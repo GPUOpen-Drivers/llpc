@@ -68,9 +68,9 @@ amdllpc [<options>...] [<files>...]
 | `-vgpr-limit=<uint>`	           | Maximum VGPR limit for this shader	|0 |
 | `-sgpr-limit=<uint>`	           | Maximum SGPR limit for this shader	|0 |
 | `-waves-per-eu=<minVal,maxVal>`  | The range of waves per EU for this shader	empty      |                               |
-| `-shader-cache-mode=<uint>`      | Shader cache mode£º<br/> 0 - disable <br/> 1 - runtime cache <br/> 2 - cache to disk	| 1 |
+| `-shader-cache-mode=<uint>`      | Shader cache mode <br/> 0 - disable <br/> 1 - runtime cache <br/> 2 - cache to disk	| 1 |
 | `-shader-replace-dir=<dir>`      | Directory to store the files used in shader replacement	      |                               |.
-| `-shader-replace-mode=<uint>`    | Shader replacement mode£º<br/> 0 - disable <br/> 1 - replacement based on shader hash <br/> 2 - replacement based on both shader hash and pipeline hash | 0 |
+| `-shader-replace-mode=<uint>`    | Shader replacement mode <br/> 0 - disable <br/> 1 - replacement based on shader hash <br/> 2 - replacement based on both shader hash and pipeline hash | 0 |
 | `-shader-replace-pipeline-hashes=<hashes with comma as separator>`|A collection of pipeline hashes, specifying shader replacement is operated on which pipelines      |                               |
 | `-enable-shadow-desc`	           | Enable shadow descriptor table 	      |                               |
 | `-shadow-desc-table-ptr-high=<uint>`| High part of VA for shadow descriptor table pointer	| 2|
@@ -79,7 +79,7 @@ amdllpc [<options>...] [<files>...]
 >>>> -pragma-unroll-threshold=4096 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -filetype=obj
 
 
-#### Files format
+#### File formats
 
 ```
 <file>.vert     GLSL source text file for a vertex shader
@@ -105,12 +105,12 @@ amdllpc [<options>...] [<files>...]
 
 #### Examples
 
-* Compile single fragment shader ¡°a.frag¡± on Vega10
+* Compile single fragment shader "a.frag" on Vega10
 ```
 amdllpc -auto-layout-desc -gfxip=9.0.0 a.frag
 ```
 
-* Compile full pipeline file ¡°b.pipe¡± on Ellesmere and output to c.elf
+* Compile full pipeline file "b.pipe" on Ellesmere and output to c.elf
 ```
 amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 ```
