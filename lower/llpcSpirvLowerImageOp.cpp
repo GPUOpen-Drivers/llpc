@@ -97,6 +97,7 @@ bool SpirvLowerImageOp::runOnModule(
         {
             pInst->dropAllReferences();
             pInst->eraseFromParent();
+            m_imageLoadOperands.erase(pInst);
         }
     }
 
