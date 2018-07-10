@@ -80,8 +80,10 @@ namespace LlpcName
     const static char BufferCallPrefix[]              = "llpc.buffer.";
     const static char BufferAtomic[]                  = "llpc.buffer.atomic.";
     const static char BufferLoad[]                    = "llpc.buffer.load.";
+    const static char BufferLoadDesc[]                = "llpc.buffer.load.desc.";
     const static char BufferLoadUniform[]             = "llpc.buffer.load.uniform.";
     const static char BufferStore[]                   = "llpc.buffer.store.";
+    const static char BufferStoreDesc[]               = "llpc.buffer.store.desc.";
     const static char BufferArrayLength[]             = "llpc.buffer.arraylength";
     const static char InlineConstLoadUniform[]        = "llpc.inlineconst.load.uniform.";
     const static char InlineConstLoad[]               = "llpc.inlineconst.load.";
@@ -206,6 +208,17 @@ bool IsElfBinary(const void* pData, size_t dataSize);
 
 // Dump module's CFG graph
 void DumpCfg(const char* pPostfixStr, llvm::Module* pModule);
+
+// =====================================================================================================================
+// Represents the special header of SPIR-V token stream (the first DWORD).
+struct SpirvHeader
+{
+    uint32_t    magicNumber;        // Magic number of SPIR-V module
+    uint32_t    spvVersion;         // SPIR-V version number
+    uint32_t    genMagicNumber;     // Generator's magic number
+    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
+    uint32_t    reserved;           // Reserved word
+};
 
 // =====================================================================================================================
 // Represents the result of CPU time profiling.

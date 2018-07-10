@@ -273,16 +273,6 @@ bool CanBitCast(
     return valid;
 }
 
-// Represents the special header of SPIR-V token stream (the first DWORD).
-struct SpirvHeader
-{
-    uint32_t    magicNumber;        // Magic number of SPIR-V module
-    uint32_t    spvVersion;         // SPIR-V version number
-    uint32_t    genMagicNumber;     // Generator's magic number
-    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
-    uint32_t    reserved;           // Reserved word
-};
-
 // =====================================================================================================================
 // Checks whether input binary data is SPIR-V binary
 bool IsSpirvBinary(

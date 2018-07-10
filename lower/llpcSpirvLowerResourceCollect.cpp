@@ -64,7 +64,7 @@ SpirvLowerResourceCollect::SpirvLowerResourceCollect()
 bool SpirvLowerResourceCollect::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Resource-Collect\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Resource-Collect\n");
 
     SpirvLower::Init(&module);
 

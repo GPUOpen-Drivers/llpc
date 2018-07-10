@@ -37,23 +37,17 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef OCLLOWERBLOCKS_H_
-#define OCLLOWERBLOCKS_H_
-
-#include "SPIRVInternal.h"
 #include "OCLUtil.h"
+#include "SPIRVInternal.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CallGraph.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/Bitcode/BitstreamReader.h"
-#include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -61,12 +55,13 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Pass.h"
 #include "llvm/PassSupport.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/GlobalStatus.h"
 #include <iostream>
@@ -82,7 +77,7 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace OCLUtil;
 
-namespace SPIRV{
+namespace SPIRV {
 
 /// Lower SPIR2 blocks to function calls.
 ///
@@ -97,55 +92,56 @@ namespace SPIRV{
 /// Propagates block_func to each spir_get_block_invoke through def-use chain of
 /// spir_block_bind, so that
 /// ret = block_func(context, args)
-class SPIRVLowerOCLBlocks: public ModulePass {
+class SPIRVLowerOCLBlocks : public ModulePass {
 public:
-  SPIRVLowerOCLBlocks():ModulePass(ID), M(nullptr){
+  SPIRVLowerOCLBlocks() : ModulePass(ID), M(nullptr) {
     initializeSPIRVLowerOCLBlocksPass(*PassRegistry::getPassRegistry());
   }
 
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<CallGraphWrapperPass>();
+    AU.addRequired<AAResultsWrapperPass>();
     AU.addRequired<AssumptionCacheTracker>();
   }
 
-  virtual bool runOnModule(Module &Module) {
+  bool runOnModule(Module &Module) override {
     M = &Module;
     lowerBlockBind();
     lowerGetBlockInvoke();
     lowerGetBlockContext();
-    EraseUselessGlobalVars();
-    EliminateDeadArgs();
+    eraseUselessGlobalVars();
+    eliminateDeadArgs();
     erase(M->getFunction(SPIR_INTRINSIC_GET_BLOCK_INVOKE));
     erase(M->getFunction(SPIR_INTRINSIC_GET_BLOCK_CONTEXT));
     erase(M->getFunction(SPIR_INTRINSIC_BLOCK_BIND));
-    DEBUG(dbgs() << "------- After OCLLowerBlocks ------------\n" <<
-                    *M << '\n');
+    LLVM_DEBUG(dbgs() << "------- After OCLLowerBlocks ------------\n"
+                      << *M << '\n');
     return true;
   }
 
   static char ID;
+
 private:
   const static int MaxIter = 1000;
   Module *M;
 
-  bool
-  lowerBlockBind() {
+  bool lowerBlockBind() {
     auto F = M->getFunction(SPIR_INTRINSIC_BLOCK_BIND);
     if (!F)
       return false;
     int Iter = MaxIter;
-    while(lowerBlockBind(F) && Iter > 0){
+    while (lowerBlockBind(F) && Iter > 0) {
       Iter--;
-      DEBUG(dbgs() << "-------------- after iteration " << MaxIter - Iter <<
-          " --------------\n" << *M << '\n');
+      LLVM_DEBUG(dbgs() << "-------------- after iteration " << MaxIter - Iter
+                        << " --------------\n"
+                        << *M << '\n');
     }
     assert(Iter > 0 && "Too many iterations");
     return true;
   }
 
-  bool
-  eraseUselessFunctions() {
-    bool changed = false;
+  bool eraseUselessFunctions() {
+    bool Changed = false;
     for (auto I = M->begin(), E = M->end(); I != E;) {
       Function *F = &(*I++);
       if (!GlobalValue::isInternalLinkage(F->getLinkage()) &&
@@ -155,23 +151,32 @@ private:
       dumpUsers(F, "[eraseUselessFunctions] ");
       for (auto UI = F->user_begin(), UE = F->user_end(); UI != UE;) {
         auto U = *UI++;
-        if (auto CE = dyn_cast<ConstantExpr>(U)){
+        if (auto CE = dyn_cast<ConstantExpr>(U)) {
           if (CE->use_empty()) {
             CE->dropAllReferences();
-            changed = true;
+            Changed = true;
           }
         }
       }
-      if (F->use_empty()) {
-        erase(F);
-        changed = true;
+
+      if (!F->use_empty()) {
+        continue;
       }
+
+      auto &CG = getAnalysis<CallGraphWrapperPass>().getCallGraph();
+      CallGraphNode *CGN = CG[F];
+
+      if (CGN->getNumReferences() != 0) {
+        continue;
+      }
+
+      erase(F);
+      Changed = true;
     }
-    return changed;
+    return Changed;
   }
 
-  void
-  lowerGetBlockInvoke() {
+  void lowerGetBlockInvoke() {
     if (auto F = M->getFunction(SPIR_INTRINSIC_GET_BLOCK_INVOKE)) {
       for (auto UI = F->user_begin(), UE = F->user_end(); UI != UE;) {
         auto CI = dyn_cast<CallInst>(*UI++);
@@ -181,8 +186,7 @@ private:
     }
   }
 
-  void
-  lowerGetBlockContext() {
+  void lowerGetBlockContext() {
     if (auto F = M->getFunction(SPIR_INTRINSIC_GET_BLOCK_CONTEXT)) {
       for (auto UI = F->user_begin(), UE = F->user_end(); UI != UE;) {
         auto CI = dyn_cast<CallInst>(*UI++);
@@ -193,12 +197,11 @@ private:
   }
   /// Lower calls of spir_block_bind.
   /// Return true if the Module is changed.
-  bool
-  lowerBlockBind(Function *BlockBindFunc) {
-    bool changed = false;
+  bool lowerBlockBind(Function *BlockBindFunc) {
+    bool Changed = false;
     for (auto I = BlockBindFunc->user_begin(), E = BlockBindFunc->user_end();
-        I != E;) {
-      DEBUG(dbgs() << "[lowerBlockBind] " << **I << '\n');
+         I != E;) {
+      LLVM_DEBUG(dbgs() << "[lowerBlockBind] " << **I << '\n');
       // Handle spir_block_bind(bitcast(block_func), context_len,
       // context_align, context)
       auto CallBlkBind = cast<CallInst>(*I++);
@@ -207,96 +210,94 @@ private:
       Value *CtxLen = nullptr;
       Value *CtxAlign = nullptr;
       getBlockInvokeFuncAndContext(CallBlkBind, &InvF, &Ctx, &CtxLen,
-          &CtxAlign);
+                                   &CtxAlign);
       for (auto II = CallBlkBind->user_begin(), EE = CallBlkBind->user_end();
-          II != EE;) {
+           II != EE;) {
         auto BlkUser = *II++;
         SPIRVDBG(dbgs() << "  Block user: " << *BlkUser << '\n');
         if (auto Ret = dyn_cast<ReturnInst>(BlkUser)) {
           bool Inlined = false;
-          changed |= lowerReturnBlock(Ret, CallBlkBind, Inlined);
+          Changed |= lowerReturnBlock(Ret, CallBlkBind, Inlined);
           if (Inlined)
             return true;
-        } else if (auto CI = dyn_cast<CallInst>(BlkUser)){
+        } else if (auto CI = dyn_cast<CallInst>(BlkUser)) {
           auto CallBindF = CI->getCalledFunction();
           auto Name = CallBindF->getName();
           std::string DemangledName;
           if (Name == SPIR_INTRINSIC_GET_BLOCK_INVOKE) {
             assert(CI->getArgOperand(0) == CallBlkBind);
-            changed |= lowerGetBlockInvoke(CI, cast<Function>(InvF));
+            Changed |= lowerGetBlockInvoke(CI, cast<Function>(InvF));
           } else if (Name == SPIR_INTRINSIC_GET_BLOCK_CONTEXT) {
             assert(CI->getArgOperand(0) == CallBlkBind);
             // Handle context_ptr = spir_get_block_context(block)
             lowerGetBlockContext(CI, Ctx);
-            changed = true;
+            Changed = true;
           } else if (oclIsBuiltin(Name, &DemangledName)) {
             lowerBlockBuiltin(CI, InvF, Ctx, CtxLen, CtxAlign, DemangledName);
-            changed = true;
+            Changed = true;
           } else
             llvm_unreachable("Invalid block user");
         }
       }
       erase(CallBlkBind);
     }
-    changed |= eraseUselessFunctions();
-    return changed;
+    Changed |= eraseUselessFunctions();
+    return Changed;
   }
 
-  void
-  lowerGetBlockContext(CallInst *CallGetBlkCtx, Value *Ctx = nullptr) {
+  void lowerGetBlockContext(CallInst *CallGetBlkCtx, Value *Ctx = nullptr) {
     if (!Ctx)
       getBlockInvokeFuncAndContext(CallGetBlkCtx->getArgOperand(0), nullptr,
-          &Ctx);
+                                   &Ctx);
     CallGetBlkCtx->replaceAllUsesWith(Ctx);
-    DEBUG(dbgs() << "  [lowerGetBlockContext] " << *CallGetBlkCtx << " => " <<
-        *Ctx << "\n\n");
+    LLVM_DEBUG(dbgs() << "  [lowerGetBlockContext] " << *CallGetBlkCtx << " => "
+                      << *Ctx << "\n\n");
     erase(CallGetBlkCtx);
   }
 
-  bool
-  lowerGetBlockInvoke(CallInst *CallGetBlkInvoke,
-      Function *InvokeF = nullptr) {
-    bool changed = false;
+  bool lowerGetBlockInvoke(CallInst *CallGetBlkInvoke,
+                           Function *InvokeF = nullptr) {
+    bool Changed = false;
     for (auto UI = CallGetBlkInvoke->user_begin(),
-        UE = CallGetBlkInvoke->user_end();
-        UI != UE;) {
+              UE = CallGetBlkInvoke->user_end();
+         UI != UE;) {
       // Handle block_func_ptr = bitcast(spir_get_block_invoke(block))
       auto CallInv = cast<Instruction>(*UI++);
       auto Cast = dyn_cast<BitCastInst>(CallInv);
       if (Cast)
         CallInv = dyn_cast<Instruction>(*CallInv->user_begin());
-      DEBUG(dbgs() << "[lowerGetBlockInvoke]  " << *CallInv);
+      LLVM_DEBUG(dbgs() << "[lowerGetBlockInvoke]  " << *CallInv);
       // Handle ret = block_func_ptr(context_ptr, args)
       auto CI = cast<CallInst>(CallInv);
       auto F = CI->getCalledValue();
       if (InvokeF == nullptr) {
         getBlockInvokeFuncAndContext(CallGetBlkInvoke->getArgOperand(0),
-            &InvokeF, nullptr);
+                                     &InvokeF, nullptr);
         assert(InvokeF);
       }
       assert(F->getType() == InvokeF->getType());
       CI->replaceUsesOfWith(F, InvokeF);
-      DEBUG(dbgs() << " => " << *CI << "\n\n");
+      LLVM_DEBUG(dbgs() << " => " << *CI << "\n\n");
       erase(Cast);
-      changed = true;
+      Changed = true;
     }
     erase(CallGetBlkInvoke);
-    return changed;
+    return Changed;
   }
 
-  void
-  lowerBlockBuiltin(CallInst *CI, Function *InvF, Value *Ctx, Value *CtxLen,
-      Value *CtxAlign, const std::string& DemangledName) {
-    mutateCallInstSPIRV (M, CI, [=](CallInst *CI, std::vector<Value *> &Args) {
+  void lowerBlockBuiltin(CallInst *CI, Function *InvF, Value *Ctx,
+                         Value *CtxLen, Value *CtxAlign,
+                         const std::string &DemangledName) {
+    mutateCallInstSPIRV(M, CI, [=](CallInst *CI, std::vector<Value *> &Args) {
       size_t I = 0;
       size_t E = Args.size();
       for (; I != E; ++I) {
         if (isPointerToOpaqueStructType(Args[I]->getType(),
-            SPIR_TYPE_NAME_BLOCK_T)) {
+                                        SPIR_TYPE_NAME_BLOCK_T)) {
           break;
         }
       }
-      assert (I < E);
+      assert(I < E);
       Args[I] = castToVoidFuncPtr(InvF);
       if (I + 1 == E) {
         Args.push_back(Ctx);
@@ -323,68 +324,68 @@ private:
   /// The function returning a block is inlined since the context cannot be
   /// passed to another function.
   /// Returns true of module is changed.
-  bool
-  lowerReturnBlock(ReturnInst *Ret, Value *CallBlkBind, bool &Inlined) {
+  bool lowerReturnBlock(ReturnInst *Ret, Value *CallBlkBind, bool &Inlined) {
     auto F = Ret->getParent()->getParent();
-    auto changed = false;
+    auto Changed = false;
     for (auto UI = F->user_begin(), UE = F->user_end(); UI != UE;) {
       auto U = *UI++;
       dumpUsers(U);
       auto Inst = dyn_cast<Instruction>(U);
       if (Inst && Inst->use_empty()) {
         erase(Inst);
-        changed = true;
+        Changed = true;
         continue;
       }
       auto CI = dyn_cast<CallInst>(U);
-      if(!CI || CI->getCalledFunction() != F)
+      if (!CI || CI->getCalledFunction() != F)
         continue;
 
-      DEBUG(dbgs() << "[lowerReturnBlock] inline " << F->getName() << '\n');
+      LLVM_DEBUG(dbgs() << "[lowerReturnBlock] inline " << F->getName()
+                        << '\n');
       auto CG = &getAnalysis<CallGraphWrapperPass>().getCallGraph();
       auto ACT = &getAnalysis<AssumptionCacheTracker>();
-      std::function<AssumptionCache &(Function &)> GAC =
-      [&ACT](Function &F) -> AssumptionCache & {
+      std::function<AssumptionCache &(Function &)> GetAssumptionCache =
+          [&](Function &F) -> AssumptionCache & {
         return ACT->getAssumptionCache(F);
       };
-
-      InlineFunctionInfo IFI(CG, &GAC);
+      InlineFunctionInfo IFI(CG, &GetAssumptionCache);
       InlineFunction(CI, IFI);
       Inlined = true;
     }
-    return changed || Inlined;
+    return Changed || Inlined;
   }
 
-  /// Looking for a global variables initialized by opencl.block*. If found, check
+  /// Looking for a global variables initialized by opencl.block*. If found,
+  /// check
   /// its users. If users are trivially dead, erase them. If the global variable
   /// has no users left after that, erase it too.
-  void EraseUselessGlobalVars() {
-    std::vector<GlobalVariable*> GlobalVarsToDelete;
-    for(GlobalVariable &G : M->globals()) {
-      if(!G.hasInitializer())
+  void eraseUselessGlobalVars() {
+    std::vector<GlobalVariable *> GlobalVarsToDelete;
+    for (GlobalVariable &G : M->globals()) {
+      if (!G.hasInitializer())
         continue;
       Type *T = G.getInitializer()->getType();
-      if(!T->isPointerTy())
+      if (!T->isPointerTy())
         continue;
       T = cast<PointerType>(T)->getElementType();
-      if(!T->isStructTy())
+      if (!T->isStructTy())
         continue;
       StringRef STName = cast<StructType>(T)->getName();
-      if(STName != "opencl.block")
+      if (STName != "opencl.block")
         continue;
 
-      std::vector<User*> UsersToDelete;
+      std::vector<User *> UsersToDelete;
       for (User *U : G.users())
         if (U->use_empty())
           UsersToDelete.push_back(U);
-      for (User* U : UsersToDelete)
+      for (User *U : UsersToDelete)
         erase(dyn_cast<Instruction>(U));
 
-      if(G.use_empty()) {
+      if (G.use_empty()) {
         GlobalVarsToDelete.push_back(&G);
       }
     }
-    for(GlobalVariable *G: GlobalVarsToDelete) {
+    for (GlobalVariable *G : GlobalVarsToDelete) {
       if (G->hasInitializer()) {
         Constant *Init = G->getInitializer();
         G->setInitializer(nullptr);
@@ -400,7 +401,7 @@ private:
   /// 2. is passed to a function call of _Z21__spirv_EnqueueKernel
   /// Returns true if F is enqueued function, false otherwise.
   bool isEnqueuedFunction(Function &F) const {
-    for (User* U : F.users()) {
+    for (User *U : F.users()) {
       if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U)) {
         if (CE->getOpcode() != Instruction::BitCast)
           continue;
@@ -409,7 +410,7 @@ private:
         // lowerBlockBind() should already have substituted last argument
         // of enqueue_kernel() call with arguments of spir_block_bind().
         for (User *UU : CE->users())
-          if (CallInst* C = dyn_cast<CallInst>(UU))
+          if (CallInst *C = dyn_cast<CallInst>(UU))
             if (Function *CF = C->getCalledFunction())
               if (CF->getName().startswith("_Z21__spirv_EnqueueKernel"))
                 return true;
@@ -424,10 +425,10 @@ private:
   /// Then adjust all users/callers of the function with new arguments
   /// Implementation of this function is based on
   /// the dead argument elimination pass.
-  void EliminateDeadArgs() {
-    std::vector<Function*> FunctionsToDelete;
+  void eliminateDeadArgs() {
+    std::vector<Function *> FunctionsToDelete;
     for (Function &F : M->functions()) {
-      if(F.arg_size() < 1)
+      if (F.arg_size() < 1)
         continue;
       auto FirstArg = F.arg_begin();
       if (FirstArg->getName() != ".block_descriptor")
@@ -439,13 +440,13 @@ private:
       if (isEnqueuedFunction(F))
         continue;
 
-      std::vector<User*> UsersToDelete;
+      std::vector<User *> UsersToDelete;
       for (User *U : FirstArg->users())
         if (U->use_empty())
           UsersToDelete.push_back(U);
 
       for (User *U : UsersToDelete)
-          erase(dyn_cast<Instruction>(U));
+        erase(dyn_cast<Instruction>(U));
       UsersToDelete.clear();
 
       if (!FirstArg->use_empty())
@@ -457,7 +458,6 @@ private:
       // the arguments are deleted from the resultant function.
       VMap[&*FirstArg] = llvm::UndefValue::get(FirstArg->getType());
       Function *NF = CloneFunction(&F, VMap);
-      F.getParent()->getFunctionList().insert(F.getIterator(), NF);
       NF->takeName(&F);
 
       // Redirect all users of the old function to the new one.
@@ -468,10 +468,11 @@ private:
           Constant *NewCE = ConstantExpr::getBitCast(NF, CE->getType());
           U->replaceAllUsesWith(NewCE);
         } else if (CS) {
-          assert(isa<CallInst>(CS.getInstruction()) && "Call instruction is expected");
-          CallInst * Call = cast<CallInst>(CS.getInstruction());
+          assert(isa<CallInst>(CS.getInstruction()) &&
+                 "Call instruction is expected");
+          CallInst *Call = cast<CallInst>(CS.getInstruction());
 
-          std::vector<Value*> Args;
+          std::vector<Value *> Args;
           auto I = CS.arg_begin();
           Args.assign(++I, CS.arg_end()); // Skip first argument.
           CallInst *New = CallInst::Create(NF, Args, "", Call);
@@ -488,7 +489,7 @@ private:
           llvm_unreachable("Unexpected user of function");
         }
       }
-      for(User* U : UsersToDelete)
+      for (User *U : UsersToDelete)
         erase(cast<Instruction>(U));
       UsersToDelete.clear();
       FunctionsToDelete.push_back(&F);
@@ -498,16 +499,17 @@ private:
       erase(F);
   }
 
-  void
-  getBlockInvokeFuncAndContext(Value *Blk, Function **PInvF, Value **PCtx,
-      Value **PCtxLen = nullptr, Value **PCtxAlign = nullptr){
+  void getBlockInvokeFuncAndContext(Value *Blk, Function **PInvF, Value **PCtx,
+                                    Value **PCtxLen = nullptr,
+                                    Value **PCtxAlign = nullptr) {
     Function *InvF = nullptr;
     Value *Ctx = nullptr;
     Value *CtxLen = nullptr;
     Value *CtxAlign = nullptr;
     if (auto CallBlkBind = dyn_cast<CallInst>(Blk)) {
       assert(CallBlkBind->getCalledFunction()->getName() ==
-          SPIR_INTRINSIC_BLOCK_BIND && "Invalid block");
+                 SPIR_INTRINSIC_BLOCK_BIND &&
+             "Invalid block");
       InvF = dyn_cast<Function>(
           CallBlkBind->getArgOperand(0)->stripPointerCasts());
       CtxLen = CallBlkBind->getArgOperand(1);
@@ -521,7 +523,8 @@ private:
       if (auto GV = dyn_cast<GlobalVariable>(Op)) {
         if (GV->isConstant()) {
           InvF = cast<Function>(GV->getInitializer()->stripPointerCasts());
-          Ctx = Constant::getNullValue(IntegerType::getInt8PtrTy(M->getContext()));
+          Ctx = Constant::getNullValue(
+              IntegerType::getInt8PtrTy(M->getContext()));
         } else {
           llvm_unreachable("load non-constant block?");
         }
@@ -531,8 +534,8 @@ private:
     } else {
       llvm_unreachable("Invalid block");
     }
-    DEBUG(dbgs() << "  Block invocation func: " << InvF->getName() << '\n' <<
-        "  Block context: " << *Ctx << '\n');
+    LLVM_DEBUG(dbgs() << "  Block invocation func: " << InvF->getName() << '\n'
+                      << "  Block context: " << *Ctx << '\n');
     assert(InvF && Ctx && "Invalid block");
     if (PInvF)
       *PInvF = InvF;
@@ -543,19 +546,16 @@ private:
     if (PCtxAlign)
       *PCtxAlign = CtxAlign;
   }
-  void
-  erase(Instruction *I) {
+  void erase(Instruction *I) {
     if (!I)
       return;
     if (I->use_empty()) {
       I->dropAllReferences();
       I->eraseFromParent();
-    }
-    else
+    } else
       dumpUsers(I);
   }
-  void
-  erase(ConstantExpr *I) {
+  void erase(ConstantExpr *I) {
     if (!I)
       return;
     if (I->use_empty()) {
@@ -564,57 +564,64 @@ private:
     } else
       dumpUsers(I);
   }
-  void
-  erase(Function *F) {
+  void erase(Function *F) {
     if (!F)
       return;
     if (!F->use_empty()) {
       dumpUsers(F);
       return;
     }
+
     F->dropAllReferences();
+
     auto &CG = getAnalysis<CallGraphWrapperPass>().getCallGraph();
-    CG.removeFunctionFromModule(new CallGraphNode(F));
+    CallGraphNode *CGN = CG[F];
+
+    if (CGN->getNumReferences() != 0) {
+      return;
+    }
+
+    CGN->removeAllCalledFunctions();
+    delete CG.removeFunctionFromModule(CGN);
   }
 
-  llvm::PointerType* getOCLClkEventType() {
+  llvm::PointerType *getOCLClkEventType() {
     return getOrCreateOpaquePtrType(M, SPIR_TYPE_NAME_CLK_EVENT_T,
-        SPIRAS_Global);
+                                    SPIRAS_Global);
   }
 
-  llvm::PointerType* getOCLClkEventPtrType() {
+  llvm::PointerType *getOCLClkEventPtrType() {
     return PointerType::get(getOCLClkEventType(), SPIRAS_Generic);
   }
 
   bool isOCLClkEventPtrType(Type *T) {
     if (auto PT = dyn_cast<PointerType>(T))
-      return isPointerToOpaqueStructType(
-        PT->getElementType(), SPIR_TYPE_NAME_CLK_EVENT_T);
+      return isPointerToOpaqueStructType(PT->getElementType(),
+                                         SPIR_TYPE_NAME_CLK_EVENT_T);
     return false;
   }
 
-  llvm::Constant* getOCLNullClkEventPtr() {
+  llvm::Constant *getOCLNullClkEventPtr() {
     return Constant::getNullValue(getOCLClkEventPtrType());
   }
 
   void dumpGetBlockInvokeUsers(StringRef Prompt) {
-    DEBUG(dbgs() << Prompt);
+    LLVM_DEBUG(dbgs() << Prompt);
     dumpUsers(M->getFunction(SPIR_INTRINSIC_GET_BLOCK_INVOKE));
   }
 };
 
 char SPIRVLowerOCLBlocks::ID = 0;
-}
+} // namespace SPIRV
 
 INITIALIZE_PASS_BEGIN(SPIRVLowerOCLBlocks, "spvblocks",
-    "SPIR-V lower OCL blocks", false, false)
+                      "SPIR-V lower OCL blocks", false, false)
 INITIALIZE_PASS_DEPENDENCY(CallGraphWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
-INITIALIZE_PASS_END(SPIRVLowerOCLBlocks, "spvblocks",
-    "SPIR-V lower OCL blocks", false, false)
+INITIALIZE_PASS_DEPENDENCY(AAResultsWrapperPass)
+INITIALIZE_PASS_END(SPIRVLowerOCLBlocks, "spvblocks", "SPIR-V lower OCL blocks",
+                    false, false)
 
 ModulePass *llvm::createSPIRVLowerOCLBlocks() {
   return new SPIRVLowerOCLBlocks();
 }
-
-#endif /* OCLLOWERBLOCKS_H_ */

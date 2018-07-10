@@ -73,7 +73,7 @@ PatchImageOp::PatchImageOp()
 bool PatchImageOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Image-Op\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Image-Op\n");
 
     Patch::Init(&module);
 

@@ -63,7 +63,7 @@ SpirvLowerAccessChain::SpirvLowerAccessChain()
 bool SpirvLowerAccessChain::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
 
     SpirvLower::Init(&module);
 

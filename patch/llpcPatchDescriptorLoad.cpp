@@ -72,7 +72,7 @@ PatchDescriptorLoad::PatchDescriptorLoad()
 bool PatchDescriptorLoad::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
 
     Patch::Init(&module);
 

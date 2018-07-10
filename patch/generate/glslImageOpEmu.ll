@@ -262,7 +262,7 @@ define <8 x i32> @llpc.patch.image.readwriteatomic.descriptor.cube(
 define i1 @llpc.patch.image.gather.check(
     <8 x i32> %resource) #0
 {
-    ; Check whether we have to do patch operation for image gather by checking the data format
+    ; Check whether we have to patch resource descriptor for image gather by checking the data format
     ; of resource descriptor.
     %1 = extractelement <8 x i32> %resource, i32 1
     ; Extract DATA_FORMAT
@@ -277,30 +277,57 @@ define i1 @llpc.patch.image.gather.check(
     ret i1 %8
 }
 
+define <2 x float> @llpc.patch.image.gather.coordinate(
+    <8 x i32> %resource, float %x, float %y) #0
+{
+    ; Get image width and height
+    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 0,
+                                                                           <8 x i32> %resource,
+                                                                           i32 15,
+                                                                           i1 false,
+                                                                           i1 false,
+                                                                           i1 false,
+                                                                           i1 false)
+
+    %2 = bitcast <4 x float> %1 to <4 x i32>
+    %3 = shufflevector  <4 x i32> %2, <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+    %4 = sitofp <2 x i32> %3 to <2 x float>
+    %5 = fdiv <2 x float> <float -0.5, float -0.5>, %4
+
+    %6 = insertelement <2 x float> undef, float %x, i32 0
+    %7 = insertelement <2 x float> %6, float %y, i32 1
+    %8 = fadd <2 x float> %7, %5
+    ret <2 x float> %8
+}
+
+define <2 x float> @llpc.patch.image.gather.coordinate.skip(
+    <8 x i32> %resource, float %x, float %y) #0
+{
+    %1 = insertelement <2 x float> undef, float %x, i32 0
+    %2 = insertelement <2 x float> %1, float %y, i32 1
+    ret <2 x float> %2
+}
+
 define <8 x i32> @llpc.patch.image.gather.descriptor.u32(
     <8 x i32> %resource) #0
 {
     %1 = extractelement <8 x i32> %resource, i32 1
-    %2 = call i1 @llpc.patch.image.gather.check(<8 x i32> %resource)
 
     ; Change NUM_FORMAT from UINT to USCALE 134217728 = 0x08000000
-    %3 = sub i32 %1, 134217728
-    %4 = select i1 %2, i32 %3, i32 %1
-    %5 = insertelement <8 x i32> %resource, i32 %4, i32 1
-    ret <8 x i32> %5
+    %2 = sub i32 %1, 134217728
+    %3 = insertelement <8 x i32> %resource, i32 %2, i32 1
+    ret <8 x i32> %3
 }
 
 define <8 x i32> @llpc.patch.image.gather.descriptor.i32(
    <8 x i32> %resource) #0
 {
     %1 = extractelement <8 x i32> %resource, i32 1
-    %2 = call i1 @llpc.patch.image.gather.check(<8 x i32> %resource)
 
     ; Change NUM_FORMAT from SINT to SSCALE 134217728 = 0x08000000
-    %3 = sub i32 %1, 134217728
-    %4 = select i1 %2, i32 %3, i32 %1
-    %5 = insertelement <8 x i32> %resource, i32 %4, i32 1
-    ret <8 x i32> %5
+    %2 = sub i32 %1, 134217728
+    %3 = insertelement <8 x i32> %resource, i32 %2, i32 1
+    ret <8 x i32> %3
 }
 
 define <4 x float> @llpc.patch.image.gather.texel.u32(

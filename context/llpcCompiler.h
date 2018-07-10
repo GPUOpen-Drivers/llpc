@@ -57,8 +57,10 @@ enum class BinaryType : uint32_t
 // Represents output data of building a shader module.
 struct ShaderModuleData : public ShaderModuleDataHeader
 {
-    BinaryType      binType;    // Shader binary type
-    BinaryData      binCode;    // Shader binary data
+    BinaryType      binType;                 // Shader binary type
+    BinaryData      binCode;                 // Shader binary data
+    bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
+    bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
 };
 
 // Represents the properties of GPU device.
@@ -134,6 +136,7 @@ private:
 
     Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut) const;
     void CleanOptimizedSpirv(BinaryData* pSpirvBin) const;
+    Result CollectInfoFromSpirvBinary(ShaderModuleData* pModuleData) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

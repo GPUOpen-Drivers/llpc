@@ -99,7 +99,7 @@ PatchEntryPointMutate::PatchEntryPointMutate()
 bool PatchEntryPointMutate::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
     Patch::Init(&module);
 
@@ -133,7 +133,7 @@ bool PatchEntryPointMutate::runOnModule(
     if (m_shaderStage == ShaderStageFragment)
     {
         auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-
+        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
         SpiPsInputAddr spiPsInputAddr = {};
 
         spiPsInputAddr.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
@@ -150,6 +150,13 @@ bool PatchEntryPointMutate::runOnModule(
                                                builtInUsage.baryCoordNoPersp);
         spiPsInputAddr.LINEAR_CENTROID_ENA  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
                                                builtInUsage.baryCoordNoPerspCentroid);
+        if (pPipelineInfo->rsState.numSamples <= 1)
+        {
+            // NOTE: If multi-sample is disabled, I/J calculation for "centroid" interpolation mode depends
+            // on "center" mode.
+            spiPsInputAddr.PERSP_CENTER_ENA |= spiPsInputAddr.PERSP_CENTROID_ENA;
+            spiPsInputAddr.LINEAR_CENTER_ENA |= spiPsInputAddr.LINEAR_CENTROID_ENA;
+        }
         spiPsInputAddr.POS_X_FLOAT_ENA      = builtInUsage.fragCoord;
         spiPsInputAddr.POS_Y_FLOAT_ENA      = builtInUsage.fragCoord;
         spiPsInputAddr.POS_Z_FLOAT_ENA      = builtInUsage.fragCoord;

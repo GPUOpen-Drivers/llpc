@@ -247,6 +247,8 @@ private:
                                        llvm::Instruction* pInsertPos);
     void AddExportInstForBuiltInOutput(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
 
+    llvm::Value* AdjustCentroidIJ(llvm::Value* pCentroidIJ, llvm::Value* pCenterIJ, llvm::Instruction* pInsertPos);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     GfxIpVersion            m_gfxIp;                    // Graphics IP version info

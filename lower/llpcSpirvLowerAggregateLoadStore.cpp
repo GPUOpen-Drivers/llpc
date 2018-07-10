@@ -64,7 +64,7 @@ SpirvLowerAggregateLoadStore::SpirvLowerAggregateLoadStore()
 bool SpirvLowerAggregateLoadStore::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Aggregate-Load-Store\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Aggregate-Load-Store\n");
 
     SpirvLower::Init(&module);
 

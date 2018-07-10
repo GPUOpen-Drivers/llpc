@@ -62,7 +62,7 @@ PatchPushConstOp::PatchPushConstOp()
 bool PatchPushConstOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Push-Const-Op\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Push-Const-Op\n");
 
     Patch::Init(&module);
 

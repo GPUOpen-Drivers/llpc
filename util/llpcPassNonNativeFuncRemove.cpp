@@ -76,7 +76,7 @@ PassNonNativeFuncRemove::PassNonNativeFuncRemove()
 bool PassNonNativeFuncRemove::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Pass-Non-Native-Func-Remove\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Pass-Non-Native-Func-Remove\n");
 
     bool changed = false;
     std::unordered_set<Function*> nonNativeFuncs;

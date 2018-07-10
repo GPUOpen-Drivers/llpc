@@ -64,7 +64,7 @@ SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore()
 bool SpirvLowerConstImmediateStore::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
 
     SpirvLower::Init(&module);
 

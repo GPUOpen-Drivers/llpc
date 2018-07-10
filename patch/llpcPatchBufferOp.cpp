@@ -62,7 +62,7 @@ PatchBufferOp::PatchBufferOp()
 bool PatchBufferOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
     Patch::Init(&module);
 
@@ -94,7 +94,12 @@ void PatchBufferOp::visitCallInst(
 
     auto mangledName = pCallee->getName();
 
-    if (mangledName.startswith(LlpcName::BufferCallPrefix))
+    if (mangledName.startswith(LlpcName::BufferLoadDesc) ||
+        mangledName.startswith(LlpcName::BufferStoreDesc))
+    {
+        // TODO: Use uniform load/store operations.
+    }
+    else if (mangledName.startswith(LlpcName::BufferCallPrefix))
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
