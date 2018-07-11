@@ -117,7 +117,7 @@ amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 
 
 ## Test with SHADERDB
-You can use [shaderdb](https://github.com/GPUOpen-Drivers/xgl/test/shadertest/) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
+You can use [shaderdb](https://github.com/GPUOpen-Drivers/xgl/tree/master/test/shadertest) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
 
 ```
 python testShaders.py [-h] [--shaderdb <path_to_shaderdb>] [--gfxip <major.minor.step>] <path_to_amdllpc> <path_to_spvgen>

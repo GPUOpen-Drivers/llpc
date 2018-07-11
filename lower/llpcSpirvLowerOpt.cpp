@@ -70,7 +70,7 @@ bool SpirvLowerOpt::runOnModule(
 
     bool changed = false;
 
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Opt\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Opt\n");
 
     SpirvLower::Init(&module);
 

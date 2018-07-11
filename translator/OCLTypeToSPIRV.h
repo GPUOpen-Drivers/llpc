@@ -38,9 +38,13 @@
 // type instead of the original type.
 //
 //===----------------------------------------------------------------------===//
-#include "llvm/Pass.h"
-#include "llvm/IR/LLVMContext.h"
+
+#ifndef SPIRV_OCLTYPETOSPIRV_H
+#define SPIRV_OCLTYPETOSPIRV_H
+
 #include "llvm/IR/Function.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/Pass.h"
 
 #include "SPIRV.h"
 
@@ -51,11 +55,11 @@ using namespace llvm;
 
 namespace SPIRV {
 
-class OCLTypeToSPIRV: public ModulePass {
+class OCLTypeToSPIRV : public ModulePass {
 public:
   OCLTypeToSPIRV();
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-  virtual bool runOnModule(Module &M);
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+  bool runOnModule(Module &M) override;
 
   /// \return Adapted type based on kernel argument metadata. If \p V is
   ///   a function, returns function type.
@@ -64,25 +68,26 @@ public:
   Type *getAdaptedType(Value *V);
 
   static char ID;
+
 private:
   Module *M;
   LLVMContext *Ctx;
   unsigned CLVer;
-  std::map<Value*, Type*> AdaptedTy;    // Adapted types for values
-  std::set<Function *> WorkSet;         // Functions to be adapted
+  std::map<Value *, Type *> AdaptedTy; // Adapted types for values
+  std::set<Function *> WorkSet;        // Functions to be adapted
 
   MDNode *getArgBaseTypeMetadata(Function *);
   MDNode *getArgAccessQualifierMetadata(Function *);
-  MDNode *getArgMetadata(Function *, const std::string& MDName);
+  MDNode *getArgMetadata(Function *, const std::string &MDName);
   MDNode *getKernelMetadata(Function *F);
-  void adaptFunctionArguments(Function* F);
-  void adaptArgumentsByMetadata(Function* F);
+  void adaptFunctionArguments(Function *F);
+  void adaptArgumentsByMetadata(Function *F);
   void adaptArgumentsBySamplerUse(Module &M);
   void adaptFunction(Function *F);
   void addAdaptedType(Value *V, Type *T);
   void addWork(Function *F);
 };
 
-}
+} // namespace SPIRV
 
-
+#endif // SPIRV_OCLTYPETOSPIRV_H

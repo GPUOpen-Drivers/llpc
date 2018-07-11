@@ -78,7 +78,7 @@ SpirvLowerImageOp::SpirvLowerImageOp()
 bool SpirvLowerImageOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Image-Op\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Image-Op\n");
 
     SpirvLower::Init(&module);
 

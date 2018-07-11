@@ -66,7 +66,7 @@ PatchResourceCollect::PatchResourceCollect()
 bool PatchResourceCollect::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
     Patch::Init(&module);
 
@@ -146,6 +146,22 @@ void PatchResourceCollect::visitCallInst(
         {
             m_hasPushConstOp = true;
         }
+    }
+    else if (mangledName.startswith(LlpcName::BufferLoadDesc) ||
+            mangledName.startswith(LlpcName::BufferStoreDesc))
+    {
+        if (isDeadCall &&
+            (mangledName.startswith(LlpcName::BufferStoreDesc) == false))
+        {
+            m_deadCalls.insert(&callInst);
+        }
+    }
+    else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer))
+    {
+        uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+        uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+        DescriptorPair descPair = { descSet, binding };
+        m_pResUsage->descPairs.insert(descPair.u64All);
     }
     else if (mangledName.startswith(LlpcName::BufferCallPrefix))
     {

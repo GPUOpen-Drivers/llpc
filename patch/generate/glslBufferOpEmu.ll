@@ -349,6 +349,219 @@ define void @llpc.buffer.store.v32i8(
     ret void
 }
 
+; GLSL: load float16/int16/uint16 with descriptor (word)
+define <2 x i8> @llpc.buffer.load.desc.v2i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = bitcast float %1 to <4 x i8>
+    %3 = shufflevector <4 x i8> %2, <4 x i8> %2, <2 x i32> <i32 0, i32 1>
+    ret <2 x i8> %3
+}
+
+; GLSL: load f16vec2/i16vec2/u16vec2/float/int/uint with descriptor (dword)
+define <4 x i8> @llpc.buffer.load.desc.v4i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = bitcast float %1 to <4 x i8>
+    ret <4 x i8> %2
+}
+
+
+; GLSL: load f16vec3/i16vec3/u16vec3 with descriptor (wordx3)
+define <6 x i8> @llpc.buffer.load.desc.v6i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = bitcast float %1 to <4 x i8>
+    %3 = add i32 %memberOffset, 4
+    %4 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %3, i1 %glc, i1 %slc)
+    %5 = bitcast float %4 to <4 x i8>
+    %6 = shufflevector <4 x i8> %2, <4 x i8> %5, <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
+    ret <6 x i8> %6
+}
+
+; GLSL: load f16vec4/i16vec4/u16vec4/vec2/ivec2/uvec2/double/int64/uint64 with descriptor (dwordx2)
+define <8 x i8> @llpc.buffer.load.desc.v8i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = bitcast <2 x float> %1 to <8 x i8>
+    ret <8 x i8> %2
+}
+
+; GLSL: load vec3/ivec3/uvec3 with descriptor (dwordx3)
+define <12 x i8> @llpc.buffer.load.desc.v12i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = shufflevector <4 x float> %1, <4 x float> %1, <3 x i32> <i32 0, i32 1, i32 2>
+    %3 = bitcast <3 x float> %2 to <12 x i8>
+    ret <12 x i8> %3
+}
+
+; GLSL: load vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 with descriptor (dwordx4)
+define <16 x i8> @llpc.buffer.load.desc.v16i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = bitcast <4 x float> %1 to <16 x i8>
+    ret <16 x i8> %2
+}
+
+; GLSL: load dvec3/i64vec3/u64vec3 with descriptor (dwordx6)
+define <24 x i8> @llpc.buffer.load.desc.v24i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = add i32 %memberOffset, 16
+    %3 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
+    %4 = shufflevector <2 x float> %3, <2 x float> %3, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
+    %5 = shufflevector <4 x float> %1, <4 x float> %4, <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5> 
+    %6 = bitcast <6 x float> %5 to <24 x i8>
+    ret <24 x i8> %6
+}
+
+; GLSL: load dvec4/i64vec4/u64vec4 with descriptor (dwordx8)
+define <32 x i8> @llpc.buffer.load.desc.v32i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+{
+    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %2 = add i32 %memberOffset, 16
+    %3 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
+    %4 = shufflevector <4 x float> %1, <4 x float> %3,
+                       <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+    %5 = bitcast <8 x float> %4 to <32 x i8>
+    ret <32 x i8> %5
+}
+
+; GLSL: store float16/int16/uint16 with descriptor (word)
+define void @llpc.buffer.store.desc.v2i8(
+    <4 x i32> %desc, i32 %memberOffset, <2 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = shufflevector <2 x i8> %storeData, <2 x i8> <i8 0, i8 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3> 
+    %2 = bitcast <4 x i8> %1 to float
+    call void @llvm.amdgcn.buffer.store.short(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    ret void
+}
+
+; GLSL: store f16vec2/i16vec2/u16vec2/float/int/uint with descriptor (dword)
+define void @llpc.buffer.store.desc.v4i8(
+    <4 x i32> %desc, i32 %memberOffset, <4 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = bitcast <4 x i8> %storeData to float
+    call void @llvm.amdgcn.buffer.store.f32(float %1, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    ret void
+}
+
+; GLSL: store f16vec3/i16vec3/u16vec3 with descriptor (wordx3)
+define void @llpc.buffer.store.desc.v6i8(
+    <4 x i32> %desc, i32 %memberOffset, <6 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = shufflevector <6 x i8> %storeData, <6 x i8> %storeData, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+    %2 = bitcast <4 x i8> %1 to float
+    call void @llvm.amdgcn.buffer.store.f32(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
+    %3 = add i32 %memberOffset, 4
+    %4 = shufflevector <6 x i8> %storeData, <6 x i8> %storeData, <2 x i32> <i32 4, i32 5>
+    %5 = shufflevector <2 x i8> %4, <2 x i8> <i8 0, i8 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+    %6 = bitcast <4 x i8> %5 to float
+    call void @llvm.amdgcn.buffer.store.short(float %6, <4 x i32> %desc, i32 0, i32 %3, i1 %glc, i1 %slc)
+    ret void
+}
+
+; GLSL: store f16vec4/i61vec4/u16vec4/vec2/ivec2/uvec2/dvec2/int64/uint64 with descriptor (dwordx2)
+define void @llpc.buffer.store.desc.v8i8(
+    <4 x i32> %desc, i32 %memberOffset, <8 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = bitcast <8 x i8> %storeData to <2 x float>
+    call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %1,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %memberOffset,
+                                              i1 %glc,
+                                              i1 %slc)
+    ret void
+}
+
+; GLSL: store vec3/ivec3/uvec3 with descriptor (dwordx3)
+define void @llpc.buffer.store.desc.v12i8(
+    <4 x i32> %desc, i32 %memberOffset, <12 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = bitcast <12 x i8> %storeData to <3 x float>
+    %2 = shufflevector <3 x float> %1, <3 x float> %1, <2 x i32> <i32 0, i32 1>
+    call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %2,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %memberOffset,
+                                              i1 %glc,
+                                              i1 %slc)
+    %3 = extractelement <3 x float> %1, i32 2
+    %4 = add i32 %memberOffset, 8
+    call void @llvm.amdgcn.buffer.store.f32(float %3, <4 x i32> %desc, i32 0, i32 %4, i1 %glc, i1 %slc)
+    ret void
+}
+
+; GLSL: store vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 with descriptor (dwordx4)
+define void @llpc.buffer.store.desc.v16i8(
+    <4 x i32> %desc, i32 %memberOffset, <16 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = bitcast <16 x i8> %storeData to <4 x float>
+    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %1,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %memberOffset,
+                                              i1 %glc,
+                                              i1 %slc)
+    ret void
+}
+
+; GLSL: store dvec3/i64vec3/u64vec3 with descriptor (dwordx6)
+define void @llpc.buffer.store.desc.v24i8(
+    <4 x i32> %desc, i32 %memberOffset, <24 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = bitcast <24 x i8> %storeData to <6 x float>
+    %2 = shufflevector <6 x float> %1, <6 x float> %1, <4 x i32> <i32 0, i32 1, i32 2 , i32 3>
+    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %2,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %memberOffset,
+                                              i1 %glc,
+                                              i1 %slc)
+    %3 = shufflevector <6 x float> %1, <6 x float> %1, <2 x i32> <i32 4, i32 5>
+    %4 = add i32 %memberOffset, 16
+    call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %3,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %4,
+                                              i1 %glc,
+                                              i1 %slc)
+    ret void
+}
+
+; GLSL: store dvec4/i64vec4/u64vec4 with descriptor (dwordx8)
+define void @llpc.buffer.store.desc.v32i8(
+    <4 x i32> %desc, i32 %memberOffset, <32 x i8> %storeData, i1 %glc, i1 %slc) #0
+{
+    %1 = bitcast <32 x i8> %storeData to <8 x float>
+    %2 = shufflevector <8 x float> %1, <8 x float> %1, <4 x i32> <i32 0, i32 1, i32 2 , i32 3>
+    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %2,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %memberOffset,
+                                              i1 %glc,
+                                              i1 %slc)
+    %3 = shufflevector <8 x float> %1, <8 x float> %1, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
+    %4 = add i32 %memberOffset, 16
+    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %3,
+                                              <4 x i32> %desc,
+                                              i32 0,
+                                              i32 %4,
+                                              i1 %glc,
+                                              i1 %slc)
+    ret void
+}
+
 ; GLSL: uint atomicAdd(inout uint, uint)
 ;       int  atomicAdd(inout int, int)
 define i32 @llpc.buffer.atomic.iadd.i32(

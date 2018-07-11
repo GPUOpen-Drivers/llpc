@@ -118,11 +118,11 @@ namespace llvm {
 class raw_pwrite_stream;
 /// \brief Translate LLVM module to SPIRV and write to ostream.
 /// \returns true if succeeds.
-bool WriteSPIRV(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
+bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
-bool ReadSPIRV(llvm::LLVMContext &C,
+bool readSpirv(llvm::LLVMContext &C,
                std::istream &IS,
                spv::ExecutionModel EntryExecModel,
                const char *EntryName,
@@ -132,11 +132,11 @@ bool ReadSPIRV(llvm::LLVMContext &C,
 
 /// \brief Regularize LLVM module by removing entities not representable by
 /// SPIRV.
-bool RegularizeLLVMForSPIRV(llvm::Module *M, std::string &ErrMsg);
+bool regularizeLlvmForSpirv(llvm::Module *M, std::string &ErrMsg);
 
 /// \brief Mangle OpenCL builtin function function name.
-void MangleOpenCLBuiltin(const std::string &UnmangledName,
-    ArrayRef<Type*> ArgTypes, std::string &MangledName);
+void mangleOpenClBuiltin(const std::string &UnmangledName,
+                         ArrayRef<Type*> ArgTypes, std::string &MangledName);
 
 /// Create a pass for translating LLVM to SPIR-V.
 ModulePass *createLLVMToSPIRV(SPIRV::SPIRVModule *);

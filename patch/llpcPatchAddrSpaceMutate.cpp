@@ -68,7 +68,7 @@ PatchAddrSpaceMutate::PatchAddrSpaceMutate()
 bool PatchAddrSpaceMutate::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Addr-Space-Mutate\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Addr-Space-Mutate\n");
 
     Patch::Init(&module);
 

@@ -1016,7 +1016,15 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
         # Offset for image operations other than OpImageFetch are packed into 1 dword which is: x | (y << 8) | (z << 16)
         ret = ""
         if offsetNum == 1:
-            ret = self.genBitcastInst(offset, irOut)
+            if self._gfxLevel < GFX9:
+                ret = self.genBitcastInst(offset, irOut)
+            else:
+                # On GFX9, 1D texture is translated to 2D,
+                # so extract 6 low bits from offset (y component is always 0)
+                tempOffset = self.acquireLocalVar()
+                irAnd = "    %s = and i32 %s, %d\n" % (tempOffset, offset, 63)
+                irOut.write(irAnd)
+                ret = self.genBitcastInst(tempOffset, irOut)
         else:
             # Extract offset components
             tempOffsets = ["", "", ""]
@@ -2260,6 +2268,10 @@ class ImageSampleGen(CodeGen):
         resourceName = VarNames.resource
         # Dmask for gather4 instructions
         dmask = "15"
+        irNeedPatchDescriptor = FuncDef.INVALID_VAR
+        LABEL_PATCH_DESCRIPTOR                  = "PatchDescriptor"
+        LABEL_PATCH_COORD                       = "PatchCoord"
+        LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD   = "MergePatchDescriptor"
         if self._opKind == SpirvImageOpKind.gather:
             if not self._hasDref:
                 # Gather component transformed in to dmask as: dmask = 1 << comp
@@ -2269,20 +2281,99 @@ class ImageSampleGen(CodeGen):
             else:
                 # Gather component is 1 for shadow textures
                 dmask = "1"
-            # Patch descriptor for gather
+            # Patch descriptor for integer gather
             if self._gfxLevel < GFX9:
-                if self._sampledType == SpirvSampledType.i32:
-                    resourceName = VarNames.patchedResource
-                    irPatchCall = "    %s = call <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32> %s)\n" \
-                        % (resourceName,
-                           VarNames.resource)
-                    irOut.write(irPatchCall)
-                elif self._sampledType == SpirvSampledType.u32:
-                    resourceName = VarNames.patchedResource
-                    irPatchCall = "    %s = call <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32> %s)\n" \
-                        % (resourceName,
-                           VarNames.resource)
-                    irOut.write(irPatchCall)
+                if self._sampledType == SpirvSampledType.i32 or self._sampledType == SpirvSampledType.u32:
+                    irNeedPatchDescriptor = self.acquireLocalVar()
+                    irCheckResourceFormatCall = "    {_irNeedPatchDescriptor} = call i1 @llpc.patch.image.gather.check(<8 x i32> {_resource})\n" \
+                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
+                                _resource = VarNames.resource)
+                    irOut.write(irCheckResourceFormatCall)
+
+                    # For i32 resource format, we patch gather coordinate, for other integer format, we patch descriptor
+                    irBranch = "    br i1 {_irNeedPatchDescriptor}, label %{_labelPatchDescriptor}, label %{_labelPatchCoord}\n" \
+                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
+                                _labelPatchDescriptor  = LABEL_PATCH_DESCRIPTOR,
+                                _labelPatchCoord       = LABEL_PATCH_COORD)
+                    irOut.write(irBranch)
+
+                    # Patch descriptor branch
+                    irOut.write("{_labelPatchDescriptor}:\n".format(_labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR))
+                    patchedResourceName = self.acquireLocalVar()
+                    if self._sampledType == SpirvSampledType.i32:
+                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> " \
+                                              "@llpc.patch.image.gather.descriptor.i32(<8 x i32> {_resource})\n" \
+                            .format(_patchedResourceName = patchedResourceName,
+                                    _resource            = VarNames.resource)
+                        irOut.write(irPatchRsrcCall)
+                    elif self._sampledType == SpirvSampledType.u32:
+                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32> {_resource})\n" \
+                            .format(_patchedResourceName = patchedResourceName,
+                                    _resource            = VarNames.resource)
+                        irOut.write(irPatchRsrcCall)
+                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
+
+                    # Patch coordinate branch
+                    irOut.write("{_labelPatchCoord}:\n".format(_labelPatchCoord = LABEL_PATCH_COORD))
+                    patchedCoord = self.acquireLocalVar()
+
+                    # We need to skip cube dimension and gathering with a specified LOD,
+                    # such cases is not supported
+                    if (self._dim == SpirvDim.DimCube) or self._hasLod:
+                        patchCoordFuncName = "llpc.patch.image.gather.coordinate.skip"
+                    else:
+                        patchCoordFuncName = "llpc.patch.image.gather.coordinate"
+                    irPatchCoordCall = "    {_patchedCoord} = call <2 x float> @{_funcName}(<8 x i32> {_resource}, " \
+                                                                         "float {_x}, " \
+                                                                         "float {_y})\n" \
+                                           .format(_patchedCoord = patchedCoord,
+                                                   _funcName     = patchCoordFuncName,
+                                                   _resource     = VarNames.resource,
+                                                   _x            = self._coordXYZW[0],
+                                                   _y            = self._coordXYZW[1])
+                    irOut.write(irPatchCoordCall)
+                    patchedCoordX  = self.acquireLocalVar()
+                    irExtract = "    {_patchedCoordX} = extractelement <2 x float> {_patchedCoord}, i32 0\n" \
+                       .format(_patchedCoordX = patchedCoordX,
+                               _patchedCoord  =patchedCoord)
+                    irOut.write(irExtract)
+                    patchedCoordY  = self.acquireLocalVar()
+                    irExtract = "    {_patchedCoordY} = extractelement <2 x float> {_patchedCoord}, i32 1\n" \
+                        .format(_patchedCoordY = patchedCoordY,
+                                _patchedCoord  = patchedCoord)
+                    irOut.write(irExtract)
+                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
+
+                    # Merge branch
+                    irOut.write("{_labelMerge}:\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
+                    resourceName = self.acquireLocalVar()
+                    irPhi = "    {_resourceName} = phi <8 x i32> [{_resource}, %{_labelPatchCoord}], [{_patchedResourceName}, %{_labelPatchDescriptor}]\n" \
+                        .format(_resourceName         = resourceName,
+                                _resource             = VarNames.resource,
+                                _labelPatchCoord      = LABEL_PATCH_COORD,
+                                _patchedResourceName  = patchedResourceName,
+                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
+                    irOut.write(irPhi)
+
+                    coordX = self.acquireLocalVar()
+                    irPhi = "    {_coordX} = phi float [{_patchedCoordX}, %{_labelPatchCoord}], [{_unpatchedCoordX}, %{_labelPatchDescriptor}]\n" \
+                        .format(_coordX               = coordX,
+                                _patchedCoordX        = patchedCoordX,
+                                _labelPatchCoord      = LABEL_PATCH_COORD,
+                                _unpatchedCoordX      = self._coordXYZW[0],
+                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
+                    irOut.write(irPhi)
+                    coordY = self.acquireLocalVar()
+                    irPhi = "    {_coordY} = phi float [{_patchedCoordY}, %{_labelPatchCoord}], [{_unpatchedCoordY}, %{_labelPatchDescriptor}]\n" \
+                        .format(_coordY               = coordY,
+                                _patchedCoordY        = patchedCoordY,
+                                _labelPatchCoord      = LABEL_PATCH_COORD,
+                                _unpatchedCoordY      = self._coordXYZW[1],
+                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
+                    irOut.write(irPhi)
+
+                    self._coordXYZW[0] = coordX
+                    self._coordXYZW[1] = coordY
 
         # Process image sample, image gather, image fetch
         retVals = [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
@@ -2299,6 +2390,12 @@ class ImageSampleGen(CodeGen):
                            FuncDef.INVALID_VAR, FuncDef.INVALID_VAR]
         # For OpImageGather* with offsets, we need to generate 4 gather4 instructions, thus introduce 4 vaddrRegs,
         # other image instructions will only use the first element
+
+        # Label used when need to patch return type for gather
+        LABEL_ENTRY_PATCH_RETURN = "EntryPatchReturnType"
+        LABEL_BEGIN_PATCH_RETURN = "BeginPatchReturnType"
+        LABEL_MERGE_PATCH_RETURN = "MergePatchReturnType"
+
         callNum     = self._hasConstOffsets and 4 or 1
         for i in range(callNum):
             vaddrRegs[i]    = self.genFillVAddrReg(i, False, irOut)
@@ -2309,6 +2406,15 @@ class ImageSampleGen(CodeGen):
 
             # Set DA flag for arrayed resource
             flags += self.getDAFlag()
+
+            # Set entry lable when need to patch return type for gather
+            if (self._gfxLevel < GFX9 and \
+                self._opKind == SpirvImageOpKind.gather and \
+                (self._sampledType == SpirvSampledType.i32 or \
+                 self._sampledType == SpirvSampledType.u32)):
+                labelEntry = "%s%d" % (LABEL_ENTRY_PATCH_RETURN, i)
+                irOut.write("    br label %{_labelEntry}\n".format(_labelEntry = labelEntry))
+                irOut.write("{_labelEntry}:\n".format(_labelEntry = labelEntry))
 
             irCall     = "    %s = call %s @%s(%s %s, <8 x i32> %s, %s i32 %s, %s)\n" \
                 % (retVals[i],
@@ -2323,22 +2429,43 @@ class ImageSampleGen(CodeGen):
             irOut.write(irCall)
             if self._gfxLevel < GFX9 and self._opKind == SpirvImageOpKind.gather:
                 # Patch return type for gather
-                if self._sampledType == SpirvSampledType.i32:
-                    patchedRetVals[i]  = self.acquireLocalVar()
-                    irPatchCall = "    %s = call <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32> %s, <4 x float> %s)\n" \
-                        % (patchedRetVals[i],
-                           VarNames.resource,
-                           retVals[i])
-                    irOut.write(irPatchCall)
-                    retVals[i] = patchedRetVals[i]
-                elif self._sampledType == SpirvSampledType.u32:
-                    patchedRetVals[i]  = self.acquireLocalVar()
-                    irPatchCall = "    %s = call <4 x float> @llpc.patch.image.gather.texel.u32(<8 x i32> %s, <4 x float> %s)\n" \
-                        % (patchedRetVals[i],
-                           VarNames.resource,
-                           retVals[i])
-                    irOut.write(irPatchCall)
-                    retVals[i] = patchedRetVals[i]
+                if self._sampledType == SpirvSampledType.i32 or self._sampledType == SpirvSampledType.u32:
+                    assert irNeedPatchDescriptor != FuncDef.INVALID_VAR
+                    labelPatch = "%s%d" % (LABEL_BEGIN_PATCH_RETURN, i)
+                    labelMerge   = "%s%d" % (LABEL_MERGE_PATCH_RETURN,i)
+
+                    irBranch = "    br i1 {_irNeedPatchDescriptor}, label %{_labelPatch}, label %{_labelMerge}\n" \
+                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
+                                _labelPatch = labelPatch,
+                                _labelMerge = labelMerge)
+                    irOut.write(irBranch)
+                    irOut.write("{_labelPatch}:\n".format(_labelPatch = labelPatch))
+                    if self._sampledType == SpirvSampledType.i32:
+                        patchedRetVals[i]  = self.acquireLocalVar()
+                        irPatchCall = "    {_patchedRetVal} = call <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32> {_resource}, <4 x float> {_retVal})\n" \
+                            .format(_patchedRetVal = patchedRetVals[i],
+                                    _resource      = VarNames.resource,
+                                    _retVal        = retVals[i])
+                        irOut.write(irPatchCall)
+                    elif self._sampledType == SpirvSampledType.u32:
+                        patchedRetVals[i]  = self.acquireLocalVar()
+                        irPatchCall = "    {_patchedRetVal} = call <4 x float> @llpc.patch.image.gather.texel.u32(<8 x i32> {_resource}, <4 x float> {_retVal})\n" \
+                            .format(_patchedRetVal = patchedRetVals[i],
+                                    _resource      = VarNames.resource,
+                                    _retVal        = retVals[i])
+                        irOut.write(irPatchCall)
+
+                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = labelMerge))
+                    irOut.write("{_labelMerge}:\n".format(_labelMerge = labelMerge))
+                    mergedRetVal = self.acquireLocalVar()
+                    irPhi = "    {_mergedRetVal} = phi <4 x float> [{_retVal}, %{_labelEntry}], [{_patchedRetVal}, %{_labelPatch}]\n" \
+                        .format(_mergedRetVal = mergedRetVal,
+                                _retVal        = retVals[i],
+                                _labelEntry    = labelEntry,
+                                _patchedRetVal = patchedRetVals[i],
+                                _labelPatch    = labelPatch)
+                    irOut.write(irPhi)
+                    retVals[i] = mergedRetVal
 
         if not self._hasConstOffsets:
             retVal  = self.genCastReturnValToSampledType(retVals[0], irOut)
@@ -2425,7 +2552,7 @@ class DimAwareImageSampleGen(CodeGen):
         if self._opKind == SpirvImageOpKind.gather:
             if self._gfxLevel < GFX9:
                 if self._sampledType == SpirvSampledType.i32:
-                    irPatchCall = "    %s = call <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32> %s)\n" \
+                    irPatchCall = "    %s = call <8 x i32> @llpc.patch.image.gather.descriptor.i32(<8 x i32> %s)\n" \
                         % (VarNames.patchedResource,
                            VarNames.resource)
                     irOut.write(irPatchCall)
@@ -3030,6 +3157,12 @@ def initLlvmDecls(gfxLevel):
     addLlvmDecl(LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE, "declare <8 x i32> @%s(<8 x i32>) #0\n" % (\
             LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE))
     if gfxLevel < GFX9:
+        addLlvmDecl("llpc.patch.image.gather.check",
+                    "declare i1 @llpc.patch.image.gather.check(<8 x i32>) #0\n")
+        addLlvmDecl("llpc.patch.image.gather.coordinate",
+                    "declare <2 x float> @llpc.patch.image.gather.coordinate(<8 x i32>, float, float) #0\n")
+        addLlvmDecl("llpc.patch.image.gather.coordinate.skip",
+                    "declare <2 x float> @llpc.patch.image.gather.coordinate.skip(<8 x i32>, float, float) #0\n")
         addLlvmDecl("llpc.patch.image.gather.descriptor.u32",
                     "declare <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32>) #0\n")
         addLlvmDecl("llpc.patch.image.gather.descriptor.i32",

@@ -60,6 +60,7 @@
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcVertexFetch.h"
+#include <unordered_set>
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
     #define SPVGEN_STATIC_LIB 1
@@ -456,7 +457,10 @@ Result Compiler::BuildShaderModule(
         void* pCode = VoidPtrInc(pAllocBuf, sizeof(ShaderModuleData));
         memcpy(pCode, pShaderInfo->shaderBin.pCode, pShaderInfo->shaderBin.codeSize);
         pModuleData->binCode.pCode = pCode;
-
+        if (pModuleData->binType == BinaryType::Spirv)
+        {
+            CollectInfoFromSpirvBinary(pModuleData);
+        }
         pShaderOut->pModuleData = pModuleData;
     }
 
@@ -1436,7 +1440,7 @@ Result Compiler::TranslateSpirvToLlvm(
         }
     }
 
-    if (ReadSPIRV(*pContext,
+    if (readSpirv(*pContext,
                     spirvStream,
                     static_cast<spv::ExecutionModel>(shaderStage),
                     pEntryTarget,
@@ -1853,6 +1857,70 @@ void Compiler::DumpTimeProfilingResult(
     LLPC_ERRS("Time Profiling Results(Special): "
               << "SPIR-V Lower (Optimization) = " << float(g_timeProfileResult.lowerOptTime) / freq << ", "
               << "LLVM Patch (Lib Link) = " << float(g_timeProfileResult.patchLinkTime) / freq << "\n");
+}
+
+// =====================================================================================================================
+// Collect information from SPIR-V binary
+Result Compiler::CollectInfoFromSpirvBinary(
+    ShaderModuleData* pModuleData   // [in] The shader module data
+    ) const
+{
+    Result result = Result::Success;
+    pModuleData->enableVarPtr = false;
+    pModuleData->enableVarPtrStorageBuf = false;
+
+    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pModuleData->binCode.pCode);
+    const uint32_t* pEnd = pCode + pModuleData->binCode.codeSize / sizeof(uint32_t);
+
+    if (IsSpirvBinary(&pModuleData->binCode))
+    {
+        const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
+
+        // Parse SPIR-V instructions
+        std::unordered_set<uint32_t> capabilities;
+        while (pCodePos < pEnd)
+        {
+            uint32_t opCode = (pCodePos[0] & OpCodeMask);
+            uint32_t wordCount = (pCodePos[0] >> WordCountShift);
+
+            if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+            {
+                LLPC_ERRS("Invalid SPIR-V binary\n");
+                result = Result::ErrorInvalidShader;
+                break;
+            }
+
+            if (opCode == spv::OpCapability)
+            {
+                LLPC_ASSERT(wordCount == 2);
+                pCodePos++;
+                spv::Capability capability = static_cast<spv::Capability>(*pCodePos++);
+                capabilities.insert(capability);
+            }
+            else
+            {
+                pCodePos += wordCount;
+            }
+        }
+
+        if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) !=
+            capabilities.end())
+        {
+            pModuleData->enableVarPtrStorageBuf = true;
+        }
+
+        if (capabilities.find(spv::CapabilityVariablePointers) != capabilities.end())
+        {
+            pModuleData->enableVarPtr = true;
+        }
+        return result;
+    }
+    else
+    {
+        result = Result::ErrorInvalidShader;
+        LLPC_ERRS("Invalid SPIR-V binary\n");
+    }
+    return result;
 }
 
 } // Llpc

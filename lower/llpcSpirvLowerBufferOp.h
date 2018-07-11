@@ -84,6 +84,12 @@ private:
                                    llvm::Constant*    pBlockMemberMeta,
                                    llvm::Instruction* pInsertPos);
 
+    llvm::Value* AddBufferLoadDescInst(llvm::Type*        pLoadTy,
+                                       llvm::Value*       pDesc,
+                                       llvm::Value*       pBlockMemberOffset,
+                                       llvm::Constant*    pBlockMemberMeta,
+                                       llvm::Instruction* pInsertPos);
+
     void AddBufferStoreInst(llvm::Value*        pStoreValue,
                             uint32_t            descSet,
                             uint32_t            binding,
@@ -91,6 +97,12 @@ private:
                             llvm::Value*        pBlockMemberOffset,
                             llvm::Constant*     pBlockMemberMeta,
                             llvm::Instruction*  pInsertPos);
+
+    void AddBufferStoreDescInst(llvm::Value*        pStoreValue,
+                                llvm::Value*        pDesc,
+                                llvm::Value*        pBlockMemberOffset,
+                                llvm::Constant*     pBlockMemberMeta,
+                                llvm::Instruction*  pInsertPos);
 
     llvm::Value* AddBufferAtomicInst(std::string                      atomicOpName,
                                      llvm::Type*                      pDataTy,

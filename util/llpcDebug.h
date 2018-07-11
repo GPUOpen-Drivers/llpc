@@ -30,6 +30,10 @@
  */
 #pragma once
 
+#ifndef LLVM_DEBUG
+#define LLVM_DEBUG DEBUG
+#endif
+
 #if PAL_ENABLE_PRINTS_ASSERTS
 #include <cassert>
 
@@ -67,7 +71,7 @@
     _typename& operator =(const _typename&);
 
 // Verify the specified module for a LLPC pass and report error messages if the verification fails
-#define LLPC_VERIFY_MODULE_FOR_PASS(M) DEBUG(                                                 \
+#define LLPC_VERIFY_MODULE_FOR_PASS(M) LLVM_DEBUG(                                            \
     std::string errMsg;                                                                       \
     raw_string_ostream errStream(errMsg);                                                     \
     if (verifyModule(M, &errStream))                                                          \

@@ -89,7 +89,7 @@ PatchInOutImportExport::~PatchInOutImportExport()
 bool PatchInOutImportExport::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
     Patch::Init(&module);
 
@@ -388,7 +388,7 @@ void PatchInOutImportExport::visitCallInst(
         {
             LLPC_ASSERT((importGenericInput + GetTypeNameForScalarOrVector(pInputTy) == mangledName));
         }
-        DEBUG(dbgs() << "Find input import call: builtin = " << isBuiltInInputImport
+        LLVM_DEBUG(dbgs() << "Find input import call: builtin = " << isBuiltInInputImport
                      << " value = " << value << "\n");
 
         m_importCalls.push_back(&callInst);
@@ -612,7 +612,7 @@ void PatchInOutImportExport::visitCallInst(
         {
             LLPC_ASSERT((importGenericOutput + GetTypeNameForScalarOrVector(pOutputTy) == mangledName));
         }
-        DEBUG(dbgs() << "Find output import call: builtin = " << isBuiltInOutputImport
+        LLVM_DEBUG(dbgs() << "Find output import call: builtin = " << isBuiltInOutputImport
                      << " value = " << value << "\n");
 
         m_importCalls.push_back(&callInst);
@@ -681,7 +681,7 @@ void PatchInOutImportExport::visitCallInst(
         {
             LLPC_ASSERT(exportGenericOutput + GetTypeNameForScalarOrVector(pOutput->getType()) == mangledName);
         }
-        DEBUG(dbgs() << "Find output export call: builtin = " << isBuiltInOutputExport
+        LLVM_DEBUG(dbgs() << "Find output export call: builtin = " << isBuiltInOutputExport
                      << " value = " << value << "\n");
 
         m_exportCalls.push_back(&callInst);
@@ -1730,7 +1730,6 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
     auto  pPrimMask    = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
-
     Value* pI  = nullptr;
     Value* pJ  = nullptr;
 
@@ -1744,7 +1743,9 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             {
                 if (interpLoc == InterpLocCentroid)
                 {
-                    pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid);
+                    pIJ = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid),
+                                           GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center),
+                                           pInsertPos);
                 }
                 else if (interpLoc == InterpLocSample)
                 {
@@ -1761,7 +1762,9 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 LLPC_ASSERT(interpMode == InterpModeNoPersp);
                 if (interpLoc == InterpLocCentroid)
                 {
-                    pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid);
+                    pIJ = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid),
+                                           GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center),
+                                           pInsertPos);
                 }
                 else if (interpLoc == InterpLocSample)
                 {
@@ -2958,7 +2961,9 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     case BuiltInBaryCoordSmoothCentroidAMD:
         {
             LLPC_ASSERT(entryArgIdxs.perspInterp.centroid != 0);
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid);
+            pInput = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.centroid),
+                                      GetFunctionArgument(m_pEntryPoint, entryArgIdxs.perspInterp.center),
+                                      pInsertPos);
             break;
         }
     case BuiltInInterpPullMode:
@@ -2986,7 +2991,9 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     case BuiltInBaryCoordNoPerspCentroidAMD:
         {
             LLPC_ASSERT(entryArgIdxs.linearInterp.centroid != 0);
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid);
+            pInput = AdjustCentroidIJ(GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.centroid),
+                                      GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center),
+                                      pInsertPos);
             break;
         }
     default:
@@ -5896,6 +5903,37 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             break;
         }
     }
+}
+
+// =====================================================================================================================
+// Adjusts I/J calculation for "centroid" interpolation mode by taking "center" mode into account.
+Value* PatchInOutImportExport::AdjustCentroidIJ(
+    Value*       pCentroidIJ,   // [in] Centroid I/J provided by hardware natively
+    Value*       pCenterIJ,     // [in] Center I/J provided by hardware natively
+    Instruction* pInsertPos)    // [in] Where to insert this call
+{
+    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
+    auto pPrimMask = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
+    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+    Value* pIJ = nullptr;
+
+    if(pPipelineInfo->rsState.numSamples <= 1)
+    {
+        // NOTE: If multi-sample is disabled, centroid I/J provided by hardware natively may be invalid. We have to
+        // adjust it with center I/J.
+        auto pCond = new ICmpInst(pInsertPos,
+                                 ICmpInst::ICMP_SLT,
+                                 pPrimMask,
+                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                 "");
+        pIJ = SelectInst::Create(pCond, pCenterIJ, pCentroidIJ, "", pInsertPos);
+    }
+    else
+    {
+        pIJ = pCentroidIJ;
+    }
+
+    return pIJ;
 }
 
 } // Llpc
