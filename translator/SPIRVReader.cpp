@@ -1642,8 +1642,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     llvm::GlobalValue::LinkageTypes LinkageTy = transLinkageType(BVar);
     Constant *Initializer = nullptr;
     SPIRVValue *Init = BVar->getInitializer();
-    if (Init)
+    if (Init) {
       Initializer = dyn_cast<Constant>(transValue(Init, F, BB, false));
+      Initializer = widenBoolConstant(Initializer);
+    }
     else if (LinkageTy == GlobalValue::CommonLinkage)
       // In LLVM variables with common linkage type must be initilized by 0
       Initializer = Constant::getNullValue(Ty);
