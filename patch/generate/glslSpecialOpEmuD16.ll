@@ -240,8 +240,8 @@ define spir_func i32 @llpc.subgroup.identity.i16(i32 %binaryOp)
     ; 0x7FFF
     ret i32 32767
 .smax:
-    ; 0x8000
-    ret i32 32768
+    ; FFFF8000
+    ret i32 4294934528
 .umin:
     ; 0xFFFF FFFF
     ret i32 4294967295

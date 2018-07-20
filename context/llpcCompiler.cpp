@@ -885,7 +885,7 @@ Result Compiler::BuildGraphicsPipeline(
         auto pPipelineModule = new Module("llpcPipeline", *pContext);
         {
             Linker linker(*pPipelineModule);
-            for (int32_t stage = ShaderStageCountInternal - 1; (stage >= 0) && (result == Result::Success); --stage)
+            for (int32_t stage = 0; (stage < ShaderStageCountInternal) && (result == Result::Success); ++stage)
             {
                 Module* pShaderModule = modules[stage];
                 if (pShaderModule == nullptr)

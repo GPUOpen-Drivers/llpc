@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include <unordered_map>
+#include <map>
 #include <string>
 #include <vector>
 #include "llpc.h"
@@ -143,6 +143,9 @@ static const char   StrTabName[]       = ".strtab";    // Name of ".strtab" sect
 static const char   SymTabName[]       = ".symtab";    // Name of ".symtab" section
 static const char   NoteName[]         = ".note";      // Name of ".note" section
 static const char   RelocName[]        = ".reloc";     // Name of ".reloc" section
+static const char   CommentName[]      = ".comment";   // Name of ".comment" section
+
+static const uint32_t NT_AMD_AMDGPU_ISA = 11;          // Note type of AMDGPU ISA version
 
 // Represents the layout of standard note header
 struct NoteHeader
@@ -388,6 +391,7 @@ public:
 
     uint32_t GetSectionCount();
     Result GetSectionDataBySectionIndex(uint32_t secIdx, ElfSectionBuffer** ppSectionData) const;
+    Result GetSectionDataBySortingIndex(uint32_t sortIdx, uint32_t* pSecIdx, ElfSectionBuffer** ppSectionData) const;
 
     // Determine if a section with the specified name is present in this ELF.
     bool IsSectionPresent(const char* pName) const { return (m_map.find(pName) != m_map.end()); }
@@ -413,8 +417,8 @@ private:
 
     GfxIpVersion    m_gfxIp;    // Graphics IP version info (used by ELF dump only)
 
-    typename Elf::FormatHeader                  m_header;     // ELF header
-    std::unordered_map<std::string, uint32_t>   m_map;        // Map between section name and section index
+    typename Elf::FormatHeader        m_header;     // ELF header
+    std::map<std::string, uint32_t>   m_map;        // Map between section name and section index
 
     std::vector<ElfReadSectionBuffer<typename Elf::SectionHeader>*> m_sections; // List of section data and headers
 

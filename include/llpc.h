@@ -40,7 +40,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 7;
+static const uint32_t  Version = 8;
 static const uint32_t  MaxColorTargets = 8;
 static const char      VkIcdName[]     = "amdvlk";
 
@@ -170,6 +170,9 @@ struct PipelineShaderOptions
                          ///  every instruction.  Only valid if trapPresent is set.
     bool   enablePerformanceData; ///< Enables the compiler to generate extra instructions to gather
                                   ///  various performance-related data.
+    bool   allowReZ;     ///< Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
+                         ///  to potentially kill PS waves before launch, and also issues a late-Z test
+                         ///  in case the PS kills pixels.  Only valid for pixel shaders.
     /// Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
     /// of this value and whatever the target GPU supports. To effectively disable this limit, set this to UINT_MAX.
     uint32_t  vgprLimit;

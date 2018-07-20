@@ -1118,6 +1118,10 @@ Result ConfigBuilder::BuildPsRegConfig(
         zOrder = LATE_Z;
         execOnHeirFail = true;
     }
+    else if (pShaderInfo->options.allowReZ)
+    {
+        zOrder = EARLY_Z_THEN_RE_Z;
+    }
     else
     {
         zOrder = EARLY_Z_THEN_LATE_Z;

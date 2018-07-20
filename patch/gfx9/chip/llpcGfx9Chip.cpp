@@ -38,9 +38,7 @@ namespace Llpc
 namespace Gfx9
 {
 #include "gfx9_plus_merged_enum.h"
-#include "gfx9_plus_merged_mask.h"
 #include "gfx9_plus_merged_offset.h"
-#include "gfx9_plus_merged_shift.h"
 
 // =====================================================================================================================
 // Initializer
@@ -170,7 +168,7 @@ void PipelineVsFsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(API_PS_HASH_DWORD0);
     INIT_REG(API_PS_HASH_DWORD1);
     INIT_REG(INDIRECT_TABLE_ENTRY);
-    INIT_REG_GFX9(IA_MULTI_VGT_PARAM);
+    INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 
     m_dynRegCount = 0;
 }
@@ -194,7 +192,7 @@ void PipelineVsTsFsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(API_PS_HASH_DWORD0);
     INIT_REG(API_PS_HASH_DWORD1);
     INIT_REG(INDIRECT_TABLE_ENTRY);
-    INIT_REG_GFX9(IA_MULTI_VGT_PARAM);
+    INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 
     m_dynRegCount = 0;
 }
@@ -216,7 +214,7 @@ void PipelineVsGsFsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(API_PS_HASH_DWORD0);
     INIT_REG(API_PS_HASH_DWORD1);
     INIT_REG(INDIRECT_TABLE_ENTRY);
-    INIT_REG_GFX9(IA_MULTI_VGT_PARAM);
+    INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 
     SET_REG(this, SPILL_THRESHOLD, UINT32_MAX);
 
@@ -245,7 +243,7 @@ void PipelineVsTsGsFsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(API_PS_HASH_DWORD0);
     INIT_REG(API_PS_HASH_DWORD1);
     INIT_REG(INDIRECT_TABLE_ENTRY);
-    INIT_REG_GFX9(IA_MULTI_VGT_PARAM);
+    INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
 
     m_dynRegCount = 0;
 }

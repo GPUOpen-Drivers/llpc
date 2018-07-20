@@ -112,9 +112,23 @@ void PatchPushConstOp::visitCallInst(
         LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
         auto pPushConstNode = &pShaderInfo->pUserDataNodes[pushConstNodeIdx];
 
+        auto pMemberOffsetInBytes = callInst.getOperand(0);
+        if (isa<Constant>(pMemberOffsetInBytes) == false)
+        {
+            // NOTE: Push constant only supports uniform control flow, so we can use uniform offset safely.
+            std::vector<Value*> args;
+            args.push_back(pMemberOffsetInBytes);
+            auto pMemberOffsetInBytes = EmitCall(m_pModule,
+                                                 "llvm.amdgcn.readfirstlane",
+                                                 m_pContext->Int32Ty(),
+                                                 args,
+                                                 NoAttrib,
+                                                 &callInst);
+            callInst.setOperand(0, pMemberOffsetInBytes);
+        }
+
         if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)
         {
-            auto pMemberOffsetInBytes = callInst.getOperand(0);
             auto pPushConst = GetFunctionArgument(m_pEntryPoint,
                                                   pIntfData->entryArgIdxs.resNodeValues[pushConstNodeIdx]);
 

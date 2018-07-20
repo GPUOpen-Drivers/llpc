@@ -543,12 +543,11 @@ class CodeGen(FuncDef):
         supportDimAware = False
         if self._dim != SpirvDim.DimBuffer:
             if self.isAtomicOp():
-                # TODO: Support dimension aware image atomic intrinsics
-                pass
+                supportDimAware = True
             elif self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.fetch:
                 supportDimAware = True
             elif self._opKind == SpirvImageOpKind.write:
-                # TODO: Support dimension aware image store intrinsics
+                supportDimAware = True
                 pass
             elif self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather:
                 supportDimAware = True
@@ -581,13 +580,11 @@ class CodeGen(FuncDef):
 
             assert self._dim != SpirvDim.DimBuffer
             if self.isAtomicOp():
-                # TODO: Support dimension aware image atomic intrinsics
-                shouldNeverCall("")
+                intrinGen = DimAwareImageAtomicGen(self)
             elif self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.fetch:
                 intrinGen = DimAwareImageLoadGen(self)
             elif self._opKind == SpirvImageOpKind.write:
-                # TODO: Support dimension aware image store intrinsics
-                shouldNeverCall("")
+                intrinGen = DimAwareImageStoreGen(self)
             elif self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather:
                 intrinGen = DimAwareImageSampleGen(self)
             elif self._opKind == SpirvImageOpKind.querylod:
@@ -1485,26 +1482,24 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
             else:
                 return "<4 x float>"
 
-    # Gets return type of llvm dimension aware image intrinsic.
-    def getDimAwareBackendRetType(self, isSparse):
-        sparseRetType = self.INVALID_TYPE
-        retType = self.INVALID_TYPE
-        retNumComp = -1
-        if self._opKind == SpirvImageOpKind.write:
-            retType = "void"
-        elif self.isAtomicOp():
-            retType = "i32"
+    # Gets data type of llvm dimension aware image intrinsic.
+    def getDimAwareBackendDataType(self, isSparse):
+        sparseDataType = self.INVALID_TYPE
+        dataType = self.INVALID_TYPE
+        dataNumComp = -1
+        if self.isAtomicOp():
+            dataType = "i32"
         else:
             if self._sampledType == SpirvSampledType.f16:
-                sparseRetType   = "<8 x half>"
-                retType         = "<4 x half>"
-                retNumComp      = 4
+                sparseDataType   = "<8 x half>"
+                dataType         = "<4 x half>"
+                dataNumComp      = 4
             else:
-                sparseRetType   = "<8 x float>"
-                retType         = "<4 x float>"
-                retNumComp      = 4
+                sparseDataType   = "<8 x float>"
+                dataType         = "<4 x float>"
+                dataNumComp      = 4
 
-        return sparseRetType, retType, retNumComp
+        return sparseDataType, dataType, dataNumComp
 
     def getDAFlag(self):
         if self._arrayed or \
@@ -1796,6 +1791,161 @@ class ImageAtomicGen(CodeGen):
         return funcName
         pass
 
+# Represents dimension aware image atomic intrinsic based code generation.
+class DimAwareImageAtomicGen(CodeGen):
+    def __init__(self, codeGenBase):
+        super(DimAwareImageAtomicGen, self).__init__(codeGenBase, codeGenBase._gfxLevel)
+        pass
+
+    # Generates call to amdgcn intrinsic function.
+    def genIntrinsicCall(self, irOut):
+        assert self.isAtomicOp()
+        assert self._dim != SpirvDim.DimBuffer
+
+        if self._dim == SpirvDim.DimCube:
+            self._resource = VarNames.patchedResource
+            irPatchCall = "    %s = call <8 x i32> @%s(<8 x i32> %s)\n" \
+                % (self._resource,
+                   LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE,
+                   VarNames.resource)
+            irOut.write(irPatchCall)
+
+        # Process image atomic operations
+        retType = self.getDimAwareBackendDataType(False)[1]
+        intrinsicName   = self.getIntrinsicName()
+        intrinsicParams = self.getIntrinsicParam(False, irOut)
+
+        retVal = self.acquireLocalVar()
+        irCall = "    %s = call %s @%s(%s)\n" \
+            % (retVal,
+               retType,
+               intrinsicName,
+               intrinsicParams)
+        irOut.write(irCall)
+
+        if self._sampledType == SpirvSampledType.f32:
+            oldRetVal = retVal
+            retVal = self.acquireLocalVar()
+            irBitcast = "    %s = bitcast i32 %s to float\n" % (retVal, oldRetVal)
+            irOut.write(irBitcast)
+
+        return retVal
+
+    # Gets image store intrinsic parameters
+    def getIntrinsicParam(self, paramTypeOnly, irOut):
+        # Data
+        if paramTypeOnly:
+            params = "i32"
+        else:
+            atomicData = VarNames.atomicData
+            if self._sampledType == SpirvSampledType.f32:
+                # Cast atomic value operand type to i32
+                atomicData = self.acquireLocalVar()
+                irBitcast = "    %s = bitcast float %s to i32\n" % (atomicData, VarNames.atomicData)
+                irOut.write(irBitcast)
+            params = "i32 %s" % (atomicData)
+
+        # Comparator
+        if self._opKind == SpirvImageOpKind.atomiccompexchange:
+            if paramTypeOnly:
+                params += ", i32"
+            else:
+                params += ", i32 %s" % (VarNames.atomicComparator)
+
+        # Coordinates
+        if self._dim == SpirvDim.Dim1D:
+            if paramTypeOnly:
+                params += ", i32"
+            else:
+                params += ", i32 %s" % (self._coordXYZW[0])
+        elif self._dim == SpirvDim.Dim2D or self._dim == SpirvDim.DimRect or self._dim == SpirvDim.DimSubpassData:
+            if paramTypeOnly:
+                params += ", i32, i32"
+            else:
+                params += ", i32 %s, i32 %s" % (self._coordXYZW[0], self._coordXYZW[1])
+        if self._dim == SpirvDim.Dim3D or self._dim == SpirvDim.DimCube:
+            if paramTypeOnly:
+                params += ", i32, i32, i32"
+            else:
+                params += ", i32 %s, i32 %s, i32 %s" % (self._coordXYZW[0], self._coordXYZW[1], self._coordXYZW[2])
+
+        # Array slice
+        if self._arrayed:
+            assert self._dim != SpirvDim.Dim3D
+            assert self._dim != SpirvDim.DimRect
+
+            if self._dim != SpirvDim.DimCube:
+                if paramTypeOnly:
+                    params += ", i32"
+                else:
+                    arrayIndex = self.getCoordNumComponents(False, False, False)
+                    params += ", i32 %s" % (self._coordXYZW[arrayIndex])
+
+        # Sample ID
+        if self._hasSample:
+            assert self._dim == SpirvDim.Dim2D
+            if paramTypeOnly:
+                params += ", i32"
+            else:
+                params += ", i32 %s" % (self._sample)
+
+        # Rsrc
+        if paramTypeOnly:
+            params += ", <8 x i32>"
+        else:
+            params += ", <8 x i32> %s" % (self._resource)
+
+        # TFE and LWE bit
+        if paramTypeOnly:
+            params += ", i32"
+        else:
+            tfeLwe = self.getTfeLwe(irOut)
+            params += ", i32 %s" % (tfeLwe)
+
+        # GLC and SLC bit
+        if paramTypeOnly:
+            params += ", i32"
+        else:
+            glcSlc = self.getGlcSlc(irOut)
+            params += ", i32 %s" % (glcSlc)
+
+        return params
+
+    # Gets image store intrinsic function name
+    def getIntrinsicName(self):
+        funcName = "llvm.amdgcn.image.atomic"
+
+        intrinsicNames = { \
+            SpirvImageOpKind.atomicexchange      : ".swap",     \
+            SpirvImageOpKind.atomiccompexchange  : ".cmpswap",  \
+            SpirvImageOpKind.atomiciincrement    : ".add",      \
+            SpirvImageOpKind.atomicidecrement    : ".sub",      \
+            SpirvImageOpKind.atomiciadd          : ".add",      \
+            SpirvImageOpKind.atomicisub          : ".sub",      \
+            SpirvImageOpKind.atomicsmin          : ".smin",     \
+            SpirvImageOpKind.atomicumin          : ".umin",     \
+            SpirvImageOpKind.atomicsmax          : ".smax",     \
+            SpirvImageOpKind.atomicumax          : ".umax",     \
+            SpirvImageOpKind.atomicand           : ".and",      \
+            SpirvImageOpKind.atomicor            : ".or",       \
+            SpirvImageOpKind.atomicxor           : ".xor",      \
+        }
+
+        funcName += intrinsicNames[self._opKind]
+
+        funcName += self.getDimAwareDimName()
+
+        funcName += ".i32.i32"
+
+        if not hasLlvmDecl(funcName):
+            # Adds LLVM declaration for this function
+            params = self.getIntrinsicParam(True, None)
+            funcExternalDecl = "declare i32 @%s(%s) %s\n" % (funcName,
+                                                             params,
+                                                             self._attr)
+            addLlvmDecl(funcName, funcExternalDecl)
+        return funcName
+
 # Represents buffer load intrinsic based code generation.
 class BufferLoadGen(CodeGen):
     def __init__(self, codeGenBase):
@@ -2019,7 +2169,7 @@ class DimAwareImageLoadGen(CodeGen):
             irOut.write(irPatchCall)
 
         # Process image load, fetch
-        sparseRetType, retType, retNumComp = self.getDimAwareBackendRetType(self._supportSparse)
+        sparseRetType, retType, retNumComp = self.getDimAwareBackendDataType(self._supportSparse)
         retVal          = FuncDef.INVALID_VAR
         retCompType     = self.getVDataRegCompType()
         intrinsicName   = self.getIntrinsicName(False)
@@ -2153,7 +2303,7 @@ class DimAwareImageLoadGen(CodeGen):
         if not hasLlvmDecl(funcName):
             # Adds LLVM declaration for this function
             params = self.getIntrinsicParam(True, isFetchingFromFmask, None)
-            sparseRetType, retType, retNumComp = self.getDimAwareBackendRetType(self._supportSparse)
+            sparseRetType, retType, retNumComp = self.getDimAwareBackendDataType(self._supportSparse)
             funcExternalDecl = "declare %s @%s(%s) %s\n" % ((self._supportSparse and not isFetchingFromFmask) and sparseRetType or retType,
                                                             funcName,
                                                             params,
@@ -2197,7 +2347,6 @@ class ImageStoreGen(CodeGen):
         assert self._dim != SpirvDim.DimBuffer
         assert self._opKind == SpirvImageOpKind.write
 
-        retType     = self.getBackendRetType()
         funcName    = self.getFuncName()
 
         # Process image write
@@ -2247,6 +2396,142 @@ class ImageStoreGen(CodeGen):
             funcExternalDecl = "declare %s @%s(%s, %s, <8 x i32>,  i32, i1, i1, i1, i1) %s\n" % \
                                (self.getBackendRetType(), funcName, self.getVDataRegType(), self.getVAddrRegType(), \
                                 self._attr)
+            addLlvmDecl(funcName, funcExternalDecl)
+        return funcName
+
+# Represents dimension aware image store intrinsic based code generation.
+class DimAwareImageStoreGen(CodeGen):
+    def __init__(self, codeGenBase):
+        super(DimAwareImageStoreGen, self).__init__(codeGenBase, codeGenBase._gfxLevel)
+        pass
+
+    # Generates call to amdgcn intrinsic function.
+    def genIntrinsicCall(self, irOut):
+        assert self._dim != SpirvDim.DimBuffer
+        assert self._opKind == SpirvImageOpKind.write
+
+        if self._dim == SpirvDim.DimCube:
+            self._resource = VarNames.patchedResource
+            irPatchCall = "    %s = call <8 x i32> @%s(<8 x i32> %s)\n" \
+                % (self._resource,
+                   LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE,
+                   VarNames.resource)
+            irOut.write(irPatchCall)
+
+        # Process image write
+        dataType = self.getDimAwareBackendDataType(False)[1]
+        intrinsicName   = self.getIntrinsicName()
+        intrinsicParams = self.getIntrinsicParam(False, irOut)
+
+        dataReg = self.genCastTexelToSampledType(VarNames.texel, irOut)
+
+        irCall = "    call void @%s(%s %s, %s)\n" \
+            % (intrinsicName,
+               dataType,
+               dataReg,
+               intrinsicParams)
+        irOut.write(irCall)
+
+        return FuncDef.INVALID_VAR
+
+    # Gets image store intrinsic parameters
+    def getIntrinsicParam(self, paramTypeOnly, irOut):
+        # DMask
+        if paramTypeOnly:
+            params = "i32"
+        else:
+            params = "i32 15"
+
+        # Coordinates
+        if self._dim == SpirvDim.Dim1D:
+            if paramTypeOnly:
+                params += ", i32"
+            else:
+                params += ", i32 %s" % (self._coordXYZW[0])
+        elif self._dim == SpirvDim.Dim2D or self._dim == SpirvDim.DimRect or self._dim == SpirvDim.DimSubpassData:
+            if paramTypeOnly:
+                params += ", i32, i32"
+            else:
+                params += ", i32 %s, i32 %s" % (self._coordXYZW[0], self._coordXYZW[1])
+        if self._dim == SpirvDim.Dim3D or self._dim == SpirvDim.DimCube:
+            if paramTypeOnly:
+                params += ", i32, i32, i32"
+            else:
+                params += ", i32 %s, i32 %s, i32 %s" % (self._coordXYZW[0], self._coordXYZW[1], self._coordXYZW[2])
+
+        # Array slice
+        if self._arrayed:
+            assert self._dim != SpirvDim.Dim3D
+            assert self._dim != SpirvDim.DimRect
+
+            if self._dim != SpirvDim.DimCube:
+                if paramTypeOnly:
+                    params += ", i32"
+                else:
+                    arrayIndex = self.getCoordNumComponents(False, False, False)
+                    params += ", i32 %s" % (self._coordXYZW[arrayIndex])
+
+        # Lod
+        if self._hasLod:
+            if paramTypeOnly:
+                params += ", i32"
+            else:
+                params += ", i32 %s" % (self._lod)
+
+        # Sample ID
+        if self._hasSample:
+            assert self._dim == SpirvDim.Dim2D
+            if paramTypeOnly:
+                params += ", i32"
+            else:
+                params += ", i32 %s" % (self._sample)
+
+        # Rsrc
+        if paramTypeOnly:
+            params += ", <8 x i32>"
+        else:
+            params += ", <8 x i32> %s" % (self._resource)
+
+        # TFE and LWE bit
+        if paramTypeOnly:
+            params += ", i32"
+        else:
+            tfeLwe = self.getTfeLwe(irOut)
+            params += ", i32 %s" % (tfeLwe)
+
+        # GLC and SLC bit
+        if paramTypeOnly:
+            params += ", i32"
+        else:
+            glcSlc = self.getGlcSlc(irOut)
+            params += ", i32 %s" % (glcSlc)
+
+        return params
+
+    # Gets image store intrinsic function name
+    def getIntrinsicName(self):
+        funcName = "llvm.amdgcn.image.store"
+
+        if self._hasLod:
+            funcName += ".mip"
+
+        funcName += self.getDimAwareDimName()
+
+        if self._sampledType == SpirvSampledType.f16:
+            funcName += ".v4f16"
+        else:
+            funcName += ".v4f32"
+
+        funcName += ".i32"
+
+        if not hasLlvmDecl(funcName):
+            # Adds LLVM declaration for this function
+            params = self.getIntrinsicParam(True, None)
+            dataType = self.getDimAwareBackendDataType(False)[1]
+            funcExternalDecl = "declare void @%s(%s, %s) %s\n" % (funcName,
+                                                              dataType,
+                                                              params,
+                                                              self._attr)
             addLlvmDecl(funcName, funcExternalDecl)
         return funcName
 
@@ -2307,7 +2592,8 @@ class ImageSampleGen(CodeGen):
                                     _resource            = VarNames.resource)
                         irOut.write(irPatchRsrcCall)
                     elif self._sampledType == SpirvSampledType.u32:
-                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32> {_resource})\n" \
+                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> " \
+                                              "@llpc.patch.image.gather.descriptor.u32(<8 x i32> {_resource})\n" \
                             .format(_patchedResourceName = patchedResourceName,
                                     _resource            = VarNames.resource)
                         irOut.write(irPatchRsrcCall)
@@ -2544,25 +2830,111 @@ class DimAwareImageSampleGen(CodeGen):
         assert self._dim != SpirvDim.DimBuffer
         assert self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather
 
-        sparseRetType, retType, retNumComp = self.getDimAwareBackendRetType(self._supportSparse)
+        sparseRetType, retType, retNumComp = self.getDimAwareBackendDataType(self._supportSparse)
         retCompType     = self.getVDataRegCompType()
         intrinsicName   = self.getIntrinsicName()
 
-        # Patch descriptor for gather
+        # Patch descriptor for integer gather
+        irNeedPatchDescriptor = FuncDef.INVALID_VAR
+        LABEL_PATCH_DESCRIPTOR                  = "PatchDescriptor"
+        LABEL_PATCH_COORD                       = "PatchCoord"
+        LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD   = "MergePatchDescriptor"
+
         if self._opKind == SpirvImageOpKind.gather:
             if self._gfxLevel < GFX9:
-                if self._sampledType == SpirvSampledType.i32:
-                    irPatchCall = "    %s = call <8 x i32> @llpc.patch.image.gather.descriptor.i32(<8 x i32> %s)\n" \
-                        % (VarNames.patchedResource,
-                           VarNames.resource)
-                    irOut.write(irPatchCall)
-                    self._resource = VarNames.patchedResource
-                elif self._sampledType == SpirvSampledType.u32:
-                    irPatchCall = "    %s = call <8 x i32> @llpc.patch.image.gather.descriptor.u32(<8 x i32> %s)\n" \
-                        % (VarNames.patchedResource,
-                           VarNames.resource)
-                    irOut.write(irPatchCall)
-                    self._resource = VarNames.patchedResource
+                if self._sampledType == SpirvSampledType.i32 or self._sampledType == SpirvSampledType.u32:
+                    irNeedPatchDescriptor = self.acquireLocalVar()
+                    irCheckResourceFormatCall = "    {_irNeedPatchDescriptor} = call i1 @llpc.patch.image.gather.check(<8 x i32> {_resource})\n" \
+                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
+                                _resource = VarNames.resource)
+                    irOut.write(irCheckResourceFormatCall)
+
+                    # For i32 resource format, we patch gather coordinate, for other integer format, we patch descriptor
+                    irBranch = "    br i1 {_irNeedPatchDescriptor}, label %{_labelPatchDescriptor}, label %{_labelPatchCoord}\n" \
+                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
+                                _labelPatchDescriptor  = LABEL_PATCH_DESCRIPTOR,
+                                _labelPatchCoord       = LABEL_PATCH_COORD)
+                    irOut.write(irBranch)
+
+                    # Patch descriptor branch
+                    irOut.write("{_labelPatchDescriptor}:\n".format(_labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR))
+                    patchedResourceName = self.acquireLocalVar()
+                    if self._sampledType == SpirvSampledType.i32:
+                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> " \
+                                              "@llpc.patch.image.gather.descriptor.i32(<8 x i32> {_resource})\n" \
+                            .format(_patchedResourceName = patchedResourceName,
+                                    _resource            = VarNames.resource)
+                        irOut.write(irPatchRsrcCall)
+                    elif self._sampledType == SpirvSampledType.u32:
+                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> " \
+                                              "@llpc.patch.image.gather.descriptor.u32(<8 x i32> {_resource})\n" \
+                            .format(_patchedResourceName = patchedResourceName,
+                                    _resource            = VarNames.resource)
+                        irOut.write(irPatchRsrcCall)
+                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
+
+                    # Patch coordinate branch
+                    irOut.write("{_labelPatchCoord}:\n".format(_labelPatchCoord = LABEL_PATCH_COORD))
+                    patchedCoord = self.acquireLocalVar()
+
+                    # We need to skip cube dimension and gathering with a specified LOD,
+                    # such cases is not supported
+                    if (self._dim == SpirvDim.DimCube) or self._hasLod:
+                        patchCoordFuncName = "llpc.patch.image.gather.coordinate.skip"
+                    else:
+                        patchCoordFuncName = "llpc.patch.image.gather.coordinate"
+                    irPatchCoordCall = "    {_patchedCoord} = call <2 x float> @{_funcName}(<8 x i32> {_resource}, " \
+                                                                         "float {_x}, " \
+                                                                         "float {_y})\n" \
+                                           .format(_patchedCoord = patchedCoord,
+                                                   _funcName     = patchCoordFuncName,
+                                                   _resource     = VarNames.resource,
+                                                   _x            = self._coordXYZW[0],
+                                                   _y            = self._coordXYZW[1])
+                    irOut.write(irPatchCoordCall)
+                    patchedCoordX  = self.acquireLocalVar()
+                    irExtract = "    {_patchedCoordX} = extractelement <2 x float> {_patchedCoord}, i32 0\n" \
+                       .format(_patchedCoordX = patchedCoordX,
+                               _patchedCoord  =patchedCoord)
+                    irOut.write(irExtract)
+                    patchedCoordY  = self.acquireLocalVar()
+                    irExtract = "    {_patchedCoordY} = extractelement <2 x float> {_patchedCoord}, i32 1\n" \
+                        .format(_patchedCoordY = patchedCoordY,
+                                _patchedCoord  = patchedCoord)
+                    irOut.write(irExtract)
+                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
+
+                    # Merge branch
+                    irOut.write("{_labelMerge}:\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
+                    resourceName = self.acquireLocalVar()
+                    irPhi = "    {_resourceName} = phi <8 x i32> [{_resource}, %{_labelPatchCoord}], [{_patchedResourceName}, %{_labelPatchDescriptor}]\n" \
+                        .format(_resourceName         = resourceName,
+                                _resource             = VarNames.resource,
+                                _labelPatchCoord      = LABEL_PATCH_COORD,
+                                _patchedResourceName  = patchedResourceName,
+                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
+                    irOut.write(irPhi)
+                    self._resource = resourceName
+
+                    coordX = self.acquireLocalVar()
+                    irPhi = "    {_coordX} = phi float [{_patchedCoordX}, %{_labelPatchCoord}], [{_unpatchedCoordX}, %{_labelPatchDescriptor}]\n" \
+                        .format(_coordX               = coordX,
+                                _patchedCoordX        = patchedCoordX,
+                                _labelPatchCoord      = LABEL_PATCH_COORD,
+                                _unpatchedCoordX      = self._coordXYZW[0],
+                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
+                    irOut.write(irPhi)
+                    coordY = self.acquireLocalVar()
+                    irPhi = "    {_coordY} = phi float [{_patchedCoordY}, %{_labelPatchCoord}], [{_unpatchedCoordY}, %{_labelPatchDescriptor}]\n" \
+                        .format(_coordY               = coordY,
+                                _patchedCoordY        = patchedCoordY,
+                                _labelPatchCoord      = LABEL_PATCH_COORD,
+                                _unpatchedCoordY      = self._coordXYZW[1],
+                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
+                    irOut.write(irPhi)
+
+                    self._coordXYZW[0] = coordX
+                    self._coordXYZW[1] = coordY
 
         # Process image sample, image gather, image fetch
         retVals = [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
@@ -2573,10 +2945,25 @@ class DimAwareImageSampleGen(CodeGen):
 
         # For OpImageGather* with offsets, we need to generate 4 gather4 instructions
         # other image instructions will only generate 1 instruction
+
+        # Label used when need to patch return type for gather
+        LABEL_ENTRY_PATCH_RETURN = "EntryPatchReturnType"
+        LABEL_BEGIN_PATCH_RETURN = "BeginPatchReturnType"
+        LABEL_MERGE_PATCH_RETURN = "MergePatchReturnType"
+
         callNum     = self._hasConstOffsets and 4 or 1
         for i in range(callNum):
             params          = self.getIntrinsicParam(False, i, irOut)
             retVals[i]      = self.acquireLocalVar()
+
+            # Set entry lable when need to patch return type for gather
+            if (self._gfxLevel < GFX9 and \
+                self._opKind == SpirvImageOpKind.gather and \
+                (self._sampledType == SpirvSampledType.i32 or \
+                 self._sampledType == SpirvSampledType.u32)):
+                labelEntry = "%s%d" % (LABEL_ENTRY_PATCH_RETURN, i)
+                irOut.write("    br label %{_labelEntry}\n".format(_labelEntry = labelEntry))
+                irOut.write("{_labelEntry}:\n".format(_labelEntry = labelEntry))
 
             irCall     = "    %s = call %s @%s(%s)\n" \
                 % (retVals[i],
@@ -2592,22 +2979,43 @@ class DimAwareImageSampleGen(CodeGen):
 
             if self._gfxLevel < GFX9 and self._opKind == SpirvImageOpKind.gather:
                 # Patch return type for gather
-                if self._sampledType == SpirvSampledType.i32:
-                    patchedRetVals[i]  = self.acquireLocalVar()
-                    irPatchCall = "    %s = call <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32> %s, <4 x float> %s)\n" \
-                        % (patchedRetVals[i],
-                           VarNames.resource,
-                           retVals[i])
-                    irOut.write(irPatchCall)
-                    retVals[i] = patchedRetVals[i]
-                elif self._sampledType == SpirvSampledType.u32:
-                    patchedRetVals[i]  = self.acquireLocalVar()
-                    irPatchCall = "    %s = call <4 x float> @llpc.patch.image.gather.texel.u32(<8 x i32> %s, <4 x float> %s)\n" \
-                        % (patchedRetVals[i],
-                           VarNames.resource,
-                           retVals[i])
-                    irOut.write(irPatchCall)
-                    retVals[i] = patchedRetVals[i]
+                if self._sampledType == SpirvSampledType.i32 or self._sampledType == SpirvSampledType.u32:
+                    assert irNeedPatchDescriptor != FuncDef.INVALID_VAR
+                    labelPatch = "%s%d" % (LABEL_BEGIN_PATCH_RETURN, i)
+                    labelMerge   = "%s%d" % (LABEL_MERGE_PATCH_RETURN,i)
+
+                    irBranch = "    br i1 {_irNeedPatchDescriptor}, label %{_labelPatch}, label %{_labelMerge}\n" \
+                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
+                                _labelPatch = labelPatch,
+                                _labelMerge = labelMerge)
+                    irOut.write(irBranch)
+                    irOut.write("{_labelPatch}:\n".format(_labelPatch = labelPatch))
+                    if self._sampledType == SpirvSampledType.i32:
+                        patchedRetVals[i]  = self.acquireLocalVar()
+                        irPatchCall = "    {_patchedRetVal} = call <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32> {_resource}, <4 x float> {_retVal})\n" \
+                            .format(_patchedRetVal = patchedRetVals[i],
+                                    _resource      = VarNames.resource,
+                                    _retVal        = retVals[i])
+                        irOut.write(irPatchCall)
+                    elif self._sampledType == SpirvSampledType.u32:
+                        patchedRetVals[i]  = self.acquireLocalVar()
+                        irPatchCall = "    {_patchedRetVal} = call <4 x float> @llpc.patch.image.gather.texel.u32(<8 x i32> {_resource}, <4 x float> {_retVal})\n" \
+                            .format(_patchedRetVal = patchedRetVals[i],
+                                    _resource      = VarNames.resource,
+                                    _retVal        = retVals[i])
+                        irOut.write(irPatchCall)
+
+                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = labelMerge))
+                    irOut.write("{_labelMerge}:\n".format(_labelMerge = labelMerge))
+                    mergedRetVal = self.acquireLocalVar()
+                    irPhi = "    {_mergedRetVal} = phi <4 x float> [{_retVal}, %{_labelEntry}], [{_patchedRetVal}, %{_labelPatch}]\n" \
+                        .format(_mergedRetVal = mergedRetVal,
+                                _retVal        = retVals[i],
+                                _labelEntry    = labelEntry,
+                                _patchedRetVal = patchedRetVals[i],
+                                _labelPatch    = labelPatch)
+                    irOut.write(irPhi)
+                    retVals[i] = mergedRetVal
 
         if not self._hasConstOffsets:
             retVal  = self.genCastReturnValToSampledType(retVals[0], irOut)
@@ -2681,7 +3089,7 @@ class DimAwareImageSampleGen(CodeGen):
         if not hasLlvmDecl(funcName):
             # Adds LLVM declaration for this function
             params = self.getIntrinsicParam(True)
-            sparseRetType, retType, retNumComp = self.getDimAwareBackendRetType(self._supportSparse)
+            sparseRetType, retType, retNumComp = self.getDimAwareBackendDataType(self._supportSparse)
             funcExternalDecl = "declare %s @%s(%s) %s\n" % (self._supportSparse and sparseRetType or retType,
                                                                 funcName,
                                                                 params,

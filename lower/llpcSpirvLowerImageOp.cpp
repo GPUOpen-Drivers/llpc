@@ -53,7 +53,7 @@ opt<bool> EnableDimAwareImageIntrinsic(
     "enable-dim-aware-image-intrinsic",
     desc("Enable dimension-aware image instrinsic in AMDGPU backend, sparse image function will always" \
          "use dimension aware image intrinsic."),
-    init(false));
+    init(true));
 }
 
 }
@@ -442,12 +442,27 @@ void SpirvLowerImageOp::visitCallInst(
             {
                 // Choose dimension aware image intrinsic or old image intrinsic, sparse image function will always
                 // use dimension aware image intrinsic.
+                bool enableDimAwareImageIntrinsic = cl::EnableDimAwareImageIntrinsic;
                 if ((callName.find(gSPIRVName::ImageCallModSparse) != std::string::npos) ||
-                    ((cl::EnableDimAwareImageIntrinsic == true) &&
+                    ((enableDimAwareImageIntrinsic == true) &&
                      ((imageCallMeta.OpKind == ImageOpSample) ||
                       (imageCallMeta.OpKind == ImageOpGather) ||
                       (imageCallMeta.OpKind == ImageOpFetch)  ||
-                      (imageCallMeta.OpKind == ImageOpRead))))
+                      (imageCallMeta.OpKind == ImageOpRead)   ||
+                      (imageCallMeta.OpKind == ImageOpWrite)  ||
+                      (imageCallMeta.OpKind == ImageOpAtomicExchange) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicCompareExchange) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicIIncrement) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicIDecrement) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicIAdd) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicISub) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicSMin) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicUMin) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicSMax) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicUMax) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicAnd) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicOr) ||
+                      (imageCallMeta.OpKind == ImageOpAtomicXor))))
                 {
                     callName += gSPIRVName::ImageCallDimAwareSuffix;
                 }
