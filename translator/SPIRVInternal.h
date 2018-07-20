@@ -356,6 +356,9 @@ namespace gSPIRVName {
   const static char ImageCallModConstOffsets[]            = ".constoffsets";
   const static char ImageCallModSample[]                  = ".sample";
   const static char ImageCallModMinLod[]                  = ".minlod";
+#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
+  const static char ImageCallModAnisoLod[]                = ".anisolod";
+#endif
   const static char ImageCallModFmaskBased[]              = ".fmaskbased";
   const static char ImageCallModFmaskId[]                 = ".fmaskid";
   const static char ImageCallModFmaskValue[]              = ".fmaskvalue";
@@ -412,7 +415,8 @@ namespace gSPIRVMD {
   const static char ImageMemory[]       = "spirv.ImageMemory";
   const static char BufferLoad[]        = "spirv.BufferLoad";
   const static char BufferStore[]       = "spirv.BufferStore";
-  const static char AccessChainp[]      = "spirv.AccessChain";
+  const static char AccessChain[]       = "spirv.AccessChain";
+  const static char StorageBufferCall[] = "spirv.StorageBufferCall";
 }
 
 enum SPIRVBlockTypeKind {

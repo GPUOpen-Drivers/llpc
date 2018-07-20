@@ -388,7 +388,7 @@ void SpirvLowerBufferOp::visitCallInst(
             }
         }
     }
-    else if (mangledName.find(gSPIRVMD::AccessChainp) != std::string::npos)
+    else if (mangledName.find(gSPIRVMD::AccessChain) != std::string::npos)
     {
         uint32_t operandIdx = 0;
         Constant* pResultMeta = nullptr;
@@ -397,40 +397,16 @@ void SpirvLowerBufferOp::visitCallInst(
         std::vector<Value*> indexOperands(callInst.getNumOperands() - 3);
         std::copy(callInst.op_begin() + 2, callInst.op_end() - 1, indexOperands.begin());
 
-        Value* pDesc = nullptr;
         Value* pBlockOffset = getInt32(m_pModule, 0);
-        MDNode* pResMetaNode = nullptr;
-        MDNode* pBlockMetaNode = nullptr;
         auto pLoadTy = callInst.getOperand(1)->getType();
-        Value* pOffset = nullptr;
 
         LLPC_ASSERT(DescriptorSizeBuffer == 4);
         auto pVec4Ty = VectorType::get(Type::getInt32Ty(*m_pContext), DescriptorSizeBuffer);
 
-        if (isa<GlobalVariable>(pSrc))
-        {
-            auto pGlobal = dyn_cast<GlobalVariable>(pSrc);
-            pResMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-            pBlockMetaNode = pGlobal->getMetadata(gSPIRVMD::Block);
-            auto pDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
-            auto pBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
-            auto pLoadType = callInst.getOperand(1)->getType()->getPointerElementType();
-            if (pLoadType->isArrayTy())
-            {
-                pBlockOffset = indexOperands[2];
-            }
-            Value* args[] = { pDescSet, pBinding, pBlockOffset };
-            Attribute::AttrKind attr[] = { Attribute::NoUnwind };
-            pDesc = EmitCall(m_pModule, LlpcName::DescriptorLoadBuffer, pVec4Ty, args, attr, &callInst);
-            pOffset = getInt32(m_pModule, 0);
-        }
-        else
-        {
-            auto pInst = dyn_cast<Instruction>(pSrc);
-            pBlockMetaNode = pInst->getMetadata(gSPIRVMD::Block);
-            pDesc = ExtractValueInst::Create(pSrc, { 0 }, "", &callInst);
-            pOffset = ExtractValueInst::Create(pSrc, { 1 }, "", &callInst);
-        }
+        auto pInst = cast<Instruction>(pSrc);
+        MDNode* pBlockMetaNode = pInst->getMetadata(gSPIRVMD::Block);
+        Value* pDesc  = ExtractValueInst::Create(pSrc, { 0 }, "", &callInst);
+        Value* pOffset = ExtractValueInst::Create(pSrc, { 1 }, "", &callInst);
 
         Constant* pBlockMeta = mdconst::dyn_extract<Constant>(pBlockMetaNode->getOperand(0));
         auto pStructTy = StructType::get(*m_pContext, { pVec4Ty, Type::getInt32Ty(*m_pContext) });
@@ -446,7 +422,7 @@ void SpirvLowerBufferOp::visitCallInst(
         Value* pStruct = UndefValue::get(pStructTy);
         pStruct = InsertValueInst::Create(pStruct, pDesc, 0, "", &callInst);
         pStruct = InsertValueInst::Create(pStruct, pOffset, 1, "", &callInst);
-        Instruction* pInst = dyn_cast<Instruction>(pStruct);
+        pInst = cast<Instruction>(pStruct);
         pInst->setMetadata(gSPIRVMD::Block, callInst.getMetadata(gSPIRVMD::Block));
         callInst.replaceAllUsesWith(pStruct);
         m_callInsts.insert(&callInst);
@@ -485,6 +461,29 @@ void SpirvLowerBufferOp::visitCallInst(
                                pOffset,
                                pBlockMeta,
                                &callInst);
+        m_callInsts.insert(&callInst);
+    }
+    else if (mangledName.find(gSPIRVMD::StorageBufferCall) != std::string::npos)
+    {
+        // Translate the emulation getter call of storage buffer variable
+        // to the structure information for variable pointer
+        Value* pSrc = callInst.getOperand(0);
+        LLPC_ASSERT(isa<GlobalVariable>(pSrc));
+        auto pBlockVarPtr = dyn_cast<GlobalVariable>(pSrc);
+        MDNode* pResMetaNode = pBlockVarPtr->getMetadata(gSPIRVMD::Resource);
+        auto pDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
+        auto pBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
+        auto pConstZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
+        Value* args[] = { pDescSet, pBinding, pConstZero };
+        auto pVec4Ty = m_pContext->Int32x4Ty();
+        auto pDesc = EmitCall(m_pModule, LlpcName::DescriptorLoadBuffer, pVec4Ty, args, NoAttrib, &callInst);
+        auto pStructTy = StructType::get(*m_pContext, { pVec4Ty, Type::getInt32Ty(*m_pContext) });
+        Value* pStruct = UndefValue::get(pStructTy);
+        pStruct = InsertValueInst::Create(pStruct, pDesc, 0, "", &callInst);
+        pStruct = InsertValueInst::Create(pStruct, pConstZero, 1, "", &callInst);
+        Instruction* pInst = dyn_cast<Instruction>(pStruct);
+        pInst->setMetadata(gSPIRVMD::Block, pBlockVarPtr->getMetadata(gSPIRVMD::Block));
+        callInst.replaceAllUsesWith(pStruct);
         m_callInsts.insert(&callInst);
     }
 }

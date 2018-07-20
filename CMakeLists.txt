@@ -142,6 +142,8 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/include
     PRIVATE
         ${PROJECT_SOURCE_DIR}/context
+        ${PROJECT_SOURCE_DIR}/imported/chip/gfx6
+        ${PROJECT_SOURCE_DIR}/imported/chip/gfx9
         ${PROJECT_SOURCE_DIR}/imported/metrohash/src
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
@@ -154,8 +156,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/translator/libSPIRV
         ${PROJECT_SOURCE_DIR}/translator/Mangler
         ${PROJECT_SOURCE_DIR}/util
-        ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
-        ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}

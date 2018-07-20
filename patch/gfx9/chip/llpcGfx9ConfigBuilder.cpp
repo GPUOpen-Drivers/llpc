@@ -53,9 +53,7 @@ namespace Gfx9
 {
 
 #include "gfx9_plus_merged_enum.h"
-#include "gfx9_plus_merged_mask.h"
 #include "gfx9_plus_merged_offset.h"
-#include "gfx9_plus_merged_shift.h"
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS).
@@ -298,11 +296,11 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
 
         if (gfxIp.major == 9)
         {
-            regVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09 vgtGsMaxPrimsPerSubgroup = {};
+            regVGT_GS_MAX_PRIMS_PER_SUBGROUP vgtGsMaxPrimsPerSubgroup = {};
             vgtGsMaxPrimsPerSubgroup.bits.MAX_PRIMS_PER_SUBGROUP =
                 GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP) *
                 GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT);
-            SET_DYN_REG(pConfig, mmVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09, vgtGsMaxPrimsPerSubgroup.u32All);
+            SET_DYN_REG(pConfig, Gfx09::mmVGT_GS_MAX_PRIMS_PER_SUBGROUP, vgtGsMaxPrimsPerSubgroup.u32All);
         }
         else
         {
@@ -425,11 +423,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
 
         if (gfxIp.major == 9)
         {
-            regVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09 vgtGsMaxPrimsPerSubgroup = {};
+            regVGT_GS_MAX_PRIMS_PER_SUBGROUP vgtGsMaxPrimsPerSubgroup = {};
             vgtGsMaxPrimsPerSubgroup.bits.MAX_PRIMS_PER_SUBGROUP =
                 GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP) *
                 GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT);
-            SET_DYN_REG(pConfig, mmVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09, vgtGsMaxPrimsPerSubgroup.u32All);
+            SET_DYN_REG(pConfig, Gfx09::mmVGT_GS_MAX_PRIMS_PER_SUBGROUP, vgtGsMaxPrimsPerSubgroup.u32All);
         }
         else
         {
@@ -552,7 +550,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         if (shaderStage == ShaderStageCopyShader)
         {
             // NOTE: For copy shader, we use fixed number of user data registers.
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
+            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
             SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pContext->GetGpuProperty()->maxSgprsAvailable);
             SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pContext->GetGpuProperty()->maxVgprsAvailable);
         }
@@ -561,8 +559,8 @@ Result ConfigBuilder::BuildVsRegConfig(
             const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, pShaderInfo->options.debugMode);
 
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
+            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
 
             SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
             SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
@@ -653,7 +651,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         {
             if (gfxIp.major == 9)
             {
-                SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
+                SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
             }
             else
             {
@@ -715,15 +713,14 @@ Result ConfigBuilder::BuildVsRegConfig(
     {
         if (gfxIp.major == 9)
         {
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
         }
         else
         {
-            LLPC_NOT_IMPLEMENTED();
         }
     }
 
@@ -731,10 +728,10 @@ Result ConfigBuilder::BuildVsRegConfig(
     {
         if (gfxIp.major == 9)
         {
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
             if (clipDistanceCount + cullDistanceCount > 4)
             {
-                SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST1_VEC_ENA, true);
+                SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST1_VEC_ENA, true);
             }
         }
         else
@@ -833,11 +830,11 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     if (gfxIp.major == 9)
     {
 
-        SET_REG_FIELD_GFX9(&pConfig->m_lsHsRegs,
+        SET_REG_FIELD(&pConfig->m_lsHsRegs,
                            SPI_SHADER_PGM_RSRC2_HS,
                            TRAP_PRESENT,
                            pTcsShaderInfo->options.trapPresent);
-        SET_REG_FIELD_GFX9(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
+        SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
     }
     else
     {
@@ -860,7 +857,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
 
     if (gfxIp.major == 9)
     {
-        SET_REG_FIELD_GFX9(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
+        SET_REG_GFX9_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
     }
     else
     {
@@ -893,7 +890,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
                      pContext,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                     mmSPI_SHADER_USER_DATA_LS_0__GFX09,
+                     Gfx09::mmSPI_SHADER_USER_DATA_LS_0,
                      pConfig);
     }
     else
@@ -968,11 +965,11 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     if (gfxIp.major == 9)
     {
 
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs,
+        SET_REG_FIELD(&pConfig->m_esGsRegs,
                            SPI_SHADER_PGM_RSRC2_GS,
                            TRAP_PRESENT,
                            pGsShaderInfo->options.trapPresent);
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
+        SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
     }
     else
     {
@@ -996,7 +993,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
         {
             if (gfxIp.major == 9)
             {
-                SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
+                SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
             }
             else
             {
@@ -1014,11 +1011,11 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     if (gfxIp.major == 9)
     {
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
+        SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
 
         const auto ldsSizeDwordGranularityShift = pContext->GetGpuProperty()->ldsSizeDwordGranularityShift;
 
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs,
+        SET_REG_FIELD(&pConfig->m_esGsRegs,
                            SPI_SHADER_PGM_RSRC2_GS,
                            LDS_SIZE,
                            calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
@@ -1139,8 +1136,8 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     if (gfxIp.major == 9)
     {
-        SET_REG_FIELD_GFX9(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
-        SET_REG_FIELD_GFX9(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
+        SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+        SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
     }
     else
     {
@@ -1184,6 +1181,10 @@ Result ConfigBuilder::BuildPsRegConfig(
     {
         zOrder = LATE_Z;
         execOnHeirFail = true;
+    }
+    else if (pShaderInfo->options.allowReZ)
+    {
+        zOrder = EARLY_Z_THEN_RE_Z;
     }
     else
     {
@@ -1314,13 +1315,10 @@ Result ConfigBuilder::BuildPsRegConfig(
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL, UNDER_RAST_ENABLE, false);
     }
 
-    const uint32_t spiShaderPgmRsrc2Ps = GET_REG(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS);
     const uint32_t loadCollisionWaveId =
-        (spiShaderPgmRsrc2Ps & SPI_SHADER_PGM_RSRC2_PS__LOAD_COLLISION_WAVEID_MASK) >>
-         SPI_SHADER_PGM_RSRC2_PS__LOAD_COLLISION_WAVEID__SHIFT;
+        GET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_COLLISION_WAVEID);
     const uint32_t  loadIntrawaveCollision =
-        (spiShaderPgmRsrc2Ps & SPI_SHADER_PGM_RSRC2_PS__LOAD_INTRAWAVE_COLLISION_MASK) >>
-         SPI_SHADER_PGM_RSRC2_PS__LOAD_INTRAWAVE_COLLISION__SHIFT;
+        GET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_INTRAWAVE_COLLISION);
 
     SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_SHADER_CONTROL, LOAD_COLLISION_WAVEID, loadCollisionWaveId);
     SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_SHADER_CONTROL, LOAD_INTRAWAVE_COLLISION, loadIntrawaveCollision);

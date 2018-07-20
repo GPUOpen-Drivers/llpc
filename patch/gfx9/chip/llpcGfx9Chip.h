@@ -52,37 +52,48 @@ namespace Gfx9
 #define DEF_REG(_reg)               uint32_t _reg##_ID; reg##_reg _reg##_VAL;
 
 // Defines GFX-dependent fields: register ID (byte-based) and its value
-#define DEF_REG_ID_GFX9(_reg)       uint32_t            _reg##__GFX09_ID;
 #define DEF_REG_ID(_reg)            uint32_t            _reg##_ID;
-
-#define DEF_REG_VAL_GFX9(_reg)      reg##_reg##__GFX09  _reg##__GFX09_VAL;
 #define DEF_REG_VAL(_reg)           struct { uint32_t u32All; } _reg##_VAL;
-
-#define DEF_REG_GFX(_reg) \
-    union \
-    { \
-        DEF_REG_ID_GFX9(_reg)   \
-        DEF_REG_ID(_reg)        \
-    }; \
-    \
-    union \
-    { \
-        DEF_REG_VAL_GFX9(_reg)  \
-        DEF_REG_VAL(_reg)       \
-    };
 
 // Initializes register ID and its value
 #define INIT_REG(_reg)            { _reg##_ID = mm##_reg; _reg##_VAL.u32All = 0; }
 
 // Initializes GFX-dependent register ID and its value
-#define INIT_REG_GFX9(_reg)       { _reg##_ID = mm##_reg##__GFX09; _reg##_VAL.u32All = 0; }
+#define INIT_REG_GFX9(_gfx, _reg) \
+{ \
+    if (_gfx == 9) \
+    { \
+        _reg##_ID         = Gfx09::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else \
+    { \
+        _reg##_ID         = InvalidMetadataKey; \
+        _reg##_VAL.u32All = InvalidMetadataValue; \
+    } \
+}
+
+#define INIT_REG_GFX10(_gfx, _reg) \
+{ \
+    if (_gfx == 10) \
+    { \
+        _reg##_ID         = Gfx10::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else \
+    { \
+        _reg##_ID         = InvalidMetadataKey; \
+        _reg##_VAL.u32All = InvalidMetadataValue; \
+    } \
+}
 
 // Case label for switch, set register value
 #define CASE_SET_REG(_stage, _reg, _val)   case (mm##_reg * 4): { (_stage)->_reg##_VAL.u32All = (_val); break; }
 
 // Adds an entry for the map from register ID to its name string
 #define ADD_REG_MAP(_reg)           RegNameMap[mm##_reg * 4] = #_reg;
-#define ADD_REG_MAP_GFX9(_reg)      RegNameMapGfx9[mm##_reg##__GFX09 * 4] = #_reg;
+
+#define ADD_REG_MAP_GFX9(_reg)      RegNameMapGfx9[Gfx09::mm##_reg * 4] = #_reg;
 
 // Gets register value
 #define GET_REG(_stage, _reg)                      ((_stage)->_reg##_VAL.u32All)
@@ -103,10 +114,10 @@ namespace Gfx9
 #define SET_REG_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.bits._field = (_val);
 
 // Gets GFX-dependent register field value
-#define GET_REG_FIELD_GFX9(_stage, _reg, _field)    ((_stage)->_reg##__GFX09_VAL.bits._field)
+#define GET_REG_GFX9_FIELD(_stage, _reg, _field)    ((_stage)->_reg##_VAL.gfx09._field)
 
 // Sets GFX-dependent register field value
-#define SET_REG_FIELD_GFX9(_stage, _reg, _field, _val)      (_stage)->_reg##__GFX09_VAL.bits._field = (_val);
+#define SET_REG_GFX9_FIELD(_stage, _reg, _field, _val)      (_stage)->_reg##_VAL.gfx09._field = (_val);
 
 // Preferred number of GS primitives per ES thread.
 constexpr uint32_t GsPrimsPerEsThread = 256;
@@ -130,15 +141,23 @@ enum VGT_GS_MODE_ONCHIP_TYPE : uint32_t
     VGT_GS_MODE_ONCHIP_ON          = 3,
 };
 
+// The register headers don't specify an enum for the values of PA_STEREO_CNTL.STEREO_MODE.
+enum StereoMode : uint32_t
+{
+    SHADER_STEREO_X                = 0,
+    STATE_STEREO_X                 = 1,
+    SHADER_STEREO_XYZW             = 2,
+};
+
 // =====================================================================================================================
 // Represents configuration of static registers relevant to hardware vertex shader.
 struct VsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_VS);
-    DEF_REG_GFX(SPI_SHADER_PGM_RSRC2_VS);
+    DEF_REG(SPI_SHADER_PGM_RSRC2_VS);
     DEF_REG(SPI_SHADER_POS_FORMAT);
     DEF_REG(SPI_VS_OUT_CONFIG);
-    DEF_REG_GFX(PA_CL_VS_OUT_CNTL);
+    DEF_REG(PA_CL_VS_OUT_CNTL);
     DEF_REG(PA_CL_CLIP_CNTL);
     DEF_REG(PA_CL_VTE_CNTL);
     DEF_REG(PA_SU_VTX_CNTL);
@@ -165,7 +184,7 @@ struct VsRegConfig
 struct LsHsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_HS);
-    DEF_REG_GFX(SPI_SHADER_PGM_RSRC2_HS);
+    DEF_REG(SPI_SHADER_PGM_RSRC2_HS);
     DEF_REG(HS_SCRATCH_BYTE_SIZE);
     DEF_REG(HS_NUM_USED_VGPRS);
     DEF_REG(HS_NUM_USED_SGPRS);
@@ -184,8 +203,8 @@ struct LsHsRegConfig
 struct EsGsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_GS);
-    DEF_REG_GFX(SPI_SHADER_PGM_RSRC2_GS);
-    DEF_REG_GFX(SPI_SHADER_PGM_RSRC4_GS);
+    DEF_REG(SPI_SHADER_PGM_RSRC2_GS);
+    DEF_REG(SPI_SHADER_PGM_RSRC4_GS);
     DEF_REG(GS_SCRATCH_BYTE_SIZE);
     DEF_REG(GS_NUM_USED_VGPRS);
     DEF_REG(GS_NUM_USED_SGPRS);
@@ -215,7 +234,7 @@ struct EsGsRegConfig
 struct PsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_PS);
-    DEF_REG_GFX(SPI_SHADER_PGM_RSRC2_PS);
+    DEF_REG(SPI_SHADER_PGM_RSRC2_PS);
     DEF_REG(SPI_SHADER_Z_FORMAT);
     DEF_REG(SPI_SHADER_COL_FORMAT);
     DEF_REG(SPI_BARYC_CNTL);

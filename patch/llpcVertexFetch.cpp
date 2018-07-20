@@ -1670,47 +1670,49 @@ void VertexFetch::AddVertexFetchInst(
         Value* pFetch = UndefValue::get(pFetchTy);
 
         // Do vertex per-component fetches
-        for (uint32_t i = 0; i < pFormatInfo->compCount; ++i)
         {
-            std::vector<Value*> args;
-            args.push_back(pVbDesc);                                                        // rsrc
-            args.push_back(compVbIndices[i]);                                               // vaddr
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offen
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]));        // inst_offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pFormatInfo->compDfmt)); // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));                  // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
-
-            Value* pCompFetch = nullptr;
-            if (is16bitFetch)
+            for (uint32_t i = 0; i < pFormatInfo->compCount; ++i)
             {
-                pCompFetch = EmitCall(m_pModule,
-                                      "llvm.amdgcn.tbuffer.load.f16",
-                                      m_pContext->Float16Ty(),
-                                      args,
-                                      NoAttrib,
-                                      pInsertPos);
+                std::vector<Value*> args;
+                args.push_back(pVbDesc);                                                        // rsrc
+                args.push_back(compVbIndices[i]);                                               // vaddr
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offen
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]));        // inst_offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pFormatInfo->compDfmt)); // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));                  // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
 
-                pCompFetch = new BitCastInst(pCompFetch, m_pContext->Int16Ty(), "", pInsertPos);
-                pCompFetch = new ZExtInst(pCompFetch, m_pContext->Int32Ty(), "", pInsertPos);
-            }
-            else
-            {
-                pCompFetch = EmitCall(m_pModule,
-                                      "llvm.amdgcn.tbuffer.load.i32",
-                                      m_pContext->Int32Ty(),
-                                      args,
-                                      NoAttrib,
-                                      pInsertPos);
-            }
+                Value* pCompFetch = nullptr;
+                if (is16bitFetch)
+                {
+                    pCompFetch = EmitCall(m_pModule,
+                                          "llvm.amdgcn.tbuffer.load.f16",
+                                          m_pContext->Float16Ty(),
+                                          args,
+                                          NoAttrib,
+                                          pInsertPos);
 
-            pFetch = InsertElementInst::Create(pFetch,
-                                               pCompFetch,
-                                               ConstantInt::get(m_pContext->Int32Ty(), i),
-                                               "",
-                                               pInsertPos);
+                    pCompFetch = new BitCastInst(pCompFetch, m_pContext->Int16Ty(), "", pInsertPos);
+                    pCompFetch = new ZExtInst(pCompFetch, m_pContext->Int32Ty(), "", pInsertPos);
+                }
+                else
+                {
+                    pCompFetch = EmitCall(m_pModule,
+                                          "llvm.amdgcn.tbuffer.load.i32",
+                                          m_pContext->Int32Ty(),
+                                          args,
+                                          NoAttrib,
+                                          pInsertPos);
+                }
+
+                pFetch = InsertElementInst::Create(pFetch,
+                                                   pCompFetch,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                   "",
+                                                   pInsertPos);
+            }
         }
 
         *ppFetch = pFetch;

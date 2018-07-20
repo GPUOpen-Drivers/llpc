@@ -209,11 +209,7 @@ Result CodeGenManager::GenerateCode(
         try
 #endif
         {
-#ifdef XGL_LLVM_UPSTREAM
             if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
-#else
-            if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, FileType))
-#endif
             {
                 success = false;
             }
