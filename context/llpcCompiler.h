@@ -41,9 +41,10 @@ namespace Llpc
 {
 
 // Forward declaration
+class ComputeContext;
 class Context;
+class GraphicsContext;
 
-// =====================================================================================================================
 // Enumerates types of shader binary.
 enum class BinaryType : uint32_t
 {
@@ -53,7 +54,6 @@ enum class BinaryType : uint32_t
     Elf,          // ELF
 };
 
-// =====================================================================================================================
 // Represents output data of building a shader module.
 struct ShaderModuleData : public ShaderModuleDataHeader
 {
@@ -84,6 +84,15 @@ struct GpuProperty
     uint32_t maxVgprsAvailable;                 // Number of max available VGPRs
 };
 
+// Represents statistics info for pipeline module
+struct PipelineStatistics
+{
+    uint32_t    numUsedVgprs;       // Number of used VGPRs
+    uint32_t    numAvailVgprs;      // Number of available VGPRs
+    bool        sgprSpill;          // Has SGPR spill
+    bool        useScratchBuffer;   // Whether scratch buffer is used
+};
+
 // =====================================================================================================================
 // Represents LLPC pipeline compiler.
 class Compiler: public ICompiler
@@ -103,6 +112,18 @@ public:
     virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pPipelineInfo,
                                         ComputePipelineBuildOut*        pPipelineOut);
 
+    Result BuildGraphicsPipelineInternal(GraphicsContext*          pGraphicsContext,
+                                         const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount],
+                                         uint32_t                  forceLoopUnrollCount,
+                                         ElfPackage*               pPipelineElf,
+                                         bool*                     pDynamicLoopUnroll);
+
+    Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
+                                        const ComputePipelineBuildInfo* pPipelineInfo,
+                                        uint32_t                        forceLoopUnrollCount,
+                                        ElfPackage*                     pPipelineElf,
+                                        bool*                           pDynamicLoopUnroll);
+
     // Gets the count of compiler instance.
     static uint32_t GetInstanceCount() { return m_instanceCount; }
 
@@ -116,6 +137,7 @@ private:
                                 const char*                  pEntryTarget,
                                 const VkSpecializationInfo*  pSpecializationInfo,
                                 llvm::LLVMContext*           pContext,
+                                uint32_t                     forceLoopUnrollCount,
                                 llvm::Module**               ppModule) const;
 
     MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
@@ -137,6 +159,16 @@ private:
     Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut) const;
     void CleanOptimizedSpirv(BinaryData* pSpirvBin) const;
     Result CollectInfoFromSpirvBinary(ShaderModuleData* pModuleData) const;
+
+    bool NeedDynamicLoopUnroll(llvm::Module* pModule) const;
+
+    void GetPipelineStatistics(const void*             pCode,
+                               size_t                  codeSize,
+                               GfxIpVersion            gfxIp,
+                               PipelineStatistics*     pPipelineStats) const;
+
+    uint32_t ChooseLoopUnrollCountCandidate(PipelineStatistics* pPipelineStats,
+                                            uint32_t            candidateCount) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

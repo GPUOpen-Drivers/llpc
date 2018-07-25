@@ -80,6 +80,10 @@ public:
 protected:
     void Init(llvm::Module* pModule);
 
+    void AddWaterFallInst(int32_t         nonUniformIndex1,
+                          int32_t         nonUniformIndex2,
+                          llvm::CallInst* pCallInst);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Module*   m_pModule;      // LLVM module to be run on

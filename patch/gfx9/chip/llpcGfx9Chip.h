@@ -42,6 +42,7 @@ namespace Gfx9
 
 #undef CS_ENABLE
 
+#include "gfx9_plus_merged_offset.h"
 #include "gfx9_plus_merged_registers.h"
 #include "gfx9_plus_merged_typedef.h"
 
@@ -59,7 +60,7 @@ namespace Gfx9
 #define INIT_REG(_reg)            { _reg##_ID = mm##_reg; _reg##_VAL.u32All = 0; }
 
 // Initializes GFX-dependent register ID and its value
-#define INIT_REG_GFX9(_gfx, _reg) \
+#define INIT_REG_GFX9_PLUS(_gfx, _reg) \
 { \
     if (_gfx == 9) \
     { \
@@ -73,11 +74,12 @@ namespace Gfx9
     } \
 }
 
-#define INIT_REG_GFX10(_gfx, _reg) \
+// GFX9 only
+#define INIT_REG_GFX9(_gfx, _reg) \
 { \
-    if (_gfx == 10) \
+    if (_gfx == 9) \
     { \
-        _reg##_ID         = Gfx10::mm##_reg; \
+        _reg##_ID         = Gfx09::mm##_reg; \
         _reg##_VAL.u32All = 0; \
     } \
     else \
@@ -125,6 +127,12 @@ constexpr uint32_t GsPrimsPerEsThread = 256;
 // Preferred number of GS threads per VS thread.
 constexpr uint32_t GsThreadsPerVsThread = 2;
 
+// Max number of threads per subgroup in NGG mode.
+constexpr uint32_t NggGsMaxThreadsPerSubgroup = 256;
+
+// Max number of GS output primitives in NGG mode.
+constexpr uint32_t NggGsMaxOutPrims = 256;
+
 // Max size of primitives per subgroup for adjacency primitives or when GS instancing is used. This restriction is
 // applicable only when onchip GS is used.
 constexpr uint32_t OnChipGsMaxPrimPerSubgroup    = 255;
@@ -132,7 +140,7 @@ constexpr uint32_t OnChipGsMaxPrimPerSubgroupAdj = 127;
 constexpr uint32_t OnChipGsMaxEsVertsPerSubgroup = 255;
 
 // Default value for the maximum LDS size per GS subgroup, in DWORD's.
-constexpr uint32_t DefaultLdsSizePerSubGroup = 8192;
+constexpr uint32_t DefaultLdsSizePerSubgroup = 8192;
 
 // The register headers don't specify an enum for the values of VGT_GS_MODE.ONCHIP.
 enum VGT_GS_MODE_ONCHIP_TYPE : uint32_t
@@ -162,12 +170,6 @@ struct VsRegConfig
     DEF_REG(PA_CL_VTE_CNTL);
     DEF_REG(PA_SU_VTX_CNTL);
     DEF_REG(VGT_PRIMITIVEID_EN);
-    //DEF_REG(VGT_STRMOUT_CONFIG);        // Always zero for LLPC
-    DEF_REG(VGT_STRMOUT_BUFFER_CONFIG); // Always zero for LLPC
-    DEF_REG(VGT_STRMOUT_VTX_STRIDE_0);  // Always zero for LLPC
-    DEF_REG(VGT_STRMOUT_VTX_STRIDE_1);  // Always zero for LLPC
-    DEF_REG(VGT_STRMOUT_VTX_STRIDE_2);  // Always zero for LLPC
-    DEF_REG(VGT_STRMOUT_VTX_STRIDE_3);  // Always zero for LLPC
     DEF_REG(VGT_REUSE_OFF);
     DEF_REG(VS_SCRATCH_BYTE_SIZE);
     DEF_REG(VS_NUM_USED_VGPRS);
@@ -225,6 +227,7 @@ struct EsGsRegConfig
     DEF_REG(VGT_GSVS_RING_OFFSET_3);
     DEF_REG(VGT_GS_MODE);
     DEF_REG(VGT_ESGS_RING_ITEMSIZE);
+    DEF_REG(VGT_GS_MAX_PRIMS_PER_SUBGROUP);
 
     void Init(GfxIpVersion gfxIp);
 };
@@ -332,6 +335,7 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
 
     void Init(GfxIpVersion gfxIp);
+
     // Get total register's count of this pipeline
     uint32_t GetRegCount() const
     {
@@ -347,8 +351,7 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     static const uint32_t MaxDynamicRegs = 32 + // mmSPI_SHADER_USER_DATA_ES_0~31
                                            32 + // mmSPI_SHADER_USER_DATA_PS_0~31
                                            32 + // mmSPI_SHADER_USER_DATA_VS_0~31
-                                           32 + // mmSPI_PS_INPUT_CNTL_0~31
-                                           1;   // mmVGT_GS_MAX_PRIMS_PER_SUBGROUP
+                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
 
     EsGsRegConfig m_esGsRegs;   // VS-GS -> hardware ES-GS
     PsRegConfig   m_psRegs;     // FS -> hardware PS
@@ -368,6 +371,7 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
 
     void Init(GfxIpVersion gfxIp);
+
     // Get total register's count of this pipeline
     uint32_t GetRegCount() const
     {
@@ -432,7 +436,8 @@ struct CsRegConfig
     DEF_REG(CS_NUM_USED_SGPRS);
     DEF_REG(CS_NUM_AVAIL_VGPRS);
     DEF_REG(CS_NUM_AVAIL_SGPRS);
-    void Init();
+
+    void Init(GfxIpVersion gfxIp);
 };
 
 // =====================================================================================================================
@@ -448,7 +453,7 @@ struct PipelineCsRegConfig: public PipelineRegConfig
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
 
-    void Init();
+    void Init(GfxIpVersion gfxIp);
 
     // Get total register's count of this pipeline
     uint32_t GetRegCount() const

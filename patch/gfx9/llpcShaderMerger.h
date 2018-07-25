@@ -94,7 +94,8 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    Context*    m_pContext;     // LLPC context
+    Context*        m_pContext; // LLPC context
+    GfxIpVersion    m_gfxIp;    // Graphics IP version info
 
     bool        m_hasVs;        // Whether the pipeline has vertex shader
     bool        m_hasTcs;       // Whether the pipeline has tessellation control shader

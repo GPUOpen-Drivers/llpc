@@ -198,6 +198,7 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
     lower/llpcSpirvLowerImageOp.cpp
+    lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerOpt.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
 )
@@ -271,6 +272,7 @@ target_sources(llpc PRIVATE
     util/llpcFile.cpp
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
+    util/llpcPassLoopInfoCollect.cpp
     util/llpcPassNonNativeFuncRemove.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp

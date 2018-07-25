@@ -131,6 +131,8 @@ private:
     std::unordered_set<llvm::Instruction*>   m_loadInsts;  // List of "load" instructions
     std::unordered_set<llvm::Instruction*>   m_storeInsts; // List of "store" instructions
     std::unordered_set<llvm::Instruction*>   m_callInsts;  // List of "call" instructions (array length or atomic operations)
+
+    bool m_restoreMeta;                                    // Restore metadata from metadata instructions
 };
 
 } // Llpc

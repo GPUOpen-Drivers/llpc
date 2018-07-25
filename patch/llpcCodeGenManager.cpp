@@ -57,8 +57,9 @@ namespace llvm
 namespace cl
 {
 
-// -enable-pipeline-dump: enable pipeline info dump
 extern opt<bool> EnablePipelineDump;
+
+extern opt<bool> EnableDynamicLoopUnroll;
 
 // -enable-si-scheduler: enable target option si-scheduler
 static opt<bool> EnableSiScheduler("enable-si-scheduler",
@@ -141,6 +142,7 @@ Result CodeGenManager::CreateTargetMachine(
 
         if (cl::EnablePipelineDump ||
             EnableOuts() ||
+            cl::EnableDynamicLoopUnroll ||
             pPipelineOptions->includeDisassembly)
         {
             features += ",+DumpCode";
@@ -330,7 +332,9 @@ Result CodeGenManager::BuildGraphicsPipelineRegConfig(
         }
         else
         {
-            result = Gfx9::ConfigBuilder::BuildPipelineVsFsRegConfig(pContext, ppConfig, pConfigSize);
+            {
+                result = Gfx9::ConfigBuilder::BuildPipelineVsFsRegConfig(pContext, ppConfig, pConfigSize);
+            }
         }
     }
     else if (hasTs && (hasGs == false))
@@ -342,7 +346,9 @@ Result CodeGenManager::BuildGraphicsPipelineRegConfig(
         }
         else
         {
-            result = Gfx9::ConfigBuilder::BuildPipelineVsTsFsRegConfig(pContext, ppConfig, pConfigSize);
+            {
+                result = Gfx9::ConfigBuilder::BuildPipelineVsTsFsRegConfig(pContext, ppConfig, pConfigSize);
+            }
         }
     }
     else if ((hasTs == false) && hasGs)
@@ -354,7 +360,9 @@ Result CodeGenManager::BuildGraphicsPipelineRegConfig(
         }
         else
         {
-            result = Gfx9::ConfigBuilder::BuildPipelineVsGsFsRegConfig(pContext, ppConfig, pConfigSize);
+            {
+                result = Gfx9::ConfigBuilder::BuildPipelineVsGsFsRegConfig(pContext, ppConfig, pConfigSize);
+            }
         }
     }
     else
@@ -366,7 +374,9 @@ Result CodeGenManager::BuildGraphicsPipelineRegConfig(
         }
         else
         {
-            result = Gfx9::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(pContext, ppConfig, pConfigSize);
+            {
+                result = Gfx9::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(pContext, ppConfig, pConfigSize);
+            }
         }
     }
 

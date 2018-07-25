@@ -507,6 +507,7 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_TF_BUFFER_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
 
         inoutUsage.pTessFactorBufDesc = EmitCall(m_pModule,
                                                  LlpcName::DescriptorLoadBuffer,
@@ -520,6 +521,7 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_HS_BUFFER0_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
 
         inoutUsage.pOffChipLdsDesc = EmitCall(m_pModule,
                                               LlpcName::DescriptorLoadBuffer,
@@ -569,6 +571,7 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_HS_BUFFER0_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
 
         inOutUsage.pOffChipLdsDesc = EmitCall(m_pModule,
                                                  LlpcName::DescriptorLoadBuffer,
@@ -602,6 +605,8 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_GS_RING_IN_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
+
         auto pEsGsRingBufDesc = EmitCall(m_pModule,
                                          LlpcName::DescriptorLoadBuffer,
                                          m_pContext->Int32x4Ty(),
@@ -686,6 +691,8 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_ES_RING_OUT_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
+
         auto pEsGsRingBufDesc = EmitCall(m_pModule,
                                          LlpcName::DescriptorLoadBuffer,
                                          m_pContext->Int32x4Ty(),

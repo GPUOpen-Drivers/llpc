@@ -106,9 +106,6 @@ cl::opt<bool> SPIRVGenFastMath("spirv-gen-fast-math",
     cl::init(true), cl::desc("Enable fast math mode with generating floating"
                               "point binary ops"));
 
-cl::opt<int> SPIRVLoopUnrollCount("spirv-loop-unroll-count",
-    cl::init(32), cl::desc("Set loop unroll count"));
-
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -314,7 +311,7 @@ public:
     const SPIRVSpecConstMap &TheSpecConstMap)
     :M(LLVMModule), BM(TheSPIRVModule), IsKernel(true), EnableLoopUnroll(false),
     EnableVarPtr(false), EntryTarget(nullptr),
-    SpecConstMap(TheSpecConstMap), DbgTran(BM, M){
+    SpecConstMap(TheSpecConstMap), DbgTran(BM, M), LoopUnrollCount(0){
     assert(M);
     Context = &M->getContext();
   }
@@ -322,6 +319,10 @@ public:
   std::string getOCLBuiltinName(SPIRVInstruction *BI);
   std::string getOCLConvertBuiltinName(SPIRVInstruction *BI);
   std::string getOCLGenericCastToPtrName(SPIRVInstruction *BI);
+
+  void setLoopUnrollCount(uint32_t Count){
+    LoopUnrollCount = Count;
+  }
 
   Type *transType(SPIRVType *BT, bool IsClassMember = false);
   std::string transTypeToOCLTypeName(SPIRVType *BT, bool IsSigned = true);
@@ -463,6 +464,8 @@ private:
   SPIRVToLLVMPlaceholderMap PlaceholderMap;
   SPIRVToLLVMDbgTran DbgTran;
   std::map<std::string, uint32_t> MangleNameToIndex;
+  uint32_t LoopUnrollCount;
+
   Type *mapType(SPIRVType *BT, Type *T) {
     SPIRVDBG(dbgs() << *T << '\n';)
     TypeMap[BT] = T;
@@ -999,9 +1002,15 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   // "LoopControlDependencyLengthMask". Currently, they are safely ignored.
   if (LM->getLoopControl() == LoopControlMaskNone) {
     if (EnableLoopUnroll) {
+      // Default loop unroll count is 32.
+      uint32_t unrollCount = 32;
+      if (LoopUnrollCount > 0) {
+          unrollCount = LoopUnrollCount;
+      }
+
       Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
       MD = ConstantAsMetadata::get(
-        ConstantInt::get(Type::getInt32Ty(*Context), SPIRVLoopUnrollCount));
+        ConstantInt::get(Type::getInt32Ty(*Context), unrollCount));
     } else {
       BI->setMetadata("llvm.loop", Self);
       return;
@@ -4452,6 +4461,21 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       auto BlockMDNode = MDNode::get(*Context, BlockMDs);
       Inst->setMetadata(gSPIRVMD::Block, BlockMDNode);
     }
+  } else {
+    bool IsNonUniform = BV->hasDecorate(DecorationNonUniformEXT);
+    if (IsNonUniform && isa<Instruction>(V)) {
+      std::string  MangledFuncName = "";
+      ArrayRef<Value*> Args = { V };
+      auto VoidTy = Type::getVoidTy(*Context);
+      auto BB = cast<Instruction>(V)->getParent();
+
+      // Per-instruction metadata is not safe, LLVM optimizer may remove them,
+      // so we choose to add a dummy instruction and remove them when it isn't
+      // needed.
+      mangleGlslBuiltin(gSPIRVMD::NonUniform, getTypes(Args), MangledFuncName);
+      auto F = getOrCreateFunction(M, VoidTy, getTypes(Args), MangledFuncName);
+      auto CI = CallInst::Create(F, Args, "", BB);
+    }
   }
 
   return true;
@@ -5447,13 +5471,15 @@ Value *SPIRVToLLVM::narrowBoolValue(Value *V, SPIRVType *BT, BasicBlock *BB) {
 bool llvm::readSpirv(LLVMContext &C, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
                      const SPIRVSpecConstMap &SpecConstMap, Module *&M,
-                     std::string &ErrMsg) {
+                     std::string &ErrMsg,
+                     uint32_t forceLoopUnrollCount) {
   M = new Module("", C);
   std::unique_ptr<SPIRVModule> BM(SPIRVModule::createSPIRVModule());
 
   IS >> *BM;
 
   SPIRVToLLVM BTL(M, BM.get(), SpecConstMap);
+  BTL.setLoopUnrollCount(forceLoopUnrollCount);
   bool Succeed = true;
   if (!BTL.translate(EntryExecModel, EntryName)) {
     BM->getError(ErrMsg);

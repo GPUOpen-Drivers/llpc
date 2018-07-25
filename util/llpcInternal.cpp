@@ -30,8 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-internal"
 
-#include "llvm/Analysis/CFGPrinter.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "spirvExt.h"
@@ -43,10 +41,12 @@
 #endif
 
 #include "SPIRVInternal.h"
+#include "llpcAbiMetadata.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcElf.h"
 #include "llpcInternal.h"
+#include "llpcPassLoopInfoCollect.h"
 
 using namespace llvm;
 
@@ -451,6 +451,44 @@ Value* ToInt32Value(
     return pValue;
 }
 
+// =====================================================================================================================
+// Checks whether "pValue" is a non-uniform value. Also, add it to the set of already-checked values.
+bool IsNonUniformValue(
+    Value*                      pValue,        // [in] Pointer to the value need to be checked
+    std::unordered_set<Value*>& checkedValues) // [in,out] Values which are checked
+{
+    if ((pValue != nullptr) && isa<Instruction>(pValue))
+    {
+        // Check value in set checkedValues to avoid infinite recusive
+        if (checkedValues.find(pValue) == checkedValues.end())
+        {
+            checkedValues.insert(pValue);
+
+            // Check metedata in current instructions
+            auto pInst = cast<Instruction>(pValue);
+            if (pInst->getMetadata(gSPIRVMD::NonUniform) != nullptr)
+            {
+                return true;
+            }
+
+            // Check metedata for each operands
+            for (auto& operand : pInst->operands())
+            {
+                if (isa<Instruction>(&operand))
+                {
+                    auto pOperand = cast<Instruction>(&operand);
+                    if ((pOperand != pInst) && IsNonUniformValue(pOperand, checkedValues))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
 #if defined(_WIN32)
 // =====================================================================================================================
 // Retrieves the frequency of the performance counter for CPU times.
@@ -522,48 +560,6 @@ bool IsElfBinary(
         isElfBin = pHeader->e_ident32[EI_MAG0] == ElfMagic;
     }
     return isElfBin;
-}
-
-// =====================================================================================================================
-// Dump module's CFG graph
-void DumpCfg(
-    const char*  pPostfixStr,               // [in] A postfix string
-    Module*      pModule)                   // [in] LLVM module for dump
-{
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
-    std::string cfgFileName;
-    char str[256] = {};
-
-    uint64_t hash = pContext->GetPiplineHashCode();
-    snprintf(str, 256, "Pipe_0x%016" PRIX64 "_%s_%s_", hash,
-        GetShaderStageName(GetShaderStageFromModule(pModule)),
-        pPostfixStr);
-
-    for (Function &function : *pModule)
-    {
-        if (function.empty())
-        {
-            continue;
-        }
-
-        cfgFileName = str;
-        cfgFileName += function.getName();
-        cfgFileName += ".dot";
-        cfgFileName = cl::PipelineDumpDir + "/" + cfgFileName;
-
-        LLPC_OUTS("Dumping CFG '" << cfgFileName << "'...\n");
-
-        std::error_code errCode;
-        raw_fd_ostream cfgFile(cfgFileName, errCode, sys::fs::F_Text);
-        if (!errCode)
-        {
-            WriteGraph(cfgFile, static_cast<const Function*>(&function));
-        }
-        else
-        {
-            LLPC_ERRS(" Error: fail to open file for writing!");
-        }
-    }
 }
 
 } // Llpc

@@ -30,6 +30,8 @@
  */
 #pragma once
 
+#include <unordered_set>
+
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
@@ -197,6 +199,9 @@ bool IsDontCareValue(llvm::Value* pValue);
 // Translates an integer to 32-bit integer regardless of its initial bit width.
 llvm::Value* ToInt32Value(Llpc::Context* pContext, llvm::Value* pValue, llvm::Instruction* pInsertPos);
 
+// Checks whether the specified value is a non-uniform value.
+bool IsNonUniformValue(llvm::Value* pValue, std::unordered_set<llvm::Value*>& checkedValues);
+
 // Retrieves the frequency of the performance counter for CPU times.
 int64_t GetPerfFrequency();
 
@@ -205,9 +210,6 @@ int64_t GetPerfCpuTime();
 
 // Checks whether the input data is actually a ELF binary
 bool IsElfBinary(const void* pData, size_t dataSize);
-
-// Dump module's CFG graph
-void DumpCfg(const char* pPostfixStr, llvm::Module* pModule);
 
 // =====================================================================================================================
 // Represents the special header of SPIR-V token stream (the first DWORD).

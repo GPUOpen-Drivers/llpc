@@ -113,6 +113,37 @@ void PatchImageOp::visitCallInst(
         std::string callName = mangledName.str();
         std::vector<Value*> args;
 
+        // Add waterfall instructions for non-uniform index
+        if (imageCallMeta.NonUniformResource || imageCallMeta.NonUniformSampler)
+        {
+            int32_t nonUniformIndex1 = -1;
+            int32_t nonUniformIndex2 = -1;
+            if ((imageCallMeta.OpKind == ImageOpSample) ||
+                (imageCallMeta.OpKind == ImageOpGather) ||
+                (imageCallMeta.OpKind == ImageOpQueryLod))
+            {
+                if (imageCallMeta.NonUniformResource)
+                {
+                    nonUniformIndex1 = 5;
+                    if (imageCallMeta.NonUniformSampler)
+                    {
+                        nonUniformIndex2 = 2;
+                    }
+                }
+                else if (imageCallMeta.NonUniformSampler)
+                {
+                    nonUniformIndex1 = 2;
+                }
+            }
+            else
+            {
+                LLPC_ASSERT(imageCallMeta.NonUniformSampler == 0);
+                nonUniformIndex1 = 2;
+            }
+
+            AddWaterFallInst(nonUniformIndex1, nonUniformIndex2, &callInst);
+        }
+
         if (imageCallMeta.Multisampled || (imageCallMeta.Dim == DimSubpassData))
         {
             if (imageCallMeta.Multisampled)
