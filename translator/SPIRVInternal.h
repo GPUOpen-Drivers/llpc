@@ -417,6 +417,7 @@ namespace gSPIRVMD {
   const static char BufferStore[]       = "spirv.BufferStore";
   const static char AccessChain[]       = "spirv.AccessChain";
   const static char StorageBufferCall[] = "spirv.StorageBufferCall";
+  const static char NonUniform[]        = "spirv.NonUniform";
 }
 
 enum SPIRVBlockTypeKind {
@@ -1265,11 +1266,13 @@ struct ShaderBlockDecorate {
 /// Metadata for image emulation call.
 union ShaderImageCallMetadata {
   struct {
-    SPIRVImageOpKind  OpKind        : 6;  // Kind of image operation
-    uint32_t          Dim           : 3;  // Image dimension
-    uint32_t          Arrayed       : 1;  // Whether image is arrayed
-    uint32_t          Multisampled  : 1;  // Whether image is multisampled
-    uint32_t          Unused        : 21;
+    SPIRVImageOpKind  OpKind             : 6; // Kind of image operation
+    uint32_t          Dim                : 3; // Image dimension
+    uint32_t          Arrayed            : 1; // Whether image is arrayed
+    uint32_t          Multisampled       : 1; // Whether image is multisampled
+    uint32_t          NonUniformSampler  : 1; // Whether sampler is non-uniform
+    uint32_t          NonUniformResource : 1; // Whether resource is non-uniform
+    uint32_t          Unused             : 19;
   };
   uint32_t U32All;
 };

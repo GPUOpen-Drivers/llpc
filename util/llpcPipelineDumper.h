@@ -72,6 +72,9 @@ public:
                                    GfxIpVersion                     gfxIp,
                                    const BinaryData*                pPipelineBin);
 
+    static void DumpPipelineExtraInfo(PipelineDumpFile*             pBinaryFile,
+                                      const std::string*            pStr);
+
     static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline, bool isCacheHash);
     static MetroHash::Hash GenerateHashForComputePipeline(const ComputePipelineBuildInfo* pPipeline, bool isCacheHash);
 

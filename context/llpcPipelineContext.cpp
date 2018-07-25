@@ -34,6 +34,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/CommandLine.h"
 
+#include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcPipelineContext.h"
 
@@ -291,10 +292,53 @@ void PipelineContext::AutoLayoutDescriptor(
         nodeOffset += (*pDummyResNodes)[setNodeIdx].tablePtr.nodeCount;
     }
 
-    // Set dummy color formats for fragment outputs
-    if (shaderStage == ShaderStageFragment)
+    // Shader stage specific processing
+    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo());
+
+    if (shaderStage == ShaderStageVertex)
     {
-        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo());
+        // Set primitive topology
+        auto pIaState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->iaState);
+        pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
+    else if ((shaderStage == ShaderStageTessControl) || (shaderStage == ShaderStageTessEval))
+    {
+        // Set primitive topology and patch control points
+        auto pIaState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->iaState);
+        pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        pIaState->patchControlPoints = 3;
+    }
+    else if (shaderStage == ShaderStageGeometry)
+    {
+        // Set primitive topology
+        auto pIaState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->iaState);
+
+        const auto inputPrimitive = pResUsage->builtInUsage.gs.inputPrimitive;
+        switch (inputPrimitive)
+        {
+        case InputPoints:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+            break;
+        case InputLines:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+            break;
+        case InputLinesAdjacency:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+            break;
+        case InputTriangles:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            break;
+        case InputTrianglesAdjacency:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+        }
+    }
+    else if (shaderStage == ShaderStageFragment)
+    {
+        // Set dummy color formats for fragment outputs
         auto pCbState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->cbState);
 
         const uint32_t cbShaderMask = pResUsage->inOutUsage.fs.cbShaderMask;

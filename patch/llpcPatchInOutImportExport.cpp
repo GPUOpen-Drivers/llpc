@@ -1424,21 +1424,24 @@ void PatchInOutImportExport::visitReturnInst(
             }
         }
 
-        // NOTE: If no generic outputs are present in this shader, we have to export a dummy one
-        if (inOutUsage.expCount == 0)
+        if (m_gfxIp.major <= 9)
         {
-            args.clear();
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0)); // tgt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                  // en
-            args.push_back(pUndef);                                                      // src0
-            args.push_back(pUndef);                                                      // src1
-            args.push_back(pUndef);                                                      // src2
-            args.push_back(pUndef);                                                      // src3
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));               // done
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));               // vm
+            // NOTE: If no generic outputs is present in this shader, we have to export a dummy one
+            if (inOutUsage.expCount == 0)
+            {
+                args.clear();
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0)); // tgt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                  // en
+                args.push_back(pUndef);                                                      // src0
+                args.push_back(pUndef);                                                      // src1
+                args.push_back(pUndef);                                                      // src2
+                args.push_back(pUndef);                                                      // src3
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));               // done
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));               // vm
 
-            EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
-            ++inOutUsage.expCount;
+                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                ++inOutUsage.expCount;
+            }
         }
     }
     else if (m_shaderStage == ShaderStageGeometry)

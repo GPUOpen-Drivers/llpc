@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,48 +24,54 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPatchBufferOp.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchBufferOp.
+ * @file  llpcPassLoopInfoCollect.h
+ * @brief LLPC header file: contains declaration of class Llpc::LoopInfoCollect.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include <unordered_set>
-#include "llpcPatch.h"
+#include "llvm/Analysis/LoopPass.h"
+#include "llpc.h"
 
 namespace Llpc
 {
 
+// Represents the info of loop analysis
+struct LoopAnalysisInfo
+{
+    uint32_t numAluInsts;               // Number of ALU instructions
+    uint32_t numBasicBlocks;            // Number of basic blocks
+    uint32_t nestedLevel;               // Nested loop level
+};
+
 // =====================================================================================================================
-// Represents the pass of LLVM patching operations for buffer operations
-class PatchBufferOp:
-    public Patch,
-    public llvm::InstVisitor<PatchBufferOp>
+// Represents the LLVM pass for loop info collecting.
+class LoopInfoCollect : public llvm::ModulePass
 {
 public:
-    PatchBufferOp();
+    LoopInfoCollect() : ModulePass(ID) {};
+    LoopInfoCollect(std::vector<LoopAnalysisInfo>* pInfo) : ModulePass(ID)
+    {
+        m_pLoopInfo = pInfo;
+    };
+
+    void HandleLoop(llvm::Loop* loop, uint32_t nestedLevel);
+
+    // Gets loop analysis usage
+    virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override
+    {
+        analysisUsage.addRequired<llvm::LoopInfoWrapperPass>();
+        analysisUsage.setPreservesAll();
+    }
 
     virtual bool runOnModule(llvm::Module& module);
-    virtual void visitCallInst(llvm::CallInst& callInst);
-
-    // Pass creator, creates the pass of LLVM patching opertions for buffer operations
-    static llvm::ModulePass* Create() { return new PatchBufferOp(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchBufferOp);
-
-    bool IsInlineConst(uint32_t descSet, uint32_t binding);
-    void ReplaceCallee(llvm::CallInst* pCallInst, const char* pOrigNamePrefix, const char* pNewNamePrefix);
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    std::unordered_set<llvm::CallInst*> m_replacedCalls;
+    std::vector<LoopAnalysisInfo>*  m_pLoopInfo;
 };
 
 } // Llpc

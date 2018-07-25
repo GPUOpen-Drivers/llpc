@@ -129,6 +129,7 @@ class VarNames:
     atomicComparator = "%atomicComparator"
     glc              = "%glc"
     slc              = "%slc"
+    imageCallMeta    = "%imageCallMeta"
 
 # LLVM image load/store intrinsic flags, meaning of these flags are:
 # glc, slc, lwe
@@ -660,7 +661,7 @@ class CodeGen(FuncDef):
            self._opKind == SpirvImageOpKind.gather or \
            self._opKind == SpirvImageOpKind.querylod:
             samplerBindings = "i32 %s, i32 %s, i32 %s, " % (VarNames.samplerSet, \
-                    VarNames.samplerBinding, VarNames.samplerIndex, )
+                    VarNames.samplerBinding, VarNames.samplerIndex)
 
         resourceBindings = "i32 %s, i32 %s, i32 %s" % (VarNames.resourceSet, VarNames.resourceBinding, \
                 VarNames.resourceIndex)
@@ -745,26 +746,26 @@ class CodeGen(FuncDef):
         if self._opKind == SpirvImageOpKind.sample or \
            self._opKind == SpirvImageOpKind.gather or \
            self._opKind == SpirvImageOpKind.querylod:
-            loadSampler = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s)\n" % \
+            loadSampler = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
                     (VarNames.sampler, LLPC_DESCRIPTOR_LOAD_SAMPLER, VarNames.samplerSet, \
-                    VarNames.samplerBinding, VarNames.samplerIndex)
+                    VarNames.samplerBinding, VarNames.samplerIndex, VarNames.imageCallMeta)
             irOut.write(loadSampler)
 
         if not self._returnFmaskId:
             if self._dim == SpirvDim.DimBuffer:
-                loadResource = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s)\n" % \
+                loadResource = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
                         (VarNames.resource, LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, VarNames.resourceSet, \
-                        VarNames.resourceBinding, VarNames.resourceIndex)
+                        VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
             else:
-                loadResource = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s)\n" % \
+                loadResource = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
                         (VarNames.resource, LLPC_DESCRIPTOR_LOAD_RESOURCE, VarNames.resourceSet, \
-                        VarNames.resourceBinding, VarNames.resourceIndex)
+                        VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
             irOut.write(loadResource)
 
         if self._isFmaskBased or self._returnFmaskId:
-            loadFMask = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s)\n" % \
+            loadFMask = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
                     (VarNames.fmask, LLPC_DESCRIPTOR_LOAD_FMASK, VarNames.resourceSet, \
-                    VarNames.resourceBinding, VarNames.resourceIndex)
+                    VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
             irOut.write(loadFMask)
 
     def processReturn(self, retVal, intrinGen, irOut):
@@ -3546,13 +3547,13 @@ def processList(irOut, listIn, gfxLevel):
 
 # Initializes necessary LLVM function declarations.
 def initLlvmDecls(gfxLevel):
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_SAMPLER, "declare <4 x i32> @%s(i32 , i32 , i32) #0\n" % (\
+    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_SAMPLER, "declare <4 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
             LLPC_DESCRIPTOR_LOAD_SAMPLER))
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_RESOURCE, "declare <8 x i32> @%s(i32 , i32 , i32) #0\n" % (\
+    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_RESOURCE, "declare <8 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
             LLPC_DESCRIPTOR_LOAD_RESOURCE))
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, "declare <4 x i32> @%s(i32 , i32 , i32) #0\n" % (\
+    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, "declare <4 x i32> @%s(i32 , i32 , i32, i32) #0\n" % (\
             LLPC_DESCRIPTOR_LOAD_TEXELBUFFER))
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_FMASK, "declare <8 x i32> @%s(i32 , i32 , i32) #0\n" % (\
+    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_FMASK, "declare <8 x i32> @%s(i32 , i32 , i32, i32) #0\n" % (\
             LLPC_DESCRIPTOR_LOAD_FMASK))
     addLlvmDecl("llvm.amdgcn.cubetc", "declare float @llvm.amdgcn.cubetc(float, float, float) #0\n")
     addLlvmDecl("llvm.amdgcn.cubesc", "declare float @llvm.amdgcn.cubesc(float, float, float) #0\n")

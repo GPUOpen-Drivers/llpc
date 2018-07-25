@@ -37,6 +37,8 @@
 #include "llpcContext.h"
 #include "llpcPatchDescriptorLoad.h"
 
+#include "SPIRVInternal.h"
+
 using namespace llvm;
 using namespace Llpc;
 
@@ -190,12 +192,29 @@ void PatchDescriptorLoad::visitCallInst(
         auto pBinding = cast<ConstantInt>(callInst.getOperand(1));
         auto pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
 
+        // Check non-uniform flag
+        bool isNonUniform = false;
+        if (nodeType == ResourceMappingNodeType::DescriptorBuffer)
+        {
+            auto pIsNonUniform = cast<ConstantInt>(callInst.getOperand(3));
+            isNonUniform = pIsNonUniform->getZExtValue() ? true : false;
+        }
+        else if (nodeType != ResourceMappingNodeType::PushConst)
+        {
+            auto pImageCallMeta = cast<ConstantInt>(callInst.getOperand(3));
+            ShaderImageCallMetadata imageCallMeta = {};
+            imageCallMeta.U32All = static_cast<uint32_t>(pImageCallMeta->getZExtValue());
+            isNonUniform = (nodeType == ResourceMappingNodeType::DescriptorSampler) ?
+                           imageCallMeta.NonUniformSampler :
+                           imageCallMeta.NonUniformResource;
+        }
+
         if (isa<ConstantInt>(pArrayOffset) == false)
         {
             const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
             // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-            if (gfxIp.major > 6)
+            if ((gfxIp.major > 6) && (isNonUniform == false))
             {
                 std::vector<Value*> args;
                 args.push_back(pArrayOffset);

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,48 +24,42 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPatchBufferOp.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchBufferOp.
+ * @file  llpcSpirvLowerInstMetaRemove.h
+ * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerInstMetaRemove.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llvm/IR/InstVisitor.h"
 
-#include <unordered_set>
-#include "llpcPatch.h"
+#include "llpcSpirvLower.h"
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patching operations for buffer operations
-class PatchBufferOp:
-    public Patch,
-    public llvm::InstVisitor<PatchBufferOp>
+// Represents the pass of SPIR-V lowering opertions for removing the instruction metadata.
+class SpirvLowerInstMetaRemove:
+    public SpirvLower,
+    public llvm::InstVisitor<SpirvLowerInstMetaRemove>
 {
 public:
-    PatchBufferOp();
+    SpirvLowerInstMetaRemove();
 
     virtual bool runOnModule(llvm::Module& module);
     virtual void visitCallInst(llvm::CallInst& callInst);
 
-    // Pass creator, creates the pass of LLVM patching opertions for buffer operations
-    static llvm::ModulePass* Create() { return new PatchBufferOp(); }
+    // Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
+    static llvm::ModulePass* Create() { return new SpirvLowerInstMetaRemove(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchBufferOp);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerInstMetaRemove);
 
-    bool IsInlineConst(uint32_t descSet, uint32_t binding);
-    void ReplaceCallee(llvm::CallInst* pCallInst, const char* pOrigNamePrefix, const char* pNewNamePrefix);
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    std::unordered_set<llvm::CallInst*> m_replacedCalls;
+    bool m_changed;  // Whether the module is changed
 };
 
 } // Llpc

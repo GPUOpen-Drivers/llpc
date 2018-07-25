@@ -1176,7 +1176,9 @@ public:
     return static_cast<SPIRVBasicBlock *>(getValue(Default));
   }
   size_t getLiteralsCount() const {
-    return getSelect()->getType()->getBitWidth() / (sizeof(SPIRVWord) * 8);
+    auto SelectorBitSize = getSelect()->getType()->getBitWidth();
+    return SelectorBitSize < (sizeof(SPIRVWord) * 8) ? 1 :
+      SelectorBitSize / (sizeof(SPIRVWord) * 8);
   }
   size_t getPairSize() const { return getLiteralsCount() + 1; }
   size_t getNumPairs() const { return Pairs.size() / getPairSize(); }

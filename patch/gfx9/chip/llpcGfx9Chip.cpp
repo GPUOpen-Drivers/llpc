@@ -42,7 +42,8 @@ namespace Gfx9
 
 // =====================================================================================================================
 // Initializer
-void VsRegConfig::Init(GfxIpVersion gfxIp)
+void VsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_VS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_VS);
@@ -53,12 +54,6 @@ void VsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(PA_CL_VTE_CNTL);
     INIT_REG(PA_SU_VTX_CNTL);
     INIT_REG(VGT_PRIMITIVEID_EN);
-    //INIT_REG(VGT_STRMOUT_CONFIG);
-    INIT_REG(VGT_STRMOUT_BUFFER_CONFIG);
-    INIT_REG(VGT_STRMOUT_VTX_STRIDE_0);
-    INIT_REG(VGT_STRMOUT_VTX_STRIDE_1);
-    INIT_REG(VGT_STRMOUT_VTX_STRIDE_2);
-    INIT_REG(VGT_STRMOUT_VTX_STRIDE_3);
     INIT_REG(VGT_REUSE_OFF);
     INIT_REG(VS_SCRATCH_BYTE_SIZE);
     INIT_REG(VS_NUM_USED_VGPRS);
@@ -70,7 +65,8 @@ void VsRegConfig::Init(GfxIpVersion gfxIp)
 
 // =====================================================================================================================
 // Initializer
-void LsHsRegConfig::Init(GfxIpVersion gfxIp)
+void LsHsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_HS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_HS);
@@ -87,7 +83,8 @@ void LsHsRegConfig::Init(GfxIpVersion gfxIp)
 
 // =====================================================================================================================
 // Initializer
-void EsGsRegConfig::Init(GfxIpVersion gfxIp)
+void EsGsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
@@ -112,11 +109,13 @@ void EsGsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(VGT_GSVS_RING_OFFSET_3);
     INIT_REG(VGT_GS_MODE);
     INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+    INIT_REG_GFX9(gfxIp.major, VGT_GS_MAX_PRIMS_PER_SUBGROUP);
 }
 
 // =====================================================================================================================
 // Initializer
-void PsRegConfig::Init(GfxIpVersion gfxIp)
+void PsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(SPI_SHADER_PGM_RSRC1_PS);
     INIT_REG(SPI_SHADER_PGM_RSRC2_PS);
@@ -156,7 +155,8 @@ void PipelineRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsFsRegConfig::Init(GfxIpVersion gfxIp)
+void PipelineVsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     m_vsRegs.Init(gfxIp);
     m_psRegs.Init(gfxIp);
@@ -175,7 +175,8 @@ void PipelineVsFsRegConfig::Init(GfxIpVersion gfxIp)
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsTsFsRegConfig::Init(GfxIpVersion gfxIp)
+void PipelineVsTsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     m_lsHsRegs.Init(gfxIp);
     m_vsRegs.Init(gfxIp);
@@ -199,7 +200,8 @@ void PipelineVsTsFsRegConfig::Init(GfxIpVersion gfxIp)
 
 // =====================================================================================================================
 // Initializer
-void PipelineVsGsFsRegConfig::Init(GfxIpVersion gfxIp)
+void PipelineVsGsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     m_esGsRegs.Init(gfxIp);
     m_vsRegs.Init(gfxIp);
@@ -215,8 +217,6 @@ void PipelineVsGsFsRegConfig::Init(GfxIpVersion gfxIp)
     INIT_REG(API_PS_HASH_DWORD1);
     INIT_REG(INDIRECT_TABLE_ENTRY);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
-
-    SET_REG(this, SPILL_THRESHOLD, UINT32_MAX);
 
     m_dynRegCount = 0;
 }
@@ -250,7 +250,8 @@ void PipelineVsTsGsFsRegConfig::Init(GfxIpVersion gfxIp)
 
 // =====================================================================================================================
 // Initializer
-void CsRegConfig::Init()
+void CsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
     INIT_REG(COMPUTE_PGM_RSRC1);
     INIT_REG(COMPUTE_PGM_RSRC2);
@@ -266,9 +267,10 @@ void CsRegConfig::Init()
 
 // =====================================================================================================================
 // Initializer
-void PipelineCsRegConfig::Init()
+void PipelineCsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
 {
-    m_csRegs.Init();
+    m_csRegs.Init(gfxIp);
     PipelineRegConfig::Init();
 
     INIT_REG(API_CS_HASH_DWORD0);
@@ -364,12 +366,6 @@ void InitRegisterNameMap(
     ADD_REG_MAP(VGT_GSVS_RING_ITEMSIZE);
 
     ADD_REG_MAP(VGT_SHADER_STAGES_EN);
-    ADD_REG_MAP(VGT_STRMOUT_CONFIG);
-    ADD_REG_MAP(VGT_STRMOUT_BUFFER_CONFIG);
-    ADD_REG_MAP(VGT_STRMOUT_VTX_STRIDE_0);
-    ADD_REG_MAP(VGT_STRMOUT_VTX_STRIDE_1);
-    ADD_REG_MAP(VGT_STRMOUT_VTX_STRIDE_2);
-    ADD_REG_MAP(VGT_STRMOUT_VTX_STRIDE_3);
     ADD_REG_MAP(VGT_REUSE_OFF);
     ADD_REG_MAP(SPI_BARYC_CNTL);
 

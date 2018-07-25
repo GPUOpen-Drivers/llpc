@@ -128,7 +128,8 @@ bool readSpirv(llvm::LLVMContext &C,
                const char *EntryName,
                const SPIRV::SPIRVSpecConstMap &SpecConstMap,
                llvm::Module *&M,
-               std::string &ErrMsg);
+               std::string &ErrMsg,
+               uint32_t forceLoopUnrollCount);
 
 /// \brief Regularize LLVM module by removing entities not representable by
 /// SPIRV.

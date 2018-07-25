@@ -104,15 +104,12 @@ void PatchBufferOp::visitCallInst(
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
         auto pOffset = callInst.getOperand(3);     // Byte offset within a block
-
+        auto isNonUniform = cast<ConstantInt>(callInst.getOperand(callInst.getNumArgOperands() - 1))->getZExtValue();
         bool isInlineConst = IsInlineConst(descSet, binding);
-        bool isUniformOffset = IsUniformValue(pOffset);
 
-        // TODO: Temporarily disable the optimization of buffer uniform load/store. Will remove this workaround
-        // after LLVM backend fixes this issue.
-        if (m_pContext->GetGfxIpVersion().major <= 7)
+        if (isNonUniform != 0)
         {
-            isUniformOffset = false;
+            AddWaterFallInst(2, -1, &callInst);
         }
 
         if (mangledName.startswith(LlpcName::BufferLoad))
@@ -142,16 +139,6 @@ void PatchBufferOp::visitCallInst(
             LLPC_ASSERT(isInlineConst == false);
         }
     }
-}
-
-// =====================================================================================================================
-// Checks whether the specified value is uniform.
-//
-// TODO: The check only examines constant value. Will be improved.
-bool PatchBufferOp::IsUniformValue(
-    Value* pValue)        // [in] Input value
-{
-    return isa<Constant>(pValue);
 }
 
 // =====================================================================================================================

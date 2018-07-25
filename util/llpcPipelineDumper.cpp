@@ -554,6 +554,15 @@ void PipelineDumper::DumpPipelineBinary(
 }
 
 // =====================================================================================================================
+// Dump extra info to pipeline file.
+void PipelineDumper::DumpPipelineExtraInfo(
+    PipelineDumpFile*             pDumpFile,               // [in] Directory of pipeline dump
+    const std::string*            pStr)                     // [in] Extra info string
+{
+    pDumpFile->dumpFile << pStr;
+}
+
+// =====================================================================================================================
 // Dumps LLPC version info to file
 void PipelineDumper::DumpVersionInfo(
     std::ostream&                  dumpFile)      // [out] dump file
