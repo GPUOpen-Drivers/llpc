@@ -106,9 +106,6 @@ cl::opt<bool> SPIRVGenFastMath("spirv-gen-fast-math",
     cl::init(true), cl::desc("Enable fast math mode with generating floating"
                               "point binary ops"));
 
-cl::opt<int> SPIRVLoopUnrollCount("spirv-loop-unroll-count",
-    cl::init(32), cl::desc("Set loop unroll count"));
-
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -313,8 +310,8 @@ public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
     const SPIRVSpecConstMap &TheSpecConstMap)
     :M(LLVMModule), BM(TheSPIRVModule), IsKernel(true), EnableLoopUnroll(false),
-    EnableVarPtrStorageBuf(false), EntryTarget(nullptr),
-    SpecConstMap(TheSpecConstMap), DbgTran(BM, M){
+    EnableVarPtr(false), EntryTarget(nullptr),
+    SpecConstMap(TheSpecConstMap), DbgTran(BM, M), LoopUnrollCount(0){
     assert(M);
     Context = &M->getContext();
   }
@@ -322,6 +319,10 @@ public:
   std::string getOCLBuiltinName(SPIRVInstruction *BI);
   std::string getOCLConvertBuiltinName(SPIRVInstruction *BI);
   std::string getOCLGenericCastToPtrName(SPIRVInstruction *BI);
+
+  void setLoopUnrollCount(uint32_t Count){
+    LoopUnrollCount = Count;
+  }
 
   Type *transType(SPIRVType *BT, bool IsClassMember = false);
   std::string transTypeToOCLTypeName(SPIRVType *BT, bool IsSigned = true);
@@ -453,7 +454,7 @@ private:
   SPIRVModule *BM;
   bool IsKernel;
   bool EnableLoopUnroll;
-  bool EnableVarPtrStorageBuf;
+  bool EnableVarPtr;
   SPIRVFunction* EntryTarget;
   const SPIRVSpecConstMap &SpecConstMap;
   SPIRVToLLVMTypeMap TypeMap;
@@ -463,6 +464,8 @@ private:
   SPIRVToLLVMPlaceholderMap PlaceholderMap;
   SPIRVToLLVMDbgTran DbgTran;
   std::map<std::string, uint32_t> MangleNameToIndex;
+  uint32_t LoopUnrollCount;
+
   Type *mapType(SPIRVType *BT, Type *T) {
     SPIRVDBG(dbgs() << *T << '\n';)
     TypeMap[BT] = T;
@@ -786,7 +789,7 @@ Type *SPIRVToLLVM::transType(SPIRVType *T, bool IsClassMember) {
         SPIRVWORD_MAX));
   case OpTypePointer:
       if ((T->getPointerStorageClass() == StorageClassStorageBuffer) &&
-        EnableVarPtrStorageBuf) {
+        EnableVarPtr) {
         // NOTE: Pointer to storage buffer will be converted to this structure <descriptor, offset>.
         assert(DescriptorSizeBuffer == 4);
         auto Vec4Ty = VectorType::get(Type::getInt32Ty(*Context), DescriptorSizeBuffer);
@@ -999,9 +1002,15 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   // "LoopControlDependencyLengthMask". Currently, they are safely ignored.
   if (LM->getLoopControl() == LoopControlMaskNone) {
     if (EnableLoopUnroll) {
+      // Default loop unroll count is 32.
+      uint32_t unrollCount = 32;
+      if (LoopUnrollCount > 0) {
+          unrollCount = LoopUnrollCount;
+      }
+
       Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
       MD = ConstantAsMetadata::get(
-        ConstantInt::get(Type::getInt32Ty(*Context), SPIRVLoopUnrollCount));
+        ConstantInt::get(Type::getInt32Ty(*Context), unrollCount));
     } else {
       BI->setMetadata("llvm.loop", Self);
       return;
@@ -1037,6 +1046,41 @@ void SPIRVToLLVM::insertImageNameAccessQualifier(SPIRV::SPIRVTypeImage *ST,
 Value *SPIRVToLLVM::transValue(SPIRVValue *BV, Function *F, BasicBlock *BB,
                                bool CreatePlaceHolder) {
   SPIRVToLLVMValueMap::iterator Loc = ValueMap.find(BV);
+
+  // Replace storage buffer variable with the emulation getter call
+  if (EnableVarPtr && (BV->getOpCode() == OpVariable) &&
+    ((static_cast<SPIRVVariable*>(BV))->getStorageClass()
+      == StorageClassStorageBuffer) &&
+    (BB != nullptr) && (Loc != ValueMap.end())){
+    Value* GV = Loc->second;
+    auto ArgTys = { GV->getType() };
+    auto RetTy = transType(BV->getType(), false);
+    std::string MangledName = "";
+    uint32_t MangleIdx = 0;
+    mangleGlslBuiltin(gSPIRVMD::StorageBufferCall, ArgTys, MangledName);
+
+    // Replace complex mangle name with simple mangle index ext
+    if (MangleNameToIndex.find(MangledName) == MangleNameToIndex.end()) {
+      MangleIdx = MangleNameToIndex.size();
+      MangleNameToIndex[MangledName] = MangleIdx;
+    }
+    else
+      MangleIdx = MangleNameToIndex[MangledName];
+
+    MangledName = gSPIRVMD::StorageBufferCall + std::to_string(MangleIdx);
+    auto NewF = getOrCreateFunction(M, RetTy, ArgTys, MangledName);
+    BasicBlock* EntryBB = &*BB->getParent()->begin();
+    Value* NewCall = nullptr;
+    if (EntryBB->size() > 0) {
+      auto InsertPt = EntryBB->getFirstInsertionPt();
+      NewCall = CallInst::Create(NewF, { GV }, "", &*InsertPt);
+    } else
+      // Empty Block
+      NewCall = CallInst::Create(NewF, { GV }, "", EntryBB);
+
+    return NewCall;
+  }
+
   if (Loc != ValueMap.end() && (!PlaceholderMap.count(BV) || CreatePlaceHolder))
     return Loc->second;
 
@@ -1642,8 +1686,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     llvm::GlobalValue::LinkageTypes LinkageTy = transLinkageType(BVar);
     Constant *Initializer = nullptr;
     SPIRVValue *Init = BVar->getInitializer();
-    if (Init)
+    if (Init) {
       Initializer = dyn_cast<Constant>(transValue(Init, F, BB, false));
+      Initializer = widenBoolConstant(Initializer);
+    }
     else if (LinkageTy == GlobalValue::CommonLinkage)
       // In LLVM variables with common linkage type must be initilized by 0
       Initializer = Constant::getNullValue(Ty);
@@ -1670,6 +1716,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                           Ty->getArrayElementType()->isIntegerTy(8))
                              ? GlobalValue::UnnamedAddr::Global
                              : GlobalValue::UnnamedAddr::None);
+
     SPIRVBuiltinVariableKind BVKind;
     if (BVar->isBuiltin(&BVKind))
       BuiltinGVMap[LVar] = BVKind;
@@ -1719,7 +1766,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   // Translation of instructions
-  switch (BV->getOpCode()) {
+  switch (static_cast<uint32_t>(BV->getOpCode())) {
   case OpBranch: {
     auto BR = static_cast<SPIRVBranch *>(BV);
     auto BI = BranchInst::Create(
@@ -2042,12 +2089,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     Value *V = nullptr;
     // Apply special processing for pointer only when capability
     // "StorageClassStorageBuffer" is declared
-    bool UseVarPtrStorageBuf = EnableVarPtrStorageBuf && (AC->getBase()->getType()->getPointerStorageClass()
+    bool UseVarPtr = EnableVarPtr && (AC->getBase()->getType()->getPointerStorageClass()
       == StorageClassStorageBuffer);
-    if (UseVarPtrStorageBuf == false) {
+    if (UseVarPtr == false) {
       if (BB) {
-        auto GEP = 
-	      GetElementPtrInst::Create(nullptr, Base, Index, BV->getName(), BB);
+        auto GEP =
+          GetElementPtrInst::Create(nullptr, Base, Index, BV->getName(), BB);
         GEP->setIsInBounds(IsInbound);
         V = GEP;
       } else {
@@ -2086,13 +2133,13 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
       std::string MangledName = "";
       uint32_t MangleIdx = 0;
-      mangleGlslBuiltin(gSPIRVMD::AccessChainp, ArgTys, MangledName);
+      mangleGlslBuiltin(gSPIRVMD::AccessChain, ArgTys, MangledName);
       if (MangleNameToIndex.find(MangledName) == MangleNameToIndex.end()) {
         MangleIdx = MangleNameToIndex.size();
         MangleNameToIndex[MangledName] = MangleIdx;
       } else
           MangleIdx = MangleNameToIndex[MangledName];
-      MangledName = gSPIRVMD::AccessChainp + std::to_string(MangleIdx);
+      MangledName = gSPIRVMD::AccessChain + std::to_string(MangleIdx);
       Function *Func = M->getFunction(MangledName);
       if (Func == nullptr) {
           auto FuncTy = FunctionType::get(StructTy, ArgTys, false);
@@ -2480,7 +2527,14 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpImageSparseFetch:
   case OpImageSparseGather:
   case OpImageSparseDrefGather:
-  case OpImageSparseRead: {
+  case OpImageSparseRead:
+#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
+  case OpImageSampleAnisoLodAMD:
+  case OpImageSampleDrefAnisoLodAMD:
+  case OpImageGatherAnisoLodAMD:
+  case OpImageDrefGatherAnisoLodAMD:
+#endif
+  {
     return mapValue(BV,
         transSPIRVImageOpFromInst(
             static_cast<SPIRVInstruction *>(BV),
@@ -2585,8 +2639,9 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
 void SPIRVToLLVM::truncConstantIndex(std::vector<Value*> &Indices, BasicBlock* BB) {
   // Only constant int32 can be used as struct index in LLVM
-  // To simplify the logic, translate all constant index to int32
-  // if constant is less than UINT32_MAX
+  // To simplify the logic, for constant index,
+  // If constant is less than UINT32_MAX , translate all constant index to int32
+  // Otherwise for non constant int, try convert them to int32
   for (uint32_t I = 0; I < Indices.size(); ++I) {
     auto Index = Indices[I];
     auto Int32Ty = Type::getInt32Ty(*Context);
@@ -3223,6 +3278,9 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     //    Format: prefix.image[sparse].op.[f32|i32|u32].dim[.proj][.dref][.bias][.lod][.grad]
     //                                                      [.constoffset][.offset]
     //                                                      [.constoffsets][.sample][.minlod]
+#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
+    //                                                      [.anisolod]
+#endif
 
     // Add call prefix
     SS << gSPIRVName::ImageCallPrefix;
@@ -3385,6 +3443,10 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
         SS << gSPIRVName::ImageCallModMinLod;
     }
 
+#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
+    if (isAnisoLodOpCode(OC))
+      SS << gSPIRVName::ImageCallModAnisoLod;
+#endif
     // Fmask usage is determined by resource node binding
     if (Desc->MS)
         SS << gSPIRVName::ImageCallModPatchFmaskUsage;
@@ -3705,9 +3767,11 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
                       EntryExecModel == ExecutionModelFragment ||
                       EntryExecModel == ExecutionModelGLCompute);
 
-  // Check if capability "VariablePointerStorageBuffer" is enabled
-  EnableVarPtrStorageBuf = BM->getCapability().find(
-    CapabilityVariablePointersStorageBuffer) != BM->getCapability().end();
+  // Check if capability "VariablePointerStorageBuffer"  is enabled
+  EnableVarPtr = BM->getCapability().find(
+      CapabilityVariablePointersStorageBuffer) != BM->getCapability().end();
+  EnableVarPtr = EnableVarPtr || (BM->getCapability().find(
+      CapabilityVariablePointers) != BM->getCapability().end());
 
   DbgTran.createCompileUnit();
   DbgTran.addDbgInfoVersion();
@@ -3720,8 +3784,7 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
         OC == OpSpecConstantFalse) {
       uint32_t SpecId = SPIRVID_INVALID;
       BV->hasDecorate(DecorationSpecId, 0, &SpecId);
-      assert(SpecId != SPIRVID_INVALID);
-
+      // assert(SpecId != SPIRVID_INVALID);
       if (SpecConstMap.find(SpecId) != SpecConstMap.end()) {
         auto SpecConstEntry = SpecConstMap.at(SpecId);
         assert(SpecConstEntry.DataSize <= sizeof(uint64_t));
@@ -4222,7 +4285,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       // Translate decorations of blocks
       // Remove array dimensions, it is useless for block metadata building
       SPIRVType* BlockTy = nullptr;
-      if (EnableVarPtrStorageBuf &&
+      if (EnableVarPtr &&
         (BV->getType()->getPointerStorageClass() == StorageClassStorageBuffer))
         // NOTE: Keep the pointer type for variable pointer storage buffer.
         BlockTy = BV->getType();
@@ -4380,20 +4443,39 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       BV->getType()->isTypePointer() &&
       BV->getType()->getPointerStorageClass()
         == StorageClassStorageBuffer &&
-      EnableVarPtrStorageBuf) {
+      EnableVarPtr) {
 
     auto Inst = dyn_cast<Instruction>(V);
-    auto BTy = transType(BV->getType());
+    // NOTE: storage pointer could be null pointer in some tests,
+    // so instruction should be ignored in this case
+    if (Inst != nullptr) {
+      auto BTy = transType(BV->getType());
 
-    // Build block metadata
-    ShaderBlockDecorate BlockDec = {};
-    Type *BlockMDTy = nullptr;
-    auto BlockMD = buildShaderBlockMetadata(BV->getType(), BlockDec, BlockMDTy);
+      // Build block metadata
+      ShaderBlockDecorate BlockDec = {};
+      Type *BlockMDTy = nullptr;
+      auto BlockMD = buildShaderBlockMetadata(BV->getType(), BlockDec, BlockMDTy);
 
-    std::vector<Metadata*> BlockMDs;
-    BlockMDs.push_back(ConstantAsMetadata::get(BlockMD));
-    auto BlockMDNode = MDNode::get(*Context, BlockMDs);
-    Inst->setMetadata(gSPIRVMD::Block, BlockMDNode);
+      std::vector<Metadata*> BlockMDs;
+      BlockMDs.push_back(ConstantAsMetadata::get(BlockMD));
+      auto BlockMDNode = MDNode::get(*Context, BlockMDs);
+      Inst->setMetadata(gSPIRVMD::Block, BlockMDNode);
+    }
+  } else {
+    bool IsNonUniform = BV->hasDecorate(DecorationNonUniformEXT);
+    if (IsNonUniform && isa<Instruction>(V)) {
+      std::string  MangledFuncName = "";
+      ArrayRef<Value*> Args = { V };
+      auto VoidTy = Type::getVoidTy(*Context);
+      auto BB = cast<Instruction>(V)->getParent();
+
+      // Per-instruction metadata is not safe, LLVM optimizer may remove them,
+      // so we choose to add a dummy instruction and remove them when it isn't
+      // needed.
+      mangleGlslBuiltin(gSPIRVMD::NonUniform, getTypes(Args), MangledFuncName);
+      auto F = getOrCreateFunction(M, VoidTy, getTypes(Args), MangledFuncName);
+      auto CI = CallInst::Create(F, Args, "", BB);
+    }
   }
 
   return true;
@@ -5389,13 +5471,15 @@ Value *SPIRVToLLVM::narrowBoolValue(Value *V, SPIRVType *BT, BasicBlock *BB) {
 bool llvm::readSpirv(LLVMContext &C, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
                      const SPIRVSpecConstMap &SpecConstMap, Module *&M,
-                     std::string &ErrMsg) {
+                     std::string &ErrMsg,
+                     uint32_t forceLoopUnrollCount) {
   M = new Module("", C);
   std::unique_ptr<SPIRVModule> BM(SPIRVModule::createSPIRVModule());
 
   IS >> *BM;
 
   SPIRVToLLVM BTL(M, BM.get(), SpecConstMap);
+  BTL.setLoopUnrollCount(forceLoopUnrollCount);
   bool Succeed = true;
   if (!BTL.translate(EntryExecModel, EntryName)) {
     BM->getError(ErrMsg);

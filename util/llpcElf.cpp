@@ -264,6 +264,30 @@ Result ElfReader<Elf>::GetSectionDataBySectionIndex(
 }
 
 // =====================================================================================================================
+// Gets section data by sorting index (ordered map).
+template<class Elf>
+Result ElfReader<Elf>::GetSectionDataBySortingIndex(
+    uint32_t           sortIdx,         // Sorting index
+    uint32_t*          pSecIdx,         // [out] Section index
+    ElfSectionBuffer** ppSectionData    // [out] Section data
+    ) const
+{
+    Result result = Result::ErrorInvalidValue;
+    if (sortIdx < m_sections.size())
+    {
+        auto it = m_map.begin();
+        for (uint32_t i = 0; i < sortIdx; ++i)
+        {
+            ++it;
+        }
+        *pSecIdx = it->second;
+        *ppSectionData = m_sections[it->second];
+        result = Result::Success;
+    }
+    return result;
+}
+
+// =====================================================================================================================
 // Gets all associated symbols by section index.
 template<class Elf>
 void ElfReader<Elf>::GetSymbolsBySectionIndex(

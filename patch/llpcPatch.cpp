@@ -194,4 +194,155 @@ void Patch::Init(
     m_pEntryPoint = GetEntryPoint(m_pModule);
 }
 
+// =====================================================================================================================
+// Expandd non-uniform index with waterfall intrinsics.
+//
+// Example:
+//    %callValue = call <4 xi8> @llpc.buffer.load.uniform.v4i8(i32 %descSet, i32 %binding, i32 %blockOffset,
+//        i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 1)
+//    ==>
+//    %waterfallBegin = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 %blockOffset)
+//    %uniformIndex = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %waterfallBegin, i32 %blockOffset)
+//    %callValue = call <4 xi8> @llpc.buffer.load.uniform.v4i8(i32 %descSet, i32 %binding, i32 %uniformIndex,
+//        i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 1)
+//    %callValue.i32 = bitcast <4 x i8> %callValue to i32
+//    %waterfallEnd = call i32 @llvm.amdgcn.waterfall.end.i32(i32 %waterfallBegin, i32 %callValue.i32)
+//    %result = bitcast i32 %waterfallEnd to <4 x i8>
+//
+void Patch::AddWaterFallInst(
+    int32_t   nonUniformIndex1,     // [in] Operand index of first non-uniform index in "pCallInst"
+    int32_t   nonUniformIndex2,     // [in] Operand index of second non-uniform index in "pCallInst"
+    CallInst* pCallInst)            // [in] Pointer to call instruction which need expand with waterfall intrinsics
+{
+    LLPC_ASSERT(nonUniformIndex1 > 0);
+
+    if (pCallInst->getType()->isVoidTy())
+    {
+        // TODO: The waterfall instruction for store operation isn't decided yet.
+        return;
+    }
+
+    Value* pNonUniformIndex1 = pCallInst->getOperand(nonUniformIndex1);
+    Value* pNonUniformIndex2 = nullptr;
+    Value* pNonUniformIndex = pNonUniformIndex1;
+    bool isVector = false;
+
+    if (nonUniformIndex2 >=  0)
+    {
+        pNonUniformIndex2 = pCallInst->getOperand(nonUniformIndex2);
+        if (pNonUniformIndex2 != pNonUniformIndex1)
+        {
+            // Merge the secondary non-uniform index with the first one.
+            pNonUniformIndex = InsertElementInst::Create(UndefValue::get(m_pContext->Int32x2Ty()),
+                                                         pNonUniformIndex1,
+                                                         getInt32(m_pModule, 0),
+                                                         "",
+                                                         pCallInst);
+            pNonUniformIndex = InsertElementInst::Create(pNonUniformIndex,
+                                                         pNonUniformIndex2,
+                                                         getInt32(m_pModule, 1),
+                                                         "",
+                                                         pCallInst);
+            isVector = true;
+        }
+    }
+
+    // %waterfallBegin = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 %nonUniformIndex)
+    Attribute::AttrKind attribs[] = { Attribute::ReadNone, Attribute::Convergent, Attribute::NoUnwind };
+    auto pWaterfallBegin = EmitCall(m_pModule,
+                                    isVector ? "llvm.amdgcn.waterfall.begin.v2i32" : "llvm.amdgcn.waterfall.begin.i32",
+                                    m_pContext->Int32Ty(),
+                                    { pNonUniformIndex },
+                                    attribs,
+                                    pCallInst);
+
+    // %uniformIndex = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %waterfallBegin, i32 %nonUniformIndex)
+    auto pUniformIndex = EmitCall(m_pModule,
+                                  isVector ? "llvm.amdgcn.waterfall.readfirstlane.v2i32.v2i32" :
+                                             "llvm.amdgcn.waterfall.readfirstlane.i32.i32",
+                                  pNonUniformIndex->getType(),
+                                  { pWaterfallBegin, pNonUniformIndex },
+                                  attribs,
+                                  pCallInst);
+
+    // Replace non-uniform index in pCallInst with uniform index
+    if (isVector)
+    {
+        auto pUniformIndex1 = ExtractElementInst::Create(pUniformIndex, getInt32(m_pModule, 0), "", pCallInst);
+        auto pUniformIndex2 = ExtractElementInst::Create(pUniformIndex, getInt32(m_pModule, 1), "", pCallInst);
+        pCallInst->setOperand(nonUniformIndex1, pUniformIndex1);
+        pCallInst->setOperand(nonUniformIndex2, pUniformIndex2);
+    }
+    else
+    {
+        pCallInst->setOperand(nonUniformIndex1, pUniformIndex);
+        if (nonUniformIndex2 >= 0)
+        {
+            pCallInst->setOperand(nonUniformIndex2, pUniformIndex);
+        }
+    }
+
+    // Insert waterfall.end after pCallInst
+    auto pNextInst = pCallInst->getNextNode();
+    auto pResultTy = pCallInst->getType();
+    auto resultBitSize = pResultTy->getPrimitiveSizeInBits();
+    Type* pWaterfallEndTy = nullptr;
+
+    LLPC_ASSERT(pNextInst != nullptr);
+
+    // waterfall.end only support vector up to 8, we need check the type and cast it if necessary
+    if ((resultBitSize % 32) == 0)
+    {
+        pWaterfallEndTy = (resultBitSize == 32) ?
+                          m_pContext->Int32Ty() :
+                          VectorType::get(m_pContext->Int32Ty(), resultBitSize / 32);
+        LLPC_ASSERT((resultBitSize / 32) <= 8);
+    }
+    else
+    {
+        LLPC_ASSERT((resultBitSize % 16) == 0);
+        pWaterfallEndTy = (resultBitSize == 16) ?
+                           m_pContext->Int16Ty() :
+                           VectorType::get(m_pContext->Int16Ty(), resultBitSize / 16);
+        LLPC_ASSERT((resultBitSize / 32) <= 8);
+    }
+
+    // %waterfallEnd = call i32 @llvm.amdgcn.waterfall.end.i32(i32 %waterfallBegin, i32 %callValue)
+    std::string waterfallEnd = "llvm.amdgcn.waterfall.end.";
+    waterfallEnd += GetTypeNameForScalarOrVector(pWaterfallEndTy);
+    Value* pResult = nullptr;
+
+    // Insert waterfall.end before the next LLVM instructions
+    if (pWaterfallEndTy != pResultTy)
+    {
+        // Do type cast
+        auto pCallValue = new BitCastInst(pCallInst, pWaterfallEndTy, "", pNextInst);
+
+        // Add waterfall.end
+        auto pWaterfallEnd = EmitCall(m_pModule,
+                                      waterfallEnd,
+                                      pWaterfallEndTy,
+                                      { pWaterfallBegin, pCallValue },
+                                      attribs,
+                                      pNextInst);
+
+        // Restore type
+        pResult = new BitCastInst(pWaterfallEnd, pResultTy, "", pNextInst);
+
+        // Replace all users of call inst with the result of waterfall.end,
+        // except the user (pCallValue) which before waterfall.end
+        pCallInst->replaceAllUsesWith(pResult);
+        pCallValue->setOperand(0, pCallInst);
+    }
+    else
+    {
+        // Add waterfall.end
+        pResult = EmitCall(m_pModule, waterfallEnd, pResultTy, { pWaterfallBegin, pCallInst }, attribs, pNextInst);
+
+        // Replace all users of call inst with the result of waterfall.end except waterfall.end itself.
+        pCallInst->replaceAllUsesWith(pResult);
+        cast<CallInst>(pResult)->setOperand(1, pCallInst);
+    }
+}
+
 } // Llpc

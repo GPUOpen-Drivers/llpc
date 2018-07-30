@@ -1176,7 +1176,9 @@ public:
     return static_cast<SPIRVBasicBlock *>(getValue(Default));
   }
   size_t getLiteralsCount() const {
-    return getSelect()->getType()->getBitWidth() / (sizeof(SPIRVWord) * 8);
+    auto SelectorBitSize = getSelect()->getType()->getBitWidth();
+    return SelectorBitSize < (sizeof(SPIRVWord) * 8) ? 1 :
+      SelectorBitSize / (sizeof(SPIRVWord) * 8);
   }
   size_t getPairSize() const { return getLiteralsCount() + 1; }
   size_t getNumPairs() const { return Pairs.size() / getPairSize(); }
@@ -2378,6 +2380,12 @@ _SPIRV_OP(ImageSparseDrefGather, true, 6, true, 3)
 _SPIRV_OP(ImageSparseRead, true, 5, true, 2)
 _SPIRV_OP(FragmentMaskFetchAMD, true, 5)
 _SPIRV_OP(FragmentFetchAMD, true, 6)
+#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
+_SPIRV_OP(ImageSampleAnisoLodAMD, true, 6, true, 3)
+_SPIRV_OP(ImageSampleDrefAnisoLodAMD, true, 6, true, 3)
+_SPIRV_OP(ImageGatherAnisoLodAMD, true, 6, true, 3)
+_SPIRV_OP(ImageDrefGatherAnisoLodAMD, true, 6, true, 3)
+#endif
 #undef _SPIRV_OP
 
 // SpecConstantOp instruction

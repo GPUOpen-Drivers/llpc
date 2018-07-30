@@ -33,6 +33,7 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpcContext.h"
@@ -47,9 +48,10 @@ namespace Llpc
 ShaderMerger::ShaderMerger(
     Context* pContext)  // [in] LLPC context
     :
-    m_pContext(pContext)
+    m_pContext(pContext),
+    m_gfxIp(m_pContext->GetGfxIpVersion())
 {
-    LLPC_ASSERT(m_pContext->GetGfxIpVersion().major >= 9);
+    LLPC_ASSERT(m_gfxIp.major >= 9);
     LLPC_ASSERT(m_pContext->IsGraphics());
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
@@ -72,11 +74,14 @@ Result ShaderMerger::BuildLsHsMergedShader(
     LLPC_ASSERT((pLsModule != nullptr) || (pHsModule != nullptr)); // At least, one of them must be present
 
     Module* pLsHsModule = new Module("llpcLsHsMergeShader", *m_pContext);
-    if (pLsHsModule == nullptr)
+    if (pLsHsModule != nullptr)
+    {
+        m_pContext->SetModuleTargetMachine(pLsHsModule);
+    }
+    else
     {
         result = Result::ErrorOutOfMemory;
     }
-    m_pContext->SetModuleTargetMachine(pLsHsModule);
 
     if (result == Result::Success)
     {
@@ -138,11 +143,14 @@ Result ShaderMerger::BuildEsGsMergedShader(
     LLPC_ASSERT(pGsModule != nullptr); // At least, GS module must be present
 
     Module* pEsGsModule = new Module("llpcEsGsMergeShader", *m_pContext);
-    if (pEsGsModule == nullptr)
+    if (pEsGsModule != nullptr)
+    {
+        m_pContext->SetModuleTargetMachine(pEsGsModule);
+    }
+    else
     {
         result = Result::ErrorOutOfMemory;
     }
-    m_pContext->SetModuleTargetMachine(pEsGsModule);
 
     if (result == Result::Success)
     {
@@ -379,30 +387,35 @@ void ShaderMerger::GenerateLsHsEntryPoint(
 
     auto pLsVertCount = EmitCall(pLsHsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
+    Value* pPatchId     = pArg;
+    Value* pRelPatchId  = (pArg + 1);
+    Value* pVertexId    = (pArg + 2);
+    Value* pRelVertexId = (pArg + 3);
+    Value* pStepRate    = (pArg + 4);
+    Value* pInstanceId  = (pArg + 5);
+
     args.clear();
     args.push_back(pMergeWaveInfo);
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
 
-    auto pHsVertCount = EmitCall(pLsHsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
-
-    auto pNullHs = new ICmpInst(*pEntryBlock,
-                                ICmpInst::ICMP_EQ,
-                                pHsVertCount,
-                                ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                "");
-
-    Value* pPatchId     = pArg;
-    Value* pRelPatchId  = (pArg + 1);
-
+    auto pHsVertCount =
+        EmitCall(pLsHsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
+    if ((m_gfxIp.major == 9) && (m_gfxIp.minor == 0) && (m_gfxIp.stepping < 4))
+    {
+        auto pNullHs = new ICmpInst(*pEntryBlock,
+                                    ICmpInst::ICMP_EQ,
+                                    pHsVertCount,
+                                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                    "");
 
-    // TODO: Check graphics IP version info to apply this conditionally.
-    Value* pVertexId    = SelectInst::Create(pNullHs, pArg,       (pArg + 2), "", pEntryBlock);
-    Value* pRelVertexId = SelectInst::Create(pNullHs, (pArg + 1), (pArg + 3), "", pEntryBlock);
-    Value* pStepRate    = SelectInst::Create(pNullHs, (pArg + 2), (pArg + 4), "", pEntryBlock);
-    Value* pInstanceId  = SelectInst::Create(pNullHs, (pArg + 3), (pArg + 5), "", pEntryBlock);
+        pVertexId    = SelectInst::Create(pNullHs, pArg,       (pArg + 2), "", pEntryBlock);
+        pRelVertexId = SelectInst::Create(pNullHs, (pArg + 1), (pArg + 3), "", pEntryBlock);
+        pStepRate    = SelectInst::Create(pNullHs, (pArg + 2), (pArg + 4), "", pEntryBlock);
+        pInstanceId  = SelectInst::Create(pNullHs, (pArg + 3), (pArg + 5), "", pEntryBlock);
+    }
 
     auto pLsEnable = new ICmpInst(*pEntryBlock, ICmpInst::ICMP_ULT, pThreadId, pLsVertCount, "");
     BranchInst::Create(pBeginLsBlock, pEndLsBlock, pLsEnable, pEntryBlock);
@@ -654,7 +667,9 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
     userDataCount = std::max(pIntfData->userDataCount, userDataCount);
 
+    // The user data register for ES-GS LDS size is not used for GFX9+
     LLPC_ASSERT(pIntfData->userDataUsage.gs.esGsLdsSize == 0);
+
     if (hasTs)
     {
         if (m_hasTes)
@@ -675,12 +690,13 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
         if (m_hasVs)
         {
             const auto pVsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
-            LLPC_ASSERT(pVsIntfData->userDataUsage.tes.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
+            LLPC_ASSERT(pVsIntfData->userDataUsage.vs.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
             if ((pIntfData->spillTable.sizeInDwords > 0) &&
                 (pVsIntfData->spillTable.sizeInDwords == 0))
             {
                 pVsIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
+                LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
             }
         }
     }

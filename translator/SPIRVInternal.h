@@ -356,6 +356,9 @@ namespace gSPIRVName {
   const static char ImageCallModConstOffsets[]            = ".constoffsets";
   const static char ImageCallModSample[]                  = ".sample";
   const static char ImageCallModMinLod[]                  = ".minlod";
+#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
+  const static char ImageCallModAnisoLod[]                = ".anisolod";
+#endif
   const static char ImageCallModFmaskBased[]              = ".fmaskbased";
   const static char ImageCallModFmaskId[]                 = ".fmaskid";
   const static char ImageCallModFmaskValue[]              = ".fmaskvalue";
@@ -412,7 +415,9 @@ namespace gSPIRVMD {
   const static char ImageMemory[]       = "spirv.ImageMemory";
   const static char BufferLoad[]        = "spirv.BufferLoad";
   const static char BufferStore[]       = "spirv.BufferStore";
-  const static char AccessChainp[]      = "spirv.AccessChain";
+  const static char AccessChain[]       = "spirv.AccessChain";
+  const static char StorageBufferCall[] = "spirv.StorageBufferCall";
+  const static char NonUniform[]        = "spirv.NonUniform";
 }
 
 enum SPIRVBlockTypeKind {
@@ -1261,11 +1266,13 @@ struct ShaderBlockDecorate {
 /// Metadata for image emulation call.
 union ShaderImageCallMetadata {
   struct {
-    SPIRVImageOpKind  OpKind        : 6;  // Kind of image operation
-    uint32_t          Dim           : 3;  // Image dimension
-    uint32_t          Arrayed       : 1;  // Whether image is arrayed
-    uint32_t          Multisampled  : 1;  // Whether image is multisampled
-    uint32_t          Unused        : 21;
+    SPIRVImageOpKind  OpKind             : 6; // Kind of image operation
+    uint32_t          Dim                : 3; // Image dimension
+    uint32_t          Arrayed            : 1; // Whether image is arrayed
+    uint32_t          Multisampled       : 1; // Whether image is multisampled
+    uint32_t          NonUniformSampler  : 1; // Whether sampler is non-uniform
+    uint32_t          NonUniformResource : 1; // Whether resource is non-uniform
+    uint32_t          Unused             : 19;
   };
   uint32_t U32All;
 };

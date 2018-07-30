@@ -55,7 +55,8 @@ char SpirvLowerBufferOp::ID = 0;
 // =====================================================================================================================
 SpirvLowerBufferOp::SpirvLowerBufferOp()
     :
-    SpirvLower(ID)
+    SpirvLower(ID),
+    m_restoreMeta(false)
 {
     initializeSpirvLowerBufferOpPass(*PassRegistry::getPassRegistry());
 }
@@ -68,6 +69,11 @@ bool SpirvLowerBufferOp::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Buffer-Op\n");
 
     SpirvLower::Init(&module);
+
+    // Visit module to restore per-instruction metadata
+    m_restoreMeta = true;
+    visit(m_pModule);
+    m_restoreMeta = false;
 
     // Invoke handling of "load" and "store" instruction
     visit(m_pModule);
@@ -164,6 +170,19 @@ void SpirvLowerBufferOp::visitCallInst(
 
     auto mangledName = pCallee->getName();
 
+    if (m_restoreMeta)
+    {
+        // Restore non-uniform metadata from metadata instruction.
+        LLPC_ASSERT(strlen(gSPIRVMD::NonUniform) == 16);
+        const std::string NonUniformPrefix = std::string("_Z16") + std::string(gSPIRVMD::NonUniform);
+        if (mangledName.startswith(NonUniformPrefix))
+        {
+            auto pNonUniform = callInst.getOperand(0);
+            cast<Instruction>(pNonUniform)->setMetadata(gSPIRVMD::NonUniform, m_pContext->GetEmptyMetadataNode());
+        }
+        return;
+    }
+
     if (mangledName.find("ArrayLength") != std::string::npos)
     {
         // Array length call
@@ -240,6 +259,9 @@ void SpirvLowerBufferOp::visitCallInst(
             ShaderBlockMetadata blockMeta = {};
             blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
 
+            std::unordered_set<Value*> checkedValues;
+            bool isNonUniform = IsNonUniformValue(pBlockOffset, checkedValues);
+
             const uint32_t arrayOffset = blockMeta.offset;
             const uint32_t arrayStride = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
 
@@ -249,7 +271,7 @@ void SpirvLowerBufferOp::visitCallInst(
             args.push_back(pBlockOffset);
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), arrayOffset));
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), arrayStride));
-
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false));
             Value* pArrayLengthCall = EmitCall(m_pModule,
                                                LlpcName::BufferArrayLength,
                                                callInst.getType(),
@@ -388,7 +410,7 @@ void SpirvLowerBufferOp::visitCallInst(
             }
         }
     }
-    else if (mangledName.find(gSPIRVMD::AccessChainp) != std::string::npos)
+    else if (mangledName.find(gSPIRVMD::AccessChain) != std::string::npos)
     {
         uint32_t operandIdx = 0;
         Constant* pResultMeta = nullptr;
@@ -397,43 +419,19 @@ void SpirvLowerBufferOp::visitCallInst(
         std::vector<Value*> indexOperands(callInst.getNumOperands() - 3);
         std::copy(callInst.op_begin() + 2, callInst.op_end() - 1, indexOperands.begin());
 
-        Value* pDesc = nullptr;
         Value* pBlockOffset = getInt32(m_pModule, 0);
-        MDNode* pResMetaNode = nullptr;
-        MDNode* pBlockMetaNode = nullptr;
         auto pLoadTy = callInst.getOperand(1)->getType();
-        Value* pOffset = nullptr;
 
         LLPC_ASSERT(DescriptorSizeBuffer == 4);
-        auto pVec4Ty = VectorType::get(Type::getInt32Ty(*m_pContext), DescriptorSizeBuffer);
+        auto pVec4Ty = VectorType::get(m_pContext->Int32Ty(), DescriptorSizeBuffer);
 
-        if (isa<GlobalVariable>(pSrc))
-        {
-            auto pGlobal = dyn_cast<GlobalVariable>(pSrc);
-            pResMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-            pBlockMetaNode = pGlobal->getMetadata(gSPIRVMD::Block);
-            auto pDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
-            auto pBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
-            auto pLoadType = callInst.getOperand(1)->getType()->getPointerElementType();
-            if (pLoadType->isArrayTy())
-            {
-                pBlockOffset = indexOperands[2];
-            }
-            Value* args[] = { pDescSet, pBinding, pBlockOffset };
-            Attribute::AttrKind attr[] = { Attribute::NoUnwind };
-            pDesc = EmitCall(m_pModule, LlpcName::DescriptorLoadBuffer, pVec4Ty, args, attr, &callInst);
-            pOffset = getInt32(m_pModule, 0);
-        }
-        else
-        {
-            auto pInst = dyn_cast<Instruction>(pSrc);
-            pBlockMetaNode = pInst->getMetadata(gSPIRVMD::Block);
-            pDesc = ExtractValueInst::Create(pSrc, { 0 }, "", &callInst);
-            pOffset = ExtractValueInst::Create(pSrc, { 1 }, "", &callInst);
-        }
+        auto pInst = cast<Instruction>(pSrc);
+        MDNode* pBlockMetaNode = pInst->getMetadata(gSPIRVMD::Block);
+        Value* pDesc  = ExtractValueInst::Create(pSrc, { 0 }, "", &callInst);
+        Value* pOffset = ExtractValueInst::Create(pSrc, { 1 }, "", &callInst);
 
         Constant* pBlockMeta = mdconst::dyn_extract<Constant>(pBlockMetaNode->getOperand(0));
-        auto pStructTy = StructType::get(*m_pContext, { pVec4Ty, Type::getInt32Ty(*m_pContext) });
+        auto pStructTy = StructType::get(*m_pContext, { pVec4Ty, m_pContext->Int32Ty() });
 
         Value* pMemberOffset = CalcBlockMemberOffset(pLoadTy,
                                                      indexOperands,
@@ -446,7 +444,7 @@ void SpirvLowerBufferOp::visitCallInst(
         Value* pStruct = UndefValue::get(pStructTy);
         pStruct = InsertValueInst::Create(pStruct, pDesc, 0, "", &callInst);
         pStruct = InsertValueInst::Create(pStruct, pOffset, 1, "", &callInst);
-        Instruction* pInst = dyn_cast<Instruction>(pStruct);
+        pInst = cast<Instruction>(pStruct);
         pInst->setMetadata(gSPIRVMD::Block, callInst.getMetadata(gSPIRVMD::Block));
         callInst.replaceAllUsesWith(pStruct);
         m_callInsts.insert(&callInst);
@@ -487,6 +485,31 @@ void SpirvLowerBufferOp::visitCallInst(
                                &callInst);
         m_callInsts.insert(&callInst);
     }
+    else if (mangledName.find(gSPIRVMD::StorageBufferCall) != std::string::npos)
+    {
+        // Translate the emulation getter call of storage buffer variable
+        // to the structure information for variable pointer
+        Value* pSrc = callInst.getOperand(0);
+        LLPC_ASSERT(isa<GlobalVariable>(pSrc));
+        auto pBlockVarPtr = dyn_cast<GlobalVariable>(pSrc);
+        MDNode* pResMetaNode = pBlockVarPtr->getMetadata(gSPIRVMD::Resource);
+        auto pDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
+        auto pBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
+        auto pConstZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
+        auto pConstFalse = ConstantInt::get(m_pContext->BoolTy(), false);
+
+        Value* args[] = { pDescSet, pBinding, pConstZero, pConstFalse };
+        auto pVec4Ty = m_pContext->Int32x4Ty();
+        auto pDesc = EmitCall(m_pModule, LlpcName::DescriptorLoadBuffer, pVec4Ty, args, NoAttrib, &callInst);
+        auto pStructTy = StructType::get(*m_pContext, { pVec4Ty, m_pContext->Int32Ty() });
+        Value* pStruct = UndefValue::get(pStructTy);
+        pStruct = InsertValueInst::Create(pStruct, pDesc, 0, "", &callInst);
+        pStruct = InsertValueInst::Create(pStruct, pConstZero, 1, "", &callInst);
+        Instruction* pInst = dyn_cast<Instruction>(pStruct);
+        pInst->setMetadata(gSPIRVMD::Block, pBlockVarPtr->getMetadata(gSPIRVMD::Block));
+        callInst.replaceAllUsesWith(pStruct);
+        m_callInsts.insert(&callInst);
+    }
 }
 
 // =====================================================================================================================
@@ -494,6 +517,11 @@ void SpirvLowerBufferOp::visitCallInst(
 void SpirvLowerBufferOp::visitLoadInst(
     LoadInst& loadInst) // [in] "Load" instruction
 {
+    if (m_restoreMeta)
+    {
+        return;
+    }
+
     Value* pLoadSrc = loadInst.getOperand(0);
 
     if ((pLoadSrc->getType()->getPointerAddressSpace() == SPIRAS_Uniform) ||
@@ -612,6 +640,11 @@ void SpirvLowerBufferOp::visitLoadInst(
 void SpirvLowerBufferOp::visitStoreInst(
     StoreInst& storeInst) // [in] "Store" instruction
 {
+    if (m_restoreMeta)
+    {
+        return;
+    }
+
     Value* pStoreSrc  = storeInst.getOperand(0);
     Value* pStoreDest = storeInst.getOperand(1);
 
@@ -905,7 +938,9 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
     Constant*    pBlockMemberMeta,   // [in] Block member metadata
     Instruction* pInsertPos)         // [in] Where to insert instructions
 {
-    Value* pLoadValue = UndefValue::get(pLoadTy);;
+    Value* pLoadValue = UndefValue::get(pLoadTy);
+    std::unordered_set<Value*> checkedValues;
+    bool isNonUniform = isPushConst ? false : IsNonUniformValue(pBlockOffset, checkedValues);
 
     if (pLoadTy->isSingleValueType())
     {
@@ -954,6 +989,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                 }
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
                 auto pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
@@ -1005,6 +1041,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             }
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
             const uint32_t bitWidth = pLoadTy->getScalarSizeInBits();
             const uint32_t compCount = pLoadTy->isVectorTy() ? pLoadTy->getVectorNumElements() : 1;
@@ -1376,6 +1413,9 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
     Instruction* pInsertPos)         // [in] Where to insert instructions
 {
     const auto pStoreTy = pStoreValue->getType();
+    std::unordered_set<Value*> checkedValues;
+    bool isNonUniform = IsNonUniformValue(pBlockOffset, checkedValues);
+
     if (pStoreTy->isSingleValueType())
     {
         // Store scalar or vector type
@@ -1416,7 +1456,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
                 args.push_back(pCompValue);
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
-
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
                 EmitCall(m_pModule, LlpcName::BufferStore + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
                 // Update the block member offset for the next component
@@ -1445,6 +1485,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             args.push_back(pStoreValue);
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
             const uint32_t bitWidth = pStoreTy->getScalarSizeInBits();
             const uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
@@ -1590,6 +1631,9 @@ Value* SpirvLowerBufferOp::AddBufferAtomicInst(
     const uint32_t bitWidth = pDataTy->getScalarSizeInBits();
     LLPC_ASSERT((bitWidth == 32) || (bitWidth == 64));
 
+    std::unordered_set<Value*> checkedValues;
+    bool isNonUniform = IsNonUniformValue(pBlockOffset, checkedValues);
+
     Value* pAtomicValue = nullptr;
 
     std::string suffix = ".i" + std::to_string(bitWidth);
@@ -1607,6 +1651,7 @@ Value* SpirvLowerBufferOp::AddBufferAtomicInst(
         args.push_back(pData);
     }
     args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+    args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
     if (atomicOpName == "store")
     {

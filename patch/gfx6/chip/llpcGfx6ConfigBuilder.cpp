@@ -1034,17 +1034,9 @@ Result ConfigBuilder::BuildGsRegConfig(
         gsOutputPrimitiveType = LINESTRIP;
     }
 
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1, gsOutputPrimitiveType);
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2, gsOutputPrimitiveType);
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3, gsOutputPrimitiveType);
-
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, inOutUsage.gs.calcFactor.gsVsRingItemSize);
-
     // TODO: Multiple output streams are not supported.
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_1, OFFSET, inOutUsage.gs.calcFactor.gsVsRingItemSize);
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_2, OFFSET, inOutUsage.gs.calcFactor.gsVsRingItemSize);
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, inOutUsage.gs.calcFactor.gsVsRingItemSize);
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, inOutUsage.gs.calcFactor.gsVsRingItemSize);
 
     SET_REG(&pConfig->m_gsRegs, GS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
     SET_REG(&pConfig->m_gsRegs, GS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
@@ -1117,6 +1109,10 @@ Result ConfigBuilder::BuildPsRegConfig(
     {
         zOrder = LATE_Z;
         execOnHeirFail = true;
+    }
+    else if (pShaderInfo->options.allowReZ)
+    {
+        zOrder = EARLY_Z_THEN_RE_Z;
     }
     else
     {

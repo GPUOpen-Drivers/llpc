@@ -31,7 +31,8 @@ define i32 @llpc.image.querynonlod.sizelod.i32(
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
                                                               i32 %resourceBinding,
-                                                              i32 %resourceIdx)
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
                                                                         i32 15,
@@ -48,7 +49,9 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.v2i32(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-    i32 %resourceBinding, i32 %resourceIdx)
+                                                              i32 %resourceBinding,
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
                                                                         i32 15,
@@ -69,7 +72,8 @@ define <3 x i32> @llpc.image.querynonlod.sizelod.v3i32(
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
                                                               i32 %resourceBinding,
-                                                              i32 %resourceIdx)
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
                                                                         i32 15,
@@ -91,7 +95,9 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.array.v2i32(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-    i32 %resourceBinding, i32 %resourceIdx)
+                                                              i32 %resourceBinding,
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     ; NOTE: For 1D array on GFX9, need to use dmask 5 to get array layer as 2D array.
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
@@ -113,7 +119,8 @@ define <3 x i32> @llpc.image.querynonlod.sizelod.array.v3i32(
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
                                                               i32 %resourceBinding,
-                                                              i32 %resourceIdx)
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
                                                                         i32 15,
@@ -137,7 +144,8 @@ define <3 x i32> @llpc.image.querynonlod.sizelod.cubearray.v3i32(
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
                                                               i32 %resourceBinding,
-                                                              i32 %resourceIdx)
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
                                                                         i32 15,
@@ -161,7 +169,8 @@ define i32 @llpc.image.querynonlod.sizelod.buffer.i32(
 {
     %resource = call <4 x i32> @llpc.descriptor.load.texelbuffer(i32 %resourceDescSet,
                                                                  i32 %resourceBinding,
-                                                                 i32 %resourceIdx)
+                                                                 i32 %resourceIdx,
+                                                                 i32 %imageCallMeta)
 
     ; Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
     %1 = extractelement <4 x i32> %resource, i32 2
@@ -174,7 +183,8 @@ define i32 @llpc.image.querynonlod.levels(
 {
     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
                                                               i32 %resourceBinding,
-                                                              i32 %resourceIdx)
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 undef,
                                                                         <8 x i32> %resource,
                                                                         i32 15,
@@ -192,7 +202,8 @@ define i32 @llpc.image.querynonlod.samples(
 {
      %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
                                                               i32 %resourceBinding,
-                                                              i32 %resourceIdx)
+                                                              i32 %resourceIdx,
+                                                              i32 %imageCallMeta)
     %1 = extractelement <8 x i32> %resource, i32 3
 
     ; Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
@@ -220,9 +231,9 @@ define <8 x i32> @llpc.patch.image.readwriteatomic.descriptor.cube(
     ret <8 x i32> %resource
 }
 
-declare <8 x i32> @llpc.descriptor.load.resource(i32 , i32 , i32) #0
+declare <8 x i32> @llpc.descriptor.load.resource(i32 , i32 , i32, i32) #0
 
-declare <4 x i32> @llpc.descriptor.load.texelbuffer(i32 , i32 , i32) #0
+declare <4 x i32> @llpc.descriptor.load.texelbuffer(i32 , i32 , i32, i32) #0
 
 declare <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 , <8 x i32> , i32, i1, i1, i1, i1) #0
 
