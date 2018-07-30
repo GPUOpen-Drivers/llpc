@@ -4518,31 +4518,38 @@ uint32_t SPIRVToLLVM::calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize,
                                           uint32_t MatrixStride,
                                           bool IsRowMajor) {
   if (BT->isTypeStruct()) {
-    // Find member with max offset
-    uint32_t MemberIdxWithMaxOffset = 0;
-    uint32_t MaxOffset = 0;
-    for (uint32_t MemberIdx = 0; MemberIdx < BT->getStructMemberCount(); ++MemberIdx) {
-      uint32_t Offset = 0;
-      if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &Offset)) {
-        if (Offset > MaxOffset) {
-          MaxOffset = Offset;
-          MemberIdxWithMaxOffset = MemberIdx;
-        }
-      } else
-        llvm_unreachable("Missing offset decoration");
+    if (BT->getStructMemberCount() == 0)
+      BlockSize = 0;
+    else {
+      // Find member with max offset
+      uint32_t MemberIdxWithMaxOffset = 0;
+      uint32_t MaxOffset = 0;
+      for (uint32_t MemberIdx = 0; MemberIdx < BT->getStructMemberCount();
+          ++MemberIdx) {
+        uint32_t Offset = 0;
+        if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &Offset)) {
+          if (Offset > MaxOffset) {
+            MaxOffset = Offset;
+            MemberIdxWithMaxOffset = MemberIdx;
+          }
+        } else
+          llvm_unreachable("Missing offset decoration");
+      }
+
+      uint32_t MemberMatrixStride = MatrixStride;
+      BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationMatrixStride, 0,
+          &MemberMatrixStride);
+
+      bool IsMemberRowMajor = IsRowMajor;
+      if (BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationRowMajor))
+        IsMemberRowMajor = true;
+      else if (BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationColMajor))
+        IsMemberRowMajor = false;
+
+      SPIRVType *MemberTy = BT->getStructMemberType(MemberIdxWithMaxOffset);
+      BlockSize += calcShaderBlockSize(MemberTy, MaxOffset, MemberMatrixStride,
+          IsMemberRowMajor);
     }
-
-    uint32_t MemberMatrixStride = MatrixStride;
-    BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationMatrixStride, 0, &MemberMatrixStride);
-
-    bool IsMemberRowMajor = IsRowMajor;
-    if (BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationRowMajor))
-      IsMemberRowMajor = true;
-    else if (BT->hasMemberDecorate(MemberIdxWithMaxOffset, DecorationColMajor))
-      IsMemberRowMajor = false;
-
-    SPIRVType *MemberTy = BT->getStructMemberType(MemberIdxWithMaxOffset);
-    BlockSize += calcShaderBlockSize(MemberTy, MaxOffset, MemberMatrixStride, IsMemberRowMajor);
   } else if (BT->isTypeArray() || BT->isTypeMatrix()) {
     if (BT->isTypeArray()) {
       uint32_t ArrayStride = 0;

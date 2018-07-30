@@ -95,9 +95,6 @@ Result SpirvLower::Run(
     // Lower SPIR-V resource collecting
     passMgr.add(SpirvLowerResourceCollect::Create());
 
-    // Lower SPIR-V access chain
-    passMgr.add(SpirvLowerAccessChain::Create());
-
     // Link external native library for constant folding
     passMgr.add(PassExternalLibLink::Create(pContext->GetNativeGlslEmuLibrary()));
     passMgr.add(PassDeadFuncRemove::Create());
@@ -105,6 +102,9 @@ Result SpirvLower::Run(
     // Function inlining
     passMgr.add(createFunctionInliningPass(InlineThreshold));
     passMgr.add(PassDeadFuncRemove::Create());
+
+    // Lower SPIR-V access chain
+    passMgr.add(SpirvLowerAccessChain::Create());
 
     // Lower SPIR-V buffer operations (load and store)
     passMgr.add(SpirvLowerBufferOp::Create());
