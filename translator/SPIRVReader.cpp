@@ -106,6 +106,9 @@ cl::opt<bool> SPIRVGenFastMath("spirv-gen-fast-math",
     cl::init(true), cl::desc("Enable fast math mode with generating floating"
                               "point binary ops"));
 
+cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv",
+    cl::init(true), cl::desc("Enable workarounds for bad SPIR-V"));
+
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -1781,10 +1784,23 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpBranchConditional: {
     auto BR = static_cast<SPIRVBranchConditional *>(BV);
+    auto C = transValue(BR->getCondition(), F, BB);
+
+    // Workaround a bug where old shader compilers would sometimes specify
+    // int/float arguments as the branch condition
+    if (SPIRVWorkaroundBadSPIRV) {
+      if (C->getType()->isFloatTy())
+        C = new llvm::FCmpInst(*BB, llvm::CmpInst::FCMP_ONE, C,
+          llvm::ConstantFP::get(C->getType(), 0.0));
+      else if (C->getType()->isIntegerTy() && !C->getType()->isIntegerTy(1))
+        C = new llvm::ICmpInst(*BB, llvm::CmpInst::ICMP_NE, C,
+          llvm::ConstantInt::get(C->getType(), 0));
+    }
+
     auto BC = BranchInst::Create(
         dyn_cast<BasicBlock>(transValue(BR->getTrueLabel(), F, BB)),
         dyn_cast<BasicBlock>(transValue(BR->getFalseLabel(), F, BB)),
-        transValue(BR->getCondition(), F, BB), BB);
+        C, BB);
     auto LM = static_cast<SPIRVLoopMerge *>(BR->getPrevious());
     if (LM != nullptr && LM->getOpCode() == OpLoopMerge)
       setLLVMLoopMetadata(LM, BC);
@@ -3452,6 +3468,7 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
         SS << gSPIRVName::ImageCallModPatchFmaskUsage;
 
   } else {
+    // Generate name strings for image query calls other than querylod
     Ops = BI->getOperands();
     assert(BI->hasType());
     std::vector<SPIRVType *> BTys = SPIRVInstruction::getOperandTypes(Ops);
@@ -3463,7 +3480,7 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     Desc    = &ImageBTy->getDescriptor();
 
     // Generate name strings for image query calls:
-    //    Format: prefix.query.op.dim[.cubearray][.buffer].returntype
+    //      Format: llpc.image.querynonlod.op.[dim][Array][.sample][.rettype]
 
     // Add call prefix
     SS << gSPIRVName::ImageCallPrefix << ".";
@@ -3477,7 +3494,8 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     SPIRVImageQueryOpKindNameMap::find(OC, &S);
     SS << S;
 
-    // Add image dimension
+    // Add image signature string to avoid overloading when image operand
+    // have different type, it will be removed after image operand is lowered.
     StructType *ImageTy =
       dyn_cast<StructType>(dyn_cast<PointerType>(ArgTys[0])->getPointerElementType());
     StringRef ImageTyName = ImageTy->getName();
@@ -3485,29 +3503,43 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
       ImageTyName.substr(ImageTyName.find_last_of('.'));
     SS << DimName.str();
 
-    if (OC == OpImageQuerySize || OC == OpImageQuerySizeLod) {
-      // NOTE: For "OpImageQuerySize", "OpImageQuerySizeLod" with dimension
-      // "cubearray" and "buffer", special processing is required to do.
-      // They are implemented with LLVM IR directly.
-      if (Desc->Dim == DimCube && Desc->Arrayed)
-        SS << ".cubearray";
-      else if (Desc->Arrayed)
-        SS << ".array";
-      else if (Desc->Dim == DimBuffer)
-        SS << ".buffer";
+    if ((OC == OpImageQuerySize) ||
+        (OC == OpImageQuerySizeLod) ||
+        (OC == OpImageQueryLevels)) {
+      // Add image dimension info
+      SPIRVImageDimKind dim = Desc->Dim;
+      if (dim == DimRect)
+          dim = Dim2D;
 
+      SS << "." << SPIRVDimNameMap::map(dim);
+      if (Desc->Arrayed)
+        SS << "Array";
+      if (Desc->MS)
+        SS << gSPIRVName::ImageCallModSample;
+    }
+
+    if (OC == OpImageQuerySize || OC == OpImageQuerySizeLod) {
       // Add image query return type
       SPIRVType *RetBTy = BI->getType();
       uint32_t CompCount =
         RetBTy->isTypeVector() ? RetBTy->getVectorComponentCount() : 1;
       switch (CompCount) {
       case 1:
+        assert((Desc->Dim == Dim1D) ||
+               (Desc->Dim == DimBuffer));
         SS << ".i32";
         break;
       case 2:
+        assert((Desc->Dim == Dim2D) ||
+               (Desc->Dim == DimRect) ||
+               (Desc->Dim == DimCube) ||
+               (Desc->Arrayed && Desc->Dim == Dim1D));
         SS << ".v2i32";
         break;
       case 3:
+        assert((Desc->Dim == Dim3D) ||
+               (Desc->Arrayed && Desc->Dim == Dim2D) ||
+               (Desc->Arrayed && Desc->Dim == DimCube));
         SS << ".v3i32";
         break;
       default:

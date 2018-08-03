@@ -507,6 +507,9 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityGroupNonUniformShuffleRelative, "GroupNonUniformShuffleRelative");
   add(CapabilityGroupNonUniformClustered, "GroupNonUniformClustered");
   add(CapabilityGroupNonUniformQuad, "GroupNonUniformQuad");
+  add(CapabilityStorageBuffer8BitAccess, "StorageBuffer8BitAccess");
+  add(CapabilityUniformAndStorageBuffer8BitAccess, "UniformAndStorageBuffer8BitAccess");
+  add(CapabilityStoragePushConstant8, "StoragePushConstant8");
   add(CapabilityImageGatherBiasLodAMD, "ImageGatherBiasLodAMD");
   add(CapabilityFragmentMaskAMD, "FragmentMaskAMD");
   add(CapabilityFloat16ImageAMD, "Float16ImageAMD");

@@ -179,8 +179,9 @@ private:
     static uint32_t     m_outRedirectCount; // The count of output redirect
     ShaderCachePtr      m_shaderCache;      // Shader cache
     GpuProperty         m_gpuProperty;      // GPU property
-    llvm::sys::Mutex    m_contextPoolMutex; // Mutex for context pool access
-    std::vector<Context*> m_contextPool;    // Context pool
+
+    static llvm::sys::Mutex      m_contextPoolMutex; // Mutex for context pool access
+    static std::vector<Context*> m_contextPool;      // Context pool
 };
 
 } // Llpc

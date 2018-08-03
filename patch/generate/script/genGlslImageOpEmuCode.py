@@ -554,7 +554,7 @@ class CodeGen(FuncDef):
                 supportDimAware = True
                 pass
             elif self._opKind == SpirvImageOpKind.querylod:
-                # Querylod opcode is not supported in dimension aware intrinsics
+                supportDimAware = True
                 pass
             else:
                 shouldNeverCall("")
@@ -589,8 +589,7 @@ class CodeGen(FuncDef):
             elif self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather:
                 intrinGen = DimAwareImageSampleGen(self)
             elif self._opKind == SpirvImageOpKind.querylod:
-                # Querylod opcode is not supported in dimension aware intrinsics
-                shouldNeverCall("")
+                intrinGen = DimAwareImageSampleGen(self)
             else:
                 shouldNeverCall("")
 
@@ -2829,7 +2828,9 @@ class DimAwareImageSampleGen(CodeGen):
     # Generates call to amdgcn intrinsic function.
     def genIntrinsicCall(self, irOut):
         assert self._dim != SpirvDim.DimBuffer
-        assert self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather
+        assert self._opKind == SpirvImageOpKind.sample or \
+               self._opKind == SpirvImageOpKind.gather or \
+               self._opKind == SpirvImageOpKind.querylod
 
         sparseRetType, retType, retNumComp = self.getDimAwareBackendDataType(self._supportSparse)
         retCompType     = self.getVDataRegCompType()
@@ -3042,6 +3043,8 @@ class DimAwareImageSampleGen(CodeGen):
             funcName += ".image.sample"
         elif self._opKind == SpirvImageOpKind.gather:
             funcName += ".image.gather4"
+        elif self._opKind == SpirvImageOpKind.querylod:
+            funcName += ".image.getlod"
         else:
             shouldNeverCall()
 

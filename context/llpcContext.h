@@ -188,7 +188,7 @@ public:
 
     GfxIpVersion GetGfxIpVersion() const
     {
-        return m_pPipelineContext->GetGfxIpVersion();
+        return m_gfxIp;
     }
 
     const GpuProperty* GetGpuProperty() const

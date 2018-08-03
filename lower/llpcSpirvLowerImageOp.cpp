@@ -424,14 +424,14 @@ void SpirvLowerImageOp::visitCallInst(
 
             if (imageCallMeta.OpKind == ImageOpQueryNonLod)
             {
-                // Format: ...".query.op.dim[.rettype]"...
+                // Format: ...".query.op.imagesig.dim[.rettype]"...
                 size_t pos = mangledName.find(gSPIRVName::ImageCallQueryNonLodPrefix);
                 LLPC_ASSERT(pos != std::string::npos);
 
                 // Skip the query operation name
                 pos = mangledName.find(".", pos + 1);
 
-                // Find the name string for image dimension and remove it
+                // Find the name string for image signature and remove it
                 size_t startPos = mangledName.find(".", pos + 1);
                 size_t endPos   = mangledName.find(".", startPos + 1);
                 if (endPos == std::string::npos)
@@ -471,25 +471,7 @@ void SpirvLowerImageOp::visitCallInst(
                 // use dimension aware image intrinsic.
                 bool enableDimAwareImageIntrinsic = cl::EnableDimAwareImageIntrinsic;
                 if ((callName.find(gSPIRVName::ImageCallModSparse) != std::string::npos) ||
-                    ((enableDimAwareImageIntrinsic == true) &&
-                     ((imageCallMeta.OpKind == ImageOpSample) ||
-                      (imageCallMeta.OpKind == ImageOpGather) ||
-                      (imageCallMeta.OpKind == ImageOpFetch)  ||
-                      (imageCallMeta.OpKind == ImageOpRead)   ||
-                      (imageCallMeta.OpKind == ImageOpWrite)  ||
-                      (imageCallMeta.OpKind == ImageOpAtomicExchange) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicCompareExchange) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicIIncrement) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicIDecrement) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicIAdd) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicISub) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicSMin) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicUMin) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicSMax) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicUMax) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicAnd) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicOr) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicXor))))
+                    (enableDimAwareImageIntrinsic == true))
                 {
                     callName += gSPIRVName::ImageCallDimAwareSuffix;
                 }

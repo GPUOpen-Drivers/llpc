@@ -711,7 +711,10 @@ protected:
       assert((Op1Ty->isTypeBool() || Op2Ty->isTypeBool()) &&
              "Invalid type for logical instruction");
     } else if (isBitwiseOpCode(OpCode)) {
-      assert((Op1Ty->isTypeInt() || Op2Ty->isTypeInt()) &&
+      // Old shader compilers would sometimes emit bitwise opcodes when they
+      // should have used logical, so accept either bool or int here.
+      assert((Op1Ty->isTypeInt() || Op1Ty->isTypeBool()) &&
+             (Op2Ty->isTypeInt() || Op2Ty->isTypeBool()) &&
              "Invalid type for bitwise instruction");
       assert((Op1Ty->getIntegerBitWidth() == Op2Ty->getIntegerBitWidth()) &&
              "Inconsistent BitWidth");
@@ -886,7 +889,9 @@ protected:
     assert(WordCount == BranchWeights.size() + 4);
     assert(OpCode == OC);
     assert(getCondition()->isForward() ||
-           getCondition()->getType()->isTypeBool());
+           getCondition()->getType()->isTypeBool() ||
+           getCondition()->getType()->isTypeFloat() ||
+           getCondition()->getType()->isTypeInt());
     assert(getTrueLabel()->isForward() || getTrueLabel()->isLabel());
     assert(getFalseLabel()->isForward() || getFalseLabel()->isLabel());
   }

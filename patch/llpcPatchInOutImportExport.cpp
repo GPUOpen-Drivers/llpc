@@ -4508,11 +4508,18 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         args.push_back(pRingOffset);                                                    // voffset
         args.push_back(pGsVsOffset);                                                    // soffset
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
-        EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        if (m_gfxIp.major <= 9)
+        {
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
+            EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        }
+        else
+        {
+            LLPC_NOT_IMPLEMENTED();
+        }
     }
 }
 

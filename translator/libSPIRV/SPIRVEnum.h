@@ -198,6 +198,9 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityGroupNonUniformShuffleRelative, { CapabilityGroupNonUniform });
   ADD_VEC_INIT(CapabilityGroupNonUniformClustered, { CapabilityGroupNonUniform });
   ADD_VEC_INIT(CapabilityGroupNonUniformQuad, { CapabilityGroupNonUniform });
+  ADD_VEC_INIT(CapabilityStorageBuffer8BitAccess, { CapabilityShader });
+  ADD_VEC_INIT(CapabilityUniformAndStorageBuffer8BitAccess, { CapabilityStorageBuffer8BitAccess });
+  ADD_VEC_INIT(CapabilityStoragePushConstant8, { CapabilityShader });
   ADD_VEC_INIT(CapabilityImageGatherBiasLodAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityFragmentMaskAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityFloat16ImageAMD, { CapabilityShader });

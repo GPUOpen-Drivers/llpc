@@ -108,6 +108,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
@@ -151,8 +152,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
 
-    uint64_t hash64 = 0;
-
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsFsRegConfig)];
     PipelineVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
@@ -177,13 +176,13 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
                                                              hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                              pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
-        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t vsHash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(vsHash64));
+        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(vsHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
-        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t tcsHash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
+        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(tcsHash64));
+        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(tcsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
@@ -201,18 +200,20 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
         SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
     {
         result = BuildPsRegConfig<PipelineVsTsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -231,7 +232,7 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -254,8 +255,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
-
-    uint64_t hash64 = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsGsFsRegConfig)];
     PipelineVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsGsFsRegConfig*>(pAllocBuf);
@@ -281,13 +280,13 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
                                                              hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                              pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
-        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t vsHash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(vsHash64));
+        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(vsHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
-        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t gsHash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
+        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(gsHash64));
+        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(gsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
@@ -303,9 +302,10 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
     {
         result = BuildPsRegConfig<PipelineVsGsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
@@ -325,7 +325,7 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -348,8 +348,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
-
-    uint64_t hash64 = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsGsFsRegConfig)];
     PipelineVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsGsFsRegConfig*>(pAllocBuf);
@@ -375,13 +373,13 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
                                                                hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
-        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t vsHash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(vsHash64));
+        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(vsHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
-        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t tcsHash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
+        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(tcsHash64));
+        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(tcsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
@@ -403,13 +401,13 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
                                                                hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
-        SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t tesHash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
+        SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(tesHash64));
+        SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(tesHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
-        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t gsHash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
+        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(gsHash64));
+        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(gsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
@@ -419,9 +417,10 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
     {
         result = BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
@@ -450,7 +449,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
     // Set up VGT_TF_PARAM
     SetupVgtTfParam(pContext, &pConfig->m_lsHsRegs);
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 

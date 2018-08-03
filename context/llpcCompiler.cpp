@@ -186,6 +186,8 @@ extern opt<std::string> LogFileOuts;
 
 namespace Llpc
 {
+llvm::sys::Mutex      Compiler::m_contextPoolMutex;
+std::vector<Context*> Compiler::m_contextPool;
 
 // Time profiling result
 TimeProfileResult g_timeProfileResult = {};
@@ -344,12 +346,33 @@ Compiler::~Compiler()
     {
         // Free context pool
         MutexGuard lock(m_contextPoolMutex);
-        for (auto pContext : m_contextPool)
+
+        // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
+        // compiler next time.
+        for (auto it = m_contextPool.begin(); it != m_contextPool.end();)
         {
-            LLPC_ASSERT(pContext->IsInUse() == false);
-            delete pContext;
+            auto   pContext             = *it;
+            size_t maxResidentContexts  = 0;
+
+            // This is just a W/A for Teamcity. Setting AMD_RESIDENT_CONTEXTS could reduce more than 40 minutes of
+            // CTS running time.
+            char*  pMaxResidentContexts = getenv("AMD_RESIDENT_CONTEXTS");
+
+            if (pMaxResidentContexts != nullptr)
+            {
+                maxResidentContexts = strtoul(pMaxResidentContexts, nullptr, 0);
+            }
+
+            if ((pContext->IsInUse() == false) && (m_contextPool.size() > maxResidentContexts))
+            {
+                it = m_contextPool.erase(it);
+                delete pContext;
+            }
+            else
+            {
+                ++it;
+            }
         }
-        m_contextPool.clear();
     }
 
     // Restore default output
@@ -1994,7 +2017,12 @@ Context* Compiler::AcquireContext()
     // Try to find a free context from pool first
     for (auto pContext : m_contextPool)
     {
-        if (pContext->IsInUse() == false)
+        GfxIpVersion gfxIpVersion = pContext->GetGfxIpVersion();
+
+        if ((pContext->IsInUse()   == false) &&
+            (gfxIpVersion.major    == m_gfxIp.major) &&
+            (gfxIpVersion.minor    == m_gfxIp.minor) &&
+            (gfxIpVersion.stepping == m_gfxIp.stepping))
         {
             pFreeContext = pContext;
             pFreeContext->SetInUse(true);

@@ -115,6 +115,105 @@ define float @llpc.dpdyFine.f32(float %p) #0
 ; >>>  Shader Invocation Group Functions
 ; =====================================================================================================================
 
+; GLSL: int/uint/float subgroupInclusiveXXX(int/uint/float)
+define spir_func i32 @llpc.subgroup.inclusiveScan.i32(i32 %binaryOp, i32 %value)
+{
+    ; dpp_ctrl 273 = 0x111, DPP_ROW_SR, row/lanes shift by 1 thread
+    ; Bound control is 0, no write out of bounds for all following dpp mov
+    %identity = call i32 @llpc.subgroup.identity.i32(i32 %binaryOp)
+    %i1.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %value, i32 273, i32 15, i32 15, i1 false)
+    %i1.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i1.1)
+    %i1.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %value, i32 %i1.2)
+
+    ; dpp_ctrl 274 = 0x112, DPP_ROW_SR, row/lanes shift by 2 thread
+    %i2.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %value, i32 274, i32 15, i32 15, i1 false)
+    %i2.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i2.1)
+    %i2.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i1.3, i32 %i2.2)
+
+    ; dpp_ctrl 275 = 0x113, DPP_ROW_SR, row/lanes shift by 3 thread
+    %i3.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %value, i32 275, i32 15, i32 15, i1 false)
+    %i3.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i3.1)
+    %i3.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i2.3, i32 %i3.2)
+
+    ; dpp_ctrl 276 = 0x114, DPP_ROW_SR, row/lanes shift by 4 thread
+    %i4.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %i3.3, i32 276, i32 15, i32 14, i1 false)
+    %i4.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i4.1)
+    %i4.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i3.3, i32 %i4.2)
+
+    ; dpp_ctrl 280 = 0x118, DPP_ROW_SR, row/lanes shift by 8 thread
+    %i5.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %i4.3, i32 280, i32 15, i32 12, i1 false)
+    %i5.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i5.1)
+    %i5.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i4.3, i32 %i5.2)
+
+    ; dpp_ctrl 322 =0x142 ,DPP_ROW_BCA, broadcast 15th thread to next row,
+    ; row_mask 10 = 0b1010, first and third row broadcast to second and fourth row
+    %i6.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %i5.3, i32 322, i32 10, i32 15, i1 false)
+    %i6.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i6.1)
+    %i6.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i5.3, i32 %i6.2)
+
+    ; dpp_ctrl 323 =0x143 ,DPP_ROW_BCA, broadcast 31th thread to next row 2 and 3,
+    ; row_mask 12 = 0b1100, first and second row broadcast to third and fouth row
+    %i7.1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %i6.3, i32 323, i32 12, i32 15, i1 false)
+    %i7.2 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i6.3, i32 %i7.1)
+    %i7.3 = call i32 @llvm.amdgcn.wwm.i32(i32 %i7.2)
+
+    ret i32 %i7.3
+}
+
+; GLSL: int/uint/float subgroupXXX(int/uint/float)
+define spir_func i32 @llpc.subgroup.reduce.i32(i32 %binaryOp, i32 %value)
+{
+    ; dpp_ctrl 273 = 0x111, DPP_ROW_SR, row/lanes shift by 1 thread
+    ; Bound control is 0, no write out of bounds for all following dpp mov
+    %i1.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %value, i32 273, i32 15, i32 15, i1 false)
+    %i1.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i1.1)
+    %i1.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %value, i32 %i1.2)
+
+    ; dpp_ctrl 274 = 0x112, DPP_ROW_SR, row/lanes shift by 2 thread
+    %i2.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %i1.3, i32 274, i32 15, i32 15, i1 false)
+    %i2.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i2.1)
+    %i2.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i1.3, i32 %i2.2)
+
+    ; dpp_ctrl 276 = 0x114, DPP_ROW_SR, row/lanes shift by 4 thread
+    %i3.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %i2.3, i32 276, i32 15, i32 15, i1 false)
+    %i3.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i3.1)
+    %i3.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i2.3, i32 %i3.2)
+
+    ; dpp_ctrl 280 = 0x118, DPP_ROW_SR, row/lanes shift by 8 thread
+    %i4.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %i3.3, i32 280, i32 15, i32 15, i1 false)
+    %i4.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i4.1)
+    %i4.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i3.3, i32 %i4.2)
+
+    ; dpp_ctrl 322 =0x142 ,DPP_ROW_BCA, broadcast 15th thread to next row,
+    ; row_mask 10 = 0b1010, first and third row broadcast to second and fourth row
+    %i5.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %i4.3, i32 322, i32 10, i32 15, i1 false)
+    %i5.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i5.1)
+    %i5.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i4.3, i32 %i5.2)
+
+    ; dpp_ctrl 323 =0x143 ,DPP_ROW_BCA, broadcast 31th thread to next row 2 and 3,
+    ; row_mask 12 = 0b1100, first and second row broadcast to third and fouth row
+    %i6.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %i5.3, i32 323, i32 12, i32 15, i1 false)
+    %i6.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i6.1)
+    %i6.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i5.3, i32 %i6.2)
+    %i6.4 = call i32 @llvm.amdgcn.wwm.i32(i32 %i6.3)
+
+    %i7 = call i32 @llvm.amdgcn.readlane(i32 %i6.4, i32 63)
+
+    ret i32 %i7
+}
+
+; GLSL: int/uint/float subgroupExclusiveXXX(int/uint/float)
+define spir_func i32 @llpc.subgroup.exclusiveScan.i32(i32 %binaryOp, i32 %value)
+{
+    %identity = call i32 @llpc.subgroup.identity.i32(i32 %binaryOp)
+    ; dpp_ctrl 312 =0x138, DPP_WF_SR1, wavefront right shift by 1 threads
+    ; bound ctrl is false, no write out of bounds
+    %1 = call i32 @llvm.amdgcn.update.dpp.i32(i32 %identity, i32 %value, i32 312, i32 15, i32 15, i1 false)
+    %2 = call i32 @llpc.subgroup.inclusiveScan.i32(i32 %binaryOp, i32 %1)
+
+    ret i32 %2
+}
+
 ; GLSL: int/uint subgroupShuffle(int/uint, uint)
 define spir_func i32 @_Z22GroupNonUniformShuffleiii(i32 %scope, i32 %value, i32 %id)
 {
@@ -212,8 +311,14 @@ define spir_func i32 @_Z21SwizzleInvocationsAMDiDv4_i(i32 %data, <4 x i32> %offs
 }
 
 declare i32 @llvm.amdgcn.mov.dpp.i32(i32, i32, i32, i32, i1) #2
+declare i32 @llvm.amdgcn.wwm.i32(i32) #1
+declare i32 @llvm.amdgcn.update.dpp.i32(i32, i32, i32, i32, i32, i1) #2
 declare i32 @llvm.amdgcn.wqm.i32(i32) #1
 declare i32 @llvm.amdgcn.ds.bpermute(i32, i32) #2
+declare i32 @llvm.amdgcn.readlane(i32, i32) #2
+declare i32 @llvm.amdgcn.readfirstlane(i32) #2
+declare spir_func i32 @llpc.subgroup.arithmetic.i32(i32, i32 , i32) #0
+declare spir_func i32 @llpc.subgroup.identity.i32(i32) #0
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }

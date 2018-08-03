@@ -595,6 +595,9 @@ inline bool isValid(spv::Capability V) {
   case CapabilityStorageInputOutput16:
   case CapabilityDeviceGroup:
   case CapabilityMultiView:
+  case CapabilityStorageBuffer8BitAccess:
+  case CapabilityUniformAndStorageBuffer8BitAccess:
+  case CapabilityStoragePushConstant8:
   case CapabilityImageGatherBiasLodAMD:
   case CapabilityFragmentMaskAMD:
   case CapabilityFloat16ImageAMD:
