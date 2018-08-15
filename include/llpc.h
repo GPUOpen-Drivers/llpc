@@ -40,7 +40,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 8;
+static const uint32_t  Version = 9;
 static const uint32_t  MaxColorTargets = 8;
 static const char      VkIcdName[]     = "amdvlk";
 
@@ -323,6 +323,20 @@ struct GraphicsPipelineBuildInfo
            VkFormat       format;               ///< Color attachment format
         } target[MaxColorTargets];              ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
+
+    struct
+    {
+        bool    enableNgg;                  ///< Enable NGG mode, use an implicit primitive shader
+
+        bool    enableFastLaunch;           ///< Enables the hardware to launch subgroups of work at a faster rate
+        bool    enableVertexReuse;          ///< Enable optimization to cull duplicate vertices
+        bool    disableBackfaceCulling;     ///< Disables culling of primitives that don't meet facing criteria
+        bool    enableFrustumCulling;       ///< Enables discarding of primitives outside of view frustum
+        bool    enableBoxFilterCulling;     ///< Enable simpler frustum culler that is less accurate
+        bool    enableSphereCulling;        ///< Enable frustum culling based on a sphere
+        bool    enableSmallPrimFilter;      ///< Enables trivial sub-sample primitive culling
+    } nggState;
+
     PipelineOptions     options;                ///< Per pipeline tuning/debugging options
 };
 

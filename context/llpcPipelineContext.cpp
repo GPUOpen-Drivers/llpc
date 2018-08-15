@@ -45,13 +45,15 @@ namespace Llpc
 
 // =====================================================================================================================
 PipelineContext::PipelineContext(
-    GfxIpVersion        gfxIp,     // Graphics IP version info
-    const GpuProperty*  pGpuProp,  // [in] GPU property
-    MetroHash::Hash*    pHash)     // [in] Pipeline hash code
+    GfxIpVersion           gfxIp,           // Graphics IP version info
+    const GpuProperty*     pGpuProp,        // [in] GPU property
+    const WorkaroundFlags* pGpuWorkarounds, // [in] GPU workarounds
+    MetroHash::Hash*       pHash)           // [in] Pipeline hash code
     :
     m_gfxIp(gfxIp),
     m_hash(*pHash),
-    m_pGpuProperty(pGpuProp)
+    m_pGpuProperty(pGpuProp),
+    m_pGpuWorkarounds(pGpuWorkarounds)
 {
 
 }
@@ -553,6 +555,9 @@ void PipelineContext::InitShaderResourceUsage(
     pResUsage->pushConstSizeInBytes = 0;
     pResUsage->imageWrite = false;
     pResUsage->perShaderTable = false;
+
+    pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
+    pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;
 
     pResUsage->inOutUsage.inputMapLocCount = 0;
     pResUsage->inOutUsage.outputMapLocCount = 0;

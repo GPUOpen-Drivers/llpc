@@ -627,6 +627,15 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "alphaToCoverageEnable = " << pPipelineInfo->cbState.alphaToCoverageEnable << "\n";
     dumpFile << "dualSourceBlendEnable = " << pPipelineInfo->cbState.dualSourceBlendEnable << "\n";
 
+    dumpFile << "enableNgg = " << pPipelineInfo->nggState.enableNgg << "\n";
+    dumpFile << "enableFastLaunch = " << pPipelineInfo->nggState.enableFastLaunch << "\n";
+    dumpFile << "enableVertexReuse = " << pPipelineInfo->nggState.enableVertexReuse << "\n";
+    dumpFile << "disableBackfaceCulling = " << pPipelineInfo->nggState.disableBackfaceCulling << "\n";
+    dumpFile << "enableFrustumCulling = " << pPipelineInfo->nggState.enableFrustumCulling << "\n";
+    dumpFile << "enableBoxFilterCulling = " << pPipelineInfo->nggState.enableBoxFilterCulling << "\n";
+    dumpFile << "enableSphereCulling = " << pPipelineInfo->nggState.enableSphereCulling << "\n";
+    dumpFile << "enableSmallPrimFilter = " << pPipelineInfo->nggState.enableSmallPrimFilter << "\n";
+
     for (uint32_t i = 0; i < MaxColorTargets; ++i)
     {
         if (pPipelineInfo->cbState.target[i].format != VK_FORMAT_UNDEFINED)

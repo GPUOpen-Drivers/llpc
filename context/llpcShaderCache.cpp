@@ -41,7 +41,7 @@ using namespace llvm;
 namespace Llpc
 {
 
-static const char CacheFileSubPath[] = "/.AMD/LlpcCache/";
+static const char CacheFileSubPath[] = "/AMD/LlpcCache/";
 
 static const char ClientStr[] = "LLPC";
 

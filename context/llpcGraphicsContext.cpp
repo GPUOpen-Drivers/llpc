@@ -66,12 +66,13 @@ namespace Llpc
 
 // =====================================================================================================================
 GraphicsContext::GraphicsContext(
-    GfxIpVersion                     gfxIp,         // Graphics Ip version info
-    const GpuProperty*               pGpuProp,      // GPU Property
-    const GraphicsPipelineBuildInfo* pPipelineInfo, // [in] Graphics pipeline build info
-    MetroHash::Hash*                 pHash)         // [in] Pipeline hash code
+    GfxIpVersion                     gfxIp,            // Graphics Ip version info
+    const GpuProperty*               pGpuProp,         // [in] GPU Property
+    const WorkaroundFlags*           pGpuWorkarounds,  // [in] GPU workarounds
+    const GraphicsPipelineBuildInfo* pPipelineInfo,    // [in] Graphics pipeline build info
+    MetroHash::Hash*                 pHash)            // [in] Pipeline hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pHash),
+    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pHash),
     m_pPipelineInfo(pPipelineInfo),
     m_stageMask(0),
     m_activeStageCount(0),

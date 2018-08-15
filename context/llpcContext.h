@@ -196,6 +196,11 @@ public:
         return m_pPipelineContext->GetGpuProperty();
     }
 
+    const WorkaroundFlags* GetGpuWorkarounds() const
+    {
+        return m_pPipelineContext->GetGpuWorkarounds();
+    }
+
     llvm::MDNode* GetEmptyMetadataNode()
     {
         return m_pEmptyMetaNode;

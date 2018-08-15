@@ -403,7 +403,8 @@ void ShaderMerger::GenerateLsHsEntryPoint(
         EmitCall(pLsHsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
-    if ((m_gfxIp.major == 9) && (m_gfxIp.minor == 0) && (m_gfxIp.stepping < 4))
+    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    if (pGpuWorkarounds->gfx9.fixLsVgprInput)
     {
         auto pNullHs = new ICmpInst(*pEntryBlock,
                                     ICmpInst::ICMP_EQ,

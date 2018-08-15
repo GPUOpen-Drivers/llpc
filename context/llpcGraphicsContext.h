@@ -42,6 +42,7 @@ class GraphicsContext: public PipelineContext
 public:
     GraphicsContext(GfxIpVersion                     gfxIp,
                     const GpuProperty*               pGpuProp,
+                    const WorkaroundFlags*           pGpuWorkarounds,
                     const GraphicsPipelineBuildInfo* pPipelineInfo,
                     MetroHash::Hash*                 pHash);
     virtual ~GraphicsContext();

@@ -526,7 +526,7 @@ struct InterfaceData
             // Geometry shader
             struct
             {
-                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode
+                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX8 and NGG)
                 uint32_t viewIndex;                 // View Index
             } gs;
 
@@ -649,7 +649,10 @@ struct InterfaceData
 class PipelineContext
 {
 public:
-    PipelineContext(GfxIpVersion gfxIp, const GpuProperty* pGpuProp, MetroHash::Hash* pHash);
+    PipelineContext(GfxIpVersion           gfxIp,
+                    const GpuProperty*     pGpuProp,
+                    const WorkaroundFlags* pGpuWorkarounds,
+                    MetroHash::Hash*       pHash);
     virtual ~PipelineContext() {}
 
     // Gets resource usage of the specified shader stage
@@ -702,6 +705,8 @@ public:
 
     const GpuProperty* GetGpuProperty() const { return m_pGpuProperty; }
 
+    const WorkaroundFlags* GetGpuWorkarounds() const { return m_pGpuWorkarounds; }
+
     void AutoLayoutDescriptor(ShaderStage shaderStage);
 
     // Gets pipeline hash code
@@ -734,9 +739,10 @@ protected:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    GfxIpVersion        m_gfxIp;         // Graphics IP version info
-    MetroHash::Hash     m_hash;          // Pipeline hash code
-    const GpuProperty*  m_pGpuProperty;  // GPU Property
+    GfxIpVersion           m_gfxIp;         // Graphics IP version info
+    MetroHash::Hash        m_hash;          // Pipeline hash code
+    const GpuProperty*     m_pGpuProperty;  // GPU Property
+    const WorkaroundFlags* m_pGpuWorkarounds;  // GPU workarounds
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);

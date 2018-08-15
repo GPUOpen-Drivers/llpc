@@ -81,7 +81,7 @@ namespace cl
 // -pipeline-dump-dir: directory where pipeline info are dumped
 opt<std::string> PipelineDumpDir("pipeline-dump-dir",
                                  desc("Directory where pipeline shader info are dumped"),
-                                 value_desc("directory"),
+                                 value_desc("dir"),
                                  init("."));
 
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -114,6 +114,12 @@ static opt<bool> DisableWipFeatures("disable-WIP-features",
 static opt<bool> EnableTimeProfiler("enable-time-profiler",
                                     desc("Enable time profiler for various compilation phases"),
                                     init(false));
+
+// -shader-cache-file-dir: root directory to store shader cache
+opt<std::string> ShaderCacheFileDir("shader-cache-file-dir",
+                                    desc("Root directory to store shader cache"),
+                                    value_desc("dir"),
+                                    init("."));
 
 // -shader-cache-mode: shader cache mode:
 // 0 - Disable
@@ -318,19 +324,21 @@ Compiler::Compiler(
     auxCreateInfo.gfxIp           = m_gfxIp;
     auxCreateInfo.hash            = m_optionHash;
     auxCreateInfo.pExecutableName = cl::ExecutableName.c_str();
-    auxCreateInfo.pCacheFilePath  = getenv("AMD_SHADER_DISK_CACHE_PATH");
-    if (auxCreateInfo.pCacheFilePath == nullptr)
+    auxCreateInfo.pCacheFilePath  = cl::ShaderCacheFileDir.c_str();
+    if (cl::ShaderCacheFileDir.empty())
     {
 #ifdef WIN_OS
         auxCreateInfo.pCacheFilePath  = getenv("LOCALAPPDATA");
 #else
-        auxCreateInfo.pCacheFilePath  = getenv("HOME");
+        LLPC_NEVER_CALLED();
 #endif
     }
 
     m_shaderCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
 
     InitGpuProperty();
+    InitGpuWorkaround();
+
     ++m_instanceCount;
     ++m_outRedirectCount;
 
@@ -984,7 +992,7 @@ Result Compiler::BuildGraphicsPipeline(
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+        GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
         result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                shaderInfo,
                                                forceLoopUnrollCount,
@@ -1007,7 +1015,7 @@ Result Compiler::BuildGraphicsPipeline(
             for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
                 forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+                GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
                 result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                        shaderInfo,
                                                        forceLoopUnrollCount,
@@ -1428,7 +1436,7 @@ Result Compiler::BuildComputePipeline(
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        ComputeContext computeContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+        ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
 
         result = BuildComputePipelineInternal(&computeContext,
                                               pPipelineInfo,
@@ -1452,7 +1460,7 @@ Result Compiler::BuildComputePipeline(
             for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
                 forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                ComputeContext computeContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+                ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
 
                 result = BuildComputePipelineInternal(&computeContext,
                                                       pPipelineInfo,
@@ -1741,6 +1749,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         cl::EnablePipelineDump.ArgStr,
         cl::DisableWipFeatures.ArgStr,
         cl::EnableTimeProfiler.ArgStr,
+        cl::ShaderCacheFileDir.ArgStr,
         cl::ShaderCacheMode.ArgStr,
         cl::ShaderReplaceMode.ArgStr,
         cl::ShaderReplaceDir.ArgStr,
@@ -2006,6 +2015,94 @@ void Compiler::InitGpuProperty()
     }
 }
 
+// =====================================================================================================================
+// Initialize GPU workarounds.
+void Compiler::InitGpuWorkaround()
+{
+    memset(&m_gpuWorkarounds, 0, sizeof(m_gpuWorkarounds));
+    if (m_gfxIp.major == 6)
+    {
+        // Hardware workarounds for GFX6 based GPU's:
+        m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+        m_gpuWorkarounds.gfx6.miscLoadBalancePerWatt = 1;
+        m_gpuWorkarounds.gfx6.shader8b16bLocalWriteCorruption = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1000_READLANE_SMRD_WORKAROUND_BUG343479 for detail
+        m_gpuWorkarounds.gfx6.shaderReadlaneSmrd = 1;
+
+        // TODO: Should be done in back-end, see SCOption_UBTS460287_FILL_SIMD_WITH_VGPRS for detail
+        m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1000R1100_VCCZ_CLOBBER_WORKAROUND_BUG457939 for detail
+        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
+
+        // TODO: Should be done in back-end, see SCOption_MIN_MAX_DENORM_WORKAROUND for detail
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        // NOTE: We only need workaround it in Tahiti, Pitcairn, Capeverde, to simplify the design, we set this
+        // flag for all gfxIp.major == 6
+        m_gpuWorkarounds.gfx6.shaderZExport = 1;
+
+    }
+    else if (m_gfxIp.major == 7)
+    {
+        // Hardware workarounds for GFX7 based GPU's:
+        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        if (m_gfxIp.stepping == 0)
+        {
+            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+
+            // NOTE: Buffer store + index mode are not used in vulkan, so we can skip this workaround in safe.
+            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
+        }
+        if (m_gfxIp.stepping == 3 ||
+            m_gfxIp.stepping == 4)
+        {
+            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
+            m_gpuWorkarounds.gfx6.shaderSpiBarrierMgmt = 1;
+            m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
+        }
+    }
+    else if (m_gfxIp.major == 8)
+    {
+        // Hardware workarounds for GFX8.x based GPU's:
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1200_UBTS523206_SMEM_RANGE_CHECK for detail
+        m_gpuWorkarounds.gfx6.shaderSmemBufferAddrClamp = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX8_DEGGIGX80_444_IMAGE_GATHER4_WORKAROUND and
+        // SCOption_GFX81_DEGGI___IMAGE_STORE_D16_WORKAROUND for detail
+        m_gpuWorkarounds.gfx6.shaderEstimateRegisterUsage = 1;
+
+        if (m_gfxIp.minor == 0 && m_gfxIp.stepping == 2)
+        {
+            m_gpuWorkarounds.gfx6.miscSpiSgprsNum = 1;
+        }
+    }
+    else if (m_gfxIp.major == 9)
+    {
+        // Hardware workarounds for GFX9 based GPU's:
+
+        // TODO: Clean up code for all 1d texture patch
+        m_gpuWorkarounds.gfx9.treat1dImagesAs2d = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX9_DEGGIGX90_864_IMAGE_GATHER_H_PCK_WORKAROUND and
+        // SCOption_GFX9_DEGGIGX90_1552_IMAGE_GATHER4_WORKAROUND for detail
+        m_gpuWorkarounds.gfx9.shaderImageGatherInstFix = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX9_DEGGIGX90_1641_CACHE_LINE_STRADDLING_BUG for detail
+        m_gpuWorkarounds.gfx9.fixCacheLineStraddling = 1;
+
+        if (m_gfxIp.stepping == 0 || m_gfxIp.stepping == 2)
+        {
+            m_gpuWorkarounds.gfx9.fixLsVgprInput = 1;
+        }
+    }
+}
 // =====================================================================================================================
 // Acquires a free context from context pool.
 Context* Compiler::AcquireContext()

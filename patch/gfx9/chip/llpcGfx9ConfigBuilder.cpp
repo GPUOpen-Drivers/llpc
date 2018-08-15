@@ -68,8 +68,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
 
-    uint64_t hash64 = 0;
-
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsFsRegConfig)];
     PipelineVsFsRegConfig* pConfig = reinterpret_cast<PipelineVsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
@@ -90,7 +88,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
         SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
@@ -105,7 +103,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     {
         result = BuildPsRegConfig<PipelineVsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
@@ -128,7 +126,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -1422,6 +1420,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                 LLPC_NEVER_CALLED();
             }
         }
+
     }
     else if (shaderStage1 == ShaderStageTessEval)
     {
@@ -1447,6 +1446,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                             static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
             }
         }
+
     }
     else if (shaderStage1 == ShaderStageGeometry)
     {
@@ -1459,6 +1459,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                         startUserData + pIntfData1->userDataUsage.gs.viewIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
+
     }
     else if (shaderStage1 == ShaderStageCompute)
     {

@@ -64,6 +64,8 @@ static opt<uint32_t> EnableCacheEmuLibContext("enable-cache-emu-lib-context",
                                          desc("Enable the cache of context of GLSL emulation library to file"),
                                          init(0));
 
+extern opt<std::string> ShaderCacheFileDir;
+
 } // cl
 
 } // llvm
@@ -134,14 +136,14 @@ Context::Context(
     ShaderCacheCreateInfo    createInfo = {};
     ShaderCacheAuxCreateInfo auxCreateInfo = {};
     auxCreateInfo.pExecutableName = "__LLPC_CONTEXT_CACHE__";
-    auxCreateInfo.pCacheFilePath = getenv("AMD_SHADER_DISK_CACHE_PATH");
+    auxCreateInfo.pCacheFilePath = cl::ShaderCacheFileDir.c_str();
 
-    if (auxCreateInfo.pCacheFilePath == nullptr)
+    if (cl::ShaderCacheFileDir.empty())
     {
 #ifdef WIN_OS
         auxCreateInfo.pCacheFilePath = getenv("LOCALAPPDATA");
 #else
-        auxCreateInfo.pCacheFilePath = getenv("HOME");
+        LLPC_ASSERT(0);
 #endif
     }
 

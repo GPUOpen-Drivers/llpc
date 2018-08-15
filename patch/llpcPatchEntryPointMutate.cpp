@@ -168,15 +168,13 @@ bool PatchEntryPointMutate::runOnModule(
         builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
     }
 
-    // Set vgpr,sgpr and wave limits
+    // Set VGPR, SGPR, and wave limits
     uint32_t vgprLimit = 0;
     uint32_t sgprLimit = 0;
     std::string wavesPerEu;
-    auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
-    auto pResourceUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
-    pResourceUsage->numSgprsAvailable = m_pContext->GetGpuProperty()->maxSgprsAvailable;
-    pResourceUsage->numVgprsAvailable = m_pContext->GetGpuProperty()->maxVgprsAvailable;
+    auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
+    auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
     if ((pShaderOptions->vgprLimit != 0) && (pShaderOptions->vgprLimit != UINT32_MAX))
     {
@@ -190,7 +188,7 @@ bool PatchEntryPointMutate::runOnModule(
     if (vgprLimit != 0)
     {
         builder.addAttribute("amdgpu-num-vgpr", std::to_string(vgprLimit));
-        pResourceUsage->numVgprsAvailable = std::min(vgprLimit, pResourceUsage->numVgprsAvailable);
+        pResUsage->numVgprsAvailable = std::min(vgprLimit, pResUsage->numVgprsAvailable);
     }
 
     if ((pShaderOptions->sgprLimit != 0) && (pShaderOptions->sgprLimit != UINT32_MAX))
@@ -205,7 +203,7 @@ bool PatchEntryPointMutate::runOnModule(
     if (sgprLimit != 0)
     {
         builder.addAttribute("amdgpu-num-sgpr", std::to_string(sgprLimit));
-        pResourceUsage->numSgprsAvailable = std::min(sgprLimit, pResourceUsage->numSgprsAvailable);
+        pResUsage->numSgprsAvailable = std::min(sgprLimit, pResUsage->numSgprsAvailable);
     }
 
     if (pShaderOptions->maxThreadGroupsPerComputeUnit != 0)
@@ -974,6 +972,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             }
         }
     }
+
     bool enableMultiView = false;
     if (m_shaderStage != ShaderStageCompute)
     {
@@ -1243,6 +1242,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 pIntfData->userDataUsage.tes.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
+
             break;
         }
     case ShaderStageGeometry:
@@ -1271,7 +1271,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     ++userDataIdx;
                 }
             }
-
             break;
         }
     case ShaderStageCompute:
