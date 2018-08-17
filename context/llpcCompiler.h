@@ -144,7 +144,7 @@ struct PipelineStatistics
 class Compiler: public ICompiler
 {
 public:
-    Compiler(GfxIpVersion gfxIp, uint32_t optionCount, const char*const* pOptions);
+    Compiler(GfxIpVersion gfxIp, uint32_t optionCount, const char*const* pOptions, MetroHash::Hash optionHash);
     ~Compiler();
 
     virtual void VKAPI_CALL Destroy();
@@ -173,6 +173,12 @@ public:
     // Gets the count of compiler instance.
     static uint32_t GetInstanceCount() { return m_instanceCount; }
 
+    // Gets the count of redirect output
+    static uint32_t GetOutRedirectCount() { return m_outRedirectCount; }
+
+    static MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
+                                                         const char*const* pOptions);
+
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
@@ -185,9 +191,6 @@ private:
                                 llvm::LLVMContext*           pContext,
                                 uint32_t                     forceLoopUnrollCount,
                                 llvm::Module**               ppModule) const;
-
-    MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
-                                                  const char*const* pOptions) const;
 
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
@@ -219,14 +222,14 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    const char*const    m_pClientName;      // Name of the client who calls LLPC
-    GfxIpVersion        m_gfxIp;            // Graphics IP version info
-    MetroHash::Hash     m_optionHash;       // Hash code of compilation options
-    static uint32_t     m_instanceCount;    // The count of compiler instance
-    static uint32_t     m_outRedirectCount; // The count of output redirect
-    ShaderCachePtr      m_shaderCache;      // Shader cache
-    GpuProperty         m_gpuProperty;      // GPU property
-    WorkaroundFlags     m_gpuWorkarounds;   // GPU workarounds;
+    std::vector<std::string>     m_options;          // Compilation options
+    MetroHash::Hash              m_optionHash;       // Hash code of compilation options
+    GfxIpVersion                 m_gfxIp;            // Graphics IP version info
+    static uint32_t              m_instanceCount;    // The count of compiler instance
+    static uint32_t              m_outRedirectCount; // The count of output redirect
+    ShaderCachePtr               m_shaderCache;      // Shader cache
+    GpuProperty                  m_gpuProperty;      // GPU property
+    WorkaroundFlags              m_gpuWorkarounds;   // GPU workarounds;
     static llvm::sys::Mutex      m_contextPoolMutex; // Mutex for context pool access
     static std::vector<Context*> m_contextPool;      // Context pool
 };

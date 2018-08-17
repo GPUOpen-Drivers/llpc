@@ -224,7 +224,6 @@ Context::Context(
                 LLPC_ERRS("Fails to link LLVM libraries together\n");
             }
         }
-
         // Do function inlining
         {
             legacy::PassManager passMgr;

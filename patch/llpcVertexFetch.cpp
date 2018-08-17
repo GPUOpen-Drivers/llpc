@@ -319,12 +319,7 @@ const VertexFormatInfo VertexFetch::m_vertexFormatInfo[] =
         4
     },
     // VK_FORMAT_A8B8G8R8_SRGB_PACK32 = 57
-    {
-        VK_FORMAT_A8B8G8R8_SRGB_PACK32,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
+    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_A8B8G8R8_SRGB_PACK32),
     // VK_FORMAT_A2R10G10B10_UNORM_PACK32 = 58
     {
         VK_FORMAT_A2R10G10B10_UNORM_PACK32,
@@ -1738,7 +1733,6 @@ bool VertexFetch::NeedPostShuffle(
     case VK_FORMAT_B8G8R8A8_SSCALED:
     case VK_FORMAT_B8G8R8A8_UINT:
     case VK_FORMAT_B8G8R8A8_SINT:
-    case VK_FORMAT_B8G8R8A8_SRGB:
     case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
     case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
     case VK_FORMAT_A2R10G10B10_USCALED_PACK32:
@@ -1774,7 +1768,7 @@ bool VertexFetch::NeedPatchA2S(
     case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
     case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
     case VK_FORMAT_A2B10G10R10_SINT_PACK32:
-        needPatch = true;
+        needPatch = (m_pContext->GetGfxIpVersion().major < 9);
         break;
     default:
         break;

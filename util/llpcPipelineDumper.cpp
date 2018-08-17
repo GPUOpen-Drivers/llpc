@@ -177,6 +177,29 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
     auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
     return MetroHash::Compact64(&hash);
 }
+// =====================================================================================================================
+// Get graphics pipeline name.
+void VKAPI_CALL IPipelineDumper::GetPipelineName(
+    const  GraphicsPipelineBuildInfo* pPipelineInfo, // [In]  Info to build this graphics pipeline
+    char*                             pPipeName,     // [Out] The full name of this graphics pipeline
+    const size_t                      nameBufSize)   // Size of the buffer to store pipeline name
+{
+    auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(nullptr, pPipelineInfo, &hash);
+    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+}
+
+// =====================================================================================================================
+// Get compute pipeline name.
+void VKAPI_CALL IPipelineDumper::GetPipelineName(
+    const ComputePipelineBuildInfo* pPipelineInfo, // [In]  Info to build this compute pipeline
+    char*                           pPipeName,     // [Out] The full name of this compute pipeline
+    const size_t                    nameBufSize)   // Size of the buffer to store pipeline name
+{
+    auto hash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(pPipelineInfo, nullptr, &hash);
+    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+}
 
 // =====================================================================================================================
 // Calculates compute pipeline hash code.
@@ -559,7 +582,7 @@ void PipelineDumper::DumpPipelineExtraInfo(
     PipelineDumpFile*             pDumpFile,               // [in] Directory of pipeline dump
     const std::string*            pStr)                     // [in] Extra info string
 {
-    pDumpFile->dumpFile << pStr;
+    pDumpFile->dumpFile << *pStr;
 }
 
 // =====================================================================================================================

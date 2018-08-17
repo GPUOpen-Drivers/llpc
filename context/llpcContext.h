@@ -303,6 +303,7 @@ private:
     static const uint8_t GlslEmuLib[];
     static const uint8_t GlslEmuLibGfx8[];
     static const uint8_t GlslEmuLibGfx9[];
+
 };
 
 } // Llpc

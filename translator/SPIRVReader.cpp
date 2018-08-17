@@ -4497,15 +4497,17 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
     bool IsNonUniform = BV->hasDecorate(DecorationNonUniformEXT);
     if (IsNonUniform && isa<Instruction>(V)) {
       std::string  MangledFuncName = "";
-      ArrayRef<Value*> Args = { V };
+      std::vector<Value*> Args;
+      Args.push_back(V);
+      auto Types = getTypes(Args);
       auto VoidTy = Type::getVoidTy(*Context);
       auto BB = cast<Instruction>(V)->getParent();
 
       // Per-instruction metadata is not safe, LLVM optimizer may remove them,
       // so we choose to add a dummy instruction and remove them when it isn't
       // needed.
-      mangleGlslBuiltin(gSPIRVMD::NonUniform, getTypes(Args), MangledFuncName);
-      auto F = getOrCreateFunction(M, VoidTy, getTypes(Args), MangledFuncName);
+      mangleGlslBuiltin(gSPIRVMD::NonUniform, Types, MangledFuncName);
+      auto F = getOrCreateFunction(M, VoidTy, Types, MangledFuncName);
       auto CI = CallInst::Create(F, Args, "", BB);
     }
   }

@@ -374,7 +374,10 @@ static Result Init(
             snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption),
                      "-shader-cache-file-dir=%s", pEnvString);
         }
-
+        else
+        {
+            strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
+        }
         newArgs.push_back(shaderCacheFileDirOption);
 
         result = ICompiler::Create(gfxIp, newArgs.size(), &newArgs[0], ppCompiler);
@@ -703,7 +706,12 @@ static Result CompileGlsl(
 
         void* pProgram = nullptr;
         const char* pLog = nullptr;
-        bool compileResult = spvCompileAndLinkProgram(sourceStringCount, sourceList, &pProgram, &pLog);
+        int compileOption = EOptionDefaultDesktop | EOptionVulkanRules | EOptionDebug;
+        bool compileResult = spvCompileAndLinkProgramWithOptions(sourceStringCount,
+                                                                 sourceList,
+                                                                 &pProgram,
+                                                                 &pLog,
+                                                                 compileOption);
 
         LLPC_OUTS("// GLSL program compile/link log\n");
 

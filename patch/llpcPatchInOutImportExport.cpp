@@ -49,21 +49,6 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the coherent flag used in tbuffer2 intrinsics
-union CoherentFlag
-{
-    struct
-    {
-        uint32_t glc    :  1;   // Global level coherence
-        uint32_t slc    :  1;   // System level coherence
-        uint32_t dlc    :  1;   // Device level coherence
-        uint32_t        :  29;
-    } bits;
-
-    uint32_t u32All;
-};
-
-// =====================================================================================================================
 // Initializes static members.
 char PatchInOutImportExport::ID = 0;
 

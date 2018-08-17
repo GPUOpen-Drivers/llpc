@@ -305,6 +305,7 @@ void SpirvLowerImageOp::visitCallInst(
             args.push_back(pResourceIndex);
             std::unordered_set<Value*> checkedValuesResource;
             imageCallMeta.NonUniformResource = IsNonUniformValue(pResourceIndex, checkedValuesResource) ? 1 : 0;
+            imageCallMeta.WriteOnly = callInst.getType()->isVoidTy();
 
             if (imageCallMeta.OpKind != ImageOpQueryNonLod)
             {

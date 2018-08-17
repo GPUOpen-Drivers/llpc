@@ -484,6 +484,24 @@ public:
     ///
     /// @returns Hash code associated this compute pipeline.
     static uint64_t VKAPI_CALL GetPipelineHash(const ComputePipelineBuildInfo* pPipelineInfo);
+
+    /// Gets graphics pipeline name.
+    ///
+    /// @param [in]  pPipelineInfo  Info to build this graphics pipeline
+    /// @param [out] pPipeName      The full name of this graphics pipeline
+    /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+    static void VKAPI_CALL GetPipelineName(const GraphicsPipelineBuildInfo* pPipelineInfo,
+                                           char* pPipeName,
+                                           const size_t nameBufSize);
+
+    /// Gets compute pipeline name.
+    ///
+    /// @param [in]  pPipelineInfo  Info to build this compute pipeline
+    /// @param [out] pPipeName      The full name of this compute pipeline
+    /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+    static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo* pPipelineInfo,
+                                           char* pPipeName,
+                                           const size_t nameBufSize);
 };
 
 // =====================================================================================================================

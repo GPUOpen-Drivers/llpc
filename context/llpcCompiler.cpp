@@ -105,11 +105,6 @@ static opt<bool> DumpDuplicatePipelines("dump-duplicate-pipelines",
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
 
-// --disable-WIP-features: disable those work-in-progress features
-static opt<bool> DisableWipFeatures("disable-WIP-features",
-                                   desc("Disable those work-in-progress features"),
-                                   init(false));
-
 // -enable-time-profiler: enable time profiler for various compilation phases
 static opt<bool> EnableTimeProfiler("enable-time-profiler",
                                     desc("Enable time profiler for various compilation phases"),
@@ -212,6 +207,7 @@ static const uint8_t GlslNullFsEmuLib[]=
 };
 
 static ManagedStatic<sys::Mutex> s_compilerMutex;
+static MetroHash::Hash s_optionHash = {};
 
 uint32_t Compiler::m_instanceCount = 0;
 uint32_t Compiler::m_outRedirectCount = 0;
@@ -245,8 +241,36 @@ Result VKAPI_CALL ICompiler::Create(
     raw_null_ostream nullStream;
 
     MutexGuard lock(*s_compilerMutex);
+    MetroHash::Hash optionHash = Compiler::GenerateHashForCompileOptions(optionCount, options);
 
-    if (Compiler::GetInstanceCount() == 0)
+    bool parseCmdOption = true;
+    if (Compiler::GetInstanceCount() > 0)
+    {
+        bool isSameOption = memcmp(&optionHash, &s_optionHash, sizeof(optionHash)) == 0;
+
+        parseCmdOption = false;
+        if (isSameOption == false)
+        {
+            if (Compiler::GetOutRedirectCount() == 0)
+            {
+                // All compiler instances are destroyed, we can reset LLVM options in safe
+                auto& options = cl::getRegisteredOptions();
+                for (auto it = options.begin(); it != options.end(); ++it)
+                {
+                    it->second->reset();
+                }
+                parseCmdOption = true;
+            }
+            else
+            {
+                LLPC_ERRS("Incompatible compiler options cross compiler instances!");
+                result = Result::ErrorInvalidValue;
+                LLPC_NEVER_CALLED();
+            }
+        }
+    }
+
+    if (parseCmdOption)
     {
         // LLVM command options can't be parsed multiple times
         if (cl::ParseCommandLineOptions(optionCount,
@@ -256,17 +280,12 @@ Result VKAPI_CALL ICompiler::Create(
         {
             result = Result::ErrorInvalidValue;
         }
-
-        // LLVM fatal error handler only can be installed once.
-        if (result == Result::Success)
-        {
-            install_fatal_error_handler(FatalErrorHandler);
-        }
     }
 
     if (result == Result::Success)
     {
-        *ppCompiler = new Compiler(gfxIp, optionCount, options);
+        s_optionHash = optionHash;
+        *ppCompiler = new Compiler(gfxIp, optionCount, options, s_optionHash);
         LLPC_ASSERT(*ppCompiler != nullptr);
     }
     else
@@ -290,12 +309,17 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 Compiler::Compiler(
     GfxIpVersion      gfxIp,        // Graphics IP version info
     uint32_t          optionCount,  // Count of compilation-option strings
-    const char*const* pOptions)      // [in] An array of compilation-option strings
+    const char*const* pOptions,     // [in] An array of compilation-option strings
+    MetroHash::Hash   optionHash)   // Hash code of compilation options
     :
-    m_pClientName(pOptions[0]),
+    m_optionHash(optionHash),
     m_gfxIp(gfxIp)
 {
-    m_optionHash = GenerateHashForCompileOptions(optionCount, pOptions);
+    for (uint32_t i = 0; i < optionCount; ++i)
+    {
+        m_options.push_back(pOptions[i]);
+    }
+
     if (m_outRedirectCount == 0)
     {
         RedirectLogOutput(false, optionCount, pOptions);
@@ -310,6 +334,9 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmPrinter();
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
+
+        // LLVM fatal error handler only can be installed once.
+        install_fatal_error_handler(FatalErrorHandler);
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
         InitSpvGen();
@@ -341,10 +368,6 @@ Compiler::Compiler(
 
     ++m_instanceCount;
     ++m_outRedirectCount;
-
-    // Create one context at initialization time
-    auto pContext = AcquireContext();
-    ReleaseContext(pContext);
 }
 
 // =====================================================================================================================
@@ -395,7 +418,7 @@ Compiler::~Compiler()
         ShaderCacheManager::GetShaderCacheManager()->ReleaseShaderCacheObject(m_shaderCache);
     }
 
-    if (strcmp(m_pClientName, VkIcdName) == 0)
+    if (m_options[0] == VkIcdName)
     {
         // NOTE: Skip subsequent cleanup work for Vulkan ICD. The work will be done by system itself
         return;
@@ -413,6 +436,7 @@ Compiler::~Compiler()
 
     if (shutdown)
     {
+        ShaderCacheManager::Shutdown();
         llvm_shutdown();
     }
 }
@@ -442,6 +466,11 @@ Result Compiler::BuildShaderModule(
     if (IsSpirvBinary(&pShaderInfo->shaderBin))
     {
         binType = BinaryType::Spirv;
+        if (VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
+        {
+            LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
+            result = Result::Unsupported;
+        }
     }
     else if (IsLlvmBitcode(&pShaderInfo->shaderBin))
     {
@@ -530,14 +559,6 @@ Result Compiler::BuildGraphicsPipelineInternal(
         const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
         if (pShaderInfo->pModuleData == nullptr)
         {
-            continue;
-        }
-
-        if (cl::DisableWipFeatures &&
-            ((stage == ShaderStageTessControl) || (stage == ShaderStageTessEval) || (stage == ShaderStageGeometry)))
-        {
-            result = Result::Unsupported;
-            LLPC_ERRS("Unsupported shader stage.\n");
             continue;
         }
 
@@ -946,6 +967,14 @@ Result Compiler::BuildGraphicsPipeline(
         dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
         dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
         pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, nullptr, pPipelineInfo, &pipelineHash);
+        std::stringstream strStream;
+        strStream << ";Compiler Options: ";
+        for (auto& option : m_options)
+        {
+            strStream << option << " ";
+        }
+        std::string extraInfo = strStream.str();
+        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -1390,6 +1419,14 @@ Result Compiler::BuildComputePipeline(
         dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
         dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
         pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, pPipelineInfo, nullptr, &pipelineHash);
+        std::stringstream strStream;
+        strStream << ";Compiler Options: ";
+        for (auto& option : m_options)
+        {
+            strStream << option << " ";
+        }
+        std::string extraInfo = strStream.str();
+        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -1739,15 +1776,14 @@ void Compiler::CleanOptimizedSpirv(
 // Builds hash code from compilation-options
 MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     uint32_t          optionCount,    // Count of compilation-option strings
-    const char*const* pOptions         // [in] An array of compilation-option strings
-    ) const
+    const char*const* pOptions        // [in] An array of compilation-option strings
+    )
 {
     // Options which needn't affect compilation results
     static StringRef IgnoredOptions[] =
     {
         cl::PipelineDumpDir.ArgStr,
         cl::EnablePipelineDump.ArgStr,
-        cl::DisableWipFeatures.ArgStr,
         cl::EnableTimeProfiler.ArgStr,
         cl::ShaderCacheFileDir.ArgStr,
         cl::ShaderCacheMode.ArgStr,
@@ -1827,15 +1863,6 @@ Result Compiler::ValidatePipelineShaderInfo(
             {
                 LLPC_ERRS("Missing entry-point name for " << GetShaderStageName(shaderStage) << " shader\n");
                 result = Result::ErrorInvalidShader;
-            }
-
-            if (cl::DisableWipFeatures)
-            {
-                if (VerifySpirvBinary(pSpirvBin) != Result::Success)
-                {
-                    LLPC_ERRS("Unsupported op codes are found in " << GetShaderStageName(shaderStage) << " shader\n");
-                    result = Result::Unsupported;
-                }
             }
         }
         else if (pModuleData->binType == BinaryType::LlvmBc)

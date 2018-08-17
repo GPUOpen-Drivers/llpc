@@ -1,4 +1,4 @@
-﻿//===- SPIRVToOCL20.cpp - Transform SPIR-V builtins to OCL20 builtins-------===//
+//===- SPIRVToOCL20.cpp - Transform SPIR-V builtins to OCL20 builtins-------===//
 //
 //                     The LLVM/SPIRV Translator
 //
@@ -444,7 +444,8 @@ void SPIRVToOCL20::visitCallSPIRVGroupBuiltin(CallInst *CI, Op OC) {
       Op = DemangledName;
     }
     DemangledName = Prefix + kSPIRVName::GroupPrefix +
-                    SPIRSPIRVGroupOperationMap::rmap(GO) + '_' + Op.str();
+                    SPIRSPIRVGroupOperationMap::rmap(GO) + '_' + Op.str() +
+                    "_waveSz";
   }
   AttributeList Attrs = CI->getCalledFunction()->getAttributes();
   mutateCallInstOCL(M, CI,

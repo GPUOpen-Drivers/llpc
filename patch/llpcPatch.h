@@ -46,6 +46,7 @@ void initializePatchDeadFuncRemovePass(PassRegistry&);
 void initializePatchDescriptorLoadPass(PassRegistry&);
 void initializePatchEntryPointMutatePass(PassRegistry&);
 void initializePatchExternalLibLinkPass(PassRegistry&);
+void initializePatchGroupOpPass(PassRegistry&);
 void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);

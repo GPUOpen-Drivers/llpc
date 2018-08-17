@@ -214,10 +214,11 @@ target_sources(llpc PRIVATE
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
     patch/llpcPatchAddrSpaceMutate.cpp
+    patch/llpcPatchBufferOp.cpp
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
+    patch/llpcPatchGroupOp.cpp
     patch/llpcPatchInOutImportExport.cpp
-    patch/llpcPatchBufferOp.cpp
     patch/llpcPatchImageOp.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
@@ -312,6 +313,7 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslGroupOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py

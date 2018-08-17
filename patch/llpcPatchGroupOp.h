@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -23,62 +23,43 @@
  *
  **********************************************************************************************************************/
 /**
- ***********************************************************************************************************************
- @file llpcShaderCacheManager.h
- @brief LLPC header file: contains declaration of class Llpc::ShaderCacheManager.
- ***********************************************************************************************************************
- */
+***********************************************************************************************************************
+* @file  llpcPatchGroupOp.h
+* @brief LLPC header file: contains declaration of class Llpc::PatchGroupOp.
+***********************************************************************************************************************
+*/
 #pragma once
 
-#include <list>
+#include "llvm/IR/InstVisitor.h"
 
-#include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcShaderCache.h"
+#include "llpcPatch.h"
+#include <unordered_set>
 
 namespace Llpc
 {
 
-typedef std::shared_ptr<ShaderCache> ShaderCachePtr;
-
 // =====================================================================================================================
-// This class manages shader cache instances for different GFXIP
-class ShaderCacheManager
+// Represents the pass of LLVM patch operations for group operations.
+class PatchGroupOp :
+    public Patch,
+    public llvm::InstVisitor<PatchGroupOp>
 {
 public:
-    // Constructor
-    ShaderCacheManager()
-    {
+    PatchGroupOp();
 
-    }
+    virtual bool runOnModule(llvm::Module& module);
+    virtual void visitCallInst(llvm::CallInst& callInst);
 
-    ~ShaderCacheManager();
+    // Pass creator, creates the pass of LLVM patching opertions for group operations.
+    static llvm::ModulePass* Create() { return new PatchGroupOp(); }
 
-    // Get the global ShaderCacheManager object
-    static ShaderCacheManager* GetShaderCacheManager()
-    {
-        if (m_pManager == nullptr)
-        {
-            m_pManager = new ShaderCacheManager();
-        }
-        return m_pManager;
-    }
+    // -----------------------------------------------------------------------------------------------------------------
 
-    static void Shutdown()
-    {
-        delete m_pManager;
-        m_pManager = nullptr;
-    }
-
-    ShaderCachePtr GetShaderCacheObject(const ShaderCacheCreateInfo*    pCreateInfo,
-                                        const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
-
-    void ReleaseShaderCacheObject(ShaderCachePtr& shaderCachePtr);
+    static char ID;   // ID of this pass
+    std::unordered_set<llvm::Instruction*>   m_groupCalls; // List of "call" instructions to emulate SPIR-V group operations
 
 private:
-    std::list<ShaderCachePtr>  m_shaderCaches;    // ShaderCache instances for all GFXIP
-
-    static ShaderCacheManager* m_pManager;              // Static manager
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchGroupOp);
 };
 
 } // Llpc
