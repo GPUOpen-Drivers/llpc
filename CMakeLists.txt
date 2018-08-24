@@ -274,6 +274,7 @@ target_sources(llpc PRIVATE
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
     util/llpcPassLoopInfoCollect.cpp
+    util/llpcPassLoopUnrollInfoRectify.cpp
     util/llpcPassNonNativeFuncRemove.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp
@@ -295,6 +296,9 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslCopyShaderEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmu.ll
@@ -305,9 +309,10 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmuD64.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmuD16.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt

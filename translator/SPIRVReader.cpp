@@ -1004,16 +1004,10 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   // TODO: Support "LoopControlDependencyInfiniteMask" and
   // "LoopControlDependencyLengthMask". Currently, they are safely ignored.
   if (LM->getLoopControl() == LoopControlMaskNone) {
-    if (EnableLoopUnroll) {
-      // Default loop unroll count is 32.
-      uint32_t unrollCount = 32;
-      if (LoopUnrollCount > 0) {
-          unrollCount = LoopUnrollCount;
-      }
-
+    if (EnableLoopUnroll && (LoopUnrollCount > 0)) {
       Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
       MD = ConstantAsMetadata::get(
-        ConstantInt::get(Type::getInt32Ty(*Context), unrollCount));
+        ConstantInt::get(Type::getInt32Ty(*Context), LoopUnrollCount));
     } else {
       BI->setMetadata("llvm.loop", Self);
       return;
@@ -1194,7 +1188,9 @@ BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
     FMF.setNoNaNs();
     FMF.setAllowReassoc();
     FMF.setAllowReciprocal();
-    FMF.setAllowContract(true);
+    // Enable contraction when "NoContraction" decoration is not specified
+    bool AllowContract = !BV->hasDecorate(DecorationNoContraction);
+    FMF.setAllowContract(AllowContract);
     Inst->setFastMathFlags(FMF);
   }
   return Inst;
@@ -4446,7 +4442,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       if (OpaqueTy->isTypeImage()) {
         auto ImageTy = static_cast<SPIRVTypeImage *>(OpaqueTy);
         auto Desc = ImageTy->getDescriptor();
-        assert(Desc.Sampled <= 2); // 0 - runtime, 1 - sampled, 2 - non sampled 
+        assert(Desc.Sampled <= 2); // 0 - runtime, 1 - sampled, 2 - non sampled
 
         if (Desc.Sampled == 2) {
           // For a storage image, build the metadata

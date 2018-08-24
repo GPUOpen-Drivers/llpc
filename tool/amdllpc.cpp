@@ -362,8 +362,8 @@ static Result Init(
             pEnvString = getenv("HOME");
             if (pEnvString != nullptr)
             {
-                strncpy(shaderCacheFileRootDir, pEnvString, sizeof(shaderCacheFileRootDir));
-                strncat(shaderCacheFileRootDir, "/.cache",  sizeof(shaderCacheFileRootDir));
+                snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir),
+                    "%s/.cache", pEnvString);
                 pEnvString = &shaderCacheFileRootDir[0];
             }
         }
