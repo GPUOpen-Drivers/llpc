@@ -99,7 +99,7 @@ PatchEntryPointMutate::PatchEntryPointMutate()
 bool PatchEntryPointMutate::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
     Patch::Init(&module);
 
@@ -133,7 +133,7 @@ bool PatchEntryPointMutate::runOnModule(
     if (m_shaderStage == ShaderStageFragment)
     {
         auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-
+        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
         SpiPsInputAddr spiPsInputAddr = {};
 
         spiPsInputAddr.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
@@ -150,6 +150,13 @@ bool PatchEntryPointMutate::runOnModule(
                                                builtInUsage.baryCoordNoPersp);
         spiPsInputAddr.LINEAR_CENTROID_ENA  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
                                                builtInUsage.baryCoordNoPerspCentroid);
+        if (pPipelineInfo->rsState.numSamples <= 1)
+        {
+            // NOTE: If multi-sample is disabled, I/J calculation for "centroid" interpolation mode depends
+            // on "center" mode.
+            spiPsInputAddr.PERSP_CENTER_ENA |= spiPsInputAddr.PERSP_CENTROID_ENA;
+            spiPsInputAddr.LINEAR_CENTER_ENA |= spiPsInputAddr.LINEAR_CENTROID_ENA;
+        }
         spiPsInputAddr.POS_X_FLOAT_ENA      = builtInUsage.fragCoord;
         spiPsInputAddr.POS_Y_FLOAT_ENA      = builtInUsage.fragCoord;
         spiPsInputAddr.POS_Z_FLOAT_ENA      = builtInUsage.fragCoord;
@@ -161,15 +168,13 @@ bool PatchEntryPointMutate::runOnModule(
         builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
     }
 
-    // Set vgpr,sgpr and wave limits
+    // Set VGPR, SGPR, and wave limits
     uint32_t vgprLimit = 0;
     uint32_t sgprLimit = 0;
     std::string wavesPerEu;
-    auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
-    auto pResourceUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
-    pResourceUsage->numSgprsAvailable = m_pContext->GetGpuProperty()->maxSgprsAvailable;
-    pResourceUsage->numVgprsAvailable = m_pContext->GetGpuProperty()->maxVgprsAvailable;
+    auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
+    auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
     if ((pShaderOptions->vgprLimit != 0) && (pShaderOptions->vgprLimit != UINT32_MAX))
     {
@@ -183,7 +188,7 @@ bool PatchEntryPointMutate::runOnModule(
     if (vgprLimit != 0)
     {
         builder.addAttribute("amdgpu-num-vgpr", std::to_string(vgprLimit));
-        pResourceUsage->numVgprsAvailable = std::min(vgprLimit, pResourceUsage->numVgprsAvailable);
+        pResUsage->numVgprsAvailable = std::min(vgprLimit, pResUsage->numVgprsAvailable);
     }
 
     if ((pShaderOptions->sgprLimit != 0) && (pShaderOptions->sgprLimit != UINT32_MAX))
@@ -198,7 +203,7 @@ bool PatchEntryPointMutate::runOnModule(
     if (sgprLimit != 0)
     {
         builder.addAttribute("amdgpu-num-sgpr", std::to_string(sgprLimit));
-        pResourceUsage->numSgprsAvailable = std::min(sgprLimit, pResourceUsage->numSgprsAvailable);
+        pResUsage->numSgprsAvailable = std::min(sgprLimit, pResUsage->numSgprsAvailable);
     }
 
     if (pShaderOptions->maxThreadGroupsPerComputeUnit != 0)
@@ -500,6 +505,7 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_TF_BUFFER_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
 
         inoutUsage.pTessFactorBufDesc = EmitCall(m_pModule,
                                                  LlpcName::DescriptorLoadBuffer,
@@ -513,6 +519,7 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_HS_BUFFER0_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
 
         inoutUsage.pOffChipLdsDesc = EmitCall(m_pModule,
                                               LlpcName::DescriptorLoadBuffer,
@@ -562,6 +569,7 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_HS_BUFFER0_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
 
         inOutUsage.pOffChipLdsDesc = EmitCall(m_pModule,
                                                  LlpcName::DescriptorLoadBuffer,
@@ -595,6 +603,8 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_GS_RING_IN_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
+
         auto pEsGsRingBufDesc = EmitCall(m_pModule,
                                          LlpcName::DescriptorLoadBuffer,
                                          m_pContext->Int32x4Ty(),
@@ -679,6 +689,8 @@ bool PatchEntryPointMutate::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_ES_RING_OUT_OFFS));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));
+
         auto pEsGsRingBufDesc = EmitCall(m_pModule,
                                          LlpcName::DescriptorLoadBuffer,
                                          m_pContext->Int32x4Ty(),
@@ -960,6 +972,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             }
         }
     }
+
     bool enableMultiView = false;
     if (m_shaderStage != ShaderStageCompute)
     {
@@ -1229,6 +1242,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 pIntfData->userDataUsage.tes.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
+
             break;
         }
     case ShaderStageGeometry:
@@ -1257,7 +1271,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     ++userDataIdx;
                 }
             }
-
             break;
         }
     case ShaderStageCompute:

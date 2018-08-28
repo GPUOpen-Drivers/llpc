@@ -59,7 +59,7 @@ PassDeadFuncRemove::PassDeadFuncRemove()
 bool PassDeadFuncRemove::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Pass-Dead-Func-Remove\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Pass-Dead-Func-Remove\n");
 
     uint32_t iterCount = 0;
     bool changed = false; // Whether changes are made
@@ -82,7 +82,7 @@ bool PassDeadFuncRemove::runOnModule(
             // Remove dead functions
             if (pCurrFunc->use_empty())
             {
-                DEBUG(dbgs() << "Remove ";
+                LLVM_DEBUG(dbgs() << "Remove ";
                       pCurrFunc->printAsOperand(dbgs());
                       dbgs() << '\n');
                 pCurrFunc->dropAllReferences();

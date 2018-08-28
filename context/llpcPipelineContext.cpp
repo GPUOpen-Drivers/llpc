@@ -34,6 +34,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/Support/CommandLine.h"
 
+#include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcPipelineContext.h"
 
@@ -44,13 +45,15 @@ namespace Llpc
 
 // =====================================================================================================================
 PipelineContext::PipelineContext(
-    GfxIpVersion        gfxIp,     // Graphics IP version info
-    const GpuProperty*  pGpuProp,  // [in] GPU property
-    MetroHash::Hash*    pHash)     // [in] Pipeline hash code
+    GfxIpVersion           gfxIp,           // Graphics IP version info
+    const GpuProperty*     pGpuProp,        // [in] GPU property
+    const WorkaroundFlags* pGpuWorkarounds, // [in] GPU workarounds
+    MetroHash::Hash*       pHash)           // [in] Pipeline hash code
     :
     m_gfxIp(gfxIp),
     m_hash(*pHash),
-    m_pGpuProperty(pGpuProp)
+    m_pGpuProperty(pGpuProp),
+    m_pGpuWorkarounds(pGpuWorkarounds)
 {
 
 }
@@ -83,6 +86,7 @@ const char* PipelineContext::GetGpuNameString() const
         { { 9, 0, 1 }, "gfx901"   },  // [9.0.1] gfx901
         { { 9, 0, 2 }, "gfx902"   },  // [9.0.2] gfx902
         { { 9, 0, 3 }, "gfx903"   },  // [9.0.3] gfx903
+        { { 9, 0, 4 }, "gfx904"   },  // [9.0.4] gfx904, vega12
     };
 
     const GpuNameStringMap* pNameMap = nullptr;
@@ -291,10 +295,53 @@ void PipelineContext::AutoLayoutDescriptor(
         nodeOffset += (*pDummyResNodes)[setNodeIdx].tablePtr.nodeCount;
     }
 
-    // Set dummy color formats for fragment outputs
-    if (shaderStage == ShaderStageFragment)
+    // Shader stage specific processing
+    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo());
+
+    if (shaderStage == ShaderStageVertex)
     {
-        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo());
+        // Set primitive topology
+        auto pIaState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->iaState);
+        pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
+    else if ((shaderStage == ShaderStageTessControl) || (shaderStage == ShaderStageTessEval))
+    {
+        // Set primitive topology and patch control points
+        auto pIaState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->iaState);
+        pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        pIaState->patchControlPoints = 3;
+    }
+    else if (shaderStage == ShaderStageGeometry)
+    {
+        // Set primitive topology
+        auto pIaState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->iaState);
+
+        const auto inputPrimitive = pResUsage->builtInUsage.gs.inputPrimitive;
+        switch (inputPrimitive)
+        {
+        case InputPoints:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+            break;
+        case InputLines:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+            break;
+        case InputLinesAdjacency:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY;
+            break;
+        case InputTriangles:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            break;
+        case InputTrianglesAdjacency:
+            pIaState->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY;
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+        }
+    }
+    else if (shaderStage == ShaderStageFragment)
+    {
+        // Set dummy color formats for fragment outputs
         auto pCbState = &(const_cast<GraphicsPipelineBuildInfo*>(pPipelineInfo)->cbState);
 
         const uint32_t cbShaderMask = pResUsage->inOutUsage.fs.cbShaderMask;
@@ -509,6 +556,9 @@ void PipelineContext::InitShaderResourceUsage(
     pResUsage->pushConstSizeInBytes = 0;
     pResUsage->imageWrite = false;
     pResUsage->perShaderTable = false;
+
+    pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
+    pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;
 
     pResUsage->inOutUsage.inputMapLocCount = 0;
     pResUsage->inOutUsage.outputMapLocCount = 0;

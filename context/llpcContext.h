@@ -188,12 +188,17 @@ public:
 
     GfxIpVersion GetGfxIpVersion() const
     {
-        return m_pPipelineContext->GetGfxIpVersion();
+        return m_gfxIp;
     }
 
     const GpuProperty* GetGpuProperty() const
     {
         return m_pPipelineContext->GetGpuProperty();
+    }
+
+    const WorkaroundFlags* GetGpuWorkarounds() const
+    {
+        return m_pPipelineContext->GetGpuWorkarounds();
     }
 
     llvm::MDNode* GetEmptyMetadataNode()
@@ -298,6 +303,7 @@ private:
     static const uint8_t GlslEmuLib[];
     static const uint8_t GlslEmuLibGfx8[];
     static const uint8_t GlslEmuLibGfx9[];
+
 };
 
 } // Llpc

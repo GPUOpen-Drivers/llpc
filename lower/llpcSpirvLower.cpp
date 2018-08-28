@@ -30,8 +30,10 @@
  */
 #define DEBUG_TYPE "llpc-spirv-lower"
 
+#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/IPO.h"
 
 #include "llpcContext.h"
@@ -46,6 +48,7 @@
 #include "llpcSpirvLowerDynIndex.h"
 #include "llpcSpirvLowerGlobal.h"
 #include "llpcSpirvLowerImageOp.h"
+#include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerOpt.h"
 #include "llpcSpirvLowerResourceCollect.h"
 
@@ -64,6 +67,8 @@ static opt<bool> LowerDynIndex("lower-dyn-index", desc("Lower SPIR-V dynamic (no
 static opt<bool> DisableLowerOpt("disable-lower-opt", desc("Disable optimization for SPIR-V lowering"));
 
 extern opt<bool> EnableDumpCfg;
+
+extern opt<std::string> PipelineDumpDir;
 
 } // cl
 
@@ -90,9 +95,6 @@ Result SpirvLower::Run(
     // Lower SPIR-V resource collecting
     passMgr.add(SpirvLowerResourceCollect::Create());
 
-    // Lower SPIR-V access chain
-    passMgr.add(SpirvLowerAccessChain::Create());
-
     // Link external native library for constant folding
     passMgr.add(PassExternalLibLink::Create(pContext->GetNativeGlslEmuLibrary()));
     passMgr.add(PassDeadFuncRemove::Create());
@@ -100,6 +102,9 @@ Result SpirvLower::Run(
     // Function inlining
     passMgr.add(createFunctionInliningPass(InlineThreshold));
     passMgr.add(PassDeadFuncRemove::Create());
+
+    // Lower SPIR-V access chain
+    passMgr.add(SpirvLowerAccessChain::Create());
 
     // Lower SPIR-V buffer operations (load and store)
     passMgr.add(SpirvLowerBufferOp::Create());
@@ -131,6 +136,9 @@ Result SpirvLower::Run(
     // Lower SPIR-V image operations (sample, fetch, gather, read/write),
     // NOTE: It is dependent on optimization result, should be after optimization pass.
     passMgr.add(SpirvLowerImageOp::Create());
+
+    // Lower SPIR-V instruction metadata remove
+    passMgr.add(SpirvLowerInstMetaRemove::Create());
 
     if (passMgr.run(*pModule) == false)
     {
@@ -167,6 +175,48 @@ void SpirvLower::Init(
     m_pContext = static_cast<Context*>(&m_pModule->getContext());
     m_shaderStage = GetShaderStageFromModule(m_pModule);
     m_pEntryPoint = GetEntryPoint(m_pModule);
+}
+
+// =====================================================================================================================
+// Dumps module's CFG graph
+void SpirvLower::DumpCfg(
+    const char*  pPostfix,   // [in] A postfix string
+    Module*      pModule)    // [in] LLVM module for dump
+{
+    Context* pContext = static_cast<Context*>(&pModule->getContext());
+    std::string cfgFileName;
+    char str[256] = {};
+
+    uint64_t hash = pContext->GetPiplineHashCode();
+    snprintf(str, 256, "Pipe_0x%016" PRIX64 "_%s_%s_", hash,
+        GetShaderStageName(GetShaderStageFromModule(pModule)),
+        pPostfix);
+
+    for (Function &function : *pModule)
+    {
+        if (function.empty())
+        {
+            continue;
+        }
+
+        cfgFileName = str;
+        cfgFileName += function.getName();
+        cfgFileName += ".dot";
+        cfgFileName = cl::PipelineDumpDir + "/" + cfgFileName;
+
+        LLPC_OUTS("Dumping CFG '" << cfgFileName << "'...\n");
+
+        std::error_code errCode;
+        raw_fd_ostream cfgFile(cfgFileName, errCode, sys::fs::F_Text);
+        if (!errCode)
+        {
+            WriteGraph(cfgFile, static_cast<const Function*>(&function));
+        }
+        else
+        {
+            LLPC_ERRS(" Error: fail to open file for writing!");
+        }
+    }
 }
 
 } // Llpc

@@ -75,7 +75,7 @@ bool PassExternalLibLink::runOnModule(
 {
     TimeProfiler timeProfiler(&g_timeProfileResult.patchLinkTime);
 
-    DEBUG(dbgs() << "Run the pass Pass-External-Lib-Link\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Pass-External-Lib-Link\n");
 
     Result result = Result::Success;
     auto pGlslEmuLib = m_pExternalLib;

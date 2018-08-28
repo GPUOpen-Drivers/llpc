@@ -142,6 +142,8 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/include
     PRIVATE
         ${PROJECT_SOURCE_DIR}/context
+        ${PROJECT_SOURCE_DIR}/imported/chip/gfx6
+        ${PROJECT_SOURCE_DIR}/imported/chip/gfx9
         ${PROJECT_SOURCE_DIR}/imported/metrohash/src
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
@@ -154,8 +156,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/translator/libSPIRV
         ${PROJECT_SOURCE_DIR}/translator/Mangler
         ${PROJECT_SOURCE_DIR}/util
-        ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
-        ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
@@ -198,6 +198,7 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
     lower/llpcSpirvLowerImageOp.cpp
+    lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerOpt.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
 )
@@ -213,10 +214,11 @@ target_sources(llpc PRIVATE
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
     patch/llpcPatchAddrSpaceMutate.cpp
+    patch/llpcPatchBufferOp.cpp
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
+    patch/llpcPatchGroupOp.cpp
     patch/llpcPatchInOutImportExport.cpp
-    patch/llpcPatchBufferOp.cpp
     patch/llpcPatchImageOp.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
@@ -271,6 +273,8 @@ target_sources(llpc PRIVATE
     util/llpcFile.cpp
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
+    util/llpcPassLoopInfoCollect.cpp
+    util/llpcPassLoopUnrollInfoRectify.cpp
     util/llpcPassNonNativeFuncRemove.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp
@@ -292,6 +296,9 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslCopyShaderEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmu.ll
@@ -302,12 +309,16 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslGroupOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py

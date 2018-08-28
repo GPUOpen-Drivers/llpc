@@ -53,9 +53,7 @@ namespace Gfx9
 {
 
 #include "gfx9_plus_merged_enum.h"
-#include "gfx9_plus_merged_mask.h"
 #include "gfx9_plus_merged_offset.h"
-#include "gfx9_plus_merged_shift.h"
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS).
@@ -69,8 +67,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
-
-    uint64_t hash64 = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsFsRegConfig)];
     PipelineVsFsRegConfig* pConfig = reinterpret_cast<PipelineVsFsRegConfig*>(pAllocBuf);
@@ -92,7 +88,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
         SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
@@ -107,9 +103,10 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     {
         result = BuildPsRegConfig<PipelineVsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
@@ -125,9 +122,11 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    {
+        SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    }
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -150,8 +149,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
-
-    uint64_t hash64 = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsFsRegConfig)];
     PipelineVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsFsRegConfig*>(pAllocBuf);
@@ -177,13 +174,13 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
                                                              hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                              pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
-        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t vsHash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(vsHash64));
+        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(vsHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
-        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t tcsHash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
+        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(tcsHash64));
+        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(tcsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
@@ -201,18 +198,20 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
         SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
     {
         result = BuildPsRegConfig<PipelineVsTsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     // Set up IA_MULTI_VGT_PARAM
@@ -227,9 +226,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    {
+        SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    }
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -252,8 +253,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
-
-    uint64_t hash64 = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsGsFsRegConfig)];
     PipelineVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsGsFsRegConfig*>(pAllocBuf);
@@ -279,13 +278,13 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
                                                              hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                              pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
-        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t vsHash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(vsHash64));
+        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(vsHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
-        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t gsHash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
+        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(gsHash64));
+        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(gsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
@@ -295,28 +294,16 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pVsIntfData->vbTable.resNodeIdx);
         }
-
-        if (gfxIp.major == 9)
-        {
-            regVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09 vgtGsMaxPrimsPerSubgroup = {};
-            vgtGsMaxPrimsPerSubgroup.bits.MAX_PRIMS_PER_SUBGROUP =
-                GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP) *
-                GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT);
-            SET_DYN_REG(pConfig, mmVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09, vgtGsMaxPrimsPerSubgroup.u32All);
-        }
-        else
-        {
-            LLPC_NOT_IMPLEMENTED();
-        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
     {
         result = BuildPsRegConfig<PipelineVsGsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
@@ -332,9 +319,11 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
     const uint32_t primGroupSize = 128;
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    {
+        SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    }
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -357,8 +346,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     uint32_t dataEntryIdx = 0;
-
-    uint64_t hash64 = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsGsFsRegConfig)];
     PipelineVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsGsFsRegConfig*>(pAllocBuf);
@@ -384,13 +371,13 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
                                                                hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
-        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t vsHash64 = pContext->GetShaderHashCode(ShaderStageVertex);
+        SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(vsHash64));
+        SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(vsHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
-        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t tcsHash64 = pContext->GetShaderHashCode(ShaderStageTessControl);
+        SET_REG(pConfig, API_HS_HASH_DWORD0, static_cast<uint32_t>(tcsHash64));
+        SET_REG(pConfig, API_HS_HASH_DWORD1, static_cast<uint32_t>(tcsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
@@ -412,38 +399,26 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
                                                                hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
-        SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t tesHash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
+        SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(tesHash64));
+        SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(tesHash64 >> 32));
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
-        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
-        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+        uint64_t gsHash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
+        SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(gsHash64));
+        SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(gsHash64 >> 32));
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-
-        if (gfxIp.major == 9)
-        {
-            regVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09 vgtGsMaxPrimsPerSubgroup = {};
-            vgtGsMaxPrimsPerSubgroup.bits.MAX_PRIMS_PER_SUBGROUP =
-                GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP) *
-                GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT);
-            SET_DYN_REG(pConfig, mmVGT_GS_MAX_PRIMS_PER_SUBGROUP__GFX09, vgtGsMaxPrimsPerSubgroup.u32All);
-        }
-        else
-        {
-            LLPC_NOT_IMPLEMENTED();
-        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
     {
         result = BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(pContext, ShaderStageFragment, pConfig);
 
-        hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
+        uint64_t hash64 = pContext->GetShaderHashCode(ShaderStageFragment);
         SET_REG(pConfig, API_PS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_PS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageCopyShader)))
@@ -465,12 +440,14 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
     }
 
-    SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    {
+        SET_REG(pConfig, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
+    }
 
     // Set up VGT_TF_PARAM
     SetupVgtTfParam(pContext, &pConfig->m_lsHsRegs);
 
-    hash64 = pContext->GetPiplineHashCode();
+    uint64_t hash64 = pContext->GetPiplineHashCode();
     SET_REG(pConfig, PIPELINE_HASH_LO, static_cast<uint32_t>(hash64));
     SET_REG(pConfig, PIPELINE_HASH_HI, static_cast<uint32_t>(hash64 >> 32));
 
@@ -489,6 +466,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
     size_t*             pConfigSize)     // [out] Size of register configuration
 {
     Result result = Result::Success;
+    GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
     LLPC_ASSERT(stageMask == ShaderStageToMask(ShaderStageCompute));
@@ -497,7 +475,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineCsRegConfig)];
     PipelineCsRegConfig* pConfig = reinterpret_cast<PipelineCsRegConfig*>(pAllocBuf);
-    pConfig->Init();
+    pConfig->Init(gfxIp);
 
     BuildApiHwShaderMapping(0,
                             0,
@@ -547,30 +525,23 @@ Result ConfigBuilder::BuildVsRegConfig(
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
-    if (gfxIp.major == 9)
+    if (shaderStage == ShaderStageCopyShader)
     {
-        if (shaderStage == ShaderStageCopyShader)
-        {
-            // NOTE: For copy shader, we use fixed number of user data registers.
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
-            SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pContext->GetGpuProperty()->maxSgprsAvailable);
-            SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pContext->GetGpuProperty()->maxVgprsAvailable);
-        }
-        else
-        {
-            const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
-            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, pShaderInfo->options.debugMode);
-
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
-
-            SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
-            SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
-        }
+        // NOTE: For copy shader, we use fixed number of user data registers.
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
+        SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pContext->GetGpuProperty()->maxSgprsAvailable);
+        SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pContext->GetGpuProperty()->maxVgprsAvailable);
     }
     else
     {
-        LLPC_NOT_IMPLEMENTED();
+        const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, pShaderInfo->options.debugMode);
+
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
+
+        SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
+        SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
     }
 
     auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
@@ -651,14 +622,7 @@ Result ConfigBuilder::BuildVsRegConfig(
 
         if (pContext->IsTessOffChip())
         {
-            if (gfxIp.major == 9)
-            {
-                SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
-            }
-            else
-            {
-                LLPC_NOT_IMPLEMENTED();
-            }
+            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
         }
     }
     else
@@ -688,12 +652,15 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
 
     SET_REG_FIELD(&pConfig->m_vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_VS_OUT_CONFIG, VS_EXPORT_COUNT, pResUsage->inOutUsage.expCount - 1);
+
+    {
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_VS_OUT_CONFIG, VS_EXPORT_COUNT, pResUsage->inOutUsage.expCount - 1);
+    }
 
     SET_REG(&pConfig->m_vsRegs, USES_VIEWPORT_ARRAY_INDEX, useViewportIndex);
 
     // According to the IA_VGT_Spec, it is only legal to enable vertex reuse when we're using viewport array
-    // index if each GS, DS, or VS invocation emits the same viewport array index for each vertex and we set
+    // index if each GS, TES, or VS invocation emits the same viewport array index for each vertex and we set
     // VTE_VPORT_PROVOKE_DISABLE.
     if (useViewportIndex)
     {
@@ -713,13 +680,14 @@ Result ConfigBuilder::BuildVsRegConfig(
 
     if (usePointSize || useLayer || useViewportIndex)
     {
+        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
+        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
+        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
+        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
+        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
+
         if (gfxIp.major == 9)
         {
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
         }
         else
         {
@@ -729,17 +697,10 @@ Result ConfigBuilder::BuildVsRegConfig(
 
     if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
     {
-        if (gfxIp.major == 9)
+        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
+        if (clipDistanceCount + cullDistanceCount > 4)
         {
-            SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
-            if (clipDistanceCount + cullDistanceCount > 4)
-            {
-                SET_REG_FIELD_GFX9(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST1_VEC_ENA, true);
-            }
-        }
-        else
-        {
-            LLPC_NOT_IMPLEMENTED();
+            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST1_VEC_ENA, true);
         }
 
         uint32_t clipDistanceMask = (1 << clipDistanceCount) - 1;
@@ -830,19 +791,9 @@ Result ConfigBuilder::BuildLsHsRegConfig(
 
     const auto pTcsShaderInfo = pContext->GetPipelineShaderInfo(ShaderStageTessControl);
     SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, pTcsShaderInfo->options.debugMode);
-    if (gfxIp.major == 9)
-    {
 
-        SET_REG_FIELD_GFX9(&pConfig->m_lsHsRegs,
-                           SPI_SHADER_PGM_RSRC2_HS,
-                           TRAP_PRESENT,
-                           pTcsShaderInfo->options.trapPresent);
-        SET_REG_FIELD_GFX9(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
-    }
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
+    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, pTcsShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
 
     // NOTE: On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K
     // DWORDs.
@@ -860,7 +811,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
 
     if (gfxIp.major == 9)
     {
-        SET_REG_FIELD_GFX9(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
+        SET_REG_GFX9_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
     }
     else
     {
@@ -893,7 +844,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
                      pContext,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                     mmSPI_SHADER_USER_DATA_LS_0__GFX09,
+                     Gfx09::mmSPI_SHADER_USER_DATA_LS_0,
                      pConfig);
     }
     else
@@ -965,19 +916,8 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     const auto pGsShaderInfo = pContext->GetPipelineShaderInfo(ShaderStageGeometry);
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, pGsShaderInfo->options.debugMode);
-    if (gfxIp.major == 9)
-    {
-
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs,
-                           SPI_SHADER_PGM_RSRC2_GS,
-                           TRAP_PRESENT,
-                           pGsShaderInfo->options.trapPresent);
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
-    }
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
+    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, pGsShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
 
     uint32_t esVgprCompCnt = 0;
     if (hasTs)
@@ -994,14 +934,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
         if (pContext->IsTessOffChip())
         {
-            if (gfxIp.major == 9)
-            {
-                SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
-            }
-            else
-            {
-                LLPC_NOT_IMPLEMENTED();
-            }
+            SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
         }
     }
     else
@@ -1012,21 +945,14 @@ Result ConfigBuilder::BuildEsGsRegConfig(
         }
     }
 
-    if (gfxIp.major == 9)
-    {
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
+    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
 
-        const auto ldsSizeDwordGranularityShift = pContext->GetGpuProperty()->ldsSizeDwordGranularityShift;
+    const auto ldsSizeDwordGranularityShift = pContext->GetGpuProperty()->ldsSizeDwordGranularityShift;
 
-        SET_REG_FIELD_GFX9(&pConfig->m_esGsRegs,
-                           SPI_SHADER_PGM_RSRC2_GS,
-                           LDS_SIZE,
-                           calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
-    }
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
+    SET_REG_FIELD(&pConfig->m_esGsRegs,
+                  SPI_SHADER_PGM_RSRC2_GS,
+                  LDS_SIZE,
+                  calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
 
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(gsBuiltInUsage.outputVertices));
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -1058,7 +984,9 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     SET_REG_FIELD(&pConfig->m_esGsRegs,
                   VGT_GS_ONCHIP_CNTL,
                   GS_INST_PRIMS_IN_SUBGRP,
-                  (gsBuiltInUsage.invocations > 1) ? (calcFactor.gsPrimsPerSubgroup * gsBuiltInUsage.invocations) : 0);
+                  (gsBuiltInUsage.invocations > 1) ?
+                      (calcFactor.gsPrimsPerSubgroup * gsBuiltInUsage.invocations) :
+                      calcFactor.gsPrimsPerSubgroup);
 
     uint32_t gsVertItemSize = 4 * std::max(1u, gsInOutUsage.outputMapLocCount);
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize);
@@ -1084,29 +1012,42 @@ Result ConfigBuilder::BuildEsGsRegConfig(
         gsOutputPrimitiveType = LINESTRIP;
     }
 
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE,   gsOutputPrimitiveType);
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1, gsOutputPrimitiveType);
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2, gsOutputPrimitiveType);
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3, gsOutputPrimitiveType);
-
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
-
     // TODO: Multiple output streams are not supported.
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GSVS_RING_OFFSET_1, OFFSET, calcFactor.gsVsRingItemSize);
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GSVS_RING_OFFSET_2, OFFSET, calcFactor.gsVsRingItemSize);
-    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, calcFactor.gsVsRingItemSize);
-
+    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
+    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, calcFactor.esGsRingItemSize);
+
+    const uint32_t gsInstPrimsInSubgrp =
+        GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP);
+
+    if (gfxIp.major == 9)
+    {
+        SET_REG_FIELD(&pConfig->m_esGsRegs,
+                      VGT_GS_MAX_PRIMS_PER_SUBGROUP,
+                      MAX_PRIMS_PER_SUBGROUP,
+                      gsInstPrimsInSubgrp * maxVertOut);
+    }
+    else
+    {
+        LLPC_NOT_IMPLEMENTED();
+    }
 
     SET_REG(&pConfig->m_esGsRegs, GS_NUM_AVAIL_SGPRS, pGsResUsage->numSgprsAvailable);
     SET_REG(&pConfig->m_esGsRegs, GS_NUM_AVAIL_VGPRS, pGsResUsage->numVgprsAvailable);
 
-    result = ConfigBuilder::BuildUserDataConfig<T>(
-                 pContext,
-                 (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
-                 (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                 mmSPI_SHADER_USER_DATA_ES_0,
-                 pConfig);
+    if (gfxIp.major == 9)
+    {
+        result = ConfigBuilder::BuildUserDataConfig<T>(
+                     pContext,
+                     (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
+                     (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
+                     mmSPI_SHADER_USER_DATA_ES_0,
+                     pConfig);
+    }
+    else
+    {
+        LLPC_NOT_IMPLEMENTED();
+    }
 
     return result;
 }
@@ -1137,15 +1078,8 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, pShaderInfo->options.debugMode);
 
-    if (gfxIp.major == 9)
-    {
-        SET_REG_FIELD_GFX9(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
-        SET_REG_FIELD_GFX9(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
-    }
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
+    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
 
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, FRONT_FACE_ALL_BITS, true);
     if (builtInUsage.pixelCenterInteger)
@@ -1184,6 +1118,10 @@ Result ConfigBuilder::BuildPsRegConfig(
     {
         zOrder = LATE_Z;
         execOnHeirFail = true;
+    }
+    else if (pShaderInfo->options.allowReZ)
+    {
+        zOrder = EARLY_Z_THEN_RE_Z;
     }
     else
     {
@@ -1314,13 +1252,10 @@ Result ConfigBuilder::BuildPsRegConfig(
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL, UNDER_RAST_ENABLE, false);
     }
 
-    const uint32_t spiShaderPgmRsrc2Ps = GET_REG(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS);
     const uint32_t loadCollisionWaveId =
-        (spiShaderPgmRsrc2Ps & SPI_SHADER_PGM_RSRC2_PS__LOAD_COLLISION_WAVEID_MASK) >>
-         SPI_SHADER_PGM_RSRC2_PS__LOAD_COLLISION_WAVEID__SHIFT;
+        GET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_COLLISION_WAVEID);
     const uint32_t  loadIntrawaveCollision =
-        (spiShaderPgmRsrc2Ps & SPI_SHADER_PGM_RSRC2_PS__LOAD_INTRAWAVE_COLLISION_MASK) >>
-         SPI_SHADER_PGM_RSRC2_PS__LOAD_INTRAWAVE_COLLISION__SHIFT;
+        GET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, LOAD_INTRAWAVE_COLLISION);
 
     SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_SHADER_CONTROL, LOAD_COLLISION_WAVEID, loadCollisionWaveId);
     SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_SHADER_CONTROL, LOAD_INTRAWAVE_COLLISION, loadIntrawaveCollision);
@@ -1369,6 +1304,8 @@ Result ConfigBuilder::BuildCsRegConfig(
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TGID_Z_EN, true);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TG_SIZE_EN, true);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, (builtInUsage.localInvocationId ? 2 : 0));
+
+    // TODO: For GFX10, COMPUTE_PGM_RSRC3.SHARED_VGPR_CNT need to be set.
 
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, builtInUsage.workgroupSizeX);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, builtInUsage.workgroupSizeY);
@@ -1483,6 +1420,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                 LLPC_NEVER_CALLED();
             }
         }
+
     }
     else if (shaderStage1 == ShaderStageTessEval)
     {
@@ -1508,6 +1446,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                             static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
             }
         }
+
     }
     else if (shaderStage1 == ShaderStageGeometry)
     {
@@ -1520,6 +1459,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                         startUserData + pIntfData1->userDataUsage.gs.viewIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
+
     }
     else if (shaderStage1 == ShaderStageCompute)
     {

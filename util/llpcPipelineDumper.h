@@ -72,14 +72,17 @@ public:
                                    GfxIpVersion                     gfxIp,
                                    const BinaryData*                pPipelineBin);
 
+    static void DumpPipelineExtraInfo(PipelineDumpFile*             pBinaryFile,
+                                      const std::string*            pStr);
+
     static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline, bool isCacheHash);
     static MetroHash::Hash GenerateHashForComputePipeline(const ComputePipelineBuildInfo* pPipeline, bool isCacheHash);
 
-private:
-    static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
     static std::string GetPipelineInfoFileName(const ComputePipelineBuildInfo*  pComputePipelineInfo,
                                                const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,
-                                               const MetroHash::Hash*                 pHash);
+                                               const MetroHash::Hash*           pHash);
+private:
+    static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
 
     static void DumpComputePipelineInfo(std::ostream*                   pDumpFile,
                                        const ComputePipelineBuildInfo* pPipelineInfo);

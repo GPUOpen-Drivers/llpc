@@ -37,6 +37,8 @@
 #include "llpcContext.h"
 #include "llpcPatchDescriptorLoad.h"
 
+#include "SPIRVInternal.h"
+
 using namespace llvm;
 using namespace Llpc;
 
@@ -72,7 +74,7 @@ PatchDescriptorLoad::PatchDescriptorLoad()
 bool PatchDescriptorLoad::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
 
     Patch::Init(&module);
 
@@ -129,6 +131,9 @@ void PatchDescriptorLoad::visitCallInst(
     ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
 
     bool loadSpillTable = false;
+    bool isNonUniform = false;
+    bool isWriteOnly = false;
+    bool checkWriteOp = true;
 
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
     if (mangledName == LlpcName::DescriptorLoadResource)
@@ -190,12 +195,30 @@ void PatchDescriptorLoad::visitCallInst(
         auto pBinding = cast<ConstantInt>(callInst.getOperand(1));
         auto pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
 
+        // Check non-uniform flag
+        if (nodeType == ResourceMappingNodeType::DescriptorBuffer)
+        {
+            auto pIsNonUniform = cast<ConstantInt>(callInst.getOperand(3));
+            isNonUniform = pIsNonUniform->getZExtValue() ? true : false;
+        }
+        else if (nodeType != ResourceMappingNodeType::PushConst)
+        {
+            auto pImageCallMeta = cast<ConstantInt>(callInst.getOperand(3));
+            ShaderImageCallMetadata imageCallMeta = {};
+            imageCallMeta.U32All = static_cast<uint32_t>(pImageCallMeta->getZExtValue());
+            isNonUniform = (nodeType == ResourceMappingNodeType::DescriptorSampler) ?
+                           imageCallMeta.NonUniformSampler :
+                           imageCallMeta.NonUniformResource;
+            isWriteOnly = imageCallMeta.WriteOnly;
+            checkWriteOp = false;
+        }
+
         if (isa<ConstantInt>(pArrayOffset) == false)
         {
             const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
             // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-            if (gfxIp.major > 6)
+            if ((gfxIp.major > 6) && (isNonUniform == false))
             {
                 std::vector<Value*> args;
                 args.push_back(pArrayOffset);
@@ -541,6 +564,49 @@ void PatchDescriptorLoad::visitCallInst(
 
         if (pDesc != nullptr)
         {
+            // Add "llvm.amdgcn.waterfall.last.use." for write-only non-uniform operations
+            if (isNonUniform)
+            {
+                // Set flag writeOnly if the non-uniform descriptor is used by instruction which don't have
+                // return type (only for buffer store operations).
+                if (checkWriteOp)
+                {
+                    for (auto pUser : callInst.users())
+                    {
+                        auto pInst = dyn_cast<CallInst>(pUser);
+                        if ((pInst != nullptr) && pInst->getType()->isVoidTy())
+                        {
+                            isWriteOnly = true;
+                        }
+                    }
+                }
+
+                if (isWriteOnly)
+                {
+                    // Insert waterfall.last.use
+                    auto pNonUniformIndex = cast<CallInst>(callInst.getOperand(2));
+                    // For non-uniform descriptor, the resource/block index must be the result of
+                    // waterfall.readfirstlane
+                    LLPC_ASSERT(pNonUniformIndex->getCalledFunction()->getName()
+                        .startswith("llvm.amdgcn.waterfall.readfirstlane."));
+
+                    auto pWaterfallBegin = pNonUniformIndex->getOperand(0);
+
+                    // NOTE: waterfall.begin is only used by waterfall.readfirstlane for write only operations.
+                    // We need insert waterfall.last.use after loading descriptor.
+                    LLPC_ASSERT(pWaterfallBegin->getNumUses() == 1);
+
+                    std::string waterfallLastUse = "llvm.amdgcn.waterfall.last.use.";
+                    waterfallLastUse += GetTypeNameForScalarOrVector(pDesc->getType());
+                    pDesc = EmitCall(m_pModule,
+                                     waterfallLastUse,
+                                     pDesc->getType(),
+                                     { pWaterfallBegin, pDesc },
+                                     NoAttrib,
+                                     &callInst);
+                }
+            }
+
             callInst.replaceAllUsesWith(pDesc);
             m_descLoadCalls.push_back(&callInst);
             m_descLoadFuncs.insert(pCallee);

@@ -69,7 +69,7 @@ SpirvLowerGlobal::SpirvLowerGlobal()
 bool SpirvLowerGlobal::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
 
     SpirvLower::Init(&module);
 
@@ -703,60 +703,25 @@ void SpirvLowerGlobal::MapOutputToProxy(
 void SpirvLowerGlobal::RemoveConstantExpr()
 {
     std::unordered_map<ConstantExpr*, Instruction*> constantExprMap;
-
-    // Collect contextant expressions and translate them to regular instructions
-    for (auto globalVarMap : m_globalVarProxyMap)
+    // Collect contant expressions and translate them to regular instructions
+    for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
     {
-        auto pGlobalVar = cast<GlobalVariable>(globalVarMap.first);
-        auto pProxy = cast<Instruction>(globalVarMap.second);
+        auto addSpace = pGlobal->getType()->getAddressSpace();
+
+        // Remove constant expressions for these global variables
+        auto isGlobalVar = ((addSpace == SPIRAS_Private) || (addSpace == SPIRAS_Input) ||
+            (addSpace == SPIRAS_Output));
+
+        if (isGlobalVar == false)
+        {
+            continue;
+        }
+
+        auto pGlobalVar = cast<GlobalVariable>(pGlobal);
 
         std::vector<Instruction*> insts;
         for (auto pUser : pGlobalVar->users())
         {
-            auto* pConstExpr = dyn_cast<ConstantExpr>(pUser);
-            if (pConstExpr != nullptr)
-            {
-                // Map this constant expression to normal instruction if it has not been visited
-                if (constantExprMap.find(pConstExpr) == constantExprMap.end())
-                {
-                    if (pConstExpr->user_empty() == false)
-                    {
-                        auto pInst = pConstExpr->getAsInstruction();
-                        insts.push_back(pInst);
-                        constantExprMap[pConstExpr] = pInst;
-                    }
-                    else
-                    {
-                        // NOTE: Some constant expressions do not have users acutally, we should exclude them from
-                        // our handling.
-                        constantExprMap[pConstExpr] = nullptr;
-                    }
-                }
-            }
-        }
-
-        for (auto pInst : insts)
-        {
-            pInst->insertAfter(pProxy);
-        }
-    }
-
-    auto pInsertPos = &*(m_pEntryPoint->begin()->getFirstInsertionPt());
-
-    for (auto inputMap : m_inputProxyMap)
-    {
-        auto pInput = cast<GlobalVariable>(inputMap.first);
-        auto pProxy = inputMap.second;
-        if (pProxy != nullptr)
-        {
-            pInsertPos = cast<Instruction>(pProxy);
-        }
-
-        std::vector<Instruction*> insts;
-        for (auto pUser : pInput->users())
-        {
-            // NOTE: Some constant expressions do not have users acutally, we should exclude them from
-            // our handling.
             auto pConstExpr = dyn_cast<ConstantExpr>(pUser);
             if (pConstExpr != nullptr)
             {
@@ -771,57 +736,11 @@ void SpirvLowerGlobal::RemoveConstantExpr()
                     }
                     else
                     {
-                        // NOTE: Some constant expressions do not have users acutally, we should exclude them from
-                        // our handling.
-                        constantExprMap[pConstExpr] = nullptr;
+                        pConstExpr->removeDeadConstantUsers();
+                        pConstExpr->dropAllReferences();
                     }
                 }
             }
-        }
-
-        for (auto pInst : insts)
-        {
-            pInst->insertAfter(pInsertPos);
-        }
-    }
-
-    for (auto outputMap : m_outputProxyMap)
-    {
-        auto pOutput = cast<GlobalVariable>(outputMap.first);
-        auto pProxy = outputMap.second;
-        if (pProxy != nullptr)
-        {
-            pInsertPos = cast<Instruction>(pProxy);
-        }
-
-        std::vector<Instruction*> insts;
-        for (auto pUser : pOutput->users())
-        {
-            auto pConstExpr = dyn_cast<ConstantExpr>(pUser);
-            if (pConstExpr != nullptr)
-            {
-                // Map this constant expression to normal instruction if it has not been visited
-                if (constantExprMap.find(pConstExpr) == constantExprMap.end())
-                {
-                    if (pConstExpr->user_empty() == false)
-                    {
-                        auto pInst = pConstExpr->getAsInstruction();
-                        insts.push_back(pInst);
-                        constantExprMap[pConstExpr] = pInst;
-                    }
-                    else
-                    {
-                        // NOTE: Some constant expressions do not have users acutally, we should exclude them from
-                        // our handling.
-                        constantExprMap[pConstExpr] = nullptr;
-                    }
-                }
-            }
-        }
-
-        for (auto pInst : insts)
-        {
-            pInst->insertAfter(pInsertPos);
         }
     }
 
@@ -829,22 +748,32 @@ void SpirvLowerGlobal::RemoveConstantExpr()
     {
         // Replace constant expressions with the mapped normal instructions
 
+        // NOTE: Make sure extracted instructions from constant expressions to be inserted to
+        // a function only once. This is forced by LLVM.
+        std::unordered_set<Instruction*> insertedInsts;
+
         // NOTE: It seems user list of constant expression is incorrect. Here, we traverse all instructions
         // in the entry-point and do replacement.
-        for (auto pBlock = m_pEntryPoint->begin(), pBlockEnd =  m_pEntryPoint->end(); pBlock != pBlockEnd; ++pBlock)
+        for (auto pBlock = m_pEntryPoint->begin(), pBlockEnd = m_pEntryPoint->end(); pBlock != pBlockEnd; ++pBlock)
         {
-            for (auto pInst = pBlock->begin(), pInstEnd =  pBlock->end(); pInst != pInstEnd; ++pInst)
+            for (auto pInst = pBlock->begin(), pInstEnd = pBlock->end(); pInst != pInstEnd; ++pInst)
             {
                 for (auto pOperand = pInst->op_begin(), pOperandEnd = pInst->op_end();
-                     pOperand != pOperandEnd;
-                     ++pOperand)
+                    pOperand != pOperandEnd;
+                    ++pOperand)
                 {
                     if (isa<ConstantExpr>(pOperand))
                     {
                         auto pConstExpr = cast<ConstantExpr>(pOperand);
                         if (constantExprMap.find(pConstExpr) != constantExprMap.end())
                         {
-                            LLPC_ASSERT(constantExprMap[pConstExpr] != nullptr);
+                            // Instruction not inserted
+                            if (insertedInsts.find(constantExprMap[pConstExpr]) == insertedInsts.end())
+                            {
+                                constantExprMap[pConstExpr]->insertBefore(&*pInst);
+                                insertedInsts.insert(constantExprMap[pConstExpr]);
+                            }
+
                             pInst->replaceUsesOfWith(pConstExpr, constantExprMap[pConstExpr]);
                             break;
                         }

@@ -340,6 +340,8 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
 
   union ConstValue {
     bool      BoolVal;
+    int8_t    Int8Val;
+    uint8_t   Uint8Val;
     int16_t   Int16Val;
     uint16_t  Uint16Val;
     int32_t   IntVal;
@@ -444,8 +446,23 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
       // Do computation (constant folding)
       switch (OC) {
       case OpUConvert: {
-        if (DestCompTy->isTypeInt(16)) {
+        if (DestCompTy->isTypeInt(8)) {
+          if (SrcCompTy->isTypeInt(16))
+            // Uint8 <- uint16
+            DestVal.Uint8Val = static_cast<uint8_t>(SrcVal[0].Uint16Val);
           if (SrcCompTy->isTypeInt(32))
+            // Uint8 <- uint32
+            DestVal.Uint8Val = static_cast<uint16_t>(SrcVal[0].UintVal);
+          else if (SrcCompTy->isTypeInt(64))
+            // Uint8 <- uint64
+            DestVal.Uint8Val = static_cast<uint16_t>(SrcVal[0].Uint64Val);
+          else
+            llvm_unreachable("Invalid type");
+        } else if (DestCompTy->isTypeInt(16)) {
+          if (SrcCompTy->isTypeInt(8))
+            // Uint16 <- uint8
+            DestVal.Uint16Val = static_cast<uint16_t>(SrcVal[0].Uint8Val);
+          else if (SrcCompTy->isTypeInt(32))
             // Uint16 <- uint32
             DestVal.Uint16Val = static_cast<uint16_t>(SrcVal[0].UintVal);
           else if (SrcCompTy->isTypeInt(64))
@@ -454,7 +471,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
           else
             llvm_unreachable("Invalid type");
         } else if (DestCompTy->isTypeInt(32)) {
-          if (SrcCompTy->isTypeInt(16))
+          if (SrcCompTy->isTypeInt(8))
+            // Uint <- uint8
+            DestVal.UintVal = static_cast<uint32_t>(SrcVal[0].Uint8Val);
+          else if (SrcCompTy->isTypeInt(16))
             // Uint <- uint16
             DestVal.UintVal = static_cast<uint32_t>(SrcVal[0].Uint16Val);
           else if (SrcCompTy->isTypeInt(64))
@@ -464,6 +484,9 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
             llvm_unreachable("Invalid type");
         } else {
           assert(DestCompTy->isTypeInt(64));
+          if (SrcCompTy->isTypeInt(8))
+            // Uint64 <- uint8
+            DestVal.Uint64Val = static_cast<uint64_t>(SrcVal[0].Uint8Val);
           if (SrcCompTy->isTypeInt(16))
             // Uint64 <- uint16
             DestVal.Uint64Val = static_cast<uint64_t>(SrcVal[0].Uint16Val);
@@ -476,8 +499,23 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
         break;
       }
       case OpSConvert: {
-        if (DestCompTy->isTypeInt(16)) {
-          if (SrcCompTy->isTypeInt(32))
+        if (DestCompTy->isTypeInt(8)) {
+          if (SrcCompTy->isTypeInt(16))
+            // Int8 <- int16
+            DestVal.Int16Val = static_cast<int8_t>(SrcVal[0].Int16Val);
+          else if (SrcCompTy->isTypeInt(32))
+            // Int8 <- int32
+            DestVal.Int16Val = static_cast<int8_t>(SrcVal[0].IntVal);
+          else if (SrcCompTy->isTypeInt(64))
+            // Int8 <- int64
+            DestVal.Int16Val = static_cast<int8_t>(SrcVal[0].Int64Val);
+          else
+            llvm_unreachable("Invalid type");
+        } else if (DestCompTy->isTypeInt(16)) {
+          if (SrcCompTy->isTypeInt(8))
+            // Int16 <- int8
+            DestVal.Int16Val = static_cast<int16_t>(SrcVal[0].Int8Val);
+          else if (SrcCompTy->isTypeInt(32))
             // Int16 <- int32
             DestVal.Int16Val = static_cast<int16_t>(SrcVal[0].IntVal);
           else if (SrcCompTy->isTypeInt(64))
@@ -486,7 +524,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
           else
             llvm_unreachable("Invalid type");
         } else if (DestCompTy->isTypeInt(32)) {
-          if (SrcCompTy->isTypeInt(16))
+          if (SrcCompTy->isTypeInt(8))
+            // Int <- int8
+            DestVal.IntVal = static_cast<int32_t>(SrcVal[0].Int8Val);
+          else if (SrcCompTy->isTypeInt(16))
             // Int <- int16
             DestVal.IntVal = static_cast<int32_t>(SrcVal[0].Int16Val);
           else if (SrcCompTy->isTypeInt(64))
@@ -496,7 +537,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
             llvm_unreachable("Invalid type");
         } else {
           assert(DestCompTy->isTypeInt(64));
-          if (SrcCompTy->isTypeInt(16))
+          if (SrcCompTy->isTypeInt(8))
+            // Int64 <- int16
+            DestVal.Int64Val = static_cast<int64_t>(SrcVal[0].Int8Val);
+          else if (SrcCompTy->isTypeInt(16))
             // Int64 <- int16
             DestVal.Int64Val = static_cast<int64_t>(SrcVal[0].Int16Val);
           else if (SrcCompTy->isTypeInt(32))

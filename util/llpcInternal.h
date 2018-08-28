@@ -30,6 +30,8 @@
  */
 #pragma once
 
+#include <unordered_set>
+
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
@@ -80,8 +82,10 @@ namespace LlpcName
     const static char BufferCallPrefix[]              = "llpc.buffer.";
     const static char BufferAtomic[]                  = "llpc.buffer.atomic.";
     const static char BufferLoad[]                    = "llpc.buffer.load.";
+    const static char BufferLoadDesc[]                = "llpc.buffer.load.desc.";
     const static char BufferLoadUniform[]             = "llpc.buffer.load.uniform.";
     const static char BufferStore[]                   = "llpc.buffer.store.";
+    const static char BufferStoreDesc[]               = "llpc.buffer.store.desc.";
     const static char BufferArrayLength[]             = "llpc.buffer.arraylength";
     const static char InlineConstLoadUniform[]        = "llpc.inlineconst.load.uniform.";
     const static char InlineConstLoad[]               = "llpc.inlineconst.load.";
@@ -195,6 +199,9 @@ bool IsDontCareValue(llvm::Value* pValue);
 // Translates an integer to 32-bit integer regardless of its initial bit width.
 llvm::Value* ToInt32Value(Llpc::Context* pContext, llvm::Value* pValue, llvm::Instruction* pInsertPos);
 
+// Checks whether the specified value is a non-uniform value.
+bool IsNonUniformValue(llvm::Value* pValue, std::unordered_set<llvm::Value*>& checkedValues);
+
 // Retrieves the frequency of the performance counter for CPU times.
 int64_t GetPerfFrequency();
 
@@ -204,8 +211,16 @@ int64_t GetPerfCpuTime();
 // Checks whether the input data is actually a ELF binary
 bool IsElfBinary(const void* pData, size_t dataSize);
 
-// Dump module's CFG graph
-void DumpCfg(const char* pPostfixStr, llvm::Module* pModule);
+// =====================================================================================================================
+// Represents the special header of SPIR-V token stream (the first DWORD).
+struct SpirvHeader
+{
+    uint32_t    magicNumber;        // Magic number of SPIR-V module
+    uint32_t    spvVersion;         // SPIR-V version number
+    uint32_t    genMagicNumber;     // Generator's magic number
+    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
+    uint32_t    reserved;           // Reserved word
+};
 
 // =====================================================================================================================
 // Represents the result of CPU time profiling.

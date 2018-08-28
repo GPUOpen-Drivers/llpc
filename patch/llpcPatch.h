@@ -46,6 +46,7 @@ void initializePatchDeadFuncRemovePass(PassRegistry&);
 void initializePatchDescriptorLoadPass(PassRegistry&);
 void initializePatchEntryPointMutatePass(PassRegistry&);
 void initializePatchExternalLibLinkPass(PassRegistry&);
+void initializePatchGroupOpPass(PassRegistry&);
 void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);
@@ -79,6 +80,10 @@ public:
 
 protected:
     void Init(llvm::Module* pModule);
+
+    void AddWaterFallInst(int32_t         nonUniformIndex1,
+                          int32_t         nonUniformIndex2,
+                          llvm::CallInst* pCallInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 

@@ -40,7 +40,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 7;
+static const uint32_t  Version = 9;
 static const uint32_t  MaxColorTargets = 8;
 static const char      VkIcdName[]     = "amdvlk";
 
@@ -170,6 +170,9 @@ struct PipelineShaderOptions
                          ///  every instruction.  Only valid if trapPresent is set.
     bool   enablePerformanceData; ///< Enables the compiler to generate extra instructions to gather
                                   ///  various performance-related data.
+    bool   allowReZ;     ///< Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
+                         ///  to potentially kill PS waves before launch, and also issues a late-Z test
+                         ///  in case the PS kills pixels.  Only valid for pixel shaders.
     /// Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
     /// of this value and whatever the target GPU supports. To effectively disable this limit, set this to UINT_MAX.
     uint32_t  vgprLimit;
@@ -320,6 +323,20 @@ struct GraphicsPipelineBuildInfo
            VkFormat       format;               ///< Color attachment format
         } target[MaxColorTargets];              ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
+
+    struct
+    {
+        bool    enableNgg;                  ///< Enable NGG mode, use an implicit primitive shader
+
+        bool    enableFastLaunch;           ///< Enables the hardware to launch subgroups of work at a faster rate
+        bool    enableVertexReuse;          ///< Enable optimization to cull duplicate vertices
+        bool    disableBackfaceCulling;     ///< Disables culling of primitives that don't meet facing criteria
+        bool    enableFrustumCulling;       ///< Enables discarding of primitives outside of view frustum
+        bool    enableBoxFilterCulling;     ///< Enable simpler frustum culler that is less accurate
+        bool    enableSphereCulling;        ///< Enable frustum culling based on a sphere
+        bool    enableSmallPrimFilter;      ///< Enables trivial sub-sample primitive culling
+    } nggState;
+
     PipelineOptions     options;                ///< Per pipeline tuning/debugging options
 };
 
@@ -467,6 +484,24 @@ public:
     ///
     /// @returns Hash code associated this compute pipeline.
     static uint64_t VKAPI_CALL GetPipelineHash(const ComputePipelineBuildInfo* pPipelineInfo);
+
+    /// Gets graphics pipeline name.
+    ///
+    /// @param [in]  pPipelineInfo  Info to build this graphics pipeline
+    /// @param [out] pPipeName      The full name of this graphics pipeline
+    /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+    static void VKAPI_CALL GetPipelineName(const GraphicsPipelineBuildInfo* pPipelineInfo,
+                                           char* pPipeName,
+                                           const size_t nameBufSize);
+
+    /// Gets compute pipeline name.
+    ///
+    /// @param [in]  pPipelineInfo  Info to build this compute pipeline
+    /// @param [out] pPipeName      The full name of this compute pipeline
+    /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+    static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo* pPipelineInfo,
+                                           char* pPipeName,
+                                           const size_t nameBufSize);
 };
 
 // =====================================================================================================================

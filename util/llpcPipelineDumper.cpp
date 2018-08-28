@@ -177,6 +177,29 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
     auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
     return MetroHash::Compact64(&hash);
 }
+// =====================================================================================================================
+// Get graphics pipeline name.
+void VKAPI_CALL IPipelineDumper::GetPipelineName(
+    const  GraphicsPipelineBuildInfo* pPipelineInfo, // [In]  Info to build this graphics pipeline
+    char*                             pPipeName,     // [Out] The full name of this graphics pipeline
+    const size_t                      nameBufSize)   // Size of the buffer to store pipeline name
+{
+    auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(nullptr, pPipelineInfo, &hash);
+    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+}
+
+// =====================================================================================================================
+// Get compute pipeline name.
+void VKAPI_CALL IPipelineDumper::GetPipelineName(
+    const ComputePipelineBuildInfo* pPipelineInfo, // [In]  Info to build this compute pipeline
+    char*                           pPipeName,     // [Out] The full name of this compute pipeline
+    const size_t                    nameBufSize)   // Size of the buffer to store pipeline name
+{
+    auto hash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(pPipelineInfo, nullptr, &hash);
+    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+}
 
 // =====================================================================================================================
 // Calculates compute pipeline hash code.
@@ -509,6 +532,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "trapPresent = " << pShaderInfo->options.trapPresent << "\n";
     dumpFile << "debugMode = " << pShaderInfo->options.debugMode << "\n";
     dumpFile << "enablePerformanceData = " << pShaderInfo->options.enablePerformanceData << "\n";
+    dumpFile << "allowReZ = " << pShaderInfo->options.allowReZ << "\n";
     dumpFile << "vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
     dumpFile << "sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
     dumpFile << "maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
@@ -550,6 +574,15 @@ void PipelineDumper::DumpPipelineBinary(
     pDumpFile->dumpFile << reader;
 
     pDumpFile->binaryFile.write(reinterpret_cast<const char*>(pPipelineBin->pCode), pPipelineBin->codeSize);
+}
+
+// =====================================================================================================================
+// Dump extra info to pipeline file.
+void PipelineDumper::DumpPipelineExtraInfo(
+    PipelineDumpFile*             pDumpFile,               // [in] Directory of pipeline dump
+    const std::string*            pStr)                     // [in] Extra info string
+{
+    pDumpFile->dumpFile << *pStr;
 }
 
 // =====================================================================================================================
@@ -616,6 +649,15 @@ void PipelineDumper::DumpGraphicsStateInfo(
 
     dumpFile << "alphaToCoverageEnable = " << pPipelineInfo->cbState.alphaToCoverageEnable << "\n";
     dumpFile << "dualSourceBlendEnable = " << pPipelineInfo->cbState.dualSourceBlendEnable << "\n";
+
+    dumpFile << "enableNgg = " << pPipelineInfo->nggState.enableNgg << "\n";
+    dumpFile << "enableFastLaunch = " << pPipelineInfo->nggState.enableFastLaunch << "\n";
+    dumpFile << "enableVertexReuse = " << pPipelineInfo->nggState.enableVertexReuse << "\n";
+    dumpFile << "disableBackfaceCulling = " << pPipelineInfo->nggState.disableBackfaceCulling << "\n";
+    dumpFile << "enableFrustumCulling = " << pPipelineInfo->nggState.enableFrustumCulling << "\n";
+    dumpFile << "enableBoxFilterCulling = " << pPipelineInfo->nggState.enableBoxFilterCulling << "\n";
+    dumpFile << "enableSphereCulling = " << pPipelineInfo->nggState.enableSphereCulling << "\n";
+    dumpFile << "enableSmallPrimFilter = " << pPipelineInfo->nggState.enableSmallPrimFilter << "\n";
 
     for (uint32_t i = 0; i < MaxColorTargets; ++i)
     {
@@ -872,6 +914,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.trapPresent);
             pHasher->Update(options.debugMode);
             pHasher->Update(options.enablePerformanceData);
+            pHasher->Update(options.allowReZ);
             pHasher->Update(options.sgprLimit);
             pHasher->Update(options.vgprLimit);
             pHasher->Update(options.maxThreadGroupsPerComputeUnit);
@@ -1015,10 +1058,11 @@ OStream& operator<<(
     uint32_t sectionCount = reader.GetSectionCount();
     char formatBuf[256];
 
-    for (uint32_t secIdx = 0; secIdx < sectionCount; ++secIdx)
+    for (uint32_t sortIdx = 0; sortIdx < sectionCount; ++sortIdx)
     {
         typename ElfReader<Elf>::ElfSectionBuffer* pSection = nullptr;
-        Result result = reader.GetSectionDataBySectionIndex(secIdx, &pSection);
+        uint32_t secIdx = 0;
+        Result result = reader.GetSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
         LLPC_ASSERT(result == Result::Success);
         if ((strcmp(pSection->pName, ShStrTabName) == 0) ||
             (strcmp(pSection->pName, StrTabName) == 0) ||
@@ -1072,32 +1116,48 @@ OStream& operator<<(
                         auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
                             pSection->pData + offset + noteHeaderSize);
 
+                        std::map<uint32_t, uint32_t> sortedConfigs;
                         for (uint32_t i = 0; i < configCount; ++i)
+                        {
+                            sortedConfigs[pConfig[i].key] = pConfig[i].value;
+                        }
+
+                        for (auto config : sortedConfigs)
                         {
                             const char* pRegName = nullptr;
                             if (gfxIp.major <= 8)
                             {
-                                pRegName = Gfx6::GetRegisterNameString(gfxIp, pConfig[i].key * 4);
+                                pRegName = Gfx6::GetRegisterNameString(gfxIp, config.first * 4);
                             }
                             else
                             {
-                                pRegName = Gfx9::GetRegisterNameString(gfxIp, pConfig[i].key * 4);
+                                pRegName = Gfx9::GetRegisterNameString(gfxIp, config.first * 4);
                             }
                             auto length = snprintf(formatBuf,
                                                    sizeof(formatBuf),
                                                    "        %-45s = 0x%08X\n",
                                                    pRegName,
-                                                   pConfig[i].value);
+                                                   config.second);
                             out << formatBuf;
                         }
                         break;
                     }
                 default:
                     {
-                        out << "    Unknown(" << (uint32_t)pNode->type << ")                (name = "
+                        if (static_cast<uint32_t>(pNode->type) == NT_AMD_AMDGPU_ISA)
+                        {
+                            out << "    IsaVersion                   (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
-                        auto pDesc = pSection->pData + offset + noteHeaderSize;
-                        OutputBinary(pDesc, 0, pNode->descSize, out);
+                            auto pDesc = pSection->pData + offset + noteHeaderSize;
+                            OutputText(pDesc, 0, pNode->descSize, out);
+                        }
+                        else
+                        {
+                            out << "    Unknown(" << (uint32_t)pNode->type << ")                (name = "
+                                << pNode->name << "  size = " << pNode->descSize << ")\n";
+                            auto pDesc = pSection->pData + offset + noteHeaderSize;
+                            OutputBinary(pDesc, 0, pNode->descSize, out);
+                        }
                         break;
                     }
                 }
@@ -1144,7 +1204,8 @@ OStream& operator<<(
             }
         }
         else if ((strncmp(pSection->pName, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0) ||
-                 (strncmp(pSection->pName, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0))
+                 (strncmp(pSection->pName, AmdGpuCsdataName, sizeof(AmdGpuCsdataName) - 1) == 0) ||
+                 (strncmp(pSection->pName, CommentName, sizeof(CommentName) - 1) == 0))
         {
             // Output text based sections
             out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";

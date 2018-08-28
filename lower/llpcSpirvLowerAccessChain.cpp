@@ -63,7 +63,7 @@ SpirvLowerAccessChain::SpirvLowerAccessChain()
 bool SpirvLowerAccessChain::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Access-Chain\n");
 
     SpirvLower::Init(&module);
 
@@ -119,7 +119,15 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
     do
     {
         chainedInsts.push(pPtrVal);
-        pPtrVal = dyn_cast<GetElementPtrInst>(pPtrVal->getPointerOperand());
+        auto pPointer = pPtrVal->getPointerOperand();
+        if (isa<ConstantExpr>(pPointer))
+        {
+            pPtrVal = dyn_cast<GetElementPtrInst>(cast<ConstantExpr>(pPointer)->getAsInstruction());
+        }
+        else
+        {
+            pPtrVal = dyn_cast<GetElementPtrInst>(pPointer);
+        }
     } while ((pPtrVal != nullptr) && (pPtrVal->getType()->getPointerAddressSpace() == addrSpace));
 
     // If there are more than one "getelementptr" instructions, do coalescing
@@ -156,7 +164,14 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
             if (pInst->user_empty())
             {
                 pInst->dropAllReferences();
-                pInst->eraseFromParent();
+                if (pInst->getParent() != nullptr)
+                {
+                    pInst->eraseFromParent();
+                }
+                else
+                {
+                    pInst->deleteValue();
+                }
             }
             removedInsts.pop();
         }

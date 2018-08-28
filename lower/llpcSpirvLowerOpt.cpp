@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-spirv-lower-opt"
 
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
@@ -38,6 +37,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "SPIRVInternal.h"
+#include "llpcPassLoopUnrollInfoRectify.h"
 #include "llpcSpirvLowerOpt.h"
 
 using namespace llvm;
@@ -70,7 +70,7 @@ bool SpirvLowerOpt::runOnModule(
 
     bool changed = false;
 
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Opt\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Opt\n");
 
     SpirvLower::Init(&module);
 
@@ -78,20 +78,15 @@ bool SpirvLowerOpt::runOnModule(
     // NOTE: Doing this here is temporary; really the whole of LLPC should be using the
     // PassManagerBuilder mechanism, adding its own passes at the provided hook points.
     legacy::PassManager passMgr;
-    legacy::FunctionPassManager functionPassMgr(&module);
     PassManagerBuilder passBuilder;
     passBuilder.OptLevel = 3; // -O3
     passBuilder.SLPVectorize = true;
-    passBuilder.populateFunctionPassManager(functionPassMgr);
+    passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
+        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+        {
+           passMgr.add(PassLoopUnrollInfoRectify::Create());
+        });
     passBuilder.populateModulePassManager(passMgr);
-
-    // Run the preliminary function passes.
-    functionPassMgr.doInitialization();
-    for (Function &function : module)
-    {
-        functionPassMgr.run(function);
-    }
-    functionPassMgr.doFinalization();
 
     // Run the other passes.
     passMgr.run(module);

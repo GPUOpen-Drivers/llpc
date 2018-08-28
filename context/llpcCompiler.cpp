@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-compiler"
 
 #include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
@@ -55,11 +56,13 @@
 #include "llpcGraphicsContext.h"
 #include "llpcElf.h"
 #include "llpcFile.h"
+#include "llpcPassLoopInfoCollect.h"
 #include "llpcPatch.h"
 #include "llpcShaderMerger.h"
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcVertexFetch.h"
+#include <unordered_set>
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
     #define SPVGEN_STATIC_LIB 1
@@ -78,7 +81,7 @@ namespace cl
 // -pipeline-dump-dir: directory where pipeline info are dumped
 opt<std::string> PipelineDumpDir("pipeline-dump-dir",
                                  desc("Directory where pipeline shader info are dumped"),
-                                 value_desc("directory"),
+                                 value_desc("dir"),
                                  init("."));
 
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -102,15 +105,16 @@ static opt<bool> DumpDuplicatePipelines("dump-duplicate-pipelines",
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
 
-// --disable-WIP-features: disable those work-in-progress features
-static opt<bool> DisableWipFeatures("disable-WIP-features",
-                                   desc("Disable those work-in-progress features"),
-                                   init(false));
-
 // -enable-time-profiler: enable time profiler for various compilation phases
 static opt<bool> EnableTimeProfiler("enable-time-profiler",
                                     desc("Enable time profiler for various compilation phases"),
                                     init(false));
+
+// -shader-cache-file-dir: root directory to store shader cache
+opt<std::string> ShaderCacheFileDir("shader-cache-file-dir",
+                                    desc("Root directory to store shader cache"),
+                                    value_desc("dir"),
+                                    init("."));
 
 // -shader-cache-mode: shader cache mode:
 // 0 - Disable
@@ -161,19 +165,20 @@ opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
                                      desc("High part of VA for shadow descriptor table pointer"),
                                      init(2));
 
-// -auto-layout-desc
+// -enable-dynamic-loop-unroll: Enable dynamic loop unroll.
+opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dynamic loop unroll"), init(false));
+
+// -force-loop-unroll-count: Force to set the loop unroll count; this option will ignore dynamic loop unroll.
+opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
+
 extern opt<bool> AutoLayoutDesc;
 
-// -enable-outs: enable general message output (to stdout or external file).
 extern opt<bool> EnableOuts;
 
-// -enable-errs: enable error message output (to stderr or external file).
 extern opt<bool> EnableErrs;
 
-// -log-file-dbgs: name of the file to log info from dbg()
 extern opt<std::string> LogFileDbgs;
 
-// -log-file-outs: name of the file to log info from LLPC_OUTS() and LLPC_ERRS()
 extern opt<std::string> LogFileOuts;
 
 } // cl
@@ -182,6 +187,8 @@ extern opt<std::string> LogFileOuts;
 
 namespace Llpc
 {
+llvm::sys::Mutex      Compiler::m_contextPoolMutex;
+std::vector<Context*> Compiler::m_contextPool;
 
 // Time profiling result
 TimeProfileResult g_timeProfileResult = {};
@@ -200,6 +207,7 @@ static const uint8_t GlslNullFsEmuLib[]=
 };
 
 static ManagedStatic<sys::Mutex> s_compilerMutex;
+static MetroHash::Hash s_optionHash = {};
 
 uint32_t Compiler::m_instanceCount = 0;
 uint32_t Compiler::m_outRedirectCount = 0;
@@ -233,8 +241,36 @@ Result VKAPI_CALL ICompiler::Create(
     raw_null_ostream nullStream;
 
     MutexGuard lock(*s_compilerMutex);
+    MetroHash::Hash optionHash = Compiler::GenerateHashForCompileOptions(optionCount, options);
 
-    if (Compiler::GetInstanceCount() == 0)
+    bool parseCmdOption = true;
+    if (Compiler::GetInstanceCount() > 0)
+    {
+        bool isSameOption = memcmp(&optionHash, &s_optionHash, sizeof(optionHash)) == 0;
+
+        parseCmdOption = false;
+        if (isSameOption == false)
+        {
+            if (Compiler::GetOutRedirectCount() == 0)
+            {
+                // All compiler instances are destroyed, we can reset LLVM options in safe
+                auto& options = cl::getRegisteredOptions();
+                for (auto it = options.begin(); it != options.end(); ++it)
+                {
+                    it->second->reset();
+                }
+                parseCmdOption = true;
+            }
+            else
+            {
+                LLPC_ERRS("Incompatible compiler options cross compiler instances!");
+                result = Result::ErrorInvalidValue;
+                LLPC_NEVER_CALLED();
+            }
+        }
+    }
+
+    if (parseCmdOption)
     {
         // LLVM command options can't be parsed multiple times
         if (cl::ParseCommandLineOptions(optionCount,
@@ -244,17 +280,12 @@ Result VKAPI_CALL ICompiler::Create(
         {
             result = Result::ErrorInvalidValue;
         }
-
-        // LLVM fatal error handler only can be installed once.
-        if (result == Result::Success)
-        {
-            install_fatal_error_handler(FatalErrorHandler);
-        }
     }
 
     if (result == Result::Success)
     {
-        *ppCompiler = new Compiler(gfxIp, optionCount, options);
+        s_optionHash = optionHash;
+        *ppCompiler = new Compiler(gfxIp, optionCount, options, s_optionHash);
         LLPC_ASSERT(*ppCompiler != nullptr);
     }
     else
@@ -278,12 +309,17 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 Compiler::Compiler(
     GfxIpVersion      gfxIp,        // Graphics IP version info
     uint32_t          optionCount,  // Count of compilation-option strings
-    const char*const* pOptions)      // [in] An array of compilation-option strings
+    const char*const* pOptions,     // [in] An array of compilation-option strings
+    MetroHash::Hash   optionHash)   // Hash code of compilation options
     :
-    m_pClientName(pOptions[0]),
+    m_optionHash(optionHash),
     m_gfxIp(gfxIp)
 {
-    m_optionHash = GenerateHashForCompileOptions(optionCount, pOptions);
+    for (uint32_t i = 0; i < optionCount; ++i)
+    {
+        m_options.push_back(pOptions[i]);
+    }
+
     if (m_outRedirectCount == 0)
     {
         RedirectLogOutput(false, optionCount, pOptions);
@@ -299,6 +335,9 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
 
+        // LLVM fatal error handler only can be installed once.
+        install_fatal_error_handler(FatalErrorHandler);
+
 #ifdef LLPC_ENABLE_SPIRV_OPT
         InitSpvGen();
 #endif
@@ -312,25 +351,23 @@ Compiler::Compiler(
     auxCreateInfo.gfxIp           = m_gfxIp;
     auxCreateInfo.hash            = m_optionHash;
     auxCreateInfo.pExecutableName = cl::ExecutableName.c_str();
-    auxCreateInfo.pCacheFilePath  = getenv("AMD_SHADER_DISK_CACHE_PATH");
-    if (auxCreateInfo.pCacheFilePath == nullptr)
+    auxCreateInfo.pCacheFilePath  = cl::ShaderCacheFileDir.c_str();
+    if (cl::ShaderCacheFileDir.empty())
     {
 #ifdef WIN_OS
         auxCreateInfo.pCacheFilePath  = getenv("LOCALAPPDATA");
 #else
-        auxCreateInfo.pCacheFilePath  = getenv("HOME");
+        LLPC_NEVER_CALLED();
 #endif
     }
 
     m_shaderCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
 
     InitGpuProperty();
+    InitGpuWorkaround();
+
     ++m_instanceCount;
     ++m_outRedirectCount;
-
-    // Create one context at initialization time
-    auto pContext = AcquireContext();
-    ReleaseContext(pContext);
 }
 
 // =====================================================================================================================
@@ -340,12 +377,33 @@ Compiler::~Compiler()
     {
         // Free context pool
         MutexGuard lock(m_contextPoolMutex);
-        for (auto pContext : m_contextPool)
+
+        // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
+        // compiler next time.
+        for (auto it = m_contextPool.begin(); it != m_contextPool.end();)
         {
-            LLPC_ASSERT(pContext->IsInUse() == false);
-            delete pContext;
+            auto   pContext             = *it;
+            size_t maxResidentContexts  = 0;
+
+            // This is just a W/A for Teamcity. Setting AMD_RESIDENT_CONTEXTS could reduce more than 40 minutes of
+            // CTS running time.
+            char*  pMaxResidentContexts = getenv("AMD_RESIDENT_CONTEXTS");
+
+            if (pMaxResidentContexts != nullptr)
+            {
+                maxResidentContexts = strtoul(pMaxResidentContexts, nullptr, 0);
+            }
+
+            if ((pContext->IsInUse() == false) && (m_contextPool.size() > maxResidentContexts))
+            {
+                it = m_contextPool.erase(it);
+                delete pContext;
+            }
+            else
+            {
+                ++it;
+            }
         }
-        m_contextPool.clear();
     }
 
     // Restore default output
@@ -360,7 +418,7 @@ Compiler::~Compiler()
         ShaderCacheManager::GetShaderCacheManager()->ReleaseShaderCacheObject(m_shaderCache);
     }
 
-    if (strcmp(m_pClientName, VkIcdName) == 0)
+    if (m_options[0] == VkIcdName)
     {
         // NOTE: Skip subsequent cleanup work for Vulkan ICD. The work will be done by system itself
         return;
@@ -378,6 +436,7 @@ Compiler::~Compiler()
 
     if (shutdown)
     {
+        ShaderCacheManager::Shutdown();
         llvm_shutdown();
     }
 }
@@ -407,6 +466,11 @@ Result Compiler::BuildShaderModule(
     if (IsSpirvBinary(&pShaderInfo->shaderBin))
     {
         binType = BinaryType::Spirv;
+        if (VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
+        {
+            LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
+            result = Result::Unsupported;
+        }
     }
     else if (IsLlvmBitcode(&pShaderInfo->shaderBin))
     {
@@ -456,9 +520,332 @@ Result Compiler::BuildShaderModule(
         void* pCode = VoidPtrInc(pAllocBuf, sizeof(ShaderModuleData));
         memcpy(pCode, pShaderInfo->shaderBin.pCode, pShaderInfo->shaderBin.codeSize);
         pModuleData->binCode.pCode = pCode;
-
+        if (pModuleData->binType == BinaryType::Spirv)
+        {
+            CollectInfoFromSpirvBinary(pModuleData);
+        }
         pShaderOut->pModuleData = pModuleData;
     }
+
+    return result;
+}
+
+// =====================================================================================================================
+// Build graphics pipeline internally
+Result Compiler::BuildGraphicsPipelineInternal(
+    GraphicsContext*          pGraphicsContext,                     // [in] Graphics context this graphics pipeline
+    const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount],      // [in] Shader info of this graphics pipeline
+    uint32_t                  forceLoopUnrollCount,                 // [in] Force loop unroll count (0 means disable)
+    ElfPackage*               pPipelineElf,                         // [out] Output Elf package
+    bool*                     pDynamicLoopUnroll)                   // [out] Need dynamic loop unroll or not
+{
+    Result          result    = Result::Success;
+    bool            skipLower = false;
+    bool            skipPatch = false;
+    BinaryType      binType   = BinaryType::Unknown;
+
+    Module* modules[ShaderStageCountInternal] = {};
+    std::unique_ptr<Module> bitcodes[ShaderStageGfxCount];
+
+    Context* pContext = AcquireContext();
+    pContext->AttachPipelineContext(pGraphicsContext);
+
+    // Create the AMDGPU TargetMachine.
+    result = CodeGenManager::CreateTargetMachine(pContext);
+
+    // Translate SPIR-V binary to machine-independent LLVM module
+    for (uint32_t stage = 0; (stage < ShaderStageGfxCount) && (result == Result::Success); ++stage)
+    {
+        const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+        if (pShaderInfo->pModuleData == nullptr)
+        {
+            continue;
+        }
+
+        Module* pModule = nullptr;
+
+        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+        // Binary type must same for all shader stages
+        LLPC_ASSERT((binType == BinaryType::Unknown) || (pModuleData->binType == binType));
+        binType = pModuleData->binType;
+        if (binType == BinaryType::Spirv)
+        {
+            TimeProfiler timeProfiler(&g_timeProfileResult.translateTime);
+            result = TranslateSpirvToLlvm(&pModuleData->binCode,
+                                          static_cast<ShaderStage>(stage),
+                                          pShaderInfo->pEntryTarget,
+                                          pShaderInfo->pSpecializationInfo,
+                                          pContext,
+                                          forceLoopUnrollCount,
+                                          &pModule);
+
+            // Check if this module needs dynamic loop unroll. Only do this check when forceLoopUnrollCount is 0. Dynamic loop unroll is only enabled for fragment shader and compute shader.
+            if (cl::EnableDynamicLoopUnroll && (result == Result::Success) &&
+                (stage == ShaderStageFragment) && (forceLoopUnrollCount == 0))
+            {
+                *pDynamicLoopUnroll = NeedDynamicLoopUnroll(pModule);
+            }
+        }
+        else if (binType == BinaryType::LlvmBc)
+        {
+            // Skip lower and patch phase if input is LLVM IR
+            skipLower = true;
+            skipPatch = true;
+            pModule = pContext->LoadLibary(&pModuleData->binCode).release();
+        }
+        else
+        {
+            LLPC_NEVER_CALLED();
+        }
+
+        // Verify this LLVM module
+        if (result == Result::Success)
+        {
+            LLPC_OUTS("===============================================================================\n");
+            LLPC_OUTS("// LLPC SPIRV-to-LLVM translation results (" <<
+                      GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+            LLPC_OUTS(*pModule);
+            LLPC_OUTS("\n");
+            std::string errMsg;
+            raw_string_ostream errStream(errMsg);
+            if (verifyModule(*pModule, &errStream))
+            {
+                LLPC_ERRS("Fails to verify module after translation (" <<
+                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader): " <<
+                          errStream.str() << "\n");
+                result = Result::ErrorInvalidShader;
+            }
+        }
+
+        // Do SPIR-V lowering operations for this LLVM module
+        if ((result == Result::Success) && (skipLower == false))
+        {
+            TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
+            result = SpirvLower::Run(pModule);
+            if (result != Result::Success)
+            {
+                LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
+                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+            }
+            else
+            {
+                LLPC_OUTS("===============================================================================\n");
+                LLPC_OUTS("// LLPC SPIRV-lowering results (" <<
+                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+                LLPC_OUTS(*pModule);
+                LLPC_OUTS("\n");
+            }
+        }
+
+        modules[stage] = pModule;
+    }
+
+    // Build null fragment shader if necessary
+    if ((result == Result::Success) && (cl::AutoLayoutDesc == false) && (modules[ShaderStageFragment] == nullptr))
+    {
+        TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
+        std::unique_ptr<Module> pNullFsModule;
+        result = BuildNullFs(pContext, pNullFsModule);
+        if (result == Result::Success)
+        {
+            modules[ShaderStageFragment] = pNullFsModule.release();
+        }
+        else
+        {
+            LLPC_ERRS("Fails to build a LLVM module for null fragment shader\n");
+        }
+    }
+
+    // Do LLVM module pacthing (preliminary patch work)
+    for (int32_t stage = ShaderStageGfxCount - 1; (stage >= 0) && (result == Result::Success); --stage)
+    {
+        Module* pModule = modules[stage];
+        if ((pModule == nullptr) || skipPatch)
+        {
+            continue;
+        }
+
+        TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
+        result = Patch::PreRun(pModule);
+        if (result != Result::Success)
+        {
+            LLPC_ERRS("Fails to do preliminary patch work for LLVM module (" <<
+                      GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+        }
+    }
+
+    // Determine whether or not GS on-chip mode is valid for this pipeline
+    if ((result == Result::Success) && (modules[ShaderStageGeometry] != nullptr))
+    {
+        // NOTE: Always call CheckGsOnChipValidity() even when GS on-chip mode is disabled, because that method
+        // also computes esGsRingItemSize and gsVsRingItemSize.
+        bool gsOnChip = pContext->CheckGsOnChipValidity();
+        pContext->SetGsOnChip(gsOnChip);
+    }
+
+    // Do user data node merge for merged shader
+    if ((result == Result::Success) && (m_gfxIp.major >= 9))
+    {
+        pContext->DoUserDataNodeMerge();
+    }
+
+    // Do LLVM module patching (main patch work)
+    for (int32_t stage = ShaderStageGfxCount - 1; (stage >= 0) && (result == Result::Success); --stage)
+    {
+        Module* pModule = modules[stage];
+        if ((pModule == nullptr) || skipPatch)
+        {
+            continue;
+        }
+
+        TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
+        result = Patch::Run(pModule);
+        if (result != Result::Success)
+        {
+            LLPC_ERRS("Fails to patch LLVM module and link it with external library (" <<
+                      GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+        }
+        else
+        {
+            LLPC_OUTS("===============================================================================\n");
+            LLPC_OUTS("// LLPC patching results (" <<
+                      GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+            LLPC_OUTS(*pModule);
+            LLPC_OUTS("\n");
+        }
+    }
+
+    // Do shader merge operations
+    if ((result == Result::Success) && (m_gfxIp.major >= 9))
+    {
+        const bool hasVs = (modules[ShaderStageVertex] != nullptr);
+        const bool hasTcs = (modules[ShaderStageTessControl] != nullptr);
+
+        const bool hasTs = ((modules[ShaderStageTessControl] != nullptr) ||
+            (modules[ShaderStageTessEval] != nullptr));
+        const bool hasGs = (modules[ShaderStageGeometry] != nullptr);
+
+        ShaderMerger shaderMerger(pContext);
+
+        if (hasTs && (hasVs || hasTcs))
+        {
+            // Ls-HS merged shader should be present
+            Module* pLsModule = modules[ShaderStageVertex];
+            Module* pHsModule = modules[ShaderStageTessControl];
+
+            Module* pLsHsModule = nullptr;
+
+            TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
+            result = shaderMerger.BuildLsHsMergedShader(pLsModule, pHsModule, &pLsHsModule);
+
+            if (result != Result::Success)
+            {
+                LLPC_ERRS("Fails to build LS-HS merged shader\n");
+            }
+            else
+            {
+                LLPC_OUTS("===============================================================================\n");
+                LLPC_OUTS("// LLPC shader merge results (LS-HS)\n");
+                LLPC_OUTS(*pLsHsModule);
+                LLPC_OUTS("\n");
+            }
+
+            // NOTE: After LS and HS are merged, LS and HS are destroy. And new LS-HS merged shader is treated
+            // as tessellation control shader.
+            modules[ShaderStageVertex] = nullptr;
+            modules[ShaderStageTessControl] = pLsHsModule;
+        }
+
+        if (hasGs)
+        {
+            // ES-GS merged shader should be present
+            Module* pEsModule = modules[hasTs ? ShaderStageTessEval : ShaderStageVertex];
+            Module* pGsModule = modules[ShaderStageGeometry];
+
+            {
+                Module* pEsGsModule = nullptr;
+
+                TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
+                result = shaderMerger.BuildEsGsMergedShader(pEsModule, pGsModule, &pEsGsModule);
+
+                if (result != Result::Success)
+                {
+                    LLPC_ERRS("Fails to build ES-GS merged shader\n");
+                }
+                else
+                {
+                    LLPC_OUTS("===============================================================================\n");
+                    LLPC_OUTS("// LLPC shader merge results (ES-GS)\n");
+                    LLPC_OUTS(*pEsGsModule);
+                    LLPC_OUTS("\n");
+                }
+
+                // NOTE: After ES and GS are merged, ES and GS are destroy. And new ES-GS merged shader is treated
+                // as geometry shader.
+                modules[hasTs ? ShaderStageTessEval : ShaderStageVertex] = nullptr;
+                modules[ShaderStageGeometry] = pEsGsModule;
+            }
+        }
+    }
+
+    // Build copy shader if necessary (has geometry shader)
+    if ((result == Result::Success) && (modules[ShaderStageGeometry] != nullptr))
+    {
+        TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+        result = BuildCopyShader(pContext, &modules[ShaderStageCopyShader]);
+        if (result != Result::Success)
+        {
+            LLPC_ERRS("Fails to build a LLVM module for copy shader\n");
+        }
+    }
+
+    // Create an empty module then link each shader module into it.
+    auto pPipelineModule = new Module("llpcPipeline", *pContext);
+    {
+        Linker linker(*pPipelineModule);
+        for (int32_t stage = 0; (stage < ShaderStageCountInternal) && (result == Result::Success); ++stage)
+        {
+            Module* pShaderModule = modules[stage];
+            if (pShaderModule == nullptr)
+            {
+                continue;
+            }
+            // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
+            // linked into pipeline module.
+            if (linker.linkInModule(std::unique_ptr<Module>(pShaderModule)))
+            {
+                LLPC_ERRS("Fails to link shader module into pipeline module (" <<
+                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+                result = Result::ErrorInvalidShader;
+            }
+        }
+    }
+
+    if (result == Result::Success)
+    {
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC linking results\n");
+        LLPC_OUTS(*pPipelineModule);
+        LLPC_OUTS("\n");
+
+        // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text instead.
+        // If "-emit-llvm" is specified, generate LLVM bitcode. These options are used through LLPC
+        // standalone compiler tool "amdllpc".
+        raw_svector_ostream elfStream(*pPipelineElf);
+        std::string errMsg;
+        TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+
+        result = CodeGenManager::GenerateCode(pPipelineModule, elfStream, errMsg);
+        if (result != Result::Success)
+        {
+            LLPC_ERRS("Fails to generate GPU ISA codes :" <<
+                      errMsg << "\n");
+        }
+    }
+    delete pPipelineModule;
+    pPipelineModule = nullptr;
+
+    ReleaseContext(pContext);
 
     return result;
 }
@@ -473,7 +860,6 @@ Result Compiler::BuildGraphicsPipeline(
     CacheEntryHandle hEntry  = nullptr;
     const void*      pElf    = nullptr;
     size_t           elfSize = 0;
-    ElfPackage       pipelineElf;
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
     {
@@ -523,7 +909,7 @@ Result Compiler::BuildGraphicsPipeline(
                     reinterpret_cast<const ShaderModuleData*>(shaderInfo[stage]->pModuleData);
                 if (pOrigModuleData != nullptr)
                 {
-                    ShaderModuleData *pModuleData = nullptr;
+                    ShaderModuleData* pModuleData = nullptr;
                     if (ReplaceShader(pOrigModuleData, &pModuleData) == Result::Success)
                     {
 
@@ -551,8 +937,6 @@ Result Compiler::BuildGraphicsPipeline(
             }
         }
     }
-
-    GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
 
     if ((result == Result::Success) && EnableOuts())
     {
@@ -583,6 +967,14 @@ Result Compiler::BuildGraphicsPipeline(
         dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
         dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
         pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, nullptr, pPipelineInfo, &pipelineHash);
+        std::stringstream strStream;
+        strStream << ";Compiler Options: ";
+        for (auto& option : m_options)
+        {
+            strStream << option << " ";
+        }
+        std::string extraInfo = strStream.str();
+        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -617,316 +1009,77 @@ Result Compiler::BuildGraphicsPipeline(
         }
     }
 
+    constexpr uint32_t CandidateCount = 4;
+    uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
+    bool               needRecompile   = false;
+    uint32_t           candidateIdx    = 0;
+    ElfPackage         candidateElfs[CandidateCount];
+
     if (cacheEntryState == ShaderEntryState::Compiling)
     {
-        bool skipLower = false;
-        bool skipPatch = false;
+        std::vector<LoopAnalysisInfo> loopInfo;
+        PipelineStatistics            pipelineStats[CandidateCount];
+        uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        BinaryType binType = BinaryType::Unknown;
+        GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
+        result = BuildGraphicsPipelineInternal(&graphicsContext,
+                                               shaderInfo,
+                                               forceLoopUnrollCount,
+                                               &candidateElfs[candidateIdx],
+                                               &needRecompile);
 
-        Module* modules[ShaderStageCountInternal] = {};
-        std::unique_ptr<Module> bitcodes[ShaderStageGfxCount];
-
-        Context* pContext = AcquireContext();
-        pContext->AttachPipelineContext(&graphicsContext);
-
-        // Create the AMDGPU TargetMachine.
-        result = CodeGenManager::CreateTargetMachine(pContext);
-
-        // Translate SPIR-V binary to machine-independent LLVM module
-        for (uint32_t stage = 0; (stage < ShaderStageGfxCount) && (result == Result::Success); ++stage)
+        if ((result == Result::Success) && needRecompile)
         {
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
-            if (pShaderInfo->pModuleData == nullptr)
-            {
-                continue;
-            }
+            GetPipelineStatistics(candidateElfs[candidateIdx].data(),
+                                  candidateElfs[candidateIdx].size(),
+                                  m_gfxIp,
+                                  &pipelineStats[candidateIdx]);
 
-            if (cl::DisableWipFeatures &&
-                ((stage == ShaderStageTessControl) || (stage == ShaderStageTessEval) || (stage == ShaderStageGeometry)))
-            {
-                result = Result::Unsupported;
-                LLPC_ERRS("Unsupported shader stage.\n");
-                continue;
-            }
+            LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
+            LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
+                      "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
+                      "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
+                      "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
 
-            Module* pModule = nullptr;
+            for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
+            {
+                forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
+                GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
+                result = BuildGraphicsPipelineInternal(&graphicsContext,
+                                                       shaderInfo,
+                                                       forceLoopUnrollCount,
+                                                       &candidateElfs[candidateIdx],
+                                                       &needRecompile);
 
-            const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-            // Binary type must same for all shader stages
-            LLPC_ASSERT((binType == BinaryType::Unknown) || (pModuleData->binType == binType));
-            binType = pModuleData->binType;
-            if (binType == BinaryType::Spirv)
-            {
-                TimeProfiler timeProfiler(&g_timeProfileResult.translateTime);
-                result = TranslateSpirvToLlvm(&pModuleData->binCode,
-                                              static_cast<ShaderStage>(stage),
-                                              pShaderInfo->pEntryTarget,
-                                              pShaderInfo->pSpecializationInfo,
-                                              pContext,
-                                              &pModule);
-            }
-            else if (binType == BinaryType::LlvmBc)
-            {
-                // Skip lower and patch phase if input is LLVM IR
-                skipLower = true;
-                skipPatch = true;
-                pModule = pContext->LoadLibary(&pModuleData->binCode).release();
-            }
-            else
-            {
-                LLPC_NEVER_CALLED();
-            }
-
-            // Verify this LLVM module
-            if (result == Result::Success)
-            {
-                LLPC_OUTS("===============================================================================\n");
-                LLPC_OUTS("// LLPC SPIRV-to-LLVM translation results (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-                LLPC_OUTS(*pModule);
-                LLPC_OUTS("\n");
-                std::string errMsg;
-                raw_string_ostream errStream(errMsg);
-                if (verifyModule(*pModule, &errStream))
+                if (result == Result::Success)
                 {
-                    LLPC_ERRS("Fails to verify module after translation (" <<
-                              GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader): " <<
-                              errStream.str() << "\n");
-                    result = Result::ErrorInvalidShader;
-                }
-            }
+                    GetPipelineStatistics(candidateElfs[candidateIdx].data(),
+                                          candidateElfs[candidateIdx].size(),
+                                          m_gfxIp,
+                                          &pipelineStats[candidateIdx]);
 
-            // Do SPIR-V lowering operations for this LLVM module
-            if ((result == Result::Success) && (skipLower == false))
-            {
-                TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-                result = SpirvLower::Run(pModule);
-                if (result != Result::Success)
-                {
-                    LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
-                              GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
+                    LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
+                    LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
+                              "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
+                              "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
+                              "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
                 }
-                else
-                {
-                    LLPC_OUTS("===============================================================================\n");
-                    LLPC_OUTS("// LLPC SPIRV-lowering results (" <<
-                              GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-                    LLPC_OUTS(*pModule);
-                    LLPC_OUTS("\n");
-                }
-            }
-
-            modules[stage] = pModule;
-        }
-
-        // Build null fragment shader if necessary
-        if ((result == Result::Success) && (cl::AutoLayoutDesc == false) && (modules[ShaderStageFragment] == nullptr))
-        {
-            TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-            std::unique_ptr<Module> pNullFsModule;
-            result = BuildNullFs(pContext, pNullFsModule);
-            if (result == Result::Success)
-            {
-                modules[ShaderStageFragment] = pNullFsModule.release();
-            }
-            else
-            {
-                LLPC_ERRS("Fails to build a LLVM module for null fragment shader\n");
             }
         }
 
-        // Do LLVM module pacthing (preliminary patch work)
-        for (int32_t stage = ShaderStageGfxCount - 1; (stage >= 0) && (result == Result::Success); --stage)
+        candidateIdx = 0;
+        if ((result == Result::Success) && needRecompile)
         {
-            Module* pModule = modules[stage];
-            if ((pModule == nullptr) || skipPatch)
-            {
-                continue;
-            }
-
-            TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
-            result = Patch::PreRun(pModule);
-            if (result != Result::Success)
-            {
-                LLPC_ERRS("Fails to do preliminary patch work for LLVM module (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-            }
-        }
-
-        // Determine whether or not GS on-chip mode is valid for this pipeline
-        if ((result == Result::Success) && (modules[ShaderStageGeometry] != nullptr))
-        {
-            // NOTE: Always call CheckGsOnChipValidity() even when GS on-chip mode is disabled, because that method
-            // also computes esGsRingItemSize and gsVsRingItemSize.
-            bool gsOnChip = pContext->CheckGsOnChipValidity();
-            pContext->SetGsOnChip(gsOnChip);
-        }
-
-        // Do user data node merge for merged shader
-        if ((result == Result::Success) && (m_gfxIp.major >= 9))
-        {
-            pContext->DoUserDataNodeMerge();
-        }
-
-        // Do LLVM module patching (main patch work)
-        for (int32_t stage = ShaderStageGfxCount - 1; (stage >= 0) && (result == Result::Success); --stage)
-        {
-            Module* pModule = modules[stage];
-            if ((pModule == nullptr) || skipPatch)
-            {
-                continue;
-            }
-
-            TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
-            result = Patch::Run(pModule);
-            if (result != Result::Success)
-            {
-                LLPC_ERRS("Fails to patch LLVM module and link it with external library (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-            }
-            else
-            {
-                LLPC_OUTS("===============================================================================\n");
-                LLPC_OUTS("// LLPC patching results (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-                LLPC_OUTS(*pModule);
-                LLPC_OUTS("\n");
-            }
-        }
-
-        // Do shader merge operations
-        if ((result == Result::Success) && (m_gfxIp.major >= 9))
-        {
-            const bool hasVs  = (modules[ShaderStageVertex] != nullptr);
-            const bool hasTcs = (modules[ShaderStageTessControl] != nullptr);
-
-            const bool hasTs = ((modules[ShaderStageTessControl] != nullptr) ||
-                                (modules[ShaderStageTessEval] != nullptr));
-            const bool hasGs = (modules[ShaderStageGeometry] != nullptr);
-
-            ShaderMerger shaderMerger(pContext);
-
-            if (hasTs && (hasVs || hasTcs))
-            {
-                // Ls-HS merged shader should be present
-                Module* pLsModule = modules[ShaderStageVertex];
-                Module* pHsModule = modules[ShaderStageTessControl];
-
-                Module* pLsHsModule = nullptr;
-
-                TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
-                result = shaderMerger.BuildLsHsMergedShader(pLsModule, pHsModule, &pLsHsModule);
-
-                if (result != Result::Success)
-                {
-                    LLPC_ERRS("Fails to build LS-HS merged shader\n");
-                }
-                else
-                {
-                    LLPC_OUTS("===============================================================================\n");
-                    LLPC_OUTS("// LLPC shader merge results (LS-HS)\n");
-                    LLPC_OUTS(*pLsHsModule);
-                    LLPC_OUTS("\n");
-                }
-
-                // NOTE: After LS and HS are merged, LS and HS are destroy. And new LS-HS merged shader is treated
-                // as tessellation control shader.
-                modules[ShaderStageVertex] = nullptr;
-                modules[ShaderStageTessControl] = pLsHsModule;
-            }
-
-            if (hasGs)
-            {
-                // ES-GS merged shader should be present
-                Module* pEsModule = modules[hasTs ? ShaderStageTessEval : ShaderStageVertex];
-                Module* pGsModule = modules[ShaderStageGeometry];
-
-                Module* pEsGsModule = nullptr;
-
-                TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
-                result = shaderMerger.BuildEsGsMergedShader(pEsModule, pGsModule, &pEsGsModule);
-
-                if (result != Result::Success)
-                {
-                    LLPC_ERRS("Fails to build ES-GS merged shader\n");
-                }
-                else
-                {
-                    LLPC_OUTS("===============================================================================\n");
-                    LLPC_OUTS("// LLPC shader merge results (ES-GS)\n");
-                    LLPC_OUTS(*pEsGsModule);
-                    LLPC_OUTS("\n");
-                }
-
-                // NOTE: After ES and GS are merged, ES and GS are destroy. And new ES-GS merged shader is treated
-                // as geometry shader.
-                modules[hasTs ? ShaderStageTessEval : ShaderStageVertex] = nullptr;
-                modules[ShaderStageGeometry] = pEsGsModule;
-            }
-        }
-
-        // Build copy shader if necessary (has geometry shader)
-        if ((result == Result::Success) && (modules[ShaderStageGeometry] != nullptr))
-        {
-            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
-            result = BuildCopyShader(pContext, &modules[ShaderStageCopyShader]);
-            if (result != Result::Success)
-            {
-                LLPC_ERRS("Fails to build a LLVM module for copy shader\n");
-            }
-        }
-
-        // Create an empty module then link each shader module into it.
-        auto pPipelineModule = new Module("llpcPipeline", *pContext);
-        {
-            Linker linker(*pPipelineModule);
-            for (int32_t stage = ShaderStageCountInternal - 1; (stage >= 0) && (result == Result::Success); --stage)
-            {
-                Module* pShaderModule = modules[stage];
-                if (pShaderModule == nullptr)
-                {
-                    continue;
-                }
-                // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
-                // linked into pipeline module.
-                if (linker.linkInModule(std::unique_ptr<Module>(pShaderModule)))
-                {
-                    LLPC_ERRS("Fails to link shader module into pipeline module (" <<
-                              GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-                    result = Result::ErrorInvalidShader;
-                }
-            }
+            candidateIdx = ChooseLoopUnrollCountCandidate(pipelineStats, CandidateCount);
+            LLPC_OUTS("// Dynamic loop unroll: choose candidate = " << candidateIdx <<
+                      "; loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n");
         }
 
         if (result == Result::Success)
         {
-            LLPC_OUTS("===============================================================================\n");
-            LLPC_OUTS("// LLPC linking results\n");
-            LLPC_OUTS(*pPipelineModule);
-            LLPC_OUTS("\n");
-
-            // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text instead.
-            // If "-emit-llvm" is specified, generate LLVM bitcode. These options are used through LLPC
-            // standalone compiler tool "amdllpc".
-            raw_svector_ostream elfStream(pipelineElf);
-            std::string errMsg;
-            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
-
-            result = CodeGenManager::GenerateCode(pPipelineModule, elfStream, errMsg);
-            if (result != Result::Success)
-            {
-                LLPC_ERRS("Fails to generate GPU ISA codes :" <<
-                          errMsg << "\n");
-            }
-            if (result == Result::Success)
-            {
-                elfSize = pipelineElf.size();
-                pElf = pipelineElf.data();
-            }
+            elfSize = candidateElfs[candidateIdx].size();
+            pElf = candidateElfs[candidateIdx].data();
         }
-        delete pPipelineModule;
-        pPipelineModule = nullptr;
 
         if ((ShaderReplaced == false) && (hEntry != nullptr))
         {
@@ -940,8 +1093,6 @@ Result Compiler::BuildGraphicsPipeline(
                 pShaderCache->ResetShader(hEntry);
             }
         }
-
-        ReleaseContext(pContext);
     }
 
     if (result == Result::Success)
@@ -971,6 +1122,14 @@ Result Compiler::BuildGraphicsPipeline(
             PipelineDumper::DumpPipelineBinary(pPipelineDumperFile,
                                                m_gfxIp,
                                                &pPipelineOut->pipelineBin);
+
+            if (needRecompile)
+            {
+                std::stringstream strStream;
+                strStream << "Dynamic loop unroll enabled: loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n";
+                std::string extraInfo = strStream.str();
+                PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
+            }
         }
 
         PipelineDumper::EndPipelineDump(pPipelineDumperFile);
@@ -998,6 +1157,180 @@ Result Compiler::BuildGraphicsPipeline(
 }
 
 // =====================================================================================================================
+// Build compute pipeline internally
+Result Compiler::BuildComputePipelineInternal(
+    ComputeContext*                 pComputeContext,                // [in] Compute context this compute pipeline
+    const ComputePipelineBuildInfo* pPipelineInfo,                  // [in] Pipeline info of this compute pipeline
+    uint32_t                        forceLoopUnrollCount,           // [in] Force loop unroll count (0 means disable)
+    ElfPackage*                     pPipelineElf,                   // [out] Output Elf package
+    bool*                           pDynamicLoopUnroll)             // [out] Need dynamic loop unroll or not
+{
+    Result result   = Result::Success;
+    bool skipPatch  = false;
+    Module* pModule = nullptr;
+    std::unique_ptr<Module> bitcode;
+
+    Context* pContext = AcquireContext();
+    pContext->AttachPipelineContext(pComputeContext);
+
+    // Create the AMDGPU target machine.
+    result = CodeGenManager::CreateTargetMachine(pContext);
+
+    // Translate SPIR-V binary to machine-independent LLVM module
+    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
+    if (pModuleData != nullptr)
+    {
+        if (pModuleData->binType == BinaryType::Spirv)
+        {
+            TimeProfiler timeProfiler(&g_timeProfileResult.translateTime);
+
+            result = TranslateSpirvToLlvm(&pModuleData->binCode,
+                                          ShaderStageCompute,
+                                          pPipelineInfo->cs.pEntryTarget,
+                                          pPipelineInfo->cs.pSpecializationInfo,
+                                          pContext,
+                                          forceLoopUnrollCount,
+                                          &pModule);
+
+            // Check if this module needs dynamic loop unroll. Only do this check when forceLoopUnrollCount is 0. Dynamic loop unroll is only enabled for fragment shader and compute shader.
+            if (cl::EnableDynamicLoopUnroll && (result == Result::Success) &&
+                (forceLoopUnrollCount == 0))
+            {
+                *pDynamicLoopUnroll = NeedDynamicLoopUnroll(pModule);
+            }
+
+            // Verify this LLVM module
+            if (result == Result::Success)
+            {
+                LLPC_OUTS("===============================================================================\n");
+                LLPC_OUTS("// LLPC SPIRV-to-LLVM translation results (" <<
+                          GetShaderStageName(ShaderStageCompute) << " shader)\n");
+                LLPC_OUTS(*pModule);
+                LLPC_OUTS("\n");
+                std::string errMsg;
+                raw_string_ostream errStream(errMsg);
+                if (verifyModule(*pModule, &errStream))
+                {
+                    LLPC_ERRS("Fails to verify module after translation: (" <<
+                              GetShaderStageName(ShaderStageCompute) << " shader) :" << errStream.str() << "\n");
+                    result = Result::ErrorInvalidShader;
+                }
+            }
+
+            // Do SPIR-V lowering operations for this LLVM module
+            if (result == Result::Success)
+            {
+                TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
+                result = SpirvLower::Run(pModule);
+                if (result != Result::Success)
+                {
+                    LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
+                              GetShaderStageName(ShaderStageCompute) << " shader)\n");
+                }
+                else
+                {
+                    LLPC_OUTS("===============================================================================\n");
+                    LLPC_OUTS("// LLPC SPIRV-lowering results (" <<
+                              GetShaderStageName(ShaderStageCompute) << " shader)\n");
+                    LLPC_OUTS(*pModule);
+                    LLPC_OUTS("\n");
+                }
+            }
+        }
+        else
+        {
+            // TODO: Handle other binary types.
+            LLPC_NOT_IMPLEMENTED();
+        }
+    }
+    else if (pModuleData->binType == BinaryType::LlvmBc)
+    {
+        // Skip lower and patch phase if input is LLVM IR
+        skipPatch = true;
+        bitcode = pContext->LoadLibary(&pModuleData->binCode);
+        pModule = bitcode.get();
+    }
+    else
+    {
+        LLPC_NEVER_CALLED();
+    }
+
+    // Do LLVM module pacthing and generate GPU ISA codes
+    if (result == Result::Success)
+    {
+        LLPC_ASSERT(pModule != nullptr);
+
+        // Preliminary patch work
+        if (skipPatch == false)
+        {
+            TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
+            result = Patch::PreRun(pModule);
+        }
+
+        if (result != Result::Success)
+        {
+            LLPC_ERRS("Fails to do preliminary patch work for LLVM module (" <<
+                      GetShaderStageName(ShaderStageCompute) << " shader)\n");
+        }
+
+        // Main patch work
+        if (result == Result::Success)
+        {
+            if (skipPatch == false)
+            {
+                TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
+                result = Patch::Run(pModule);
+            }
+
+            if (result != Result::Success)
+            {
+                LLPC_ERRS("Fails to patch LLVM module and link it with external library (" <<
+                          GetShaderStageName(ShaderStageCompute) << " shader)\n");
+            }
+            else
+            {
+                LLPC_OUTS("===============================================================================\n");
+                LLPC_OUTS("// LLPC patching result (" <<
+                          GetShaderStageName(ShaderStageCompute) << " shader)\n");
+                LLPC_OUTS(*pModule);
+                LLPC_OUTS("\n");
+            }
+        }
+
+        if (result == Result::Success)
+        {
+            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+            // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text
+            // instead.  If "-emit-llvm" is specified, generate LLVM bitcode. These options are used
+            // through LLPC standalone compiler tool "amdllpc".
+            raw_svector_ostream elfStream(*pPipelineElf);
+            std::string errMsg;
+            result = CodeGenManager::GenerateCode(pModule, elfStream, errMsg);
+            if (result != Result::Success)
+            {
+                LLPC_ERRS("Fails to generate GPU ISA codes (" <<
+                          GetShaderStageName(ShaderStageCompute) << " shader) : " << errMsg << "\n");
+            }
+        }
+    }
+
+    if (bitcode != nullptr)
+    {
+        LLPC_ASSERT(bitcode.get() == pModule);
+        bitcode = nullptr;
+        pModule = nullptr;
+    }
+    else
+    {
+        delete pModule;
+        pModule = nullptr;
+    }
+
+    ReleaseContext(pContext);
+    return result;
+}
+
+// =====================================================================================================================
 // Build compute pipeline from the specified info.
 Result Compiler::BuildComputePipeline(
     const ComputePipelineBuildInfo* pPipelineInfo,  // [in] Info to build this compute pipeline
@@ -1006,7 +1339,6 @@ Result Compiler::BuildComputePipeline(
     CacheEntryHandle hEntry    = nullptr;
     const void*      pElf      = nullptr;
     size_t           elfSize   = 0;
-    ElfPackage       pipelineElf;
 
     Result result = ValidatePipelineShaderInfo(ShaderStageCompute, &pPipelineInfo->cs);
 
@@ -1042,7 +1374,7 @@ Result Compiler::BuildComputePipeline(
                 reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
             if (pOrigModuleData != nullptr)
             {
-                ShaderModuleData *pModuleData = nullptr;
+                ShaderModuleData* pModuleData = nullptr;
                 if (ReplaceShader(pOrigModuleData, &pModuleData) == Result::Success)
                 {
                     ShaderReplaced = true;
@@ -1066,8 +1398,6 @@ Result Compiler::BuildComputePipeline(
         }
     }
 
-    ComputeContext computeContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
-
     if ((result == Result::Success) && EnableOuts())
     {
         const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
@@ -1089,6 +1419,14 @@ Result Compiler::BuildComputePipeline(
         dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
         dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
         pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, pPipelineInfo, nullptr, &pipelineHash);
+        std::stringstream strStream;
+        strStream << ";Compiler Options: ";
+        for (auto& option : m_options)
+        {
+            strStream << option << " ";
+        }
+        std::string extraInfo = strStream.str();
+        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -1123,164 +1461,79 @@ Result Compiler::BuildComputePipeline(
         }
     }
 
+    constexpr uint32_t CandidateCount = 4;
+    uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
+    bool               needRecompile   = false;
+    uint32_t           candidateIdx    = 0;
+    ElfPackage         candidateElfs[CandidateCount];
+
     if (cacheEntryState == ShaderEntryState::Compiling)
     {
-        bool skipPatch = false;
-        Module* pModule = nullptr;
-        std::unique_ptr<Module> bitcode;
+        std::vector<LoopAnalysisInfo> loopInfo;
+        PipelineStatistics            pipelineStats[CandidateCount];
+        uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        Context* pContext = AcquireContext();
-        pContext->AttachPipelineContext(&computeContext);
+        ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
 
-        // Create the AMDGPU target machine.
-        result = CodeGenManager::CreateTargetMachine(pContext);
+        result = BuildComputePipelineInternal(&computeContext,
+                                              pPipelineInfo,
+                                              forceLoopUnrollCount,
+                                              &candidateElfs[candidateIdx],
+                                              &needRecompile);
 
-        // Translate SPIR-V binary to machine-independent LLVM module
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
-        if (pModuleData != nullptr)
+        if ((result == Result::Success) && needRecompile)
         {
-            if (pModuleData->binType == BinaryType::Spirv)
+            GetPipelineStatistics(candidateElfs[candidateIdx].data(),
+                                  candidateElfs[candidateIdx].size(),
+                                  m_gfxIp,
+                                  &pipelineStats[candidateIdx]);
+
+            LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
+            LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
+                      "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
+                      "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
+                      "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
+
+            for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
-                TimeProfiler timeProfiler(&g_timeProfileResult.translateTime);
+                forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
+                ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
 
-                result = TranslateSpirvToLlvm(&pModuleData->binCode,
-                                              ShaderStageCompute,
-                                              pPipelineInfo->cs.pEntryTarget,
-                                              pPipelineInfo->cs.pSpecializationInfo,
-                                              pContext,
-                                              &pModule);
+                result = BuildComputePipelineInternal(&computeContext,
+                                                      pPipelineInfo,
+                                                      forceLoopUnrollCount,
+                                                      &candidateElfs[candidateIdx],
+                                                      &needRecompile);
 
-                // Verify this LLVM module
-                if (result == Result::Success)
+                if ((result == Result::Success) && needRecompile)
                 {
-                    LLPC_OUTS("===============================================================================\n");
-                    LLPC_OUTS("// LLPC SPIRV-to-LLVM translation results (" <<
-                              GetShaderStageName(ShaderStageCompute) << " shader)\n");
-                    LLPC_OUTS(*pModule);
-                    LLPC_OUTS("\n");
-                    std::string errMsg;
-                    raw_string_ostream errStream(errMsg);
-                    if (verifyModule(*pModule, &errStream))
-                    {
-                        LLPC_ERRS("Fails to verify module after translation: (" <<
-                                  GetShaderStageName(ShaderStageCompute) << " shader) :" << errStream.str() << "\n");
-                        result = Result::ErrorInvalidShader;
-                    }
-                }
+                    GetPipelineStatistics(candidateElfs[candidateIdx].data(),
+                                          candidateElfs[candidateIdx].size(),
+                                          m_gfxIp,
+                                          &pipelineStats[candidateIdx]);
 
-                // Do SPIR-V lowering operations for this LLVM module
-                if (result == Result::Success)
-                {
-                    TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-                    result = SpirvLower::Run(pModule);
-                    if (result != Result::Success)
-                    {
-                        LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
-                                  GetShaderStageName(ShaderStageCompute) << " shader)\n");
-                    }
-                    else
-                    {
-                        LLPC_OUTS("===============================================================================\n");
-                        LLPC_OUTS("// LLPC SPIRV-lowering results (" <<
-                                  GetShaderStageName(ShaderStageCompute) << " shader)\n");
-                        LLPC_OUTS(*pModule);
-                        LLPC_OUTS("\n");
-                    }
+                    LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
+                    LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
+                              "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
+                              "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
+                              "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
+
                 }
             }
-            else
-            {
-                // TODO: Handle other binary types.
-                LLPC_NOT_IMPLEMENTED();
-            }
-        }
-        else if (pModuleData->binType == BinaryType::LlvmBc)
-        {
-            // Skip lower and patch phase if input is LLVM IR
-            skipPatch = true;
-            bitcode = pContext->LoadLibary(&pModuleData->binCode);
-            pModule = bitcode.get();
-        }
-        else
-        {
-            LLPC_NEVER_CALLED();
         }
 
-        // Do LLVM module pacthing and generate GPU ISA codes
+        candidateIdx = 0;
+        if ((result == Result::Success) && needRecompile)
+        {
+            candidateIdx = ChooseLoopUnrollCountCandidate(pipelineStats, CandidateCount);
+            LLPC_OUTS("// Dynamic loop unroll: choose candidate = " << candidateIdx <<
+                      "; loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n");
+        }
+
         if (result == Result::Success)
         {
-            LLPC_ASSERT(pModule != nullptr);
-
-            // Preliminary patch work
-            if (skipPatch == false)
-            {
-                TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
-                result = Patch::PreRun(pModule);
-            }
-
-            if (result != Result::Success)
-            {
-                LLPC_ERRS("Fails to do preliminary patch work for LLVM module (" <<
-                          GetShaderStageName(ShaderStageCompute) << " shader)\n");
-            }
-
-            // Main patch work
-            if (result == Result::Success)
-            {
-                if (skipPatch == false)
-                {
-                    TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
-                    result = Patch::Run(pModule);
-                }
-
-                if (result != Result::Success)
-                {
-                    LLPC_ERRS("Fails to patch LLVM module and link it with external library (" <<
-                              GetShaderStageName(ShaderStageCompute) << " shader)\n");
-                }
-                else
-                {
-                    LLPC_OUTS("===============================================================================\n");
-                    LLPC_OUTS("// LLPC patching result (" <<
-                              GetShaderStageName(ShaderStageCompute) << " shader)\n");
-                    LLPC_OUTS(*pModule);
-                    LLPC_OUTS("\n");
-                }
-            }
-
-            if (result == Result::Success)
-            {
-                TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
-                // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text
-                // instead.  If "-emit-llvm" is specified, generate LLVM bitcode. These options are used
-                // through LLPC standalone compiler tool "amdllpc".
-                raw_svector_ostream elfStream(pipelineElf);
-                std::string errMsg;
-                result = CodeGenManager::GenerateCode(pModule, elfStream, errMsg);
-                if (result != Result::Success)
-                {
-                    LLPC_ERRS("Fails to generate GPU ISA codes (" <<
-                              GetShaderStageName(ShaderStageCompute) << " shader) : " << errMsg << "\n");
-                }
-            }
-
-            if (result == Result::Success)
-            {
-                elfSize = pipelineElf.size();
-                pElf = pipelineElf.data();
-            }
-        }
-
-        if (bitcode != nullptr)
-        {
-            LLPC_ASSERT(bitcode.get() == pModule);
-            bitcode = nullptr;
-            pModule = nullptr;
-        }
-        else
-        {
-            delete pModule;
-            pModule = nullptr;
+            elfSize = candidateElfs[candidateIdx].size();
+            pElf = candidateElfs[candidateIdx].data();
         }
 
         if ((ShaderReplaced == false) && (hEntry != nullptr))
@@ -1295,8 +1548,6 @@ Result Compiler::BuildComputePipeline(
                 pShaderCache->ResetShader(hEntry);
             }
         }
-
-        ReleaseContext(pContext);
     }
 
     if (result == Result::Success)
@@ -1326,6 +1577,14 @@ Result Compiler::BuildComputePipeline(
             PipelineDumper::DumpPipelineBinary(pPipelineDumperFile,
                                                m_gfxIp,
                                                &pPipelineOut->pipelineBin);
+
+            if (needRecompile)
+            {
+                std::stringstream strStream;
+                strStream << "Dynamic loop unroll enabled: loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n";
+                std::string extraInfo = strStream.str();
+                PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
+            }
         }
 
         PipelineDumper::EndPipelineDump(pPipelineDumperFile);
@@ -1406,6 +1665,7 @@ Result Compiler::TranslateSpirvToLlvm(
     const char*                 pEntryTarget,        // [in] SPIR-V entry point
     const VkSpecializationInfo* pSpecializationInfo, // [in] Specialization info
     LLVMContext*                pContext,            // [in] LLPC pipeline context
+    uint32_t                    forceLoopUnrollCount,// [in] Force loop unroll count
     Module**                    ppModule             // [out] Created LLVM module after this translation
     ) const
 {
@@ -1436,13 +1696,14 @@ Result Compiler::TranslateSpirvToLlvm(
         }
     }
 
-    if (ReadSPIRV(*pContext,
+    if (readSpirv(*pContext,
                     spirvStream,
                     static_cast<spv::ExecutionModel>(shaderStage),
                     pEntryTarget,
                     specConstMap,
                     *ppModule,
-                    errMsg) == false)
+                    errMsg,
+                    forceLoopUnrollCount) == false)
     {
         LLPC_ERRS("Fails to translate SPIR-V to LLVM (" <<
                     GetShaderStageName(static_cast<ShaderStage>(shaderStage)) << " shader): " << errMsg << "\n");
@@ -1515,16 +1776,16 @@ void Compiler::CleanOptimizedSpirv(
 // Builds hash code from compilation-options
 MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     uint32_t          optionCount,    // Count of compilation-option strings
-    const char*const* pOptions         // [in] An array of compilation-option strings
-    ) const
+    const char*const* pOptions        // [in] An array of compilation-option strings
+    )
 {
     // Options which needn't affect compilation results
     static StringRef IgnoredOptions[] =
     {
         cl::PipelineDumpDir.ArgStr,
         cl::EnablePipelineDump.ArgStr,
-        cl::DisableWipFeatures.ArgStr,
         cl::EnableTimeProfiler.ArgStr,
+        cl::ShaderCacheFileDir.ArgStr,
         cl::ShaderCacheMode.ArgStr,
         cl::ShaderReplaceMode.ArgStr,
         cl::ShaderReplaceDir.ArgStr,
@@ -1602,15 +1863,6 @@ Result Compiler::ValidatePipelineShaderInfo(
             {
                 LLPC_ERRS("Missing entry-point name for " << GetShaderStageName(shaderStage) << " shader\n");
                 result = Result::ErrorInvalidShader;
-            }
-
-            if (cl::DisableWipFeatures)
-            {
-                if (VerifySpirvBinary(pSpirvBin) != Result::Success)
-                {
-                    LLPC_ERRS("Unsupported op codes are found in " << GetShaderStageName(shaderStage) << " shader\n");
-                    result = Result::Unsupported;
-                }
             }
         }
         else if (pModuleData->binType == BinaryType::LlvmBc)
@@ -1791,6 +2043,94 @@ void Compiler::InitGpuProperty()
 }
 
 // =====================================================================================================================
+// Initialize GPU workarounds.
+void Compiler::InitGpuWorkaround()
+{
+    memset(&m_gpuWorkarounds, 0, sizeof(m_gpuWorkarounds));
+    if (m_gfxIp.major == 6)
+    {
+        // Hardware workarounds for GFX6 based GPU's:
+        m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+        m_gpuWorkarounds.gfx6.miscLoadBalancePerWatt = 1;
+        m_gpuWorkarounds.gfx6.shader8b16bLocalWriteCorruption = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1000_READLANE_SMRD_WORKAROUND_BUG343479 for detail
+        m_gpuWorkarounds.gfx6.shaderReadlaneSmrd = 1;
+
+        // TODO: Should be done in back-end, see SCOption_UBTS460287_FILL_SIMD_WITH_VGPRS for detail
+        m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1000R1100_VCCZ_CLOBBER_WORKAROUND_BUG457939 for detail
+        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
+
+        // TODO: Should be done in back-end, see SCOption_MIN_MAX_DENORM_WORKAROUND for detail
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        // NOTE: We only need workaround it in Tahiti, Pitcairn, Capeverde, to simplify the design, we set this
+        // flag for all gfxIp.major == 6
+        m_gpuWorkarounds.gfx6.shaderZExport = 1;
+
+    }
+    else if (m_gfxIp.major == 7)
+    {
+        // Hardware workarounds for GFX7 based GPU's:
+        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        if (m_gfxIp.stepping == 0)
+        {
+            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+
+            // NOTE: Buffer store + index mode are not used in vulkan, so we can skip this workaround in safe.
+            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
+        }
+        if (m_gfxIp.stepping == 3 ||
+            m_gfxIp.stepping == 4)
+        {
+            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
+            m_gpuWorkarounds.gfx6.shaderSpiBarrierMgmt = 1;
+            m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
+        }
+    }
+    else if (m_gfxIp.major == 8)
+    {
+        // Hardware workarounds for GFX8.x based GPU's:
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1200_UBTS523206_SMEM_RANGE_CHECK for detail
+        m_gpuWorkarounds.gfx6.shaderSmemBufferAddrClamp = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX8_DEGGIGX80_444_IMAGE_GATHER4_WORKAROUND and
+        // SCOption_GFX81_DEGGI___IMAGE_STORE_D16_WORKAROUND for detail
+        m_gpuWorkarounds.gfx6.shaderEstimateRegisterUsage = 1;
+
+        if (m_gfxIp.minor == 0 && m_gfxIp.stepping == 2)
+        {
+            m_gpuWorkarounds.gfx6.miscSpiSgprsNum = 1;
+        }
+    }
+    else if (m_gfxIp.major == 9)
+    {
+        // Hardware workarounds for GFX9 based GPU's:
+
+        // TODO: Clean up code for all 1d texture patch
+        m_gpuWorkarounds.gfx9.treat1dImagesAs2d = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX9_DEGGIGX90_864_IMAGE_GATHER_H_PCK_WORKAROUND and
+        // SCOption_GFX9_DEGGIGX90_1552_IMAGE_GATHER4_WORKAROUND for detail
+        m_gpuWorkarounds.gfx9.shaderImageGatherInstFix = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX9_DEGGIGX90_1641_CACHE_LINE_STRADDLING_BUG for detail
+        m_gpuWorkarounds.gfx9.fixCacheLineStraddling = 1;
+
+        if (m_gfxIp.stepping == 0 || m_gfxIp.stepping == 2)
+        {
+            m_gpuWorkarounds.gfx9.fixLsVgprInput = 1;
+        }
+    }
+}
+// =====================================================================================================================
 // Acquires a free context from context pool.
 Context* Compiler::AcquireContext()
 {
@@ -1801,7 +2141,12 @@ Context* Compiler::AcquireContext()
     // Try to find a free context from pool first
     for (auto pContext : m_contextPool)
     {
-        if (pContext->IsInUse() == false)
+        GfxIpVersion gfxIpVersion = pContext->GetGfxIpVersion();
+
+        if ((pContext->IsInUse()   == false) &&
+            (gfxIpVersion.major    == m_gfxIp.major) &&
+            (gfxIpVersion.minor    == m_gfxIp.minor) &&
+            (gfxIpVersion.stepping == m_gfxIp.stepping))
         {
             pFreeContext = pContext;
             pFreeContext->SetInUse(true);
@@ -1853,6 +2198,311 @@ void Compiler::DumpTimeProfilingResult(
     LLPC_ERRS("Time Profiling Results(Special): "
               << "SPIR-V Lower (Optimization) = " << float(g_timeProfileResult.lowerOptTime) / freq << ", "
               << "LLVM Patch (Lib Link) = " << float(g_timeProfileResult.patchLinkTime) / freq << "\n");
+}
+
+// =====================================================================================================================
+// Collect information from SPIR-V binary
+Result Compiler::CollectInfoFromSpirvBinary(
+    ShaderModuleData* pModuleData   // [in] The shader module data
+    ) const
+{
+    Result result = Result::Success;
+    pModuleData->enableVarPtr = false;
+    pModuleData->enableVarPtrStorageBuf = false;
+
+    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pModuleData->binCode.pCode);
+    const uint32_t* pEnd = pCode + pModuleData->binCode.codeSize / sizeof(uint32_t);
+
+    if (IsSpirvBinary(&pModuleData->binCode))
+    {
+        const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
+
+        // Parse SPIR-V instructions
+        std::unordered_set<uint32_t> capabilities;
+        while (pCodePos < pEnd)
+        {
+            uint32_t opCode = (pCodePos[0] & OpCodeMask);
+            uint32_t wordCount = (pCodePos[0] >> WordCountShift);
+
+            if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+            {
+                LLPC_ERRS("Invalid SPIR-V binary\n");
+                result = Result::ErrorInvalidShader;
+                break;
+            }
+
+            if (opCode == spv::OpCapability)
+            {
+                LLPC_ASSERT(wordCount == 2);
+                pCodePos++;
+                spv::Capability capability = static_cast<spv::Capability>(*pCodePos++);
+                capabilities.insert(capability);
+            }
+            else
+            {
+                pCodePos += wordCount;
+            }
+        }
+
+        if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) !=
+            capabilities.end())
+        {
+            pModuleData->enableVarPtrStorageBuf = true;
+        }
+
+        if (capabilities.find(spv::CapabilityVariablePointers) != capabilities.end())
+        {
+            pModuleData->enableVarPtr = true;
+        }
+        return result;
+    }
+    else
+    {
+        result = Result::ErrorInvalidShader;
+        LLPC_ERRS("Invalid SPIR-V binary\n");
+    }
+    return result;
+}
+
+// =====================================================================================================================
+// Checks if dynamic loop unroll is needed for this module.
+bool Compiler::NeedDynamicLoopUnroll(
+    Module* pModule  // [in]  LLVM module to check
+    ) const
+{
+    Context* pContext = static_cast<Context*>(&pModule->getContext());
+    std::vector<LoopAnalysisInfo>  loopInfo;
+    bool needDynamicLoopUnroll = false;
+    LoopInfoCollect* pLoopPass = new LoopInfoCollect(&loopInfo);
+
+    legacy::PassManager passMgr;
+    passMgr.add(pLoopPass);
+    passMgr.run(*pModule);
+
+    for (uint32_t i = 0; i < loopInfo.size(); i++)
+    {
+        // These conditions mean the loop is a complex loop.
+        if ((loopInfo[i].numAluInsts > 20) ||
+            (loopInfo[i].nestedLevel >= 3) ||
+            (loopInfo[i].numBasicBlocks > 8))
+        {
+            needDynamicLoopUnroll = true;
+            break;
+        }
+    }
+
+    return needDynamicLoopUnroll;
+}
+
+// =====================================================================================================================
+// Gets the statistics info for the specified pipeline binary.
+void Compiler::GetPipelineStatistics(
+    const void*             pCode,                  // [in]  Pipeline ISA code
+    size_t                  codeSize,               // Pipeline ISA code size
+    GfxIpVersion            gfxIp,                  // Graphics IP version info
+    PipelineStatistics*     pPipelineStats          // [out] Output statistics info for the pipeline
+    ) const
+{
+    ElfReader<Elf64> reader(gfxIp);
+    auto result = reader.ReadFromBuffer(pCode, &codeSize);
+    LLPC_ASSERT(result == Result::Success);
+
+    pPipelineStats->numAvailVgprs       = 0;
+    pPipelineStats->numUsedVgprs        = 0;
+    pPipelineStats->useScratchBuffer    = false;
+    pPipelineStats->sgprSpill           = false;
+
+    uint32_t sectionCount = reader.GetSectionCount();
+    for (uint32_t secIdx = 0; secIdx < sectionCount; ++secIdx)
+    {
+        typename ElfReader<Elf64>::ElfSectionBuffer* pSection = nullptr;
+        bool isCompute = false;
+        Result result = reader.GetSectionDataBySectionIndex(secIdx, &pSection);
+        LLPC_ASSERT(result == Result::Success);
+
+        if (strcmp(pSection->pName, NoteName) == 0)
+        {
+            uint32_t offset = 0;
+            const uint32_t noteHeaderSize = sizeof(NoteHeader);
+            while (offset < pSection->secHead.sh_size)
+            {
+                const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
+                if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
+                {
+                    const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
+                    auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
+                                   pSection->pData + offset + noteHeaderSize);
+                    for (uint32_t i = 0; i < configCount; ++i)
+                    {
+                        uint32_t regId = pConfig[i].key;
+                        switch (regId)
+                        {
+                        case mmPS_NUM_USED_VGPRS:
+                            pPipelineStats->numUsedVgprs= pConfig[i].value;
+                            break;
+                        case mmCS_NUM_USED_VGPRS:
+                            isCompute = true;
+                            pPipelineStats->numUsedVgprs = pConfig[i].value;
+                            break;
+                        case mmPS_SCRATCH_BYTE_SIZE:
+                        case mmCS_SCRATCH_BYTE_SIZE:
+                            pPipelineStats->useScratchBuffer = (pConfig[i].value > 0);
+                            break;
+                        case mmPS_NUM_AVAIL_VGPRS:
+                        case mmCS_NUM_AVAIL_VGPRS:
+                            pPipelineStats->numAvailVgprs = pConfig[i].value;
+                        default:
+                            break;
+                        }
+                    }
+                }
+
+                offset += noteHeaderSize + Pow2Align(pNode->descSize, sizeof(uint32_t));
+                LLPC_ASSERT(offset <= pSection->secHead.sh_size);
+            }
+        }
+        else if (strncmp(pSection->pName, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0)
+        {
+            uint32_t startPos = 0;
+            uint32_t endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
+
+            uint8_t lastChar = pSection->pData[endPos - 1];
+            const_cast<uint8_t*>(pSection->pData)[endPos - 1] = '\0';
+
+            const char* pText = reinterpret_cast<const char*>(pSection->pData + startPos);
+
+            // Search PS or CS segment first
+            auto entryStage = Util::Abi::PipelineSymbolType::PsMainEntry;
+            if (isCompute)
+            {
+                entryStage = Util::Abi::PipelineSymbolType::CsMainEntry;
+            }
+
+            const char* pEntryName = Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(entryStage)];
+
+            pText = strstr(pText, pEntryName);
+
+            if (pText != nullptr)
+            {
+                // Search program end marker
+                const char* pEndPgm = strstr(pText, "s_endpgm");
+                LLPC_ASSERT(pEndPgm);
+                char savedChar = *pEndPgm;
+                const_cast<char*>(pEndPgm)[0] = '\0';
+
+                // Search writelane instructions, which mean SGPR spill.
+                if (strstr(pText, "writelane") != nullptr)
+                {
+                    pPipelineStats->sgprSpill = true;
+                }
+
+                // Restore last character
+                const_cast<char*>(pEndPgm)[0] = savedChar;
+            }
+
+            // Restore last character
+            const_cast<uint8_t*>(pSection->pData)[endPos - 1] = lastChar;
+        }
+    }
+}
+
+// =====================================================================================================================
+// Chooses the optimal candidate of loop unroll count with the specified pipeline statistics info
+//
+// NOTE: Candidates of loop unroll count is assumed to be provide with a descending order. The first candidate has max loop unroll count while the last has the min one.
+uint32_t Compiler::ChooseLoopUnrollCountCandidate(
+    PipelineStatistics* pPipelineStats,             // [in] Pipeline module info
+    uint32_t            candidateCount              // [in] Candidate  Count
+    ) const
+{
+    uint32_t candidateIdx        = 0;
+    uint32_t optimalCandidateIdx = 0;
+    uint32_t noSpillCandidateIdx = 0;
+    uint32_t maxWaveCandidateIdx = 0;
+
+    // Find the optimal candidate with no SGPR spill or scratch buffer.
+    for (; candidateIdx < candidateCount; candidateIdx++)
+    {
+        if ((pPipelineStats[candidateIdx].sgprSpill == false) &&
+            (pPipelineStats[candidateIdx].useScratchBuffer == false))
+        {
+            break;
+        }
+    }
+    noSpillCandidateIdx = candidateIdx;
+
+    // Check available wavefronts
+    // Only need to check VGPR usage. There are a lot more SGPRs(800).
+    // It will only limit waves to 8, which is not a problem as the designed wave ratio is 0.2
+    uint32_t maxWave = 0;
+    uint32_t totalVgprs = pPipelineStats[0].numAvailVgprs;
+    LLPC_ASSERT(totalVgprs > 0);
+
+    for (candidateIdx = 0; candidateIdx < candidateCount; candidateIdx++)
+    {
+        uint32_t wave = totalVgprs / pPipelineStats[candidateIdx].numUsedVgprs;
+        if (maxWave < wave)
+        {
+            maxWave = wave;
+            maxWaveCandidateIdx = candidateIdx;
+        }
+    }
+
+    float waveRatio = 0.0f;
+
+    if (noSpillCandidateIdx < candidateCount)
+    {
+        if (noSpillCandidateIdx < maxWaveCandidateIdx)
+        {
+            // Choose the optimal candidate with max wave
+            optimalCandidateIdx = maxWaveCandidateIdx;
+            uint32_t wave = totalVgprs / pPipelineStats[optimalCandidateIdx - 1].numUsedVgprs;
+
+            waveRatio = static_cast<float>(maxWave - wave);
+            waveRatio = waveRatio / maxWave;
+
+            // Choose larger loop unroll count if wave difference is relatively small.
+            if (waveRatio < 0.2)
+            {
+                optimalCandidateIdx--;
+                int32_t nextIndex = static_cast<int32_t>(optimalCandidateIdx) - 1;
+                while (nextIndex > 0)
+                {
+                    if (wave != (totalVgprs / pPipelineStats[nextIndex].numUsedVgprs))
+                    {
+                        break;
+                    }
+                    optimalCandidateIdx--;
+                    nextIndex = optimalCandidateIdx - 1;
+                }
+            }
+        }
+        else if (noSpillCandidateIdx == maxWaveCandidateIdx)
+        {
+            optimalCandidateIdx = maxWaveCandidateIdx;
+        }
+        else
+        {
+            // Large loop unroll count has more wavefronts.
+            // This is not a common case.
+            waveRatio = static_cast<float>(maxWave - totalVgprs / pPipelineStats[noSpillCandidateIdx].numUsedVgprs);
+            waveRatio = waveRatio / maxWave;
+            if (waveRatio < 0.2)
+            {
+                optimalCandidateIdx = noSpillCandidateIdx;
+            }
+            else
+            {
+                optimalCandidateIdx = maxWaveCandidateIdx;
+            }
+        }
+    }
+    else
+    {
+        optimalCandidateIdx = 0;
+    }
+
+    return optimalCandidateIdx;
 }
 
 } // Llpc

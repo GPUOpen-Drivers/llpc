@@ -71,6 +71,8 @@ private:
     std::unordered_set<llvm::CallInst*>    m_imageCalls;  // List of "call" instructions to emulate SPIR-V image operations
     std::unordered_set<llvm::Instruction*> m_imageLoads;  // List of "load" or "call" instructions to emulate SPIR-V image load
     std::unordered_set<llvm::Instruction*> m_imageLoadOperands; // List of instructions to emulate SPIR-V image load operands
+
+    bool m_restoreMeta;                                   // Restore metadata from metadata instructions
 };
 
 } // Llpc

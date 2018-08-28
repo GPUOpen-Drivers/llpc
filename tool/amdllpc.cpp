@@ -55,7 +55,6 @@
 
 #if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
     #define _CRTDBG_MAP_ALLOC
-    #include <stdlib.h>
     #include <crtdbg.h>
 #else
     #ifdef WIN_OS
@@ -63,6 +62,8 @@
         #include <signal.h>
     #endif
 #endif
+
+#include <stdlib.h> // getenv
 
 // NOTE: To enable VLD, please add option BUILD_WIN_VLD=1 in build option.To run amdllpc with VLD enabled,
 // please copy vld.ini and all files in.\winVisualMemDetector\bin\Win64 to current directory of amdllpc.
@@ -123,6 +124,57 @@ static cl::opt<std::string> EntryTarget("entry-target",
 // -ignore-color-attachment-formats: ignore color attachment formats
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
+
+// -enable-ngg: enable NGG mode
+static cl::opt<bool> EnableNgg(
+    "enable-ngg",
+    cl::desc("Enable implicit primitive shader (NGG) mode"),
+    cl::init(false));
+
+// TODO: Comment NggEnableFastLaunch out for workaround the build failure on Linux
+#if 0
+// -ngg-enable-fast-launch: enable the hardware to launch subgroups of work at a faster rate (NGG)
+static cl::opt<bool> NggEnableFastLaunch(
+    "ngg-enable-fast-launch",
+    cl::desc("Enable the hardware to launch subgroups of work at a faster rate (NGG)"),
+    cl::init(false));
+#endif
+
+// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
+static cl::opt<bool> NggEnableVertexReuse(
+    "ngg-enable-vertex-reuse",
+    cl::desc("Enable optimization to cull duplicate vertices (NGG)"),
+    cl::init(false));
+
+// -ngg-disable-backface-culling: disable culling of primitives that don't meet facing criteria (NGG)
+static cl::opt<bool> NggDisableBackfaceCulling(
+    "ngg-disable-backface-culling",
+    cl::desc("Disable culling of primitives that don't meet facing criteria (NGG)"),
+    cl::init(true));
+
+// -ngg-enable-frustum-culling: enable discarding of primitives outside of view frustum (NGG)
+static cl::opt<bool> NggEnableFrustumCulling(
+    "ngg-enable-frustum-culling",
+    cl::desc("Enable discarding of primitives outside of view frustum (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-box-filter-culling: enable simpler frustum culler that is less accurate (NGG)
+static cl::opt<bool> NggEnableBoxFilterCulling(
+    "ngg-enable-box-filter-culling",
+    cl::desc("Enable simpler frustum culler that is less accurate (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-sphere-culling: enable frustum culling based on a sphere (NGG)
+static cl::opt<bool> NggEnableSphereCulling(
+    "ngg-enable-sphere-culling",
+    cl::desc("Enable frustum culling based on a sphere (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-small-prim-filter: enable trivial sub-sample primitive culling (NGG)
+static cl::opt<bool> NggEnableSmallPrimFilter(
+    "ngg-enable-small-prim-filter",
+    cl::desc("Enable trivial sub-sample primitive culling (NGG)"),
+    cl::init(false));
 
 #ifdef WIN_OS
 // -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
@@ -277,11 +329,78 @@ static Result Init(
             }
         }
 
+        // Initialize the path for shader cache
+        constexpr uint32_t MaxFilePathLen = 512;
+        char               shaderCacheFileDirOption[MaxFilePathLen];
+
+        // Initialize the root path of cache files
+        // Steps:
+        //   1. Find AMD_SHADER_DISK_CACHE_PATH to keep backward compatibility.
+        const char* pEnvString = getenv("AMD_SHADER_DISK_CACHE_PATH");
+
+#ifdef WIN_OS
+        //   2. Find LOCALAPPDATA.
+        if (pEnvString == nullptr)
+        {
+            pEnvString = getenv("LOCALAPPDATA");
+        }
+
+        LLPC_ASSERT(pEnvString != nullptr);
+#else
+        char shaderCacheFileRootDir[MaxFilePathLen];
+
+        //   2. Find XDG_CACHE_HOME.
+        //   3. If AMD_SHADER_DISK_CACHE_PATH and XDG_CACHE_HOME both not set,
+        //      use "$HOME/.cache".
+        if (pEnvString == nullptr)
+        {
+            pEnvString = getenv("XDG_CACHE_HOME");
+        }
+
+        if (pEnvString == nullptr)
+        {
+            pEnvString = getenv("HOME");
+            if (pEnvString != nullptr)
+            {
+                snprintf(shaderCacheFileRootDir, sizeof(shaderCacheFileRootDir),
+                    "%s/.cache", pEnvString);
+                pEnvString = &shaderCacheFileRootDir[0];
+            }
+        }
+#endif
+
+        if (pEnvString != nullptr)
+        {
+            snprintf(shaderCacheFileDirOption, sizeof(shaderCacheFileDirOption),
+                     "-shader-cache-file-dir=%s", pEnvString);
+        }
+        else
+        {
+            strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
+        }
+        newArgs.push_back(shaderCacheFileDirOption);
+
         result = ICompiler::Create(gfxIp, newArgs.size(), &newArgs[0], ppCompiler);
 
         if (result == Result::Success)
         {
             pCompileInfo->gfxIp = gfxIp;
+
+            // Set NGG control settings
+            if (gfxIp.major >= 10)
+            {
+                auto& nggState = pCompileInfo->gfxPipelineInfo.nggState;
+
+                nggState.enableNgg                  = EnableNgg;
+                //nggState.enableFastLaunch           = NggEnableFastLaunch;
+                nggState.enableFastLaunch           = false;
+                nggState.enableVertexReuse          = NggEnableVertexReuse;
+                nggState.disableBackfaceCulling     = NggDisableBackfaceCulling;
+                nggState.enableFrustumCulling       = NggEnableFrustumCulling;
+                nggState.enableBoxFilterCulling     = NggEnableBoxFilterCulling;
+                nggState.enableSphereCulling        = NggEnableSphereCulling;
+                nggState.enableSmallPrimFilter      = NggEnableSmallPrimFilter;
+            }
         }
     }
 
@@ -587,7 +706,12 @@ static Result CompileGlsl(
 
         void* pProgram = nullptr;
         const char* pLog = nullptr;
-        bool compileResult = spvCompileAndLinkProgram(sourceStringCount, sourceList, &pProgram, &pLog);
+        int compileOption = EOptionDefaultDesktop | EOptionVulkanRules | EOptionDebug;
+        bool compileResult = spvCompileAndLinkProgramWithOptions(sourceStringCount,
+                                                                 sourceList,
+                                                                 &pProgram,
+                                                                 &pLog,
+                                                                 compileOption);
 
         LLPC_OUTS("// GLSL program compile/link log\n");
 

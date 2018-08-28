@@ -48,6 +48,7 @@ void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
 void initializeSpirvLowerDynIndexPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
+void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerOptPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
 
@@ -77,6 +78,8 @@ public:
 
 protected:
     void Init(llvm::Module* pModule);
+
+    static void DumpCfg(const char* pPostfix, llvm::Module* pModule);
 
     // -----------------------------------------------------------------------------------------------------------------
 

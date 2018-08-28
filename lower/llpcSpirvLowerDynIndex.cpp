@@ -63,7 +63,7 @@ SpirvLowerDynIndex::SpirvLowerDynIndex()
 bool SpirvLowerDynIndex::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Dyn-Index\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Dyn-Index\n");
 
     SpirvLower::Init(&module);
 
@@ -84,7 +84,7 @@ bool SpirvLowerDynIndex::runOnModule(
         pInst->eraseFromParent();
     }
 
-    DEBUG(dbgs() << "After the pass Spirv-Lower-Dyn-Index: " << module);
+    LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Dyn-Index: " << module);
 
     std::string errMsg;
     raw_string_ostream errStream(errMsg);

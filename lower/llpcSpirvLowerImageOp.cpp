@@ -53,7 +53,7 @@ opt<bool> EnableDimAwareImageIntrinsic(
     "enable-dim-aware-image-intrinsic",
     desc("Enable dimension-aware image instrinsic in AMDGPU backend, sparse image function will always" \
          "use dimension aware image intrinsic."),
-    init(false));
+    init(true));
 }
 
 }
@@ -68,7 +68,8 @@ char SpirvLowerImageOp::ID = 0;
 // =====================================================================================================================
 SpirvLowerImageOp::SpirvLowerImageOp()
     :
-    SpirvLower(ID)
+    SpirvLower(ID),
+    m_restoreMeta(false)
 {
     initializeSpirvLowerImageOpPass(*PassRegistry::getPassRegistry());
 }
@@ -78,9 +79,14 @@ SpirvLowerImageOp::SpirvLowerImageOp()
 bool SpirvLowerImageOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Image-Op\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Image-Op\n");
 
     SpirvLower::Init(&module);
+
+    // Visit module to restore per-instruction metadata
+    m_restoreMeta = true;
+    visit(m_pModule);
+    m_restoreMeta = false;
 
     // Invoke handling of "call" instruction
     visit(m_pModule);
@@ -97,6 +103,7 @@ bool SpirvLowerImageOp::runOnModule(
         {
             pInst->dropAllReferences();
             pInst->eraseFromParent();
+            m_imageLoadOperands.erase(pInst);
         }
     }
 
@@ -130,6 +137,19 @@ void SpirvLowerImageOp::visitCallInst(
     // Skip image lowering operations except entry-points
     if (callInst.getParent()->getParent()->getDLLStorageClass() != GlobalValue::DLLExportStorageClass)
     {
+        return;
+    }
+
+    if (m_restoreMeta)
+    {
+        // Restore non-uniform metadata from metadata instruction.
+        LLPC_ASSERT(strlen(gSPIRVMD::NonUniform) == 16);
+        const std::string NonUniformPrefix = std::string("_Z16") + std::string(gSPIRVMD::NonUniform);
+        if (pCallee->getName().startswith(NonUniformPrefix))
+        {
+            auto pNonUniform = callInst.getOperand(0);
+            cast<Instruction>(pNonUniform)->setMetadata(gSPIRVMD::NonUniform, m_pContext->GetEmptyMetadataNode());
+        }
         return;
     }
 
@@ -276,11 +296,16 @@ void SpirvLowerImageOp::visitCallInst(
                 args.push_back(pSamplerDescSet);
                 args.push_back(pSamplerBinding);
                 args.push_back(pSamplerIndex);
+                std::unordered_set<Value*> checkedValuesSampler;
+                imageCallMeta.NonUniformSampler = IsNonUniformValue(pSamplerIndex, checkedValuesSampler) ? 1 : 0;
             }
 
             args.push_back(pResourceDescSet);
             args.push_back(pResourceBinding);
             args.push_back(pResourceIndex);
+            std::unordered_set<Value*> checkedValuesResource;
+            imageCallMeta.NonUniformResource = IsNonUniformValue(pResourceIndex, checkedValuesResource) ? 1 : 0;
+            imageCallMeta.WriteOnly = callInst.getType()->isVoidTy();
 
             if (imageCallMeta.OpKind != ImageOpQueryNonLod)
             {
@@ -358,19 +383,23 @@ void SpirvLowerImageOp::visitCallInst(
                     args.push_back(pCoord);
                 }
 
-                for (uint32_t i = 2; i < callInst.getNumArgOperands(); ++i)
+                for (uint32_t i = 2; i < callInst.getNumArgOperands() - 1; ++i)
                 {
                     auto pArg = callInst.getArgOperand(i);
                     args.push_back(pArg);
                 }
+                // ImageCallMeta may be changed due to non-uniform index, so we can't copy it from callInst.
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All));
             }
             else
             {
-                for (uint32_t i = 1; i < callInst.getNumArgOperands(); ++i)
+                for (uint32_t i = 1; i < callInst.getNumArgOperands() - 1; ++i)
                 {
                     auto pArg = callInst.getArgOperand(i);
                     args.push_back(pArg);
                 }
+                // ImageCallMeta may be changed due to non-uniform index, so we can't copy it from callInst.
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All));
             }
 
             // Process image memory metadata
@@ -396,14 +425,14 @@ void SpirvLowerImageOp::visitCallInst(
 
             if (imageCallMeta.OpKind == ImageOpQueryNonLod)
             {
-                // Format: ...".query.op.dim[.rettype]"...
+                // Format: ...".query.op.imagesig.dim[.rettype]"...
                 size_t pos = mangledName.find(gSPIRVName::ImageCallQueryNonLodPrefix);
                 LLPC_ASSERT(pos != std::string::npos);
 
                 // Skip the query operation name
                 pos = mangledName.find(".", pos + 1);
 
-                // Find the name string for image dimension and remove it
+                // Find the name string for image signature and remove it
                 size_t startPos = mangledName.find(".", pos + 1);
                 size_t endPos   = mangledName.find(".", startPos + 1);
                 if (endPos == std::string::npos)
@@ -441,12 +470,9 @@ void SpirvLowerImageOp::visitCallInst(
             {
                 // Choose dimension aware image intrinsic or old image intrinsic, sparse image function will always
                 // use dimension aware image intrinsic.
+                bool enableDimAwareImageIntrinsic = cl::EnableDimAwareImageIntrinsic;
                 if ((callName.find(gSPIRVName::ImageCallModSparse) != std::string::npos) ||
-                    ((cl::EnableDimAwareImageIntrinsic == true) &&
-                     ((imageCallMeta.OpKind == ImageOpSample) ||
-                      (imageCallMeta.OpKind == ImageOpGather) ||
-                      (imageCallMeta.OpKind == ImageOpFetch)  ||
-                      (imageCallMeta.OpKind == ImageOpRead))))
+                    (enableDimAwareImageIntrinsic == true))
                 {
                     callName += gSPIRVName::ImageCallDimAwareSuffix;
                 }

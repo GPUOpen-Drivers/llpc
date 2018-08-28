@@ -319,12 +319,7 @@ const VertexFormatInfo VertexFetch::m_vertexFormatInfo[] =
         4
     },
     // VK_FORMAT_A8B8G8R8_SRGB_PACK32 = 57
-    {
-        VK_FORMAT_A8B8G8R8_SRGB_PACK32,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
+    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_A8B8G8R8_SRGB_PACK32),
     // VK_FORMAT_A2R10G10B10_UNORM_PACK32 = 58
     {
         VK_FORMAT_A2R10G10B10_UNORM_PACK32,
@@ -1515,6 +1510,8 @@ void VertexFetch::AddVertexFetchInst(
 {
     const VertexCompFormatInfo* pFormatInfo = GetVertexComponentFormatInfo(dfmt);
 
+    const char* pInstName = "llvm.amdgcn.tbuffer.load";
+
     // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
     // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
     if ((((offset % pFormatInfo->vertexByteSize) == 0) && ((stride % pFormatInfo->vertexByteSize) == 0)) ||
@@ -1532,106 +1529,106 @@ void VertexFetch::AddVertexFetchInst(
         }
 
         // Do vertex fetch
+        std::vector<Value*> args;
+        args.push_back(pVbDesc);                                                // rsrc
+        args.push_back(pVbIndex);                                               // vaddr
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));             // soffset
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));             // offen
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), offset));        // inst_offset
         {
-            std::vector<Value*> args;
-            args.push_back(pVbDesc);                                                // rsrc
-            args.push_back(pVbIndex);                                               // vaddr
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));             // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));             // offen
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), offset));        // inst_offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), dfmt));          // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));          // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));          // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));          // slc
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), dfmt));      // dfmt
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));      // nfmt
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));      // glc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));      // slc
+        }
 
-            StringRef suffix = "";
-            Type* pFetchTy = nullptr;
+        StringRef suffix = "";
+        Type* pFetchTy = nullptr;
 
-            if (is16bitFetch)
+        if (is16bitFetch)
+        {
+            switch (numChannels)
             {
-                switch (numChannels)
-                {
-                case 1:
-                    suffix = ".f16";
-                    pFetchTy = m_pContext->Float16Ty();
-                    break;
-                case 2:
-                    suffix = ".v2f16";
-                    pFetchTy = m_pContext->Float16x2Ty();
-                    break;
-                case 3:
-                case 4:
-                    suffix = ".v4f16";
-                    pFetchTy = m_pContext->Float16x4Ty();
-                    break;
-                default:
-                    LLPC_NEVER_CALLED();
-                    break;
-                }
+            case 1:
+                suffix = ".f16";
+                pFetchTy = m_pContext->Float16Ty();
+                break;
+            case 2:
+                suffix = ".v2f16";
+                pFetchTy = m_pContext->Float16x2Ty();
+                break;
+            case 3:
+            case 4:
+                suffix = ".v4f16";
+                pFetchTy = m_pContext->Float16x4Ty();
+                break;
+            default:
+                LLPC_NEVER_CALLED();
+                break;
             }
-            else
+        }
+        else
+        {
+            switch (numChannels)
             {
-                switch (numChannels)
-                {
-                case 1:
-                    suffix = ".i32";
-                    pFetchTy = m_pContext->Int32Ty();
-                    break;
-                case 2:
-                    suffix = ".v2i32";
-                    pFetchTy = m_pContext->Int32x2Ty();
-                    break;
-                case 3:
-                case 4:
-                    suffix = ".v4i32";
-                    pFetchTy = m_pContext->Int32x4Ty();
-                    break;
-                default:
-                    LLPC_NEVER_CALLED();
-                    break;
-                }
+            case 1:
+                suffix = ".i32";
+                pFetchTy = m_pContext->Int32Ty();
+                break;
+            case 2:
+                suffix = ".v2i32";
+                pFetchTy = m_pContext->Int32x2Ty();
+                break;
+            case 3:
+            case 4:
+                suffix = ".v4i32";
+                pFetchTy = m_pContext->Int32x4Ty();
+                break;
+            default:
+                LLPC_NEVER_CALLED();
+                break;
             }
+        }
 
-            auto pFetch = EmitCall(m_pModule,
-                                   ("llvm.amdgcn.tbuffer.load" + suffix).str(),
-                                   pFetchTy,
-                                   args,
-                                   NoAttrib,
-                                   pInsertPos);
+        Value* pFetch = EmitCall(m_pModule,
+                                 (pInstName + suffix).str(),
+                                 pFetchTy,
+                                 args,
+                                 NoAttrib,
+                                 pInsertPos);
 
-            if (is16bitFetch)
-            {
-                // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
-                // int32 eventually.
-                pFetch = new BitCastInst(pFetch,
-                                         (numChannels == 1) ?
-                                             m_pContext->Int16Ty() :
-                                             VectorType::get(m_pContext->Int16Ty(), numChannels),
-                                         "",
-                                         pInsertPos);
+        if (is16bitFetch)
+        {
+            // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
+            // int32 eventually.
+            pFetch = new BitCastInst(pFetch,
+                                        (numChannels == 1) ?
+                                            m_pContext->Int16Ty() :
+                                            VectorType::get(m_pContext->Int16Ty(), numChannels),
+                                        "",
+                                        pInsertPos);
 
-                pFetch = new ZExtInst(pFetch,
-                                      (numChannels == 1) ?
-                                          m_pContext->Int32Ty() :
-                                          VectorType::get(m_pContext->Int32Ty(), numChannels),
-                                      "",
-                                      pInsertPos);
-            }
+            pFetch = new ZExtInst(pFetch,
+                                    (numChannels == 1) ?
+                                        m_pContext->Int32Ty() :
+                                        VectorType::get(m_pContext->Int32Ty(), numChannels),
+                                    "",
+                                    pInsertPos);
+        }
 
-            if (numChannels == 3)
-            {
-                // NOTE: If valid number of channels is 3, the actual fetch type should be revised from <4 x i32>
-                // to <3 x i32>.
-                std::vector<Constant*> shuffleMask;
-                shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-                shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-                shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
-                *ppFetch = new ShuffleVectorInst(pFetch, pFetch, ConstantVector::get(shuffleMask), "", pInsertPos);
-            }
-            else
-            {
-                *ppFetch = pFetch;
-            }
+        if (numChannels == 3)
+        {
+            // NOTE: If valid number of channels is 3, the actual fetch type should be revised from <4 x i32>
+            // to <3 x i32>.
+            std::vector<Constant*> shuffleMask;
+            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
+            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
+            *ppFetch = new ShuffleVectorInst(pFetch, pFetch, ConstantVector::get(shuffleMask), "", pInsertPos);
+        }
+        else
+        {
+            *ppFetch = pFetch;
         }
     }
     else
@@ -1678,16 +1675,18 @@ void VertexFetch::AddVertexFetchInst(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // soffset
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offen
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]));        // inst_offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pFormatInfo->compDfmt)); // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));                  // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
+            {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pFormatInfo->compDfmt)); // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));                  // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
+            }
 
             Value* pCompFetch = nullptr;
             if (is16bitFetch)
             {
                 pCompFetch = EmitCall(m_pModule,
-                                      "llvm.amdgcn.tbuffer.load.f16",
+                                      (StringRef(pInstName) + ".f16").str(),
                                       m_pContext->Float16Ty(),
                                       args,
                                       NoAttrib,
@@ -1699,7 +1698,7 @@ void VertexFetch::AddVertexFetchInst(
             else
             {
                 pCompFetch = EmitCall(m_pModule,
-                                      "llvm.amdgcn.tbuffer.load.i32",
+                                      (StringRef(pInstName) + ".i32").str(),
                                       m_pContext->Int32Ty(),
                                       args,
                                       NoAttrib,
@@ -1734,7 +1733,6 @@ bool VertexFetch::NeedPostShuffle(
     case VK_FORMAT_B8G8R8A8_SSCALED:
     case VK_FORMAT_B8G8R8A8_UINT:
     case VK_FORMAT_B8G8R8A8_SINT:
-    case VK_FORMAT_B8G8R8A8_SRGB:
     case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
     case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
     case VK_FORMAT_A2R10G10B10_USCALED_PACK32:
@@ -1770,7 +1768,7 @@ bool VertexFetch::NeedPatchA2S(
     case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
     case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
     case VK_FORMAT_A2B10G10R10_SINT_PACK32:
-        needPatch = true;
+        needPatch = (m_pContext->GetGfxIpVersion().major < 9);
         break;
     default:
         break;

@@ -64,7 +64,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
 
-    DEBUG(dbgs() << "Run the pass Spirv-Lower-Algebra-Transform\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Algebra-Transform\n");
 
     SpirvLower::Init(&module);
     m_changed = false;

@@ -29,6 +29,7 @@ import subprocess
 import sys
 
 import genGlslArithOpEmuCode
+import genGlslGroupOpEmuCode
 import genGlslImageOpEmuCode
 
 # Change working directory (/llpc/patch/generate/)
@@ -77,6 +78,13 @@ genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeF16.txt", "g_glslArith
 genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeF64.txt", "g_glslArithOpEmuF64.ll", "float64")
 genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeI16.txt", "g_glslArithOpEmuI16.ll", "int16")
 genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeI64.txt", "g_glslArithOpEmuI64.ll", "int64")
+
+print("*******************************************************************************")
+print("                 Generate LLVM Emulation IR (GLSL Group)                       ")
+print("*******************************************************************************")
+genGlslGroupOpEmuCode.main(16, 64, "")
+genGlslGroupOpEmuCode.main(32, 64, "")
+genGlslGroupOpEmuCode.main(64, 64, "")
 
 print("*******************************************************************************")
 print("                   Generate LLVM Emulation IR (GLSL Image) for %s             "%("GFX6"))
@@ -207,6 +215,7 @@ print("")
 
 # Assemble .ll files to .bc files and link emulation .bc files to libraries
 GFX_EMUS = ["gfx8", "gfx9"]
+
 for gfx in GFX_EMUS:
     print("*******************************************************************************")
     print("                    Generate LLVM Emulation Library (%s)                     "%(gfx.upper()))
