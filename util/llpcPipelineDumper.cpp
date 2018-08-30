@@ -37,11 +37,12 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElf.h"
 #include "llpcPipelineDumper.h"
-#include "llpcMetroHash.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcUtil.h"
@@ -115,7 +116,7 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
     const BinaryData*               pSpirvBin)  // [in] SPIR-V binary
 {
     MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
+    MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
                       pSpirvBin->codeSize,
                       hash.bytes);
     PipelineDumper::DumpSpirvBinary(pDumpDir, pSpirvBin, &hash);
@@ -362,6 +363,9 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
             pDumpFile = nullptr;
             s_dumpMutex.Unlock();
         }
+
+        // Create the dump directory
+        CreateDirectory(pDumpOptions->pDumpDir);
 
         // Dump pipeline input info
         if (pComputePipelineInfo)
@@ -746,7 +750,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     bool                            isCacheHash   // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageVertex, &pPipeline->vs, isCacheHash, &hasher);
     UpdateHashForPipelineShaderInfo(ShaderStageTessControl, &pPipeline->tcs, isCacheHash, &hasher);
@@ -827,7 +831,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     bool                            isCacheHash  // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
@@ -845,7 +849,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
     ShaderStage               stage,           // shader stage
     const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
     bool                      isCacheHash,     // TRUE if the hash is used by shader cache
-    MetroHash64*              pHasher          // [in,out] Haher to generate hash code
+    MetroHash::MetroHash64*   pHasher          // [in,out] Haher to generate hash code
     )
 {
     if (pShaderInfo->pModuleData)
@@ -928,7 +932,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 // NOTE: This function will be called recusively if node's type is "DescriptorTableVaPtr"
 void PipelineDumper::UpdateHashForResourceMappingNode(
     const ResourceMappingNode* pUserDataNode,    // [in] Resource mapping node
-    MetroHash64*               pHasher           // [in,out] Haher to generate hash code
+    MetroHash::MetroHash64*    pHasher           // [in,out] Haher to generate hash code
     )
 {
     pHasher->Update(pUserDataNode->type);

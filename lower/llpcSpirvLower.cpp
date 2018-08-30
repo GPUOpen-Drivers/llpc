@@ -49,6 +49,7 @@
 #include "llpcSpirvLowerGlobal.h"
 #include "llpcSpirvLowerImageOp.h"
 #include "llpcSpirvLowerInstMetaRemove.h"
+#include "llpcSpirvLowerLoopUnrollControl.h"
 #include "llpcSpirvLowerOpt.h"
 #include "llpcSpirvLowerResourceCollect.h"
 
@@ -80,7 +81,8 @@ namespace Llpc
 // =====================================================================================================================
 // Executes various passes that do SPIR-V lowering opertions for LLVM module.
 Result SpirvLower::Run(
-    Module* pModule)    // [in,out] LLVM module to be run on
+    Module* pModule,                // [in,out] LLVM module to be run on
+    uint32_t forceLoopUnrollCount)  // 0 or force loop unroll count
 {
     Result result = Result::Success;
     Context* pContext = static_cast<Context*>(&pModule->getContext());
@@ -91,6 +93,9 @@ Result SpirvLower::Run(
     }
 
     legacy::PassManager passMgr;
+
+    // Control loop unrolling
+    passMgr.add(SpirvLowerLoopUnrollControl::Create(forceLoopUnrollCount));
 
     // Lower SPIR-V resource collecting
     passMgr.add(SpirvLowerResourceCollect::Create());

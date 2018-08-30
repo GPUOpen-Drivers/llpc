@@ -290,7 +290,7 @@ uint64_t GraphicsContext::GetShaderHashCode(
 
     if (pShaderInfo->pModuleData != nullptr)
     {
-        MetroHash64 hasher;
+        MetroHash::MetroHash64 hasher;
 
         UpdateShaderHashForPipelineShaderInfo(shaderStage, pShaderInfo, &hasher);
         hasher.Update(m_pPipelineInfo->iaState.deviceIndex);

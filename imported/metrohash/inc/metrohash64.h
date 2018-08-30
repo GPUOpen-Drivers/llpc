@@ -28,7 +28,7 @@
 
 #include <stdint.h>
 
-namespace Llpc
+namespace MetroHash
 {
 
 class MetroHash64
@@ -86,6 +86,6 @@ private:
 void metrohash64_1(const uint8_t * key, uint64_t len, uint32_t seed, uint8_t * out);
 void metrohash64_2(const uint8_t * key, uint64_t len, uint32_t seed, uint8_t * out);
 
-} // Llpc
+} // MetroHash
 
 #endif // #ifndef METROHASH_METROHASH_64_H

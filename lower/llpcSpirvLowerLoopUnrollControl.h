@@ -24,74 +24,42 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLower.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLower.
+ * @file  llpcSpirvLowerLoopUnrollControl.h
+ * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerLoopUnrollControl.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/Pass.h"
-
-#include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcInternal.h"
-
-namespace llvm
-{
-
-class PassRegistry;
-void initializeSpirvLowerAccessChainPass(PassRegistry&);
-void initializeSpirvLowerAggregateLoadStorePass(PassRegistry&);
-void initializeSpirvLowerAlgebraTransformPass(PassRegistry&);
-void initializeSpirvLowerBufferOpPass(PassRegistry&);
-void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
-void initializeSpirvLowerDynIndexPass(PassRegistry&);
-void initializeSpirvLowerGlobalPass(PassRegistry&);
-void initializeSpirvLowerImageOpPass(PassRegistry&);
-void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
-void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
-void initializeSpirvLowerOptPass(PassRegistry&);
-void initializeSpirvLowerResourceCollectPass(PassRegistry&);
-
-} // llvm
+#include "llpcSpirvLower.h"
 
 namespace Llpc
 {
 
-class Context;
-
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations, as the base class.
-class SpirvLower: public llvm::ModulePass
+// Represents the pass of SPIR-V lowering operations for loop unroll control
+class SpirvLowerLoopUnrollControl: public SpirvLower
 {
 public:
-    explicit SpirvLower(char& Pid)
-        :
-        llvm::ModulePass(Pid),
-        m_pModule(nullptr),
-        m_pContext(nullptr),
-        m_shaderStage(ShaderStageInvalid),
-        m_pEntryPoint(nullptr)
+    SpirvLowerLoopUnrollControl();
+
+    virtual bool runOnModule(llvm::Module& module);
+
+    // Pass creator, creates the pass of SPIR-V lowering operations for loop unroll control
+    static llvm::ModulePass* Create(uint32_t forceLoopUnrollCount)
     {
+        auto pPass = new SpirvLowerLoopUnrollControl();
+        pPass->m_forceLoopUnrollCount = forceLoopUnrollCount;
+        return pPass;
     }
-
-    static Result Run(llvm::Module* pModule, uint32_t forceLoopUnrollCount);
-
-protected:
-    void Init(llvm::Module* pModule);
-
-    static void DumpCfg(const char* pPostfix, llvm::Module* pModule);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*   m_pModule;      // LLVM module to be run on
-    Context*        m_pContext;     // Associated LLPC context of the LLVM module that passes run on
-    ShaderStage     m_shaderStage;  // Shader stage
-    llvm::Function* m_pEntryPoint;  // Entry point of input module
+    static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(SpirvLower);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLower);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerLoopUnrollControl);
+
+    uint32_t m_forceLoopUnrollCount;  // Forced loop unroll count
 };
 
 } // Llpc

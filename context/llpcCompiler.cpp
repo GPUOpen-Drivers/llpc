@@ -43,8 +43,8 @@
 #include "llvm/Support/TargetSelect.h"
 
 #include <sstream>
+#include "LLVMSPIRVLib.h"
 #include "spirvExt.h"
-#include "SPIRV.h"
 #include "SPIRVInternal.h"
 #include "llpcCodeGenManager.h"
 #include "llpcCompiler.h"
@@ -504,7 +504,7 @@ Result Compiler::BuildShaderModule(
         pModuleData->binType = binType;
         pModuleData->binCode.codeSize = pShaderInfo->shaderBin.codeSize;
         MetroHash::Hash hash = {};
-        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
+        MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
                           pShaderInfo->shaderBin.codeSize,
                           hash.bytes);
         static_assert(sizeof(pModuleData->hash) == sizeof(hash), "Unexpected value!");
@@ -621,7 +621,7 @@ Result Compiler::BuildGraphicsPipelineInternal(
         if ((result == Result::Success) && (skipLower == false))
         {
             TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-            result = SpirvLower::Run(pModule);
+            result = SpirvLower::Run(pModule, forceLoopUnrollCount);
             if (result != Result::Success)
             {
                 LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
@@ -1221,7 +1221,7 @@ Result Compiler::BuildComputePipelineInternal(
             if (result == Result::Success)
             {
                 TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-                result = SpirvLower::Run(pModule);
+                result = SpirvLower::Run(pModule, forceLoopUnrollCount);
                 if (result != Result::Success)
                 {
                     LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
@@ -1645,7 +1645,7 @@ Result Compiler::ReplaceShader(
             pModuleData->binCode.codeSize = binSize;
             pModuleData->binCode.pCode = pShaderBin;
             MetroHash::Hash hash = {};
-            MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderBin), binSize, hash.bytes);
+            MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderBin), binSize, hash.bytes);
             memcpy(&pModuleData->hash, &hash, sizeof(hash));
 
             *ppModuleData = pModuleData;
@@ -1702,8 +1702,7 @@ Result Compiler::TranslateSpirvToLlvm(
                     pEntryTarget,
                     specConstMap,
                     *ppModule,
-                    errMsg,
-                    forceLoopUnrollCount) == false)
+                    errMsg) == false)
     {
         LLPC_ERRS("Fails to translate SPIR-V to LLVM (" <<
                     GetShaderStageName(static_cast<ShaderStage>(shaderStage)) << " shader): " << errMsg << "\n");
@@ -1820,7 +1819,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         }
     }
 
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     // Build hash code from effecting options
     for (auto option : effectingOptions)

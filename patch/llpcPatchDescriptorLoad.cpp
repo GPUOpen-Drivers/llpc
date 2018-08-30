@@ -360,9 +360,7 @@ void PatchDescriptorLoad::visitCallInst(
                         SqBufRsrcWord3 sqBufRsrcWord3 = {};
 
                         sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-                        sqBufRsrcWord2.bits.NUM_RECORDS = (m_pContext->GetGfxIpVersion().major == 6) ?
-                                                          UINT16_MAX :
-                                                          UINT32_MAX;
+                        sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
 
                         sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
                         sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;

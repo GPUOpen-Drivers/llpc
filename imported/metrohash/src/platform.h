@@ -28,7 +28,7 @@
 
 #include <stdint.h>
 
-namespace Llpc
+namespace MetroHash
 {
 
 // rotate right idiom recognized by most compilers
@@ -58,6 +58,6 @@ inline static uint64_t read_u8 (const void * const ptr)
     return static_cast<uint64_t>(*reinterpret_cast<const uint8_t *>(ptr));
 }
 
-} // Llpc
+} // MetroHash
 
 #endif // #ifndef METROHASH_PLATFORM_H
