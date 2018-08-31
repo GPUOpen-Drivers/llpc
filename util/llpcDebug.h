@@ -82,6 +82,8 @@
 namespace llvm { class raw_ostream; }
 namespace llvm { class raw_fd_ostream; }
 
+namespace MetroHash { struct Hash; };
+
 namespace Llpc
 {
 
@@ -93,8 +95,6 @@ struct Elf32;
 struct GfxIpVersion;
 
 template<class Elf> class ElfReader;
-
-namespace MetroHash { struct Hash; };
 
 // Gets the value of option "enable-outs"
 bool EnableOuts();

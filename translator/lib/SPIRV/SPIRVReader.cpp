@@ -312,9 +312,9 @@ class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
     const SPIRVSpecConstMap &TheSpecConstMap)
-    :M(LLVMModule), BM(TheSPIRVModule), IsKernel(true), EnableLoopUnroll(false),
+    :M(LLVMModule), BM(TheSPIRVModule), IsKernel(true),
     EnableVarPtr(false), EntryTarget(nullptr),
-    SpecConstMap(TheSpecConstMap), DbgTran(BM, M), LoopUnrollCount(0){
+    SpecConstMap(TheSpecConstMap), DbgTran(BM, M) {
     assert(M);
     Context = &M->getContext();
   }
@@ -322,10 +322,6 @@ public:
   std::string getOCLBuiltinName(SPIRVInstruction *BI);
   std::string getOCLConvertBuiltinName(SPIRVInstruction *BI);
   std::string getOCLGenericCastToPtrName(SPIRVInstruction *BI);
-
-  void setLoopUnrollCount(uint32_t Count){
-    LoopUnrollCount = Count;
-  }
 
   Type *transType(SPIRVType *BT, bool IsClassMember = false);
   std::string transTypeToOCLTypeName(SPIRVType *BT, bool IsSigned = true);
@@ -456,7 +452,6 @@ private:
   LLVMContext *Context;
   SPIRVModule *BM;
   bool IsKernel;
-  bool EnableLoopUnroll;
   bool EnableVarPtr;
   SPIRVFunction* EntryTarget;
   const SPIRVSpecConstMap &SpecConstMap;
@@ -467,7 +462,6 @@ private:
   SPIRVToLLVMPlaceholderMap PlaceholderMap;
   SPIRVToLLVMDbgTran DbgTran;
   std::map<std::string, uint32_t> MangleNameToIndex;
-  uint32_t LoopUnrollCount;
 
   Type *mapType(SPIRVType *BT, Type *T) {
     SPIRVDBG(dbgs() << *T << '\n';)
@@ -994,24 +988,12 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
     return;
   llvm::MDString *Name = nullptr;
   auto Temp = MDNode::getTemporary(*Context, None);
-  Metadata *Args[] = {Temp.get()};
-  auto Self = MDNode::get(*Context, Args);
+  auto Self = MDNode::get(*Context, Temp.get());
   Self->replaceOperandWith(0, Self);
 
-  SmallVector<llvm::Metadata *, 2> OpValues;
-  llvm::Metadata *MD = nullptr;
-
-  // TODO: Support "LoopControlDependencyInfiniteMask" and
-  // "LoopControlDependencyLengthMask". Currently, they are safely ignored.
   if (LM->getLoopControl() == LoopControlMaskNone) {
-    if (EnableLoopUnroll && (LoopUnrollCount > 0)) {
-      Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
-      MD = ConstantAsMetadata::get(
-        ConstantInt::get(Type::getInt32Ty(*Context), LoopUnrollCount));
-    } else {
-      BI->setMetadata("llvm.loop", Self);
-      return;
-    }
+    BI->setMetadata("llvm.loop", Self);
+    return;
   } else if (LM->getLoopControl() == LoopControlUnrollMask)
     Name = llvm::MDString::get(*Context, "llvm.loop.unroll.full");
   else if (LM->getLoopControl() == LoopControlDontUnrollMask)
@@ -1019,9 +1001,7 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   else
     return;
 
-  OpValues.push_back(Name);
-  if (MD)
-    OpValues.push_back(MD);
+  std::vector<llvm::Metadata *> OpValues(1, Name);
   SmallVector<llvm::Metadata *, 2> Metadata;
   Metadata.push_back(llvm::MDNode::get(*Context, Self));
   Metadata.push_back(llvm::MDNode::get(*Context, OpValues));
@@ -3790,11 +3770,6 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
   // Check if the SPIR-V corresponds to OpenCL kernel
   IsKernel = (EntryExecModel == ExecutionModelKernel);
 
-  // Check if Enable force unroll
-  EnableLoopUnroll = (EntryExecModel == ExecutionModelVertex ||
-                      EntryExecModel == ExecutionModelFragment ||
-                      EntryExecModel == ExecutionModelGLCompute);
-
   // Check if capability "VariablePointerStorageBuffer"  is enabled
   EnableVarPtr = BM->getCapability().find(
       CapabilityVariablePointersStorageBuffer) != BM->getCapability().end();
@@ -5508,15 +5483,13 @@ Value *SPIRVToLLVM::narrowBoolValue(Value *V, SPIRVType *BT, BasicBlock *BB) {
 bool llvm::readSpirv(LLVMContext &C, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
                      const SPIRVSpecConstMap &SpecConstMap, Module *&M,
-                     std::string &ErrMsg,
-                     uint32_t forceLoopUnrollCount) {
+                     std::string &ErrMsg) {
   M = new Module("", C);
   std::unique_ptr<SPIRVModule> BM(SPIRVModule::createSPIRVModule());
 
   IS >> *BM;
 
   SPIRVToLLVM BTL(M, BM.get(), SpecConstMap);
-  BTL.setLoopUnrollCount(forceLoopUnrollCount);
   bool Succeed = true;
   if (!BTL.translate(EntryExecModel, EntryName)) {
     BM->getError(ErrMsg);

@@ -46,7 +46,7 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Pass.h"
 
-#include "SPIRV.h"
+#include "LLVMSPIRVLib.h"
 
 #include <map>
 #include <set>

@@ -30,6 +30,8 @@
  */
 #define DEBUG_TYPE "llpc-context"
 
+#include <metrohash.h>
+
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitstreamReader.h"
@@ -48,7 +50,6 @@
 
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "llpcMetroHash.h"
 #include "llpcPassNonNativeFuncRemove.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
@@ -161,7 +162,7 @@ Context::Context(
     }
 
     auto contextCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
-    MetroHash64 emuLibhasher;
+    MetroHash::MetroHash64 emuLibhasher;
     emuLibhasher.Update(gfxIp);
     MetroHash::Hash emuLibHash = {};
     emuLibhasher.Finalize(emuLibHash.bytes);
@@ -174,7 +175,7 @@ Context::Context(
     }
 
     bool isNativeLib = true;
-    MetroHash64 nativeEmuLibHasher;
+    MetroHash::MetroHash64 nativeEmuLibHasher;
     nativeEmuLibHasher.Update(gfxIp);
     nativeEmuLibHasher.Update(isNativeLib);
     MetroHash::Hash nativeEmuLibHash = {};

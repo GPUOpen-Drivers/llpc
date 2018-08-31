@@ -38,12 +38,13 @@
 #include <unordered_set>
 #include "spirvExt.h"
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
-#include "llpcMetroHash.h"
 
 namespace Llpc
 {
@@ -735,7 +736,7 @@ protected:
 
     void UpdateShaderHashForPipelineShaderInfo(ShaderStage               stage,
                                                const PipelineShaderInfo* pShaderInfo,
-                                               MetroHash64*              pHasher) const;
+                                               MetroHash::MetroHash64*   pHasher) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

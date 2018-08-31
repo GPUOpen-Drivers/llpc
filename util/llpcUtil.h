@@ -51,6 +51,9 @@ const char* GetShaderStageAbbreviation(ShaderStage shaderStage, bool upper = fal
 // Translates shader stage to corresponding stage mask.
 uint32_t ShaderStageToMask(ShaderStage stage);
 
+// Create directory.
+bool CreateDirectory(const char* pDir);
+
 // =====================================================================================================================
 // Increments a pointer by nBytes by first casting it to a uint8_t*.
 //

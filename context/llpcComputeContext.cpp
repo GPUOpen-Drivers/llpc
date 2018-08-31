@@ -96,7 +96,7 @@ uint64_t ComputeContext::GetShaderHashCode(
     auto pShaderInfo = GetPipelineShaderInfo(stage);
     LLPC_ASSERT(pShaderInfo != nullptr);
 
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     UpdateShaderHashForPipelineShaderInfo(ShaderStageCompute, pShaderInfo, &hasher);
     hasher.Update(m_pPipelineInfo->deviceIndex);

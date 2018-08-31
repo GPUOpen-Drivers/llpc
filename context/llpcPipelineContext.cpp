@@ -520,7 +520,7 @@ uint32_t PipelineContext::GetResourceMapNodeSize(
 void PipelineContext::UpdateShaderHashForPipelineShaderInfo(
     ShaderStage               stage,           // Shader stage
     const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
-    MetroHash64*              pHasher          // [in,out] Haher to generate hash code
+    MetroHash::MetroHash64*   pHasher          // [in,out] Haher to generate hash code
     ) const
 {
     const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);

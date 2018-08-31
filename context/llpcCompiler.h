@@ -30,11 +30,12 @@
  */
 #pragma once
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElf.h"
 #include "llpcInternal.h"
-#include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
 
 namespace Llpc

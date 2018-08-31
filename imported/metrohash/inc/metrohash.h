@@ -28,5 +28,6 @@
 
 #include "metrohash64.h"
 #include "metrohash128.h"
+#include "utils.h"
 
 #endif // #ifndef METROHASH_METROHASH_H
