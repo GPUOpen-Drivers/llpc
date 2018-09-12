@@ -32,6 +32,18 @@
 
 #include "llpcComputeContext.h"
 
+using namespace llvm;
+
+namespace llvm
+{
+
+namespace cl
+{
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
@@ -105,6 +117,18 @@ uint64_t ComputeContext::GetShaderHashCode(
     hasher.Finalize(hash.bytes);
 
     return MetroHash::Compact64(&hash);
+}
+
+// =====================================================================================================================
+// Gets wave size for the specified shader stage
+//
+// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
+uint32_t ComputeContext::GetShaderWaveSize(
+    ShaderStage stage)  // Shader stage
+{
+    uint32_t waveSize = m_pGpuProperty->waveSize;
+    return waveSize;
+
 }
 
 } // Llpc

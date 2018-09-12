@@ -275,10 +275,12 @@ bool PatchInOutImportExport::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
         m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
 
-        args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-        args.push_back(m_pThreadId);
-        m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
+        {
+            args.clear();
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+            args.push_back(m_pThreadId);
+            m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
+        }
     }
 
     // Create the global variable that is to model LDS
@@ -1518,6 +1520,11 @@ void PatchInOutImportExport::visitReturnInst(
                 auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
                 const uint32_t channelMask = ((1 << compCount) - 1);
                 const uint32_t origLoc = pResUsage->inOutUsage.fs.outputOrigLocs[location];
+                if (origLoc == InvalidValue)
+                {
+                    continue;
+                }
+
                 pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * origLoc));
 
                 // Construct exported fragment colors
@@ -2248,7 +2255,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2355,7 +2362,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2521,7 +2528,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2616,7 +2623,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2924,7 +2931,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -3056,7 +3063,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -3073,7 +3080,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
                                            builtInUsage.workgroupSizeZ;
 
             // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
-            const uint32_t subgroupSize = m_pContext->GetGpuProperty()->waveSize;
+            const uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
             const uint32_t numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
 
             pInput = ConstantInt::get(m_pContext->Int32Ty(), numSubgroups);
@@ -4507,12 +4514,12 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         std::vector<Value*> args;
         args.push_back(pStoreValue);                                                    // vdata
         args.push_back(inOutUsage.gs.pGsVsRingBufDesc);                                 // rsrc
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-        args.push_back(pRingOffset);                                                    // voffset
-        args.push_back(pGsVsOffset);                                                    // soffset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offset
         if (m_gfxIp.major <= 9)
         {
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+            args.push_back(pRingOffset);                                                    // voffset
+            args.push_back(pGsVsOffset);                                                    // soffset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offset
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
@@ -4736,12 +4743,12 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         {
             std::vector<Value*> args;
             args.push_back(pOffChipLdsDesc);                                                // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-            args.push_back(pLdsOffset);                                                     // voffset
-            args.push_back(pOffChipLdsBase);                                                // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                 // offset
             if (m_gfxIp.major <= 9)
             {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+                args.push_back(pLdsOffset);                                                     // voffset
+                args.push_back(pOffChipLdsBase);                                                // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                 // offset
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
@@ -4877,12 +4884,12 @@ void PatchInOutImportExport::WriteValueToLds(
             std::vector<Value*> args;
             args.push_back(storeValues[i]);                                                    // vdata
             args.push_back(inOutUsage.pOffChipLdsDesc);                                        // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                        // vindex
-            args.push_back(pLdsOffset);                                                        // voffset
-            args.push_back(pOffChipLdsBase);                                                   // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                    // offset
             if (m_gfxIp.major <= 9)
             {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                        // vindex
+                args.push_back(pLdsOffset);                                                        // voffset
+                args.push_back(pOffChipLdsBase);                                                   // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                    // offset
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));       // dfmt
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));     // nfmt
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                      // glc
@@ -5085,12 +5092,12 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
 
             args.push_back(tessFactors[i]);                                                 // vdata
             args.push_back(inOutUsage.pTessFactorBufDesc);                                  // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-            args.push_back(pTfBufferOffset);                                                // voffset
-            args.push_back(pTfBufferBase);                                                  // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), tessFactorByteOffset));  // offset
             if (m_gfxIp.major <= 9)
             {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+                args.push_back(pTfBufferOffset);                                                // voffset
+                args.push_back(pTfBufferBase);                                                  // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), tessFactorByteOffset));  // offset
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
@@ -5527,7 +5534,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     uint32_t patchConstCount    // Count of output patch constants
     ) const
 {
-    const uint32_t waveSize = m_pContext->GetGpuProperty()->waveSize;
+    const uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
 
     // NOTE: The limit of thread count for tessellation control shader is 4 wavefronts per thread group.
     const uint32_t maxThreadCountPerThreadGroup = (4 * waveSize);

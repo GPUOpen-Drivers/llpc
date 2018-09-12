@@ -823,6 +823,7 @@ Result Compiler::BuildGraphicsPipelineInternal(
 
     if (result == Result::Success)
     {
+        CodeGenManager::SetupTargetFeatures(pPipelineModule);
         LLPC_OUTS("===============================================================================\n");
         LLPC_OUTS("// LLPC linking results\n");
         LLPC_OUTS(*pPipelineModule);
@@ -1280,6 +1281,7 @@ Result Compiler::BuildComputePipelineInternal(
             {
                 TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
                 result = Patch::Run(pModule);
+                CodeGenManager::SetupTargetFeatures(pModule);
             }
 
             if (result != Result::Success)
@@ -2208,6 +2210,7 @@ Result Compiler::CollectInfoFromSpirvBinary(
     Result result = Result::Success;
     pModuleData->enableVarPtr = false;
     pModuleData->enableVarPtrStorageBuf = false;
+    pModuleData->useSubgroupSize = false;
 
     const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pModuleData->binCode.pCode);
     const uint32_t* pEnd = pCode + pModuleData->binCode.codeSize / sizeof(uint32_t);
@@ -2253,6 +2256,22 @@ Result Compiler::CollectInfoFromSpirvBinary(
         {
             pModuleData->enableVarPtr = true;
         }
+
+        if ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformVote) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformBallot) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformShuffle) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformShuffleRelative) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformClustered) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformQuad) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilitySubgroupBallotKHR) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilitySubgroupVoteKHR) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroups) != capabilities.end()))
+        {
+            pModuleData->useSubgroupSize = true;
+        }
+
         return result;
     }
     else
@@ -2326,7 +2345,11 @@ void Compiler::GetPipelineStatistics(
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                if (pNode->type == Util::Abi::PipelineAbiNoteType::LegacyMetadata)
+#else
                 if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
+#endif
                 {
                     const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
                     auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(

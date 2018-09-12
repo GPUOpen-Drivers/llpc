@@ -83,6 +83,8 @@ private:
 
     static const VertexCompFormatInfo* GetVertexComponentFormatInfo(uint32_t dfmt);
 
+    uint32_t MapVertexFormat(uint32_t dfmt, uint32_t nfmt) const;
+
     llvm::Value* LoadVertexBufferDescriptor(uint32_t binding, llvm::Instruction* pInsertPos) const;
 
     void ExtractVertexInputInfo(uint32_t                                          location,

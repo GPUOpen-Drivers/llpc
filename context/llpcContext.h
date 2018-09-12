@@ -236,6 +236,12 @@ public:
         m_pPipelineContext->DoUserDataNodeMerge();
     }
 
+    // Gets wave size for the specified shader stage
+    uint32_t GetShaderWaveSize(ShaderStage stage)
+    {
+        return m_pPipelineContext->GetShaderWaveSize(stage);
+    }
+
     uint64_t GetPiplineHashCode() const
     {
         return m_pPipelineContext->GetPiplineHashCode();

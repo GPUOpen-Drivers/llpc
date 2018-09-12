@@ -44,6 +44,18 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
+namespace llvm
+{
+
+namespace cl
+{
+
+extern opt<bool> AutoLayoutDesc;
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
@@ -1597,14 +1609,17 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                     m_pResUsage->inOutUsage.fs.outputTypes[startLoc] = basicTy;
 
-                    // Collect CB shader mask (will be revised in LLVM patching operations)
-                    LLPC_ASSERT(pBaseTy->isSingleValueType());
-                    const uint32_t compCount = pBaseTy->isVectorTy() ? pBaseTy->getVectorNumElements() : 1;
-                    const uint32_t compIdx = inOutMeta.Component;
-                    LLPC_ASSERT(compIdx + compCount <= 4);
+                    if (cl::AutoLayoutDesc)
+                    {
+                        // Collect CB shader mask (will be revised in LLVM patching operations)
+                        LLPC_ASSERT(pBaseTy->isSingleValueType());
+                        const uint32_t compCount = pBaseTy->isVectorTy() ? pBaseTy->getVectorNumElements() : 1;
+                        const uint32_t compIdx = inOutMeta.Component;
+                        LLPC_ASSERT(compIdx + compCount <= 4);
 
-                    const uint32_t channelMask = (((1 << compCount) - 1) << compIdx);
-                    m_pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << 4 * startLoc);
+                        const uint32_t channelMask = (((1 << compCount) - 1) << compIdx);
+                        m_pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << 4 * startLoc);
+                    }
                 }
             }
         }

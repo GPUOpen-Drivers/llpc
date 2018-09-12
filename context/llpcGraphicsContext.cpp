@@ -704,6 +704,26 @@ void GraphicsContext::DoUserDataNodeMerge()
 }
 
 // =====================================================================================================================
+// Gets wave size for the specified shader stage
+//
+// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
+uint32_t GraphicsContext::GetShaderWaveSize(
+    ShaderStage stage)  // Shader stage
+{
+    if (stage == ShaderStageCopyShader)
+    {
+       // Treat copy shader as part of geometry shader
+       stage = ShaderStageGeometry;
+    }
+
+    LLPC_ASSERT(stage < ShaderStageGfxCount);
+
+    uint32_t waveSize = m_pGpuProperty->waveSize;
+
+    return waveSize;
+}
+
+// =====================================================================================================================
 // Compare the offsets of the two user data node (use "less" relational operator).
 static inline bool CompareNode(
     const ResourceMappingNode* pNodes1, // [in] The first user data node

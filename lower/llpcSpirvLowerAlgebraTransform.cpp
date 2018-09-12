@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"
 
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -103,6 +104,18 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             {
                 pDest = pSrc1;
             }
+            // Recursively find backward if the operand "does not" specify contract flags
+            auto fastMathFlags = binaryOp.getFastMathFlags();
+            if (fastMathFlags.allowContract())
+            {
+                bool hasNoContract = IsOperandNoContract(pSrc1) || IsOperandNoContract(pSrc2);
+                bool allowContract = !hasNoContract;
+
+                // Reassocation and contract should be same
+                fastMathFlags.setAllowReassoc(allowContract);
+                fastMathFlags.setAllowContract(allowContract);
+                binaryOp.copyFastMathFlags(fastMathFlags);
+            }
             break;
         }
     case Instruction::FMul:
@@ -146,6 +159,34 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         binaryOp.dropAllReferences();
         binaryOp.eraseFromParent();
     }
+}
+
+// =====================================================================================================================
+// Recursively finds backward if the FPMathOperator operand does not specifiy "contract" flag.
+bool SpirvLowerAlgebraTransform::IsOperandNoContract(
+    Value *pOperand)  // [in] Operand to check
+{
+    if (isa<BinaryOperator>(pOperand))
+    {
+        auto pInst = dyn_cast<BinaryOperator>(pOperand);
+
+        if (isa<FPMathOperator>(pOperand))
+        {
+            auto fastMathFlags = pInst->getFastMathFlags();
+            bool allowContract = fastMathFlags.allowContract();
+            if (fastMathFlags.any() && (allowContract == false))
+            {
+                return true;
+            }
+        }
+
+        for (auto opIt = pInst->op_begin(), pEnd = pInst->op_end();
+            opIt != pEnd; ++opIt)
+        {
+            return IsOperandNoContract(*opIt);
+        }
+    }
+    return false;
 }
 
 } // Llpc

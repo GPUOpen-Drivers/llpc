@@ -698,6 +698,9 @@ public:
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
 
+    // Gets wave size for the specified shader stage
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage) = 0;
+
     const char* GetGpuNameString() const;
     const char* GetGpuNameAbbreviation() const;
 

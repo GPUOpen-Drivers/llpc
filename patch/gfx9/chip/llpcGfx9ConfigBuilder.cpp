@@ -42,6 +42,8 @@ namespace llvm
 
 namespace cl
 {
+
+extern opt<int> ForceWaveSize;
 } // cl
 
 } // llvm

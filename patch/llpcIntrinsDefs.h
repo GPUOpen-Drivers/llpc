@@ -258,4 +258,17 @@ union SqBufRsrcWord3 {
     uint32_t u32All;
 };
 
+// =====================================================================================================================
+// Represents the combine format used in tbuffer intrinsics
+union CombineFormat
+{
+    struct
+    {
+        uint32_t dfmt   :  4;   // Data format
+        uint32_t nfmt   :  3;   // Numeric format
+        uint32_t        :  25;
+    } bits;
+
+    uint32_t u32All;
+};
 } // Llpc

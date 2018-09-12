@@ -62,6 +62,7 @@ struct ShaderModuleData : public ShaderModuleDataHeader
     BinaryData      binCode;                 // Shader binary data
     bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
     bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
+    bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
 };
 
 // Represents the properties of GPU device.

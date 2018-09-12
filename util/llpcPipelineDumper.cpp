@@ -996,7 +996,7 @@ void OutputText(
 
         // Output text
         const char* pText = reinterpret_cast<const char*>(pData + startPos);
-        out << pText << lastChar << "\n";
+        out << pText << lastChar;
 
         // Restore last character
         const_cast<uint8_t*>(pData)[endPos - 1] = lastChar;
@@ -1111,7 +1111,11 @@ OStream& operator<<(
                         out << "        minor = " << pCodeVersion->minorVersion << "\n";
                         break;
                     }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                case Util::Abi::PipelineAbiNoteType::LegacyMetadata:
+#else
                 case Util::Abi::PipelineAbiNoteType::PalMetadata:
+#endif
                     {
                         out << "    PalMetadata                  (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1146,6 +1150,127 @@ OStream& operator<<(
                         }
                         break;
                     }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                case Util::Abi::PipelineAbiNoteType::PalMetadata:
+                    {
+                        out << "    PalMetadata                  (name = "
+                            << pNode->name << "  size = " << pNode->descSize << ")\n";
+
+                        auto pBuffer = pSection->pData + offset + noteHeaderSize;
+                        reader.InitMsgPack(pBuffer, pNode->descSize);
+
+                        while (reader.GetNextMsgItem())
+                        {
+                            auto msgIterStatus = reader.GetMsgIteratorStatus();
+                            auto pItem = reader.GetMsgItem();
+                            if (msgIterStatus == MsgPackIteratorMapKey)
+                            {
+                                out << "\n";
+                                for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
+                                {
+                                    out << "    ";
+                                }
+                            }
+
+                            switch (pItem->type)
+                            {
+                            case CWP_ITEM_MAP:
+                                {
+                                    out << "{";
+                                    break;
+                                }
+                            case CWP_ITEM_STR:
+                                {
+                                    OutputText(reinterpret_cast<const uint8_t*>(pItem->as.str.start),
+                                               0,
+                                               pItem->as.str.length,
+                                               out);
+                                    if (msgIterStatus == MsgPackIteratorMapKey)
+                                    {
+                                        out << ": ";
+                                    }
+                                    break;
+                                }
+                            case CWP_ITEM_ARRAY:
+                                {
+                                    out << "[ ";
+                                    break;
+                                }
+                            case CWP_ITEM_BIN:
+                                {
+                                    OutputBinary(reinterpret_cast<const uint8_t*>(pItem->as.bin.start),
+                                                 0,
+                                                 pItem->as.bin.length,
+                                                 out);
+                                    break;
+                                }
+                            case CWP_ITEM_BOOLEAN:
+                                {
+                                    out << pItem->as.boolean << " ";
+                                    break;
+                                }
+                            case CWP_ITEM_POSITIVE_INTEGER:
+                            case CWP_ITEM_NEGATIVE_INTEGER:
+                                {
+                                    if (msgIterStatus == MsgPackIteratorMapKey)
+                                    {
+                                        LLPC_ASSERT(pItem->as.u64 < UINT32_MAX);
+                                        const char* pRegName = nullptr;
+                                        uint32_t regId = static_cast<uint32_t>(pItem->as.u64 * 4);
+                                        if (gfxIp.major <= 8)
+                                        {
+                                            pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
+                                        }
+                                        else
+                                        {
+                                            pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
+                                        }
+                                        auto length = snprintf(formatBuf,
+                                                               sizeof(formatBuf),
+                                                               "%-45s ",
+                                                               pRegName);
+                                        out << formatBuf;
+                                    }
+                                    else
+                                    {
+                                        auto length = snprintf(formatBuf,
+                                                               sizeof(formatBuf),
+                                                               "0x%016" PRIX64 " ",
+                                                               pItem->as.u64);
+                                        out << formatBuf;
+                                    }
+                                    break;
+                                }
+                            case CWP_ITEM_FLOAT:
+                                {
+                                    out << pItem->as.real << " ";
+                                    break;
+                                }
+                            case CWP_ITEM_DOUBLE:
+                                {
+                                    out << pItem->as.long_real << " ";
+                                    break;
+                                }
+                            default:
+                                {
+                                    LLPC_NEVER_CALLED();
+                                    break;
+                                }
+                            }
+
+                            reader.UpdateMsgPackStatus(
+                                [&](MsgPackIteratorStatus status)
+                                {
+                                    if (status == MsgPackIteratorMapValue)
+                                        out << "}";
+                                    else
+                                        out << "]";
+                                }
+                            );
+                        }
+                        break;
+                    }
+#endif
                 default:
                     {
                         if (static_cast<uint32_t>(pNode->type) == NT_AMD_AMDGPU_ISA)
@@ -1154,6 +1279,7 @@ OStream& operator<<(
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
                             auto pDesc = pSection->pData + offset + noteHeaderSize;
                             OutputText(pDesc, 0, pNode->descSize, out);
+                            out << "\n";
                         }
                         else
                         {
@@ -1231,6 +1357,7 @@ OStream& operator<<(
                 }
 
                 OutputText(pSection->pData, startPos, endPos, out);
+                out << "\n";
 
                 if (symIdx < symbols.size())
                 {

@@ -371,11 +371,13 @@ void ShaderMerger::GenerateLsHsEntryPoint(
 
     auto pThreadId = EmitCall(pLsHsModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
-    args.clear();
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-    args.push_back(pThreadId);
+    {
+        args.clear();
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+        args.push_back(pThreadId);
 
-    pThreadId = EmitCall(pLsHsModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        pThreadId = EmitCall(pLsHsModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    }
 
     args.clear();
     args.push_back(pMergeWaveInfo);
@@ -842,11 +844,13 @@ void ShaderMerger::GenerateEsGsEntryPoint(
 
     auto pThreadId = EmitCall(pEsGsModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
-    args.clear();
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-    args.push_back(pThreadId);
+    {
+        args.clear();
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+        args.push_back(pThreadId);
 
-    pThreadId = EmitCall(pEsGsModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        pThreadId = EmitCall(pEsGsModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    }
 
     args.clear();
     args.push_back(pMergeWaveInfo);
