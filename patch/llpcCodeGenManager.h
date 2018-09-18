@@ -66,6 +66,8 @@ class CodeGenManager
 public:
     static Result CreateTargetMachine(Context* pContext);
 
+    static void SetupTargetFeatures(llvm::Module* pModule);
+
     static Result GenerateCode(llvm::Module* pModule, llvm::raw_pwrite_stream& outStream, std::string& errMsg);
 
 private:

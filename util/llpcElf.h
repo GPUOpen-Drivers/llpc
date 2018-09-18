@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -37,6 +38,9 @@
 #include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "palPipelineAbi.h"
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+#include "g_palPipelineAbiMetadata.h"
+#endif
 
 namespace llvm
 {
@@ -366,6 +370,23 @@ struct ElfNote
 
 typedef llvm::SmallString<1024> ElfPackage;
 
+// Represents the status of message packer iterator
+enum MsgPackIteratorStatus : uint32_t
+{
+    MsgPackIteratorNone,
+    MsgPackIteratorMapKey,
+    MsgPackIteratorMapValue,
+    MsgPackIteratorArray
+};
+
+// Represents the struct of message packer iterator
+struct MsgPackIterator
+{
+    MsgPackIteratorStatus status;  // Iterator status
+    uint32_t              index;   // Index in map or array
+    uint32_t              size;    // Size of map or array
+};
+
 // =====================================================================================================================
 // Represents a reader for loading data from an [Executable and Linkable Format (ELF)](http://tinyurl.com/2toj8) buffer.
 //
@@ -410,6 +431,19 @@ public:
         return (pEntry != m_map.end()) ? pEntry->second : InvalidValue;
     }
 
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+    void InitMsgPack(const void* pBuffer, uint32_t sizeInBytes);
+
+    bool GetNextMsgItem();
+
+    const cwpack_item* GetMsgItem() const;
+
+    MsgPackIteratorStatus GetMsgIteratorStatus() const;
+
+    void UpdateMsgPackStatus(std::function<void(MsgPackIteratorStatus)> callback);
+
+    uint32_t GetMsgMapLevel() const;
+#endif
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ElfReader);
 
@@ -425,6 +459,12 @@ private:
     int32_t   m_symSecIdx;      // Index of symbol section
     int32_t   m_relocSecIdx;    // Index of relocation section
     int32_t   m_strtabSecIdx;   // Index of string table section
+
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+    cw_unpack_context            m_msgPackContext;   // Context of MsgPack
+    std::vector<MsgPackIterator> m_iteratorStack;    // MsgPack iterator stack
+    uint32_t                     m_msgPackMapLevel;  // The map level of current message item
+#endif
 };
 
 } // Llpc

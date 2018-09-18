@@ -84,6 +84,9 @@ public:
 
     virtual void DoUserDataNodeMerge();
 
+    // Gets wave size for the specified shader stage
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage);
+
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
