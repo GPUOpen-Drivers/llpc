@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPassLoopInfoCollect.cpp
- * @brief LLPC source file: contains implementation of class Llpc::LoopInfoCollect.
+ * @brief LLPC source file: contains implementation of class Llpc::PassLoopInfoCollect.
  ***********************************************************************************************************************
  */
 
@@ -43,12 +43,12 @@ namespace Llpc
 
 // =====================================================================================================================
 // Initializes static members.
-char LoopInfoCollect::ID = 0;
+char PassLoopInfoCollect::ID = 0;
 
 // =====================================================================================================================
 // Gather various infomation for one loop.
 // It will also gather infomation for this loop's children by calling itself recursively.
-void LoopInfoCollect::HandleLoop(
+void PassLoopInfoCollect::HandleLoop(
     Loop*    loop,                          // [in] Loop block to gather infomation
     uint32_t nestedLevel)                   // [in] Nested level of this loop
 {
@@ -79,7 +79,7 @@ void LoopInfoCollect::HandleLoop(
 
 // =====================================================================================================================
 // Executes the get loop info pass on the specified LLVM module.
-bool LoopInfoCollect::runOnModule(
+bool PassLoopInfoCollect::runOnModule(
     llvm::Module& module)                       // [in,out] LLVM module to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Pass-Loop-Info-Collect\n");

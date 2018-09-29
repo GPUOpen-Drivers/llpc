@@ -163,50 +163,6 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.Cube.v2i32.dimaware(
     ret <2 x i32> %6
 }
 
-define <2 x i32> @llpc.image.querynonlod.sizelod.1DArray.v2i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    ; NOTE: For 1D array on GFX9, need to use dmask 5 to get array layer as 2D array.
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 5,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 true)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = insertelement <2 x i32> undef, i32 %3, i32 0
-    %6 = insertelement <2 x i32> %5, i32 %4, i32 1
-    ret <2 x i32> %6
-}
-
-define <2 x i32> @llpc.image.querynonlod.sizelod.1DArray.v2i32.dimaware(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    ; NOTE: For 1D array on GFX9, need to use dmask 5 to get array layer as 2D array.
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.2darray.v4f32.i32(i32 5,
-                                                                          i32 %lod,
-                                                                          <8 x i32> %resource,
-                                                                          i32 0,
-                                                                          i32 0)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = insertelement <2 x i32> undef, i32 %3, i32 0
-    %6 = insertelement <2 x i32> %5, i32 %4, i32 1
-    ret <2 x i32> %6
-}
-
 define <3 x i32> @llpc.image.querynonlod.sizelod.3D.v3i32(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {

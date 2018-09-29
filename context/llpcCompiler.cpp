@@ -819,28 +819,32 @@ Result Compiler::BuildGraphicsPipelineInternal(
                 result = Result::ErrorInvalidShader;
             }
         }
+
+        if (result == Result::Success)
+        {
+            LLPC_OUTS("===============================================================================\n");
+            LLPC_OUTS("// LLPC linking results\n");
+            LLPC_OUTS(*pPipelineModule);
+            LLPC_OUTS("\n");
+        }
     }
 
     if (result == Result::Success)
     {
         CodeGenManager::SetupTargetFeatures(pPipelineModule);
-        LLPC_OUTS("===============================================================================\n");
-        LLPC_OUTS("// LLPC linking results\n");
-        LLPC_OUTS(*pPipelineModule);
-        LLPC_OUTS("\n");
 
         // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text instead.
         // If "-emit-llvm" is specified, generate LLVM bitcode. These options are used through LLPC
         // standalone compiler tool "amdllpc".
         raw_svector_ostream elfStream(*pPipelineElf);
         std::string errMsg;
+
         TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
 
         result = CodeGenManager::GenerateCode(pPipelineModule, elfStream, errMsg);
         if (result != Result::Success)
         {
-            LLPC_ERRS("Fails to generate GPU ISA codes :" <<
-                      errMsg << "\n");
+            LLPC_ERRS("Fails to generate GPU ISA codes :" << errMsg << "\n");
         }
     }
     delete pPipelineModule;
@@ -1281,7 +1285,6 @@ Result Compiler::BuildComputePipelineInternal(
             {
                 TimeProfiler timeProfiler(&g_timeProfileResult.patchTime);
                 result = Patch::Run(pModule);
-                CodeGenManager::SetupTargetFeatures(pModule);
             }
 
             if (result != Result::Success)
@@ -1301,12 +1304,16 @@ Result Compiler::BuildComputePipelineInternal(
 
         if (result == Result::Success)
         {
-            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+            CodeGenManager::SetupTargetFeatures(pModule);
+
             // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text
             // instead.  If "-emit-llvm" is specified, generate LLVM bitcode. These options are used
             // through LLPC standalone compiler tool "amdllpc".
             raw_svector_ostream elfStream(*pPipelineElf);
             std::string errMsg;
+
+            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+
             result = CodeGenManager::GenerateCode(pModule, elfStream, errMsg);
             if (result != Result::Success)
             {
@@ -2158,7 +2165,7 @@ Context* Compiler::AcquireContext()
     if (pFreeContext == nullptr)
     {
         // Create a new one if we fail to find an available one
-        pFreeContext = new Context(m_gfxIp);
+        pFreeContext = new Context(m_gfxIp, &m_gpuWorkarounds);
         pFreeContext->SetInUse(true);
         m_contextPool.push_back(pFreeContext);
     }
@@ -2291,7 +2298,7 @@ bool Compiler::NeedDynamicLoopUnroll(
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     std::vector<LoopAnalysisInfo>  loopInfo;
     bool needDynamicLoopUnroll = false;
-    LoopInfoCollect* pLoopPass = new LoopInfoCollect(&loopInfo);
+    PassLoopInfoCollect* pLoopPass = new PassLoopInfoCollect(&loopInfo);
 
     legacy::PassManager passMgr;
     passMgr.add(pLoopPass);
@@ -2348,7 +2355,7 @@ void Compiler::GetPipelineStatistics(
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
                 if (pNode->type == Util::Abi::PipelineAbiNoteType::LegacyMetadata)
 #else
-                if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
+                if (pNode->type == LegacyMetadata)
 #endif
                 {
                     const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);

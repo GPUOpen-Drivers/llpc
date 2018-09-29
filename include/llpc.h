@@ -40,8 +40,9 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 9;
+static const uint32_t  Version = 12;
 static const uint32_t  MaxColorTargets = 8;
+static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
 
 // Forward declarations
@@ -293,22 +294,26 @@ struct GraphicsPipelineBuildInfo
 
     struct
     {
-        bool        depthClipEnable;    ///< Enable clipping based on Z coordinate
-    } vpState;                          ///< Viewport state
+        bool        depthClipEnable;            ///< Enable clipping based on Z coordinate
+    } vpState;                                  ///< Viewport state
 
     struct
     {
-        bool    rasterizerDiscardEnable;    ///< Kill all rasterized pixels. This is implicitly true if stream out
-                                            ///  is enabled and no streams are rasterized
-        bool    innerCoverage;              ///< Related to conservative rasterization.  Must be false if conservative
-                                            ///  rasterization is disabled.
-        bool    perSampleShading;           ///< Enable per sample shading
-        uint32_t  numSamples;               ///< Number of coverage samples used when rendering with this pipeline.
-        uint32_t  samplePatternIdx;         ///< Index into the currently bound MSAA sample pattern table that
-                                            ///  matches the sample pattern used by the rasterizer when rendering
-                                            ///  with this pipeline.
-        uint8_t   usrClipPlaneMask;         ///< Mask to indicate the enabled user defined clip planes
-    } rsState;                              ///< Rasterizer State
+        bool    rasterizerDiscardEnable;        ///< Kill all rasterized pixels. This is implicitly true if stream out
+                                                ///  is enabled and no streams are rasterized
+        bool    innerCoverage;                  ///< Related to conservative rasterization.  Must be false if
+                                                ///  conservative rasterization is disabled.
+        bool    perSampleShading;               ///< Enable per sample shading
+        uint32_t  numSamples;                   ///< Number of coverage samples used when rendering with this pipeline
+        uint32_t  samplePatternIdx;             ///< Index into the currently bound MSAA sample pattern table that
+                                                ///  matches the sample pattern used by the rasterizer when rendering
+                                                ///  with this pipeline.
+        uint8_t   usrClipPlaneMask;             ///< Mask to indicate the enabled user defined clip planes
+        VkPolygonMode       polygonMode;        ///< Triangle rendering mode
+        VkCullModeFlags     cullMode;           ///< Fragment culling mode
+        VkFrontFace         frontFace;          ///< Front-facing triangle orientation
+        bool                depthBiasEnable;    ///< Whether to bias fragment depth values
+    } rsState;                                  ///< Rasterizer State
 
     struct
     {
@@ -323,19 +328,6 @@ struct GraphicsPipelineBuildInfo
            VkFormat       format;               ///< Color attachment format
         } target[MaxColorTargets];              ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
-
-    struct
-    {
-        bool    enableNgg;                  ///< Enable NGG mode, use an implicit primitive shader
-
-        bool    enableFastLaunch;           ///< Enables the hardware to launch subgroups of work at a faster rate
-        bool    enableVertexReuse;          ///< Enable optimization to cull duplicate vertices
-        bool    disableBackfaceCulling;     ///< Disables culling of primitives that don't meet facing criteria
-        bool    enableFrustumCulling;       ///< Enables discarding of primitives outside of view frustum
-        bool    enableBoxFilterCulling;     ///< Enable simpler frustum culler that is less accurate
-        bool    enableSphereCulling;        ///< Enable frustum culling based on a sphere
-        bool    enableSmallPrimFilter;      ///< Enables trivial sub-sample primitive culling
-    } nggState;
 
     PipelineOptions     options;                ///< Per pipeline tuning/debugging options
 };

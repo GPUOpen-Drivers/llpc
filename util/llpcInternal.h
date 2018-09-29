@@ -154,7 +154,7 @@ llvm::Function* GetEntryPoint(llvm::Module* pModule);
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
 llvm::Value* EmitCall(llvm::Module*                             pModule,
-                      llvm::StringRef                           instName,
+                      llvm::StringRef                           funcName,
                       llvm::Type*                               pRetTy,
                       llvm::ArrayRef<llvm::Value *>             args,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
@@ -163,7 +163,7 @@ llvm::Value* EmitCall(llvm::Module*                             pModule,
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
 llvm::Value* EmitCall(llvm::Module*                             pModule,
-                      llvm::StringRef                           instName,
+                      llvm::StringRef                           funcName,
                       llvm::Type*                               pRetTy,
                       llvm::ArrayRef<llvm::Value *>             args,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,

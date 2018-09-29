@@ -193,5 +193,5 @@ bool SpirvLowerAlgebraTransform::IsOperandNoContract(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for algebraic transformation.
-INITIALIZE_PASS(SpirvLowerAlgebraTransform, "spirv-lower-algebra-transform",
+INITIALIZE_PASS(SpirvLowerAlgebraTransform, "Spirv-lower-algebra-transform",
                 "Lower SPIR-V algebraic transforms", false, false)

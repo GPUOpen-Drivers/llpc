@@ -193,6 +193,8 @@ public:
   }
 };
 
+typedef SPIRVDecorate SPIRVDecorateStringGOOGLE;
+
 class SPIRVMemberDecorate : public SPIRVDecorateGeneric {
 public:
   static const Op OC = OpMemberDecorate;
@@ -228,6 +230,8 @@ public:
 protected:
   SPIRVWord MemberNumber;
 };
+
+typedef SPIRVMemberDecorate SPIRVMemberDecorateStringGOOGLE;
 
 class SPIRVDecorationGroup : public SPIRVEntry {
 public:

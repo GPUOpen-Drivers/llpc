@@ -355,21 +355,6 @@ void PatchDescriptorLoad::visitCallInst(
                     // Extract compact buffer descriptor
                     if (descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t))
                     {
-                        SqBufRsrcWord1 sqBufRsrcWord1 = {};
-                        SqBufRsrcWord2 sqBufRsrcWord2 = {};
-                        SqBufRsrcWord3 sqBufRsrcWord3 = {};
-
-                        sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-                        sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
-
-                        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                        sqBufRsrcWord3.bits.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                        sqBufRsrcWord3.bits.DATA_FORMAT = BUF_DATA_FORMAT_32;
-                        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
-
                         // Extract compact buffer descriptor
                         Value* pDescElem0 = ExtractElementInst::Create(pDesc,
                             ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -393,6 +378,9 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD1
+                        SqBufRsrcWord1 sqBufRsrcWord1 = {};
+                        sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
+
                         pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
                             ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
                             "",
@@ -404,6 +392,9 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD2
+                        SqBufRsrcWord2 sqBufRsrcWord2 = {};
+                        sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+
                         pBufDesc = InsertElementInst::Create(pBufDesc,
                             ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
                             ConstantInt::get(m_pContext->Int32Ty(), 2),
@@ -411,11 +402,22 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD3
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                            ConstantInt::get(m_pContext->Int32Ty(), 3),
-                            "",
-                            &callInst);
+                        {
+                            SqBufRsrcWord3 sqBufRsrcWord3 = {};
+                            sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+                            sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+                            sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+                            sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+                            sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+                            sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+                            LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+
+                            pBufDesc = InsertElementInst::Create(pBufDesc,
+                                ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                                ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                "",
+                                &callInst);
+                        }
 
                         pDesc = pBufDesc;
                     }
@@ -471,8 +473,8 @@ void PatchDescriptorLoad::visitCallInst(
                     sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
                     sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
                     sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                    sqBufRsrcWord3.bits.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                    sqBufRsrcWord3.bits.DATA_FORMAT = BUF_DATA_FORMAT_32;
+                    sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+                    sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
                     LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
 
                     Value* pDescElem1 = ExtractElementInst::Create(pDescTableAddr,

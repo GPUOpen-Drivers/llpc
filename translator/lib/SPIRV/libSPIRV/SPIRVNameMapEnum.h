@@ -333,6 +333,8 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
   add(DecorationMaxByteOffset, "MaxByteOffset");
   add(DecorationExplicitInterpAMD, "ExplicitInterpAMD");
   add(DecorationNonUniformEXT, "NonUniformEXT");
+  add(DecorationHlslCounterBufferGOOGLE, "HlslCounterBufferGOOGLE");
+  add(DecorationHlslSemanticGOOGLE, "HlslSemanticGOOGLE");
 }
 SPIRV_DEF_NAMEMAP(Decoration, SPIRVDecorationNameMap)
 

@@ -42,22 +42,6 @@
 using namespace llvm;
 using namespace Llpc;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-// -enable-dim-aware-image-intrinsic
-opt<bool> EnableDimAwareImageIntrinsic(
-    "enable-dim-aware-image-intrinsic",
-    desc("Enable dimension-aware image instrinsic in AMDGPU backend, sparse image function will always" \
-         "use dimension aware image intrinsic."),
-    init(true));
-}
-
-}
-
 namespace Llpc
 {
 
@@ -164,7 +148,7 @@ void SpirvLowerImageOp::visitCallInst(
 
         if ((imageCallMeta.OpKind == ImageOpWrite) || isImageAtomicOp(imageCallMeta.OpKind))
         {
-            m_pContext->GetShaderResourceUsage(m_shaderStage)->imageWrite = true;
+            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
         }
 
         ConstantInt* pMemoryQualifier = nullptr;
@@ -468,14 +452,7 @@ void SpirvLowerImageOp::visitCallInst(
 
             if (imageCallMeta.Dim != DimBuffer)
             {
-                // Choose dimension aware image intrinsic or old image intrinsic, sparse image function will always
-                // use dimension aware image intrinsic.
-                bool enableDimAwareImageIntrinsic = cl::EnableDimAwareImageIntrinsic;
-                if ((callName.find(gSPIRVName::ImageCallModSparse) != std::string::npos) ||
-                    (enableDimAwareImageIntrinsic == true))
-                {
-                    callName += gSPIRVName::ImageCallDimAwareSuffix;
-                }
+                callName += gSPIRVName::ImageCallDimAwareSuffix;
             }
 
             // Image call replacement
@@ -603,5 +580,5 @@ void SpirvLowerImageOp::ExtractBindingInfo(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for image operations.
-INITIALIZE_PASS(SpirvLowerImageOp, "spirv-lower-image-op",
+INITIALIZE_PASS(SpirvLowerImageOp, "Spirv-lower-image-op",
                 "Lower SPIR-V image operations (sample, fetch, gather, read/write)", false, false)

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPassLoopInfoCollect.h
- * @brief LLPC header file: contains declaration of class Llpc::LoopInfoCollect.
+ * @brief LLPC header file: contains declaration of class Llpc::PassLoopInfoCollect.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -46,11 +46,11 @@ struct LoopAnalysisInfo
 
 // =====================================================================================================================
 // Represents the LLVM pass for loop info collecting.
-class LoopInfoCollect : public llvm::ModulePass
+class PassLoopInfoCollect : public llvm::ModulePass
 {
 public:
-    LoopInfoCollect() : ModulePass(ID) {};
-    LoopInfoCollect(std::vector<LoopAnalysisInfo>* pInfo) : ModulePass(ID)
+    PassLoopInfoCollect() : ModulePass(ID) {};
+    PassLoopInfoCollect(std::vector<LoopAnalysisInfo>* pInfo) : ModulePass(ID)
     {
         m_pLoopInfo = pInfo;
     };

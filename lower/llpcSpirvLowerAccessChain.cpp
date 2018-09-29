@@ -184,5 +184,5 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for access chain.
-INITIALIZE_PASS(SpirvLowerAccessChain, "spirv-lower-access-chain",
+INITIALIZE_PASS(SpirvLowerAccessChain, "Spirv-lower-access-chain",
                 "Lower SPIR-V access chain", false, false)

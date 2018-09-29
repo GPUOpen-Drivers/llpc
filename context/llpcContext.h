@@ -49,7 +49,7 @@ namespace Llpc
 class Context : public llvm::LLVMContext
 {
 public:
-    Context(GfxIpVersion gfxIp);
+    Context(GfxIpVersion gfxIp, const WorkaroundFlags* pGpuWorkarounds);
     ~Context();
 
     // Checks whether this context is in use.
@@ -129,6 +129,8 @@ public:
     uint32_t MetaIdUniform() const { return m_metaIds.uniform; }
 
     std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
+
+    llvm::Function* CloneLibraryFunction(llvm::Module* pModule, llvm::StringRef funcName) const;
 
     // Wrappers of interfaces of pipeline context
     ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage)
@@ -309,6 +311,7 @@ private:
     static const uint8_t GlslEmuLib[];
     static const uint8_t GlslEmuLibGfx8[];
     static const uint8_t GlslEmuLibGfx9[];
+    static const uint8_t GlslEmuLibWaTreat1dImagesAs2d[];
 
 };
 

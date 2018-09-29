@@ -3059,6 +3059,36 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     case BuiltInLocalInvocationId:
         {
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
+
+            if (builtInUsage.workgroupSizeZ > 1)
+            {
+                // XYZ, do nothing
+            }
+            else if (builtInUsage.workgroupSizeY > 1)
+            {
+                // XY
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                   "",
+                                                   pInsertPos);
+            }
+            else
+            {
+                // X
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                   "",
+                                                   pInsertPos);
+
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                   "",
+                                                   pInsertPos);
+            }
+
             break;
         }
     case BuiltInSubgroupSize:
@@ -4414,13 +4444,16 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
         else
         {
             std::vector<Value*> args;
-            args.push_back(inOutUsage.pEsGsRingBufDesc);
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            args.push_back(pRingOffset);
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // slc
+            args.push_back(inOutUsage.pEsGsRingBufDesc);                                // rsrc
+            args.push_back(pRingOffset);                                                // offset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                 // soffset
+            CoherentFlag coherent = {};
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc slc
+
             pLoadValue = EmitCall(m_pModule,
-                                  "llvm.amdgcn.buffer.load.f32",
+                                  "llvm.amdgcn.raw.buffer.load.f32",
                                   m_pContext->FloatTy(),
                                   args,
                                   NoAttrib,
@@ -4820,7 +4853,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
 // =====================================================================================================================
 // Writes value to LDS.
 void PatchInOutImportExport::WriteValueToLds(
-    Value*        pWriteValue,   // [in] Value Written to LDS
+    Value*        pWriteValue,   // [in] Value written to LDS
     Value*        pLdsOffset,    // [in] Start offset to do LDS write operations
     Instruction*  pInsertPos)    // [in] Where to insert write instructions
 {

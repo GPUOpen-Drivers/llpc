@@ -2386,7 +2386,7 @@ _SPIRV_OP(ImageSparseRead, true, 5, true, 2)
 _SPIRV_OP(FragmentMaskFetchAMD, true, 5)
 _SPIRV_OP(FragmentFetchAMD, true, 6)
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-_SPIRV_OP(ImageSampleAnisoLodAMD, true, 6, true, 3)
+_SPIRV_OP(ImageSampleAnisoLodAMD, true, 6, true, 2)
 _SPIRV_OP(ImageSampleDrefAnisoLodAMD, true, 6, true, 3)
 _SPIRV_OP(ImageGatherAnisoLodAMD, true, 6, true, 3)
 _SPIRV_OP(ImageDrefGatherAnisoLodAMD, true, 6, true, 3)

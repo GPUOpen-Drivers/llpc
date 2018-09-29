@@ -115,7 +115,7 @@ struct ResourceUsage
     std::vector<DescriptorSet> descSets;              // Info array of descriptor sets and bindings
     std::unordered_set<uint64_t> descPairs;           // Pairs of descriptor set/binding
     uint32_t                   pushConstSizeInBytes;  // Push constant size (in bytes)
-    bool                       imageWrite;            // Whether shader does image-write operations
+    bool                       resourceWrite;         // Whether shader does resource-write operations
     bool                       perShaderTable;        // Whether per shader stage table is used
     uint32_t                   numSgprsAvailable;     // Number of available SGPRs
     uint32_t                   numVgprsAvailable;     // Number of available VGPRs

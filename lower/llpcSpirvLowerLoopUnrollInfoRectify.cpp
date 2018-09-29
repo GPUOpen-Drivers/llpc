@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopUnrollInfoRectify.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PassLoopUnrollInfoRectify.
+ * @file  llpcSpirvLowerLoopUnrollInfoRectify.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerLoopUnrollInfoRectify.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-pass-loop-unroll-info-rectify"
+#define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-info-rectify"
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -39,7 +39,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcPassLoopUnrollInfoRectify.h"
+#include "llpcSpirvLowerLoopUnrollInfoRectify.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -56,22 +56,22 @@ namespace Llpc
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char PassLoopUnrollInfoRectify::ID;
+char SpirvLowerLoopUnrollInfoRectify::ID;
 
 // =====================================================================================================================
-PassLoopUnrollInfoRectify::PassLoopUnrollInfoRectify()
+SpirvLowerLoopUnrollInfoRectify::SpirvLowerLoopUnrollInfoRectify()
     :
     FunctionPass(ID)
 {
-    initializePassLoopUnrollInfoRectifyPass(*PassRegistry::getPassRegistry());
+    initializeSpirvLowerLoopUnrollInfoRectifyPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
-bool PassLoopUnrollInfoRectify::runOnFunction(
+bool SpirvLowerLoopUnrollInfoRectify::runOnFunction(
     Function& function) // [in,out] Function that we will rectify any loop unroll information.
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Pass-Loop-Unroll-Info-Rectify\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Loop-Unroll-Info-Rectify\n");
 
     bool modified = false;
 
@@ -149,7 +149,7 @@ bool PassLoopUnrollInfoRectify::runOnFunction(
 
 // =====================================================================================================================
 // Specify what analysis passes this pass depends on.
-void PassLoopUnrollInfoRectify::getAnalysisUsage(
+void SpirvLowerLoopUnrollInfoRectify::getAnalysisUsage(
     AnalysisUsage& analysisUsage // [in,out] The place to record our analysis pass usage requirements.
     ) const
 {
@@ -162,9 +162,9 @@ void PassLoopUnrollInfoRectify::getAnalysisUsage(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the LLVM pass for rectifying unroll information.
-INITIALIZE_PASS(PassLoopUnrollInfoRectify, "Pass-Loop-Unroll-Info-Rectify",
-    "LLVM pass for rectifying loop unroll information", false, false)
+// Initializes the pass of SPIR-V lowering opertions for rectifying unroll information.
+INITIALIZE_PASS(SpirvLowerLoopUnrollInfoRectify, "Spirv-lower-loop-unroll-info-rectify",
+    "Lower SPIR-V loop unroll info rectifying", false, false)
 
 // =====================================================================================================================
 // Definitions for our static helper functions.

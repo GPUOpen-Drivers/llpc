@@ -194,7 +194,9 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
+    lower/llpcSpirvLowerLoopUnrollInfoRectify.cpp
     lower/llpcSpirvLowerOpt.cpp
+    lower/llpcSpirvLowerPeepholeOpt.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
 )
 
@@ -269,7 +271,6 @@ target_sources(llpc PRIVATE
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
     util/llpcPassLoopInfoCollect.cpp
-    util/llpcPassLoopUnrollInfoRectify.cpp
     util/llpcPassNonNativeFuncRemove.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp
@@ -278,6 +279,10 @@ target_sources(llpc PRIVATE
 # llpc/imported/metrohash
 add_subdirectory(imported/metrohash)
 target_link_libraries(llpc PRIVATE llpc_metrohash)
+
+# llpc/imported/cwpack
+add_subdirectory(imported/cwpack)
+target_link_libraries(llpc PRIVATE llpc_cwpack)
 
 ### LLPC Auto-generated Files ##########################################################################################
 set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)
@@ -313,6 +318,7 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/wa/treat1dImagesAs2d/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt

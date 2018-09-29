@@ -92,9 +92,15 @@ const uint8_t Context::GlslEmuLibGfx9[]=
     #include "./generate/gfx9/g_llpcGlslEmuLibGfx9.h"
 };
 
+const uint8_t Context::GlslEmuLibWaTreat1dImagesAs2d[] =
+{
+    #include "./generate/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h"
+};
+
 // =====================================================================================================================
 Context::Context(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp,                     // Graphics IP version info
+    const WorkaroundFlags* pGpuWorkarounds) // GPU workarounds
     :
     LLVMContext(),
     m_gfxIp(gfxIp)
@@ -225,6 +231,20 @@ Context::Context(
                 LLPC_ERRS("Fails to link LLVM libraries together\n");
             }
         }
+
+       // Link treat 1d image as 2d gpu workaround libraries together
+       if (pGpuWorkarounds->gfx9.treat1dImagesAs2d)
+       {
+            libBin.codeSize = sizeof(GlslEmuLibWaTreat1dImagesAs2d);
+            libBin.pCode    = GlslEmuLibWaTreat1dImagesAs2d;
+            pGlslEmuLibGfx = LoadLibary(&libBin);
+            LLPC_ASSERT(pGlslEmuLibGfx != nullptr);
+            if (Linker::linkModules(*m_pGlslEmuLib, std::move(pGlslEmuLibGfx), Linker::OverrideFromSrc))
+            {
+                LLPC_ERRS("Fails to link LLVM libraries together\n");
+            }
+       }
+
         // Do function inlining
         {
             legacy::PassManager passMgr;
@@ -303,6 +323,82 @@ std::unique_ptr<Module> Context::LoadLibary(
     }
 
     return std::move(pLibModule);
+}
+
+// =====================================================================================================================
+// Clones a function from external LLVM library to the specified module.
+Function* Context::CloneLibraryFunction(
+    Module*   pModule,      // [in] LLVM module to which the library function is cloned
+    StringRef funcName      // Function name
+    ) const
+{
+    auto pCloneFunc = pModule->getFunction(funcName);
+    if (pCloneFunc == nullptr)
+    {
+        auto pFunc = m_pGlslEmuLib->getFunction(funcName);
+        LLPC_ASSERT((pFunc != nullptr) && (pFunc->isDeclaration() == false));
+
+        std::unordered_set<Function*> callees;
+
+        // Visit the function body to see if it references more functions
+        for (auto& block : *pFunc)
+        {
+            for (auto& inst : block)
+            {
+                if (isa<CallInst>(&inst))
+                {
+                    auto pCall = cast<CallInst>(&inst);
+                    auto pCallee = pCall->getCalledFunction();
+
+                    if (pCallee != nullptr)
+                    {
+                        // NOTE: All callees must be LLVM native intrinsics because the GLSL emulation library
+                        // is completely inlined.
+                        LLPC_ASSERT(pCallee->isDeclaration());
+                        callees.insert(pCallee);
+                    }
+                }
+            }
+        }
+
+        ValueToValueMapTy valueMap;
+
+        for (auto pCallee : callees)
+        {
+            auto pCloneCallee = Function::Create(pCallee->getFunctionType(),
+                                                 pCallee->getLinkage(),
+                                                 pCallee->getName(),
+                                                 pModule);
+            pCloneCallee->copyAttributesFrom(pCallee);
+            valueMap[pCallee] = pCloneCallee;
+        }
+
+        pCloneFunc = Function::Create(pFunc->getFunctionType(), GlobalValue::PrivateLinkage, funcName, pModule);
+
+        Argument* pCloneArg = pCloneFunc->arg_begin();
+        for (auto& arg : pFunc->args())
+        {
+            pCloneArg->setName(arg.getName());
+            valueMap[&arg] = pCloneArg++;
+        }
+
+        SmallVector<ReturnInst*, 8> retInsts;
+        CloneFunctionInto(pCloneFunc, pFunc, valueMap, true, retInsts);
+
+        // Function with "private" linkage after cloning should be set "dso_local"
+        pCloneFunc->setDSOLocal(true);
+    }
+    else
+    {
+        // If the clone function has already existed, it should have function body
+        if (pCloneFunc->isDeclaration())
+        {
+            LLPC_NEVER_CALLED();
+            pCloneFunc = nullptr;
+        }
+    }
+
+    return pCloneFunc;
 }
 
 // =====================================================================================================================

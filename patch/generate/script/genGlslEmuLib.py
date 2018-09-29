@@ -278,3 +278,72 @@ for gfx in GFX_EMUS:
 
     print("")
 
+# =====================================================================================================================
+# Generate Workaround LLVM emulation library
+# =====================================================================================================================
+
+# Assemble .ll files to .bc files and link emulation .bc files to libraries
+WA_EMUS = ["treat1dImagesAs2d"]
+WA_ROOT="wa"
+for wa in WA_EMUS:
+    print("*******************************************************************************")
+    print("                    Generate LLVM Emulation Library (%s)                     "%(wa.upper()))
+    print("*******************************************************************************")
+
+    workDir = WA_ROOT + "/" + wa
+    # Assemble .ll files to .bc files
+    for f in os.listdir(workDir):
+        if f.endswith(".ll"):
+            cmd = LLVM_AS + " " + workDir + "/" + f
+            print(">>>  (LL-as) " + cmd)
+            if OS_TYPE == "win" :
+                subprocess.check_call(cmd)
+            else :
+                subprocess.check_call(cmd, shell = True)
+
+    # Search for the .bc file
+    bcFiles = ""
+    for f in os.listdir(workDir):
+        if f.endswith(".bc"):
+            bcFiles += workDir + "/" + f + " "
+
+    # Link .bc files to .lib file
+    libFile = workDir + "/glslEmu" + wa.capitalize() + ".lib"
+    cmd = LLVM_LINK + " -o=" + libFile + " " + bcFiles
+    print(">>>  (LL-link) " + cmd)
+    if OS_TYPE == "win" :
+        subprocess.check_call(cmd)
+    else :
+        subprocess.check_call(cmd, shell = True)
+
+    # Convert .lib file to a hex file
+    hFile = WA_ROOT + "/g_llpcGlslEmuLib" + wa[:1].upper() + wa[1:] + ".h"
+    print(">>>  (LL-bin2hex) " + libFile + "  ==>  " + hFile)
+    fBin = open(libFile, "rb")
+    binData = fBin.read()
+    fBin.close()
+
+    hexData = binascii.hexlify(binData).decode()
+    fHex = open(hFile, "w")
+    hexText = ""
+    i = 0
+    while i < len(hexData):
+        hexText += "0x"
+        hexText += hexData[i]
+        hexText += hexData[i + 1]
+        i += 2
+        if (i != len(hexData)):
+            hexText += ", "
+        if (i % 32 == 0):
+            hexText += "\n"
+    fHex.write(hexText)
+    fHex.close()
+
+    # Cleanup, remove those temporary files
+    for f in bcFiles.split():
+        print(">>>  (LL-clean) remove " + f);
+        os.remove(f)
+    print(">>>  (LL-clean) remove " + libFile);
+    os.remove(libFile)
+
+    print("")

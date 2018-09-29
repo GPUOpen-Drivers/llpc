@@ -336,5 +336,5 @@ void SpirvLowerDynIndex::ExpandStoreInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for dynamic index in access chain.
-INITIALIZE_PASS(SpirvLowerDynIndex, "spirv-lower-dyn-index",
+INITIALIZE_PASS(SpirvLowerDynIndex, "Spirv-lower-dyn-index",
                 "Lower SPIR-V dynamic index in access chain", false, false)

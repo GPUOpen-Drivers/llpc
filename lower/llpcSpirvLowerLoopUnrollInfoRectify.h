@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopUnrollInfoRectify.h
- * @brief LLPC header file: contains declaration of class Llpc::PassLoopUnrollInfoRectify.
+ * @file  llpcSpirvLowerLoopUnrollInfoRectify.h
+ * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerLoopUnrollInfoRectify.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -40,7 +40,7 @@ namespace llvm
 {
 
 class PassRegistry;
-void initializePassLoopUnrollInfoRectifyPass(PassRegistry&);
+void initializeSpirvLowerLoopUnrollInfoRectifyPass(PassRegistry&);
 
 } // llvm
 
@@ -48,19 +48,19 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the LLVM pass for rectifying loop unroll information.
-class PassLoopUnrollInfoRectify final:
+// Represents the pass of SPIR-V lowering opertions for rectifying loop unroll information.
+class SpirvLowerLoopUnrollInfoRectify final:
     public llvm::FunctionPass
 {
 public:
-    explicit PassLoopUnrollInfoRectify();
+    explicit SpirvLowerLoopUnrollInfoRectify();
 
     bool runOnFunction(llvm::Function& function) override;
 
     void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
 
-    // Pass creator, creates the LLVM pass for rectifying unroll information.
-    static llvm::FunctionPass* Create() { return new PassLoopUnrollInfoRectify(); }
+    // Pass creator, creates the pass of SPIR-V lowering opertions for rectifying unroll information.
+    static llvm::FunctionPass* Create() { return new SpirvLowerLoopUnrollInfoRectify(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ public:
 
 private:
 
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PassLoopUnrollInfoRectify);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerLoopUnrollInfoRectify);
 
     static constexpr uint32_t MaxLoopUnrollCount = 32;
 };

@@ -312,10 +312,10 @@ void SpirvLowerBufferOp::visitCallInst(
         if (pBufferPtr->getType()->getPointerAddressSpace() == SPIRAS_Uniform)
         {
             // Atomic operations on buffer
+            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+
             GetElementPtrInst* pGetElemInst = nullptr;
             Instruction*       pConstExpr   = nullptr;
-
-            m_pContext->GetShaderResourceUsage(m_shaderStage)->imageWrite = true;
 
             if (isa<GetElementPtrInst>(pBufferPtr))
             {
@@ -651,7 +651,8 @@ void SpirvLowerBufferOp::visitStoreInst(
     if (pStoreDest->getType()->getPointerAddressSpace() == SPIRAS_Uniform)
     {
         // Store to buffer block
-        m_pContext->GetShaderResourceUsage(m_shaderStage)->imageWrite = true;
+        m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+
         GetElementPtrInst* pGetElemInst = nullptr;
         Instruction*       pConstExpr   = nullptr;
 
@@ -1144,19 +1145,25 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if (pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Load structure member
             auto pMember = AddBufferLoadInst(pMemberTy,
@@ -1358,19 +1365,25 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if (pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Load structure member
             auto pMember = AddBufferLoadDescInst(pMemberTy,
@@ -1570,19 +1583,25 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if (pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Store structure member
             AddBufferStoreInst(pMember,
@@ -2050,19 +2069,25 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if(pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Store structure member
             AddBufferStoreDescInst(pMember,
@@ -2078,5 +2103,5 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for buffer operations.
-INITIALIZE_PASS(SpirvLowerBufferOp, "spirv-lower-buffer-op",
+INITIALIZE_PASS(SpirvLowerBufferOp, "Spirv-lower-buffer-op",
                 "Lower SPIR-V buffer operations (load and store)", false, false)

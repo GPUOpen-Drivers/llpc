@@ -124,5 +124,5 @@ void PatchGroupOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM path operations for group operations.
-INITIALIZE_PASS(PatchGroupOp, "patch-group-op", "Patch LLVM for group operationss", false, false)
+INITIALIZE_PASS(PatchGroupOp, "Patch-group-op", "Patch LLVM for group operations", false, false)
 

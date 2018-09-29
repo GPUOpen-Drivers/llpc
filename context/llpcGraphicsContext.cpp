@@ -30,6 +30,8 @@
  */
 #define DEBUG_TYPE "llpc-graphics-context"
 
+#include "llvm/Support/Format.h"
+
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcGfx6Chip.h"
@@ -271,7 +273,7 @@ void GraphicsContext::InitShaderInfoForNullFs()
     pResUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
 
     // Add usage info for dummy output
-    pResUsage->inOutUsage.fs.cbShaderMask = 0xF;
+    pResUsage->inOutUsage.fs.cbShaderMask = 0;
     pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 }
 

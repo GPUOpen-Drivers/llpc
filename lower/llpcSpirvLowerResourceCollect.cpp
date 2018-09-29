@@ -1694,5 +1694,5 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for resource collecting.
-INITIALIZE_PASS(SpirvLowerResourceCollect, "spirv-lower-resource-collect",
+INITIALIZE_PASS(SpirvLowerResourceCollect, "Spirv-lower-resource-collect",
                 "Lower SPIR-V resource collecting", false, false)

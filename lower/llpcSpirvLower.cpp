@@ -28,13 +28,24 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLower.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower"
 
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
+#include "llvm/Transforms/IPO/FunctionAttrs.h"
+#include "llvm/Transforms/IPO/InferFunctionAttrs.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/SimpleLoopUnswitch.h"
+#include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Vectorize.h"
 
 #include "llpcContext.h"
 #include "llpcPassDeadFuncRemove.h"
@@ -52,6 +63,8 @@
 #include "llpcSpirvLowerLoopUnrollControl.h"
 #include "llpcSpirvLowerOpt.h"
 #include "llpcSpirvLowerResourceCollect.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower"
 
 using namespace llvm;
 
@@ -120,6 +133,22 @@ Result SpirvLower::Run(
     // Lower SPIR-V constant immediate store.
     passMgr.add(SpirvLowerConstImmediateStore::Create());
 
+    // Remove reduant load/store operations and do minimal optimization
+    // It is required by SpirvLowerImageOp.
+    passMgr.add(createSROAPass());
+    passMgr.add(createGlobalOptimizerPass());
+    passMgr.add(createGlobalDCEPass());
+    passMgr.add(createPromoteMemoryToRegisterPass());
+    passMgr.add(createAggressiveDCEPass());
+    passMgr.add(createInstructionCombiningPass(false));
+    passMgr.add(createCFGSimplificationPass());
+    passMgr.add(createSROAPass());
+    passMgr.add(createEarlyCSEPass());
+    passMgr.add(createCFGSimplificationPass());
+
+    // Lower SPIR-V image operations (sample, fetch, gather, read/write),
+    passMgr.add(SpirvLowerImageOp::Create());
+
     // Lower SPIR-V dynamic index in access chain
     if (cl::LowerDynIndex)
     {
@@ -137,10 +166,6 @@ Result SpirvLower::Run(
 
     // Lower SPIR-V load/store operations on aggregate type
     passMgr.add(SpirvLowerAggregateLoadStore::Create());
-
-    // Lower SPIR-V image operations (sample, fetch, gather, read/write),
-    // NOTE: It is dependent on optimization result, should be after optimization pass.
-    passMgr.add(SpirvLowerImageOp::Create());
 
     // Lower SPIR-V instruction metadata remove
     passMgr.add(SpirvLowerInstMetaRemove::Create());

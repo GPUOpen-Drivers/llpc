@@ -238,5 +238,5 @@ void SpirvLowerConstImmediateStore::ConvertAllocaToReadOnlyGlobal(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering operations for constant immediate store.
-INITIALIZE_PASS(SpirvLowerConstImmediateStore, "spirv-lower-const-immediate-store",
+INITIALIZE_PASS(SpirvLowerConstImmediateStore, "Spirv-lower-const-immediate-store",
                 "Lower SPIR-V constant immediate store", false, false)

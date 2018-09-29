@@ -88,7 +88,10 @@ using namespace Llpc;
 // Represents options of LLPC standalone tool.
 
 // -gfxip: graphics IP version
-static cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"), cl::init("8.0.0"));
+static cl::opt<std::string> GfxIp("gfxip",
+                                  cl::desc("Graphics IP version"),
+                                  cl::value_desc("major.minor.step"),
+                                  cl::init("8.0.0"));
 
 // Input sources
 static cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,
@@ -124,57 +127,6 @@ static cl::opt<std::string> EntryTarget("entry-target",
 // -ignore-color-attachment-formats: ignore color attachment formats
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
-
-// -enable-ngg: enable NGG mode
-static cl::opt<bool> EnableNgg(
-    "enable-ngg",
-    cl::desc("Enable implicit primitive shader (NGG) mode"),
-    cl::init(false));
-
-// TODO: Comment NggEnableFastLaunch out for workaround the build failure on Linux
-#if 0
-// -ngg-enable-fast-launch: enable the hardware to launch subgroups of work at a faster rate (NGG)
-static cl::opt<bool> NggEnableFastLaunch(
-    "ngg-enable-fast-launch",
-    cl::desc("Enable the hardware to launch subgroups of work at a faster rate (NGG)"),
-    cl::init(false));
-#endif
-
-// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
-static cl::opt<bool> NggEnableVertexReuse(
-    "ngg-enable-vertex-reuse",
-    cl::desc("Enable optimization to cull duplicate vertices (NGG)"),
-    cl::init(false));
-
-// -ngg-disable-backface-culling: disable culling of primitives that don't meet facing criteria (NGG)
-static cl::opt<bool> NggDisableBackfaceCulling(
-    "ngg-disable-backface-culling",
-    cl::desc("Disable culling of primitives that don't meet facing criteria (NGG)"),
-    cl::init(true));
-
-// -ngg-enable-frustum-culling: enable discarding of primitives outside of view frustum (NGG)
-static cl::opt<bool> NggEnableFrustumCulling(
-    "ngg-enable-frustum-culling",
-    cl::desc("Enable discarding of primitives outside of view frustum (NGG)"),
-    cl::init(false));
-
-// -ngg-enable-box-filter-culling: enable simpler frustum culler that is less accurate (NGG)
-static cl::opt<bool> NggEnableBoxFilterCulling(
-    "ngg-enable-box-filter-culling",
-    cl::desc("Enable simpler frustum culler that is less accurate (NGG)"),
-    cl::init(false));
-
-// -ngg-enable-sphere-culling: enable frustum culling based on a sphere (NGG)
-static cl::opt<bool> NggEnableSphereCulling(
-    "ngg-enable-sphere-culling",
-    cl::desc("Enable frustum culling based on a sphere (NGG)"),
-    cl::init(false));
-
-// -ngg-enable-small-prim-filter: enable trivial sub-sample primitive culling (NGG)
-static cl::opt<bool> NggEnableSmallPrimFilter(
-    "ngg-enable-small-prim-filter",
-    cl::desc("Enable trivial sub-sample primitive culling (NGG)"),
-    cl::init(false));
 
 #ifdef WIN_OS
 // -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
@@ -382,26 +334,6 @@ static Result Init(
 
         result = ICompiler::Create(gfxIp, newArgs.size(), &newArgs[0], ppCompiler);
 
-        if (result == Result::Success)
-        {
-            pCompileInfo->gfxIp = gfxIp;
-
-            // Set NGG control settings
-            if (gfxIp.major >= 10)
-            {
-                auto& nggState = pCompileInfo->gfxPipelineInfo.nggState;
-
-                nggState.enableNgg                  = EnableNgg;
-                //nggState.enableFastLaunch           = NggEnableFastLaunch;
-                nggState.enableFastLaunch           = false;
-                nggState.enableVertexReuse          = NggEnableVertexReuse;
-                nggState.disableBackfaceCulling     = NggDisableBackfaceCulling;
-                nggState.enableFrustumCulling       = NggEnableFrustumCulling;
-                nggState.enableBoxFilterCulling     = NggEnableBoxFilterCulling;
-                nggState.enableSphereCulling        = NggEnableSphereCulling;
-                nggState.enableSmallPrimFilter      = NggEnableSmallPrimFilter;
-            }
-        }
     }
 
     return result;

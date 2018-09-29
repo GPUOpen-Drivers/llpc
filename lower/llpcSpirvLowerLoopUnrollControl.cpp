@@ -127,5 +127,5 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering operations for loop unroll control.
-INITIALIZE_PASS(SpirvLowerLoopUnrollControl, "spirv-lower-loop-unroll-control",
+INITIALIZE_PASS(SpirvLowerLoopUnrollControl, "Spirv-lower-loop-unroll-control",
                 "Set metadata to control LLPC loop unrolling", false, false)

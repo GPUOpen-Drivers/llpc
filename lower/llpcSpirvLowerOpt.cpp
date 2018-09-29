@@ -35,10 +35,13 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 
 #include "SPIRVInternal.h"
-#include "llpcPassLoopUnrollInfoRectify.h"
 #include "llpcSpirvLowerOpt.h"
+#include "llpcSpirvLowerLoopUnrollInfoRectify.h"
+#include "llpcSpirvLowerPeepholeOpt.h"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -80,12 +83,36 @@ bool SpirvLowerOpt::runOnModule(
     legacy::PassManager passMgr;
     PassManagerBuilder passBuilder;
     passBuilder.OptLevel = 3; // -O3
-    passBuilder.SLPVectorize = true;
+
+    passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
+        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+        {
+            passMgr.add(SpirvLowerPeepholeOpt::Create());
+            passMgr.add(createInstSimplifyLegacyPass());
+        });
+    passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
+        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+        {
+            // We run our peephole pass just before the scalarizer to ensure that our simplification optimizations are
+            // performed before the scalarizer. One important case this helps with is when you have bit casts whose
+            // source is a PHI - we want to make sure that the PHI does not have an i8 type before the scalarizer is
+            // called, otherwise a different kind of PHI mess is generated.
+            passMgr.add(SpirvLowerPeepholeOpt::Create());
+
+            // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer allows
+            // us to much more easily identify dead parts of vectors that we do not need to do any computation for.
+            passMgr.add(createScalarizerPass());
+
+            // We add an extra inst simplify here to make sure that dead PHI nodes that are easily identified post
+            // running the scalarizer can be folded away before instruction combining tries to re-create them.
+            passMgr.add(createInstSimplifyLegacyPass());
+        });
     passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
         [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
         {
-           passMgr.add(PassLoopUnrollInfoRectify::Create());
+            passMgr.add(SpirvLowerLoopUnrollInfoRectify::Create());
         });
+
     passBuilder.populateModulePassManager(passMgr);
 
     // Run the other passes.
@@ -98,5 +125,5 @@ bool SpirvLowerOpt::runOnModule(
 
 // =====================================================================================================================
 // Initializes the pass of general optimizations for SPIR-V lowering.
-INITIALIZE_PASS(SpirvLowerOpt, "spirv-lower-opt",
+INITIALIZE_PASS(SpirvLowerOpt, "Spirv-lower-opt",
                 "Lower SPIR-V with general optimizations", false, false)

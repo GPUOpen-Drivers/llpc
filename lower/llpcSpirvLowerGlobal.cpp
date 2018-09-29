@@ -2180,5 +2180,5 @@ void SpirvLowerGlobal::StoreOutputMember(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for globals.
-INITIALIZE_PASS(SpirvLowerGlobal, "spirv-lower-global",
+INITIALIZE_PASS(SpirvLowerGlobal, "Spirv-lower-global",
                 "Lower SPIR-V globals (global variables, inputs, and outputs)", false, false)

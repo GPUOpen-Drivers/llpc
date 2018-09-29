@@ -402,6 +402,8 @@ inline bool isValid(spv::Decoration V) {
   case DecorationMaxByteOffset:
   case DecorationExplicitInterpAMD:
   case DecorationNonUniformEXT:
+  case DecorationHlslCounterBufferGOOGLE:
+  case DecorationHlslSemanticGOOGLE:
     return true;
   default:
     return false;
