@@ -141,7 +141,7 @@ Result Patch::Run(
     passMgr.add(PatchGroupOp::Create());
 
     // Link external libraries and remove dead functions after it
-    passMgr.add(PassExternalLibLink::Create(pContext->GetGlslEmuLibrary()));
+    passMgr.add(PassExternalLibLink::Create(false)); // Not native only
     passMgr.add(PassDeadFuncRemove::Create());
 
     // Function inlining and remove dead functions after it

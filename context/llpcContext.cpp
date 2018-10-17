@@ -50,26 +50,8 @@
 
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "llpcPassNonNativeFuncRemove.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
-
-namespace llvm
-{
-
-namespace cl
-{
-
-// -enable-cache-emu-lib-context: enable the cache of context of GLSL emulation library to file.
-static opt<uint32_t> EnableCacheEmuLibContext("enable-cache-emu-lib-context",
-                                         desc("Enable the cache of context of GLSL emulation library to file"),
-                                         init(0));
-
-extern opt<std::string> ShaderCacheFileDir;
-
-} // cl
-
-} // llvm
 
 using namespace llvm;
 
@@ -103,7 +85,8 @@ Context::Context(
     const WorkaroundFlags* pGpuWorkarounds) // GPU workarounds
     :
     LLVMContext(),
-    m_gfxIp(gfxIp)
+    m_gfxIp(gfxIp),
+    m_glslEmuLib(this)
 {
     std::vector<Metadata*> emptyMeta;
     m_pEmptyMetaNode = MDNode::get(*this, emptyMeta);
@@ -135,159 +118,25 @@ Context::Context(
     m_metaIds.range         = getMDKindID("range");
     m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
 
-    ShaderEntryState glslEmuLibEntryState = {};
-    CacheEntryHandle hGlslEmuLibEntry = nullptr;
-    ShaderEntryState nativeGlslEmuLibEntryState = {};
-    CacheEntryHandle hNativeGlslEmuLibEntry = nullptr;
-    // Initialize shader cache
-    ShaderCacheCreateInfo    createInfo = {};
-    ShaderCacheAuxCreateInfo auxCreateInfo = {};
-    auxCreateInfo.pExecutableName = "__LLPC_CONTEXT_CACHE__";
-    auxCreateInfo.pCacheFilePath = cl::ShaderCacheFileDir.c_str();
-
-    if (cl::ShaderCacheFileDir.empty())
+    // Load external LLVM libraries, in search order.
+    if (pGpuWorkarounds->gfx9.treat1dImagesAs2d)
     {
-#ifdef WIN_OS
-        auxCreateInfo.pCacheFilePath = getenv("LOCALAPPDATA");
-#else
-        LLPC_ASSERT(0);
-#endif
+        // Add library for "treat 1d image as 2d gpu workaround".
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibWaTreat1dImagesAs2d),
+                sizeof(GlslEmuLibWaTreat1dImagesAs2d)), "GlslEmuLibWaTreat1dImagesAs2d"));
     }
-
-    if (cl::EnableCacheEmuLibContext == 1)
+    if (gfxIp.major >= 9)
     {
-        auxCreateInfo.shaderCacheMode = ShaderCacheEnableOnDisk;
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),
+                sizeof(GlslEmuLibGfx9)), "GlslEmuLibGfx9"));
     }
-    else if (cl::EnableCacheEmuLibContext == 2)
+    if (gfxIp.major >= 8)
     {
-        auxCreateInfo.shaderCacheMode = ShaderCacheEnableOnDiskReadOnly;
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx8),
+                sizeof(GlslEmuLibGfx8)), "GlslEmuLibGfx8"));
     }
-    else
-    {
-        auxCreateInfo.shaderCacheMode = ShaderCacheEnableRuntime;
-    }
-
-    auto contextCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
-    MetroHash::MetroHash64 emuLibhasher;
-    emuLibhasher.Update(gfxIp);
-    MetroHash::Hash emuLibHash = {};
-    emuLibhasher.Finalize(emuLibHash.bytes);
-    glslEmuLibEntryState = contextCache->FindShader(emuLibHash, true, &hGlslEmuLibEntry);
-    if (glslEmuLibEntryState == ShaderEntryState::Ready)
-    {
-        BinaryData libBin = {};
-        auto result = contextCache->RetrieveShader(hGlslEmuLibEntry, &libBin.pCode, &libBin.codeSize);
-        m_pGlslEmuLib = LoadLibary(&libBin);
-    }
-
-    bool isNativeLib = true;
-    MetroHash::MetroHash64 nativeEmuLibHasher;
-    nativeEmuLibHasher.Update(gfxIp);
-    nativeEmuLibHasher.Update(isNativeLib);
-    MetroHash::Hash nativeEmuLibHash = {};
-    nativeEmuLibHasher.Finalize(nativeEmuLibHash.bytes);
-
-    nativeGlslEmuLibEntryState = contextCache->FindShader(nativeEmuLibHash, true, &hNativeGlslEmuLibEntry);
-    if (nativeGlslEmuLibEntryState == ShaderEntryState::Ready)
-    {
-        BinaryData libBin = {};
-        auto result = contextCache->RetrieveShader(hNativeGlslEmuLibEntry, &libBin.pCode, &libBin.codeSize);
-        m_pNativeGlslEmuLib = LoadLibary(&libBin);
-    }
-
-    // Load external LLVM libraries
-    if ((m_pNativeGlslEmuLib == nullptr) || (m_pGlslEmuLib == nullptr))
-    {
-        BinaryData libBin = {};
-        libBin.codeSize = sizeof(GlslEmuLib);
-        libBin.pCode    = GlslEmuLib;
-        m_pGlslEmuLib = LoadLibary(&libBin);
-        LLPC_ASSERT(m_pGlslEmuLib != nullptr);
-
-        // Link GFX-independent and GFX-dependent libraries together
-        EnableDebugOutput(false);
-
-        std::unique_ptr<Module> pGlslEmuLibGfx;
-        if (gfxIp.major >= 8)
-        {
-            libBin.codeSize = sizeof(GlslEmuLibGfx8);
-            libBin.pCode = GlslEmuLibGfx8;
-            pGlslEmuLibGfx = LoadLibary(&libBin);
-            LLPC_ASSERT(pGlslEmuLibGfx != nullptr);
-            if (Linker::linkModules(*m_pGlslEmuLib, std::move(pGlslEmuLibGfx), Linker::OverrideFromSrc))
-            {
-                LLPC_ERRS("Fails to link LLVM libraries together\n");
-            }
-        }
-
-        if (gfxIp.major >= 9)
-        {
-            libBin.codeSize = sizeof(GlslEmuLibGfx9);
-            libBin.pCode    = GlslEmuLibGfx9;
-            pGlslEmuLibGfx = LoadLibary(&libBin);
-            LLPC_ASSERT(pGlslEmuLibGfx != nullptr);
-            if (Linker::linkModules(*m_pGlslEmuLib, std::move(pGlslEmuLibGfx), Linker::OverrideFromSrc))
-            {
-                LLPC_ERRS("Fails to link LLVM libraries together\n");
-            }
-        }
-
-       // Link treat 1d image as 2d gpu workaround libraries together
-       if (pGpuWorkarounds->gfx9.treat1dImagesAs2d)
-       {
-            libBin.codeSize = sizeof(GlslEmuLibWaTreat1dImagesAs2d);
-            libBin.pCode    = GlslEmuLibWaTreat1dImagesAs2d;
-            pGlslEmuLibGfx = LoadLibary(&libBin);
-            LLPC_ASSERT(pGlslEmuLibGfx != nullptr);
-            if (Linker::linkModules(*m_pGlslEmuLib, std::move(pGlslEmuLibGfx), Linker::OverrideFromSrc))
-            {
-                LLPC_ERRS("Fails to link LLVM libraries together\n");
-            }
-       }
-
-        // Do function inlining
-        {
-            legacy::PassManager passMgr;
-
-            passMgr.add(createFunctionInliningPass(InlineThreshold));
-
-            if (passMgr.run(*m_pGlslEmuLib) == false)
-            {
-                LLPC_NEVER_CALLED();
-            }
-        }
-
-        if (hGlslEmuLibEntry && (glslEmuLibEntryState == ShaderEntryState::Compiling))
-        {
-            SmallString<1024> glslEmuLibBin;
-            raw_svector_ostream libBinStream(glslEmuLibBin);
-            WriteBitcodeToFile(*m_pGlslEmuLib, libBinStream);
-            contextCache->InsertShader(hGlslEmuLibEntry, glslEmuLibBin.data(), glslEmuLibBin.size());
-            hGlslEmuLibEntry = nullptr;
-        }
-
-        // Remove non-native function for native lib
-        {
-            m_pNativeGlslEmuLib = CloneModule(*m_pGlslEmuLib.get());
-            legacy::PassManager passMgr;
-            passMgr.add(PassNonNativeFuncRemove::Create());
-
-            if (passMgr.run(*m_pNativeGlslEmuLib) == false)
-            {
-                LLPC_NEVER_CALLED();
-            }
-        }
-
-        if (hNativeGlslEmuLibEntry &&  (nativeGlslEmuLibEntryState == ShaderEntryState::Compiling))
-        {
-            SmallString<1024> nativeGlslEmuLibBin;
-            raw_svector_ostream libBinStream(nativeGlslEmuLibBin);
-            WriteBitcodeToFile(*m_pNativeGlslEmuLib, libBinStream);
-            contextCache->InsertShader(hNativeGlslEmuLibEntry, nativeGlslEmuLibBin.data(), nativeGlslEmuLibBin.size());
-        }
-
-        EnableDebugOutput(true);
-    }
+    m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLib),
+            sizeof(GlslEmuLib)), "GlslEmuLib"));
 }
 
 // =====================================================================================================================
@@ -323,82 +172,6 @@ std::unique_ptr<Module> Context::LoadLibary(
     }
 
     return std::move(pLibModule);
-}
-
-// =====================================================================================================================
-// Clones a function from external LLVM library to the specified module.
-Function* Context::CloneLibraryFunction(
-    Module*   pModule,      // [in] LLVM module to which the library function is cloned
-    StringRef funcName      // Function name
-    ) const
-{
-    auto pCloneFunc = pModule->getFunction(funcName);
-    if (pCloneFunc == nullptr)
-    {
-        auto pFunc = m_pGlslEmuLib->getFunction(funcName);
-        LLPC_ASSERT((pFunc != nullptr) && (pFunc->isDeclaration() == false));
-
-        std::unordered_set<Function*> callees;
-
-        // Visit the function body to see if it references more functions
-        for (auto& block : *pFunc)
-        {
-            for (auto& inst : block)
-            {
-                if (isa<CallInst>(&inst))
-                {
-                    auto pCall = cast<CallInst>(&inst);
-                    auto pCallee = pCall->getCalledFunction();
-
-                    if (pCallee != nullptr)
-                    {
-                        // NOTE: All callees must be LLVM native intrinsics because the GLSL emulation library
-                        // is completely inlined.
-                        LLPC_ASSERT(pCallee->isDeclaration());
-                        callees.insert(pCallee);
-                    }
-                }
-            }
-        }
-
-        ValueToValueMapTy valueMap;
-
-        for (auto pCallee : callees)
-        {
-            auto pCloneCallee = Function::Create(pCallee->getFunctionType(),
-                                                 pCallee->getLinkage(),
-                                                 pCallee->getName(),
-                                                 pModule);
-            pCloneCallee->copyAttributesFrom(pCallee);
-            valueMap[pCallee] = pCloneCallee;
-        }
-
-        pCloneFunc = Function::Create(pFunc->getFunctionType(), GlobalValue::PrivateLinkage, funcName, pModule);
-
-        Argument* pCloneArg = pCloneFunc->arg_begin();
-        for (auto& arg : pFunc->args())
-        {
-            pCloneArg->setName(arg.getName());
-            valueMap[&arg] = pCloneArg++;
-        }
-
-        SmallVector<ReturnInst*, 8> retInsts;
-        CloneFunctionInto(pCloneFunc, pFunc, valueMap, true, retInsts);
-
-        // Function with "private" linkage after cloning should be set "dso_local"
-        pCloneFunc->setDSOLocal(true);
-    }
-    else
-    {
-        // If the clone function has already existed, it should have function body
-        if (pCloneFunc->isDeclaration())
-        {
-            LLPC_NEVER_CALLED();
-            pCloneFunc = nullptr;
-        }
-    }
-
-    return pCloneFunc;
 }
 
 // =====================================================================================================================

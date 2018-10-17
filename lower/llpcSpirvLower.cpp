@@ -114,7 +114,7 @@ Result SpirvLower::Run(
     passMgr.add(SpirvLowerResourceCollect::Create());
 
     // Link external native library for constant folding
-    passMgr.add(PassExternalLibLink::Create(pContext->GetNativeGlslEmuLibrary()));
+    passMgr.add(PassExternalLibLink::Create(true)); // Native only
     passMgr.add(PassDeadFuncRemove::Create());
 
     // Function inlining

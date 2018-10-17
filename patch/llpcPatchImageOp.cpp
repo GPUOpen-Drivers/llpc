@@ -382,47 +382,6 @@ void PatchImageOp::visitCallInst(
                 }
             }
         }
-
-        if ((imageCallMeta.OpKind == ImageOpSample) ||
-            (imageCallMeta.OpKind == ImageOpGather) ||
-            (imageCallMeta.OpKind == ImageOpFetch))
-        {
-            // Call optimized version if LOD is provided with constant 0 value
-            if ((mangledName.find(gSPIRVName::ImageCallModLod) != std::string::npos) &&
-                (mangledName.find(gSPIRVName::ImageCallModLodNz) == std::string::npos))
-            {
-                uint32_t argCount = callInst.getNumArgOperands();
-                bool hasConstOffset = (mangledName.find(gSPIRVName::ImageCallModConstOffset) != std::string::npos);
-                // For all supported image operations, LOD argument is the second to last operand or third to last
-                // operand if constant offset is persent.
-                uint32_t lodArgIdx = hasConstOffset ? (argCount - 3) : (argCount - 2);
-
-                // If LOD argument is constant 0, call zero-LOD version of image operation implementation
-                auto pLod = callInst.getArgOperand(lodArgIdx);
-                if (isa<Constant>(*pLod) && cast<Constant>(pLod)->isZeroValue())
-                {
-                    for (uint32_t i = 0; i < callInst.getNumArgOperands(); ++i)
-                    {
-                        Value* pArg = callInst.getArgOperand(i);
-                        args.push_back(pArg);
-                    }
-
-                    std::string callNameLodz = callName.replace(callName.find(gSPIRVName::ImageCallModLod),
-                                                                strlen(gSPIRVName::ImageCallModLod),
-                                                                gSPIRVName::ImageCallModLodz);
-                    CallInst* pImageCall = cast<CallInst>(EmitCall(m_pModule,
-                                                                   callNameLodz,
-                                                                   callInst.getType(),
-                                                                   args,
-                                                                   NoAttrib,
-                                                                   &callInst));
-
-                    callInst.replaceAllUsesWith(pImageCall);
-
-                    m_imageCalls.insert(&callInst);
-                }
-            }
-        }
     }
 }
 

@@ -266,12 +266,12 @@ target_sources(llpc PRIVATE
 target_sources(llpc PRIVATE
     util/llpcElf.cpp
     util/llpcDebug.cpp
+    util/llpcEmuLib.cpp
     util/llpcInternal.cpp
     util/llpcFile.cpp
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
     util/llpcPassLoopInfoCollect.cpp
-    util/llpcPassNonNativeFuncRemove.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp
 )

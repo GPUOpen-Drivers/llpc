@@ -47,9 +47,7 @@ SPIRV_IMAGE_OPERAND_DREF_MODIFIER           = "dref"
 SPIRV_IMAGE_OPERAND_PROJ_MODIFIER           = "proj"
 SPIRV_IMAGE_OPERAND_BIAS_MODIFIER           = "bias"
 SPIRV_IMAGE_OPERAND_LOD_MODIFIER            = "lod"
-SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER        = "lod|lodz"
 SPIRV_IMAGE_OPERAND_LODNZ_MODIFIER          = "lodnz"
-SPIRV_IMAGE_OPERAND_LODZ_MODIFIER           = "lodz"
 SPIRV_IMAGE_OPERAND_GRAD_MODIFIER           = "grad"
 SPIRV_IMAGE_OPERAND_CONSTOFFSET_MODIFIER    = "constoffset"
 SPIRV_IMAGE_OPERAND_OFFSET_MODIFIER         = "offset"
@@ -287,7 +285,6 @@ class FuncDef(object):
         self._atomicData        = other._atomicData
         self._resource          = other._resource
 
-        self._supportLzOptimization    = other._supportLzOptimization
         self._supportSparse     = other._supportSparse
         self._mangledName       = other._mangledName
         pass
@@ -334,9 +331,6 @@ class FuncDef(object):
         self._atomicData        = FuncDef.INVALID_VAR
         self._resource          = VarNames.resource
 
-        # For zero-LOD optimization, will generate 2 version of function, a lz optimized version which uses
-        # zero-LOD instruction, and a normal version uses lod instruction.
-        self._supportLzOptimization    = (mangledName.find(SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER) != -1)
         self._supportSparse     = (mangledName.find(SPIRV_IMAGE_SPARSE_MODIFIER) != -1)
         self._mangledName       = mangledName
         pass
@@ -370,10 +364,6 @@ class FuncDef(object):
             elif t == SPIRV_IMAGE_OPERAND_BIAS_MODIFIER:
                 self._hasBias           = True
             elif t == SPIRV_IMAGE_OPERAND_LOD_MODIFIER:
-                self._hasLod            = True
-            elif t == SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER:
-                self._hasLod            = True
-            elif t == SPIRV_IMAGE_OPERAND_LODZ_MODIFIER:
                 self._hasLod            = True
             elif t == SPIRV_IMAGE_OPERAND_LODNZ_MODIFIER:
                 self._hasLodNz          = True
@@ -449,29 +439,11 @@ class CodeGen(FuncDef):
         if self._supportSparse:
             # Generate sparse version
             codeGen = CodeGen(self, self._gfxLevel)
-            codeGen._genWithLzOptimization(irOut)
+            codeGen._genWithDimAware(irOut)
 
             # Turn off sparse support
             self._supportSparse = False
 
-        # Generate normal version
-        codeGen = CodeGen(self, self._gfxLevel)
-        codeGen._genWithLzOptimization(irOut)
-        pass
-
-    # Generate both normal and zero-LOD optimized version
-    def _genWithLzOptimization(self, irOut):
-        if self._supportLzOptimization:
-            # Generate zero-LOD optimized version
-            self._mangledName = self._mangledName.replace(SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER,
-                                                          SPIRV_IMAGE_OPERAND_LODZ_MODIFIER)
-            codeGen = CodeGen(self, self._gfxLevel)
-            codeGen._genWithDimAware(irOut)
-
-            # Turn off zero-LOD optimization
-            self._supportLzOptimization = False
-            self._mangledName = self._mangledName.replace(SPIRV_IMAGE_OPERAND_LODZ_MODIFIER,
-                                                          SPIRV_IMAGE_OPERAND_LOD_MODIFIER)
         # Generate normal version
         codeGen = CodeGen(self, self._gfxLevel)
         codeGen._genWithDimAware(irOut)
@@ -1864,7 +1836,7 @@ class DimAwareImageLoadGen(CodeGen):
                     params += ", i32 %s" % (self._coordXYZW[arrayIndex])
 
         # Lod
-        if self._hasLod and not self._supportLzOptimization:
+        if self._hasLod:
             if paramTypeOnly:
                 params += ", i32"
             else:
@@ -1913,7 +1885,7 @@ class DimAwareImageLoadGen(CodeGen):
     def getIntrinsicName(self, isFetchingFromFmask):
         funcName = "llvm.amdgcn.image.load"
 
-        if self._hasLod and not self._supportLzOptimization:
+        if self._hasLod:
             funcName += ".mip"
 
         if isFetchingFromFmask:
@@ -2344,10 +2316,8 @@ class DimAwareImageSampleGen(CodeGen):
 
         if self._hasBias:
             funcName += ".b"
-        elif self._hasLod and not self._supportLzOptimization:
+        elif self._hasLod:
             funcName += ".l"
-        elif self._hasLod and self._supportLzOptimization:
-            funcName += ".lz"
         elif self._hasGrad:
             funcName += ".d"
 
@@ -2484,7 +2454,7 @@ class DimAwareImageSampleGen(CodeGen):
                 params += ", float %s" % (self._minlod)
 
         # Lod
-        if self._hasLod and not self._supportLzOptimization:
+        if self._hasLod:
             if paramTypeOnly:
                 params += ", float"
             else:
@@ -2557,9 +2527,7 @@ def processLine(irOut, funcConfig, gfxLevel):
     # 4.  proj                                              (optional)
     # 5.  dref                                              (optional)
     # 6.  bias                                              (optional)
-    # 7.  lod or lod|lodz                                   (optional)
-    #         lod|lodz means lz optimization is enabled for this function, besides normal lod version, an additional
-    #         lodz version will also be generated, which leverages hardware lz instructions.
+    # 7.  lod                                               (optional)
     # 8.  grad                                              (optional)
     # 9.  constoffset                                       (optional)
     # 10. offset                                            (optional)
@@ -2568,6 +2536,8 @@ def processLine(irOut, funcConfig, gfxLevel):
     # 13. minlod                                            (optional)
     # 14. fmaskbased                                        (optional)
     # 15. fmaskid                                           (optional)
+    # 16. lodnz                                             (optional)
+    #         Apply to gather instructions, indicates lz version of instruction should not be used.
     #         returns index of fragment which is encoded in Fmask.
     # Dimension string: All supported dimensions are packed in a dimension string, as a configuration token.
     # Dimension string format:
@@ -2655,141 +2625,6 @@ def outputLlvmAttributes(irOut):
         irOut.write("%s\n" % (LLVM_ATTRIBUTES[i]))
     pass
 
-def outputPreDefinedFunctions(irOut):
-    transformCubeGrad = """\
-define <4 x float> @llpc.image.transformCubeGrad(float %cubeId, float %cubeMa, float %faceCoordX, float %faceCoordY, float %gradX.x, float %gradX.y, float %gradX.z, float %gradY.x, float %gradY.y, float %gradY.z) #0
-{
-    ; When sampling cubemap with explicit gradient value, API supplied gradients are cube vectors,
-    ; need to transform them to face gradients for the selected face.
-    ; Mapping of MajorAxis, U-Axis, V-Axis is (according to DXSDK doc and refrast):
-    ;   face_id | MajorAxis | FaceUAxis | FaceVAxis
-    ;   0       | +X        | -Z        | -Y
-    ;   1       | -X        | +Z        | -Y
-    ;   2       | +Y        | +X        | +Z
-    ;   3       | -Y        | +X        | -Z
-    ;   4       | +Z        | +X        | -Y
-    ;   5       | -Z        | -X        | -Y
-    ;   (Major Axis is defined by enum D3D11_TEXTURECUBE_FACE in d3d ddk header file (d3d11.h in DX11DDK).)
-    ;
-    ; Parameters used to convert cube gradient vector to face gradient (face ids are in floats because HW returns floats):
-    ;   face_id | faceidPos    | faceNeg   | flipU | flipV
-    ;   0.0     | 0.0          | false     | true  | true
-    ;   1.0     | 0.0          | true      | false | true
-    ;   2.0     | 1.0          | false     | false | false
-    ;   3.0     | 1.0          | true      | false | true
-    ;   4.0     | 2.0          | false     | false | true
-    ;   5.0     | 2.0          | true      | true  | true
-
-    ; faceidHalf = faceid * 0.5
-    %1 = fmul float %cubeId, 0.5
-    ; faceidPos = round_zero(faceidHalf)
-    ;   faceidPos is: 0.0 (X axis) when face id is 0.0 or 1.0;
-    ;                 1.0 (Y axis) when face id is 2.0 or 3.0;
-    ;                 2.0 (Z axis) when face id is 4.0 or 5.0;
-    %2 = call float @llvm.trunc.f32(float %1)
-    ; faceNeg = (faceIdPos != faceIdHalf)
-    ;   faceNeg is true when major axis is negative, this corresponds to             face id being 1.0, 3.0, or 5.0
-    %3 = fcmp one float %2, %1
-    ; faceIsY = (faceidPos == 1.0);
-    %4 = fcmp oeq float %2, 1.0
-    ; flipU is true when U-axis is negative, this corresponds to face id being 0.0 or 5.0.
-    %5 = fcmp oeq float %cubeId, 5.0
-    %6 = fcmp oeq float %cubeId, 0.0
-    %7 = or i1 %5, %6
-    ; flipV is true when V-axis is negative, this corresponds to face id being             anything other than 2.0.
-    ; flipV = (faceid != 2.0);
-    %8 = fcmp one float %cubeId, 2.0
-    ; major2.x = 1/major.x * 1/major.x * 0.5;
-    ;          = 1/(2*major.x) * 1/(2*major.x) * 2
-    %9 = fdiv float 1.0, %cubeMa
-    %10 = fmul float %9, %9
-    %11 = fmul float %10, 2.0
-    ; majorDeriv.x = (faceidPos == 0.0) ? grad.x : grad.z;
-    %12 = fcmp oeq float %2, 0.0
-    %13 = select i1 %12, float %gradX.x, float %gradX.z
-    ; majorDeriv.x = (faceIsY == 0) ? majorDeriv.x : grad.y;
-    %14 = icmp eq i1 %4, 0
-    %15 = select i1 %14, float %13, float %gradX.y
-    ; majorDeriv.x = (faceNeg == 0.0) ? majorDeriv.x : (-majorDeriv.x);
-    %16 = icmp eq i1 %3, 0
-    %17 = fmul float %15, -1.0
-    %18 = select i1 %16, float %15, float %17
-    ; faceDeriv.x = (faceidPos == 0.0) ? grad.z : grad.x;
-    %19 = fcmp oeq float %2, 0.0
-    %20 = select i1 %19, float %gradX.z, float %gradX.x
-    ; faceDeriv.x = (flipU == 0) ? faceDeriv.x : (-faceDeriv.x);
-    %21 = icmp eq i1 %7, 0
-    %22 = fmul float %20, -1.0
-    %23 = select i1 %21, float %20, float %22
-    ; faceDeriv.y = (faceIsY == 0) ? grad.y : grad.z;
-    %24 = icmp eq i1 %4, 0
-    %25 = select i1 %24, float %gradX.y, float %gradX.z
-    ; faceDeriv.y = (flipV == 0) ? faceDeriv.y : (-faceDeriv.y);
-    %26 = icmp eq i1 %8, 0
-    %27 = fmul float %25, -1.0
-    %28 = select i1 %26, float %25, float %27
-    ; faceDeriv.xy = major.xx * faceDeriv.xy;
-    %29 = fmul float %cubeMa, 0.5
-    %30 = fmul float %23, %29
-    %31 = fmul float %28, %29
-    ; faceDeriv.xy = (-faceCrd.xy) * majorDeriv.xx + faceDeriv.xy;
-    %32 = fmul float %faceCoordX, -1.0
-    %33 = fmul float %faceCoordY, -1.0
-    %34 = fmul float %32, %18
-    %35 = fmul float %33, %18
-    %36 = fadd float %34, %30
-    %37 = fadd float %35, %31
-    ; grad.xy = faceDeriv.xy * major2.xx;
-    %38 = fmul float %36, %11
-    %39 = fmul float %37, %11
-    ; majorDeriv.x = (faceidPos == 0.0) ? grad.x : grad.z;
-    %40 = fcmp oeq float %2, 0.0
-    %41 = select i1 %40, float %gradY.x, float %gradY.z
-    ; majorDeriv.x = (faceIsY == 0) ? majorDeriv.x : grad.y;
-    %42 = icmp eq i1 %4, 0
-    %43 = select i1 %42, float %41, float %gradY.y
-    ; majorDeriv.x = (faceNeg == 0.0) ? majorDeriv.x : (-majorDeriv.x);
-    %44 = icmp eq i1 %3, 0
-    %45 = fmul float %43, -1.0
-    %46 = select i1 %44, float %43, float %45
-    ; faceDeriv.x = (faceidPos == 0.0) ? grad.z : grad.x;
-    %47 = fcmp oeq float %2, 0.0
-    %48 = select i1 %47, float %gradY.z, float %gradY.x
-    ; faceDeriv.x = (flipU == 0) ? faceDeriv.x : (-faceDeriv.x);
-    %49 = icmp eq i1 %7, 0
-    %50 = fmul float %48, -1.0
-    %51 = select i1 %49, float %48, float %50
-    ; faceDeriv.y = (faceIsY == 0) ? grad.y : grad.z;
-    %52 = icmp eq i1 %4, 0
-    %53 = select i1 %52, float %gradY.y, float %gradY.z
-    ; faceDeriv.y = (flipV == 0) ? faceDeriv.y : (-faceDeriv.y);
-    %54 = icmp eq i1 %8, 0
-    %55 = fmul float %53, -1.0
-    %56 = select i1 %54, float %53, float %55
-    ; faceDeriv.xy = major.xx * faceDeriv.xy;
-    %57 = fmul float %cubeMa, 0.5
-    %58 = fmul float %51, %57
-    %59 = fmul float %56, %57
-    ; faceDeriv.xy = (-faceCrd.xy) * majorDeriv.xx + faceDeriv.xy;
-    %60 = fmul float %faceCoordX, -1.0
-    %61 = fmul float %faceCoordY, -1.0
-    %62 = fmul float %60, %46
-    %63 = fmul float %61, %46
-    %64 = fadd float %62, %58
-    %65 = fadd float %63, %59
-    ; grad.xy = faceDeriv.xy * major2.xx;
-    %66 = fmul float %64, %11
-    %67 = fmul float %65, %11
-    %68 = insertelement <4 x float> undef, float %38, i32 0
-    %69 = insertelement <4 x float> %68, float %39, i32 1
-    %70 = insertelement <4 x float> %69, float %66, i32 2
-    %71 = insertelement <4 x float> %70, float %67, i32 3
-    ret <4 x float> %71
-}
-
-"""
-    irOut.write(transformCubeGrad)
-
 # Outputs header contents.
 def outputLlvmHeader(irOut):
     header = """\
@@ -2821,7 +2656,7 @@ target triple = "spir64-unknown-unknown"
     pass
 
 # Processes each listed image function configuration
-def processList(irOut, listIn, gfxLevel):
+def processList(outDir, listIn, gfxLevel):
     print("===  Process list: " + os.path.split(listIn)[1])
 
     fList = open(listIn, 'rt')
@@ -2830,7 +2665,19 @@ def processList(irOut, listIn, gfxLevel):
         isComment = line.startswith('#')
         isEmpty = len(line.strip()) == 0
         if not isComment and not isEmpty:
+            outFile = outDir + "/g_" + line.replace("|", "_") + ".ll"
+            irOut = open(outFile, 'wt')
+
+            initLlvmDecls(gfxLevel)
+            outputLlvmHeader(irOut)
+
             processLine(irOut, line, gfxLevel)
+
+            outputLlvmDecls(irOut)
+            outputLlvmAttributes(irOut)
+            outputLlvmMetadata(irOut)
+            irOut.close()
+
     fList.close()
 
     print("")
@@ -2838,6 +2685,8 @@ def processList(irOut, listIn, gfxLevel):
 
 # Initializes necessary LLVM function declarations.
 def initLlvmDecls(gfxLevel):
+    global LLVM_DECLS
+    LLVM_DECLS = {}
     addLlvmDecl(LLPC_DESCRIPTOR_LOAD_SAMPLER, "declare <4 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
             LLPC_DESCRIPTOR_LOAD_SAMPLER))
     addLlvmDecl(LLPC_DESCRIPTOR_LOAD_RESOURCE, "declare <8 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
@@ -2856,6 +2705,7 @@ def initLlvmDecls(gfxLevel):
     addLlvmDecl("llvm.trunc.f32", "declare float @llvm.trunc.f32(float) #0\n")
     addLlvmDecl(LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE, "declare <8 x i32> @%s(<8 x i32>) #0\n" % (\
             LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE))
+    addLlvmDecl("llpc.image.transformCubeGrad", "declare <4 x float> @llpc.image.transformCubeGrad(float %cubeId, float %cubeMa, float %faceCoordX, float %faceCoordY, float %gradX.x, float %gradX.y, float %gradX.z, float %gradY.x, float %gradY.y, float %gradY.z) #0\n")
     if gfxLevel < GFX9:
         addLlvmDecl("llpc.patch.image.gather.check",
                     "declare i1 @llpc.patch.image.gather.check(<8 x i32>) #0\n")
@@ -2876,20 +2726,10 @@ def initLlvmDecls(gfxLevel):
         addLlvmDecl("llpc.patch.image.gather.texel.i32",
                     "declare <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32>, <4 x float>) #0\n")
 
-def main(inFile, outFile, gfxLevelStr):
+def main(inFile, outDir, gfxLevelStr):
     gfxLevel = float(gfxLevelStr[3:])
-    irOut = open(outFile, 'wt')
 
-    initLlvmDecls(gfxLevel)
-    outputLlvmHeader(irOut)
-    outputPreDefinedFunctions(irOut)
-
-    processList(irOut, inFile, gfxLevel)
-
-    outputLlvmDecls(irOut)
-    outputLlvmAttributes(irOut)
-    outputLlvmMetadata(irOut)
-    irOut.close()
+    processList(outDir, inFile, gfxLevel)
 
 if __name__ == "__main__":
     main(sys.argv[1], sys.argv[2], sys.argv[3])

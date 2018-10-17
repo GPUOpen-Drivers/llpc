@@ -919,14 +919,35 @@ define void @llpc.buffer.atomic.store.f32(
     ret void
 }
 
+; Gets buffer address with specified offset from buffer descriptor
+define i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset) #0
+{
+    ; Extract BASE_ADDRESS (low)
+    %1 = extractelement <4 x i32> %desc, i32 0
+    ; Extract BASE_ADDRESS_HI
+    %2 = extractelement <4 x i32> %desc, i32 1
+    %3 = and i32 %2, 65535
+    ; Build 64-bit BASE_ADDRESS
+    %4 = insertelement <2 x i32> undef, i32 %1, i32 0
+    %5 = insertelement <2 x i32> %4, i32 %3, i32 1
+    %6 = bitcast <2 x i32> %5 to i64
+    ; Add offset
+    %7 = zext i32 %memberOffset to i64
+    %8 = add i64 %6, %7
+    ; Cast to const buffer pointer
+    %9 = inttoptr i64 %8 to i64 addrspace(1)*
+    ret  i64 addrspace(1)* %9
+}
+
 ; GLSL: uint64_t atomicAdd(inout uint64_t, uint64_t)
 ;       int64_t  atomicAdd(inout int64_t, int64_t)
 define i64 @llpc.buffer.atomic.iadd.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile add i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicSub(inout uint64_t, uint64_t)
@@ -935,8 +956,9 @@ define i64 @llpc.buffer.atomic.isub.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile sub i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicMin(inout uint64_t, uint64_t)
@@ -944,8 +966,9 @@ define i64 @llpc.buffer.atomic.umin.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile umin i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: int64_t atomicMin(inout int64_t, int64_t)
@@ -953,8 +976,9 @@ define i64 @llpc.buffer.atomic.smin.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile min i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicMax(inout uint64_t, uint64_t)
@@ -962,8 +986,9 @@ define i64 @llpc.buffer.atomic.umax.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile umax i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: int64_t atomicMax(inout int64_t, int64_t)
@@ -971,8 +996,9 @@ define i64 @llpc.buffer.atomic.smax.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile max i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicAnd(inout uint64_t, uint64_t)
@@ -981,8 +1007,9 @@ define i64 @llpc.buffer.atomic.and.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile and i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicOr(inout uint64_t, uint64_t)
@@ -991,8 +1018,9 @@ define i64 @llpc.buffer.atomic.or.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile or i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicXor(inout uint64_t, uint64_t)
@@ -1001,8 +1029,9 @@ define i64 @llpc.buffer.atomic.xor.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile xor i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicExchange(inout uint64_t, uint64_t)
@@ -1011,8 +1040,9 @@ define i64 @llpc.buffer.atomic.exchange.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = atomicrmw volatile xchg i64 addrspace(1)* %1, i64 %data seq_cst
+    ret i64 %2
 }
 
 ; GLSL: uint64_t atomicCompSwap(inout uint64_t, uint64_t, uint64_t)
@@ -1021,8 +1051,10 @@ define i64 @llpc.buffer.atomic.compareexchange.i64(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i64 %compare, i1 %slc, i1 %nonUniform) #0
 {
     %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    ; Support 64-bit buffer atomic operations.
-    ret i64 0
+    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
+    %2 = cmpxchg i64 addrspace(1)* %1, i64 %compare, i64 %data seq_cst monotonic
+    %3 = extractvalue { i64, i1 } %2, 0
+    ret i64 %3
 }
 
 ; GLSL: uint64_t atomicIncrement(inout uint64_t)

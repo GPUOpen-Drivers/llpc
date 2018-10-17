@@ -618,7 +618,6 @@ void PipelineContext::InitShaderResourceUsage(
         }
 
         pResUsage->inOutUsage.fs.cbShaderMask = 0;
-        pResUsage->inOutUsage.fs.dualSourceBlend = false;
         pResUsage->inOutUsage.fs.pViewIndex = nullptr;
     }
 }

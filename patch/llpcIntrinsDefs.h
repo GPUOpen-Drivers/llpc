@@ -280,7 +280,7 @@ union SqBufRsrcWord3
     uint32_t u32All;
 };
 
-// Represent register fileds of PA_SU_SC_MODE_CNTL
+// Represent register fields of PA_SU_SC_MODE_CNTL
 union PaSuScModeCntl
 {
     struct
@@ -315,7 +315,68 @@ union PaSuScModeCntl
 
 };
 
-// =====================================================================================================================
+// Represent register fields of PA_CL_CLIP_CNTL
+union PaClClipCntl
+{
+    struct
+    {
+		uint32_t UCP_ENA_0                  : 1;
+		uint32_t UCP_ENA_1                  : 1;
+		uint32_t UCP_ENA_2                  : 1;
+		uint32_t UCP_ENA_3                  : 1;
+		uint32_t UCP_ENA_4                  : 1;
+		uint32_t UCP_ENA_5                  : 1;
+		uint32_t                            : 7;
+		uint32_t PS_UCP_Y_SCALE_NEG         : 1;
+		uint32_t PS_UCP_MODE                : 2;
+		uint32_t CLIP_DISABLE               : 1;
+		uint32_t UCP_CULL_ONLY_ENA          : 1;
+		uint32_t BOUNDARY_EDGE_FLAG_ENA     : 1;
+		uint32_t DX_CLIP_SPACE_DEF          : 1;
+		uint32_t DIS_CLIP_ERR_DETECT        : 1;
+		uint32_t VTX_KILL_OR                : 1;
+		uint32_t DX_RASTERIZATION_KILL      : 1;
+		uint32_t                            : 1;
+		uint32_t DX_LINEAR_ATTR_CLIP_ENA    : 1;
+		uint32_t VTE_VPORT_PROVOKE_DISABLE  : 1;
+		uint32_t ZCLIP_NEAR_DISABLE         : 1;
+		uint32_t ZCLIP_FAR_DISABLE          : 1;
+		uint32_t                            : 4;
+	} bits;
+
+	uint32_t u32All;
+};
+
+// Represent register fields PA_CL_VTE_CNTL
+union PaClVteCntl
+{
+    struct
+    {
+		uint32_t VPORT_X_SCALE_ENA      : 1;
+		uint32_t VPORT_X_OFFSET_ENA     : 1;
+		uint32_t VPORT_Y_SCALE_ENA      : 1;
+		uint32_t VPORT_Y_OFFSET_ENA     : 1;
+		uint32_t VPORT_Z_SCALE_ENA      : 1;
+		uint32_t VPORT_Z_OFFSET_ENA     : 1;
+		uint32_t                        : 2;
+		uint32_t VTX_XY_FMT             : 1;
+		uint32_t VTX_Z_FMT              : 1;
+		uint32_t VTX_W0_FMT             : 1;
+		uint32_t PERFCOUNTER_REF        : 1;
+		uint32_t                        : 20;
+	} bits;
+
+	uint32_t u32All;
+};
+
+// Enumerates how to render front-facing polygons
+enum PolyModeType
+{
+    POLY_MODE_POINTS        = 0,
+    POLY_MODE_LINES         = 1,
+    POLY_MODE_TRIANGLES     = 2,
+};
+
 // Represents the coherent flag used in buffer intrinsics
 union CoherentFlag
 {
@@ -329,7 +390,6 @@ union CoherentFlag
     uint32_t u32All;
 };
 
-// =====================================================================================================================
 // Represents the combine format used in tbuffer intrinsics
 union CombineFormat
 {

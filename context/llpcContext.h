@@ -39,6 +39,7 @@
 #include <unordered_set>
 #include "spirvExt.h"
 
+#include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 
 namespace Llpc
@@ -68,18 +69,6 @@ public:
     PipelineContext* GetPipelineContext() const
     {
         return m_pPipelineContext;
-    }
-
-    // Gets the library that is responsible for GLSL emulation.
-    llvm::Module* GetGlslEmuLibrary() const
-    {
-        return m_pGlslEmuLib.get();
-    }
-
-    // Gets the library that is responsible for GLSL emulation with LLVM native instructions and intrinsics.
-    llvm::Module* GetNativeGlslEmuLibrary() const
-    {
-        return m_pNativeGlslEmuLib.get();
     }
 
     // Sets the target machine.
@@ -129,8 +118,6 @@ public:
     uint32_t MetaIdUniform() const { return m_metaIds.uniform; }
 
     std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
-
-    llvm::Function* CloneLibraryFunction(llvm::Module* pModule, llvm::StringRef funcName) const;
 
     // Wrappers of interfaces of pipeline context
     ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage)
@@ -257,6 +244,11 @@ public:
     // Sets triple and data layout in specified module from the context's target machine.
     void SetModuleTargetMachine(llvm::Module* pModule);
 
+    EmuLib* GetGlslEmuLib()
+    {
+        return &m_glslEmuLib;
+    }
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);
@@ -265,8 +257,7 @@ private:
 
     GfxIpVersion                  m_gfxIp;             // Graphics IP version info
     PipelineContext*              m_pPipelineContext;  // Pipeline-specific context
-    std::unique_ptr<llvm::Module> m_pGlslEmuLib;       // LLVM library for GLSL emulation
-    std::unique_ptr<llvm::Module> m_pNativeGlslEmuLib; // Native LLVM library for GLSL emulation
+    EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine

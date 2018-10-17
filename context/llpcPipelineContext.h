@@ -458,7 +458,6 @@ struct ResourceUsage
             BasicType    outputTypes[MaxColorTargets];  // Array of basic types of fragment outputs
             uint32_t     cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
             llvm::Value* pViewIndex;                    // View Index
-            bool         dualSourceBlend;               // Whether dual source blending is detected
         } fs;
     } inOutUsage;
 };

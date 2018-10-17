@@ -56,12 +56,12 @@ class PassExternalLibLink
     public llvm::ModulePass
 {
 public:
-    PassExternalLibLink(llvm::Module* pExternalLib = nullptr);
+    PassExternalLibLink(bool nativeOnly = false);
 
     virtual bool runOnModule(llvm::Module& module);
 
     // Pass creator, creates the LLVM pass for linking external library of LLVM IR
-    static llvm::ModulePass* Create(llvm::Module* pExternalLib) { return new PassExternalLibLink(pExternalLib); }
+    static llvm::ModulePass* Create(bool nativeOnly) { return new PassExternalLibLink(nativeOnly); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PassExternalLibLink);
 
-    llvm::Module* m_pExternalLib;
+    bool m_nativeOnly;  // Whether to only link native functions
 };
 
 } // Llpc

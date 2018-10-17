@@ -1798,7 +1798,6 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         cl::ShaderReplaceMode.ArgStr,
         cl::ShaderReplaceDir.ArgStr,
         cl::ShaderReplacePipelineHashes.ArgStr,
-        cl::EnablePipelineDump.ArgStr,
         cl::EnableOuts.ArgStr,
         cl::EnableErrs.ArgStr,
         cl::LogFileDbgs.ArgStr,
@@ -1811,7 +1810,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     // Build effecting options
     for (uint32_t i = 1; i < optionCount; ++i)
     {
-        StringRef option = pOptions[i];
+        StringRef option = pOptions[i] + 1;  // Skip '-' in options
         bool ignore = false;
         for (uint32_t j = 0; j < sizeof(IgnoredOptions) / sizeof(IgnoredOptions[0]); ++j)
         {
@@ -1978,6 +1977,7 @@ Result Compiler::CreateShaderCache(
 void Compiler::InitGpuProperty()
 {
     // Initial settings (could be adjusted later according to graphics IP version info)
+    memset(&m_gpuProperty, 0, sizeof(m_gpuProperty));
     m_gpuProperty.waveSize = 64;
 
     m_gpuProperty.ldsSizePerCu = (m_gfxIp.major > 6) ? 65536 : 32768;

@@ -224,7 +224,7 @@ void SpirvLowerPeepholeOpt::visitBitCast(
     if (PHINode* const pPhiNode = dyn_cast<PHINode>(bitCast.getOperand(0)))
     {
         // We only want to push bitcasts where the PHI node is an i8, as it'll save us PHI nodes later.
-        if (pPhiNode->getType()->getScalarSizeInBits() > 8)
+        if (pPhiNode->getType()->getScalarSizeInBits() != 8)
         {
             return;
         }

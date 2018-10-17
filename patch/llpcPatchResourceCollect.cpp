@@ -1058,7 +1058,7 @@ void PatchResourceCollect::MatchGenericInOut()
             if (m_shaderStage == ShaderStageFragment)
             {
                 uint32_t location = locMap.first;
-                if (inOutUsage.fs.dualSourceBlend && location == 1)
+                if (pPipelineInfo->cbState.dualSourceBlendEnable && (location == 1))
                 {
                     location = 0;
                 }

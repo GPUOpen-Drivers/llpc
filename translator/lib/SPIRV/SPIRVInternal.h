@@ -349,7 +349,6 @@ namespace gSPIRVName {
   const static char ImageCallModProj[]                    = ".proj";
   const static char ImageCallModBias[]                    = ".bias";
   const static char ImageCallModLod[]                     = ".lod";
-  const static char ImageCallModLodz[]                    = ".lodz";
   const static char ImageCallModLodNz[]                   = ".lodnz";
   const static char ImageCallModGrad[]                    = ".grad";
   const static char ImageCallModConstOffset[]             = ".constoffset";
