@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-code-gen-manager"
 
-#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -221,7 +220,7 @@ Result CodeGenManager::GenerateCode(
 
     if (cl::EmitLlvm)
     {
-        WriteBitcodeToFile(*pModule, outStream);
+        outStream << *pModule;
         return result;
     }
 

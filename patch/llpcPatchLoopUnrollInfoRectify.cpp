@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerLoopUnrollInfoRectify.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerLoopUnrollInfoRectify.
+ * @file  llpcPatchLoopUnrollInfoRectify.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::PatchLoopUnrollInfoRectify.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-info-rectify"
+#define DEBUG_TYPE "llpc-patch-loop-unroll-info-rectify"
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -39,7 +39,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcSpirvLowerLoopUnrollInfoRectify.h"
+#include "llpcPatchLoopUnrollInfoRectify.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -56,22 +56,32 @@ namespace Llpc
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char SpirvLowerLoopUnrollInfoRectify::ID;
+char PatchLoopUnrollInfoRectify::ID;
 
 // =====================================================================================================================
-SpirvLowerLoopUnrollInfoRectify::SpirvLowerLoopUnrollInfoRectify()
+PatchLoopUnrollInfoRectify::PatchLoopUnrollInfoRectify()
     :
     FunctionPass(ID)
 {
-    initializeSpirvLowerLoopUnrollInfoRectifyPass(*PassRegistry::getPassRegistry());
+    initializePatchLoopUnrollInfoRectifyPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
-bool SpirvLowerLoopUnrollInfoRectify::runOnFunction(
+bool PatchLoopUnrollInfoRectify::runOnFunction(
     Function& function) // [in,out] Function that we will rectify any loop unroll information.
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Loop-Unroll-Info-Rectify\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Loop-Unroll-Info-Rectify\n");
+
+    // First check if any Whole Wave Mode (WWM) intrinsics are used in the function, and if so we do not do any extra
+    // detection on the loop unroll count.
+    for (const Function& otherFunction : function.getParent()->functions())
+    {
+        if (Intrinsic::amdgcn_wwm == otherFunction.getIntrinsicID())
+        {
+            return false;
+        }
+    }
 
     bool modified = false;
 
@@ -149,7 +159,7 @@ bool SpirvLowerLoopUnrollInfoRectify::runOnFunction(
 
 // =====================================================================================================================
 // Specify what analysis passes this pass depends on.
-void SpirvLowerLoopUnrollInfoRectify::getAnalysisUsage(
+void PatchLoopUnrollInfoRectify::getAnalysisUsage(
     AnalysisUsage& analysisUsage // [in,out] The place to record our analysis pass usage requirements.
     ) const
 {
@@ -162,9 +172,9 @@ void SpirvLowerLoopUnrollInfoRectify::getAnalysisUsage(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for rectifying unroll information.
-INITIALIZE_PASS(SpirvLowerLoopUnrollInfoRectify, "Spirv-lower-loop-unroll-info-rectify",
-    "Lower SPIR-V loop unroll info rectifying", false, false)
+// Initializes the pass of LLVM patching operations for rectifying unroll information.
+INITIALIZE_PASS(PatchLoopUnrollInfoRectify, "Patch-loop-unroll-info-rectify",
+    "Patch LLVM for loop unroll info rectifying", false, false)
 
 // =====================================================================================================================
 // Definitions for our static helper functions.

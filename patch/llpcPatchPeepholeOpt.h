@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerPeepholeOpt.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerPeepholeOpt.
+ * @file  llpcPatchPeepholeOpt.h
+ * @brief LLPC header file: contains declaration of class Llpc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -42,7 +42,7 @@ namespace llvm
 {
 
 class PassRegistry;
-void initializeSpirvLowerPeepholeOptPass(PassRegistry&);
+void initializePatchPeepholeOptPass(PassRegistry&);
 
 } // llvm
 
@@ -50,7 +50,7 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for peephole optimizations, with the following patterns covered:
+// Represents the pass of LLVM patching operations for peephole optimizations, with the following patterns covered:
 //
 // - Combine multiple identical bit casts (LLVM treats these as no-ops, but since we use the scalarizer they can become
 //   costly when transforming <4 x i8> <-> i32/float).
@@ -64,12 +64,12 @@ namespace Llpc
 //   multiple extract elements that are identical).
 // - Optimize PHI nodes that are confusingly non-PHIs by deducing these complicated cases and removing the PHIs.
 //
-class SpirvLowerPeepholeOpt final:
+class PatchPeepholeOpt final:
     public llvm::FunctionPass,
-    public llvm::InstVisitor<SpirvLowerPeepholeOpt>
+    public llvm::InstVisitor<PatchPeepholeOpt>
 {
 public:
-    explicit SpirvLowerPeepholeOpt();
+    explicit PatchPeepholeOpt();
 
     bool runOnFunction(llvm::Function& function) override;
 
@@ -83,15 +83,15 @@ public:
     void moveAfter(llvm::Instruction& move, llvm::Instruction& after) const;
     void insertAfter(llvm::Instruction& insert, llvm::Instruction& after) const;
 
-    // Pass creator, creates the pass of SPIR-V lowering opertions for peephole optimizations.
-    static llvm::FunctionPass* Create() { return new SpirvLowerPeepholeOpt(); }
+    // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
+    static llvm::FunctionPass* Create() { return new PatchPeepholeOpt(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerPeepholeOpt);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchPeepholeOpt);
 
     // -----------------------------------------------------------------------------------------------------------------
 

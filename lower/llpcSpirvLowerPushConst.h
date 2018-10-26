@@ -24,53 +24,46 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerLoopUnrollInfoRectify.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerLoopUnrollInfoRectify.
+ * @file  llpcSpirvLowerPushConst.h
+ * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerPushConst.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/Pass.h"
+#include "llvm/Analysis/LoopPass.h"
 
-#include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcInternal.h"
-
-namespace llvm
-{
-
-class PassRegistry;
-void initializeSpirvLowerLoopUnrollInfoRectifyPass(PassRegistry&);
-
-} // llvm
+#include "llpcSpirvLower.h"
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for rectifying loop unroll information.
-class SpirvLowerLoopUnrollInfoRectify final:
-    public llvm::FunctionPass
+// Represents the pass of SPIR-V lowering opertions for push constant.
+class SpirvLowerPushConst:
+    public SpirvLower
 {
 public:
-    explicit SpirvLowerLoopUnrollInfoRectify();
+    SpirvLowerPushConst();
 
-    bool runOnFunction(llvm::Function& function) override;
+    virtual bool runOnModule(llvm::Module& module);
 
-    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
+    // Gets loop analysis usage
+    virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
 
-    // Pass creator, creates the pass of SPIR-V lowering opertions for rectifying unroll information.
-    static llvm::FunctionPass* Create() { return new SpirvLowerLoopUnrollInfoRectify(); }
+    // Pass creator, creates the pass of SPIR-V lowering opertions for push constant
+    static llvm::ModulePass* Create() { return new SpirvLowerPushConst(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerPushConst);
 
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerLoopUnrollInfoRectify);
+    void HandleLoop(llvm::Loop* pLoop, Instruction* pInsertPos);
 
-    static constexpr uint32_t MaxLoopUnrollCount = 32;
+    // Push constant load map, from <component count, load offset> to load call
+    std::map<uint32_t, CallInst*>   m_pushConstLoadMap;
 };
 
 } // Llpc

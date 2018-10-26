@@ -24,38 +24,38 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerOpt.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerOpt.
+ * @file  llpcPatchOpt.h
+ * @brief LLPC header file: contains declaration of class Llpc::PatchOpt.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "llvm/IR/InstVisitor.h"
 
-#include "llpcSpirvLower.h"
+#include "llpcPatch.h"
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of genaral optimizations for SPIR-V lowering.
-class SpirvLowerOpt:
-    public SpirvLower
+// Represents the pass of general optimizations for SPIR-V patching.
+class PatchOpt:
+    public Patch
 {
 public:
-    SpirvLowerOpt();
+    PatchOpt();
 
     virtual bool runOnModule(llvm::Module& module);
 
-    // Pass creator, creates the pass of genaral optimizations for SPIR-V lowering.
-    static llvm::ModulePass* Create() { return new SpirvLowerOpt(); }
+    // Pass creator, creates the pass of general optimizations for LLVM patching.
+    static llvm::ModulePass* Create() { return new PatchOpt(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerOpt);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchOpt);
 };
 
 } // Llpc

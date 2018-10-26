@@ -34,7 +34,7 @@
 #define LLVM_DEBUG DEBUG
 #endif
 
-#if PAL_ENABLE_PRINTS_ASSERTS
+#if PAL_ENABLE_PRINTS_ASSERTS || !defined(NDEBUG)
 #include <cassert>
 
 // Debug assertion: generic

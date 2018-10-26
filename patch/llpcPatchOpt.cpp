@@ -24,12 +24,13 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerOpt.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerOpt.
+ * @file  llpcPatchOpt.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::PatchOpt.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-opt"
+#define DEBUG_TYPE "llpc-patch-opt"
 
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
@@ -39,9 +40,10 @@
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 
 #include "SPIRVInternal.h"
-#include "llpcSpirvLowerOpt.h"
-#include "llpcSpirvLowerLoopUnrollInfoRectify.h"
-#include "llpcSpirvLowerPeepholeOpt.h"
+#include "llpcContext.h"
+#include "llpcPatchOpt.h"
+#include "llpcPatchLoopUnrollInfoRectify.h"
+#include "llpcPatchPeepholeOpt.h"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -54,28 +56,28 @@ extern TimeProfileResult g_timeProfileResult;
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerOpt::ID = 0;
+char PatchOpt::ID = 0;
 
 // =====================================================================================================================
-SpirvLowerOpt::SpirvLowerOpt()
+PatchOpt::PatchOpt()
     :
-    SpirvLower(ID)
+    Patch(ID)
 {
-    initializeSpirvLowerOptPass(*PassRegistry::getPassRegistry());
+    initializePatchOptPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-bool SpirvLowerOpt::runOnModule(
+// Executes this LLVM patching pass on the specified LLVM module.
+bool PatchOpt::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
     TimeProfiler timeProfiler(&g_timeProfileResult.lowerOptTime);
 
     bool changed = false;
 
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Opt\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Opt\n");
 
-    SpirvLower::Init(&module);
+    Patch::Init(&module);
 
     // Set up standard optimization passes.
     // NOTE: Doing this here is temporary; really the whole of LLPC should be using the
@@ -83,11 +85,15 @@ bool SpirvLowerOpt::runOnModule(
     legacy::PassManager passMgr;
     PassManagerBuilder passBuilder;
     passBuilder.OptLevel = 3; // -O3
+    passBuilder.DisableGVNLoadPRE = true;
+    passBuilder.DivergentTarget = true;
+
+    passMgr.add(createTargetTransformInfoWrapperPass(m_pContext->GetTargetMachine()->getTargetIRAnalysis()));
 
     passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
         [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
         {
-            passMgr.add(SpirvLowerPeepholeOpt::Create());
+            passMgr.add(PatchPeepholeOpt::Create());
             passMgr.add(createInstSimplifyLegacyPass());
         });
     passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
@@ -97,7 +103,7 @@ bool SpirvLowerOpt::runOnModule(
             // performed before the scalarizer. One important case this helps with is when you have bit casts whose
             // source is a PHI - we want to make sure that the PHI does not have an i8 type before the scalarizer is
             // called, otherwise a different kind of PHI mess is generated.
-            passMgr.add(SpirvLowerPeepholeOpt::Create());
+            passMgr.add(PatchPeepholeOpt::Create());
 
             // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer allows
             // us to much more easily identify dead parts of vectors that we do not need to do any computation for.
@@ -110,7 +116,7 @@ bool SpirvLowerOpt::runOnModule(
     passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
         [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
         {
-            passMgr.add(SpirvLowerLoopUnrollInfoRectify::Create());
+            passMgr.add(PatchLoopUnrollInfoRectify::Create());
         });
 
     passBuilder.populateModulePassManager(passMgr);
@@ -124,6 +130,6 @@ bool SpirvLowerOpt::runOnModule(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the pass of general optimizations for SPIR-V lowering.
-INITIALIZE_PASS(SpirvLowerOpt, "Spirv-lower-opt",
-                "Lower SPIR-V with general optimizations", false, false)
+// Initializes the pass of general optimizations for LLVM patching.
+INITIALIZE_PASS(PatchOpt, "Patch-opt",
+                "Patch LLVM for general optimizations", false, false)

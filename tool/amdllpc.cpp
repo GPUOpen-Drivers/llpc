@@ -93,6 +93,9 @@ static cl::opt<std::string> GfxIp("gfxip",
                                   cl::value_desc("major.minor.step"),
                                   cl::init("8.0.0"));
 
+// The GFXIP version parsed out of the -gfxip option before normal option processing occurs.
+static GfxIpVersion ParsedGfxIp = {8, 0, 0};
+
 // Input sources
 static cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,
             cl::desc("<source>...\n"
@@ -190,8 +193,7 @@ static ShaderStage SourceLangToShaderStage(
 static Result Init(
     int32_t      argc,          // Count of arguments
     char*        argv[],        // [in] List of arguments
-    ICompiler**  ppCompiler,    // [out] Created LLPC compiler object
-    CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
+    ICompiler**  ppCompiler)    // [out] Created LLPC compiler object
 {
     Result result = Result::Success;
 
@@ -223,7 +225,6 @@ static Result Init(
 
         // Build new arguments, starting with those supplied in command line
         std::vector<const char*> newArgs;
-        GfxIpVersion gfxIp = {8, 0, 0};
         for (int32_t i = 0; i < argc; ++i)
         {
             newArgs.push_back(argv[i]);
@@ -271,9 +272,9 @@ static Result Init(
                         pToken = std::strtok(nullptr, ".");
                     }
 
-                    gfxIp.major    = (tokens[0] != nullptr) ? std::strtoul(tokens[0], nullptr, 10) : 0;
-                    gfxIp.minor    = (tokens[1] != nullptr) ? std::strtoul(tokens[1], nullptr, 10) : 0;
-                    gfxIp.stepping = (tokens[2] != nullptr) ? std::strtoul(tokens[2], nullptr, 10) : 0;
+                    ParsedGfxIp.major    = (tokens[0] != nullptr) ? std::strtoul(tokens[0], nullptr, 10) : 0;
+                    ParsedGfxIp.minor    = (tokens[1] != nullptr) ? std::strtoul(tokens[1], nullptr, 10) : 0;
+                    ParsedGfxIp.stepping = (tokens[2] != nullptr) ? std::strtoul(tokens[2], nullptr, 10) : 0;
 
                     delete[] pGfxIp;
                 }
@@ -331,17 +332,23 @@ static Result Init(
         }
         newArgs.push_back(shaderCacheFileDirOption);
 
-        result = ICompiler::Create(gfxIp, newArgs.size(), &newArgs[0], ppCompiler);
-
+        result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
     }
 
     return result;
 }
 
 // =====================================================================================================================
+// Performs per-pipeline initialization work for LLPC standalone tool.
+static Result InitCompileInfo(
+    CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
+{
+    return Result::Success;
+}
+
+// =====================================================================================================================
 // Performs cleanup work for LLPC standalone tool.
-static void Cleanup(
-    ICompiler*   pCompiler,     // [in,out] LLPC compiler object
+static void CleanupCompileInfo(
     CompileInfo* pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
 {
     for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
@@ -366,7 +373,6 @@ static void Cleanup(
     }
 
     memset(pCompileInfo, 0, sizeof(*pCompileInfo));
-    pCompiler->Destroy();
 }
 
 // =====================================================================================================================
@@ -894,8 +900,9 @@ static Result BuildPipeline(
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 static Result OutputElf(
     CompileInfo*       pCompileInfo,  // [in] Compilation info of LLPC standalone tool
-    const std::string& outFile)       // [in] Name of the file to output ELF binary (specify "" to use base name of
+    const std::string& outFile,       // [in] Name of the file to output ELF binary (specify "" to use base name of
                                       //     first input file with appropriate extension; specify "-" to use stdout)
+    StringRef          firstInFile)   // [in] Name of first input file
 {
     Result result = Result::Success;
     const BinaryData* pPipelineBin = (pCompileInfo->stageMask & ShaderStageToMask(ShaderStageCompute)) ?
@@ -912,11 +919,11 @@ static Result OutputElf(
         {
             pExt = ".elf";
         }
-        if (IsLlvmBitcode(pPipelineBin))
+        else
         {
-            pExt = ".bc";
+            pExt = ".ll";
         }
-        outFileName = sys::path::filename(InFiles[0]);
+        outFileName = sys::path::filename(firstInFile);
         sys::path::replace_extension(outFileName, pExt);
     }
 
@@ -984,50 +991,22 @@ static void EnableMemoryLeakDetection()
 #endif
 
 // =====================================================================================================================
-// Main function of LLPC standalone tool, entry-point.
-//
-// Returns 0 if successful. Other numeric values indicate failure.
-int32_t main(
-    int32_t argc,       // Count of arguments
-    char*   argv[])     // [in] List of arguments
+// Process one pipeline.
+static Result ProcessPipeline(
+    ICompiler*            pCompiler,  // LLPC context
+    ArrayRef<std::string> inFiles)    // Input filename(s)
 {
     Result result = Result::Success;
-
-    ICompiler*  pCompiler   = nullptr;
     CompileInfo compileInfo = {};
 
-    //
-    // Initialization
-    //
-
-    // TODO: CRT based Memory leak detection is conflict with stack trace now, we only can enable one of them.
-#if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
-    EnableMemoryLeakDetection();
-#else
-    EnablePrettyStackTrace();
-    sys::PrintStackTraceOnErrorSignal(argv[0]);
-    PrettyStackTraceProgram X(argc, argv);
-
-#ifdef WIN_OS
-    signal(SIGABRT, LlpcSignalAbortHandler);
-#endif
-#endif
-
-    result = Init(argc, argv, &pCompiler, &compileInfo);
-
-#ifdef WIN_OS
-    if (AssertToMsgBox)
-    {
-        _set_error_mode(_OUT_TO_MSGBOX);
-    }
-#endif
+    result = InitCompileInfo(&compileInfo);
 
     //
     // Translate sources to SPIR-V binary
     //
-    for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
+    for (uint32_t i = 0; (i < inFiles.size()) && (result == Result::Success); ++i)
     {
-        const std::string& inFile = InFiles[i];
+        const std::string& inFile = inFiles[i];
         std::string spvBinFile;
 
         if (IsGlslTextFile(inFile))
@@ -1253,20 +1232,85 @@ int32_t main(
         result = BuildPipeline(pCompiler, &compileInfo);
         if (result == Result::Success)
         {
-            result = OutputElf(&compileInfo, OutFile);
+            result = OutputElf(&compileInfo, OutFile, inFiles[0]);
         }
     }
 
     //
     // Clean up
     //
-    Cleanup(pCompiler, &compileInfo);
-    pCompiler = nullptr;
+    CleanupCompileInfo(&compileInfo);
+
+    return result;
+}
+
+// =====================================================================================================================
+// Main function of LLPC standalone tool, entry-point.
+//
+// Returns 0 if successful. Other numeric values indicate failure.
+int32_t main(
+    int32_t argc,       // Count of arguments
+    char*   argv[])     // [in] List of arguments
+{
+    Result result = Result::Success;
+
+    ICompiler*  pCompiler   = nullptr;
+
+    //
+    // Initialization
+    //
+
+    // TODO: CRT based Memory leak detection is conflict with stack trace now, we only can enable one of them.
+#if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
+    EnableMemoryLeakDetection();
+#else
+    EnablePrettyStackTrace();
+    sys::PrintStackTraceOnErrorSignal(argv[0]);
+    PrettyStackTraceProgram X(argc, argv);
+
+#ifdef WIN_OS
+    signal(SIGABRT, LlpcSignalAbortHandler);
+#endif
+#endif
+
+    result = Init(argc, argv, &pCompiler);
+
+#ifdef WIN_OS
+    if (AssertToMsgBox)
+    {
+        _set_error_mode(_OUT_TO_MSGBOX);
+    }
+#endif
+
+    if (StringRef(InFiles[0]).endswith(".pipe"))
+    {
+        // The first input file is a pipeline file. Assume they all are, and compile each one separately
+        // but in the same context.
+        for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
+        {
+            result = ProcessPipeline(pCompiler, InFiles[i]);
+        }
+    }
+    else
+    {
+        // Otherwise, join all input files into the same pipeline.
+        SmallVector<std::string, 6> inFiles;
+        for (const auto &inFile : InFiles)
+        {
+            inFiles.push_back(inFile);
+        }
+        result = ProcessPipeline(pCompiler, inFiles);
+    }
+
+    pCompiler->Destroy();
 
     if (result == Result::Success)
     {
-        outs().flush();
-        printf("\n=====  AMDLLPC SUCCESS  =====\n");
+        LLPC_OUTS("\n=====  AMDLLPC SUCCESS  =====\n");
+    }
+    else
+    {
+        LLPC_ERRS("\n=====  AMDLLPC FAILED  =====\n");
     }
 
     return (result == Result::Success) ? 0 : 1;

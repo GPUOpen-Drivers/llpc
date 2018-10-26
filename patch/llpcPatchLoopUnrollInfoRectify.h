@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLower.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLower.
+ * @file  llpcPatchLoopUnrollInfoRectify.h
+ * @brief LLPC header file: contains declaration of class Llpc::PatchLoopUnrollInfoRectify.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -40,58 +40,36 @@ namespace llvm
 {
 
 class PassRegistry;
-void initializeSpirvLowerAccessChainPass(PassRegistry&);
-void initializeSpirvLowerAggregateLoadStorePass(PassRegistry&);
-void initializeSpirvLowerAlgebraTransformPass(PassRegistry&);
-void initializeSpirvLowerBufferOpPass(PassRegistry&);
-void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
-void initializeSpirvLowerDynIndexPass(PassRegistry&);
-void initializeSpirvLowerGlobalPass(PassRegistry&);
-void initializeSpirvLowerImageOpPass(PassRegistry&);
-void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
-void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
-void initializeSpirvLowerPushConstPass(PassRegistry&);
-void initializeSpirvLowerResourceCollectPass(PassRegistry&);
+void initializePatchLoopUnrollInfoRectifyPass(PassRegistry&);
 
 } // llvm
 
 namespace Llpc
 {
 
-class Context;
-
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations, as the base class.
-class SpirvLower: public llvm::ModulePass
+// Represents the pass of LLVM patching operations for rectifying loop unroll information.
+class PatchLoopUnrollInfoRectify final:
+    public llvm::FunctionPass
 {
 public:
-    explicit SpirvLower(char& Pid)
-        :
-        llvm::ModulePass(Pid),
-        m_pModule(nullptr),
-        m_pContext(nullptr),
-        m_shaderStage(ShaderStageInvalid),
-        m_pEntryPoint(nullptr)
-    {
-    }
+    explicit PatchLoopUnrollInfoRectify();
 
-    static Result Run(llvm::Module* pModule, uint32_t forceLoopUnrollCount);
+    bool runOnFunction(llvm::Function& function) override;
 
-protected:
-    void Init(llvm::Module* pModule);
+    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
 
-    static void DumpCfg(const char* pPostfix, llvm::Module* pModule);
+    // Pass creator, creates the pass of LLVM patching operations for rectifying unroll information.
+    static llvm::FunctionPass* Create() { return new PatchLoopUnrollInfoRectify(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::Module*   m_pModule;      // LLVM module to be run on
-    Context*        m_pContext;     // Associated LLPC context of the LLVM module that passes run on
-    ShaderStage     m_shaderStage;  // Shader stage
-    llvm::Function* m_pEntryPoint;  // Entry point of input module
+    static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_DEFAULT_CTOR(SpirvLower);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLower);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchLoopUnrollInfoRectify);
+
+    static constexpr uint32_t MaxLoopUnrollCount = 32;
 };
 
 } // Llpc

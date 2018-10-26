@@ -65,7 +65,28 @@ if(UNIX)
         >)
 
         message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        target_compile_options(llpc PRIVATE
+            -fvisibility-inlines-hidden
+            -fcolor-diagnostics
+            -Wall
+            -Werror
+            -Wno-invalid-offsetof
+            -Wno-error=unused-variable
+            -Wno-missing-braces
+            -Wno-error=unused-function
+            -Wno-error=parentheses-equality
+        )
+        target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -std=c++11
+            -fno-rtti
+            -fPIC
+            -Wno-error=pessimizing-move
+            -Wno-error=inconsistent-missing-override
+            -Wno-error=unused-private-field
+            -Wno-error=dynamic-class-memaccess
+            -Wno-error=unused-result
+        >)
         #message(STATUS "Configured compiler options for Clang.")
         message(WARNING "Clang is untested.")
     else()
@@ -194,9 +215,7 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
-    lower/llpcSpirvLowerLoopUnrollInfoRectify.cpp
-    lower/llpcSpirvLowerOpt.cpp
-    lower/llpcSpirvLowerPeepholeOpt.cpp
+    lower/llpcSpirvLowerPushConst.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
 )
 
@@ -217,6 +236,9 @@ target_sources(llpc PRIVATE
     patch/llpcPatchGroupOp.cpp
     patch/llpcPatchInOutImportExport.cpp
     patch/llpcPatchImageOp.cpp
+    patch/llpcPatchLoopUnrollInfoRectify.cpp
+    patch/llpcPatchOpt.cpp
+    patch/llpcPatchPeepholeOpt.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
     patch/llpcVertexFetch.cpp
@@ -394,7 +416,18 @@ if(UNIX)
         target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
 
         message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        target_compile_options(amdllpc PRIVATE
+            -fvisibility-inlines-hidden
+            -fcolor-diagnostics
+            -Wall
+            -Werror
+            -Wno-error=unused-variable
+        )
+        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -std=c++11
+            -fno-rtti
+        >)
         #message(STATUS "Configured compiler options for Clang.")
         message(WARNING "Clang is untested.")
     else()

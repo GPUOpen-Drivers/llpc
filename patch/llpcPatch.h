@@ -49,6 +49,7 @@ void initializePatchExternalLibLinkPass(PassRegistry&);
 void initializePatchGroupOpPass(PassRegistry&);
 void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
+void initializePatchOptPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);
 void initializePatchResourceCollectPass(PassRegistry&);
 

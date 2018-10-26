@@ -41,7 +41,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 13;
+static const uint32_t  Version = 14;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";

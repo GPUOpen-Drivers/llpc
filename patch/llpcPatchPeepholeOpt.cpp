@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerPeepholeOpt.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerPeepholeOpt.
+ * @file  llpcPatchPeepholeOpt.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::PatchPeepholeOpt.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-peephole-opt"
+#define DEBUG_TYPE "llpc-patch-peephole-opt"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -36,7 +36,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcSpirvLowerPeepholeOpt.h"
+#include "llpcPatchPeepholeOpt.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -46,23 +46,23 @@ namespace Llpc
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char SpirvLowerPeepholeOpt::ID;
+char PatchPeepholeOpt::ID;
 
 // =====================================================================================================================
-SpirvLowerPeepholeOpt::SpirvLowerPeepholeOpt()
+PatchPeepholeOpt::PatchPeepholeOpt()
     :
     FunctionPass(ID)
 {
-    initializeSpirvLowerPeepholeOptPass(*PassRegistry::getPassRegistry());
+    initializePatchPeepholeOptPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
-bool SpirvLowerPeepholeOpt::runOnFunction(
+bool PatchPeepholeOpt::runOnFunction(
     Function& function // [in,out] Function that we will peephole optimize.
     )
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Peephole-Opt\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
 
     visit(function);
 
@@ -81,7 +81,7 @@ bool SpirvLowerPeepholeOpt::runOnFunction(
 
 // =====================================================================================================================
 // Specify what analysis passes this pass depends on.
-void SpirvLowerPeepholeOpt::getAnalysisUsage(
+void PatchPeepholeOpt::getAnalysisUsage(
     AnalysisUsage& analysisUsage // [in,out] The place to record our analysis pass usage requirements.
     ) const
 {
@@ -90,7 +90,7 @@ void SpirvLowerPeepholeOpt::getAnalysisUsage(
 
 // =====================================================================================================================
 // Visit a bit cast instruction.
-void SpirvLowerPeepholeOpt::visitBitCast(
+void PatchPeepholeOpt::visitBitCast(
     BitCastInst& bitCast) // [in] The "bitcast" instruction to visit.
 {
     // If the bit cast has no users, no point trying to optimize it!
@@ -248,9 +248,6 @@ void SpirvLowerPeepholeOpt::visitBitCast(
                 insertAfter(*pNewBitCast, *pInst);
 
                 pNewPhiNode->addIncoming(pNewBitCast, pBasicBlock);
-
-                // Visit the bit cast instructions we just inserted in case there are optimization opportunities.
-                visitBitCast(*pNewBitCast);
             }
             else if (Constant* const pConstant = dyn_cast<Constant>(pIncoming))
             {
@@ -292,7 +289,7 @@ void SpirvLowerPeepholeOpt::visitBitCast(
 
 // =====================================================================================================================
 // Visit an integer comparison instruction.
-void SpirvLowerPeepholeOpt::visitICmp(
+void PatchPeepholeOpt::visitICmp(
     ICmpInst& iCmp) // [in] The "icmp" instruction to visit.
 {
     switch (iCmp.getPredicate())
@@ -365,7 +362,7 @@ void SpirvLowerPeepholeOpt::visitICmp(
 
 // =====================================================================================================================
 // Visit an extract element instruction.
-void SpirvLowerPeepholeOpt::visitExtractElement(
+void PatchPeepholeOpt::visitExtractElement(
     ExtractElementInst& extractElement) // [in] The "extractelement" instruction to visit.
 {
     // If the extract has no users, no point trying to optimize it!
@@ -520,7 +517,7 @@ void SpirvLowerPeepholeOpt::visitExtractElement(
 
 // =====================================================================================================================
 // Visit a PHI node.
-void SpirvLowerPeepholeOpt::visitPHINode(
+void PatchPeepholeOpt::visitPHINode(
     PHINode& phiNode) // [in] The PHI node to visit.
 {
     // If the PHI has no users, no point trying to optimize it!
@@ -850,7 +847,7 @@ void SpirvLowerPeepholeOpt::visitPHINode(
 
 // =====================================================================================================================
 // Helper function to move an instruction after another.
-void SpirvLowerPeepholeOpt::moveAfter(
+void PatchPeepholeOpt::moveAfter(
     Instruction& move, // [in] Instruction to move.
     Instruction& after // [in] Where to move after.
     ) const
@@ -868,7 +865,7 @@ void SpirvLowerPeepholeOpt::moveAfter(
 
 // =====================================================================================================================
 // Helper function to insert an instruction after another.
-void SpirvLowerPeepholeOpt::insertAfter(
+void PatchPeepholeOpt::insertAfter(
     Instruction& insert, // [in] Instruction to insert.
     Instruction& after   // [in] Where to insert after.
     ) const
@@ -887,6 +884,6 @@ void SpirvLowerPeepholeOpt::insertAfter(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for peephole optimizations.
-INITIALIZE_PASS(SpirvLowerPeepholeOpt, "Spirv-lower-peephole-opt",
-    "Lower SPIR-V peephole optimizations", false, false)
+// Initializes the pass of LLVM patching operations for peephole optimizations.
+INITIALIZE_PASS(PatchPeepholeOpt, "Patch-peephole-opt",
+    "Patch LLVM for peephole optimizations", false, false)

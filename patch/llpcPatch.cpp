@@ -55,6 +55,7 @@
 #include "llpcPatchGroupOp.h"
 #include "llpcPatchImageOp.h"
 #include "llpcPatchInOutImportExport.h"
+#include "llpcPatchOpt.h"
 #include "llpcPatchPushConstOp.h"
 #include "llpcPatchResourceCollect.h"
 
@@ -71,6 +72,9 @@ namespace cl
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
 opt<bool> AutoLayoutDesc("auto-layout-desc",
                          desc("Automatically create descriptor layout based on resource usages"));
+
+// -disable-patch-opt: disable optimization for LLVM patching
+opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
 
 } // cl
 
@@ -122,7 +126,7 @@ Result Patch::Run(
     // Do patching opertions
     legacy::PassManager passMgr;
 
-    // Lower SPIRAS address spaces to AMDGPU address spaces.
+    // Lower SPIRAS address spaces to AMDGPU address spaces
     passMgr.add(PatchAddrSpaceMutate::Create());
 
     // Patch entry-point mutation (should be done before external library link)
@@ -137,7 +141,7 @@ Result Patch::Run(
     // Patch buffer operations (should be done before external library link)
     passMgr.add(PatchBufferOp::Create());
 
-    // Patch group operations(should be done before external library link)
+    // Patch group operations (should be done before external library link)
     passMgr.add(PatchGroupOp::Create());
 
     // Link external libraries and remove dead functions after it
@@ -151,20 +155,22 @@ Result Patch::Run(
     // Patch input import and output export operations
     passMgr.add(PatchInOutImportExport::Create());
 
-    // Patch descriptor load opertions
+    // Patch descriptor load operations
     passMgr.add(PatchDescriptorLoad::Create());
 
-    // Prior to general optimization, do funcion inlining and dead function removal once again
+    // Prior to general optimization, do function inlining and dead function removal once again
     passMgr.add(createFunctionInliningPass(InlineThreshold));
     passMgr.add(PassDeadFuncRemove::Create());
 
     // Add some optimization passes
+
+    // Need to run a first promote mem 2 reg to remove alloca's whose only args are lifetimes
     passMgr.add(createPromoteMemoryToRegisterPass());
-    passMgr.add(createSROAPass());
-    passMgr.add(createLICMPass());
-    passMgr.add(createAggressiveDCEPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createInstructionCombiningPass());
+
+    if (cl::DisablePatchOpt == false)
+    {
+        passMgr.add(PatchOpt::Create());
+    }
 
     if (passMgr.run(*pModule) == false)
     {

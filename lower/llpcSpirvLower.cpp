@@ -61,7 +61,7 @@
 #include "llpcSpirvLowerImageOp.h"
 #include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerLoopUnrollControl.h"
-#include "llpcSpirvLowerOpt.h"
+#include "llpcSpirvLowerPushConst.h"
 #include "llpcSpirvLowerResourceCollect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
@@ -145,6 +145,10 @@ Result SpirvLower::Run(
     passMgr.add(createSROAPass());
     passMgr.add(createEarlyCSEPass());
     passMgr.add(createCFGSimplificationPass());
+    passMgr.add(createIPConstantPropagationPass());
+
+    // Lower SPIR-V push constant load
+    passMgr.add(SpirvLowerPushConst::Create());
 
     // Lower SPIR-V image operations (sample, fetch, gather, read/write),
     passMgr.add(SpirvLowerImageOp::Create());
@@ -153,12 +157,6 @@ Result SpirvLower::Run(
     if (cl::LowerDynIndex)
     {
         passMgr.add(SpirvLowerDynIndex::Create());
-    }
-
-    // General optimization in lower phase
-    if (cl::DisableLowerOpt == false)
-    {
-        passMgr.add(SpirvLowerOpt::Create());
     }
 
     // Lower SPIR-V algebraic transforms
