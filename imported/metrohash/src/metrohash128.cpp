@@ -27,7 +27,7 @@
 #include "platform.h"
 #include "metrohash128.h"
 
-namespace Llpc
+namespace MetroHash
 {
 
 const char * MetroHash128::test_string = "012345678901234567890123456789012345678901234567890123456789012";
@@ -423,4 +423,4 @@ void metrohash128_2(const uint8_t * key, uint64_t len, uint32_t seed, uint8_t * 
     memcpy(out, v, 16);
 }
 
-} // Llpc
+} // MetroHash

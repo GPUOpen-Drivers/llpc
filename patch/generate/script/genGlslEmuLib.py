@@ -25,10 +25,12 @@
 
 import binascii
 import os
+import re
 import subprocess
 import sys
 
 import genGlslArithOpEmuCode
+import genGlslGroupOpEmuCode
 import genGlslImageOpEmuCode
 
 # Change working directory (/llpc/patch/generate/)
@@ -41,6 +43,7 @@ OS_TYPE = sys.argv[3]
 # LLVM utility binaries
 LLVM_AS = LLVM_AS_DIR + "llvm-as"
 LLVM_LINK = LLVM_LINK_DIR + "llvm-link"
+LLVM_AR = LLVM_LINK_DIR + "llvm-ar"
 
 # Cleanup, remove those auto-generated files
 print("*******************************************************************************")
@@ -72,21 +75,28 @@ print("")
 print("*******************************************************************************")
 print("                 Generate LLVM Emulation IR (GLSL Arithmetic)                  ")
 print("*******************************************************************************")
-genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCode.txt", "g_glslArithOpEmu.ll", "std32")
-genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeF16.txt", "g_glslArithOpEmuF16.ll", "float16")
-genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeF64.txt", "g_glslArithOpEmuF64.ll", "float64")
-genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeI16.txt", "g_glslArithOpEmuI16.ll", "int16")
-genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeI64.txt", "g_glslArithOpEmuI64.ll", "int64")
+genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCode.txt", ".", "std32")
+genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeF16.txt", ".", "float16")
+genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeF64.txt", ".", "float64")
+genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeI16.txt", ".", "int16")
+genGlslArithOpEmuCode.main("./script/genGlslArithOpEmuCodeI64.txt", ".", "int64")
+
+print("*******************************************************************************")
+print("                 Generate LLVM Emulation IR (GLSL Group)                       ")
+print("*******************************************************************************")
+genGlslGroupOpEmuCode.main(16, 64, "")
+genGlslGroupOpEmuCode.main(32, 64, "")
+genGlslGroupOpEmuCode.main(64, 64, "")
 
 print("*******************************************************************************")
 print("                   Generate LLVM Emulation IR (GLSL Image) for %s             "%("GFX6"))
 print("*******************************************************************************")
-genGlslImageOpEmuCode.main("./script/genGlslImageOpEmuCode.txt", "g_glslImageOpEmu.ll", "gfx6")
+genGlslImageOpEmuCode.main("./script/genGlslImageOpEmuCode.txt", ".", "gfx6")
 
 print("*******************************************************************************")
 print("                   Generate LLVM Emulation IR (GLSL Image) for %s             "%("GFX9"))
 print("*******************************************************************************")
-genGlslImageOpEmuCode.main("./script/genGlslImageOpEmuCode.txt", "gfx9/g_glslImageOpEmu.ll", "gfx9")
+genGlslImageOpEmuCode.main("./script/genGlslImageOpEmuCode.txt", "gfx9", "gfx9")
 
 # Generate .lib file
 print("*******************************************************************************")
@@ -153,17 +163,17 @@ for feature in SPECIAL_EMUS:
     print(">>>  (LL-clean) remove " + libFile)
     os.remove(libFile)
 
-# Link general emulation .bc files to libraries (GLSL operations and built-ins)
+# Add general emulation .bc files to a .lib archive (GLSL operations and built-ins)
 # Collect .bc files
 bcFiles = ""
 for f in os.listdir("./"):
     if f.endswith(".bc"):
         bcFiles += f + " "
 
-# Link .bc files to .lib file
+# Add .bc files to .lib archive file
 libFile = "glslEmu.lib"
-cmd = LLVM_LINK + " -o=" + libFile + " " + bcFiles
-print(">>>  (LL-link) " + cmd)
+cmd = LLVM_AR + " r " + libFile + " " + bcFiles
+print(">>>  (LL-ar) " + cmd)
 if OS_TYPE == "win" :
     subprocess.check_call(cmd)
 else :
@@ -205,8 +215,9 @@ print("")
 # Generate GFX-dependent LLVM emulation library
 # =====================================================================================================================
 
-# Assemble .ll files to .bc files and link emulation .bc files to libraries
+# Assemble .ll files to .bc files and add emulation .bc files to archives
 GFX_EMUS = ["gfx8", "gfx9"]
+
 for gfx in GFX_EMUS:
     print("*******************************************************************************")
     print("                    Generate LLVM Emulation Library (%s)                     "%(gfx.upper()))
@@ -228,10 +239,10 @@ for gfx in GFX_EMUS:
         if f.endswith(".bc"):
             bcFiles += gfx + "/" + f + " "
 
-    # Link .bc files to .lib file
+    # Add .bc files to archive .lib file
     libFile = gfx + "/glslEmu" + gfx.capitalize() + ".lib"
-    cmd = LLVM_LINK + " -o=" + libFile + " " + bcFiles
-    print(">>>  (LL-link) " + cmd)
+    cmd = LLVM_AR + " r " + libFile + " " + bcFiles
+    print(">>>  (LL-ar) " + cmd)
     if OS_TYPE == "win" :
         subprocess.check_call(cmd)
     else :
@@ -269,3 +280,72 @@ for gfx in GFX_EMUS:
 
     print("")
 
+# =====================================================================================================================
+# Generate Workaround LLVM emulation library
+# =====================================================================================================================
+
+# Assemble .ll files to .bc files and link emulation .bc files to libraries
+WA_EMUS = ["treat1dImagesAs2d"]
+WA_ROOT="wa"
+for wa in WA_EMUS:
+    print("*******************************************************************************")
+    print("                    Generate LLVM Emulation Library (%s)                     "%(wa.upper()))
+    print("*******************************************************************************")
+
+    workDir = WA_ROOT + "/" + wa
+    # Assemble .ll files to .bc files
+    for f in os.listdir(workDir):
+        if f.endswith(".ll"):
+            cmd = LLVM_AS + " " + workDir + "/" + f
+            print(">>>  (LL-as) " + cmd)
+            if OS_TYPE == "win" :
+                subprocess.check_call(cmd)
+            else :
+                subprocess.check_call(cmd, shell = True)
+
+    # Search for the .bc file
+    bcFiles = ""
+    for f in os.listdir(workDir):
+        if f.endswith(".bc"):
+            bcFiles += workDir + "/" + f + " "
+
+    # Add .bc files to archive .lib file
+    libFile = workDir + "/glslEmu" + wa.capitalize() + ".lib"
+    cmd = LLVM_AR + " r " + libFile + " " + bcFiles
+    print(">>>  (LL-ar) " + cmd)
+    if OS_TYPE == "win" :
+        subprocess.check_call(cmd)
+    else :
+        subprocess.check_call(cmd, shell = True)
+
+    # Convert .lib file to a hex file
+    hFile = WA_ROOT + "/g_llpcGlslEmuLib" + wa[:1].upper() + wa[1:] + ".h"
+    print(">>>  (LL-bin2hex) " + libFile + "  ==>  " + hFile)
+    fBin = open(libFile, "rb")
+    binData = fBin.read()
+    fBin.close()
+
+    hexData = binascii.hexlify(binData).decode()
+    fHex = open(hFile, "w")
+    hexText = ""
+    i = 0
+    while i < len(hexData):
+        hexText += "0x"
+        hexText += hexData[i]
+        hexText += hexData[i + 1]
+        i += 2
+        if (i != len(hexData)):
+            hexText += ", "
+        if (i % 32 == 0):
+            hexText += "\n"
+    fHex.write(hexText)
+    fHex.close()
+
+    # Cleanup, remove those temporary files
+    for f in bcFiles.split():
+        print(">>>  (LL-clean) remove " + f);
+        os.remove(f)
+    print(">>>  (LL-clean) remove " + libFile);
+    os.remove(libFile)
+
+    print("")

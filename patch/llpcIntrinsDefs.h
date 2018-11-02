@@ -63,7 +63,9 @@ enum ExportTarget
     EXP_TARGET_POS_1            = 13,           // Position 1
     EXP_TARGET_POS_2            = 14,           // Position 2
     EXP_TARGET_POS_3            = 15,           // Position 3
-    EXP_TARGET_PARAM_0          = 32,           // Param 0..31
+    EXP_TARGET_PARAM_0          = 32,           // Param 0
+                                                // Param 1..30
+    EXP_TARGET_PARAM_31         = 63,           // Param 31
 };
 
 // Enumerates shader export format used for "export" instruction.
@@ -187,75 +189,217 @@ union SpiPsInputAddr
 {
     struct
     {
-        uint32_t    PERSP_SAMPLE_ENA        : 1;        // PERSP_SAMPLE_ENA
-        uint32_t    PERSP_CENTER_ENA        : 1;        // PERSP_CENTER_ENA
-        uint32_t    PERSP_CENTROID_ENA      : 1;        // PERSP_CENTROID_ENA
-        uint32_t    PERSP_PULL_MODEL_ENA    : 1;        // PERSP_PULL_MODEL_ENA
-        uint32_t    LINEAR_SAMPLE_ENA       : 1;        // LINEAR_SAMPLE_ENA
-        uint32_t    LINEAR_CENTER_ENA       : 1;        // LINEAR_CENTER_ENA
-        uint32_t    LINEAR_CENTROID_ENA     : 1;        // LINEAR_CENTROID_ENA
-        uint32_t    LINE_STIPPLE_TEX_ENA    : 1;        // LINE_STIPPLE_TEX_ENA
-        uint32_t    POS_X_FLOAT_ENA         : 1;        // POS_X_FLOAT_ENA
-        uint32_t    POS_Y_FLOAT_ENA         : 1;        // POS_Y_FLOAT_ENA
-        uint32_t    POS_Z_FLOAT_ENA         : 1;        // POS_Z_FLOAT_ENA
-        uint32_t    POS_W_FLOAT_ENA         : 1;        // POS_W_FLOAT_ENA
-        uint32_t    FRONT_FACE_ENA          : 1;        // FRONT_FACE_ENA
-        uint32_t    ANCILLARY_ENA           : 1;        // ANCILLARY_ENA
-        uint32_t    SAMPLE_COVERAGE_ENA     : 1;        // SAMPLE_COVERAGE_ENA
-        uint32_t    POS_FIXED_PT_ENA        : 1;        // POS_FIXED_PT_ENA
-
-        uint32_t    unused                  : 16;
-    };
+        uint32_t    PERSP_SAMPLE_ENA        : 1;
+        uint32_t    PERSP_CENTER_ENA        : 1;
+        uint32_t    PERSP_CENTROID_ENA      : 1;
+        uint32_t    PERSP_PULL_MODEL_ENA    : 1;
+        uint32_t    LINEAR_SAMPLE_ENA       : 1;
+        uint32_t    LINEAR_CENTER_ENA       : 1;
+        uint32_t    LINEAR_CENTROID_ENA     : 1;
+        uint32_t    LINE_STIPPLE_TEX_ENA    : 1;
+        uint32_t    POS_X_FLOAT_ENA         : 1;
+        uint32_t    POS_Y_FLOAT_ENA         : 1;
+        uint32_t    POS_Z_FLOAT_ENA         : 1;
+        uint32_t    POS_W_FLOAT_ENA         : 1;
+        uint32_t    FRONT_FACE_ENA          : 1;
+        uint32_t    ANCILLARY_ENA           : 1;
+        uint32_t    SAMPLE_COVERAGE_ENA     : 1;
+        uint32_t    POS_FIXED_PT_ENA        : 1;
+        uint32_t                            : 16;
+    } bits;
 
     uint32_t u32All;
 };
 
-// Represents the first word of buffer descriptor SQ_BUF_RSRC_WORD0
-union SqBufRsrcWord0 {
-    struct {
-        uint32_t    BASE_ADDRESS : 32;       // BASE_ADDRESS
+// Represents the first DWORD of buffer descriptor SQ_BUF_RSRC_WORD0.
+union SqBufRsrcWord0
+{
+    struct
+    {
+        uint32_t    BASE_ADDRESS : 32;
     } bits;
+
     uint32_t u32All;
 };
 
-// Represents the second word of buffer descriptor SQ_BUF_RSRC_WORD1
-union SqBufRsrcWord1 {
-    struct {
-        uint32_t    BASE_ADDRESS_HI : 16;    // BASE_ADDRESS_HI
-        uint32_t    STRIDE          : 14;    // STRIDE
-        uint32_t    CACHE_SWIZZLE   : 1;     // CACHE_SWIZZLE
-        uint32_t    SWIZZLE_ENABLE  : 1;     // SWIZZLE_ENABLE
+// Represents the second DWORD of buffer descriptor SQ_BUF_RSRC_WORD1.
+union SqBufRsrcWord1
+{
+    struct
+    {
+        uint32_t    BASE_ADDRESS_HI : 16;
+        uint32_t    STRIDE          : 14;
+        uint32_t    CACHE_SWIZZLE   : 1;
+        uint32_t    SWIZZLE_ENABLE  : 1;
     } bits;
+
     uint32_t	u32All;
 };
 
-// Represents the third word of buffer descriptor SQ_BUF_RSRC_WORD2
-union SqBufRsrcWord2 {
-    struct {
-        uint32_t    NUM_RECORDS : 32;        // NUM_RECORDS
+// Represents the third DWORD of buffer descriptor SQ_BUF_RSRC_WORD2.
+union SqBufRsrcWord2
+{
+    struct
+    {
+        uint32_t    NUM_RECORDS : 32;
     } bits;
+
     uint32_t u32All;
 };
 
-// Represents the forth word of buffer descriptor SQ_BUF_RSRC_WORD3
-union SqBufRsrcWord3 {
-    struct {
-        uint32_t    DST_SEL_X      : 3;      // DST_SEL_X
-        uint32_t    DST_SEL_Y      : 3;      // DST_SEL_Y
-        uint32_t    DST_SEL_Z      : 3;      // DST_SEL_Z
-        uint32_t    DST_SEL_W      : 3;      // DST_SEL_W
-        uint32_t    NUM_FORMAT     : 3;      // NUM_FORMAT
-        uint32_t    DATA_FORMAT    : 4;      // DATA_FORMAT
-        uint32_t    ELEMENT_SIZE   : 2;      // ELEMENT_SIZE
-        uint32_t    INDEX_STRIDE   : 2;      // INDEX_STRIDE
-        uint32_t    ADD_TID_ENABLE : 1;      // ADD_TID_ENABLE
-        uint32_t    ATC__CI__VI    : 1;      // ATC
-        uint32_t    HASH_ENABLE    : 1;      // HASH_ENABLE
-        uint32_t    HEAP           : 1;      // HEAP
-        uint32_t    MTYPE__CI__VI  : 3;      // MTYPE
-        uint32_t    TYPE           : 2;      // TYPE
+// Represents the forth DWORD of buffer descriptor SQ_BUF_RSRC_WORD3.
+union SqBufRsrcWord3
+{
+    struct
+    {
+        uint32_t    DST_SEL_X       : 3;
+        uint32_t    DST_SEL_Y       : 3;
+        uint32_t    DST_SEL_Z       : 3;
+        uint32_t    DST_SEL_W       : 3;
+        uint32_t                    : 9;
+        uint32_t    INDEX_STRIDE    : 2;
+        uint32_t    ADD_TID_ENABLE  : 1;
+        uint32_t                    : 6;
+        uint32_t    TYPE            : 2;
     } bits;
+
+    struct
+    {
+        uint32_t                    : 12;
+        uint32_t    NUM_FORMAT      : 3;
+        uint32_t    DATA_FORMAT     : 4;
+        uint32_t    ELEMENT_SIZE    : 2;
+        uint32_t                    : 3;
+        uint32_t    ATC             : 1;
+        uint32_t    HASH_ENABLE     : 1;
+        uint32_t    HEAP            : 1;
+        uint32_t    MTYPE           : 3;
+        uint32_t                    : 2;
+    } gfx6;
+
     uint32_t u32All;
 };
 
+// Represent register fields of PA_SU_SC_MODE_CNTL
+union PaSuScModeCntl
+{
+    struct
+    {
+        uint32_t CULL_FRONT                                 : 1;
+        uint32_t CULL_BACK                                  : 1;
+        uint32_t FACE                                       : 1;
+        uint32_t POLY_MODE                                  : 2;
+        uint32_t POLYMODE_FRONT_PTYPE                       : 3;
+        uint32_t POLYMODE_BACK_PTYPE                        : 3;
+        uint32_t POLY_OFFSET_FRONT_ENABLE                   : 1;
+        uint32_t POLY_OFFSET_BACK_ENABLE                    : 1;
+        uint32_t POLY_OFFSET_PARA_ENABLE                    : 1;
+        uint32_t                                            : 2;
+        uint32_t VTX_WINDOW_OFFSET_ENABLE                   : 1;
+        uint32_t                                            : 2;
+        uint32_t PROVOKING_VTX_LAST                         : 1;
+        uint32_t PERSP_CORR_DIS                             : 1;
+        uint32_t MULTI_PRIM_IB_ENA                          : 1;
+        uint32_t                                            : 10;
+    } bits;
+
+    struct
+    {
+        uint32_t                                            : 22;
+        uint32_t RIGHT_TRIANGLE_ALTERNATE_GRADIENT_REF      : 1;
+        uint32_t NEW_QUAD_DECOMPOSITION                     : 1;
+        uint32_t                                            : 8;
+    } gfx9;
+
+    uint32_t u32All;
+
+};
+
+// Represent register fields of PA_CL_CLIP_CNTL
+union PaClClipCntl
+{
+    struct
+    {
+		uint32_t UCP_ENA_0                  : 1;
+		uint32_t UCP_ENA_1                  : 1;
+		uint32_t UCP_ENA_2                  : 1;
+		uint32_t UCP_ENA_3                  : 1;
+		uint32_t UCP_ENA_4                  : 1;
+		uint32_t UCP_ENA_5                  : 1;
+		uint32_t                            : 7;
+		uint32_t PS_UCP_Y_SCALE_NEG         : 1;
+		uint32_t PS_UCP_MODE                : 2;
+		uint32_t CLIP_DISABLE               : 1;
+		uint32_t UCP_CULL_ONLY_ENA          : 1;
+		uint32_t BOUNDARY_EDGE_FLAG_ENA     : 1;
+		uint32_t DX_CLIP_SPACE_DEF          : 1;
+		uint32_t DIS_CLIP_ERR_DETECT        : 1;
+		uint32_t VTX_KILL_OR                : 1;
+		uint32_t DX_RASTERIZATION_KILL      : 1;
+		uint32_t                            : 1;
+		uint32_t DX_LINEAR_ATTR_CLIP_ENA    : 1;
+		uint32_t VTE_VPORT_PROVOKE_DISABLE  : 1;
+		uint32_t ZCLIP_NEAR_DISABLE         : 1;
+		uint32_t ZCLIP_FAR_DISABLE          : 1;
+		uint32_t                            : 4;
+	} bits;
+
+	uint32_t u32All;
+};
+
+// Represent register fields PA_CL_VTE_CNTL
+union PaClVteCntl
+{
+    struct
+    {
+		uint32_t VPORT_X_SCALE_ENA      : 1;
+		uint32_t VPORT_X_OFFSET_ENA     : 1;
+		uint32_t VPORT_Y_SCALE_ENA      : 1;
+		uint32_t VPORT_Y_OFFSET_ENA     : 1;
+		uint32_t VPORT_Z_SCALE_ENA      : 1;
+		uint32_t VPORT_Z_OFFSET_ENA     : 1;
+		uint32_t                        : 2;
+		uint32_t VTX_XY_FMT             : 1;
+		uint32_t VTX_Z_FMT              : 1;
+		uint32_t VTX_W0_FMT             : 1;
+		uint32_t PERFCOUNTER_REF        : 1;
+		uint32_t                        : 20;
+	} bits;
+
+	uint32_t u32All;
+};
+
+// Enumerates how to render front-facing polygons
+enum PolyModeType
+{
+    POLY_MODE_POINTS        = 0,
+    POLY_MODE_LINES         = 1,
+    POLY_MODE_TRIANGLES     = 2,
+};
+
+// Represents the coherent flag used in buffer intrinsics
+union CoherentFlag
+{
+    struct
+    {
+        uint32_t glc    :  1;   // Global level coherence
+        uint32_t slc    :  1;   // System level coherence
+        uint32_t        :  30;
+    } bits;
+
+    uint32_t u32All;
+};
+
+// Represents the combine format used in tbuffer intrinsics
+union CombineFormat
+{
+    struct
+    {
+        uint32_t dfmt   :  4;   // Data format
+        uint32_t nfmt   :  3;   // Numeric format
+        uint32_t        :  25;
+    } bits;
+
+    uint32_t u32All;
+};
 } // Llpc

@@ -42,6 +42,7 @@ class ComputeContext: public PipelineContext
 public:
     ComputeContext(GfxIpVersion                    gfxIp,
                    const GpuProperty*              pGpuProp,
+                   const WorkaroundFlags*          pGpuWorkarounds,
                    const ComputePipelineBuildInfo* pPipelineInfo,
                    MetroHash::Hash*                pHash);
     virtual ~ComputeContext() {}
@@ -77,6 +78,9 @@ public:
 
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() { LLPC_NEVER_CALLED(); }
+
+    // Gets wave size for the specified shader stage
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage);
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }

@@ -43,8 +43,8 @@
 #include "llvm/Support/TargetSelect.h"
 
 #include <sstream>
+#include "LLVMSPIRVLib.h"
 #include "spirvExt.h"
-#include "SPIRV.h"
 #include "SPIRVInternal.h"
 #include "llpcCodeGenManager.h"
 #include "llpcCompiler.h"
@@ -81,7 +81,7 @@ namespace cl
 // -pipeline-dump-dir: directory where pipeline info are dumped
 opt<std::string> PipelineDumpDir("pipeline-dump-dir",
                                  desc("Directory where pipeline shader info are dumped"),
-                                 value_desc("directory"),
+                                 value_desc("dir"),
                                  init("."));
 
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -105,15 +105,16 @@ static opt<bool> DumpDuplicatePipelines("dump-duplicate-pipelines",
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
 
-// --disable-WIP-features: disable those work-in-progress features
-static opt<bool> DisableWipFeatures("disable-WIP-features",
-                                   desc("Disable those work-in-progress features"),
-                                   init(false));
-
 // -enable-time-profiler: enable time profiler for various compilation phases
 static opt<bool> EnableTimeProfiler("enable-time-profiler",
                                     desc("Enable time profiler for various compilation phases"),
                                     init(false));
+
+// -shader-cache-file-dir: root directory to store shader cache
+opt<std::string> ShaderCacheFileDir("shader-cache-file-dir",
+                                    desc("Root directory to store shader cache"),
+                                    value_desc("dir"),
+                                    init("."));
 
 // -shader-cache-mode: shader cache mode:
 // 0 - Disable
@@ -186,6 +187,8 @@ extern opt<std::string> LogFileOuts;
 
 namespace Llpc
 {
+llvm::sys::Mutex      Compiler::m_contextPoolMutex;
+std::vector<Context*> Compiler::m_contextPool;
 
 // Time profiling result
 TimeProfileResult g_timeProfileResult = {};
@@ -204,6 +207,7 @@ static const uint8_t GlslNullFsEmuLib[]=
 };
 
 static ManagedStatic<sys::Mutex> s_compilerMutex;
+static MetroHash::Hash s_optionHash = {};
 
 uint32_t Compiler::m_instanceCount = 0;
 uint32_t Compiler::m_outRedirectCount = 0;
@@ -237,8 +241,36 @@ Result VKAPI_CALL ICompiler::Create(
     raw_null_ostream nullStream;
 
     MutexGuard lock(*s_compilerMutex);
+    MetroHash::Hash optionHash = Compiler::GenerateHashForCompileOptions(optionCount, options);
 
-    if (Compiler::GetInstanceCount() == 0)
+    bool parseCmdOption = true;
+    if (Compiler::GetInstanceCount() > 0)
+    {
+        bool isSameOption = memcmp(&optionHash, &s_optionHash, sizeof(optionHash)) == 0;
+
+        parseCmdOption = false;
+        if (isSameOption == false)
+        {
+            if (Compiler::GetOutRedirectCount() == 0)
+            {
+                // All compiler instances are destroyed, we can reset LLVM options in safe
+                auto& options = cl::getRegisteredOptions();
+                for (auto it = options.begin(); it != options.end(); ++it)
+                {
+                    it->second->reset();
+                }
+                parseCmdOption = true;
+            }
+            else
+            {
+                LLPC_ERRS("Incompatible compiler options cross compiler instances!");
+                result = Result::ErrorInvalidValue;
+                LLPC_NEVER_CALLED();
+            }
+        }
+    }
+
+    if (parseCmdOption)
     {
         // LLVM command options can't be parsed multiple times
         if (cl::ParseCommandLineOptions(optionCount,
@@ -248,17 +280,12 @@ Result VKAPI_CALL ICompiler::Create(
         {
             result = Result::ErrorInvalidValue;
         }
-
-        // LLVM fatal error handler only can be installed once.
-        if (result == Result::Success)
-        {
-            install_fatal_error_handler(FatalErrorHandler);
-        }
     }
 
     if (result == Result::Success)
     {
-        *ppCompiler = new Compiler(gfxIp, optionCount, options);
+        s_optionHash = optionHash;
+        *ppCompiler = new Compiler(gfxIp, optionCount, options, s_optionHash);
         LLPC_ASSERT(*ppCompiler != nullptr);
     }
     else
@@ -282,12 +309,17 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 Compiler::Compiler(
     GfxIpVersion      gfxIp,        // Graphics IP version info
     uint32_t          optionCount,  // Count of compilation-option strings
-    const char*const* pOptions)      // [in] An array of compilation-option strings
+    const char*const* pOptions,     // [in] An array of compilation-option strings
+    MetroHash::Hash   optionHash)   // Hash code of compilation options
     :
-    m_pClientName(pOptions[0]),
+    m_optionHash(optionHash),
     m_gfxIp(gfxIp)
 {
-    m_optionHash = GenerateHashForCompileOptions(optionCount, pOptions);
+    for (uint32_t i = 0; i < optionCount; ++i)
+    {
+        m_options.push_back(pOptions[i]);
+    }
+
     if (m_outRedirectCount == 0)
     {
         RedirectLogOutput(false, optionCount, pOptions);
@@ -303,6 +335,9 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
 
+        // LLVM fatal error handler only can be installed once.
+        install_fatal_error_handler(FatalErrorHandler);
+
 #ifdef LLPC_ENABLE_SPIRV_OPT
         InitSpvGen();
 #endif
@@ -316,25 +351,23 @@ Compiler::Compiler(
     auxCreateInfo.gfxIp           = m_gfxIp;
     auxCreateInfo.hash            = m_optionHash;
     auxCreateInfo.pExecutableName = cl::ExecutableName.c_str();
-    auxCreateInfo.pCacheFilePath  = getenv("AMD_SHADER_DISK_CACHE_PATH");
-    if (auxCreateInfo.pCacheFilePath == nullptr)
+    auxCreateInfo.pCacheFilePath  = cl::ShaderCacheFileDir.c_str();
+    if (cl::ShaderCacheFileDir.empty())
     {
 #ifdef WIN_OS
         auxCreateInfo.pCacheFilePath  = getenv("LOCALAPPDATA");
 #else
-        auxCreateInfo.pCacheFilePath  = getenv("HOME");
+        LLPC_NEVER_CALLED();
 #endif
     }
 
     m_shaderCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
 
     InitGpuProperty();
+    InitGpuWorkaround();
+
     ++m_instanceCount;
     ++m_outRedirectCount;
-
-    // Create one context at initialization time
-    auto pContext = AcquireContext();
-    ReleaseContext(pContext);
 }
 
 // =====================================================================================================================
@@ -344,12 +377,33 @@ Compiler::~Compiler()
     {
         // Free context pool
         MutexGuard lock(m_contextPoolMutex);
-        for (auto pContext : m_contextPool)
+
+        // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
+        // compiler next time.
+        for (auto it = m_contextPool.begin(); it != m_contextPool.end();)
         {
-            LLPC_ASSERT(pContext->IsInUse() == false);
-            delete pContext;
+            auto   pContext             = *it;
+            size_t maxResidentContexts  = 0;
+
+            // This is just a W/A for Teamcity. Setting AMD_RESIDENT_CONTEXTS could reduce more than 40 minutes of
+            // CTS running time.
+            char*  pMaxResidentContexts = getenv("AMD_RESIDENT_CONTEXTS");
+
+            if (pMaxResidentContexts != nullptr)
+            {
+                maxResidentContexts = strtoul(pMaxResidentContexts, nullptr, 0);
+            }
+
+            if ((pContext->IsInUse() == false) && (m_contextPool.size() > maxResidentContexts))
+            {
+                it = m_contextPool.erase(it);
+                delete pContext;
+            }
+            else
+            {
+                ++it;
+            }
         }
-        m_contextPool.clear();
     }
 
     // Restore default output
@@ -364,7 +418,7 @@ Compiler::~Compiler()
         ShaderCacheManager::GetShaderCacheManager()->ReleaseShaderCacheObject(m_shaderCache);
     }
 
-    if (strcmp(m_pClientName, VkIcdName) == 0)
+    if (m_options[0] == VkIcdName)
     {
         // NOTE: Skip subsequent cleanup work for Vulkan ICD. The work will be done by system itself
         return;
@@ -382,6 +436,7 @@ Compiler::~Compiler()
 
     if (shutdown)
     {
+        ShaderCacheManager::Shutdown();
         llvm_shutdown();
     }
 }
@@ -411,6 +466,11 @@ Result Compiler::BuildShaderModule(
     if (IsSpirvBinary(&pShaderInfo->shaderBin))
     {
         binType = BinaryType::Spirv;
+        if (VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
+        {
+            LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
+            result = Result::Unsupported;
+        }
     }
     else if (IsLlvmBitcode(&pShaderInfo->shaderBin))
     {
@@ -444,7 +504,7 @@ Result Compiler::BuildShaderModule(
         pModuleData->binType = binType;
         pModuleData->binCode.codeSize = pShaderInfo->shaderBin.codeSize;
         MetroHash::Hash hash = {};
-        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
+        MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
                           pShaderInfo->shaderBin.codeSize,
                           hash.bytes);
         static_assert(sizeof(pModuleData->hash) == sizeof(hash), "Unexpected value!");
@@ -499,14 +559,6 @@ Result Compiler::BuildGraphicsPipelineInternal(
         const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
         if (pShaderInfo->pModuleData == nullptr)
         {
-            continue;
-        }
-
-        if (cl::DisableWipFeatures &&
-            ((stage == ShaderStageTessControl) || (stage == ShaderStageTessEval) || (stage == ShaderStageGeometry)))
-        {
-            result = Result::Unsupported;
-            LLPC_ERRS("Unsupported shader stage.\n");
             continue;
         }
 
@@ -569,7 +621,7 @@ Result Compiler::BuildGraphicsPipelineInternal(
         if ((result == Result::Success) && (skipLower == false))
         {
             TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-            result = SpirvLower::Run(pModule);
+            result = SpirvLower::Run(pModule, forceLoopUnrollCount);
             if (result != Result::Success)
             {
                 LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
@@ -767,27 +819,32 @@ Result Compiler::BuildGraphicsPipelineInternal(
                 result = Result::ErrorInvalidShader;
             }
         }
+
+        if (result == Result::Success)
+        {
+            LLPC_OUTS("===============================================================================\n");
+            LLPC_OUTS("// LLPC linking results\n");
+            LLPC_OUTS(*pPipelineModule);
+            LLPC_OUTS("\n");
+        }
     }
 
     if (result == Result::Success)
     {
-        LLPC_OUTS("===============================================================================\n");
-        LLPC_OUTS("// LLPC linking results\n");
-        LLPC_OUTS(*pPipelineModule);
-        LLPC_OUTS("\n");
+        CodeGenManager::SetupTargetFeatures(pPipelineModule);
 
         // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text instead.
         // If "-emit-llvm" is specified, generate LLVM bitcode. These options are used through LLPC
         // standalone compiler tool "amdllpc".
         raw_svector_ostream elfStream(*pPipelineElf);
         std::string errMsg;
+
         TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
 
         result = CodeGenManager::GenerateCode(pPipelineModule, elfStream, errMsg);
         if (result != Result::Success)
         {
-            LLPC_ERRS("Fails to generate GPU ISA codes :" <<
-                      errMsg << "\n");
+            LLPC_ERRS("Fails to generate GPU ISA codes :" << errMsg << "\n");
         }
     }
     delete pPipelineModule;
@@ -915,6 +972,14 @@ Result Compiler::BuildGraphicsPipeline(
         dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
         dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
         pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, nullptr, pPipelineInfo, &pipelineHash);
+        std::stringstream strStream;
+        strStream << ";Compiler Options: ";
+        for (auto& option : m_options)
+        {
+            strStream << option << " ";
+        }
+        std::string extraInfo = strStream.str();
+        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -961,7 +1026,7 @@ Result Compiler::BuildGraphicsPipeline(
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+        GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
         result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                shaderInfo,
                                                forceLoopUnrollCount,
@@ -984,7 +1049,7 @@ Result Compiler::BuildGraphicsPipeline(
             for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
                 forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+                GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
                 result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                        shaderInfo,
                                                        forceLoopUnrollCount,
@@ -1161,7 +1226,7 @@ Result Compiler::BuildComputePipelineInternal(
             if (result == Result::Success)
             {
                 TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-                result = SpirvLower::Run(pModule);
+                result = SpirvLower::Run(pModule, forceLoopUnrollCount);
                 if (result != Result::Success)
                 {
                     LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
@@ -1239,12 +1304,16 @@ Result Compiler::BuildComputePipelineInternal(
 
         if (result == Result::Success)
         {
-            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+            CodeGenManager::SetupTargetFeatures(pModule);
+
             // Generate GPU ISA binary. If "filetype=asm" is specified, generate ISA assembly text
             // instead.  If "-emit-llvm" is specified, generate LLVM bitcode. These options are used
             // through LLPC standalone compiler tool "amdllpc".
             raw_svector_ostream elfStream(*pPipelineElf);
             std::string errMsg;
+
+            TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+
             result = CodeGenManager::GenerateCode(pModule, elfStream, errMsg);
             if (result != Result::Success)
             {
@@ -1359,6 +1428,14 @@ Result Compiler::BuildComputePipeline(
         dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
         dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
         pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, pPipelineInfo, nullptr, &pipelineHash);
+        std::stringstream strStream;
+        strStream << ";Compiler Options: ";
+        for (auto& option : m_options)
+        {
+            strStream << option << " ";
+        }
+        std::string extraInfo = strStream.str();
+        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -1405,7 +1482,7 @@ Result Compiler::BuildComputePipeline(
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        ComputeContext computeContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+        ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
 
         result = BuildComputePipelineInternal(&computeContext,
                                               pPipelineInfo,
@@ -1429,7 +1506,7 @@ Result Compiler::BuildComputePipeline(
             for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
                 forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                ComputeContext computeContext(m_gfxIp, &m_gpuProperty, pPipelineInfo, &pipelineHash);
+                ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
 
                 result = BuildComputePipelineInternal(&computeContext,
                                                       pPipelineInfo,
@@ -1577,7 +1654,7 @@ Result Compiler::ReplaceShader(
             pModuleData->binCode.codeSize = binSize;
             pModuleData->binCode.pCode = pShaderBin;
             MetroHash::Hash hash = {};
-            MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderBin), binSize, hash.bytes);
+            MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderBin), binSize, hash.bytes);
             memcpy(&pModuleData->hash, &hash, sizeof(hash));
 
             *ppModuleData = pModuleData;
@@ -1634,8 +1711,7 @@ Result Compiler::TranslateSpirvToLlvm(
                     pEntryTarget,
                     specConstMap,
                     *ppModule,
-                    errMsg,
-                    forceLoopUnrollCount) == false)
+                    errMsg) == false)
     {
         LLPC_ERRS("Fails to translate SPIR-V to LLVM (" <<
                     GetShaderStageName(static_cast<ShaderStage>(shaderStage)) << " shader): " << errMsg << "\n");
@@ -1708,21 +1784,20 @@ void Compiler::CleanOptimizedSpirv(
 // Builds hash code from compilation-options
 MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     uint32_t          optionCount,    // Count of compilation-option strings
-    const char*const* pOptions         // [in] An array of compilation-option strings
-    ) const
+    const char*const* pOptions        // [in] An array of compilation-option strings
+    )
 {
     // Options which needn't affect compilation results
     static StringRef IgnoredOptions[] =
     {
         cl::PipelineDumpDir.ArgStr,
         cl::EnablePipelineDump.ArgStr,
-        cl::DisableWipFeatures.ArgStr,
         cl::EnableTimeProfiler.ArgStr,
+        cl::ShaderCacheFileDir.ArgStr,
         cl::ShaderCacheMode.ArgStr,
         cl::ShaderReplaceMode.ArgStr,
         cl::ShaderReplaceDir.ArgStr,
         cl::ShaderReplacePipelineHashes.ArgStr,
-        cl::EnablePipelineDump.ArgStr,
         cl::EnableOuts.ArgStr,
         cl::EnableErrs.ArgStr,
         cl::LogFileDbgs.ArgStr,
@@ -1735,7 +1810,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     // Build effecting options
     for (uint32_t i = 1; i < optionCount; ++i)
     {
-        StringRef option = pOptions[i];
+        StringRef option = pOptions[i] + 1;  // Skip '-' in options
         bool ignore = false;
         for (uint32_t j = 0; j < sizeof(IgnoredOptions) / sizeof(IgnoredOptions[0]); ++j)
         {
@@ -1752,7 +1827,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         }
     }
 
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     // Build hash code from effecting options
     for (auto option : effectingOptions)
@@ -1795,15 +1870,6 @@ Result Compiler::ValidatePipelineShaderInfo(
             {
                 LLPC_ERRS("Missing entry-point name for " << GetShaderStageName(shaderStage) << " shader\n");
                 result = Result::ErrorInvalidShader;
-            }
-
-            if (cl::DisableWipFeatures)
-            {
-                if (VerifySpirvBinary(pSpirvBin) != Result::Success)
-                {
-                    LLPC_ERRS("Unsupported op codes are found in " << GetShaderStageName(shaderStage) << " shader\n");
-                    result = Result::Unsupported;
-                }
             }
         }
         else if (pModuleData->binType == BinaryType::LlvmBc)
@@ -1911,6 +1977,7 @@ Result Compiler::CreateShaderCache(
 void Compiler::InitGpuProperty()
 {
     // Initial settings (could be adjusted later according to graphics IP version info)
+    memset(&m_gpuProperty, 0, sizeof(m_gpuProperty));
     m_gpuProperty.waveSize = 64;
 
     m_gpuProperty.ldsSizePerCu = (m_gfxIp.major > 6) ? 65536 : 32768;
@@ -1984,6 +2051,94 @@ void Compiler::InitGpuProperty()
 }
 
 // =====================================================================================================================
+// Initialize GPU workarounds.
+void Compiler::InitGpuWorkaround()
+{
+    memset(&m_gpuWorkarounds, 0, sizeof(m_gpuWorkarounds));
+    if (m_gfxIp.major == 6)
+    {
+        // Hardware workarounds for GFX6 based GPU's:
+        m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+        m_gpuWorkarounds.gfx6.miscLoadBalancePerWatt = 1;
+        m_gpuWorkarounds.gfx6.shader8b16bLocalWriteCorruption = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1000_READLANE_SMRD_WORKAROUND_BUG343479 for detail
+        m_gpuWorkarounds.gfx6.shaderReadlaneSmrd = 1;
+
+        // TODO: Should be done in back-end, see SCOption_UBTS460287_FILL_SIMD_WITH_VGPRS for detail
+        m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1000R1100_VCCZ_CLOBBER_WORKAROUND_BUG457939 for detail
+        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
+
+        // TODO: Should be done in back-end, see SCOption_MIN_MAX_DENORM_WORKAROUND for detail
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        // NOTE: We only need workaround it in Tahiti, Pitcairn, Capeverde, to simplify the design, we set this
+        // flag for all gfxIp.major == 6
+        m_gpuWorkarounds.gfx6.shaderZExport = 1;
+
+    }
+    else if (m_gfxIp.major == 7)
+    {
+        // Hardware workarounds for GFX7 based GPU's:
+        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        if (m_gfxIp.stepping == 0)
+        {
+            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+
+            // NOTE: Buffer store + index mode are not used in vulkan, so we can skip this workaround in safe.
+            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
+        }
+        if (m_gfxIp.stepping == 3 ||
+            m_gfxIp.stepping == 4)
+        {
+            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
+            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
+            m_gpuWorkarounds.gfx6.shaderSpiBarrierMgmt = 1;
+            m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
+        }
+    }
+    else if (m_gfxIp.major == 8)
+    {
+        // Hardware workarounds for GFX8.x based GPU's:
+        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
+
+        // TODO: Should be done in back-end, see SCOption_R1200_UBTS523206_SMEM_RANGE_CHECK for detail
+        m_gpuWorkarounds.gfx6.shaderSmemBufferAddrClamp = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX8_DEGGIGX80_444_IMAGE_GATHER4_WORKAROUND and
+        // SCOption_GFX81_DEGGI___IMAGE_STORE_D16_WORKAROUND for detail
+        m_gpuWorkarounds.gfx6.shaderEstimateRegisterUsage = 1;
+
+        if (m_gfxIp.minor == 0 && m_gfxIp.stepping == 2)
+        {
+            m_gpuWorkarounds.gfx6.miscSpiSgprsNum = 1;
+        }
+    }
+    else if (m_gfxIp.major == 9)
+    {
+        // Hardware workarounds for GFX9 based GPU's:
+
+        // TODO: Clean up code for all 1d texture patch
+        m_gpuWorkarounds.gfx9.treat1dImagesAs2d = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX9_DEGGIGX90_864_IMAGE_GATHER_H_PCK_WORKAROUND and
+        // SCOption_GFX9_DEGGIGX90_1552_IMAGE_GATHER4_WORKAROUND for detail
+        m_gpuWorkarounds.gfx9.shaderImageGatherInstFix = 1;
+
+        // TODO: Should be done in back-end, see SCOption_GFX9_DEGGIGX90_1641_CACHE_LINE_STRADDLING_BUG for detail
+        m_gpuWorkarounds.gfx9.fixCacheLineStraddling = 1;
+
+        if (m_gfxIp.stepping == 0 || m_gfxIp.stepping == 2)
+        {
+            m_gpuWorkarounds.gfx9.fixLsVgprInput = 1;
+        }
+    }
+}
+// =====================================================================================================================
 // Acquires a free context from context pool.
 Context* Compiler::AcquireContext()
 {
@@ -1994,7 +2149,12 @@ Context* Compiler::AcquireContext()
     // Try to find a free context from pool first
     for (auto pContext : m_contextPool)
     {
-        if (pContext->IsInUse() == false)
+        GfxIpVersion gfxIpVersion = pContext->GetGfxIpVersion();
+
+        if ((pContext->IsInUse()   == false) &&
+            (gfxIpVersion.major    == m_gfxIp.major) &&
+            (gfxIpVersion.minor    == m_gfxIp.minor) &&
+            (gfxIpVersion.stepping == m_gfxIp.stepping))
         {
             pFreeContext = pContext;
             pFreeContext->SetInUse(true);
@@ -2005,7 +2165,7 @@ Context* Compiler::AcquireContext()
     if (pFreeContext == nullptr)
     {
         // Create a new one if we fail to find an available one
-        pFreeContext = new Context(m_gfxIp);
+        pFreeContext = new Context(m_gfxIp, &m_gpuWorkarounds);
         pFreeContext->SetInUse(true);
         m_contextPool.push_back(pFreeContext);
     }
@@ -2057,6 +2217,7 @@ Result Compiler::CollectInfoFromSpirvBinary(
     Result result = Result::Success;
     pModuleData->enableVarPtr = false;
     pModuleData->enableVarPtrStorageBuf = false;
+    pModuleData->useSubgroupSize = false;
 
     const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pModuleData->binCode.pCode);
     const uint32_t* pEnd = pCode + pModuleData->binCode.codeSize / sizeof(uint32_t);
@@ -2102,6 +2263,22 @@ Result Compiler::CollectInfoFromSpirvBinary(
         {
             pModuleData->enableVarPtr = true;
         }
+
+        if ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformVote) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformBallot) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformShuffle) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformShuffleRelative) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformClustered) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroupNonUniformQuad) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilitySubgroupBallotKHR) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilitySubgroupVoteKHR) != capabilities.end()) ||
+            (capabilities.find(spv::CapabilityGroups) != capabilities.end()))
+        {
+            pModuleData->useSubgroupSize = true;
+        }
+
         return result;
     }
     else
@@ -2121,7 +2298,7 @@ bool Compiler::NeedDynamicLoopUnroll(
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     std::vector<LoopAnalysisInfo>  loopInfo;
     bool needDynamicLoopUnroll = false;
-    LoopInfoCollect* pLoopPass = new LoopInfoCollect(&loopInfo);
+    PassLoopInfoCollect* pLoopPass = new PassLoopInfoCollect(&loopInfo);
 
     legacy::PassManager passMgr;
     passMgr.add(pLoopPass);
@@ -2175,7 +2352,11 @@ void Compiler::GetPipelineStatistics(
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
-                if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                if (pNode->type == Util::Abi::PipelineAbiNoteType::LegacyMetadata)
+#else
+                if (pNode->type == LegacyMetadata)
+#endif
                 {
                     const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
                     auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(

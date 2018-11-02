@@ -32,17 +32,30 @@
 
 #include "llpcComputeContext.h"
 
+using namespace llvm;
+
+namespace llvm
+{
+
+namespace cl
+{
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
 // =====================================================================================================================
 ComputeContext::ComputeContext(
-    GfxIpVersion                    gfxIp,         // Graphics Ip version info
-    const GpuProperty*              pGpuProp,      // [in] GPU Property
-    const ComputePipelineBuildInfo* pPipelineInfo, // [in] Compute pipeline build info
-    MetroHash::Hash*                pHash)         // [in] Pipeline hash code
+    GfxIpVersion                    gfxIp,            // Graphics Ip version info
+    const GpuProperty*              pGpuProp,         // [in] GPU Property
+    const WorkaroundFlags*          pGpuWorkarounds,  // [in] GPU workarounds
+    const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
+    MetroHash::Hash*                pHash)            // [in] Pipeline hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pHash),
+    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pHash),
     m_pPipelineInfo(pPipelineInfo)
 {
     InitShaderResourceUsage(ShaderStageCompute);
@@ -95,7 +108,7 @@ uint64_t ComputeContext::GetShaderHashCode(
     auto pShaderInfo = GetPipelineShaderInfo(stage);
     LLPC_ASSERT(pShaderInfo != nullptr);
 
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     UpdateShaderHashForPipelineShaderInfo(ShaderStageCompute, pShaderInfo, &hasher);
     hasher.Update(m_pPipelineInfo->deviceIndex);
@@ -104,6 +117,18 @@ uint64_t ComputeContext::GetShaderHashCode(
     hasher.Finalize(hash.bytes);
 
     return MetroHash::Compact64(&hash);
+}
+
+// =====================================================================================================================
+// Gets wave size for the specified shader stage
+//
+// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
+uint32_t ComputeContext::GetShaderWaveSize(
+    ShaderStage stage)  // Shader stage
+{
+    uint32_t waveSize = m_pGpuProperty->waveSize;
+    return waveSize;
+
 }
 
 } // Llpc

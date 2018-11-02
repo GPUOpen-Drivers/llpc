@@ -42,22 +42,6 @@
 using namespace llvm;
 using namespace Llpc;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-// -enable-dim-aware-image-intrinsic
-opt<bool> EnableDimAwareImageIntrinsic(
-    "enable-dim-aware-image-intrinsic",
-    desc("Enable dimension-aware image instrinsic in AMDGPU backend, sparse image function will always" \
-         "use dimension aware image intrinsic."),
-    init(true));
-}
-
-}
-
 namespace Llpc
 {
 
@@ -164,7 +148,7 @@ void SpirvLowerImageOp::visitCallInst(
 
         if ((imageCallMeta.OpKind == ImageOpWrite) || isImageAtomicOp(imageCallMeta.OpKind))
         {
-            m_pContext->GetShaderResourceUsage(m_shaderStage)->imageWrite = true;
+            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
         }
 
         ConstantInt* pMemoryQualifier = nullptr;
@@ -305,6 +289,7 @@ void SpirvLowerImageOp::visitCallInst(
             args.push_back(pResourceIndex);
             std::unordered_set<Value*> checkedValuesResource;
             imageCallMeta.NonUniformResource = IsNonUniformValue(pResourceIndex, checkedValuesResource) ? 1 : 0;
+            imageCallMeta.WriteOnly = callInst.getType()->isVoidTy();
 
             if (imageCallMeta.OpKind != ImageOpQueryNonLod)
             {
@@ -424,14 +409,14 @@ void SpirvLowerImageOp::visitCallInst(
 
             if (imageCallMeta.OpKind == ImageOpQueryNonLod)
             {
-                // Format: ...".query.op.dim[.rettype]"...
+                // Format: ...".query.op.imagesig.dim[.rettype]"...
                 size_t pos = mangledName.find(gSPIRVName::ImageCallQueryNonLodPrefix);
                 LLPC_ASSERT(pos != std::string::npos);
 
                 // Skip the query operation name
                 pos = mangledName.find(".", pos + 1);
 
-                // Find the name string for image dimension and remove it
+                // Find the name string for image signature and remove it
                 size_t startPos = mangledName.find(".", pos + 1);
                 size_t endPos   = mangledName.find(".", startPos + 1);
                 if (endPos == std::string::npos)
@@ -467,32 +452,7 @@ void SpirvLowerImageOp::visitCallInst(
 
             if (imageCallMeta.Dim != DimBuffer)
             {
-                // Choose dimension aware image intrinsic or old image intrinsic, sparse image function will always
-                // use dimension aware image intrinsic.
-                bool enableDimAwareImageIntrinsic = cl::EnableDimAwareImageIntrinsic;
-                if ((callName.find(gSPIRVName::ImageCallModSparse) != std::string::npos) ||
-                    ((enableDimAwareImageIntrinsic == true) &&
-                     ((imageCallMeta.OpKind == ImageOpSample) ||
-                      (imageCallMeta.OpKind == ImageOpGather) ||
-                      (imageCallMeta.OpKind == ImageOpFetch)  ||
-                      (imageCallMeta.OpKind == ImageOpRead)   ||
-                      (imageCallMeta.OpKind == ImageOpWrite)  ||
-                      (imageCallMeta.OpKind == ImageOpAtomicExchange) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicCompareExchange) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicIIncrement) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicIDecrement) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicIAdd) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicISub) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicSMin) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicUMin) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicSMax) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicUMax) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicAnd) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicOr) ||
-                      (imageCallMeta.OpKind == ImageOpAtomicXor))))
-                {
-                    callName += gSPIRVName::ImageCallDimAwareSuffix;
-                }
+                callName += gSPIRVName::ImageCallDimAwareSuffix;
             }
 
             // Image call replacement
@@ -620,5 +580,5 @@ void SpirvLowerImageOp::ExtractBindingInfo(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for image operations.
-INITIALIZE_PASS(SpirvLowerImageOp, "spirv-lower-image-op",
+INITIALIZE_PASS(SpirvLowerImageOp, "Spirv-lower-image-op",
                 "Lower SPIR-V image operations (sample, fetch, gather, read/write)", false, false)

@@ -312,10 +312,10 @@ void SpirvLowerBufferOp::visitCallInst(
         if (pBufferPtr->getType()->getPointerAddressSpace() == SPIRAS_Uniform)
         {
             // Atomic operations on buffer
+            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+
             GetElementPtrInst* pGetElemInst = nullptr;
             Instruction*       pConstExpr   = nullptr;
-
-            m_pContext->GetShaderResourceUsage(m_shaderStage)->imageWrite = true;
 
             if (isa<GetElementPtrInst>(pBufferPtr))
             {
@@ -651,7 +651,8 @@ void SpirvLowerBufferOp::visitStoreInst(
     if (pStoreDest->getType()->getPointerAddressSpace() == SPIRAS_Uniform)
     {
         // Store to buffer block
-        m_pContext->GetShaderResourceUsage(m_shaderStage)->imageWrite = true;
+        m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+
         GetElementPtrInst* pGetElemInst = nullptr;
         Instruction*       pConstExpr   = nullptr;
 
@@ -957,10 +958,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             // Cast type of the component type to <n x i8>
             uint32_t loadSize = pCompTy->getPrimitiveSizeInBits() / 8;
             Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), loadSize);
-
-            const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             for (uint32_t i = 0; i < compCount; ++i)
             {
@@ -1014,7 +1012,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
         {
             // Cast type of the load type to <n x i8>
             uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), loadSize);
+            Type* pCastTy = (loadSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), loadSize);
 
             const char* pInstName = nullptr;
 
@@ -1043,10 +1041,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
-            const uint32_t bitWidth = pLoadTy->getScalarSizeInBits();
-            const uint32_t compCount = pLoadTy->isVectorTy() ? pLoadTy->getVectorNumElements() : 1;
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8 * compCount) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             pLoadValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
@@ -1150,19 +1145,25 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if (pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Load structure member
             auto pMember = AddBufferLoadInst(pMemberTy,
@@ -1208,10 +1209,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             // Cast type of the component type to <n x i8>
             uint32_t loadSize = pCompTy->getPrimitiveSizeInBits() / 8;
             Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), loadSize);
-
-            const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8) + "i8" ;
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             for (uint32_t i = 0; i < compCount; ++i)
             {
@@ -1252,7 +1250,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
         {
             // Cast type of the load type to <n x i8>
             uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), loadSize);
+            Type* pCastTy = (loadSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), loadSize);
 
             const char* pInstName = LlpcName::BufferLoadDesc;
 
@@ -1266,10 +1264,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
 
-            const uint32_t bitWidth = pLoadTy->getScalarSizeInBits();
-            const uint32_t compCount = pLoadTy->isVectorTy() ? pLoadTy->getVectorNumElements() : 1;
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8 * compCount) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             pLoadValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
@@ -1370,19 +1365,25 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if (pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Load structure member
             auto pMember = AddBufferLoadDescInst(pMemberTy,
@@ -1432,10 +1433,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             // Cast type of the component type to <n x i8>
             uint32_t storeSize = pCompTy->getPrimitiveSizeInBits() / 8;
             Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), storeSize);
-
-            const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             for (uint32_t i = 0; i < compCount; ++i)
             {
@@ -1471,7 +1469,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
         {
             // Cast type of the store value to <n x i8>
             uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), storeSize);
+            Type* pCastTy = (storeSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), storeSize);
 
             LLPC_ASSERT(CanBitCast(pStoreTy, pCastTy));
             pStoreValue = new BitCastInst(pStoreValue, pCastTy, "", pInsertPos);
@@ -1487,10 +1485,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
-            const uint32_t bitWidth = pStoreTy->getScalarSizeInBits();
-            const uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8 * compCount) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             EmitCall(m_pModule, LlpcName::BufferStore + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
@@ -1588,19 +1583,25 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if (pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Store structure member
             AddBufferStoreInst(pMember,
@@ -1925,10 +1926,7 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             // Cast type of the component type to <n x i8>
             uint32_t storeSize = pCompTy->getPrimitiveSizeInBits() / 8;
             Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), storeSize);
-
-            const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             for (uint32_t i = 0; i < compCount; ++i)
             {
@@ -1963,7 +1961,7 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
         {
             // Cast type of the store value to <n x i8>
             uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = VectorType::get(m_pContext->Int8Ty(), storeSize);
+            Type* pCastTy = (storeSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), storeSize);
 
             LLPC_ASSERT(CanBitCast(pStoreTy, pCastTy));
             pStoreValue = new BitCastInst(pStoreValue, pCastTy, "", pInsertPos);
@@ -1975,11 +1973,7 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             args.push_back(pStoreValue);
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
-
-            const uint32_t bitWidth = pStoreTy->getScalarSizeInBits();
-            const uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
-            std::string suffix = "v" + std::to_string(bitWidth / 8 * compCount) + "i8";
+            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
             EmitCall(m_pModule, LlpcName::BufferStoreDesc + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
@@ -2075,19 +2069,25 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
             Value* pMemberOffset = nullptr;
+            ShaderBlockMetadata blockMeta = {};
             if (pMemberTy->isSingleValueType())
             {
-                ShaderBlockMetadata blockMeta = {};
                 blockMeta.U64All = cast<ConstantInt>(pMemberMeta)->getZExtValue();
-                pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
-                                                          "",
-                                                          pInsertPos);
+            }
+            else if(pMemberTy->isArrayTy())
+            {
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(1))->getZExtValue();
             }
             else
             {
-                pMemberOffset = pBlockMemberOffset;
+                LLPC_ASSERT(pMemberTy->isStructTy() == true);
+                blockMeta.U64All = cast<ConstantInt>(pMemberMeta->getOperand(0))->getZExtValue();
             }
+
+            pMemberOffset = BinaryOperator::CreateAdd(pBlockMemberOffset,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), blockMeta.offset),
+                                                      "",
+                                                      pInsertPos);
 
             // Store structure member
             AddBufferStoreDescInst(pMember,
@@ -2103,5 +2103,5 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for buffer operations.
-INITIALIZE_PASS(SpirvLowerBufferOp, "spirv-lower-buffer-op",
+INITIALIZE_PASS(SpirvLowerBufferOp, "Spirv-lower-buffer-op",
                 "Lower SPIR-V buffer operations (load and store)", false, false)

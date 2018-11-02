@@ -1195,7 +1195,7 @@ Value* FragColorExport::Run(
         // Dual source blending is enabled
         expFmt= ComputeExportFormat(pOutputTy, 0);
     }
-    else if (pResUsage->inOutUsage.fs.dualSourceBlend == false)
+    else
     {
         expFmt = ComputeExportFormat(pOutputTy, origLoc);
     }
@@ -1704,14 +1704,7 @@ ExportFormat FragColorExport::ComputeExportFormat(
     ExportFormat expFmt = EXP_FORMAT_ZERO;
 
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-
-    bool waCbNoLt16BitIntClamp = false;
-    if (gfxIp.major == 6)
-    {
-        // NOTE: For GFX6 hardware, the CB does not properly clamp its input if the shader
-        // export format is "UINT16" or "SINT16" and the CB format is less than 16 bits per channel.
-        waCbNoLt16BitIntClamp = true;
-    }
+    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
 
     bool gfx8RbPlusEnable = false;
     if ((gfxIp.major == 8) && (gfxIp.minor == 1))
@@ -1739,7 +1732,8 @@ ExportFormat FragColorExport::ComputeExportFormat(
         expFmt = EXP_FORMAT_FP16_ABGR;
     }
     else if (isSint &&
-             ((maxCompBitCount == 16) || ((waCbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
+             ((maxCompBitCount == 16) ||
+              ((pGpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
              (enableAlphaToCoverage == false))
     {
         // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
@@ -1753,7 +1747,8 @@ ExportFormat FragColorExport::ComputeExportFormat(
         expFmt = EXP_FORMAT_SNORM16_ABGR;
     }
     else if (isUint &&
-             ((maxCompBitCount == 16) || ((waCbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
+             ((maxCompBitCount == 16) ||
+              ((pGpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
              (enableAlphaToCoverage == false))
     {
         // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"

@@ -49,7 +49,8 @@ void initializeSpirvLowerDynIndexPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
-void initializeSpirvLowerOptPass(PassRegistry&);
+void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
+void initializeSpirvLowerPushConstPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
 
 } // llvm
@@ -74,7 +75,7 @@ public:
     {
     }
 
-    static Result Run(llvm::Module* pModule);
+    static Result Run(llvm::Module* pModule, uint32_t forceLoopUnrollCount);
 
 protected:
     void Init(llvm::Module* pModule);

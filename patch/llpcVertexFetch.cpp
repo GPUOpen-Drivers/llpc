@@ -319,12 +319,7 @@ const VertexFormatInfo VertexFetch::m_vertexFormatInfo[] =
         4
     },
     // VK_FORMAT_A8B8G8R8_SRGB_PACK32 = 57
-    {
-        VK_FORMAT_A8B8G8R8_SRGB_PACK32,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
+    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_A8B8G8R8_SRGB_PACK32),
     // VK_FORMAT_A2R10G10B10_UNORM_PACK32 = 58
     {
         VK_FORMAT_A2R10G10B10_UNORM_PACK32,
@@ -1424,6 +1419,26 @@ const VertexCompFormatInfo* VertexFetch::GetVertexComponentFormatInfo(
 }
 
 // =====================================================================================================================
+// Maps separate buffer data and numeric formats to the combined buffer format
+uint32_t VertexFetch::MapVertexFormat(
+    uint32_t dfmt,  // Data format
+    uint32_t nfmt   // Numeric format
+    ) const
+{
+    LLPC_ASSERT(dfmt < 16);
+    LLPC_ASSERT(nfmt < 8);
+    uint32_t format = 0;
+
+    {
+        CombineFormat formatOprd = {};
+        formatOprd.bits.dfmt = dfmt;
+        formatOprd.bits.nfmt = nfmt;
+        format = formatOprd.u32All;
+    }
+    return format;
+}
+
+// =====================================================================================================================
 // Loads vertex descriptor based on the specified vertex input location.
 Value* VertexFetch::LoadVertexBufferDescriptor(
     uint32_t     binding,       // ID of vertex buffer binding
@@ -1515,8 +1530,6 @@ void VertexFetch::AddVertexFetchInst(
 {
     const VertexCompFormatInfo* pFormatInfo = GetVertexComponentFormatInfo(dfmt);
 
-    const char* pInstName = "llvm.amdgcn.tbuffer.load";
-
     // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
     // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
     if ((((offset % pFormatInfo->vertexByteSize) == 0) && ((stride % pFormatInfo->vertexByteSize) == 0)) ||
@@ -1535,17 +1548,12 @@ void VertexFetch::AddVertexFetchInst(
 
         // Do vertex fetch
         std::vector<Value*> args;
-        args.push_back(pVbDesc);                                                // rsrc
-        args.push_back(pVbIndex);                                               // vaddr
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));             // soffset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));             // offen
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), offset));        // inst_offset
-        {
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), dfmt));      // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));      // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));      // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));      // slc
-        }
+        args.push_back(pVbDesc);                                                              // rsrc
+        args.push_back(pVbIndex);                                                             // vindex
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), offset));                      // offset
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                           // soffset
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), MapVertexFormat(dfmt, nfmt))); // dfmt, nfmt
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                           // glc, slc
 
         StringRef suffix = "";
         Type* pFetchTy = nullptr;
@@ -1596,7 +1604,7 @@ void VertexFetch::AddVertexFetchInst(
         }
 
         Value* pFetch = EmitCall(m_pModule,
-                                 (pInstName + suffix).str(),
+                                 (Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(),
                                  pFetchTy,
                                  args,
                                  NoAttrib,
@@ -1676,22 +1684,18 @@ void VertexFetch::AddVertexFetchInst(
         {
             std::vector<Value*> args;
             args.push_back(pVbDesc);                                                        // rsrc
-            args.push_back(compVbIndices[i]);                                               // vaddr
+            args.push_back(compVbIndices[i]);                                               // vindex
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]));        // offset
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offen
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]));        // inst_offset
-            {
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pFormatInfo->compDfmt)); // dfmt
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), nfmt));                  // nfmt
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
-            }
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(),
+                                            MapVertexFormat(pFormatInfo->compDfmt, nfmt))); // dfmt, nfmt
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // glc, slc
 
             Value* pCompFetch = nullptr;
             if (is16bitFetch)
             {
                 pCompFetch = EmitCall(m_pModule,
-                                      (StringRef(pInstName) + ".f16").str(),
+                                      "llvm.amdgcn.struct.tbuffer.load.f16",
                                       m_pContext->Float16Ty(),
                                       args,
                                       NoAttrib,
@@ -1703,7 +1707,7 @@ void VertexFetch::AddVertexFetchInst(
             else
             {
                 pCompFetch = EmitCall(m_pModule,
-                                      (StringRef(pInstName) + ".i32").str(),
+                                      "llvm.amdgcn.struct.tbuffer.load.i32",
                                       m_pContext->Int32Ty(),
                                       args,
                                       NoAttrib,
@@ -1738,7 +1742,6 @@ bool VertexFetch::NeedPostShuffle(
     case VK_FORMAT_B8G8R8A8_SSCALED:
     case VK_FORMAT_B8G8R8A8_UINT:
     case VK_FORMAT_B8G8R8A8_SINT:
-    case VK_FORMAT_B8G8R8A8_SRGB:
     case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
     case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
     case VK_FORMAT_A2R10G10B10_USCALED_PACK32:
@@ -1774,7 +1777,7 @@ bool VertexFetch::NeedPatchA2S(
     case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
     case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
     case VK_FORMAT_A2B10G10R10_SINT_PACK32:
-        needPatch = true;
+        needPatch = (m_pContext->GetGfxIpVersion().major < 9);
         break;
     default:
         break;

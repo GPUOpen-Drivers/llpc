@@ -1043,10 +1043,32 @@ void PatchResourceCollect::MatchGenericInOut()
 
     if (outLocMap.empty() == false)
     {
+        auto& outOrigLocs = inOutUsage.fs.outputOrigLocs;
+        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+        if (m_shaderStage == ShaderStageFragment)
+        {
+            memset(&outOrigLocs, InvalidValue, sizeof(inOutUsage.fs.outputOrigLocs));
+        }
+
         nextMapLoc = 0;
         LLPC_ASSERT(inOutUsage.outputMapLocCount == 0);
-        for (auto& locMap : outLocMap)
+        for (auto locMapIt = outLocMap.begin(); locMapIt != outLocMap.end();)
         {
+            auto& locMap = *locMapIt;
+            if (m_shaderStage == ShaderStageFragment)
+            {
+                uint32_t location = locMap.first;
+                if (pPipelineInfo->cbState.dualSourceBlendEnable && (location == 1))
+                {
+                    location = 0;
+                }
+                if (pPipelineInfo->cbState.target[location].format == VK_FORMAT_UNDEFINED)
+                {
+                    locMapIt = outLocMap.erase(locMapIt);
+                    continue;
+                }
+            }
+
             if (locMap.second == InvalidValue)
             {
                 // Only do location mapping if the output has not been mapped
@@ -1058,13 +1080,14 @@ void PatchResourceCollect::MatchGenericInOut()
             }
             inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
             LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output: loc = "
-                          << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
+                            << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
 
             if (m_shaderStage == ShaderStageFragment)
             {
-                auto& outOrigLocs = inOutUsage.fs.outputOrigLocs;
                 outOrigLocs[locMap.second] = locMap.first;
             }
+
+            ++locMapIt;
         }
         LLPC_OUTS("\n");
     }

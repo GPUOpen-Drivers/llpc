@@ -71,9 +71,11 @@ namespace Llpc
 
 namespace LlpcName
 {
+    const static char InputCallPrefix[]               = "llpc.input.";
     const static char InputImportGeneric[]            = "llpc.input.import.generic.";
     const static char InputImportBuiltIn[]            = "llpc.input.import.builtin.";
     const static char InputImportInterpolant[]        = "llpc.input.import.interpolant.";
+    const static char OutputCallPrefix[]              = "llpc.output.";
     const static char OutputImportGeneric[]           = "llpc.output.import.generic.";
     const static char OutputImportBuiltIn[]           = "llpc.output.import.builtin.";
     const static char OutputExportGeneric[]           = "llpc.output.export.generic.";
@@ -92,6 +94,7 @@ namespace LlpcName
     const static char PushConstLoad[]                 = "llpc.pushconst.load.";
     const static char TfBufferStore[]                 = "llpc.tfbuffer.store.f32";
 
+    const static char DescriptorCallPrefix[]          = "llpc.descriptor.";
     const static char DescriptorLoadPrefix[]          = "llpc.descriptor.load.";
     const static char DescriptorLoadResource[]        = "llpc.descriptor.load.resource";
     const static char DescriptorLoadSampler[]         = "llpc.descriptor.load.sampler";
@@ -154,7 +157,7 @@ llvm::Function* GetEntryPoint(llvm::Module* pModule);
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
 llvm::Value* EmitCall(llvm::Module*                             pModule,
-                      llvm::StringRef                           instName,
+                      llvm::StringRef                           funcName,
                       llvm::Type*                               pRetTy,
                       llvm::ArrayRef<llvm::Value *>             args,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
@@ -163,7 +166,7 @@ llvm::Value* EmitCall(llvm::Module*                             pModule,
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
 llvm::Value* EmitCall(llvm::Module*                             pModule,
-                      llvm::StringRef                           instName,
+                      llvm::StringRef                           funcName,
                       llvm::Type*                               pRetTy,
                       llvm::ArrayRef<llvm::Value *>             args,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,

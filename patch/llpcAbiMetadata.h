@@ -46,6 +46,7 @@ struct HwReg
 // Invalid metadata key and value which shouldn't be exported to ELF.
 constexpr uint32_t InvalidMetadataKey   = 0xFFFFFFFF;
 constexpr uint32_t InvalidMetadataValue = 0xBAADBEEF;
+constexpr Util::Abi::PipelineAbiNoteType LegacyMetadata = static_cast<Util::Abi::PipelineAbiNoteType>(12);
 
 // Defines PAL metadata entries based on the specified name and type of this metadata
 #define DEF_META(_name, _type) \

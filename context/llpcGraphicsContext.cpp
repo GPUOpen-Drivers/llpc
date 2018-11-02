@@ -30,6 +30,8 @@
  */
 #define DEBUG_TYPE "llpc-graphics-context"
 
+#include "llvm/Support/Format.h"
+
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcGfx6Chip.h"
@@ -66,12 +68,13 @@ namespace Llpc
 
 // =====================================================================================================================
 GraphicsContext::GraphicsContext(
-    GfxIpVersion                     gfxIp,         // Graphics Ip version info
-    const GpuProperty*               pGpuProp,      // GPU Property
-    const GraphicsPipelineBuildInfo* pPipelineInfo, // [in] Graphics pipeline build info
-    MetroHash::Hash*                 pHash)         // [in] Pipeline hash code
+    GfxIpVersion                     gfxIp,            // Graphics Ip version info
+    const GpuProperty*               pGpuProp,         // [in] GPU Property
+    const WorkaroundFlags*           pGpuWorkarounds,  // [in] GPU workarounds
+    const GraphicsPipelineBuildInfo* pPipelineInfo,    // [in] Graphics pipeline build info
+    MetroHash::Hash*                 pHash)            // [in] Pipeline hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pHash),
+    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pHash),
     m_pPipelineInfo(pPipelineInfo),
     m_stageMask(0),
     m_activeStageCount(0),
@@ -270,7 +273,7 @@ void GraphicsContext::InitShaderInfoForNullFs()
     pResUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
 
     // Add usage info for dummy output
-    pResUsage->inOutUsage.fs.cbShaderMask = 0xF;
+    pResUsage->inOutUsage.fs.cbShaderMask = 0;
     pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 }
 
@@ -289,7 +292,7 @@ uint64_t GraphicsContext::GetShaderHashCode(
 
     if (pShaderInfo->pModuleData != nullptr)
     {
-        MetroHash64 hasher;
+        MetroHash::MetroHash64 hasher;
 
         UpdateShaderHashForPipelineShaderInfo(shaderStage, pShaderInfo, &hasher);
         hasher.Update(m_pPipelineInfo->iaState.deviceIndex);
@@ -700,6 +703,26 @@ void GraphicsContext::DoUserDataNodeMerge()
             pShaderInfo2->pUserDataNodes    = pMergedNodes;
         }
     }
+}
+
+// =====================================================================================================================
+// Gets wave size for the specified shader stage
+//
+// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
+uint32_t GraphicsContext::GetShaderWaveSize(
+    ShaderStage stage)  // Shader stage
+{
+    if (stage == ShaderStageCopyShader)
+    {
+       // Treat copy shader as part of geometry shader
+       stage = ShaderStageGeometry;
+    }
+
+    LLPC_ASSERT(stage < ShaderStageGfxCount);
+
+    uint32_t waveSize = m_pGpuProperty->waveSize;
+
+    return waveSize;
 }
 
 // =====================================================================================================================

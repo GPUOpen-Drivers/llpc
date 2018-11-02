@@ -45,13 +45,15 @@ namespace Llpc
 
 // =====================================================================================================================
 PipelineContext::PipelineContext(
-    GfxIpVersion        gfxIp,     // Graphics IP version info
-    const GpuProperty*  pGpuProp,  // [in] GPU property
-    MetroHash::Hash*    pHash)     // [in] Pipeline hash code
+    GfxIpVersion           gfxIp,           // Graphics IP version info
+    const GpuProperty*     pGpuProp,        // [in] GPU property
+    const WorkaroundFlags* pGpuWorkarounds, // [in] GPU workarounds
+    MetroHash::Hash*       pHash)           // [in] Pipeline hash code
     :
     m_gfxIp(gfxIp),
     m_hash(*pHash),
-    m_pGpuProperty(pGpuProp)
+    m_pGpuProperty(pGpuProp),
+    m_pGpuWorkarounds(pGpuWorkarounds)
 {
 
 }
@@ -84,6 +86,7 @@ const char* PipelineContext::GetGpuNameString() const
         { { 9, 0, 1 }, "gfx901"   },  // [9.0.1] gfx901
         { { 9, 0, 2 }, "gfx902"   },  // [9.0.2] gfx902
         { { 9, 0, 3 }, "gfx903"   },  // [9.0.3] gfx903
+        { { 9, 0, 4 }, "gfx904"   },  // [9.0.4] gfx904, vega12
     };
 
     const GpuNameStringMap* pNameMap = nullptr;
@@ -517,7 +520,7 @@ uint32_t PipelineContext::GetResourceMapNodeSize(
 void PipelineContext::UpdateShaderHashForPipelineShaderInfo(
     ShaderStage               stage,           // Shader stage
     const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
-    MetroHash64*              pHasher          // [in,out] Haher to generate hash code
+    MetroHash::MetroHash64*   pHasher          // [in,out] Haher to generate hash code
     ) const
 {
     const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
@@ -551,8 +554,10 @@ void PipelineContext::InitShaderResourceUsage(
     memset(&pResUsage->builtInUsage, 0, sizeof(pResUsage->builtInUsage));
 
     pResUsage->pushConstSizeInBytes = 0;
-    pResUsage->imageWrite = false;
-    pResUsage->perShaderTable = false;
+    pResUsage->resourceWrite = false;
+
+    pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
+    pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;
 
     pResUsage->inOutUsage.inputMapLocCount = 0;
     pResUsage->inOutUsage.outputMapLocCount = 0;
@@ -613,7 +618,6 @@ void PipelineContext::InitShaderResourceUsage(
         }
 
         pResUsage->inOutUsage.fs.cbShaderMask = 0;
-        pResUsage->inOutUsage.fs.dualSourceBlend = false;
         pResUsage->inOutUsage.fs.pViewIndex = nullptr;
     }
 }

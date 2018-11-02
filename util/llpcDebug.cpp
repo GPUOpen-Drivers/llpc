@@ -30,6 +30,8 @@
  */
 #define DEBUG_TYPE "llpc-debug"
 
+#include <metrohash.h>
+
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -43,7 +45,6 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcInternal.h"
-#include "llpcMetroHash.h"
 
 namespace llvm
 {
@@ -54,8 +55,14 @@ namespace cl
 // -enable-outs: enable general message output (to stdout or external file).
 opt<bool> EnableOuts(
     "enable-outs",
-    desc("Enable general message output (to stdout or external file) (default: true)"),
-    init(true));
+    desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
+    init(false));
+
+// -v: alias for -enable-outs
+opt<bool> Verbose(
+    "v",
+    desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
+    init(false));
 
 // -enable-errs: enable error message output (to stderr or external file).
 opt<bool> EnableErrs(
@@ -88,7 +95,7 @@ namespace Llpc
 // Gets the value of option "allow-out".
 bool EnableOuts()
 {
-    return cl::EnableOuts;
+    return cl::EnableOuts || cl::Verbose;
 }
 
 // =====================================================================================================================

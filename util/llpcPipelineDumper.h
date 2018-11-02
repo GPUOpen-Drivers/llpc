@@ -33,6 +33,12 @@
 #include <fstream>
 #include <llpc.h>
 
+namespace MetroHash
+{
+    class MetroHash64;
+    struct Hash;
+};
+
 namespace Llpc
 {
 
@@ -40,8 +46,6 @@ struct ComputePipelineBuildInfo;
 struct GraphicsPipelineBuildInfo;
 struct BinaryData;
 struct PipelineDumpFile;
-namespace MetroHash { struct Hash; };
-class MetroHash64;
 
 // Enumerates which types of pipeline dump are disable
 enum PipelineDumpFilters : uint32_t
@@ -78,11 +82,11 @@ public:
     static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline, bool isCacheHash);
     static MetroHash::Hash GenerateHashForComputePipeline(const ComputePipelineBuildInfo* pPipeline, bool isCacheHash);
 
-private:
-    static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
     static std::string GetPipelineInfoFileName(const ComputePipelineBuildInfo*  pComputePipelineInfo,
                                                const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,
-                                               const MetroHash::Hash*                 pHash);
+                                               const MetroHash::Hash*           pHash);
+private:
+    static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
 
     static void DumpComputePipelineInfo(std::ostream*                   pDumpFile,
                                        const ComputePipelineBuildInfo* pPipelineInfo);
@@ -104,10 +108,10 @@ private:
     static void UpdateHashForPipelineShaderInfo(ShaderStage               stage,
                                                 const PipelineShaderInfo* pShaderInfo,
                                                 bool                      isCacheHash,
-                                                MetroHash64*              pHasher);
+                                                MetroHash::MetroHash64*   pHasher);
 
     static void UpdateHashForResourceMappingNode(const ResourceMappingNode* pUserDataNode,
-                                                 MetroHash64*               pHasher);
+                                                 MetroHash::MetroHash64*    pHasher);
 };
 
 } // Llpc

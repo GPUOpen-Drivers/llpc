@@ -36,11 +36,12 @@
 #include <unordered_map>
 #include "llvm/Support/Mutex.h"
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcFile.h"
 #include "llpcInternal.h"
-#include "llpcMetroHash.h"
 
 namespace Llpc
 {

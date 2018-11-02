@@ -37,11 +37,12 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElf.h"
 #include "llpcPipelineDumper.h"
-#include "llpcMetroHash.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcUtil.h"
@@ -115,7 +116,7 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
     const BinaryData*               pSpirvBin)  // [in] SPIR-V binary
 {
     MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
+    MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
                       pSpirvBin->codeSize,
                       hash.bytes);
     PipelineDumper::DumpSpirvBinary(pDumpDir, pSpirvBin, &hash);
@@ -176,6 +177,29 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
 {
     auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
     return MetroHash::Compact64(&hash);
+}
+// =====================================================================================================================
+// Get graphics pipeline name.
+void VKAPI_CALL IPipelineDumper::GetPipelineName(
+    const  GraphicsPipelineBuildInfo* pPipelineInfo, // [In]  Info to build this graphics pipeline
+    char*                             pPipeName,     // [Out] The full name of this graphics pipeline
+    const size_t                      nameBufSize)   // Size of the buffer to store pipeline name
+{
+    auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(nullptr, pPipelineInfo, &hash);
+    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+}
+
+// =====================================================================================================================
+// Get compute pipeline name.
+void VKAPI_CALL IPipelineDumper::GetPipelineName(
+    const ComputePipelineBuildInfo* pPipelineInfo, // [In]  Info to build this compute pipeline
+    char*                           pPipeName,     // [Out] The full name of this compute pipeline
+    const size_t                    nameBufSize)   // Size of the buffer to store pipeline name
+{
+    auto hash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(pPipelineInfo, nullptr, &hash);
+    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
 }
 
 // =====================================================================================================================
@@ -339,6 +363,9 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
             pDumpFile = nullptr;
             s_dumpMutex.Unlock();
         }
+
+        // Create the dump directory
+        CreateDirectory(pDumpOptions->pDumpDir);
 
         // Dump pipeline input info
         if (pComputePipelineInfo)
@@ -559,7 +586,7 @@ void PipelineDumper::DumpPipelineExtraInfo(
     PipelineDumpFile*             pDumpFile,               // [in] Directory of pipeline dump
     const std::string*            pStr)                     // [in] Extra info string
 {
-    pDumpFile->dumpFile << pStr;
+    pDumpFile->dumpFile << *pStr;
 }
 
 // =====================================================================================================================
@@ -621,6 +648,10 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "numSamples = " << pPipelineInfo->rsState.numSamples << "\n";
     dumpFile << "samplePatternIdx = " << pPipelineInfo->rsState.samplePatternIdx << "\n";
     dumpFile << "usrClipPlaneMask = " << static_cast<uint32_t>(pPipelineInfo->rsState.usrClipPlaneMask) << "\n";
+    dumpFile << "polygonMode = " << pPipelineInfo->rsState.polygonMode << "\n";
+    dumpFile << "cullMode = " << pPipelineInfo->rsState.cullMode << "\n";
+    dumpFile << "frontFace = " << pPipelineInfo->rsState.frontFace << "\n";
+    dumpFile << "depthBiasEnable = " << pPipelineInfo->rsState.depthBiasEnable << "\n";
 
     dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
 
@@ -714,7 +745,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     bool                            isCacheHash   // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageVertex, &pPipeline->vs, isCacheHash, &hasher);
     UpdateHashForPipelineShaderInfo(ShaderStageTessControl, &pPipeline->tcs, isCacheHash, &hasher);
@@ -765,6 +796,10 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     hasher.Update(pRsState->numSamples);
     hasher.Update(pRsState->samplePatternIdx);
     hasher.Update(pRsState->usrClipPlaneMask);
+    hasher.Update(pRsState->polygonMode);
+    hasher.Update(pRsState->cullMode);
+    hasher.Update(pRsState->frontFace);
+    hasher.Update(pRsState->depthBiasEnable);
 
     auto pCbState = &pPipeline->cbState;
     hasher.Update(pCbState->alphaToCoverageEnable);
@@ -795,7 +830,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     bool                            isCacheHash  // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash64 hasher;
+    MetroHash::MetroHash64 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
@@ -813,7 +848,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
     ShaderStage               stage,           // shader stage
     const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
     bool                      isCacheHash,     // TRUE if the hash is used by shader cache
-    MetroHash64*              pHasher          // [in,out] Haher to generate hash code
+    MetroHash::MetroHash64*   pHasher          // [in,out] Haher to generate hash code
     )
 {
     if (pShaderInfo->pModuleData)
@@ -896,7 +931,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 // NOTE: This function will be called recusively if node's type is "DescriptorTableVaPtr"
 void PipelineDumper::UpdateHashForResourceMappingNode(
     const ResourceMappingNode* pUserDataNode,    // [in] Resource mapping node
-    MetroHash64*               pHasher           // [in,out] Haher to generate hash code
+    MetroHash::MetroHash64*    pHasher           // [in,out] Haher to generate hash code
     )
 {
     pHasher->Update(pUserDataNode->type);
@@ -960,7 +995,7 @@ void OutputText(
 
         // Output text
         const char* pText = reinterpret_cast<const char*>(pData + startPos);
-        out << pText << lastChar << "\n";
+        out << pText << lastChar;
 
         // Restore last character
         const_cast<uint8_t*>(pData)[endPos - 1] = lastChar;
@@ -1075,39 +1110,165 @@ OStream& operator<<(
                         out << "        minor = " << pCodeVersion->minorVersion << "\n";
                         break;
                     }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                case Util::Abi::PipelineAbiNoteType::LegacyMetadata:
+#endif
                 case Util::Abi::PipelineAbiNoteType::PalMetadata:
                     {
-                        out << "    PalMetadata                  (name = "
-                            << pNode->name << "  size = " << pNode->descSize << ")\n";
-
-                        const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
-                        auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
-                            pSection->pData + offset + noteHeaderSize);
-
-                        std::map<uint32_t, uint32_t> sortedConfigs;
-                        for (uint32_t i = 0; i < configCount; ++i)
+                        if (pNode->type == LegacyMetadata)
                         {
-                            sortedConfigs[pConfig[i].key] = pConfig[i].value;
-                        }
+                            out << "    PalMetadata                  (name = "
+                                << pNode->name << "  size = " << pNode->descSize << ")\n";
 
-                        for (auto config : sortedConfigs)
-                        {
-                            const char* pRegName = nullptr;
-                            if (gfxIp.major <= 8)
+                            const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
+                            auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
+                                pSection->pData + offset + noteHeaderSize);
+
+                            std::map<uint32_t, uint32_t> sortedConfigs;
+                            for (uint32_t i = 0; i < configCount; ++i)
                             {
-                                pRegName = Gfx6::GetRegisterNameString(gfxIp, config.first * 4);
+                                sortedConfigs[pConfig[i].key] = pConfig[i].value;
                             }
-                            else
+
+                            for (auto config : sortedConfigs)
                             {
-                                pRegName = Gfx9::GetRegisterNameString(gfxIp, config.first * 4);
+                                const char* pRegName = nullptr;
+                                if (gfxIp.major <= 8)
+                                {
+                                    pRegName = Gfx6::GetRegisterNameString(gfxIp, config.first * 4);
+                                }
+                                else
+                                {
+                                    pRegName = Gfx9::GetRegisterNameString(gfxIp, config.first * 4);
+                                }
+                                auto length = snprintf(formatBuf,
+                                    sizeof(formatBuf),
+                                    "        %-45s = 0x%08X\n",
+                                    pRegName,
+                                    config.second);
+                                out << formatBuf;
                             }
-                            auto length = snprintf(formatBuf,
-                                                   sizeof(formatBuf),
-                                                   "        %-45s = 0x%08X\n",
-                                                   pRegName,
-                                                   config.second);
-                            out << formatBuf;
                         }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                        else
+                        {
+                            out << "    PalMetadata                  (name = "
+                                << pNode->name << "  size = " << pNode->descSize << ")\n";
+
+                            auto pBuffer = pSection->pData + offset + noteHeaderSize;
+                            reader.InitMsgPack(pBuffer, pNode->descSize);
+
+                            while (reader.GetNextMsgItem())
+                            {
+                                auto msgIterStatus = reader.GetMsgIteratorStatus();
+                                auto pItem = reader.GetMsgItem();
+                                if (msgIterStatus == MsgPackIteratorMapKey)
+                                {
+                                    out << "\n";
+                                    for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
+                                    {
+                                        out << "    ";
+                                    }
+                                }
+
+                                switch (pItem->type)
+                                {
+                                case CWP_ITEM_MAP:
+                                    {
+                                        out << "{";
+                                        break;
+                                    }
+                                case CWP_ITEM_STR:
+                                    {
+                                        OutputText(reinterpret_cast<const uint8_t*>(pItem->as.str.start),
+                                                   0,
+                                                   pItem->as.str.length,
+                                                   out);
+                                        if (msgIterStatus == MsgPackIteratorMapKey)
+                                        {
+                                            out << ": ";
+                                        }
+                                        break;
+                                    }
+                                case CWP_ITEM_ARRAY:
+                                    {
+                                        out << "[ ";
+                                        break;
+                                    }
+                                case CWP_ITEM_BIN:
+                                    {
+                                        OutputBinary(reinterpret_cast<const uint8_t*>(pItem->as.bin.start),
+                                                     0,
+                                                     pItem->as.bin.length,
+                                                     out);
+                                        break;
+                                    }
+                                case CWP_ITEM_BOOLEAN:
+                                    {
+                                        out << pItem->as.boolean << " ";
+                                        break;
+                                    }
+                                case CWP_ITEM_POSITIVE_INTEGER:
+                                case CWP_ITEM_NEGATIVE_INTEGER:
+                                    {
+                                        if (msgIterStatus == MsgPackIteratorMapKey)
+                                        {
+                                            LLPC_ASSERT(pItem->as.u64 < UINT32_MAX);
+                                            const char* pRegName = nullptr;
+                                            uint32_t regId = static_cast<uint32_t>(pItem->as.u64 * 4);
+                                            if (gfxIp.major <= 8)
+                                            {
+                                                pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
+                                            }
+                                            else
+                                            {
+                                                pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
+                                            }
+                                            auto length = snprintf(formatBuf,
+                                                                   sizeof(formatBuf),
+                                                                   "%-45s ",
+                                                                   pRegName);
+                                            out << formatBuf;
+                                        }
+                                        else
+                                        {
+                                            auto length = snprintf(formatBuf,
+                                                                   sizeof(formatBuf),
+                                                                   "0x%016" PRIX64 " ",
+                                                                   pItem->as.u64);
+                                            out << formatBuf;
+                                        }
+                                        break;
+                                    }
+                                case CWP_ITEM_FLOAT:
+                                    {
+                                        out << pItem->as.real << " ";
+                                        break;
+                                    }
+                                case CWP_ITEM_DOUBLE:
+                                    {
+                                        out << pItem->as.long_real << " ";
+                                        break;
+                                    }
+                                default:
+                                    {
+                                        LLPC_NEVER_CALLED();
+                                        break;
+                                    }
+                                }
+
+                                reader.UpdateMsgPackStatus(
+                                    [&](MsgPackIteratorStatus status)
+                                    {
+                                        if (status == MsgPackIteratorMapValue)
+                                            out << "}";
+                                        else
+                                            out << "]";
+                                    }
+                                );
+                            }
+                        }
+#endif
                         break;
                     }
                 default:
@@ -1118,6 +1279,7 @@ OStream& operator<<(
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
                             auto pDesc = pSection->pData + offset + noteHeaderSize;
                             OutputText(pDesc, 0, pNode->descSize, out);
+                            out << "\n";
                         }
                         else
                         {
@@ -1195,6 +1357,7 @@ OStream& operator<<(
                 }
 
                 OutputText(pSection->pData, startPos, endPos, out);
+                out << "\n";
 
                 if (symIdx < symbols.size())
                 {

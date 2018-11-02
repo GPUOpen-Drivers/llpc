@@ -275,10 +275,12 @@ bool PatchInOutImportExport::runOnModule(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
         m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
 
-        args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-        args.push_back(m_pThreadId);
-        m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
+        {
+            args.clear();
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+            args.push_back(m_pThreadId);
+            m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
+        }
     }
 
     // Create the global variable that is to model LDS
@@ -1457,7 +1459,8 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
-        if ((m_gfxIp.major == 6) &&
+        auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+        if (pGpuWorkarounds->gfx6.shaderZExport &&
             ((m_pFragDepth != nullptr) || (m_pFragStencilRef != nullptr) || (m_pSampleMask != nullptr)))
         {
             auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
@@ -1517,6 +1520,11 @@ void PatchInOutImportExport::visitReturnInst(
                 auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
                 const uint32_t channelMask = ((1 << compCount) - 1);
                 const uint32_t origLoc = pResUsage->inOutUsage.fs.outputOrigLocs[location];
+                if (origLoc == InvalidValue)
+                {
+                    continue;
+                }
+
                 pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * origLoc));
 
                 // Construct exported fragment colors
@@ -2247,7 +2255,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2354,7 +2362,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2520,7 +2528,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2615,7 +2623,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -2923,7 +2931,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -3051,11 +3059,41 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     case BuiltInLocalInvocationId:
         {
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
+
+            if (builtInUsage.workgroupSizeZ > 1)
+            {
+                // XYZ, do nothing
+            }
+            else if (builtInUsage.workgroupSizeY > 1)
+            {
+                // XY
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                   "",
+                                                   pInsertPos);
+            }
+            else
+            {
+                // X
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                   "",
+                                                   pInsertPos);
+
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                   "",
+                                                   pInsertPos);
+            }
+
             break;
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetGpuProperty()->waveSize);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInDeviceIndex:
@@ -3072,7 +3110,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
                                            builtInUsage.workgroupSizeZ;
 
             // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
-            const uint32_t subgroupSize = m_pContext->GetGpuProperty()->waveSize;
+            const uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
             const uint32_t numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
 
             pInput = ConstantInt::get(m_pContext->Int32Ty(), numSubgroups);
@@ -4053,6 +4091,8 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
     uint32_t     builtInId,     // ID of the built-in variable
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
+    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+
     auto pOutputTy = pOutput->getType();
 
     const auto pUndef = UndefValue::get(m_pContext->FloatTy());
@@ -4063,7 +4103,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
     {
     case BuiltInFragDepth:
         {
-            if (m_gfxIp.major == 6)
+            if (pGpuWorkarounds->gfx6.shaderZExport)
             {
                 m_pFragDepth = pOutput;
             }
@@ -4098,7 +4138,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
             Value* pSampleMask = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
             pSampleMask = new BitCastInst(pSampleMask, m_pContext->FloatTy(), "", pInsertPos);
 
-            if (m_gfxIp.major == 6)
+            if (pGpuWorkarounds->gfx6.shaderZExport)
             {
                 m_pSampleMask = pSampleMask;
             }
@@ -4126,7 +4166,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
     case BuiltInFragStencilRefEXT:
         {
             Value* pFragStencilRef = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
-            if (m_gfxIp.major == 6)
+            if (pGpuWorkarounds->gfx6.shaderZExport)
             {
                 m_pFragStencilRef = pFragStencilRef;
             }
@@ -4404,13 +4444,16 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
         else
         {
             std::vector<Value*> args;
-            args.push_back(inOutUsage.pEsGsRingBufDesc);
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            args.push_back(pRingOffset);
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // slc
+            args.push_back(inOutUsage.pEsGsRingBufDesc);                                // rsrc
+            args.push_back(pRingOffset);                                                // offset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                 // soffset
+            CoherentFlag coherent = {};
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc slc
+
             pLoadValue = EmitCall(m_pModule,
-                                  "llvm.amdgcn.buffer.load.f32",
+                                  "llvm.amdgcn.raw.buffer.load.f32",
                                   m_pContext->FloatTy(),
                                   args,
                                   NoAttrib,
@@ -4504,15 +4547,22 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         std::vector<Value*> args;
         args.push_back(pStoreValue);                                                    // vdata
         args.push_back(inOutUsage.gs.pGsVsRingBufDesc);                                 // rsrc
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-        args.push_back(pRingOffset);                                                    // voffset
-        args.push_back(pGsVsOffset);                                                    // soffset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
-        EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        if (m_gfxIp.major <= 9)
+        {
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+            args.push_back(pRingOffset);                                                    // voffset
+            args.push_back(pGsVsOffset);                                                    // soffset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
+            EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        }
+        else
+        {
+            LLPC_NOT_IMPLEMENTED();
+        }
     }
 }
 
@@ -4726,21 +4776,27 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         {
             std::vector<Value*> args;
             args.push_back(pOffChipLdsDesc);                                                // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-            args.push_back(pLdsOffset);                                                     // voffset
-            args.push_back(pOffChipLdsBase);                                                // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                 // offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
-
-            loadValues[i] = EmitCall(m_pModule,
-                                     "llvm.amdgcn.tbuffer.load.i32",
-                                     m_pContext->Int32Ty(),
-                                     args,
-                                     NoAttrib,
-                                     pInsertPos);
+            if (m_gfxIp.major <= 9)
+            {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+                args.push_back(pLdsOffset);                                                     // voffset
+                args.push_back(pOffChipLdsBase);                                                // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                 // offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
+                loadValues[i] = EmitCall(m_pModule,
+                                         "llvm.amdgcn.tbuffer.load.i32",
+                                         m_pContext->Int32Ty(),
+                                         args,
+                                         NoAttrib,
+                                         pInsertPos);
+            }
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
 
             if (bitWidth == 16)
             {
@@ -4797,7 +4853,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
 // =====================================================================================================================
 // Writes value to LDS.
 void PatchInOutImportExport::WriteValueToLds(
-    Value*        pWriteValue,   // [in] Value Written to LDS
+    Value*        pWriteValue,   // [in] Value written to LDS
     Value*        pLdsOffset,    // [in] Start offset to do LDS write operations
     Instruction*  pInsertPos)    // [in] Where to insert write instructions
 {
@@ -4861,15 +4917,22 @@ void PatchInOutImportExport::WriteValueToLds(
             std::vector<Value*> args;
             args.push_back(storeValues[i]);                                                    // vdata
             args.push_back(inOutUsage.pOffChipLdsDesc);                                        // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                        // vindex
-            args.push_back(pLdsOffset);                                                        // voffset
-            args.push_back(pOffChipLdsBase);                                                   // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                    // offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));       // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));     // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                      // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                     // slc
-            EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            if (m_gfxIp.major <= 9)
+            {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                        // vindex
+                args.push_back(pLdsOffset);                                                        // voffset
+                args.push_back(pOffChipLdsBase);                                                   // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                    // offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));       // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));     // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                      // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                     // slc
+                EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            }
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
         }
     }
     else // Write to on-chip LDS
@@ -5051,7 +5114,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         for (uint32_t i = 0; i < tessFactors.size(); ++i)
         {
             uint32_t  tessFactorByteOffset = i * 4 + tessFactorOffset * 4;
-            if (m_pContext->GetGfxIpVersion().major != 9)
+            if (m_pContext->GetGfxIpVersion().major <= 8)
             {
                 // NOTE: GFX9 does not support dynamic tessellation control, so additional 4-byte offset is not required for
                 // tessellation off-chip mode.
@@ -5062,16 +5125,22 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
 
             args.push_back(tessFactors[i]);                                                 // vdata
             args.push_back(inOutUsage.pTessFactorBufDesc);                                  // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-            args.push_back(pTfBufferOffset);                                                // voffset
-            args.push_back(pTfBufferBase);                                                  // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), tessFactorByteOffset));  // offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
-
-            EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            if (m_gfxIp.major <= 9)
+            {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+                args.push_back(pTfBufferOffset);                                                // voffset
+                args.push_back(pTfBufferBase);                                                  // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), tessFactorByteOffset));  // offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
+                EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            }
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
         }
     }
     else
@@ -5498,10 +5567,10 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     uint32_t patchConstCount    // Count of output patch constants
     ) const
 {
-    const uint32_t wavefrontSize = m_pContext->GetGpuProperty()->waveSize;
+    const uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
 
     // NOTE: The limit of thread count for tessellation control shader is 4 wavefronts per thread group.
-    const uint32_t maxThreadCountPerThreadGroup = (4 * wavefrontSize);
+    const uint32_t maxThreadCountPerThreadGroup = (4 * waveSize);
     const uint32_t maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
     const uint32_t patchCountLimitedByThread = maxThreadCountPerThreadGroup / maxThreadCountPerPatch;
 
@@ -5528,6 +5597,29 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
         auto tessOffChipPatchCountPerThreadGroup =
             m_pContext->GetGpuProperty()->tessOffChipLdsBufferSize / outPatchLdsBufferSize;
         patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
+    }
+
+    // Adjust the patches-per-thread-group based on hardware workarounds.
+    if (m_pContext->GetGpuWorkarounds()->gfx6.miscLoadBalancePerWatt != 0)
+    {
+        const uint32_t waveSize = m_pContext->GetGpuProperty()->waveSize;
+        // Load balance per watt is a mechanism which monitors HW utilization (num waves active, instructions issued
+        // per cycle, etc.) to determine if the HW can handle the workload with fewer CUs enabled.  The SPI_LB_CU_MASK
+        // register directs the SPI to stop launching waves to a CU so it will be clock-gated.  There is a bug in the
+        // SPI which where that register setting is applied immediately, which causes any pending LS/HS/CS waves on
+        // that CU to never be launched.
+        //
+        // The workaround is to limit each LS/HS threadgroup to a single wavefront: if there's only one wave, then the
+        // CU can safely be turned off afterwards.  A microcode fix exists for CS but for GFX it was decided that the
+        // cost in power efficiency wasn't worthwhile.
+        //
+        // Clamping to threads-per-wavefront / max(input control points, threads-per-patch) will make the hardware
+        // launch a single LS/HS wave per thread-group.
+        // For vulkan, threads-per-patch is always equal with outVertexCount.
+        const uint32_t maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
+        const uint32_t maxPatchCount = waveSize / maxThreadCountPerPatch;
+
+        patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, maxPatchCount);
     }
 
     return patchCountPerThreadGroup;

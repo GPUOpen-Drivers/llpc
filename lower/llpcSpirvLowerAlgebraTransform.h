@@ -59,6 +59,8 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerAlgebraTransform);
 
+    bool IsOperandNoContract(llvm::Value* pOperand);
+
     bool m_changed;  // Whether the module is changed
 };
 

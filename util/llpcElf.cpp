@@ -1,4 +1,4 @@
-/*
+﻿/*
  ***********************************************************************************************************************
  *
  *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
@@ -324,6 +324,118 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
              });
     }
 }
+
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+// =====================================================================================================================
+// Initialize MsgPack context and related visitor iterators
+template<class Elf>
+void ElfReader<Elf>::InitMsgPack(
+    const void* pBuffer,       // [in] Message buffer
+    uint32_t    sizeInBytes)   // Buffer size in bytes
+{
+    memset(&m_msgPackContext, 0, sizeof(m_msgPackContext));
+    cw_unpack_context_init(&m_msgPackContext, pBuffer, sizeInBytes, nullptr, nullptr);
+
+    m_iteratorStack.clear();
+    MsgPackIterator iter = { };
+    iter.status = MsgPackIteratorNone;
+    iter.index = 0;
+    iter.size = 0;
+    m_iteratorStack.push_back(iter);
+
+    m_msgPackMapLevel = 0;
+}
+
+// =====================================================================================================================
+// Advances the MsgPack context to the next item token and return true if success.
+template<class Elf>
+bool ElfReader<Elf>::GetNextMsgItem()
+{
+    cw_unpack_next(&m_msgPackContext);
+    return m_msgPackContext.return_code == CWP_RC_OK;
+}
+
+// =====================================================================================================================
+// Gets MsgPack item.
+template<class Elf>
+const cwpack_item* ElfReader<Elf>::GetMsgItem() const
+{
+    return &m_msgPackContext.item;
+}
+
+// =====================================================================================================================
+// Gets the status of message packer iterator.
+template<class Elf>
+MsgPackIteratorStatus ElfReader<Elf>::GetMsgIteratorStatus() const
+{
+    return m_iteratorStack.back().status;
+}
+
+// =====================================================================================================================
+// Gets the map level of current message item.
+template<class Elf>
+uint32_t ElfReader<Elf>::GetMsgMapLevel() const
+{
+    return m_msgPackMapLevel;
+}
+
+// =====================================================================================================================
+// Gets the map level of current message item.
+template<class Elf>
+void ElfReader<Elf>::UpdateMsgPackStatus(
+    std::function<void(MsgPackIteratorStatus)> callback) // Callback function for array or map finish
+{
+    auto pCurIter = &m_iteratorStack.back();
+
+    if ((m_msgPackContext.item.type == CWP_ITEM_MAP) || (m_msgPackContext.item.type == CWP_ITEM_ARRAY))
+    {
+        // Begin a new map or array
+        MsgPackIterator iter = { };
+
+        iter.status = (m_msgPackContext.item.type == CWP_ITEM_MAP) ? MsgPackIteratorMapKey : MsgPackIteratorArray;
+        iter.index = 0;
+        iter.size = m_msgPackContext.item.as.map.size;
+        m_iteratorStack.push_back(iter);
+
+        if (m_msgPackContext.item.type == CWP_ITEM_MAP)
+        {
+            ++m_msgPackMapLevel;
+        }
+    }
+    else if ((GetMsgIteratorStatus() == MsgPackIteratorMapValue) || (GetMsgIteratorStatus() == MsgPackIteratorArray))
+    {
+        // Visit a map value or array item
+        ++pCurIter->index;
+        while ((pCurIter->index == pCurIter->size) && (m_iteratorStack.size() > 1))
+        {
+            if (pCurIter->status == MsgPackIteratorMapValue)
+            {
+                callback(pCurIter->status);
+                --m_msgPackMapLevel;
+            }
+            else
+            {
+                callback(pCurIter->status);
+            }
+            m_iteratorStack.pop_back();
+            pCurIter = &m_iteratorStack.back();
+            ++ pCurIter->index;
+        }
+
+        if (pCurIter->status == MsgPackIteratorMapValue)
+        {
+            pCurIter->status = MsgPackIteratorMapKey;
+        }
+    }
+    else if (pCurIter->status == MsgPackIteratorMapKey)
+    {
+        // Visit a map key
+        LLPC_ASSERT((m_msgPackContext.item.type == CWP_ITEM_STR) ||
+                    (m_msgPackContext.item.type == CWP_ITEM_POSITIVE_INTEGER));
+        pCurIter->status = MsgPackIteratorMapValue;
+    }
+}
+#endif
 
 // Explicit instantiations for ELF utilities
 template class ElfReader<Elf64>;

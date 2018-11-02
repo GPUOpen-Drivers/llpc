@@ -181,7 +181,7 @@ def genLlvmArithFuncGroup(retType, funcName, args, intrinsic, attr):
 def parseLine(line, funcNo):
     tokens = line.split()
     if tokens == []:
-        return ("", funcNo)
+        return ("", funcNo, "")
 
     funcNo += 1
 
@@ -214,15 +214,13 @@ def parseLine(line, funcNo):
 
     # Generate LLVM function group
     funcGroup = genLlvmArithFuncGroup(retType, funcName, args, instrinsic, attr)
-    return (funcGroup, funcNo)
+    return (funcGroup, funcNo, instrinsic)
 
 # Main function.
-def main(inFile, outFile, dataType):
+def main(inFile, outDir, dataType):
     print("===  Process list: " + os.path.split(inFile)[1])
 
     fList = open(inFile, "rt")
-    irOut = open(outFile, "wt")
-
     header ="""\
 ;**********************************************************************************************************************
 ;*
@@ -248,23 +246,29 @@ v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256
 target triple = "spir64-unknown-unknown"
 
 """
-    header = header.format(outFile, dataType)
-    irOut.write(header)
     funcNo = 0
+    pendingComment = ""
     for line in fList:
         if not line.startswith('#'):
-            (funcGroup, funcNo) = parseLine(line, funcNo)
-            irOut.write(funcGroup)
-        else:
-            irOut.write("; " + "=" * 117 + "\n")
-            irOut.write("; >>>" + line.replace('#', ' '))
-            irOut.write("; " + "=" * 117 + "\n\n")
+            (funcGroup, funcNo, intrinsic) = parseLine(line, funcNo)
+            if intrinsic != "":
+                outFile = outDir + "/g_" + intrinsic + ".ll"
+                irOut = open(outFile, "wt")
+                formattedHeader = header.format(outFile, dataType)
+                irOut.write(formattedHeader)
+                irOut.write(pendingComment)
+                pendingComment = ""
+                irOut.write(funcGroup)
+                irOut.write("attributes #0 = { nounwind }\n")
+                irOut.write("attributes #1 = { nounwind readnone }\n")
+                irOut.close()
 
-    irOut.write("attributes #0 = { nounwind }\n")
-    irOut.write("attributes #1 = { nounwind readnone }\n")
+        else:
+            pendingComment += "; " + "=" * 117 + "\n"
+            pendingComment += "; >>>" + line.replace('#', ' ');
+            pendingComment += "; " + "=" * 117 + "\n\n";
 
     fList.close()
-    irOut.close()
 
     print("===  " + str(funcNo) + " functions processed\n")
 

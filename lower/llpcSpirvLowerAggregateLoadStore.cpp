@@ -231,5 +231,5 @@ Value* SpirvLowerAggregateLoadStore::ExpandLoadInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for load and store operations on aggregate type.
-INITIALIZE_PASS(SpirvLowerAggregateLoadStore, "spirv-lower-aggregate-load-store",
+INITIALIZE_PASS(SpirvLowerAggregateLoadStore, "Spirv-lower-aggregate-load-store",
                 "Lower SPIR-V load and store operations on aggregate type", false, false)

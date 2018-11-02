@@ -38,12 +38,13 @@
 #include <unordered_set>
 #include "spirvExt.h"
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
-#include "llpcMetroHash.h"
 
 namespace Llpc
 {
@@ -114,7 +115,7 @@ struct ResourceUsage
     std::vector<DescriptorSet> descSets;              // Info array of descriptor sets and bindings
     std::unordered_set<uint64_t> descPairs;           // Pairs of descriptor set/binding
     uint32_t                   pushConstSizeInBytes;  // Push constant size (in bytes)
-    bool                       imageWrite;            // Whether shader does image-write operations
+    bool                       resourceWrite;         // Whether shader does resource-write operations
     bool                       perShaderTable;        // Whether per shader stage table is used
     uint32_t                   numSgprsAvailable;     // Number of available SGPRs
     uint32_t                   numVgprsAvailable;     // Number of available VGPRs
@@ -457,7 +458,6 @@ struct ResourceUsage
             BasicType    outputTypes[MaxColorTargets];  // Array of basic types of fragment outputs
             uint32_t     cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
             llvm::Value* pViewIndex;                    // View Index
-            bool         dualSourceBlend;               // Whether dual source blending is detected
         } fs;
     } inOutUsage;
 };
@@ -526,7 +526,7 @@ struct InterfaceData
             // Geometry shader
             struct
             {
-                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode
+                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX8 and NGG)
                 uint32_t viewIndex;                 // View Index
             } gs;
 
@@ -649,7 +649,10 @@ struct InterfaceData
 class PipelineContext
 {
 public:
-    PipelineContext(GfxIpVersion gfxIp, const GpuProperty* pGpuProp, MetroHash::Hash* pHash);
+    PipelineContext(GfxIpVersion           gfxIp,
+                    const GpuProperty*     pGpuProp,
+                    const WorkaroundFlags* pGpuWorkarounds,
+                    MetroHash::Hash*       pHash);
     virtual ~PipelineContext() {}
 
     // Gets resource usage of the specified shader stage
@@ -694,6 +697,9 @@ public:
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
 
+    // Gets wave size for the specified shader stage
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage) = 0;
+
     const char* GetGpuNameString() const;
     const char* GetGpuNameAbbreviation() const;
 
@@ -701,6 +707,8 @@ public:
     GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
 
     const GpuProperty* GetGpuProperty() const { return m_pGpuProperty; }
+
+    const WorkaroundFlags* GetGpuWorkarounds() const { return m_pGpuWorkarounds; }
 
     void AutoLayoutDescriptor(ShaderStage shaderStage);
 
@@ -730,13 +738,14 @@ protected:
 
     void UpdateShaderHashForPipelineShaderInfo(ShaderStage               stage,
                                                const PipelineShaderInfo* pShaderInfo,
-                                               MetroHash64*              pHasher) const;
+                                               MetroHash::MetroHash64*   pHasher) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    GfxIpVersion        m_gfxIp;         // Graphics IP version info
-    MetroHash::Hash     m_hash;          // Pipeline hash code
-    const GpuProperty*  m_pGpuProperty;  // GPU Property
+    GfxIpVersion           m_gfxIp;         // Graphics IP version info
+    MetroHash::Hash        m_hash;          // Pipeline hash code
+    const GpuProperty*     m_pGpuProperty;  // GPU Property
+    const WorkaroundFlags* m_pGpuWorkarounds;  // GPU workarounds
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);

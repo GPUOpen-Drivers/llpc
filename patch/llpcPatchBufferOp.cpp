@@ -129,6 +129,27 @@ void PatchBufferOp::visitCallInst(
             // NOTE: Only uniform block support inline constant now
             LLPC_ASSERT(isInlineConst == false);
 
+            auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+            if (pGpuWorkarounds->gfx6.shader8b16bLocalWriteCorruption)
+            {
+                // NOTE: Enable workaround for the 8-bit/16-bit local write corruption bug. When doing 8-bit or
+                // 16-bit UAV writes, a line could incorrectly be left valid in TCP's cache when not all bytes
+                // were written. The workaround is to set the GLC (globally coherent) bit for such writes,
+                // effectively disabling the L1 cache.
+                if ((mangledName.find(".i8") != StringRef::npos) ||
+                    (mangledName.find(".v2i8") != StringRef::npos) ||
+                    (mangledName.find(".v3i8") != StringRef::npos) ||
+                    (mangledName.find(".v6i8") != StringRef::npos))
+                {
+                    uint32_t glcOperandIdx = 5;
+                    if (mangledName.startswith(LlpcName::BufferStoreDesc))
+                    {
+                        glcOperandIdx = 3;
+                    }
+                    callInst.setOperand(glcOperandIdx, ConstantInt::getTrue(*m_pContext));
+                }
+            }
+
             // TODO: Translate buffer store operation to s_store if the offset is uniform, which is similar to buffer
             // load operation.
         }

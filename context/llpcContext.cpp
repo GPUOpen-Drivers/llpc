@@ -30,6 +30,8 @@
  */
 #define DEBUG_TYPE "llpc-context"
 
+#include <metrohash.h>
+
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitstreamReader.h"
@@ -48,25 +50,8 @@
 
 #include "llpcCompiler.h"
 #include "llpcContext.h"
-#include "llpcMetroHash.h"
-#include "llpcPassNonNativeFuncRemove.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
-
-namespace llvm
-{
-
-namespace cl
-{
-
-// -enable-cache-emu-lib-context: enable the cache of context of GLSL emulation library to file.
-static opt<uint32_t> EnableCacheEmuLibContext("enable-cache-emu-lib-context",
-                                         desc("Enable the cache of context of GLSL emulation library to file"),
-                                         init(0));
-
-} // cl
-
-} // llvm
 
 using namespace llvm;
 
@@ -89,12 +74,19 @@ const uint8_t Context::GlslEmuLibGfx9[]=
     #include "./generate/gfx9/g_llpcGlslEmuLibGfx9.h"
 };
 
+const uint8_t Context::GlslEmuLibWaTreat1dImagesAs2d[] =
+{
+    #include "./generate/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h"
+};
+
 // =====================================================================================================================
 Context::Context(
-    GfxIpVersion gfxIp) // Graphics IP version info
+    GfxIpVersion gfxIp,                     // Graphics IP version info
+    const WorkaroundFlags* pGpuWorkarounds) // GPU workarounds
     :
     LLVMContext(),
-    m_gfxIp(gfxIp)
+    m_gfxIp(gfxIp),
+    m_glslEmuLib(this)
 {
     std::vector<Metadata*> emptyMeta;
     m_pEmptyMetaNode = MDNode::get(*this, emptyMeta);
@@ -126,146 +118,25 @@ Context::Context(
     m_metaIds.range         = getMDKindID("range");
     m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
 
-    ShaderEntryState glslEmuLibEntryState = {};
-    CacheEntryHandle hGlslEmuLibEntry = nullptr;
-    ShaderEntryState nativeGlslEmuLibEntryState = {};
-    CacheEntryHandle hNativeGlslEmuLibEntry = nullptr;
-    // Initialize shader cache
-    ShaderCacheCreateInfo    createInfo = {};
-    ShaderCacheAuxCreateInfo auxCreateInfo = {};
-    auxCreateInfo.pExecutableName = "__LLPC_CONTEXT_CACHE__";
-    auxCreateInfo.pCacheFilePath = getenv("AMD_SHADER_DISK_CACHE_PATH");
-
-    if (auxCreateInfo.pCacheFilePath == nullptr)
+    // Load external LLVM libraries, in search order.
+    if (pGpuWorkarounds->gfx9.treat1dImagesAs2d)
     {
-#ifdef WIN_OS
-        auxCreateInfo.pCacheFilePath = getenv("LOCALAPPDATA");
-#else
-        auxCreateInfo.pCacheFilePath = getenv("HOME");
-#endif
+        // Add library for "treat 1d image as 2d gpu workaround".
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibWaTreat1dImagesAs2d),
+                sizeof(GlslEmuLibWaTreat1dImagesAs2d)), "GlslEmuLibWaTreat1dImagesAs2d"));
     }
-
-    if (cl::EnableCacheEmuLibContext == 1)
+    if (gfxIp.major >= 9)
     {
-        auxCreateInfo.shaderCacheMode = ShaderCacheEnableOnDisk;
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),
+                sizeof(GlslEmuLibGfx9)), "GlslEmuLibGfx9"));
     }
-    else if (cl::EnableCacheEmuLibContext == 2)
+    if (gfxIp.major >= 8)
     {
-        auxCreateInfo.shaderCacheMode = ShaderCacheEnableOnDiskReadOnly;
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx8),
+                sizeof(GlslEmuLibGfx8)), "GlslEmuLibGfx8"));
     }
-    else
-    {
-        auxCreateInfo.shaderCacheMode = ShaderCacheEnableRuntime;
-    }
-
-    auto contextCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
-    MetroHash64 emuLibhasher;
-    emuLibhasher.Update(gfxIp);
-    MetroHash::Hash emuLibHash = {};
-    emuLibhasher.Finalize(emuLibHash.bytes);
-    glslEmuLibEntryState = contextCache->FindShader(emuLibHash, true, &hGlslEmuLibEntry);
-    if (glslEmuLibEntryState == ShaderEntryState::Ready)
-    {
-        BinaryData libBin = {};
-        auto result = contextCache->RetrieveShader(hGlslEmuLibEntry, &libBin.pCode, &libBin.codeSize);
-        m_pGlslEmuLib = LoadLibary(&libBin);
-    }
-
-    bool isNativeLib = true;
-    MetroHash64 nativeEmuLibHasher;
-    nativeEmuLibHasher.Update(gfxIp);
-    nativeEmuLibHasher.Update(isNativeLib);
-    MetroHash::Hash nativeEmuLibHash = {};
-    nativeEmuLibHasher.Finalize(nativeEmuLibHash.bytes);
-
-    nativeGlslEmuLibEntryState = contextCache->FindShader(nativeEmuLibHash, true, &hNativeGlslEmuLibEntry);
-    if (nativeGlslEmuLibEntryState == ShaderEntryState::Ready)
-    {
-        BinaryData libBin = {};
-        auto result = contextCache->RetrieveShader(hNativeGlslEmuLibEntry, &libBin.pCode, &libBin.codeSize);
-        m_pNativeGlslEmuLib = LoadLibary(&libBin);
-    }
-
-    // Load external LLVM libraries
-    if ((m_pNativeGlslEmuLib == nullptr) || (m_pGlslEmuLib == nullptr))
-    {
-        BinaryData libBin = {};
-        libBin.codeSize = sizeof(GlslEmuLib);
-        libBin.pCode    = GlslEmuLib;
-        m_pGlslEmuLib = LoadLibary(&libBin);
-        LLPC_ASSERT(m_pGlslEmuLib != nullptr);
-
-        // Link GFX-independent and GFX-dependent libraries together
-        EnableDebugOutput(false);
-
-        std::unique_ptr<Module> pGlslEmuLibGfx;
-        if (gfxIp.major >= 8)
-        {
-            libBin.codeSize = sizeof(GlslEmuLibGfx8);
-            libBin.pCode = GlslEmuLibGfx8;
-            pGlslEmuLibGfx = LoadLibary(&libBin);
-            LLPC_ASSERT(pGlslEmuLibGfx != nullptr);
-            if (Linker::linkModules(*m_pGlslEmuLib, std::move(pGlslEmuLibGfx), Linker::OverrideFromSrc))
-            {
-                LLPC_ERRS("Fails to link LLVM libraries together\n");
-            }
-        }
-
-        if (gfxIp.major >= 9)
-        {
-            libBin.codeSize = sizeof(GlslEmuLibGfx9);
-            libBin.pCode    = GlslEmuLibGfx9;
-            pGlslEmuLibGfx = LoadLibary(&libBin);
-            LLPC_ASSERT(pGlslEmuLibGfx != nullptr);
-            if (Linker::linkModules(*m_pGlslEmuLib, std::move(pGlslEmuLibGfx), Linker::OverrideFromSrc))
-            {
-                LLPC_ERRS("Fails to link LLVM libraries together\n");
-            }
-        }
-
-        // Do function inlining
-        {
-            legacy::PassManager passMgr;
-
-            passMgr.add(createFunctionInliningPass(InlineThreshold));
-
-            if (passMgr.run(*m_pGlslEmuLib) == false)
-            {
-                LLPC_NEVER_CALLED();
-            }
-        }
-
-        if (hGlslEmuLibEntry && (glslEmuLibEntryState == ShaderEntryState::Compiling))
-        {
-            SmallString<1024> glslEmuLibBin;
-            raw_svector_ostream libBinStream(glslEmuLibBin);
-            WriteBitcodeToFile(*m_pGlslEmuLib, libBinStream);
-            contextCache->InsertShader(hGlslEmuLibEntry, glslEmuLibBin.data(), glslEmuLibBin.size());
-            hGlslEmuLibEntry = nullptr;
-        }
-
-        // Remove non-native function for native lib
-        {
-            m_pNativeGlslEmuLib = CloneModule(*m_pGlslEmuLib.get());
-            legacy::PassManager passMgr;
-            passMgr.add(PassNonNativeFuncRemove::Create());
-
-            if (passMgr.run(*m_pNativeGlslEmuLib) == false)
-            {
-                LLPC_NEVER_CALLED();
-            }
-        }
-
-        if (hNativeGlslEmuLibEntry &&  (nativeGlslEmuLibEntryState == ShaderEntryState::Compiling))
-        {
-            SmallString<1024> nativeGlslEmuLibBin;
-            raw_svector_ostream libBinStream(nativeGlslEmuLibBin);
-            WriteBitcodeToFile(*m_pNativeGlslEmuLib, libBinStream);
-            contextCache->InsertShader(hNativeGlslEmuLibEntry, nativeGlslEmuLibBin.data(), nativeGlslEmuLibBin.size());
-        }
-
-        EnableDebugOutput(true);
-    }
+    m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLib),
+            sizeof(GlslEmuLib)), "GlslEmuLib"));
 }
 
 // =====================================================================================================================

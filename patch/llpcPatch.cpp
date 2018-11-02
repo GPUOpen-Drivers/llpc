@@ -52,8 +52,10 @@
 #include "llpcPatchBufferOp.h"
 #include "llpcPatchDescriptorLoad.h"
 #include "llpcPatchEntryPointMutate.h"
+#include "llpcPatchGroupOp.h"
 #include "llpcPatchImageOp.h"
 #include "llpcPatchInOutImportExport.h"
+#include "llpcPatchOpt.h"
 #include "llpcPatchPushConstOp.h"
 #include "llpcPatchResourceCollect.h"
 
@@ -70,6 +72,9 @@ namespace cl
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
 opt<bool> AutoLayoutDesc("auto-layout-desc",
                          desc("Automatically create descriptor layout based on resource usages"));
+
+// -disable-patch-opt: disable optimization for LLVM patching
+opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
 
 } // cl
 
@@ -121,7 +126,7 @@ Result Patch::Run(
     // Do patching opertions
     legacy::PassManager passMgr;
 
-    // Lower SPIRAS address spaces to AMDGPU address spaces.
+    // Lower SPIRAS address spaces to AMDGPU address spaces
     passMgr.add(PatchAddrSpaceMutate::Create());
 
     // Patch entry-point mutation (should be done before external library link)
@@ -136,8 +141,11 @@ Result Patch::Run(
     // Patch buffer operations (should be done before external library link)
     passMgr.add(PatchBufferOp::Create());
 
+    // Patch group operations (should be done before external library link)
+    passMgr.add(PatchGroupOp::Create());
+
     // Link external libraries and remove dead functions after it
-    passMgr.add(PassExternalLibLink::Create(pContext->GetGlslEmuLibrary()));
+    passMgr.add(PassExternalLibLink::Create(false)); // Not native only
     passMgr.add(PassDeadFuncRemove::Create());
 
     // Function inlining and remove dead functions after it
@@ -147,20 +155,22 @@ Result Patch::Run(
     // Patch input import and output export operations
     passMgr.add(PatchInOutImportExport::Create());
 
-    // Patch descriptor load opertions
+    // Patch descriptor load operations
     passMgr.add(PatchDescriptorLoad::Create());
 
-    // Prior to general optimization, do funcion inlining and dead function removal once again
+    // Prior to general optimization, do function inlining and dead function removal once again
     passMgr.add(createFunctionInliningPass(InlineThreshold));
     passMgr.add(PassDeadFuncRemove::Create());
 
     // Add some optimization passes
+
+    // Need to run a first promote mem 2 reg to remove alloca's whose only args are lifetimes
     passMgr.add(createPromoteMemoryToRegisterPass());
-    passMgr.add(createSROAPass());
-    passMgr.add(createLICMPass());
-    passMgr.add(createAggressiveDCEPass());
-    passMgr.add(createCFGSimplificationPass());
-    passMgr.add(createInstructionCombiningPass());
+
+    if (cl::DisablePatchOpt == false)
+    {
+        passMgr.add(PatchOpt::Create());
+    }
 
     if (passMgr.run(*pModule) == false)
     {
@@ -216,12 +226,6 @@ void Patch::AddWaterFallInst(
 {
     LLPC_ASSERT(nonUniformIndex1 > 0);
 
-    if (pCallInst->getType()->isVoidTy())
-    {
-        // TODO: The waterfall instruction for store operation isn't decided yet.
-        return;
-    }
-
     Value* pNonUniformIndex1 = pCallInst->getOperand(nonUniformIndex1);
     Value* pNonUniformIndex2 = nullptr;
     Value* pNonUniformIndex = pNonUniformIndex1;
@@ -248,12 +252,11 @@ void Patch::AddWaterFallInst(
     }
 
     // %waterfallBegin = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 %nonUniformIndex)
-    Attribute::AttrKind attribs[] = { Attribute::ReadNone, Attribute::Convergent, Attribute::NoUnwind };
     auto pWaterfallBegin = EmitCall(m_pModule,
                                     isVector ? "llvm.amdgcn.waterfall.begin.v2i32" : "llvm.amdgcn.waterfall.begin.i32",
                                     m_pContext->Int32Ty(),
                                     { pNonUniformIndex },
-                                    attribs,
+                                    NoAttrib,
                                     pCallInst);
 
     // %uniformIndex = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %waterfallBegin, i32 %nonUniformIndex)
@@ -262,7 +265,7 @@ void Patch::AddWaterFallInst(
                                              "llvm.amdgcn.waterfall.readfirstlane.i32.i32",
                                   pNonUniformIndex->getType(),
                                   { pWaterfallBegin, pNonUniformIndex },
-                                  attribs,
+                                  NoAttrib,
                                   pCallInst);
 
     // Replace non-uniform index in pCallInst with uniform index
@@ -285,63 +288,66 @@ void Patch::AddWaterFallInst(
     // Insert waterfall.end after pCallInst
     auto pNextInst = pCallInst->getNextNode();
     auto pResultTy = pCallInst->getType();
-    auto resultBitSize = pResultTy->getPrimitiveSizeInBits();
     Type* pWaterfallEndTy = nullptr;
 
-    LLPC_ASSERT(pNextInst != nullptr);
-
-    // waterfall.end only support vector up to 8, we need check the type and cast it if necessary
-    if ((resultBitSize % 32) == 0)
+    if (pResultTy->isVoidTy() == false)
     {
-        pWaterfallEndTy = (resultBitSize == 32) ?
-                          m_pContext->Int32Ty() :
-                          VectorType::get(m_pContext->Int32Ty(), resultBitSize / 32);
-        LLPC_ASSERT((resultBitSize / 32) <= 8);
-    }
-    else
-    {
-        LLPC_ASSERT((resultBitSize % 16) == 0);
-        pWaterfallEndTy = (resultBitSize == 16) ?
-                           m_pContext->Int16Ty() :
-                           VectorType::get(m_pContext->Int16Ty(), resultBitSize / 16);
-        LLPC_ASSERT((resultBitSize / 32) <= 8);
-    }
+        auto resultBitSize = pResultTy->getPrimitiveSizeInBits();
+        LLPC_ASSERT(pNextInst != nullptr);
 
-    // %waterfallEnd = call i32 @llvm.amdgcn.waterfall.end.i32(i32 %waterfallBegin, i32 %callValue)
-    std::string waterfallEnd = "llvm.amdgcn.waterfall.end.";
-    waterfallEnd += GetTypeNameForScalarOrVector(pWaterfallEndTy);
-    Value* pResult = nullptr;
+        // waterfall.end only support vector up to 8, we need check the type and cast it if necessary
+        if ((resultBitSize % 32) == 0)
+        {
+            pWaterfallEndTy = (resultBitSize == 32) ?
+                              m_pContext->Int32Ty() :
+                              VectorType::get(m_pContext->Int32Ty(), resultBitSize / 32);
+            LLPC_ASSERT((resultBitSize / 32) <= 8);
+        }
+        else
+        {
+            LLPC_ASSERT((resultBitSize % 16) == 0);
+            pWaterfallEndTy = (resultBitSize == 16) ?
+                               m_pContext->Int16Ty() :
+                               VectorType::get(m_pContext->Int16Ty(), resultBitSize / 16);
+            LLPC_ASSERT((resultBitSize / 32) <= 8);
+        }
 
-    // Insert waterfall.end before the next LLVM instructions
-    if (pWaterfallEndTy != pResultTy)
-    {
-        // Do type cast
-        auto pCallValue = new BitCastInst(pCallInst, pWaterfallEndTy, "", pNextInst);
+        // %waterfallEnd = call i32 @llvm.amdgcn.waterfall.end.i32(i32 %waterfallBegin, i32 %callValue)
+        std::string waterfallEnd = "llvm.amdgcn.waterfall.end.";
+        waterfallEnd += GetTypeNameForScalarOrVector(pWaterfallEndTy);
+        Value* pResult = nullptr;
 
-        // Add waterfall.end
-        auto pWaterfallEnd = EmitCall(m_pModule,
+        // Insert waterfall.end before the next LLVM instructions
+        if (pWaterfallEndTy != pResultTy)
+        {
+            // Do type cast
+            Value* pCallValue = nullptr;
+
+            pCallValue = new BitCastInst(pCallInst, pWaterfallEndTy, "", pNextInst);
+            // Add waterfall.end
+            auto pWaterfallEnd = EmitCall(m_pModule,
                                       waterfallEnd,
                                       pWaterfallEndTy,
                                       { pWaterfallBegin, pCallValue },
-                                      attribs,
+                                      NoAttrib,
                                       pNextInst);
+            // Restore type
+            pResult = new BitCastInst(pWaterfallEnd, pResultTy, "", pNextInst);
 
-        // Restore type
-        pResult = new BitCastInst(pWaterfallEnd, pResultTy, "", pNextInst);
+            // Replace all users of call inst with the result of waterfall.end,
+            // except the user (pCallValue) which before waterfall.end
+            pCallInst->replaceAllUsesWith(pResult);
+            cast<Instruction>(pCallValue)->setOperand(0, pCallInst);
+        }
+        else
+        {
+            // Add waterfall.end
+            pResult = EmitCall(m_pModule, waterfallEnd, pResultTy, { pWaterfallBegin, pCallInst }, NoAttrib, pNextInst);
 
-        // Replace all users of call inst with the result of waterfall.end,
-        // except the user (pCallValue) which before waterfall.end
-        pCallInst->replaceAllUsesWith(pResult);
-        pCallValue->setOperand(0, pCallInst);
-    }
-    else
-    {
-        // Add waterfall.end
-        pResult = EmitCall(m_pModule, waterfallEnd, pResultTy, { pWaterfallBegin, pCallInst }, attribs, pNextInst);
-
-        // Replace all users of call inst with the result of waterfall.end except waterfall.end itself.
-        pCallInst->replaceAllUsesWith(pResult);
-        cast<CallInst>(pResult)->setOperand(1, pCallInst);
+            // Replace all users of call inst with the result of waterfall.end except waterfall.end itself.
+            pCallInst->replaceAllUsesWith(pResult);
+            cast<CallInst>(pResult)->setOperand(1, pCallInst);
+        }
     }
 }
 

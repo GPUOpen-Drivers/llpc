@@ -68,6 +68,23 @@ struct  VfxPipelineState;
 typedef struct VfxRenderState* VfxRenderStatePtr;
 typedef struct VfxPipelineState* VfxPipelineStatePtr;
 
+// Command-line options
+enum TOptions {
+    EOptionNone = 0,
+    EOptionVulkanRules = (1 << 0),
+    EOptionDefaultDesktop = (1 << 1),
+    EOptionReadHlsl = (1 << 2),
+    EOptionHlslOffsets = (1 << 3),
+    EOptionHlslIoMapping = (1 << 4),
+    EOptionDebug = (1 << 5),
+    EOptionAutoMapBindings = (1 << 6),
+    EOptionFlattenUniformArrays = (1 << 7),
+    EOptionAutoMapLocations = (1 << 8),
+    EOptionOptimizeDisable = (1 << 9),
+    EOptionOptimizeSize = (1 << 10),
+    EOptionInvertY = (1 << 11),
+};
+
 #ifdef SH_EXPORTING
 
 #ifdef __cplusplus
@@ -84,6 +101,13 @@ bool SH_IMPORT_EXPORT spvCompileAndLinkProgram(
     const char* const* sourceList[EShLangCount],
     void**             pProgram,
     const char**       ppLog);
+
+bool SH_IMPORT_EXPORT spvCompileAndLinkProgramWithOptions(
+    int                sourceStringCount[EShLangCount],
+    const char* const* sourceList[EShLangCount],
+    void**             pProgram,
+    const char**       ppLog,
+    int                options);
 
 void SH_IMPORT_EXPORT spvDestroyProgram(
     void* hProgram);
@@ -181,6 +205,13 @@ typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvCompileAndLinkProgram)(
     void**             pProgram,
     const char**       ppLog);
 
+typedef bool SH_IMPORT_EXPORT(SPVAPI* PFN_spvCompileAndLinkProgramWithOptions)(
+    int                sourceStringCount[EShLangCount],
+    const char* const* sourceList[EShLangCount],
+    void**             pProgram,
+    const char**       ppLog,
+    int                options);
+
 typedef void SH_IMPORT_EXPORT (SPVAPI* PFN_spvDestroyProgram)(void* hProgram);
 
 typedef int SH_IMPORT_EXPORT (SPVAPI* PFN_spvGetSpirvBinaryFromProgram)(
@@ -253,6 +284,7 @@ typedef void SH_IMPORT_EXPORT (SPVAPI* PFN_vfxPrintDoc)(
 
 DECL_EXPORT_FUNC(spvCompileAndLinkProgramFromFile);
 DECL_EXPORT_FUNC(spvCompileAndLinkProgram);
+DECL_EXPORT_FUNC(spvCompileAndLinkProgramWithOptions);
 DECL_EXPORT_FUNC(spvDestroyProgram);
 DECL_EXPORT_FUNC(spvGetSpirvBinaryFromProgram);
 DECL_EXPORT_FUNC(spvAssembleSpirv);
@@ -276,6 +308,7 @@ DECL_EXPORT_FUNC(vfxPrintDoc);
 
 DEFI_EXPORT_FUNC(spvCompileAndLinkProgramFromFile);
 DEFI_EXPORT_FUNC(spvCompileAndLinkProgram);
+DEFI_EXPORT_FUNC(spvCompileAndLinkProgramWithOptions);
 DEFI_EXPORT_FUNC(spvDestroyProgram);
 DEFI_EXPORT_FUNC(spvGetSpirvBinaryFromProgram);
 DEFI_EXPORT_FUNC(spvAssembleSpirv);
@@ -344,6 +377,7 @@ bool InitSpvGen()
     {
         INITFUNC(spvCompileAndLinkProgramFromFile);
         INITFUNC(spvCompileAndLinkProgram);
+        INITFUNC(spvCompileAndLinkProgramWithOptions);
         INITFUNC(spvDestroyProgram);
         INITFUNC(spvGetSpirvBinaryFromProgram);
         INITFUNC(spvAssembleSpirv);
@@ -372,21 +406,22 @@ bool InitSpvGen()
 
 #ifndef SH_EXPORTING
 
-#define spvCompileAndLinkProgramFromFile g_pfnspvCompileAndLinkProgramFromFile
-#define spvCompileAndLinkProgram         g_pfnspvCompileAndLinkProgram
-#define spvDestroyProgram                g_pfnspvDestroyProgram
-#define spvGetSpirvBinaryFromProgram     g_pfnspvGetSpirvBinaryFromProgram
-#define spvAssembleSpirv                 g_pfnspvAssembleSpirv
-#define spvDisassembleSpirv              g_pfnspvDisassembleSpirv
-#define spvValidateSpirv                 g_pfnspvValidateSpirv
-#define spvOptimizeSpirv                 g_pfnspvOptimizeSpirv
-#define spvFreeBuffer                    g_pfnspvFreeBuffer
-#define spvGetVersion                    g_pfnspvGetVersion
-#define vfxParseFile                     g_pfnvfxParseFile
-#define vfxCloseDoc                      g_pfnvfxCloseDoc
-#define vfxGetRenderDoc                  g_pfnvfxGetRenderDoc
-#define vfxGetPipelineDoc                g_pfnvfxGetPipelineDoc
-#define vfxPrintDoc                      g_pfnvfxPrintDoc
+#define spvCompileAndLinkProgramFromFile    g_pfnspvCompileAndLinkProgramFromFile
+#define spvCompileAndLinkProgram            g_pfnspvCompileAndLinkProgram
+#define spvCompileAndLinkProgramWithOptions g_pfnspvCompileAndLinkProgramWithOptions
+#define spvDestroyProgram                   g_pfnspvDestroyProgram
+#define spvGetSpirvBinaryFromProgram        g_pfnspvGetSpirvBinaryFromProgram
+#define spvAssembleSpirv                    g_pfnspvAssembleSpirv
+#define spvDisassembleSpirv                 g_pfnspvDisassembleSpirv
+#define spvValidateSpirv                    g_pfnspvValidateSpirv
+#define spvOptimizeSpirv                    g_pfnspvOptimizeSpirv
+#define spvFreeBuffer                       g_pfnspvFreeBuffer
+#define spvGetVersion                       g_pfnspvGetVersion
+#define vfxParseFile                        g_pfnvfxParseFile
+#define vfxCloseDoc                         g_pfnvfxCloseDoc
+#define vfxGetRenderDoc                     g_pfnvfxGetRenderDoc
+#define vfxGetPipelineDoc                   g_pfnvfxGetPipelineDoc
+#define vfxPrintDoc                         g_pfnvfxPrintDoc
 
 #endif
 

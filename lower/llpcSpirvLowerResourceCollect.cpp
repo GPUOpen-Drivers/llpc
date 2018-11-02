@@ -44,6 +44,18 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
+namespace llvm
+{
+
+namespace cl
+{
+
+extern opt<bool> AutoLayoutDesc;
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
@@ -1452,11 +1464,6 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         {
             // Generic input/output
             const uint32_t startLoc = inOutMeta.Value + inOutMeta.Index;
-            if ((inOutMeta.Value == 0) && (inOutMeta.Index == 1))
-            {
-                // Dual source blending is detected
-                m_pResUsage->inOutUsage.fs.dualSourceBlend = true;
-            }
 
             pBaseTy = pInOutTy;
             locCount = (pInOutTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4) ? 2 : 1;
@@ -1597,14 +1604,17 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                     m_pResUsage->inOutUsage.fs.outputTypes[startLoc] = basicTy;
 
-                    // Collect CB shader mask (will be revised in LLVM patching operations)
-                    LLPC_ASSERT(pBaseTy->isSingleValueType());
-                    const uint32_t compCount = pBaseTy->isVectorTy() ? pBaseTy->getVectorNumElements() : 1;
-                    const uint32_t compIdx = inOutMeta.Component;
-                    LLPC_ASSERT(compIdx + compCount <= 4);
+                    if (cl::AutoLayoutDesc)
+                    {
+                        // Collect CB shader mask (will be revised in LLVM patching operations)
+                        LLPC_ASSERT(pBaseTy->isSingleValueType());
+                        const uint32_t compCount = pBaseTy->isVectorTy() ? pBaseTy->getVectorNumElements() : 1;
+                        const uint32_t compIdx = inOutMeta.Component;
+                        LLPC_ASSERT(compIdx + compCount <= 4);
 
-                    const uint32_t channelMask = (((1 << compCount) - 1) << compIdx);
-                    m_pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << 4 * startLoc);
+                        const uint32_t channelMask = (((1 << compCount) - 1) << compIdx);
+                        m_pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << 4 * startLoc);
+                    }
                 }
             }
         }
@@ -1679,5 +1689,5 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for resource collecting.
-INITIALIZE_PASS(SpirvLowerResourceCollect, "spirv-lower-resource-collect",
+INITIALIZE_PASS(SpirvLowerResourceCollect, "Spirv-lower-resource-collect",
                 "Lower SPIR-V resource collecting", false, false)

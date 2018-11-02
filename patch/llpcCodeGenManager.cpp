@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-code-gen-manager"
 
-#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -47,6 +46,7 @@
 #include "llpcCodeGenManager.h"
 #include "llpcContext.h"
 #include "llpcElf.h"
+#include "llpcFile.h"
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcInternal.h"
@@ -138,25 +138,7 @@ Result CodeGenManager::CreateTargetMachine(
     {
         TargetOptions targetOpts;
         auto relocModel = Optional<Reloc::Model>();
-        std::string features = "+vgpr-spilling";
-
-        if (cl::EnablePipelineDump ||
-            EnableOuts() ||
-            cl::EnableDynamicLoopUnroll ||
-            pPipelineOptions->includeDisassembly)
-        {
-            features += ",+DumpCode";
-        }
-
-        if (cl::EnableSiScheduler)
-        {
-            features += ",+si-scheduler";
-        }
-
-        if (cl::DisableFp32Denormals)
-        {
-            features += ",-fp32-denormals";
-        }
+        std::string features = "";
 
         // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)
         targetOpts.NoSignedZerosFPMath = true;
@@ -181,6 +163,48 @@ Result CodeGenManager::CreateTargetMachine(
 }
 
 // =====================================================================================================================
+// Setup LLVM target features, target features are set per entry point function.
+void CodeGenManager::SetupTargetFeatures(
+    Module* pModule)  // [in, out] LLVM module
+{
+    Context* pContext = static_cast<Context*>(&pModule->getContext());
+    auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
+
+    std::string globalFeatures = "+vgpr-spilling";
+
+    if (cl::EnablePipelineDump ||
+        EnableOuts() ||
+        cl::EnableDynamicLoopUnroll ||
+        pPipelineOptions->includeDisassembly)
+    {
+        globalFeatures += ",+DumpCode";
+    }
+
+    if (cl::EnableSiScheduler)
+    {
+        globalFeatures += ",+si-scheduler";
+    }
+
+    if (cl::DisableFp32Denormals)
+    {
+        globalFeatures += ",-fp32-denormals";
+    }
+
+    for (auto pFunc = pModule->begin(), pEnd = pModule->end(); pFunc != pEnd; ++pFunc)
+    {
+        if (pFunc->getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
+        {
+            {
+                AttrBuilder builder;
+                builder.addAttribute("target-features", globalFeatures);
+                AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
+                pFunc->addAttributes(attribIdx, builder);
+            }
+        }
+    }
+}
+
+// =====================================================================================================================
 // Generates GPU ISA codes (ELF binary, ISA assembly text, or LLVM bitcode, depending on "-filetype" and
 // "-emit-llvm" options)
 Result CodeGenManager::GenerateCode(
@@ -196,7 +220,7 @@ Result CodeGenManager::GenerateCode(
 
     if (cl::EmitLlvm)
     {
-        WriteBitcodeToFile(*pModule, outStream);
+        outStream << *pModule;
         return result;
     }
 

@@ -895,6 +895,36 @@ Result ConfigBuilder::BuildLsRegConfig(
         ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
     }
 
+    auto pGpuWorkarounds = pContext->GetGpuWorkarounds();
+
+    // Override the LDS size based on hardware workarounds.
+    if (pGpuWorkarounds->gfx6.shaderSpiBarrierMgmt != 0)
+    {
+        // The SPI has a bug where the VS never checks for or waits on barrier resources, so if all barriers are in-use
+        // on a CU which gets picked for VS work the SPI will overflow the resources and clobber the barrier tracking.
+        // (There are 16 barriers available per CU, if resource reservations have not reduced this.)
+        //
+        // The workaround is to set a minimum LDS allocation size of 4KB for all dependent groups (tessellation, onchip
+        // GS, and CS) threadgroups larger than one wavefront.  This means that any wave type which wants to use a
+        // barrier must allocate >= 1/16th of the available LDS space per CU which will guarantee that the SPI will not
+        // overflow the resource tracking (since LDS will be full).
+
+        // If the HS threadgroup requires more than one wavefront, barriers will be allocated and we need to limit the
+        // number of thread groups in flight.
+        const uint32_t outputVertices =
+            pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs.outputVertices;
+
+        const uint32_t threadGroupSize = calcFactor.patchCountPerThreadGroup * outputVertices;
+        const uint32_t waveSize = pContext->GetGpuProperty()->waveSize;
+        const uint32_t wavesPerThreadGroup = (threadGroupSize + waveSize - 1) / waveSize;
+
+        if (wavesPerThreadGroup > 1)
+        {
+            constexpr uint32_t MinLdsSizeWa = 1024; // 4KB in DWORDs.
+            ldsSizeInDwords = std::max(ldsSizeInDwords, MinLdsSizeWa);
+        }
+    }
+
     uint32_t ldsSize = 0;
     const auto gfxIp = pContext->GetGfxIpVersion();
 
@@ -1105,7 +1135,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     {
         zOrder = EARLY_Z_THEN_LATE_Z;
     }
-    else if (pResUsage->imageWrite)
+    else if (pResUsage->resourceWrite)
     {
         zOrder = LATE_Z;
         execOnHeirFail = true;
@@ -1127,7 +1157,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, builtInUsage.sampleMask);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, builtInUsage.earlyFragmentTests);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
-                  (builtInUsage.earlyFragmentTests && pResUsage->imageWrite));
+                  (builtInUsage.earlyFragmentTests && pResUsage->resourceWrite));
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
 
     uint32_t depthExpFmt = EXP_FORMAT_ZERO;
@@ -1146,7 +1176,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
     uint32_t spiShaderColFormat = 0;
-    uint32_t cbShaderMask = pResUsage->inOutUsage.fs.cbShaderMask;
+    uint32_t cbShaderMask = (pShaderInfo->pModuleData == nullptr) ? 0 : pResUsage->inOutUsage.fs.cbShaderMask;
     const auto& expFmts = pResUsage->inOutUsage.fs.expFmts;
     for (uint32_t i = 0; i < MaxColorTargets; ++i)
     {
@@ -1161,7 +1191,6 @@ Result ConfigBuilder::BuildPsRegConfig(
         // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
         // off by CB_SHADER_MASK.
         spiShaderColFormat = SPI_SHADER_32_R;
-        cbShaderMask = 1;
     }
 
     SET_REG(&pConfig->m_psRegs, SPI_SHADER_COL_FORMAT, spiShaderColFormat);
@@ -1196,6 +1225,15 @@ Result ConfigBuilder::BuildPsRegConfig(
             spiPsInputCntl.bits.FLAT_SHADE = true;
             spiPsInputCntl.bits.OFFSET |= PassThroughMode;
         }
+        else
+        {
+            if (interpInfo[i].is16bit)
+            {
+                // NOTE: Enable 16-bit interpolation mode for non-passthrough mode. Attribute 0 is always valid.
+                spiPsInputCntl.bits.FP16_INTERP_MODE__VI = true;
+                spiPsInputCntl.bits.ATTR0_VALID__VI = true;
+            }
+        }
 
         if (pointCoordLoc == i)
         {
@@ -1218,7 +1256,7 @@ Result ConfigBuilder::BuildPsRegConfig(
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, SPI_PNT_SPRITE_SEL_1);
     }
 
-    SET_REG(&pConfig->m_psRegs, PS_USES_UAVS, static_cast<uint32_t>(pResUsage->imageWrite));
+    SET_REG(&pConfig->m_psRegs, PS_USES_UAVS, static_cast<uint32_t>(pResUsage->resourceWrite));
     SET_REG(&pConfig->m_psRegs, PS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
     SET_REG(&pConfig->m_psRegs, PS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
 
@@ -1258,7 +1296,18 @@ Result ConfigBuilder::BuildCsRegConfig(
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TGID_Y_EN, true);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TGID_Z_EN, true);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TG_SIZE_EN, true);
-    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, (builtInUsage.localInvocationId ? 2 : 0));
+
+    // 0 = X, 1 = XY, 2 = XYZ
+    uint32_t tidigCompCnt = 0;
+    if (builtInUsage.workgroupSizeZ > 1)
+    {
+        tidigCompCnt = 2;
+    }
+    else if (builtInUsage.workgroupSizeY > 1)
+    {
+        tidigCompCnt = 1;
+    }
+    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, builtInUsage.workgroupSizeX);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, builtInUsage.workgroupSizeY);

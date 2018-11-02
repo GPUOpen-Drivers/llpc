@@ -65,7 +65,28 @@ if(UNIX)
         >)
 
         message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        target_compile_options(llpc PRIVATE
+            -fvisibility-inlines-hidden
+            -fcolor-diagnostics
+            -Wall
+            -Werror
+            -Wno-invalid-offsetof
+            -Wno-error=unused-variable
+            -Wno-missing-braces
+            -Wno-error=unused-function
+            -Wno-error=parentheses-equality
+        )
+        target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -std=c++11
+            -fno-rtti
+            -fPIC
+            -Wno-error=pessimizing-move
+            -Wno-error=inconsistent-missing-override
+            -Wno-error=unused-private-field
+            -Wno-error=dynamic-class-memaccess
+            -Wno-error=unused-result
+        >)
         #message(STATUS "Configured compiler options for Clang.")
         message(WARNING "Clang is untested.")
     else()
@@ -144,7 +165,6 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/context
         ${PROJECT_SOURCE_DIR}/imported/chip/gfx6
         ${PROJECT_SOURCE_DIR}/imported/chip/gfx9
-        ${PROJECT_SOURCE_DIR}/imported/metrohash/src
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/lower
         ${PROJECT_SOURCE_DIR}/patch
@@ -152,9 +172,10 @@ target_include_directories(llpc
         ${PROJECT_SOURCE_DIR}/patch/gfx9/chip
         ${PROJECT_SOURCE_DIR}/patch/gfx9
         ${PROJECT_SOURCE_DIR}/patch/generate
-        ${PROJECT_SOURCE_DIR}/translator
-        ${PROJECT_SOURCE_DIR}/translator/libSPIRV
-        ${PROJECT_SOURCE_DIR}/translator/Mangler
+        ${PROJECT_SOURCE_DIR}/translator/include
+        ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
+        ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
+        ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/Mangler
         ${PROJECT_SOURCE_DIR}/util
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
@@ -181,12 +202,6 @@ target_sources(llpc PRIVATE
     context/llpcShaderCacheManager.cpp
 )
 
-# llpc/imported/metrohash/src
-target_sources(llpc PRIVATE
-    imported/metrohash/src/metrohash128.cpp
-    imported/metrohash/src/metrohash64.cpp
-)
-
 # llpc/lower
 target_sources(llpc PRIVATE
     lower/llpcSpirvLower.cpp
@@ -199,7 +214,8 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerGlobal.cpp
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
-    lower/llpcSpirvLowerOpt.cpp
+    lower/llpcSpirvLowerLoopUnrollControl.cpp
+    lower/llpcSpirvLowerPushConst.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
 )
 
@@ -214,11 +230,15 @@ target_sources(llpc PRIVATE
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
     patch/llpcPatchAddrSpaceMutate.cpp
+    patch/llpcPatchBufferOp.cpp
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
+    patch/llpcPatchGroupOp.cpp
     patch/llpcPatchInOutImportExport.cpp
-    patch/llpcPatchBufferOp.cpp
     patch/llpcPatchImageOp.cpp
+    patch/llpcPatchLoopUnrollInfoRectify.cpp
+    patch/llpcPatchOpt.cpp
+    patch/llpcPatchPeepholeOpt.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
     patch/llpcVertexFetch.cpp
@@ -226,57 +246,65 @@ target_sources(llpc PRIVATE
 
 # llpc/translator
 target_sources(llpc PRIVATE
-    translator/OCL20To12.cpp
-    translator/OCL20ToSPIRV.cpp
-    translator/OCL21ToSPIRV.cpp
-    translator/OCLTypeToSPIRV.cpp
-    translator/OCLUtil.cpp
-    translator/SPIRVLowerBool.cpp
-    translator/SPIRVLowerConstExpr.cpp
-    translator/SPIRVLowerMemmove.cpp
-    translator/SPIRVLowerOCLBlocks.cpp
-    translator/SPIRVReader.cpp
-    translator/SPIRVRegularizeLLVM.cpp
-    translator/SPIRVToOCL20.cpp
-    translator/SPIRVUtil.cpp
-    translator/SPIRVWriter.cpp
-    translator/SPIRVWriterPass.cpp
-    translator/TransOCLMD.cpp
+    translator/lib/SPIRV/OCL20To12.cpp
+    translator/lib/SPIRV/OCL20ToSPIRV.cpp
+    translator/lib/SPIRV/OCL21ToSPIRV.cpp
+    translator/lib/SPIRV/OCLTypeToSPIRV.cpp
+    translator/lib/SPIRV/OCLUtil.cpp
+    translator/lib/SPIRV/SPIRVLowerBool.cpp
+    translator/lib/SPIRV/SPIRVLowerConstExpr.cpp
+    translator/lib/SPIRV/SPIRVLowerMemmove.cpp
+    translator/lib/SPIRV/SPIRVLowerOCLBlocks.cpp
+    translator/lib/SPIRV/SPIRVReader.cpp
+    translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
+    translator/lib/SPIRV/SPIRVToOCL20.cpp
+    translator/lib/SPIRV/SPIRVUtil.cpp
+    translator/lib/SPIRV/SPIRVWriter.cpp
+    translator/lib/SPIRV/SPIRVWriterPass.cpp
+    translator/lib/SPIRV/TransOCLMD.cpp
 )
 
 target_sources(llpc PRIVATE
-    translator/libSPIRV/SPIRVBasicBlock.cpp
-    translator/libSPIRV/SPIRVDebug.cpp
-    translator/libSPIRV/SPIRVDecorate.cpp
-    translator/libSPIRV/SPIRVEntry.cpp
-    translator/libSPIRV/SPIRVFunction.cpp
-    translator/libSPIRV/SPIRVInstruction.cpp
-    translator/libSPIRV/SPIRVModule.cpp
-    translator/libSPIRV/SPIRVStream.cpp
-    translator/libSPIRV/SPIRVType.cpp
-    translator/libSPIRV/SPIRVValue.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVBasicBlock.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVDebug.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVDecorate.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVEntry.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVFunction.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVInstruction.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVModule.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVStream.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVType.cpp
+    translator/lib/SPIRV/libSPIRV/SPIRVValue.cpp
 )
 
 target_sources(llpc PRIVATE
-    translator/Mangler/FunctionDescriptor.cpp
-    translator/Mangler/Mangler.cpp
-    translator/Mangler/ManglingUtils.cpp
-    translator/Mangler/ParameterType.cpp
+    translator/lib/SPIRV/Mangler/FunctionDescriptor.cpp
+    translator/lib/SPIRV/Mangler/Mangler.cpp
+    translator/lib/SPIRV/Mangler/ManglingUtils.cpp
+    translator/lib/SPIRV/Mangler/ParameterType.cpp
 )
 
 # llpc/util
 target_sources(llpc PRIVATE
     util/llpcElf.cpp
     util/llpcDebug.cpp
+    util/llpcEmuLib.cpp
     util/llpcInternal.cpp
     util/llpcFile.cpp
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
     util/llpcPassLoopInfoCollect.cpp
-    util/llpcPassNonNativeFuncRemove.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp
 )
+
+# llpc/imported/metrohash
+add_subdirectory(imported/metrohash)
+target_link_libraries(llpc PRIVATE llpc_metrohash)
+
+# llpc/imported/cwpack
+add_subdirectory(imported/cwpack)
+target_link_libraries(llpc PRIVATE llpc_cwpack)
 
 ### LLPC Auto-generated Files ##########################################################################################
 set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)
@@ -294,6 +322,9 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslCopyShaderEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmu.ll
@@ -304,12 +335,17 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/wa/treat1dImagesAs2d/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslGroupOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
@@ -358,9 +394,9 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/patch/gfx6/chip
     ${PROJECT_SOURCE_DIR}/patch/gfx9/chip
     ${PROJECT_SOURCE_DIR}/patch/generate
-    ${PROJECT_SOURCE_DIR}/translator
-    ${PROJECT_SOURCE_DIR}/translator/libSPIRV
-    ${PROJECT_SOURCE_DIR}/translator/Mangler
+    ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
+    ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
+    ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/Mangler
     ${PROJECT_SOURCE_DIR}/util
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
@@ -380,7 +416,18 @@ if(UNIX)
         target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
 
         message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        target_compile_options(amdllpc PRIVATE
+            -fvisibility-inlines-hidden
+            -fcolor-diagnostics
+            -Wall
+            -Werror
+            -Wno-error=unused-variable
+        )
+        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -std=c++11
+            -fno-rtti
+        >)
         #message(STATUS "Configured compiler options for Clang.")
         message(WARNING "Clang is untested.")
     else()

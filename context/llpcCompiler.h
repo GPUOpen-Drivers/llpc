@@ -30,11 +30,12 @@
  */
 #pragma once
 
+#include <metrohash.h>
+
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElf.h"
 #include "llpcInternal.h"
-#include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
 
 namespace Llpc
@@ -61,6 +62,7 @@ struct ShaderModuleData : public ShaderModuleDataHeader
     BinaryData      binCode;                 // Shader binary data
     bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
     bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
+    bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
 };
 
 // Represents the properties of GPU device.
@@ -84,6 +86,52 @@ struct GpuProperty
     uint32_t maxVgprsAvailable;                 // Number of max available VGPRs
 };
 
+// Contains flags for all of the hardware workarounds which affect pipeline compilation.
+struct WorkaroundFlags
+{
+    union
+    {
+        struct
+        {
+            uint32_t  cbNoLt16BitIntClamp               :  1;
+            uint32_t  miscLoadBalancePerWatt            :  1;
+            uint32_t  miscSpiSgprsNum                   :  1;
+            uint32_t  shader8b16bLocalWriteCorruption   :  1;
+            uint32_t  shaderCoalesceStore               :  1;
+            uint32_t  shaderEstimateRegisterUsage       :  1;
+            uint32_t  shaderReadlaneSmrd                :  1;
+            uint32_t  shaderSmemBufferAddrClamp         :  1;
+            uint32_t  shaderSpiBarrierMgmt              :  1;
+            //
+            //
+            //
+            //
+            //
+
+            uint32_t  shaderSpiCsRegAllocFragmentation  :  1;
+            uint32_t  shaderVcczScalarReadBranchFailure :  1;
+            uint32_t  shaderZExport                     :  1;
+            // Pre-GFX9 hardware doesn't support min/max denorm flush, we insert extra fmul with 1.0 to flush the denorm value
+            uint32_t  shaderMinMaxFlushDenorm           :  1;
+            uint32_t  reserved                          : 19;
+        };
+        uint32_t  u32All;
+    } gfx6;
+
+    union
+    {
+        struct
+        {
+            uint32_t  fixCacheLineStraddling       :  1;
+            uint32_t  fixLsVgprInput               :  1;
+            uint32_t  shaderImageGatherInstFix     :  1;
+            uint32_t  treat1dImagesAs2d            :  1;
+            uint32_t  reserved                     : 28;
+        };
+        uint32_t  u32All;
+    } gfx9;
+};
+
 // Represents statistics info for pipeline module
 struct PipelineStatistics
 {
@@ -98,7 +146,7 @@ struct PipelineStatistics
 class Compiler: public ICompiler
 {
 public:
-    Compiler(GfxIpVersion gfxIp, uint32_t optionCount, const char*const* pOptions);
+    Compiler(GfxIpVersion gfxIp, uint32_t optionCount, const char*const* pOptions, MetroHash::Hash optionHash);
     ~Compiler();
 
     virtual void VKAPI_CALL Destroy();
@@ -127,6 +175,12 @@ public:
     // Gets the count of compiler instance.
     static uint32_t GetInstanceCount() { return m_instanceCount; }
 
+    // Gets the count of redirect output
+    static uint32_t GetOutRedirectCount() { return m_outRedirectCount; }
+
+    static MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
+                                                         const char*const* pOptions);
+
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
@@ -140,9 +194,6 @@ private:
                                 uint32_t                     forceLoopUnrollCount,
                                 llvm::Module**               ppModule) const;
 
-    MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
-                                                  const char*const* pOptions) const;
-
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
     Result BuildNullFs(Context* pContext, std::unique_ptr<llvm::Module>& pNullFsModule) const;
@@ -151,6 +202,7 @@ private:
     Result ReplaceShader(const ShaderModuleData* pOrigModuleData, ShaderModuleData** ppModuleData) const;
 
     void InitGpuProperty();
+    void InitGpuWorkaround();
     void DumpTimeProfilingResult(const MetroHash::Hash* pHash);
 
     Context* AcquireContext();
@@ -172,15 +224,16 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    const char*const    m_pClientName;      // Name of the client who calls LLPC
-    GfxIpVersion        m_gfxIp;            // Graphics IP version info
-    MetroHash::Hash     m_optionHash;       // Hash code of compilation options
-    static uint32_t     m_instanceCount;    // The count of compiler instance
-    static uint32_t     m_outRedirectCount; // The count of output redirect
-    ShaderCachePtr      m_shaderCache;      // Shader cache
-    GpuProperty         m_gpuProperty;      // GPU property
-    llvm::sys::Mutex    m_contextPoolMutex; // Mutex for context pool access
-    std::vector<Context*> m_contextPool;    // Context pool
+    std::vector<std::string>     m_options;          // Compilation options
+    MetroHash::Hash              m_optionHash;       // Hash code of compilation options
+    GfxIpVersion                 m_gfxIp;            // Graphics IP version info
+    static uint32_t              m_instanceCount;    // The count of compiler instance
+    static uint32_t              m_outRedirectCount; // The count of output redirect
+    ShaderCachePtr               m_shaderCache;      // Shader cache
+    GpuProperty                  m_gpuProperty;      // GPU property
+    WorkaroundFlags              m_gpuWorkarounds;   // GPU workarounds;
+    static llvm::sys::Mutex      m_contextPoolMutex; // Mutex for context pool access
+    static std::vector<Context*> m_contextPool;      // Context pool
 };
 
 } // Llpc

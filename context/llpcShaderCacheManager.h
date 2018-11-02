@@ -64,6 +64,12 @@ public:
         return m_pManager;
     }
 
+    static void Shutdown()
+    {
+        delete m_pManager;
+        m_pManager = nullptr;
+    }
+
     ShaderCachePtr GetShaderCacheObject(const ShaderCacheCreateInfo*    pCreateInfo,
                                         const ShaderCacheAuxCreateInfo* pAuxCreateInfo);
 

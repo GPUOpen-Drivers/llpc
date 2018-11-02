@@ -39,6 +39,7 @@
 #include "llpcContext.h"
 #include "llpcCopyShader.h"
 #include "llpcDebug.h"
+#include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPatch.h"
@@ -460,13 +461,16 @@ Value* CopyShader::LoadValueFromGsVsRingBuffer(
         auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
 
         std::vector<Value*> args;
-        args.push_back(inOutUsage.gs.pGsVsRingBufDesc);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        args.push_back(pRingOffset);
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));  // glc
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));  // slc
+        args.push_back(inOutUsage.gs.pGsVsRingBufDesc);                             // rsrc
+        args.push_back(pRingOffset);                                                // offset
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                 // soffset
+        CoherentFlag coherent = {};
+        coherent.bits.glc = true;
+        coherent.bits.slc = true;
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc, slc
+
         pLoadValue = EmitCall(m_pModule,
-                              "llvm.amdgcn.buffer.load.f32",
+                              "llvm.amdgcn.raw.buffer.load.f32",
                               m_pContext->FloatTy(),
                               args,
                               NoAttrib,

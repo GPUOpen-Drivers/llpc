@@ -1840,7 +1840,9 @@ define i32 @llpc.bitFieldUExtract.i32(i32 %value, i32 %offset, i32 %bits) #0
     %1 = icmp eq i32 %bits, 32
     %2 = call i32 @llvm.amdgcn.ubfe.i32(i32 %value, i32 %offset, i32 %bits)
     %3 = select i1 %1, i32 %value, i32 %2
-    ret i32 %3
+    %4 = icmp eq i32 %bits, 0
+    %5 = select i1 %4, i32 0, i32 %3
+    ret i32 %5
 }
 
 ; =====================================================================================================================

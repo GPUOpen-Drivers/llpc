@@ -101,5 +101,5 @@ void SpirvLowerInstMetaRemove::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for removing instruction metadata.
-INITIALIZE_PASS(SpirvLowerInstMetaRemove, "spirv-lower-inst-meta-remove",
+INITIALIZE_PASS(SpirvLowerInstMetaRemove, "Spirv-lower-inst-meta-remove",
                 "Lower SPIR-V instruction metadata by removing those targeted", false, false)

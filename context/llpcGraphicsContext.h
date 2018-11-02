@@ -42,6 +42,7 @@ class GraphicsContext: public PipelineContext
 public:
     GraphicsContext(GfxIpVersion                     gfxIp,
                     const GpuProperty*               pGpuProp,
+                    const WorkaroundFlags*           pGpuWorkarounds,
                     const GraphicsPipelineBuildInfo* pPipelineInfo,
                     MetroHash::Hash*                 pHash);
     virtual ~GraphicsContext();
@@ -82,6 +83,9 @@ public:
     virtual void SetGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
 
     virtual void DoUserDataNodeMerge();
+
+    // Gets wave size for the specified shader stage
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage);
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }

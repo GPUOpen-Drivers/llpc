@@ -36,12 +36,14 @@
 #undef True
 #undef False
 #undef DestroyAll
+#undef Status
 
 namespace Llpc
 {
 
-static const uint32_t  Version = 8;
+static const uint32_t  Version = 14;
 static const uint32_t  MaxColorTargets = 8;
+static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
 
 // Forward declarations
@@ -293,22 +295,26 @@ struct GraphicsPipelineBuildInfo
 
     struct
     {
-        bool        depthClipEnable;    ///< Enable clipping based on Z coordinate
-    } vpState;                          ///< Viewport state
+        bool        depthClipEnable;            ///< Enable clipping based on Z coordinate
+    } vpState;                                  ///< Viewport state
 
     struct
     {
-        bool    rasterizerDiscardEnable;    ///< Kill all rasterized pixels. This is implicitly true if stream out
-                                            ///  is enabled and no streams are rasterized
-        bool    innerCoverage;              ///< Related to conservative rasterization.  Must be false if conservative
-                                            ///  rasterization is disabled.
-        bool    perSampleShading;           ///< Enable per sample shading
-        uint32_t  numSamples;               ///< Number of coverage samples used when rendering with this pipeline.
-        uint32_t  samplePatternIdx;         ///< Index into the currently bound MSAA sample pattern table that
-                                            ///  matches the sample pattern used by the rasterizer when rendering
-                                            ///  with this pipeline.
-        uint8_t   usrClipPlaneMask;         ///< Mask to indicate the enabled user defined clip planes
-    } rsState;                              ///< Rasterizer State
+        bool    rasterizerDiscardEnable;        ///< Kill all rasterized pixels. This is implicitly true if stream out
+                                                ///  is enabled and no streams are rasterized
+        bool    innerCoverage;                  ///< Related to conservative rasterization.  Must be false if
+                                                ///  conservative rasterization is disabled.
+        bool    perSampleShading;               ///< Enable per sample shading
+        uint32_t  numSamples;                   ///< Number of coverage samples used when rendering with this pipeline
+        uint32_t  samplePatternIdx;             ///< Index into the currently bound MSAA sample pattern table that
+                                                ///  matches the sample pattern used by the rasterizer when rendering
+                                                ///  with this pipeline.
+        uint8_t   usrClipPlaneMask;             ///< Mask to indicate the enabled user defined clip planes
+        VkPolygonMode       polygonMode;        ///< Triangle rendering mode
+        VkCullModeFlags     cullMode;           ///< Fragment culling mode
+        VkFrontFace         frontFace;          ///< Front-facing triangle orientation
+        bool                depthBiasEnable;    ///< Whether to bias fragment depth values
+    } rsState;                                  ///< Rasterizer State
 
     struct
     {
@@ -323,6 +329,7 @@ struct GraphicsPipelineBuildInfo
            VkFormat       format;               ///< Color attachment format
         } target[MaxColorTargets];              ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
+
     PipelineOptions     options;                ///< Per pipeline tuning/debugging options
 };
 
@@ -470,6 +477,24 @@ public:
     ///
     /// @returns Hash code associated this compute pipeline.
     static uint64_t VKAPI_CALL GetPipelineHash(const ComputePipelineBuildInfo* pPipelineInfo);
+
+    /// Gets graphics pipeline name.
+    ///
+    /// @param [in]  pPipelineInfo  Info to build this graphics pipeline
+    /// @param [out] pPipeName      The full name of this graphics pipeline
+    /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+    static void VKAPI_CALL GetPipelineName(const GraphicsPipelineBuildInfo* pPipelineInfo,
+                                           char* pPipeName,
+                                           const size_t nameBufSize);
+
+    /// Gets compute pipeline name.
+    ///
+    /// @param [in]  pPipelineInfo  Info to build this compute pipeline
+    /// @param [out] pPipeName      The full name of this compute pipeline
+    /// @param [in]  nameBufSize    Size of the buffer to store pipeline name
+    static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo* pPipelineInfo,
+                                           char* pPipeName,
+                                           const size_t nameBufSize);
 };
 
 // =====================================================================================================================

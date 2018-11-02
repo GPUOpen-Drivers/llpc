@@ -131,6 +131,9 @@ void PatchDescriptorLoad::visitCallInst(
     ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
 
     bool loadSpillTable = false;
+    bool isNonUniform = false;
+    bool isWriteOnly = false;
+    bool checkWriteOp = true;
 
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
     if (mangledName == LlpcName::DescriptorLoadResource)
@@ -193,7 +196,6 @@ void PatchDescriptorLoad::visitCallInst(
         auto pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
 
         // Check non-uniform flag
-        bool isNonUniform = false;
         if (nodeType == ResourceMappingNodeType::DescriptorBuffer)
         {
             auto pIsNonUniform = cast<ConstantInt>(callInst.getOperand(3));
@@ -207,6 +209,8 @@ void PatchDescriptorLoad::visitCallInst(
             isNonUniform = (nodeType == ResourceMappingNodeType::DescriptorSampler) ?
                            imageCallMeta.NonUniformSampler :
                            imageCallMeta.NonUniformResource;
+            isWriteOnly = imageCallMeta.WriteOnly;
+            checkWriteOp = false;
         }
 
         if (isa<ConstantInt>(pArrayOffset) == false)
@@ -351,23 +355,6 @@ void PatchDescriptorLoad::visitCallInst(
                     // Extract compact buffer descriptor
                     if (descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t))
                     {
-                        SqBufRsrcWord1 sqBufRsrcWord1 = {};
-                        SqBufRsrcWord2 sqBufRsrcWord2 = {};
-                        SqBufRsrcWord3 sqBufRsrcWord3 = {};
-
-                        sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-                        sqBufRsrcWord2.bits.NUM_RECORDS = (m_pContext->GetGfxIpVersion().major == 6) ?
-                                                          UINT16_MAX :
-                                                          UINT32_MAX;
-
-                        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                        sqBufRsrcWord3.bits.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                        sqBufRsrcWord3.bits.DATA_FORMAT = BUF_DATA_FORMAT_32;
-                        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
-
                         // Extract compact buffer descriptor
                         Value* pDescElem0 = ExtractElementInst::Create(pDesc,
                             ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -391,6 +378,9 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD1
+                        SqBufRsrcWord1 sqBufRsrcWord1 = {};
+                        sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
+
                         pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
                             ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
                             "",
@@ -402,6 +392,9 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD2
+                        SqBufRsrcWord2 sqBufRsrcWord2 = {};
+                        sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+
                         pBufDesc = InsertElementInst::Create(pBufDesc,
                             ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
                             ConstantInt::get(m_pContext->Int32Ty(), 2),
@@ -409,11 +402,22 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD3
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                            ConstantInt::get(m_pContext->Int32Ty(), 3),
-                            "",
-                            &callInst);
+                        {
+                            SqBufRsrcWord3 sqBufRsrcWord3 = {};
+                            sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+                            sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+                            sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+                            sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+                            sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+                            sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+                            LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+
+                            pBufDesc = InsertElementInst::Create(pBufDesc,
+                                ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                                ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                "",
+                                &callInst);
+                        }
 
                         pDesc = pBufDesc;
                     }
@@ -469,8 +473,8 @@ void PatchDescriptorLoad::visitCallInst(
                     sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
                     sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
                     sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                    sqBufRsrcWord3.bits.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                    sqBufRsrcWord3.bits.DATA_FORMAT = BUF_DATA_FORMAT_32;
+                    sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+                    sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
                     LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
 
                     Value* pDescElem1 = ExtractElementInst::Create(pDescTableAddr,
@@ -560,6 +564,49 @@ void PatchDescriptorLoad::visitCallInst(
 
         if (pDesc != nullptr)
         {
+            // Add "llvm.amdgcn.waterfall.last.use." for write-only non-uniform operations
+            if (isNonUniform)
+            {
+                // Set flag writeOnly if the non-uniform descriptor is used by instruction which don't have
+                // return type (only for buffer store operations).
+                if (checkWriteOp)
+                {
+                    for (auto pUser : callInst.users())
+                    {
+                        auto pInst = dyn_cast<CallInst>(pUser);
+                        if ((pInst != nullptr) && pInst->getType()->isVoidTy())
+                        {
+                            isWriteOnly = true;
+                        }
+                    }
+                }
+
+                if (isWriteOnly)
+                {
+                    // Insert waterfall.last.use
+                    auto pNonUniformIndex = cast<CallInst>(callInst.getOperand(2));
+                    // For non-uniform descriptor, the resource/block index must be the result of
+                    // waterfall.readfirstlane
+                    LLPC_ASSERT(pNonUniformIndex->getCalledFunction()->getName()
+                        .startswith("llvm.amdgcn.waterfall.readfirstlane."));
+
+                    auto pWaterfallBegin = pNonUniformIndex->getOperand(0);
+
+                    // NOTE: waterfall.begin is only used by waterfall.readfirstlane for write only operations.
+                    // We need insert waterfall.last.use after loading descriptor.
+                    LLPC_ASSERT(pWaterfallBegin->getNumUses() == 1);
+
+                    std::string waterfallLastUse = "llvm.amdgcn.waterfall.last.use.";
+                    waterfallLastUse += GetTypeNameForScalarOrVector(pDesc->getType());
+                    pDesc = EmitCall(m_pModule,
+                                     waterfallLastUse,
+                                     pDesc->getType(),
+                                     { pWaterfallBegin, pDesc },
+                                     NoAttrib,
+                                     &callInst);
+                }
+            }
+
             callInst.replaceAllUsesWith(pDesc);
             m_descLoadCalls.push_back(&callInst);
             m_descLoadFuncs.insert(pCallee);
