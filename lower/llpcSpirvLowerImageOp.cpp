@@ -228,6 +228,7 @@ void SpirvLowerImageOp::visitCallInst(
                                        &pResourceIndex,
                                        &pMemoryQualifier);
 
+                    m_imageLoadOperands.insert(pLoadResource);
                     m_imageLoads.insert(pLoadCall);
                 }
                 else
