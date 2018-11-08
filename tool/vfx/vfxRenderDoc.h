@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -23,47 +23,37 @@
  *
  **********************************************************************************************************************/
 /**
- ***********************************************************************************************************************
- * @file  llpcSpirvLowerPushConst.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerPushConst.
- ***********************************************************************************************************************
- */
-#pragma once
+***********************************************************************************************************************
+* @file  vfxRenderDocument.h
+* @brief Contains declaration of class RenderDocument
+***********************************************************************************************************************
+*/
 
-#include "llvm/Analysis/LoopPass.h"
+#include "vfxParser.h"
 
-#include "llpcSpirvLower.h"
-
-namespace Llpc
+namespace Vfx
 {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for push constant.
-class SpirvLowerPushConst:
-    public SpirvLower
+// Represents the render state result of Vfx parser
+class RenderDocument : public Document
 {
 public:
-    SpirvLowerPushConst();
+    RenderDocument()
+    {
+        memset(&m_renderState, 0, sizeof(m_renderState));
+    };
 
-    virtual bool runOnModule(llvm::Module& module) override;
+    virtual uint32_t GetMaxSectionCount(SectionType type)
+    {
+        return m_MaxSectionCount[type];
+    }
 
-    // Gets loop analysis usage
-    virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
-
-    // Pass creator, creates the pass of SPIR-V lowering opertions for push constant
-    static llvm::ModulePass* Create() { return new SpirvLowerPushConst(); }
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
+    virtual VfxRenderStatePtr GetDocument();
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerPushConst);
-
-    void HandleLoop(llvm::Loop* pLoop, Instruction* pInsertPos);
-
-    // Push constant load map, from <component count, load offset> to load call
-    std::map<uint32_t, CallInst*>   m_pushConstLoadMap;
+    static uint32_t m_MaxSectionCount[SectionTypeNameNum]; // Contants max section count for each section type
+    VfxRenderState  m_renderState;                         // Contants the render state
 };
 
-} // Llpc
+}

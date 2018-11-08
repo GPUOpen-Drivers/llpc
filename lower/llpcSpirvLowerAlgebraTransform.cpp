@@ -32,7 +32,6 @@
 
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -71,8 +70,6 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     m_changed = false;
 
     visit(m_pModule);
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return m_changed;
 }

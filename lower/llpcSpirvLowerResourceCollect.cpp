@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-resource-collect"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -43,18 +42,6 @@
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
-
-namespace llvm
-{
-
-namespace cl
-{
-
-extern opt<bool> AutoLayoutDesc;
-
-} // cl
-
-} // llvm
 
 namespace Llpc
 {
@@ -321,8 +308,6 @@ bool SpirvLowerResourceCollect::runOnModule(
         pViewIndex->addMetadata(gSPIRVMD::InOut, *pViewIndexMetaNode);
         CollectInOutUsage(m_pContext->Int32Ty(), pViewIndexMetaValue, SPIRAS_Input);
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -1604,7 +1589,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                     m_pResUsage->inOutUsage.fs.outputTypes[startLoc] = basicTy;
 
-                    if (cl::AutoLayoutDesc)
+                    if (m_pContext->NeedAutoLayoutDesc())
                     {
                         // Collect CB shader mask (will be revised in LLVM patching operations)
                         LLPC_ASSERT(pBaseTy->isSingleValueType());

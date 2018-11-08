@@ -30,9 +30,7 @@
  */
 #pragma once
 
-#ifndef LLVM_DEBUG
-#define LLVM_DEBUG DEBUG
-#endif
+#include <stdint.h>
 
 #if PAL_ENABLE_PRINTS_ASSERTS || !defined(NDEBUG)
 #include <cassert>
@@ -69,15 +67,6 @@
 #define LLPC_DISALLOW_COPY_AND_ASSIGN(_typename)    \
     _typename(const _typename&);                    \
     _typename& operator =(const _typename&);
-
-// Verify the specified module for a LLPC pass and report error messages if the verification fails
-#define LLPC_VERIFY_MODULE_FOR_PASS(M) LLVM_DEBUG(                                            \
-    std::string errMsg;                                                                       \
-    raw_string_ostream errStream(errMsg);                                                     \
-    if (verifyModule(M, &errStream))                                                          \
-    {                                                                                         \
-        LLPC_ERRS("Fails to verify module (" DEBUG_TYPE "): " << errStream.str() << "\n");    \
-    })                                                                                        \
 
 namespace llvm { class raw_ostream; }
 namespace llvm { class raw_fd_ostream; }

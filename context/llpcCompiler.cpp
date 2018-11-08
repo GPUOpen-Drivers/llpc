@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-compiler"
 
 #include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
@@ -57,6 +56,7 @@
 #include "llpcElf.h"
 #include "llpcFile.h"
 #include "llpcPassLoopInfoCollect.h"
+#include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcShaderMerger.h"
 #include "llpcPipelineDumper.h"
@@ -170,8 +170,6 @@ opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dyn
 
 // -force-loop-unroll-count: Force to set the loop unroll count; this option will ignore dynamic loop unroll.
 opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
-
-extern opt<bool> AutoLayoutDesc;
 
 extern opt<bool> EnableOuts;
 
@@ -641,7 +639,8 @@ Result Compiler::BuildGraphicsPipelineInternal(
     }
 
     // Build null fragment shader if necessary
-    if ((result == Result::Success) && (cl::AutoLayoutDesc == false) && (modules[ShaderStageFragment] == nullptr))
+    if ((result == Result::Success) && (pContext->NeedAutoLayoutDesc() == false) &&
+          (modules[ShaderStageFragment] == nullptr))
     {
         TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
         std::unique_ptr<Module> pNullFsModule;
@@ -2300,7 +2299,7 @@ bool Compiler::NeedDynamicLoopUnroll(
     bool needDynamicLoopUnroll = false;
     PassLoopInfoCollect* pLoopPass = new PassLoopInfoCollect(&loopInfo);
 
-    legacy::PassManager passMgr;
+    PassManager passMgr;
     passMgr.add(pLoopPass);
     passMgr.run(*pModule);
 

@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-push-const"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -82,8 +81,6 @@ bool SpirvLowerPushConst::runOnModule(
             HandleLoop(pLoop, &insertPos);
         }
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

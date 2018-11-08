@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-aggregate-load-store"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -84,8 +83,6 @@ bool SpirvLowerAggregateLoadStore::runOnModule(
         pStoreInst->dropAllReferences();
         pStoreInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-in-out-import-export"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -329,8 +328,6 @@ bool PatchInOutImportExport::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -1081,7 +1078,6 @@ void PatchInOutImportExport::visitReturnInst(
             // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or gl_CullDistance[]
             // should start from pos2.
             uint32_t pos = (usePointSize || useLayer || useViewportIndex) ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
-
             args.clear();
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pos));   // tgt
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0xF));   // en

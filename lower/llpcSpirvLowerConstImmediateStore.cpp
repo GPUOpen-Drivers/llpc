@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-const-immediate-store"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 
 #include <vector>
@@ -80,8 +79,6 @@ bool SpirvLowerConstImmediateStore::runOnModule(
             }
         }
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

@@ -49,6 +49,7 @@ namespace Vfx
 
 // =====================================================================================================================
 // Common definition of VfxParser
+static const uint32_t ShaderStageCount = 6;             // Number of shader stages in Vulkan
 static const uint32_t MaxSectionCount = 16;             // Max section count
 static const uint32_t MaxBindingCount = 16;             // Max binding count
 static const uint32_t MaxResultCount = 16;              // Max result count
@@ -76,15 +77,6 @@ static const size_t MaxLineBufSize  = 512;  // Buffer size to parse a line in VF
 #define STRING(x) _STRING(x)
 
 #define SIZE_OF_ARRAY(ary) (sizeof(ary)/sizeof(ary[0]))
-
-#define PARSE_ERROR(errorMsg, lineNum, ...) { \
-    char errorBuf[4096]; \
-    int pos = Snprintf(errorBuf, 4096, "Parse error at line %u: ", lineNum); \
-    pos += Snprintf(errorBuf + pos, 4096 - pos, __VA_ARGS__); \
-    pos += Snprintf(errorBuf + pos, 4096 - pos, "\n"); \
-    VFX_ASSERT(pos < 4096); \
-    errorMsg += errorBuf; \
-}
 
 namespace Math
 {
@@ -527,6 +519,10 @@ struct DrawState
     uint32_t              firstIndex;                               // First index in draw index
     uint32_t              vertexOffset;                             // Vertex offset in draw index
     VkPrimitiveTopology   topology;                                 // Primitive topology
+    VkPolygonMode         polygonMode;                              // Triangle rendering mode
+    VkCullModeFlags       cullMode;                                 // Fragment culling mode
+    VkFrontFace           frontFace;                                // Front-facing triangle orientation
+    uint32_t              depthBiasEnable;                          // Whether to bias fragment depth values
     uint32_t              patchControlPoints;                       // Patch control points
     IUFValue              dispatch;                                 // Dispatch dimension
     uint32_t              width;                                    // Window width
@@ -543,7 +539,6 @@ struct DrawState
     PushConstRange        pushConstRange[MaxPushConstRangCount];    // Pipeline push constant ranges
 };
 
-#ifndef DISABLE_PIPLINE_DOC
 // =====================================================================================================================
 // Represents the state of ColorBuffer.
 struct ColorBuffer
@@ -559,6 +554,10 @@ struct ColorBuffer
 struct GraphicsPipelineState
 {
     VkPrimitiveTopology  topology;            // Primitive type
+    VkPolygonMode        polygonMode;         // Triangle rendering mode
+    VkCullModeFlags      cullMode;            // Fragment culling mode
+    VkFrontFace          frontFace;           // Front-facing triangle orientation
+    uint32_t             depthBiasEnable;     // Whether to bias fragment depth values
     uint32_t    patchControlPoints;           // Patch control points
     uint32_t    deviceIndex;                  // Device index for device group
     uint32_t    disableVertexReuse;           // Disable reusing vertex shader output for indexed draws
@@ -573,15 +572,7 @@ struct GraphicsPipelineState
     uint32_t    switchWinding;                // reverse the TCS declared output primitive vertex order
     uint32_t    enableMultiView;              // Whether to enable multi-view support
     uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
-
-    uint32_t    enableNgg;                    // Enable NGG mode, use an implicit primitive shader
-    uint32_t    enableFastLaunch;             // Enables the hardware to launch subgroups of work at a faster rate
-    uint32_t    enableVertexReuse;            // Enable optimization to cull duplicate vertices
-    uint32_t    disableBackfaceCulling;       // Disables culling of primitives that don't meet facing criteria
-    uint32_t    enableFrustumCulling;         // Enables discarding of primitives outside of view frustum
-    uint32_t    enableBoxFilterCulling;       // Enable simpler frustum culler that is less accurate
-    uint32_t    enableSphereCulling;          // Enable frustum culling based on a sphere
-    uint32_t    enableSmallPrimFilter;        // Enables trivial sub-sample primitive culling
+    uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
 
     ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
 };
@@ -592,8 +583,8 @@ struct ComputePipelineState
 {
     uint32_t    deviceIndex;                  // Device index for device group
     uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
+    uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
 };
-#endif
 
 };
 
@@ -611,7 +602,7 @@ struct VfxRenderState
     Vfx::ImageView    imageView[Vfx::MaxSectionCount];          // Section "ImageView"
     uint32_t          numSampler;                               // Number of section "Sampler"
     Vfx::Sampler      sampler[Vfx::MaxSectionCount];            // Section "Sampler"
-    Vfx::ShaderSource stages[EShLangCount];                     // Shader source sections
+    Vfx::ShaderSource stages[Vfx::ShaderStageCount];            // Shader source sections
 };
 
 #ifndef DISABLE_PIPLINE_DOC
@@ -625,4 +616,49 @@ struct VfxPipelineState
     Vfx::ShaderSource         stages[ShaderStageCount];         // Shader source sections
 };
 #endif
+
+// =====================================================================================================================
+// Types used in VFX library public entry points.
+enum VfxDocType
+{
+    VfxDocTypeRender,
+    VfxDocTypePipeline
+};
+
+struct VfxRenderState;
+struct  VfxPipelineState;
+
+typedef struct VfxRenderState* VfxRenderStatePtr;
+typedef struct VfxPipelineState* VfxPipelineStatePtr;
+
+// =====================================================================================================================
+// Public entry points of VFX library. Use these functions (in namespace Vfx) when linking to VFX as a static library.
+namespace Vfx
+{
+
+bool vfxParseFile(
+    const char*  pFilename,
+    unsigned int numMacro,
+    const char*  pMacros[],
+    VfxDocType   type,
+    void**       ppDoc,
+    const char** ppErrorMsg);
+
+void vfxCloseDoc(
+    void* pDoc);
+
+void vfxGetRenderDoc(
+    void*              pDoc,
+    VfxRenderStatePtr* pRenderState);
+
+#ifndef DISABLE_PIPLINE_DOC
+void vfxGetPipelineDoc(
+    void*                pDoc,
+    VfxPipelineStatePtr* pPipelineState);
+#endif
+
+void vfxPrintDoc(
+    void*                pDoc);
+
+} // Vfx
 

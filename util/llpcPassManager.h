@@ -24,54 +24,24 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopInfoCollect.h
- * @brief LLPC header file: contains declaration of class Llpc::PassLoopInfoCollect.
+ * @file  llpcPassManager.h
+ * @brief LLPC header file: legacy::PassManager override
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/Analysis/LoopPass.h"
-#include "llpc.h"
+#include "llvm/IR/LegacyPassManager.h"
 
 namespace Llpc
 {
 
-// Represents the info of loop analysis
-struct LoopAnalysisInfo
-{
-    uint32_t numAluInsts;               // Number of ALU instructions
-    uint32_t numBasicBlocks;            // Number of basic blocks
-    uint32_t nestedLevel;               // Nested loop level
-};
-
 // =====================================================================================================================
-// Represents the LLVM pass for loop info collecting.
-class PassLoopInfoCollect : public llvm::ModulePass
+// LLPC's legacy::PassManager override
+class PassManager final :
+    public llvm::legacy::PassManager
 {
 public:
-    PassLoopInfoCollect() : ModulePass(ID) {};
-    PassLoopInfoCollect(std::vector<LoopAnalysisInfo>* pInfo) : ModulePass(ID)
-    {
-        m_pLoopInfo = pInfo;
-    };
-
-    void HandleLoop(llvm::Loop* loop, uint32_t nestedLevel);
-
-    // Gets loop analysis usage
-    virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override
-    {
-        analysisUsage.addRequired<llvm::LoopInfoWrapperPass>();
-        analysisUsage.setPreservesAll();
-    }
-
-    virtual bool runOnModule(llvm::Module& module) override;
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
-
-private:
-    std::vector<LoopAnalysisInfo>*  m_pLoopInfo;
+    void add(llvm::Pass* pPass) override;
 };
 
 } // Llpc

@@ -355,7 +355,7 @@ uint32_t GetStageMaskFromSpirvBinary(
             }
 
             // All "OpEntryPoint" are before "OpFunction"
-            if ((opCode == OpFunction))
+            if (opCode == OpFunction)
             {
                 break;
             }

@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-copy-shader"
 
 #include "llvm/Bitcode/BitcodeReader.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 
@@ -42,6 +41,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"
 #include "llpcPassDeadFuncRemove.h"
+#include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPatchAddrSpaceMutate.h"
 #include "llpcPatchDescriptorLoad.h"
@@ -360,7 +360,7 @@ Result CopyShader::DoPatch()
     Result result = Result::Success;
 
     // Do patching opertions
-    legacy::PassManager passMgr;
+    PassManager passMgr;
 
     // Convert SPIRAS address spaces to AMDGPU address spaces.
     passMgr.add(PatchAddrSpaceMutate::Create());

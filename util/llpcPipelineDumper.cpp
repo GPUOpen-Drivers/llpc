@@ -609,6 +609,7 @@ void PipelineDumper::DumpComputeStateInfo(
     // Output pipeline states
     dumpFile << "deviceIndex = " << pPipelineInfo->deviceIndex << "\n";
     dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
+    dumpFile << "autoLayoutDesc = " << pPipelineInfo->options.autoLayoutDesc << "\n";
 }
 
 // =====================================================================================================================
@@ -654,6 +655,7 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "depthBiasEnable = " << pPipelineInfo->rsState.depthBiasEnable << "\n";
 
     dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
+    dumpFile << "autoLayoutDesc = " << pPipelineInfo->options.autoLayoutDesc << "\n";
 
     dumpFile << "alphaToCoverageEnable = " << pPipelineInfo->cbState.alphaToCoverageEnable << "\n";
     dumpFile << "dualSourceBlendEnable = " << pPipelineInfo->cbState.dualSourceBlendEnable << "\n";
@@ -816,6 +818,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     }
 
     hasher.Update(pPipeline->options.includeDisassembly);
+    hasher.Update(pPipeline->options.autoLayoutDesc);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -835,6 +838,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
     hasher.Update(pPipeline->options.includeDisassembly);
+    hasher.Update(pPipeline->options.autoLayoutDesc);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);

@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-access-chain"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -69,8 +68,6 @@ bool SpirvLowerAccessChain::runOnModule(
 
     // Invoke handling of "getelementptr" instruction
     visit(m_pModule);
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

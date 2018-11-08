@@ -30,8 +30,6 @@
 */
 #define DEBUG_TYPE "llpc-patch-group-op"
 
-#include "llvm/IR/Verifier.h"
-
 #include <vector>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
@@ -76,7 +74,6 @@ bool PatchGroupOp::runOnModule(
         pGroupCall->eraseFromParent();
     }
 
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
     return true;
 }
 

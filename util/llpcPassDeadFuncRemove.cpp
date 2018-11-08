@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-pass-dead-func-remove"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -93,8 +92,6 @@ bool PassDeadFuncRemove::runOnModule(
 
         ++iterCount;
     } while (changed && (iterCount < MaxIterCountOfDetection));
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-descriptor-load"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -97,8 +96,6 @@ bool PatchDescriptorLoad::runOnModule(
             pFunc->eraseFromParent();
         }
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

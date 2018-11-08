@@ -32,7 +32,6 @@
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -73,8 +72,6 @@ bool PatchPeepholeOpt::runOnFunction(
         // Lastly delete any instructions we replaced.
         pInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(*(function.getParent()));
 
     return changed;
 }

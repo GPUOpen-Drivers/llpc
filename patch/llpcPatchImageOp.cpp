@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-image-op"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -85,8 +84,6 @@ bool PatchImageOp::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

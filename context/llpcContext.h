@@ -249,6 +249,12 @@ public:
         return &m_glslEmuLib;
     }
 
+    // Gets whether auto layout of descriptors is required (caller is amdllpc not with a whole pipeline).
+    bool NeedAutoLayoutDesc() const
+    {
+        return GetPipelineContext()->GetPipelineOptions()->autoLayoutDesc;
+    }
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);

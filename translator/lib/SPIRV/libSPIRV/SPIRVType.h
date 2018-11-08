@@ -332,13 +332,13 @@ public:
   SPIRVType *getColumnType() const { return ColumnType;}
   SPIRVWord getColumnCount() const { return ColumnCount;}
   bool isValidIndex(SPIRVWord Index) const { return Index < ColumnCount;}
-  SPIRVCapVec getRequiredCapability() const {
+  SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec V(getColumnType()->getRequiredCapability());
     V.push_back(CapabilityMatrix);
-    return std::move(V);
+    return V;
   }
 
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     return std::vector<SPIRVEntry*>(1, ColumnType);
   }
 
@@ -393,10 +393,10 @@ public:
       : SPIRVType(OpTypeRuntimeArray), ElemType(nullptr) {}
 
   SPIRVType *getElementType() const { return ElemType;}
-  SPIRVCapVec getRequiredCapability() const {
-    return std::move(getElementType()->getRequiredCapability());
+  SPIRVCapVec getRequiredCapability() const override {
+    return getElementType()->getRequiredCapability();
   }
-  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const {
+  virtual std::vector<SPIRVEntry*> getNonLiteralOperands() const override {
     std::vector<SPIRVEntry*> Operands(1, ElemType);
     return Operands;
   }

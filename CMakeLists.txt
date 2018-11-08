@@ -75,17 +75,11 @@ if(UNIX)
             -Wno-error=unused-variable
             -Wno-missing-braces
             -Wno-error=unused-function
-            -Wno-error=parentheses-equality
         )
         target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++11
             -fno-rtti
             -fPIC
-            -Wno-error=pessimizing-move
-            -Wno-error=inconsistent-missing-override
-            -Wno-error=unused-private-field
-            -Wno-error=dynamic-class-memaccess
-            -Wno-error=unused-result
         >)
         #message(STATUS "Configured compiler options for Clang.")
         message(WARNING "Clang is untested.")
@@ -294,6 +288,7 @@ target_sources(llpc PRIVATE
     util/llpcPassDeadFuncRemove.cpp
     util/llpcPassExternalLibLink.cpp
     util/llpcPassLoopInfoCollect.cpp
+    util/llpcPassManager.cpp
     util/llpcPipelineDumper.cpp
     util/llpcUtil.cpp
 )
@@ -351,6 +346,15 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
 )
 
+set(GEN_GLSL_EMU_LIB_OUTPUTS
+    ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslCopyShaderEmuLib.h
+    ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslEmuLib.h
+    ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslNullFsEmuLib.h
+    ${OP_EMU_LIB_GEN_DIR}/gfx8/g_llpcGlslEmuLibGfx8.h
+    ${OP_EMU_LIB_GEN_DIR}/gfx9/g_llpcGlslEmuLibGfx9.h
+    ${OP_EMU_LIB_GEN_DIR}/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h
+)
+
 if(UNIX)
     set(LLVM_BIN_DIR ${XGL_LLVM_BUILD_PATH}/bin/)
 elseif(WIN32)
@@ -359,12 +363,17 @@ endif()
 
 add_custom_target(
     RunHeapGlslOpEmuLibGenerator
-    COMMAND ${PYTHON_CMD} ${GEN_GLSL_OP_EMU_LIB_SCRIPT} ${LLVM_BIN_DIR}  ${LLVM_BIN_DIR}  ${BUILD_OS}
-    DEPENDS ${GEN_OP_EMU_LIB_FILES}
-    COMMENT "Checking if re-generation is required for g_llpcGlslOpEmuLib.h"
+    DEPENDS ${GEN_GLSL_EMU_LIB_OUTPUTS}
 )
 
-add_dependencies(RunHeapGlslOpEmuLibGenerator llvm-ar llvm-link llvm-as)
+add_custom_command(
+    OUTPUT ${GEN_GLSL_EMU_LIB_OUTPUTS}
+    COMMAND ${PYTHON_CMD} ${GEN_GLSL_OP_EMU_LIB_SCRIPT} ${LLVM_BIN_DIR}  ${LLVM_BIN_DIR}  ${BUILD_OS}
+    COMMENT "Re-generating GLSL emulation library"
+    DEPENDS ${GEN_GLSL_EMU_LIB_DEPS}
+    DEPENDS llvm-ar llvm-link llvm-as
+)
+
 add_dependencies(llpc RunHeapGlslOpEmuLibGenerator)
 
 ### Link Libraries #####################################################################################################
@@ -374,6 +383,56 @@ add_dependencies(llpc RunHeapGlslOpEmuLibGenerator)
 
 ### Visual Studio Filters ##############################################################################################
 target_vs_filters(llpc)
+
+### VFX library for Standalone Compiler ###################################################################################
+add_library(vfx STATIC "")
+
+target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
+
+target_sources(vfx PRIVATE
+    tool/vfx/vfxParser.cpp
+    tool/vfx/vfxPipelineDoc.cpp
+    tool/vfx/vfxRenderDoc.cpp
+    tool/vfx/vfxSection.cpp
+    tool/vfx/vfxEnumsConverter.cpp
+)
+
+target_include_directories(vfx
+PUBLIC
+    ${PROJECT_SOURCE_DIR}/tool/vfx
+PRIVATE
+    ${PROJECT_SOURCE_DIR}/imported/spirv
+    ${PROJECT_SOURCE_DIR}/include
+    ${XGL_ICD_PATH}/api/include/khronos
+)
+
+if(UNIX)
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        target_compile_options(vfx PRIVATE -fno-strict-aliasing)
+        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++0x -fno-rtti>)
+
+        target_compile_options(vfx PRIVATE -Wno-unused-parameter -Wno-shift-negative-value -Wno-type-limits -Wno-error=switch -Wno-error=sign-compare -Wno-error=parentheses -Wno-error=maybe-uninitialized -Wno-error=delete-non-virtual-dtor -Wno-sign-compare -Wno-error)
+        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
+
+        message(STATUS "Configured ${PROJECT_NAME} compiler options for GCC.")
+    elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        target_compile_options(vfx PRIVATE
+            -fvisibility-inlines-hidden
+            -fcolor-diagnostics
+            -Wall
+            -Werror
+            -Wno-error=unused-variable
+        )
+        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -std=c++11
+            -fno-rtti
+        >)
+        #message(STATUS "Configured compiler options for Clang.")
+        message(WARNING "Clang is untested.")
+    else()
+        message(FATAL_ERROR "Using unknown compiler.")
+    endif()
+endif()
 
 ### Create Standalone Compiler ############################################################################################
 add_executable(amdllpc tool/amdllpc.cpp)
@@ -436,9 +495,9 @@ if(UNIX)
 endif()
 
 if(UNIX)
-    target_link_libraries(amdllpc PRIVATE llpc dl stdc++)
+    target_link_libraries(amdllpc PRIVATE llpc vfx dl stdc++)
 elseif(WIN32)
-    target_link_libraries(amdllpc PRIVATE llpc)
+    target_link_libraries(amdllpc PRIVATE llpc vfx)
 endif()
     llvm_map_components_to_libnames(llvm_libs amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})

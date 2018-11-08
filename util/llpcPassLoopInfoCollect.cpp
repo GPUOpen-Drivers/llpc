@@ -31,8 +31,6 @@
 
 #define DEBUG_TYPE "llpc-pass-loop-info-collect"
 
-#include "llvm/IR/Verifier.h"
-
 #include "llpcDebug.h"
 #include "llpcPassLoopInfoCollect.h"
 
@@ -101,8 +99,6 @@ bool PassLoopInfoCollect::runOnModule(
             HandleLoop(*loopIt, 0);
         }
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return false;
 }

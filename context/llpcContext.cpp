@@ -37,7 +37,6 @@
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
@@ -171,7 +170,7 @@ std::unique_ptr<Module> Context::LoadLibary(
         }
     }
 
-    return std::move(pLibModule);
+    return pLibModule;
 }
 
 // =====================================================================================================================

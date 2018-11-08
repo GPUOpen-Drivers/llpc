@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-control"
 
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 
 #include <vector>
@@ -117,8 +116,6 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
             changed = true;
         }
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return changed;
 }

@@ -197,13 +197,6 @@ static Result Init(
 {
     Result result = Result::Success;
 
-#ifndef LLPC_ENABLE_SPIRV_OPT
-    if (InitSpvGen() == false)
-    {
-        printf("Fail to load spvgen.dll and do initialization, can only compile SPIR-V binary\n");
-    }
-#endif
-
     if (result == Result::Success)
     {
         // NOTE: For testing consistency, these options should be kept the same as those of Vulkan
@@ -343,6 +336,11 @@ static Result Init(
 static Result InitCompileInfo(
     CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
 {
+
+    // Assume not compiling whole pipeline.
+    pCompileInfo->gfxPipelineInfo.options.autoLayoutDesc = true;
+    pCompileInfo->compPipelineInfo.options.autoLayoutDesc = true;
+
     return Result::Success;
 }
 
@@ -369,7 +367,7 @@ static void CleanupCompileInfo(
 
     if (pCompileInfo->pPipelineInfoFile)
     {
-        vfxCloseDoc(pCompileInfo->pPipelineInfoFile);
+        Vfx::vfxCloseDoc(pCompileInfo->pPipelineInfoFile);
     }
 
     memset(pCompileInfo, 0, sizeof(*pCompileInfo));
@@ -594,6 +592,12 @@ static Result CompileGlsl(
     ShaderStage*       pStage,      // [out] Shader stage
     std::string&       outFile)     // [out] Output file, SPIR-V binary
 {
+    if (InitSpvGen() == false)
+    {
+        LLPC_ERRS("Failed to load SPVGEN -- cannot compile GLSL\n");
+        return Result::ErrorUnavailable;
+    }
+
     Result result = Result::Success;
 
     EShLanguage lang = GetGlslSourceLang(inFile);
@@ -688,6 +692,12 @@ static Result AssembleSpirv(
     const std::string& inFile,  // [in] Input file, SPIR-V assembly text
     std::string&       outFile) // [out] Output file, SPIR-V binary
 {
+    if (InitSpvGen() == false)
+    {
+        LLPC_ERRS("Failed to load SPVGEN -- cannot assemble SPIR-V assembler source\n");
+        return Result::ErrorUnavailable;
+    }
+
     Result result = Result::Success;
 
     FILE* pInFile = fopen(inFile.c_str(), "r");
@@ -1038,23 +1048,37 @@ static Result ProcessPipeline(
             {
                 result = GetSpirvBinaryFromFile(spvBinFile, &spvBin);
 
-                // Disassemble SPIR-V code
-                uint32_t textSize = spvBin.codeSize * 10 + 1024;
-                char* pSpvText = new char[textSize];
-                LLPC_ASSERT(pSpvText != nullptr);
-                memset(pSpvText, 0, textSize);
+                if (result == Result::Success)
+                {
+                    if (InitSpvGen() == false)
+                    {
+                        LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
+                    }
+                    else
+                    {
+                        // Disassemble SPIR-V code
+                        uint32_t textSize = spvBin.codeSize * 10 + 1024;
+                        char* pSpvText = new char[textSize];
+                        LLPC_ASSERT(pSpvText != nullptr);
+                        memset(pSpvText, 0, textSize);
 
-                LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
-                spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, pSpvText);
-                LLPC_OUTS(pSpvText << "\n");
+                        LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
+                        spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, pSpvText);
+                        LLPC_OUTS(pSpvText << "\n");
 
-                delete[] pSpvText;
+                        delete[] pSpvText;
+                    }
+                }
             }
 
             if ((result == Result::Success) && Validate)
             {
                 char log[1024] = {};
-                if (spvValidateSpirv != nullptr)
+                if (InitSpvGen() == false)
+                {
+                    errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
+                }
+                else
                 {
                     if (spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log) == false)
                     {
@@ -1089,16 +1113,16 @@ static Result ProcessPipeline(
         else if (IsPipelineInfoFile(inFile))
         {
             const char* pLog = nullptr;
-            bool vfxResult = vfxParseFile(inFile.c_str(),
-                                          0,
-                                          nullptr,
-                                          VfxDocTypePipeline,
-                                          &compileInfo.pPipelineInfoFile,
-                                          &pLog);
+            bool vfxResult = Vfx::vfxParseFile(inFile.c_str(),
+                                               0,
+                                               nullptr,
+                                               VfxDocTypePipeline,
+                                               &compileInfo.pPipelineInfoFile,
+                                               &pLog);
             if (vfxResult)
             {
                 VfxPipelineStatePtr pPipelineState = nullptr;
-                vfxGetPipelineDoc(compileInfo.pPipelineInfoFile, &pPipelineState);
+                Vfx::vfxGetPipelineDoc(compileInfo.pPipelineInfoFile, &pPipelineState);
 
                 if (pPipelineState->version != Llpc::Version)
                 {
@@ -1129,6 +1153,11 @@ static Result ProcessPipeline(
                         }
                     }
 
+                    if (EnableOuts() && (InitSpvGen() == false))
+                    {
+                        LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
+                    }
+
                     for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
                     {
                         if (pPipelineState->stages[stage].dataSize > 0)
@@ -1137,16 +1166,19 @@ static Result ProcessPipeline(
                             compileInfo.spirvBin[stage].pCode = pPipelineState->stages[stage].pData;
                             compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
 
-                            uint32_t binSize =  pPipelineState->stages[stage].dataSize;
-                            uint32_t textSize = binSize * 10 + 1024;
-                            char* pSpvText = new char[textSize];
-                            LLPC_ASSERT(pSpvText != nullptr);
-                            memset(pSpvText, 0, textSize);
-                            LLPC_OUTS("\nSPIR-V disassembly for " <<
-                                      GetShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
-                            spvDisassembleSpirv(binSize, compileInfo.spirvBin[stage].pCode, textSize, pSpvText);
-                            LLPC_OUTS(pSpvText << "\n");
-                            delete[] pSpvText;
+                            if (spvDisassembleSpirv != nullptr)
+                            {
+                                uint32_t binSize =  pPipelineState->stages[stage].dataSize;
+                                uint32_t textSize = binSize * 10 + 1024;
+                                char* pSpvText = new char[textSize];
+                                LLPC_ASSERT(pSpvText != nullptr);
+                                memset(pSpvText, 0, textSize);
+                                LLPC_OUTS("\nSPIR-V disassembly for " <<
+                                          GetShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
+                                spvDisassembleSpirv(binSize, compileInfo.spirvBin[stage].pCode, textSize, pSpvText);
+                                LLPC_OUTS(pSpvText << "\n");
+                                delete[] pSpvText;
+                            }
                         }
                     }
                 }

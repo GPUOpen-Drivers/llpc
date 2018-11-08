@@ -35,7 +35,6 @@
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -152,8 +151,6 @@ bool PatchLoopUnrollInfoRectify::runOnFunction(
         modified = true;
     }
 
-    LLPC_VERIFY_MODULE_FOR_PASS(*(function.getParent()));
-
     return modified;
 }
 
@@ -198,7 +195,7 @@ uint32_t GetLoopUnrollTripCount(
             // The backedge count is the number of times the loop branches back to the loop header, which is one less
             // than the actual trip count of the loop - so we thus have to increment it by 1 to set the correct loop
             // unroll amount.
-            backedgeCount++;
+            ++backedgeCount;
 
             const uint64_t tripCount = backedgeCount.getLimitedValue(UINT32_MAX);
 

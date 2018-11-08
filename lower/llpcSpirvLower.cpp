@@ -30,7 +30,6 @@
  */
 
 #include "llvm/Analysis/CFGPrinter.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
@@ -50,6 +49,7 @@
 #include "llpcContext.h"
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPassExternalLibLink.h"
+#include "llpcPassManager.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerAggregateLoadStore.h"
@@ -105,7 +105,7 @@ Result SpirvLower::Run(
         DumpCfg("Original", pModule);
     }
 
-    legacy::PassManager passMgr;
+    PassManager passMgr;
 
     // Control loop unrolling
     passMgr.add(SpirvLowerLoopUnrollControl::Create(forceLoopUnrollCount));

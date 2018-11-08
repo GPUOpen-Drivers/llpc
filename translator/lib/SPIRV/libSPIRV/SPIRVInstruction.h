@@ -505,7 +505,7 @@ public:
 
 protected:
   _SPIRV_DEF_ENCDEC5(Type, Id, Image, Coordinate, Sample)
-  void validate()const {
+  void validate()const override {
     SPIRVInstruction::validate();
     assert(Type->isTypePointer() &&
            Type->getPointerStorageClass() == StorageClassImage &&
@@ -540,7 +540,7 @@ public:
 protected:
   _SPIRV_DEF_ENCDEC3(Type, Id, ResidentCode)
 
-  void validate()const {
+  void validate()const override {
     assert(Type->isTypeBool() && Type->isTypeScalar());
 
     auto ResidentCodeTy = getValueType(ResidentCode);
@@ -574,7 +574,7 @@ public:
   SPIRVValue *getSrc() const { return getValue(ValId); }
   SPIRVValue *getDst() const { return getValue(PtrId); }
 
-  std::vector<SPIRVValue *> getOperands() {
+  std::vector<SPIRVValue *> getOperands() override {
     std::vector<SPIRVValue *> Operands;
     Operands.push_back(getValue(ValId));
     Operands.push_back(getValue(PtrId));
@@ -774,7 +774,7 @@ public:
   // Incomplete constructor
   SPIRVInstNoOperand() : SPIRVInstruction(TheOpCode) { setAttr(); }
 
-  std::vector<SPIRVValue *> getOperands() {
+  std::vector<SPIRVValue *> getOperands() override {
     std::vector<SPIRVValue *> NoOperand;
     return NoOperand;
   }
@@ -1134,7 +1134,7 @@ public:
   std::vector<SPIRVWord>& getLoopControlParameters() {
     return LoopControlParameters;
   }
-  void setWordCount(SPIRVWord TheWordCount) {
+  void setWordCount(SPIRVWord TheWordCount) override {
     SPIRVEntry::setWordCount(TheWordCount);
     LoopControlParameters.resize(TheWordCount - FixedWordCount);
   }
@@ -2043,7 +2043,7 @@ public:
 
   SPIRVValue *getStruct() { return getValue(Struct); }
   SPIRVWord getMemberIndex() const { return MemberIndex; }
-  std::vector<SPIRVValue *> getOperands() {
+  std::vector<SPIRVValue *> getOperands() override {
     std::vector<SPIRVId> Operands;
     Operands.push_back(Struct);
     Operands.push_back(MemberIndex);

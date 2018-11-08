@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-entry-point-mutate"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -767,8 +766,6 @@ bool PatchEntryPointMutate::runOnModule(
     const char* pEntryName = Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(entryStage)];
     pEntryPoint->setName(pEntryName);
     pEntryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

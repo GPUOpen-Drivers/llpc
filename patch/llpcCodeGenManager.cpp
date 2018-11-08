@@ -34,7 +34,6 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -50,6 +49,7 @@
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcInternal.h"
+#include "llpcPassManager.h"
 
 namespace llvm
 {
@@ -227,7 +227,7 @@ Result CodeGenManager::GenerateCode(
     auto pTargetMachine = pContext->GetTargetMachine();
 
     pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
-    legacy::PassManager passMgr;
+    Llpc::PassManager passMgr;
     if (result == Result::Success)
     {
         bool success = true;

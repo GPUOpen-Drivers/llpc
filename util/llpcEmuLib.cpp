@@ -64,7 +64,7 @@ static opt<bool> DisableLlvmPatch("disable-llvm-patch",
 void EmuLib::AddArchive(
     MemoryBufferRef buffer) // Buffer required to create the archive
 {
-    m_archives.push_back(EmuLibArchive(std::move(cantFail(Archive::create(buffer), "Failed to parse archive"))));
+    m_archives.push_back(EmuLibArchive(cantFail(Archive::create(buffer), "Failed to parse archive")));
 }
 
 // =====================================================================================================================

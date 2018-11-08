@@ -33,7 +33,6 @@
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
@@ -47,6 +46,7 @@
 #include "llpcInternal.h"
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPassExternalLibLink.h"
+#include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPatchAddrSpaceMutate.h"
 #include "llpcPatchBufferOp.h"
@@ -70,8 +70,10 @@ namespace cl
 {
 
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
-opt<bool> AutoLayoutDesc("auto-layout-desc",
-                         desc("Automatically create descriptor layout based on resource usages"));
+//
+// NOTE: This option is deprecated and will be ignored, and is present only for compatibility.
+static opt<bool> AutoLayoutDesc("auto-layout-desc",
+                                desc("Automatically create descriptor layout based on resource usages"));
 
 // -disable-patch-opt: disable optimization for LLVM patching
 opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
@@ -93,7 +95,7 @@ Result Patch::PreRun(
     auto pContext = static_cast<Context*>(&pModule->getContext());
     ShaderStage shaderStage = GetShaderStageFromModule(pModule);
 
-    if (cl::AutoLayoutDesc)
+    if (pContext->NeedAutoLayoutDesc())
     {
         // Automatically layout descriptor
         pContext->AutoLayoutDescriptor(shaderStage);
@@ -102,7 +104,7 @@ Result Patch::PreRun(
     // Do patching opertions
     if (result == Result::Success)
     {
-        legacy::PassManager passMgr;
+        PassManager passMgr;
 
         // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
         passMgr.add(PatchResourceCollect::Create());
@@ -124,7 +126,7 @@ Result Patch::Run(
     Result result = Result::Success;
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     // Do patching opertions
-    legacy::PassManager passMgr;
+    PassManager passMgr;
 
     // Lower SPIRAS address spaces to AMDGPU address spaces
     passMgr.add(PatchAddrSpaceMutate::Create());

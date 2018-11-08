@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-patch-opt"
 
 #include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -41,6 +40,7 @@
 
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcPassManager.h"
 #include "llpcPatchOpt.h"
 #include "llpcPatchLoopUnrollInfoRectify.h"
 #include "llpcPatchPeepholeOpt.h"
@@ -82,7 +82,7 @@ bool PatchOpt::runOnModule(
     // Set up standard optimization passes.
     // NOTE: Doing this here is temporary; really the whole of LLPC should be using the
     // PassManagerBuilder mechanism, adding its own passes at the provided hook points.
-    legacy::PassManager passMgr;
+    PassManager passMgr;
     PassManagerBuilder passBuilder;
     passBuilder.OptLevel = 3; // -O3
     passBuilder.DisableGVNLoadPRE = true;

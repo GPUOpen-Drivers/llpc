@@ -45,6 +45,7 @@ static const uint32_t  Version = 14;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
+static const uint32_t  InternalDescriptorSetId = static_cast<uint32_t>(-1);
 
 // Forward declarations
 class IShaderCache;
@@ -195,6 +196,8 @@ struct PipelineOptions
 {
     bool includeDisassembly;  ///< If set, the disassembly for all compiled shaders will be included in
                               ///  the pipeline ELF.
+    bool autoLayoutDesc;      ///< If set, the LLPC standalone compiler is compiling individual shader(s)
+                              ///  without pipeline info, so LLPC needs to do auto descriptor layout.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to

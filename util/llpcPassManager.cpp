@@ -24,54 +24,43 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopInfoCollect.h
- * @brief LLPC header file: contains declaration of class Llpc::PassLoopInfoCollect.
+ * @file  llpcPassManager.cpp
+ * @brief LLPC source file: legacy::PassManager override
  ***********************************************************************************************************************
  */
-#pragma once
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/CommandLine.h"
 
-#include "llvm/Analysis/LoopPass.h"
-#include "llpc.h"
+#include "llpcPassManager.h"
 
-namespace Llpc
+namespace llvm
+{
+namespace cl
 {
 
-// Represents the info of loop analysis
-struct LoopAnalysisInfo
-{
-    uint32_t numAluInsts;               // Number of ALU instructions
-    uint32_t numBasicBlocks;            // Number of basic blocks
-    uint32_t nestedLevel;               // Nested loop level
-};
+// -verify-ir : verify the IR after each pass
+static cl::opt<bool> VerifyIr("verify-ir",
+                              cl::desc("Verify IR after each pass"),
+                              cl::init(false));
+
+} // cl
+
+} // llvm
+
+using namespace llvm;
+using namespace Llpc;
 
 // =====================================================================================================================
-// Represents the LLVM pass for loop info collecting.
-class PassLoopInfoCollect : public llvm::ModulePass
+// Add a pass to the pass manager.
+void Llpc::PassManager::add(
+    Pass* pPass)    // [in] Pass to add to the pass manager
 {
-public:
-    PassLoopInfoCollect() : ModulePass(ID) {};
-    PassLoopInfoCollect(std::vector<LoopAnalysisInfo>* pInfo) : ModulePass(ID)
-    {
-        m_pLoopInfo = pInfo;
-    };
+    // Add the pass to the superclass pass manager.
+    legacy::PassManager::add(pPass);
 
-    void HandleLoop(llvm::Loop* loop, uint32_t nestedLevel);
-
-    // Gets loop analysis usage
-    virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override
+    if (cl::VerifyIr)
     {
-        analysisUsage.addRequired<llvm::LoopInfoWrapperPass>();
-        analysisUsage.setPreservesAll();
+        // Add a verify pass after it.
+        legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
     }
-
-    virtual bool runOnModule(llvm::Module& module) override;
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
-
-private:
-    std::vector<LoopAnalysisInfo>*  m_pLoopInfo;
-};
-
-} // Llpc
+}
