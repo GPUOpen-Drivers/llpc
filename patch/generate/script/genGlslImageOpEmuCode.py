@@ -2665,7 +2665,7 @@ def processList(outDir, listIn, gfxLevel):
         isComment = line.startswith('#')
         isEmpty = len(line.strip()) == 0
         if not isComment and not isEmpty:
-            outFile = outDir + "/g_" + line.replace("|", "_") + ".ll"
+            outFile = os.path.join(outDir, "g_" + line.replace("|", "_") + ".ll")
             irOut = open(outFile, 'wt')
 
             initLlvmDecls(gfxLevel)
@@ -2727,6 +2727,9 @@ def initLlvmDecls(gfxLevel):
                     "declare <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32>, <4 x float>) #0\n")
 
 def main(inFile, outDir, gfxLevelStr):
+    if not os.path.exists(outDir):
+        os.makedirs(outDir)
+
     gfxLevel = float(gfxLevelStr[3:])
 
     processList(outDir, inFile, gfxLevel)
