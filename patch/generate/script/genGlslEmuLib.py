@@ -77,17 +77,17 @@ if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
 for f in os.listdir(OUTPUT_DIR):
-    fpath = os.path.join(OUTPUT_DIR, f)
+    fPath = os.path.join(OUTPUT_DIR, f)
     if f.startswith("g_") or  f.endswith(".bc") or f.endswith(".lib"): # Common library
-        print(">>>  (LL-clean) remove " + fpath)
-        os.remove(fpath)
-    elif os.path.isdir(fpath) and f.startswith("gfx"): # GFX library
+        print(">>>  (LL-clean) remove " + fPath)
+        os.remove(fPath)
+    elif os.path.isdir(fPath) and f.startswith("gfx"): # GFX library
         gfx = f
-        for subf in os.listdir(fpath):
-            subfpath = os.path.join(fpath, subf)
+        for subf in os.listdir(fPath):
+            subfPath = os.path.join(fPath, subf)
             if subf.startswith("g_") or  subf.endswith(".bc") or subf.endswith(".lib"):
-                print(">>>  (LL-clean) remove " + subfpath)
-                os.remove(subfpath)
+                print(">>>  (LL-clean) remove " + subfPath)
+                os.remove(subfPath)
 
 print("")
 
@@ -135,16 +135,16 @@ print("                   Generate LLVM Emulation Library (Common)              
 print("*******************************************************************************")
 
 # Assemble .ll files to .bc files
-for ll_dir in SRC_DIRS:
-  for f in os.listdir(ll_dir):
+for srcDir in SRC_DIRS:
+  for f in os.listdir(srcDir):
       if f.endswith(".ll"):
-        outf = f.replace(".ll", ".bc")
-        cmd = LLVM_AS + " " + f + " -o " + os.path.join(OUTPUT_DIR, outf)
+        outF = f.replace(".ll", ".bc")
+        cmd = LLVM_AS + " " + f + " -o " + os.path.join(OUTPUT_DIR, outF)
         print(">>>  (LL-as) " + cmd)
         if OS_TYPE == "win":
-          subprocess.check_call(cmd, cwd = ll_dir)
+          subprocess.check_call(cmd, cwd = srcDir)
         else:
-          subprocess.check_call(cmd, cwd = ll_dir, shell=True)
+          subprocess.check_call(cmd, cwd = srcDir, shell=True)
 
 # Link special emulation .bc files to libraries (null fragment shader, copy shader)
 SPECIAL_EMUS = ["NullFs", "CopyShader"]
@@ -219,31 +219,31 @@ for gfx in GFX_EMUS:
     print("                    Generate LLVM Emulation Library (%s)                     "%(gfx.upper()))
     print("*******************************************************************************")
 
-    outdir = os.path.join(OUTPUT_DIR, gfx)
-    if not os.path.exists(outdir):
-      os.makedirs(outdir)
+    outDir = os.path.join(OUTPUT_DIR, gfx)
+    if not os.path.exists(outDir):
+      os.makedirs(outDir)
 
     # Assemble .ll files to .bc files
-    for src_dir in SRC_DIRS:
-      gfx_subdir = os.path.join(src_dir, gfx)
-      for f in os.listdir(gfx_subdir):
+    for srcDir in SRC_DIRS:
+      gfxSubdir = os.path.join(srcDir, gfx)
+      for f in os.listdir(gfxSubdir):
           if f.endswith(".ll"):
-              outf = f.replace(".ll", ".bc")
-              cmd = LLVM_AS + " " + os.path.join(gfx, f) + " -o " + os.path.join(outdir, outf)
+              outF = f.replace(".ll", ".bc")
+              cmd = LLVM_AS + " " + os.path.join(gfx, f) + " -o " + os.path.join(outDir, outF)
               print(">>>  (LL-as) " + cmd)
               if OS_TYPE == "win" :
-                  subprocess.check_call(cmd, cwd = src_dir)
+                  subprocess.check_call(cmd, cwd = srcDir)
               else :
-                  subprocess.check_call(cmd, cwd = src_dir, shell = True)
+                  subprocess.check_call(cmd, cwd = srcDir, shell = True)
 
     # Search for the .bc file
     bcFiles = ""
-    for f in os.listdir(outdir):
+    for f in os.listdir(outDir):
         if f.endswith(".bc"):
-            bcFiles += os.path.join(outdir, f) + " "
+            bcFiles += os.path.join(outDir, f) + " "
 
     # Add .bc files to archive .lib file
-    libFile = os.path.join(outdir, "glslEmu" + gfx.capitalize() + ".lib")
+    libFile = os.path.join(outDir, "glslEmu" + gfx.capitalize() + ".lib")
     cmd = LLVM_AR + " r " + libFile + " " + bcFiles
     print(">>>  (LL-ar) " + cmd)
     if OS_TYPE == "win" :
@@ -252,7 +252,7 @@ for gfx in GFX_EMUS:
         subprocess.check_call(cmd, shell = True)
 
     # Convert .lib file to a hex file
-    hFile = os.path.join(outdir, "g_llpcGlslEmuLib" + gfx.capitalize() + ".h")
+    hFile = os.path.join(outDir, "g_llpcGlslEmuLib" + gfx.capitalize() + ".h")
     bin2hex(libFile, hFile)
 
     # Cleanup, remove those temporary files
@@ -277,15 +277,15 @@ for wa in WA_EMUS:
     print("*******************************************************************************")
 
     workDir = os.path.join(WA_ROOT, wa)
-    outdir = os.path.join(OUTPUT_DIR, WA_ROOT, wa)
-    if not os.path.exists(outdir):
-      os.makedirs(outdir)
+    outDir = os.path.join(OUTPUT_DIR, WA_ROOT, wa)
+    if not os.path.exists(outDir):
+      os.makedirs(outDir)
 
     # Assemble .ll files to .bc files
     for f in os.listdir(os.path.join(INPUT_DIR, workDir)):
         if f.endswith(".ll"):
-            outf = f.replace(".ll", ".bc")
-            cmd = LLVM_AS + " " + os.path.join(workDir, f) + " -o " + os.path.join(outdir, outf)
+            outF = f.replace(".ll", ".bc")
+            cmd = LLVM_AS + " " + os.path.join(workDir, f) + " -o " + os.path.join(outDir, outF)
             print(">>>  (LL-as) " + cmd)
             if OS_TYPE == "win" :
                 subprocess.check_call(cmd, cwd = INPUT_DIR)
@@ -294,12 +294,12 @@ for wa in WA_EMUS:
 
     # Search for the .bc file
     bcFiles = ""
-    for f in os.listdir(outdir):
+    for f in os.listdir(outDir):
         if f.endswith(".bc"):
-            bcFiles += os.path.join(outdir, f)
+            bcFiles += os.path.join(outDir, f)
 
     # Add .bc files to archive .lib file
-    libFile = os.path.join(outdir, "glslEmu" + wa.capitalize() + ".lib")
+    libFile = os.path.join(outDir, "glslEmu" + wa.capitalize() + ".lib")
     cmd = LLVM_AR + " r " + libFile + " " + bcFiles
     print(">>>  (LL-ar) " + cmd)
     if OS_TYPE == "win" :
