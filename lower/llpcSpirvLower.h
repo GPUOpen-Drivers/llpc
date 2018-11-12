@@ -50,7 +50,7 @@ void initializeSpirvLowerGlobalPass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
-void initializeSpirvLowerOptPass(PassRegistry&);
+void initializeSpirvLowerPushConstPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
 
 } // llvm

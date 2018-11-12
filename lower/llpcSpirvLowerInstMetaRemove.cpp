@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-inst-meta-remove"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -70,8 +69,6 @@ bool SpirvLowerInstMetaRemove::runOnModule(
 
     visit(m_pModule);
 
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
-
     return m_changed;
 }
 
@@ -101,5 +98,5 @@ void SpirvLowerInstMetaRemove::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for removing instruction metadata.
-INITIALIZE_PASS(SpirvLowerInstMetaRemove, "spirv-lower-inst-meta-remove",
+INITIALIZE_PASS(SpirvLowerInstMetaRemove, "Spirv-lower-inst-meta-remove",
                 "Lower SPIR-V instruction metadata by removing those targeted", false, false)

@@ -30,8 +30,6 @@
 */
 #define DEBUG_TYPE "llpc-patch-group-op"
 
-#include "llvm/IR/Verifier.h"
-
 #include <vector>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
@@ -76,7 +74,6 @@ bool PatchGroupOp::runOnModule(
         pGroupCall->eraseFromParent();
     }
 
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
     return true;
 }
 
@@ -124,5 +121,5 @@ void PatchGroupOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM path operations for group operations.
-INITIALIZE_PASS(PatchGroupOp, "patch-group-op", "Patch LLVM for group operationss", false, false)
+INITIALIZE_PASS(PatchGroupOp, "Patch-group-op", "Patch LLVM for group operations", false, false)
 

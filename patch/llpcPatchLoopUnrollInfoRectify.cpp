@@ -24,22 +24,21 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopUnrollInfoRectify.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PassLoopUnrollInfoRectify.
+ * @file  llpcPatchLoopUnrollInfoRectify.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::PatchLoopUnrollInfoRectify.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-pass-loop-unroll-info-rectify"
+#define DEBUG_TYPE "llpc-patch-loop-unroll-info-rectify"
 
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcPassLoopUnrollInfoRectify.h"
+#include "llpcPatchLoopUnrollInfoRectify.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -56,22 +55,32 @@ namespace Llpc
 
 // =====================================================================================================================
 // Define static members (no initializer needed as LLVM only cares about the address of ID, never its value).
-char PassLoopUnrollInfoRectify::ID;
+char PatchLoopUnrollInfoRectify::ID;
 
 // =====================================================================================================================
-PassLoopUnrollInfoRectify::PassLoopUnrollInfoRectify()
+PatchLoopUnrollInfoRectify::PatchLoopUnrollInfoRectify()
     :
     FunctionPass(ID)
 {
-    initializePassLoopUnrollInfoRectifyPass(*PassRegistry::getPassRegistry());
+    initializePatchLoopUnrollInfoRectifyPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
-bool PassLoopUnrollInfoRectify::runOnFunction(
+bool PatchLoopUnrollInfoRectify::runOnFunction(
     Function& function) // [in,out] Function that we will rectify any loop unroll information.
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Pass-Loop-Unroll-Info-Rectify\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Loop-Unroll-Info-Rectify\n");
+
+    // First check if any Whole Wave Mode (WWM) intrinsics are used in the function, and if so we do not do any extra
+    // detection on the loop unroll count.
+    for (const Function& otherFunction : function.getParent()->functions())
+    {
+        if (Intrinsic::amdgcn_wwm == otherFunction.getIntrinsicID())
+        {
+            return false;
+        }
+    }
 
     bool modified = false;
 
@@ -142,14 +151,12 @@ bool PassLoopUnrollInfoRectify::runOnFunction(
         modified = true;
     }
 
-    LLPC_VERIFY_MODULE_FOR_PASS(*(function.getParent()));
-
     return modified;
 }
 
 // =====================================================================================================================
 // Specify what analysis passes this pass depends on.
-void PassLoopUnrollInfoRectify::getAnalysisUsage(
+void PatchLoopUnrollInfoRectify::getAnalysisUsage(
     AnalysisUsage& analysisUsage // [in,out] The place to record our analysis pass usage requirements.
     ) const
 {
@@ -162,9 +169,9 @@ void PassLoopUnrollInfoRectify::getAnalysisUsage(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the LLVM pass for rectifying unroll information.
-INITIALIZE_PASS(PassLoopUnrollInfoRectify, "Pass-Loop-Unroll-Info-Rectify",
-    "LLVM pass for rectifying loop unroll information", false, false)
+// Initializes the pass of LLVM patching operations for rectifying unroll information.
+INITIALIZE_PASS(PatchLoopUnrollInfoRectify, "Patch-loop-unroll-info-rectify",
+    "Patch LLVM for loop unroll info rectifying", false, false)
 
 // =====================================================================================================================
 // Definitions for our static helper functions.
@@ -188,7 +195,7 @@ uint32_t GetLoopUnrollTripCount(
             // The backedge count is the number of times the loop branches back to the loop header, which is one less
             // than the actual trip count of the loop - so we thus have to increment it by 1 to set the correct loop
             // unroll amount.
-            backedgeCount++;
+            ++backedgeCount;
 
             const uint64_t tripCount = backedgeCount.getLimitedValue(UINT32_MAX);
 

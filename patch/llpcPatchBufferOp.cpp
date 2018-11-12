@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-buffer-op"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -75,8 +74,6 @@ bool PatchBufferOp::runOnModule(
         pCall->dropAllReferences();
         pCall->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

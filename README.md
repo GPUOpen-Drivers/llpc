@@ -34,17 +34,19 @@ amdllpc [<options>...] [<files>...]
 | ------------------------------   | ----------------------------------------------------------------- | ------------------------------|
 | `-help`                          | Print detail help, include all LLVM options                       |                               |
 | `-gfxip=<major.minor.step>`      | Graphics IP version                                               | 8.0.0                         |                                                                                                |
-| `-auto-layout-desc`              | Automatically create descriptor layout based on resource usages   |                               | 
-| `-o=<filename>`                  | Output ELF binary file	                                       |                               |  
+| `-o=<filename>`                  | Output ELF binary file                                            |                               |
 | `-entry-target=<entryname>`      | Name string of entry target in SPIRV                              | main                          |
 | `-val	`                          | Validate input SPIR-V binary or text	                       |                               |
+| `-verify-ir`                     | Verify LLVM IR after each pass                                    | false                         |
 
 * Dump options
 
 | Option Name                      | Description                                                       | Default Value                 |
 | ------------------------------   | ----------------------------------------------------------------- | ------------------------------|
 | `-enable-errs`                   | Enable error message output (to stdout or external file)	       |                               |
-| `-enable-outs`                   | Enable general message output (to stdout or external file)        |                               |
+| `-enable-outs`                   | Enable LLPC-specific debug dump output (to stdout or external     | false                         |
+|                                  | file)                                                             |                               |
+| `-v`                             | Alias for `-enable-outs`                                          | false                         |
 | `-enable-time-profiler`          | Enable time profiler for various compilation phases	       |                               | 
 | `-log-file-dbgs=<filename>`      | Name of the file to log info from dbgs()	llpcLog.txt            |                               |
 | `-log-file-outs=<filename>`      | Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()     |                               |           
@@ -100,7 +102,11 @@ amdllpc [<options>...] [<files>...]
 
 <file>.pipe     Pipeline info file
 ```
-> **Note:** To compile GLSL source text file and Pipeline info file, amdllpc needs to call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The path of spvgen library needs to be added to environment variable LD_LIBRARY_PATH.
+> **Note:** To compile a GLSL source text file or a SPIR-V text (assembly) file,
+or a Pipeline info file that contains or points to either of those, amdllpc needs to
+call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The directory of the spvgen library
+needs to be added to the environment variable LD_LIBRARY_PATH. Compiling SPIR-V binary
+or a Pipeline info file that contains or points to SPIR-V binary does not require spvgen.
 
 
 #### Examples
@@ -128,4 +134,5 @@ LLPC contains code written by third parties:
 * SPIRV-LLVM translator is distributed under the terms of University of Illinois/NCSA Open Source License. See translator/LICENSE.TXT.  
 * SPIRV-Tools is distributed under the terms of Apache License version 2.0. See translator/hex_float.h and bitutils.h.
 * Metrohash is distributed under the terms of MIT License. See imported/metrohash/metrohash-license.
+* CWPack is distributed under the terms of MITLicense. See imported/cwpack/cwpack-license.
 

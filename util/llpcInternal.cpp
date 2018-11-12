@@ -40,6 +40,10 @@
     #include <unistd.h>
 #endif
 
+#if __APPLE__ && __MACH__
+    #include <mach/mach_time.h>
+#endif
+
 #include "SPIRVInternal.h"
 #include "llpcAbiMetadata.h"
 #include "llpcContext.h"
@@ -351,7 +355,7 @@ uint32_t GetStageMaskFromSpirvBinary(
             }
 
             // All "OpEntryPoint" are before "OpFunction"
-            if ((opCode == OpFunction))
+            if (opCode == OpFunction)
             {
                 break;
             }
@@ -511,6 +515,26 @@ int64_t GetPerfCpuTime()
     LARGE_INTEGER cpuTimeQuery = { };
     QueryPerformanceCounter(&cpuTimeQuery);
     return cpuTimeQuery.QuadPart;
+}
+
+#elif __APPLE__ && __MACH__
+// =====================================================================================================================
+// Retrieves the frequency of the performance counter for CPU times.
+//
+// NOTE: In current implementation, the tick has been set to 1 ns.
+int64_t GetPerfFrequency()
+{
+    constexpr uint32_t NanosecsPerSec = (1000 * 1000 * 1000);
+
+    return NanosecsPerSec;
+}
+
+// =====================================================================================================================
+// Retrieves the current value of the performance counter, which is a high resolution time stamp that can be used for
+// time-interval measurements.
+int64_t GetPerfCpuTime()
+{
+    return mach_absolute_time();
 }
 
 #else

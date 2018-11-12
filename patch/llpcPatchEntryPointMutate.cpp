@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-entry-point-mutate"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -136,34 +135,34 @@ bool PatchEntryPointMutate::runOnModule(
         auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
         SpiPsInputAddr spiPsInputAddr = {};
 
-        spiPsInputAddr.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
-                                               builtInUsage.baryCoordSmoothSample);
-        spiPsInputAddr.PERSP_CENTER_ENA     = ((builtInUsage.smooth && builtInUsage.center) ||
-                                               builtInUsage.baryCoordSmooth);
-        spiPsInputAddr.PERSP_CENTROID_ENA   = ((builtInUsage.smooth && builtInUsage.centroid) ||
-                                               builtInUsage.baryCoordSmoothCentroid);
-        spiPsInputAddr.PERSP_PULL_MODEL_ENA = ((builtInUsage.smooth && builtInUsage.pullMode) ||
-                                               builtInUsage.baryCoordPullModel);
-        spiPsInputAddr.LINEAR_SAMPLE_ENA    = ((builtInUsage.noperspective && builtInUsage.sample) ||
-                                               builtInUsage.baryCoordNoPerspSample);
-        spiPsInputAddr.LINEAR_CENTER_ENA    = ((builtInUsage.noperspective && builtInUsage.center) ||
-                                               builtInUsage.baryCoordNoPersp);
-        spiPsInputAddr.LINEAR_CENTROID_ENA  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
-                                               builtInUsage.baryCoordNoPerspCentroid);
+        spiPsInputAddr.bits.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
+                                                    builtInUsage.baryCoordSmoothSample);
+        spiPsInputAddr.bits.PERSP_CENTER_ENA     = ((builtInUsage.smooth && builtInUsage.center) ||
+                                                    builtInUsage.baryCoordSmooth);
+        spiPsInputAddr.bits.PERSP_CENTROID_ENA   = ((builtInUsage.smooth && builtInUsage.centroid) ||
+                                                    builtInUsage.baryCoordSmoothCentroid);
+        spiPsInputAddr.bits.PERSP_PULL_MODEL_ENA = ((builtInUsage.smooth && builtInUsage.pullMode) ||
+                                                    builtInUsage.baryCoordPullModel);
+        spiPsInputAddr.bits.LINEAR_SAMPLE_ENA    = ((builtInUsage.noperspective && builtInUsage.sample) ||
+                                                    builtInUsage.baryCoordNoPerspSample);
+        spiPsInputAddr.bits.LINEAR_CENTER_ENA    = ((builtInUsage.noperspective && builtInUsage.center) ||
+                                                    builtInUsage.baryCoordNoPersp);
+        spiPsInputAddr.bits.LINEAR_CENTROID_ENA  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
+                                                    builtInUsage.baryCoordNoPerspCentroid);
         if (pPipelineInfo->rsState.numSamples <= 1)
         {
             // NOTE: If multi-sample is disabled, I/J calculation for "centroid" interpolation mode depends
             // on "center" mode.
-            spiPsInputAddr.PERSP_CENTER_ENA |= spiPsInputAddr.PERSP_CENTROID_ENA;
-            spiPsInputAddr.LINEAR_CENTER_ENA |= spiPsInputAddr.LINEAR_CENTROID_ENA;
+            spiPsInputAddr.bits.PERSP_CENTER_ENA  |= spiPsInputAddr.bits.PERSP_CENTROID_ENA;
+            spiPsInputAddr.bits.LINEAR_CENTER_ENA |= spiPsInputAddr.bits.LINEAR_CENTROID_ENA;
         }
-        spiPsInputAddr.POS_X_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.POS_Y_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.POS_Z_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.POS_W_FLOAT_ENA      = builtInUsage.fragCoord;
-        spiPsInputAddr.FRONT_FACE_ENA       = builtInUsage.frontFacing;
-        spiPsInputAddr.ANCILLARY_ENA        = builtInUsage.sampleId;
-        spiPsInputAddr.SAMPLE_COVERAGE_ENA  = builtInUsage.sampleMaskIn;
+        spiPsInputAddr.bits.POS_X_FLOAT_ENA      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.POS_Y_FLOAT_ENA      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.POS_Z_FLOAT_ENA      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.POS_W_FLOAT_ENA      = builtInUsage.fragCoord;
+        spiPsInputAddr.bits.FRONT_FACE_ENA       = builtInUsage.frontFacing;
+        spiPsInputAddr.bits.ANCILLARY_ENA        = builtInUsage.sampleId;
+        spiPsInputAddr.bits.SAMPLE_COVERAGE_ENA  = builtInUsage.sampleMaskIn;
 
         builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
     }
@@ -768,8 +767,6 @@ bool PatchEntryPointMutate::runOnModule(
     pEntryPoint->setName(pEntryName);
     pEntryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
 
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
-
     return true;
 }
 
@@ -885,14 +882,14 @@ Value* PatchEntryPointMutate::SetRingBufferDataFormat(
 
     SqBufRsrcWord3 dataFormatClearMask;
     dataFormatClearMask.u32All = UINT32_MAX;
-    dataFormatClearMask.bits.DATA_FORMAT = 0;
+    dataFormatClearMask.gfx6.DATA_FORMAT = 0;
     pElem3 = BinaryOperator::CreateAnd(pElem3,
                                        ConstantInt::get(m_pContext->Int32Ty(), dataFormatClearMask.u32All),
                                        "",
                                        pInsertPos);
 
     SqBufRsrcWord3 dataFormatSetValue = {};
-    dataFormatSetValue.bits.DATA_FORMAT = dataFormat;
+    dataFormatSetValue.gfx6.DATA_FORMAT = dataFormat;
     pElem3 = BinaryOperator::CreateOr(pElem3,
                                       ConstantInt::get(m_pContext->Int32Ty(), dataFormatSetValue.u32All),
                                       "",

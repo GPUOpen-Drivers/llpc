@@ -41,6 +41,7 @@ namespace Llpc
 
 class FragColorExport;
 class VertexFetch;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for input import and output export.
 class PatchInOutImportExport:

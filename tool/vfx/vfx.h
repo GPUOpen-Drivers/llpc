@@ -49,18 +49,19 @@ namespace Vfx
 
 // =====================================================================================================================
 // Common definition of VfxParser
-static const uint32_t MaxSectionCount = 16;
-static const uint32_t MaxBindingCount = 16;
-static const uint32_t MaxResultCount = 16;
-static const uint32_t MaxPushConstRangCount = 16;
-static const uint32_t MaxVertexBufferBindingCount = 16;
-static const uint32_t MaxVertexAttributeCount = 32;
-static const uint32_t MaxSpecConstantCount = 32;
-static const uint32_t VfxSizeOfVec4        = 16;
-static const uint32_t VfxInvalidValue      = 0xFFFFFFFF;
-static const uint32_t VfxVertexBufferSetId = 0xFFFFFFFE;
-static const uint32_t VfxIndexBufferSetId  = 0xFFFFFFFD;
-static const uint32_t VfxDynamicArrayId    = 0xFFFFFFFC;
+static const uint32_t ShaderStageCount = 6;             // Number of shader stages in Vulkan
+static const uint32_t MaxSectionCount = 16;             // Max section count
+static const uint32_t MaxBindingCount = 16;             // Max binding count
+static const uint32_t MaxResultCount = 16;              // Max result count
+static const uint32_t MaxPushConstRangCount = 16;       // Max push const range count
+static const uint32_t MaxVertexBufferBindingCount = 16; // Max vertex buffer binding count
+static const uint32_t MaxVertexAttributeCount = 32;     // Max vertex attribute count
+static const uint32_t MaxSpecConstantCount = 32;        // Max spec constant count
+static const uint32_t VfxSizeOfVec4        = 16;        // Ehe size of vec4
+static const uint32_t VfxInvalidValue      = 0xFFFFFFFF; // Invalid value
+static const uint32_t VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex bufer set id
+static const uint32_t VfxIndexBufferSetId  = 0xFFFFFFFD; // Index buffer set id
+static const uint32_t VfxDynamicArrayId    = 0xFFFFFFFC; // Dynamic array id
 static const size_t MaxKeyBufSize   = 256;  // Buffer size to parse a key-value pair key in VFX file.
 static const size_t MaxLineBufSize  = 512;  // Buffer size to parse a line in VFX file.
 
@@ -76,15 +77,6 @@ static const size_t MaxLineBufSize  = 512;  // Buffer size to parse a line in VF
 #define STRING(x) _STRING(x)
 
 #define SIZE_OF_ARRAY(ary) (sizeof(ary)/sizeof(ary[0]))
-
-#define PARSE_ERROR(errorMsg, lineNum, ...) { \
-    char errorBuf[4096]; \
-    int pos = Snprintf(errorBuf, 4096, "Parse error at line %u: ", lineNum); \
-    pos += Snprintf(errorBuf + pos, 4096 - pos, __VA_ARGS__); \
-    pos += Snprintf(errorBuf + pos, 4096 - pos, "\n"); \
-    VFX_ASSERT(pos < 4096); \
-    errorMsg += errorBuf; \
-}
 
 namespace Math
 {
@@ -314,6 +306,7 @@ private:
     Float16Bits  m_bits; // Bits
 };
 
+// =====================================================================================================================
 // Represents the combination union of vec4 values.
 typedef struct IUFValue_
 {
@@ -337,6 +330,7 @@ typedef struct IUFValue_
     } props;
 } IUFValue;
 
+// =====================================================================================================================
 // Represents the shader binary data
 struct ShaderSource
 {
@@ -345,8 +339,6 @@ struct ShaderSource
 };
 
 // =====================================================================================================================
-// Definitions for RenderDocument
-
 // Enumerates the type of ResultItem's resultSource
 enum ResultSource : uint32_t
 {
@@ -356,6 +348,7 @@ enum ResultSource : uint32_t
     ResultSourceMaxEnum           = VfxInvalidValue,
 };
 
+// =====================================================================================================================
 // Enumerates the type of ResultItem's compareMethod
 enum ResultCompareMethod : uint32_t
 {
@@ -364,6 +357,7 @@ enum ResultCompareMethod : uint32_t
     ResultCompareMethodMaxEnum   = VfxInvalidValue,
 };
 
+// =====================================================================================================================
 // Enumerates the type of Sampler's dataPattern
 enum SamplerPattern : uint32_t
 {
@@ -373,6 +367,7 @@ enum SamplerPattern : uint32_t
     SamplerLinearMipLinear,
 };
 
+// =====================================================================================================================
 // Enumerates the type of ImageView's dataPattern
 enum ImagePattern :uint32_t
 {
@@ -387,6 +382,7 @@ enum ImagePattern :uint32_t
     ImageSolidDepth,
 };
 
+// =====================================================================================================================
 // Represents a result item in Result section.
 struct ResultItem
 {
@@ -404,6 +400,7 @@ struct ResultItem
     ResultCompareMethod compareMethod;  // How to compare result to expected value
 };
 
+// =====================================================================================================================
 // Represents Result section.
 struct TestResult
 {
@@ -411,6 +408,7 @@ struct TestResult
     ResultItem result[MaxResultCount];  // Whole test results
 };
 
+// =====================================================================================================================
 // Represents one specialization constant
 struct SpecConstItem
 {
@@ -422,6 +420,7 @@ struct SpecConstItem
     };
 };
 
+// =====================================================================================================================
 // Represents specializaton constants for one shader stage.
 struct SpecConst
 {
@@ -429,6 +428,7 @@ struct SpecConst
     SpecConstItem  specConst[MaxSpecConstantCount];  // All specialization constants
 };
 
+// =====================================================================================================================
 // Represents one vertex binding
 //
 // NOTE: deprecated!!
@@ -439,6 +439,7 @@ struct VertrexBufferBinding
     VkVertexInputRate stepRate;     // Offset of result value
 };
 
+// =====================================================================================================================
 // Represents one vertex attribute
 //
 // NOTE: deprecated!!
@@ -450,6 +451,7 @@ struct VertexAttribute
     uint32_t offsetInBytes;     // Attribute offset
 };
 
+// =====================================================================================================================
 // Represents vertex input state
 //
 // NOTE: deprecated!!
@@ -461,6 +463,7 @@ struct VertexState
     VertexAttribute      attribute[MaxVertexAttributeCount];      // All vertex input attributes
 };
 
+// =====================================================================================================================
 // Represents one BufferView section.
 struct BufferView
 {
@@ -472,6 +475,7 @@ struct BufferView
     uint8_t*           pData;         // Buffer data
 };
 
+// =====================================================================================================================
 // Represents one ImageView section.
 struct ImageView
 {
@@ -484,6 +488,7 @@ struct ImageView
     uint32_t           mipmap;        // Whether this image has mipmap
 };
 
+// =====================================================================================================================
 // Represents one Sampler section.
 struct Sampler
 {
@@ -492,6 +497,7 @@ struct Sampler
     SamplerPattern     dataPattern;    // Sampler pattern
 };
 
+// =====================================================================================================================
 // Represents one push constant range
 struct PushConstRange
 {
@@ -501,6 +507,7 @@ struct PushConstRange
     uint32_t*                    pData;         // Push constant data
 };
 
+// =====================================================================================================================
 // Represents DrawState section
 struct DrawState
 {
@@ -512,6 +519,10 @@ struct DrawState
     uint32_t              firstIndex;                               // First index in draw index
     uint32_t              vertexOffset;                             // Vertex offset in draw index
     VkPrimitiveTopology   topology;                                 // Primitive topology
+    VkPolygonMode         polygonMode;                              // Triangle rendering mode
+    VkCullModeFlags       cullMode;                                 // Fragment culling mode
+    VkFrontFace           frontFace;                                // Front-facing triangle orientation
+    uint32_t              depthBiasEnable;                          // Whether to bias fragment depth values
     uint32_t              patchControlPoints;                       // Patch control points
     IUFValue              dispatch;                                 // Dispatch dimension
     uint32_t              width;                                    // Window width
@@ -528,19 +539,25 @@ struct DrawState
     PushConstRange        pushConstRange[MaxPushConstRangCount];    // Pipeline push constant ranges
 };
 
-#ifndef DISABLE_PIPLINE_DOC
+// =====================================================================================================================
 // Represents the state of ColorBuffer.
 struct ColorBuffer
 {
+    uint32_t channelWriteMask;        // Write mask to specify destination channels
     VkFormat format;                  // The format of color buffer
     uint32_t blendEnable;             // Whether the blend is enabled on this color buffer
     uint32_t blendSrcAlphaToColor;    // Whether source alpha is blended to color channels for this target at draw time
 };
 
+// =====================================================================================================================
 // Represents GraphicsPipelineState section.
 struct GraphicsPipelineState
 {
     VkPrimitiveTopology  topology;            // Primitive type
+    VkPolygonMode        polygonMode;         // Triangle rendering mode
+    VkCullModeFlags      cullMode;            // Fragment culling mode
+    VkFrontFace          frontFace;           // Front-facing triangle orientation
+    uint32_t             depthBiasEnable;     // Whether to bias fragment depth values
     uint32_t    patchControlPoints;           // Patch control points
     uint32_t    deviceIndex;                  // Device index for device group
     uint32_t    disableVertexReuse;           // Disable reusing vertex shader output for indexed draws
@@ -553,19 +570,25 @@ struct GraphicsPipelineState
     uint32_t    alphaToCoverageEnable;        // Enable alpha to coverage
     uint32_t    dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
     uint32_t    switchWinding;                // reverse the TCS declared output primitive vertex order
-    uint32_t    enableMultiView;              // Whether to enable multi-views mask
+    uint32_t    enableMultiView;              // Whether to enable multi-view support
+    uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
+    uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
+
     ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
 };
 
+// =====================================================================================================================
 // Represents ComputePipelineState section.
 struct ComputePipelineState
 {
     uint32_t    deviceIndex;                  // Device index for device group
+    uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
+    uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
 };
-#endif
 
 };
 
+// =====================================================================================================================
 // Represents the content of RenderDocument.
 struct VfxRenderState
 {
@@ -579,10 +602,11 @@ struct VfxRenderState
     Vfx::ImageView    imageView[Vfx::MaxSectionCount];          // Section "ImageView"
     uint32_t          numSampler;                               // Number of section "Sampler"
     Vfx::Sampler      sampler[Vfx::MaxSectionCount];            // Section "Sampler"
-    Vfx::ShaderSource stages[EShLangCount];                     // Shader source sections
+    Vfx::ShaderSource stages[Vfx::ShaderStageCount];            // Shader source sections
 };
 
 #ifndef DISABLE_PIPLINE_DOC
+// =====================================================================================================================
 // Represents the content of PipelineDoucment.
 struct VfxPipelineState
 {
@@ -592,4 +616,49 @@ struct VfxPipelineState
     Vfx::ShaderSource         stages[ShaderStageCount];         // Shader source sections
 };
 #endif
+
+// =====================================================================================================================
+// Types used in VFX library public entry points.
+enum VfxDocType
+{
+    VfxDocTypeRender,
+    VfxDocTypePipeline
+};
+
+struct VfxRenderState;
+struct  VfxPipelineState;
+
+typedef struct VfxRenderState* VfxRenderStatePtr;
+typedef struct VfxPipelineState* VfxPipelineStatePtr;
+
+// =====================================================================================================================
+// Public entry points of VFX library. Use these functions (in namespace Vfx) when linking to VFX as a static library.
+namespace Vfx
+{
+
+bool vfxParseFile(
+    const char*  pFilename,
+    unsigned int numMacro,
+    const char*  pMacros[],
+    VfxDocType   type,
+    void**       ppDoc,
+    const char** ppErrorMsg);
+
+void vfxCloseDoc(
+    void* pDoc);
+
+void vfxGetRenderDoc(
+    void*              pDoc,
+    VfxRenderStatePtr* pRenderState);
+
+#ifndef DISABLE_PIPLINE_DOC
+void vfxGetPipelineDoc(
+    void*                pDoc,
+    VfxPipelineStatePtr* pPipelineState);
+#endif
+
+void vfxPrintDoc(
+    void*                pDoc);
+
+} // Vfx
 

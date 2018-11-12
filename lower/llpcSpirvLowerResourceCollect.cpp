@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-resource-collect"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -43,18 +42,6 @@
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
-
-namespace llvm
-{
-
-namespace cl
-{
-
-extern opt<bool> AutoLayoutDesc;
-
-} // cl
-
-} // llvm
 
 namespace Llpc
 {
@@ -321,8 +308,6 @@ bool SpirvLowerResourceCollect::runOnModule(
         pViewIndex->addMetadata(gSPIRVMD::InOut, *pViewIndexMetaNode);
         CollectInOutUsage(m_pContext->Int32Ty(), pViewIndexMetaValue, SPIRAS_Input);
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -1464,11 +1449,6 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         {
             // Generic input/output
             const uint32_t startLoc = inOutMeta.Value + inOutMeta.Index;
-            if ((inOutMeta.Value == 0) && (inOutMeta.Index == 1))
-            {
-                // Dual source blending is detected
-                m_pResUsage->inOutUsage.fs.dualSourceBlend = true;
-            }
 
             pBaseTy = pInOutTy;
             locCount = (pInOutTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4) ? 2 : 1;
@@ -1609,7 +1589,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                     m_pResUsage->inOutUsage.fs.outputTypes[startLoc] = basicTy;
 
-                    if (cl::AutoLayoutDesc)
+                    if (m_pContext->NeedAutoLayoutDesc())
                     {
                         // Collect CB shader mask (will be revised in LLVM patching operations)
                         LLPC_ASSERT(pBaseTy->isSingleValueType());
@@ -1694,5 +1674,5 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for resource collecting.
-INITIALIZE_PASS(SpirvLowerResourceCollect, "spirv-lower-resource-collect",
+INITIALIZE_PASS(SpirvLowerResourceCollect, "Spirv-lower-resource-collect",
                 "Lower SPIR-V resource collecting", false, false)

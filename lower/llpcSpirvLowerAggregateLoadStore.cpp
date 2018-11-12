@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-aggregate-load-store"
 
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -84,8 +83,6 @@ bool SpirvLowerAggregateLoadStore::runOnModule(
         pStoreInst->dropAllReferences();
         pStoreInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -231,5 +228,5 @@ Value* SpirvLowerAggregateLoadStore::ExpandLoadInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for load and store operations on aggregate type.
-INITIALIZE_PASS(SpirvLowerAggregateLoadStore, "spirv-lower-aggregate-load-store",
+INITIALIZE_PASS(SpirvLowerAggregateLoadStore, "Spirv-lower-aggregate-load-store",
                 "Lower SPIR-V load and store operations on aggregate type", false, false)

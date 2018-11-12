@@ -88,7 +88,13 @@ using namespace Llpc;
 // Represents options of LLPC standalone tool.
 
 // -gfxip: graphics IP version
-static cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"), cl::init("8.0.0"));
+static cl::opt<std::string> GfxIp("gfxip",
+                                  cl::desc("Graphics IP version"),
+                                  cl::value_desc("major.minor.step"),
+                                  cl::init("8.0.0"));
+
+// The GFXIP version parsed out of the -gfxip option before normal option processing occurs.
+static GfxIpVersion ParsedGfxIp = {8, 0, 0};
 
 // Input sources
 static cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,
@@ -124,57 +130,6 @@ static cl::opt<std::string> EntryTarget("entry-target",
 // -ignore-color-attachment-formats: ignore color attachment formats
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
-
-// -enable-ngg: enable NGG mode
-static cl::opt<bool> EnableNgg(
-    "enable-ngg",
-    cl::desc("Enable implicit primitive shader (NGG) mode"),
-    cl::init(false));
-
-// TODO: Comment NggEnableFastLaunch out for workaround the build failure on Linux
-#if 0
-// -ngg-enable-fast-launch: enable the hardware to launch subgroups of work at a faster rate (NGG)
-static cl::opt<bool> NggEnableFastLaunch(
-    "ngg-enable-fast-launch",
-    cl::desc("Enable the hardware to launch subgroups of work at a faster rate (NGG)"),
-    cl::init(false));
-#endif
-
-// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
-static cl::opt<bool> NggEnableVertexReuse(
-    "ngg-enable-vertex-reuse",
-    cl::desc("Enable optimization to cull duplicate vertices (NGG)"),
-    cl::init(false));
-
-// -ngg-disable-backface-culling: disable culling of primitives that don't meet facing criteria (NGG)
-static cl::opt<bool> NggDisableBackfaceCulling(
-    "ngg-disable-backface-culling",
-    cl::desc("Disable culling of primitives that don't meet facing criteria (NGG)"),
-    cl::init(true));
-
-// -ngg-enable-frustum-culling: enable discarding of primitives outside of view frustum (NGG)
-static cl::opt<bool> NggEnableFrustumCulling(
-    "ngg-enable-frustum-culling",
-    cl::desc("Enable discarding of primitives outside of view frustum (NGG)"),
-    cl::init(false));
-
-// -ngg-enable-box-filter-culling: enable simpler frustum culler that is less accurate (NGG)
-static cl::opt<bool> NggEnableBoxFilterCulling(
-    "ngg-enable-box-filter-culling",
-    cl::desc("Enable simpler frustum culler that is less accurate (NGG)"),
-    cl::init(false));
-
-// -ngg-enable-sphere-culling: enable frustum culling based on a sphere (NGG)
-static cl::opt<bool> NggEnableSphereCulling(
-    "ngg-enable-sphere-culling",
-    cl::desc("Enable frustum culling based on a sphere (NGG)"),
-    cl::init(false));
-
-// -ngg-enable-small-prim-filter: enable trivial sub-sample primitive culling (NGG)
-static cl::opt<bool> NggEnableSmallPrimFilter(
-    "ngg-enable-small-prim-filter",
-    cl::desc("Enable trivial sub-sample primitive culling (NGG)"),
-    cl::init(false));
 
 #ifdef WIN_OS
 // -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
@@ -238,17 +193,9 @@ static ShaderStage SourceLangToShaderStage(
 static Result Init(
     int32_t      argc,          // Count of arguments
     char*        argv[],        // [in] List of arguments
-    ICompiler**  ppCompiler,    // [out] Created LLPC compiler object
-    CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
+    ICompiler**  ppCompiler)    // [out] Created LLPC compiler object
 {
     Result result = Result::Success;
-
-#ifndef LLPC_ENABLE_SPIRV_OPT
-    if (InitSpvGen() == false)
-    {
-        printf("Fail to load spvgen.dll and do initialization, can only compile SPIR-V binary\n");
-    }
-#endif
 
     if (result == Result::Success)
     {
@@ -267,12 +214,10 @@ static Result Init(
             "-simplifycfg-sink-common",  "-simplifycfg-sink-common=false",
             "-amdgpu-vgpr-index-mode",   "-amdgpu-vgpr-index-mode",         // force VGPR indexing on GFX8
             "-filetype",                 "-filetype=obj",   // target = obj, ELF binary; target = asm, ISA assembly text
-            "-enable-cache-emu-lib-context", "-enable-cache-emu-lib-context=1",
         };
 
         // Build new arguments, starting with those supplied in command line
         std::vector<const char*> newArgs;
-        GfxIpVersion gfxIp = {8, 0, 0};
         for (int32_t i = 0; i < argc; ++i)
         {
             newArgs.push_back(argv[i]);
@@ -320,9 +265,9 @@ static Result Init(
                         pToken = std::strtok(nullptr, ".");
                     }
 
-                    gfxIp.major    = (tokens[0] != nullptr) ? std::strtoul(tokens[0], nullptr, 10) : 0;
-                    gfxIp.minor    = (tokens[1] != nullptr) ? std::strtoul(tokens[1], nullptr, 10) : 0;
-                    gfxIp.stepping = (tokens[2] != nullptr) ? std::strtoul(tokens[2], nullptr, 10) : 0;
+                    ParsedGfxIp.major    = (tokens[0] != nullptr) ? std::strtoul(tokens[0], nullptr, 10) : 0;
+                    ParsedGfxIp.minor    = (tokens[1] != nullptr) ? std::strtoul(tokens[1], nullptr, 10) : 0;
+                    ParsedGfxIp.stepping = (tokens[2] != nullptr) ? std::strtoul(tokens[2], nullptr, 10) : 0;
 
                     delete[] pGfxIp;
                 }
@@ -380,37 +325,28 @@ static Result Init(
         }
         newArgs.push_back(shaderCacheFileDirOption);
 
-        result = ICompiler::Create(gfxIp, newArgs.size(), &newArgs[0], ppCompiler);
-
-        if (result == Result::Success)
-        {
-            pCompileInfo->gfxIp = gfxIp;
-
-            // Set NGG control settings
-            if (gfxIp.major >= 10)
-            {
-                auto& nggState = pCompileInfo->gfxPipelineInfo.nggState;
-
-                nggState.enableNgg                  = EnableNgg;
-                //nggState.enableFastLaunch           = NggEnableFastLaunch;
-                nggState.enableFastLaunch           = false;
-                nggState.enableVertexReuse          = NggEnableVertexReuse;
-                nggState.disableBackfaceCulling     = NggDisableBackfaceCulling;
-                nggState.enableFrustumCulling       = NggEnableFrustumCulling;
-                nggState.enableBoxFilterCulling     = NggEnableBoxFilterCulling;
-                nggState.enableSphereCulling        = NggEnableSphereCulling;
-                nggState.enableSmallPrimFilter      = NggEnableSmallPrimFilter;
-            }
-        }
+        result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
     }
 
     return result;
 }
 
 // =====================================================================================================================
+// Performs per-pipeline initialization work for LLPC standalone tool.
+static Result InitCompileInfo(
+    CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
+{
+
+    // Assume not compiling whole pipeline.
+    pCompileInfo->gfxPipelineInfo.options.autoLayoutDesc = true;
+    pCompileInfo->compPipelineInfo.options.autoLayoutDesc = true;
+
+    return Result::Success;
+}
+
+// =====================================================================================================================
 // Performs cleanup work for LLPC standalone tool.
-static void Cleanup(
-    ICompiler*   pCompiler,     // [in,out] LLPC compiler object
+static void CleanupCompileInfo(
     CompileInfo* pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
 {
     for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
@@ -431,11 +367,10 @@ static void Cleanup(
 
     if (pCompileInfo->pPipelineInfoFile)
     {
-        vfxCloseDoc(pCompileInfo->pPipelineInfoFile);
+        Vfx::vfxCloseDoc(pCompileInfo->pPipelineInfoFile);
     }
 
     memset(pCompileInfo, 0, sizeof(*pCompileInfo));
-    pCompiler->Destroy();
 }
 
 // =====================================================================================================================
@@ -657,6 +592,12 @@ static Result CompileGlsl(
     ShaderStage*       pStage,      // [out] Shader stage
     std::string&       outFile)     // [out] Output file, SPIR-V binary
 {
+    if (InitSpvGen() == false)
+    {
+        LLPC_ERRS("Failed to load SPVGEN -- cannot compile GLSL\n");
+        return Result::ErrorUnavailable;
+    }
+
     Result result = Result::Success;
 
     EShLanguage lang = GetGlslSourceLang(inFile);
@@ -751,6 +692,12 @@ static Result AssembleSpirv(
     const std::string& inFile,  // [in] Input file, SPIR-V assembly text
     std::string&       outFile) // [out] Output file, SPIR-V binary
 {
+    if (InitSpvGen() == false)
+    {
+        LLPC_ERRS("Failed to load SPVGEN -- cannot assemble SPIR-V assembler source\n");
+        return Result::ErrorUnavailable;
+    }
+
     Result result = Result::Success;
 
     FILE* pInFile = fopen(inFile.c_str(), "r");
@@ -963,8 +910,9 @@ static Result BuildPipeline(
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 static Result OutputElf(
     CompileInfo*       pCompileInfo,  // [in] Compilation info of LLPC standalone tool
-    const std::string& outFile)       // [in] Name of the file to output ELF binary (specify "" to use base name of
+    const std::string& outFile,       // [in] Name of the file to output ELF binary (specify "" to use base name of
                                       //     first input file with appropriate extension; specify "-" to use stdout)
+    StringRef          firstInFile)   // [in] Name of first input file
 {
     Result result = Result::Success;
     const BinaryData* pPipelineBin = (pCompileInfo->stageMask & ShaderStageToMask(ShaderStageCompute)) ?
@@ -981,11 +929,11 @@ static Result OutputElf(
         {
             pExt = ".elf";
         }
-        if (IsLlvmBitcode(pPipelineBin))
+        else
         {
-            pExt = ".bc";
+            pExt = ".ll";
         }
-        outFileName = sys::path::filename(InFiles[0]);
+        outFileName = sys::path::filename(firstInFile);
         sys::path::replace_extension(outFileName, pExt);
     }
 
@@ -1053,50 +1001,22 @@ static void EnableMemoryLeakDetection()
 #endif
 
 // =====================================================================================================================
-// Main function of LLPC standalone tool, entry-point.
-//
-// Returns 0 if successful. Other numeric values indicate failure.
-int32_t main(
-    int32_t argc,       // Count of arguments
-    char*   argv[])     // [in] List of arguments
+// Process one pipeline.
+static Result ProcessPipeline(
+    ICompiler*            pCompiler,  // LLPC context
+    ArrayRef<std::string> inFiles)    // Input filename(s)
 {
     Result result = Result::Success;
-
-    ICompiler*  pCompiler   = nullptr;
     CompileInfo compileInfo = {};
 
-    //
-    // Initialization
-    //
-
-    // TODO: CRT based Memory leak detection is conflict with stack trace now, we only can enable one of them.
-#if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
-    EnableMemoryLeakDetection();
-#else
-    EnablePrettyStackTrace();
-    sys::PrintStackTraceOnErrorSignal(argv[0]);
-    PrettyStackTraceProgram X(argc, argv);
-
-#ifdef WIN_OS
-    signal(SIGABRT, LlpcSignalAbortHandler);
-#endif
-#endif
-
-    result = Init(argc, argv, &pCompiler, &compileInfo);
-
-#ifdef WIN_OS
-    if (AssertToMsgBox)
-    {
-        _set_error_mode(_OUT_TO_MSGBOX);
-    }
-#endif
+    result = InitCompileInfo(&compileInfo);
 
     //
     // Translate sources to SPIR-V binary
     //
-    for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
+    for (uint32_t i = 0; (i < inFiles.size()) && (result == Result::Success); ++i)
     {
-        const std::string& inFile = InFiles[i];
+        const std::string& inFile = inFiles[i];
         std::string spvBinFile;
 
         if (IsGlslTextFile(inFile))
@@ -1128,23 +1048,37 @@ int32_t main(
             {
                 result = GetSpirvBinaryFromFile(spvBinFile, &spvBin);
 
-                // Disassemble SPIR-V code
-                uint32_t textSize = spvBin.codeSize * 10 + 1024;
-                char* pSpvText = new char[textSize];
-                LLPC_ASSERT(pSpvText != nullptr);
-                memset(pSpvText, 0, textSize);
+                if (result == Result::Success)
+                {
+                    if (InitSpvGen() == false)
+                    {
+                        LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
+                    }
+                    else
+                    {
+                        // Disassemble SPIR-V code
+                        uint32_t textSize = spvBin.codeSize * 10 + 1024;
+                        char* pSpvText = new char[textSize];
+                        LLPC_ASSERT(pSpvText != nullptr);
+                        memset(pSpvText, 0, textSize);
 
-                LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
-                spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, pSpvText);
-                LLPC_OUTS(pSpvText << "\n");
+                        LLPC_OUTS("\nSPIR-V disassembly for " << inFile << "\n");
+                        spvDisassembleSpirv(spvBin.codeSize, spvBin.pCode, textSize, pSpvText);
+                        LLPC_OUTS(pSpvText << "\n");
 
-                delete[] pSpvText;
+                        delete[] pSpvText;
+                    }
+                }
             }
 
             if ((result == Result::Success) && Validate)
             {
                 char log[1024] = {};
-                if (spvValidateSpirv != nullptr)
+                if (InitSpvGen() == false)
+                {
+                    errs() << "Warning: Failed to load SPVGEN -- cannot validate SPIR-V\n";
+                }
+                else
                 {
                     if (spvValidateSpirv(spvBin.codeSize, spvBin.pCode, sizeof(log), log) == false)
                     {
@@ -1179,16 +1113,16 @@ int32_t main(
         else if (IsPipelineInfoFile(inFile))
         {
             const char* pLog = nullptr;
-            bool vfxResult = vfxParseFile(inFile.c_str(),
-                                          0,
-                                          nullptr,
-                                          VfxDocTypePipeline,
-                                          &compileInfo.pPipelineInfoFile,
-                                          &pLog);
+            bool vfxResult = Vfx::vfxParseFile(inFile.c_str(),
+                                               0,
+                                               nullptr,
+                                               VfxDocTypePipeline,
+                                               &compileInfo.pPipelineInfoFile,
+                                               &pLog);
             if (vfxResult)
             {
                 VfxPipelineStatePtr pPipelineState = nullptr;
-                vfxGetPipelineDoc(compileInfo.pPipelineInfoFile, &pPipelineState);
+                Vfx::vfxGetPipelineDoc(compileInfo.pPipelineInfoFile, &pPipelineState);
 
                 if (pPipelineState->version != Llpc::Version)
                 {
@@ -1198,6 +1132,10 @@ int32_t main(
                 }
                 else
                 {
+                    if ((pLog != nullptr) && (strlen(pLog) > 0))
+                    {
+                        LLPC_OUTS("Pipeline file parse warning:\n" << pLog << "\n");
+                    }
                     compileInfo.compPipelineInfo = pPipelineState->compPipelineInfo;
                     compileInfo.gfxPipelineInfo = pPipelineState->gfxPipelineInfo;
                     if (IgnoreColorAttachmentFormats)
@@ -1215,6 +1153,11 @@ int32_t main(
                         }
                     }
 
+                    if (EnableOuts() && (InitSpvGen() == false))
+                    {
+                        LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
+                    }
+
                     for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
                     {
                         if (pPipelineState->stages[stage].dataSize > 0)
@@ -1223,16 +1166,19 @@ int32_t main(
                             compileInfo.spirvBin[stage].pCode = pPipelineState->stages[stage].pData;
                             compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
 
-                            uint32_t binSize =  pPipelineState->stages[stage].dataSize;
-                            uint32_t textSize = binSize * 10 + 1024;
-                            char* pSpvText = new char[textSize];
-                            LLPC_ASSERT(pSpvText != nullptr);
-                            memset(pSpvText, 0, textSize);
-                            LLPC_OUTS("\nSPIR-V disassembly for " <<
-                                      GetShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
-                            spvDisassembleSpirv(binSize, compileInfo.spirvBin[stage].pCode, textSize, pSpvText);
-                            LLPC_OUTS(pSpvText << "\n");
-                            delete[] pSpvText;
+                            if (spvDisassembleSpirv != nullptr)
+                            {
+                                uint32_t binSize =  pPipelineState->stages[stage].dataSize;
+                                uint32_t textSize = binSize * 10 + 1024;
+                                char* pSpvText = new char[textSize];
+                                LLPC_ASSERT(pSpvText != nullptr);
+                                memset(pSpvText, 0, textSize);
+                                LLPC_OUTS("\nSPIR-V disassembly for " <<
+                                          GetShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
+                                spvDisassembleSpirv(binSize, compileInfo.spirvBin[stage].pCode, textSize, pSpvText);
+                                LLPC_OUTS(pSpvText << "\n");
+                                delete[] pSpvText;
+                            }
                         }
                     }
                 }
@@ -1318,20 +1264,85 @@ int32_t main(
         result = BuildPipeline(pCompiler, &compileInfo);
         if (result == Result::Success)
         {
-            result = OutputElf(&compileInfo, OutFile);
+            result = OutputElf(&compileInfo, OutFile, inFiles[0]);
         }
     }
 
     //
     // Clean up
     //
-    Cleanup(pCompiler, &compileInfo);
-    pCompiler = nullptr;
+    CleanupCompileInfo(&compileInfo);
+
+    return result;
+}
+
+// =====================================================================================================================
+// Main function of LLPC standalone tool, entry-point.
+//
+// Returns 0 if successful. Other numeric values indicate failure.
+int32_t main(
+    int32_t argc,       // Count of arguments
+    char*   argv[])     // [in] List of arguments
+{
+    Result result = Result::Success;
+
+    ICompiler*  pCompiler   = nullptr;
+
+    //
+    // Initialization
+    //
+
+    // TODO: CRT based Memory leak detection is conflict with stack trace now, we only can enable one of them.
+#if defined(LLPC_MEM_TRACK_LEAK) && defined(_DEBUG)
+    EnableMemoryLeakDetection();
+#else
+    EnablePrettyStackTrace();
+    sys::PrintStackTraceOnErrorSignal(argv[0]);
+    PrettyStackTraceProgram X(argc, argv);
+
+#ifdef WIN_OS
+    signal(SIGABRT, LlpcSignalAbortHandler);
+#endif
+#endif
+
+    result = Init(argc, argv, &pCompiler);
+
+#ifdef WIN_OS
+    if (AssertToMsgBox)
+    {
+        _set_error_mode(_OUT_TO_MSGBOX);
+    }
+#endif
+
+    if (StringRef(InFiles[0]).endswith(".pipe"))
+    {
+        // The first input file is a pipeline file. Assume they all are, and compile each one separately
+        // but in the same context.
+        for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
+        {
+            result = ProcessPipeline(pCompiler, InFiles[i]);
+        }
+    }
+    else
+    {
+        // Otherwise, join all input files into the same pipeline.
+        SmallVector<std::string, 6> inFiles;
+        for (const auto &inFile : InFiles)
+        {
+            inFiles.push_back(inFile);
+        }
+        result = ProcessPipeline(pCompiler, inFiles);
+    }
+
+    pCompiler->Destroy();
 
     if (result == Result::Success)
     {
-        outs().flush();
-        printf("\n=====  AMDLLPC SUCCESS  =====\n");
+        LLPC_OUTS("\n=====  AMDLLPC SUCCESS  =====\n");
+    }
+    else
+    {
+        LLPC_ERRS("\n=====  AMDLLPC FAILED  =====\n");
     }
 
     return (result == Result::Success) ? 0 : 1;

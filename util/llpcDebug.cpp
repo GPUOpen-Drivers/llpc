@@ -55,8 +55,14 @@ namespace cl
 // -enable-outs: enable general message output (to stdout or external file).
 opt<bool> EnableOuts(
     "enable-outs",
-    desc("Enable general message output (to stdout or external file) (default: true)"),
-    init(true));
+    desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
+    init(false));
+
+// -v: alias for -enable-outs
+opt<bool> Verbose(
+    "v",
+    desc("Enable LLPC-specific debug dump output (to stdout or external file) (default: false)"),
+    init(false));
 
 // -enable-errs: enable error message output (to stderr or external file).
 opt<bool> EnableErrs(
@@ -89,7 +95,7 @@ namespace Llpc
 // Gets the value of option "allow-out".
 bool EnableOuts()
 {
-    return cl::EnableOuts;
+    return cl::EnableOuts || cl::Verbose;
 }
 
 // =====================================================================================================================
@@ -121,14 +127,14 @@ void RedirectLogOutput(
         // Restore default raw_fd_ostream objects
         if (pDbgFile != nullptr)
         {
-            memcpy(&errs(), dbgFileBak, sizeof(raw_fd_ostream));
+            memcpy((void*)&errs(), dbgFileBak, sizeof(raw_fd_ostream));
             pDbgFile->close();
             pDbgFile = nullptr;
         }
 
         if (pOutFile != nullptr)
         {
-            memcpy(&outs(), outFileBak, sizeof(raw_fd_ostream));
+            memcpy((void*)&outs(), outFileBak, sizeof(raw_fd_ostream));
             pOutFile->close();
             pOutFile = nullptr;
         }
@@ -159,8 +165,8 @@ void RedirectLogOutput(
                 if (pDbgFile == nullptr)
                 {
                     dbgFile.SetUnbuffered();
-                    memcpy(dbgFileBak, &errs(), sizeof(raw_fd_ostream));
-                    memcpy(&errs(), &dbgFile, sizeof(raw_fd_ostream));
+                    memcpy((void*)dbgFileBak, (void*)&errs(), sizeof(raw_fd_ostream));
+                    memcpy((void*)&errs(), (void*)&dbgFile, sizeof(raw_fd_ostream));
                     pDbgFile = &dbgFile;
                 }
             }
@@ -171,8 +177,8 @@ void RedirectLogOutput(
         {
             if ((cl::LogFileOuts == cl::LogFileDbgs) && (pDbgFile != nullptr))
             {
-                 memcpy(outFileBak, &outs(), sizeof(raw_fd_ostream));
-                 memcpy(&outs(), pDbgFile, sizeof(raw_fd_ostream));
+                 memcpy((void*)outFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
+                 memcpy((void*)&outs(), (void*)pDbgFile, sizeof(raw_fd_ostream));
                  pOutFile = pDbgFile;
             }
             else
@@ -184,8 +190,8 @@ void RedirectLogOutput(
                 if (pOutFile == nullptr)
                 {
                     outFile.SetUnbuffered();
-                    memcpy(outFileBak, &outs(), sizeof(raw_fd_ostream));
-                    memcpy(&outs(), &outFile, sizeof(raw_fd_ostream));
+                    memcpy((void*)outFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
+                    memcpy((void*)&outs(), (void*)&outFile, sizeof(raw_fd_ostream));
                     pOutFile = &outFile;
                 }
             }
@@ -204,13 +210,13 @@ void EnableDebugOutput(
     if (restore)
     {
         // Restore default raw_fd_ostream objects
-        memcpy(&errs(), dbgStream, sizeof(raw_fd_ostream));
+        memcpy((void*)&errs(), dbgStream, sizeof(raw_fd_ostream));
     }
     else
     {
         // Redirect errs() for dbgs()
-         memcpy(dbgStream, &errs(), sizeof(raw_fd_ostream));
-         memcpy(&errs(), &nullStream, sizeof(nullStream));
+         memcpy((void*)dbgStream, (void*)&errs(), sizeof(raw_fd_ostream));
+         memcpy((void*)&errs(), (void*)&nullStream, sizeof(nullStream));
     }
 }
 

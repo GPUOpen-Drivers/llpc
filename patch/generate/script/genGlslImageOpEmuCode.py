@@ -47,8 +47,7 @@ SPIRV_IMAGE_OPERAND_DREF_MODIFIER           = "dref"
 SPIRV_IMAGE_OPERAND_PROJ_MODIFIER           = "proj"
 SPIRV_IMAGE_OPERAND_BIAS_MODIFIER           = "bias"
 SPIRV_IMAGE_OPERAND_LOD_MODIFIER            = "lod"
-SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER        = "lod|lodz"
-SPIRV_IMAGE_OPERAND_LODZ_MODIFIER           = "lodz"
+SPIRV_IMAGE_OPERAND_LODNZ_MODIFIER          = "lodnz"
 SPIRV_IMAGE_OPERAND_GRAD_MODIFIER           = "grad"
 SPIRV_IMAGE_OPERAND_CONSTOFFSET_MODIFIER    = "constoffset"
 SPIRV_IMAGE_OPERAND_OFFSET_MODIFIER         = "offset"
@@ -250,6 +249,7 @@ class FuncDef(object):
         self._hasProj           = other._hasProj
         self._hasBias           = other._hasBias
         self._hasLod            = other._hasLod
+        self._hasLodNz          = other._hasLodNz
         self._hasGrad           = other._hasGrad
         self._hasConstOffset    = other._hasConstOffset
         self._hasOffset         = other._hasOffset
@@ -285,7 +285,6 @@ class FuncDef(object):
         self._atomicData        = other._atomicData
         self._resource          = other._resource
 
-        self._supportLzOptimization    = other._supportLzOptimization
         self._supportSparse     = other._supportSparse
         self._mangledName       = other._mangledName
         pass
@@ -299,6 +298,7 @@ class FuncDef(object):
         self._hasProj           = False
         self._hasBias           = False
         self._hasLod            = False
+        self._hasLodNz          = False
         self._hasGrad           = False
         self._hasConstOffset    = False
         self._hasOffset         = False
@@ -331,9 +331,6 @@ class FuncDef(object):
         self._atomicData        = FuncDef.INVALID_VAR
         self._resource          = VarNames.resource
 
-        # For zero-LOD optimization, will generate 2 version of function, a lz optimized version which uses
-        # zero-LOD instruction, and a normal version uses lod instruction.
-        self._supportLzOptimization    = (mangledName.find(SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER) != -1)
         self._supportSparse     = (mangledName.find(SPIRV_IMAGE_SPARSE_MODIFIER) != -1)
         self._mangledName       = mangledName
         pass
@@ -368,10 +365,8 @@ class FuncDef(object):
                 self._hasBias           = True
             elif t == SPIRV_IMAGE_OPERAND_LOD_MODIFIER:
                 self._hasLod            = True
-            elif t == SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER:
-                self._hasLod            = True
-            elif t == SPIRV_IMAGE_OPERAND_LODZ_MODIFIER:
-                self._hasLod            = True
+            elif t == SPIRV_IMAGE_OPERAND_LODNZ_MODIFIER:
+                self._hasLodNz          = True
             elif t == SPIRV_IMAGE_OPERAND_GRAD_MODIFIER:
                 self._hasGrad           = True
             elif t == SPIRV_IMAGE_OPERAND_CONSTOFFSET_MODIFIER:
@@ -408,6 +403,8 @@ class FuncDef(object):
             traits.append(SPIRV_IMAGE_OPERAND_BIAS_MODIFIER)
         elif self._hasLod == True:
             traits.append(SPIRV_IMAGE_OPERAND_LOD_MODIFIER)
+        elif self._hasLodNz == True:
+            traits.append(SPIRV_IMAGE_OPERAND_LODNZ_MODIFIER)
         elif self._hasGrad == True:
             traits.append(SPIRV_IMAGE_OPERAND_GRAD_MODIFIER)
         elif self._hasConstOffset == True:
@@ -442,29 +439,11 @@ class CodeGen(FuncDef):
         if self._supportSparse:
             # Generate sparse version
             codeGen = CodeGen(self, self._gfxLevel)
-            codeGen._genWithLzOptimization(irOut)
+            codeGen._genWithDimAware(irOut)
 
             # Turn off sparse support
             self._supportSparse = False
 
-        # Generate normal version
-        codeGen = CodeGen(self, self._gfxLevel)
-        codeGen._genWithLzOptimization(irOut)
-        pass
-
-    # Generate both normal and zero-LOD optimized version
-    def _genWithLzOptimization(self, irOut):
-        if self._supportLzOptimization:
-            # Generate zero-LOD optimized version
-            self._mangledName = self._mangledName.replace(SPIRV_IMAGE_OPERAND_LODLODZ_MODIFIER,
-                                                          SPIRV_IMAGE_OPERAND_LODZ_MODIFIER)
-            codeGen = CodeGen(self, self._gfxLevel)
-            codeGen._genWithDimAware(irOut)
-
-            # Turn off zero-LOD optimization
-            self._supportLzOptimization = False
-            self._mangledName = self._mangledName.replace(SPIRV_IMAGE_OPERAND_LODZ_MODIFIER,
-                                                          SPIRV_IMAGE_OPERAND_LOD_MODIFIER)
         # Generate normal version
         codeGen = CodeGen(self, self._gfxLevel)
         codeGen._genWithDimAware(irOut)
@@ -472,9 +451,6 @@ class CodeGen(FuncDef):
 
     # Generate both dimension aware image intrinsic version and old image intrinsic version
     def _genWithDimAware(self, irOut):
-        # Generate old image intrinsic version
-        codeGen = CodeGen(self, self._gfxLevel)
-        codeGen._genInternal(irOut)
 
         # Generate dimension aware image intrinsic version
         codeGen = CodeGen(self, self._gfxLevel)
@@ -510,31 +486,13 @@ class CodeGen(FuncDef):
             else:
                 shouldNeverCall()
         else:
-            if self.isAtomicOp():
-                intrinGen = ImageAtomicGen(self)
-            elif self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.fetch:
-                intrinGen = ImageLoadGen(self)
-            elif self._opKind == SpirvImageOpKind.write:
-                intrinGen = ImageStoreGen(self)
-            elif self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather or \
-                    self._opKind == SpirvImageOpKind.querylod:
-                intrinGen = ImageSampleGen(self)
-            else:
-                shouldNeverCall()
+            shouldNeverCall()
 
-        if intrinGen._returnFmaskId:
-            # Fetch fmask only
-            fmaskVal    = intrinGen.genLoadFmask(irOut)
-            retVal      = intrinGen.genReturnFmaskValue(fmaskVal, irOut)
-            irOut.write("    ret %s %s\n" % (intrinGen.getReturnType(), retVal))
-        else:
-            if intrinGen._isFmaskBased:
-                # Get sampleId from fmask value
-                fmaskVal            = intrinGen.genLoadFmask(irOut)
-                intrinGen._sample   = intrinGen.genGetSampleIdFromFmaskValue(fmaskVal, irOut)
+        if intrinGen._returnFmaskId or intrinGen._isFmaskBased:
+            shouldNeverCall()
 
-            retVal    = intrinGen.genIntrinsicCall(irOut)
-            intrinGen.processReturn(retVal, intrinGen, irOut)
+        retVal    = intrinGen.genIntrinsicCall(irOut)
+        intrinGen.processReturn(retVal, intrinGen, irOut)
 
         irOut.write('}\n\n')
 
@@ -597,6 +555,8 @@ class CodeGen(FuncDef):
             intrinGen.processReturn(retVal, intrinGen, irOut)
 
             irOut.write('}\n\n')
+        else:
+            self._genInternal(irOut)
 
     # Gets return type of image operation, which is type of texel.
     def getReturnType(self):
@@ -1147,34 +1107,6 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
         self._localVarCounter += 1
         return "%%%d" % (ret)
 
-    # Generates loading of F-mask value.
-    def genLoadFmask(self, irOut):
-        vaddrRegType    = self.getVAddrRegType()
-        vaddrReg        = self.genFillVAddrReg(0, True, irOut)
-        fmaskDesc       = "<8 x i32> %s," % (VarNames.fmask)
-        fmaskVal        = self.acquireLocalVar()
-        flags           = LLVM_IMAGE_INTRINSIC_LOADSTORE_FLAGS + ", i1 0"
-        funcName        = "llvm.amdgcn.image.load.v4f32.v4i32.v8i32"
-        loadFmask       = "    %s = call <4 x float> @%s(%s %s, %s i32 15, %s)\n" % \
-                      (fmaskVal, \
-                       funcName, \
-                       vaddrRegType, \
-                       vaddrReg, \
-                       fmaskDesc, \
-                       flags)
-        irOut.write(loadFmask)
-        temp        = self.acquireLocalVar()
-        bitcast     = "    %s = bitcast <4 x float> %s to <4 x i32>\n" % (temp, fmaskVal)
-        irOut.write(bitcast)
-
-        if not hasLlvmDecl(funcName):
-            # Adds LLVM declaration for this function
-            funcExternalDecl = "declare <4 x float> @%s(<4 x i32>, <8 x i32>, i32, i1, i1, i1, i1) %s\n" % \
-                               (funcName, self._attr)
-            addLlvmDecl(funcName, funcExternalDecl)
-
-        return temp
-
     # Generates return value for F-mask only fetch.
     def genReturnFmaskValue(self, fmaskVal, irOut):
         descriptorDataFormat = self.genExtractDescriptorDataFormat(irOut)
@@ -1249,144 +1181,6 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
         irInsertElement = "    %s = insertelement %s %s, %s %s, i32 %d\n" % (vaddrReg, vaddrRegType, oldVaddrReg, \
                                                                              vaddrRegCompType, var, index)
         return (vaddrReg, irInsertElement)
-
-    # Generates vaddr register setup
-    def genFillVAddrReg(self, constOffsetsIndex, isFetchingFromFmask, irOut):
-        index = 0
-        vaddrRegType = self.getVAddrRegType()
-        vaddrRegCompType = self.getVAddrRegCompType()
-        vaddrReg = "undef"
-
-        if self._hasConstOffset or self._hasOffset:
-            if self._opKind != SpirvImageOpKind.fetch:
-                # Fetch offset has already been added to coordinate per component
-                ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._packedOffset, index)
-                vaddrReg = ret[0]
-                index += 1
-                irOut.write(ret[1])
-
-        if self._hasConstOffsets:
-            ret = self.getInsertElement(vaddrReg,
-                                        vaddrRegType,
-                                        vaddrRegCompType,
-                                        self._packedOffsets[constOffsetsIndex],
-                                        index)
-            vaddrReg = ret[0]
-            index += 1
-            irOut.write(ret[1])
-
-        if self._hasBias:
-            ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._bias, index)
-            vaddrReg = ret[0]
-            index += 1
-            irOut.write(ret[1])
-
-        if self._dRef:
-            ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._dRef, index)
-            vaddrReg = ret[0]
-            index += 1
-            irOut.write(ret[1])
-
-        if self._gradX[0]:
-            numGradComponents = self.getCoordNumComponents(False, False, False)
-            if self._dim == SpirvDim.DimCube:
-                numGradComponents = 2
-
-            for i in range(numGradComponents):
-                ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._gradX[i], index)
-                vaddrReg = ret[0]
-                index += 1
-                irOut.write(ret[1])
-            for i in range(numGradComponents):
-                ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._gradY[i], index)
-                vaddrReg = ret[0]
-                index += 1
-                irOut.write(ret[1])
-
-        if self.getVAddrRegSize() == 1:
-            vaddrReg = self._coordXYZW[0]
-            index += 1
-            pass
-        else:
-            for i in range(self.getCoordNumComponents(True, False, False)):
-                coordComp = self._coordXYZW[i]
-                ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, coordComp, index)
-                vaddrReg = ret[0]
-                index += 1
-                irOut.write(ret[1])
-            # SampleNumber is appended to last coordinate component
-            if self._hasSample:
-                if isFetchingFromFmask:
-                    ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, "0", index)
-                    pass
-                else:
-                    ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._sample, index)
-                vaddrReg = ret[0]
-                index += 1
-                irOut.write(ret[1])
-            # MinLod is appended to last coordinate component
-            if self._minlod:
-                ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._minlod, index)
-                vaddrReg = ret[0]
-                index += 1
-                irOut.write(ret[1])
-
-        if self._hasLod and not self._supportLzOptimization:
-            ret = self.getInsertElement(vaddrReg, vaddrRegType, vaddrRegCompType, self._lod, index)
-            vaddrReg = ret[0]
-            index += 1
-            irOut.write(ret[1])
-        return vaddrReg
-
-    # Gets size of vaddr register
-    def getVAddrRegSize(self):
-        size = self.getCoordNumComponents(True, False, False)
-        if self._hasDref:
-            size += 1
-        if self._hasBias:
-            size += 1
-        if self._hasLod and not self._supportLzOptimization:
-            size += 1
-        if self._hasGrad:
-            size += self.getCoordNumComponents(False, False, False) * 2
-        if self._hasConstOffset or self._hasOffset or self._hasConstOffsets:
-            if self._opKind != SpirvImageOpKind.fetch:
-                size += 1
-        if self._hasSample:
-            size += 1
-        if self._hasMinLod:
-            size += 1
-
-        # Round up size to 1, 2, 4, 8, 16
-        sizes = (1, 2, 4, 8, 16)
-        for i in sizes:
-            if size <= i:
-                size = i
-                break
-        assert size in sizes
-
-        return size
-
-    # Gets type of vaddr register.
-    def getVAddrRegType(self):
-        vaddrRegSize = self.getVAddrRegSize()
-        if self._opKind == SpirvImageOpKind.fetch or \
-           self._opKind == SpirvImageOpKind.read or \
-           self._opKind == SpirvImageOpKind.write or \
-           self.isAtomicOp():
-            return vaddrRegSize == 1 and "i32" or "<%d x i32>" % (vaddrRegSize)
-        else:
-            return vaddrRegSize == 1 and "float" or "<%d x float>" % (vaddrRegSize)
-
-    # Gets component type of vaddr register
-    def getVAddrRegCompType(self):
-        if self._opKind == SpirvImageOpKind.fetch or \
-           self._opKind == SpirvImageOpKind.read or \
-           self._opKind == SpirvImageOpKind.write or \
-           self.isAtomicOp():
-            return "i32"
-        else:
-            return "float"
 
     # Gets type of vdata register
     def getVDataRegType(self):
@@ -1686,111 +1480,6 @@ class BufferAtomicGen(CodeGen):
 
         return funcName
 
-# Represents image atomic intrinsic based code generation.
-class ImageAtomicGen(CodeGen):
-    def __init__(self, codeGenBase):
-        super(ImageAtomicGen, self).__init__(codeGenBase, codeGenBase._gfxLevel)
-        pass
-
-    # Generates call to amdgcn intrinsic function.
-    def genIntrinsicCall(self, irOut):
-        assert self.isAtomicOp()
-        assert self._dim != SpirvDim.DimBuffer
-
-        retType     = self.getBackendRetType()
-        retVal      = FuncDef.INVALID_VAR
-        funcName    = self.getFuncName()
-
-        # Process image atomic operations
-        atomicData = VarNames.atomicData
-        if self._sampledType == SpirvSampledType.f32:
-            # Cast atomic value operand type to i32
-            atomicData = self.acquireLocalVar()
-            irBitcast = "    %s = bitcast float %s to i32\n" % (atomicData, VarNames.atomicData)
-            irOut.write(irBitcast)
-
-        vaddrRegType = self.getVAddrRegType()
-        vaddrReg     = self.genFillVAddrReg(0, False, irOut)
-        comp         = self._opKind == SpirvImageOpKind.atomiccompexchange \
-                        and "i32 " + VarNames.atomicComparator + "," \
-                        or  ""
-        retVal     = self.acquireLocalVar()
-
-        # Set r128 bit flag
-        flags = ", i1 0"
-
-        # Set DA flag for arrayed resource
-        flags += self.getDAFlag()
-        # Set slc flag
-        flags += ", i1 %slc"
-
-        resourceName = VarNames.resource;
-        if self._dim == SpirvDim.DimCube:
-            resourceName = VarNames.patchedResource
-            irPatchCall = "    %s = call <8 x i32> @%s(<8 x i32> %s)\n" \
-                % (resourceName,
-                   LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE,
-                   VarNames.resource)
-            irOut.write(irPatchCall)
-
-        irCall = "    %s = call i32 @%s(i32 %s, %s %s %s, <8 x i32> %s %s)\n" \
-            % (retVal,
-               funcName,
-               atomicData,
-               comp,
-               vaddrRegType,
-               vaddrReg,
-               resourceName,
-               flags)
-        irOut.write(irCall)
-
-        if self._sampledType == SpirvSampledType.f32:
-            oldRetVal = retVal
-            retVal = self.acquireLocalVar()
-            irBitcast = "    %s = bitcast i32 %s to float\n" % (retVal, oldRetVal)
-            irOut.write(irBitcast)
-
-        return retVal
-
-    # Gets buffer atomic intrinsic function name
-    def getFuncName(self):
-        funcName = "llvm.amdgcn.image.atomic"
-
-        intrinsicNames = { \
-            SpirvImageOpKind.atomicexchange      : ".swap",     \
-            SpirvImageOpKind.atomiccompexchange  : ".cmpswap",  \
-            SpirvImageOpKind.atomiciincrement    : ".add",      \
-            SpirvImageOpKind.atomicidecrement    : ".sub",      \
-            SpirvImageOpKind.atomiciadd          : ".add",      \
-            SpirvImageOpKind.atomicisub          : ".sub",      \
-            SpirvImageOpKind.atomicsmin          : ".smin",     \
-            SpirvImageOpKind.atomicumin          : ".umin",     \
-            SpirvImageOpKind.atomicsmax          : ".smax",     \
-            SpirvImageOpKind.atomicumax          : ".umax",     \
-            SpirvImageOpKind.atomicand           : ".and",      \
-            SpirvImageOpKind.atomicor            : ".or",       \
-            SpirvImageOpKind.atomicxor           : ".xor",      \
-        }
-
-        funcName += intrinsicNames[self._opKind]
-
-        vaddrRegSize = self.getVAddrRegSize()
-        funcName += vaddrRegSize == 1 and ".i32" or ".v%di32" % (vaddrRegSize)
-
-        compareType = ""
-        if self._opKind == SpirvImageOpKind.atomiccompexchange:
-            compareType = "i32,"
-
-        if not hasLlvmDecl(funcName):
-            # Adds LLVM declaration for this function
-            funcExternalDecl = "declare %s @%s(i32, %s %s, <8 x i32>, i1, i1, i1) %s\n" % \
-                               (self.getBackendRetType(), funcName, compareType, self.getVAddrRegType(), \
-                                self._attr)
-            addLlvmDecl(funcName, funcExternalDecl)
-
-        return funcName
-        pass
-
 # Represents dimension aware image atomic intrinsic based code generation.
 class DimAwareImageAtomicGen(CodeGen):
     def __init__(self, codeGenBase):
@@ -2053,89 +1742,6 @@ class BufferStoreGen(CodeGen):
 
         return funcName
 
-# Represents image load intrinsic based code generation.
-class ImageLoadGen(CodeGen):
-    def __init__(self, codeGenBase):
-        super(ImageLoadGen, self).__init__(codeGenBase, codeGenBase._gfxLevel)
-        pass
-
-    # Generates call to amdgcn intrinsic function.
-    def genIntrinsicCall(self, irOut):
-        assert self._dim != SpirvDim.DimBuffer
-        assert self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.fetch
-
-        retType     = self.getBackendRetType()
-        retVal      = FuncDef.INVALID_VAR
-        funcName    = self.getFuncName()
-
-        # Process image sample, image gather, image fetch
-        retVals = [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
-                   FuncDef.INVALID_VAR, FuncDef.INVALID_VAR]
-
-        vaddrReg    = self.genFillVAddrReg(0, False, irOut)
-        retVal      = self.acquireLocalVar()
-
-        if self._opKind == SpirvImageOpKind.fetch:
-            flags = LLVM_IMAGE_INTRINSIC_LOADSTORE_FLAGS
-        else:
-            flags = LLVM_IMAGE_INTRINSIC_LOADSTORE_FLAGS_DYNAMIC
-
-        # Set DA flag for arrayed resource
-        flags += self.getDAFlag()
-
-        resourceName = VarNames.resource;
-        if self._dim == SpirvDim.DimCube:
-            resourceName = VarNames.patchedResource
-            irPatchCall = "    %s = call <8 x i32> @%s(<8 x i32> %s)\n" \
-                % (resourceName,
-                   LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE,
-                   VarNames.resource)
-            irOut.write(irPatchCall)
-
-        irCall = "    %s = call %s @%s(%s %s, <8 x i32> %s,  i32 15, %s)\n" \
-            % (retVal,
-               retType,
-               funcName,
-               self.getVAddrRegType(),
-               vaddrReg,
-               resourceName,
-               flags)
-        irOut.write(irCall)
-
-        retVal = self.genCastReturnValToSampledType(retVal, irOut)
-
-        return retVal
-
-    # Gets image load intrinsic function name
-    def getFuncName(self):
-        funcName = "llvm.amdgcn.image.load"
-
-        if self._hasLod and not self._supportLzOptimization:
-            funcName += ".mip"
-
-        if self._hasConstOffset:
-            if self._opKind != SpirvImageOpKind.fetch:
-                funcName += ".o"
-
-        if self._sampledType == SpirvSampledType.f16:
-            funcName += ".v4f16"
-        else:
-            funcName += ".v4f32"
-
-        vaddrRegSize = self.getVAddrRegSize()
-        funcName += vaddrRegSize == 1 and ".i32" or ".v%di32" % (vaddrRegSize)
-        funcName += ".v8i32"
-
-        if not hasLlvmDecl(funcName):
-            # Adds LLVM declaration for this function
-            if self._opKind != SpirvImageOpKind.write:
-                funcExternalDecl = "declare %s @%s(%s, <8 x i32>,  i32, i1, i1, i1, i1) %s\n" % \
-                                   (self.getBackendRetType(), funcName, self.getVAddrRegType(), \
-                                    self._attr)
-            addLlvmDecl(funcName, funcExternalDecl)
-        return funcName
-        pass
-
 # Represents dimension aware image load intrinsic based code generation.
 class DimAwareImageLoadGen(CodeGen):
     def __init__(self, codeGenBase):
@@ -2230,7 +1836,7 @@ class DimAwareImageLoadGen(CodeGen):
                     params += ", i32 %s" % (self._coordXYZW[arrayIndex])
 
         # Lod
-        if self._hasLod and not self._supportLzOptimization:
+        if self._hasLod:
             if paramTypeOnly:
                 params += ", i32"
             else:
@@ -2279,7 +1885,7 @@ class DimAwareImageLoadGen(CodeGen):
     def getIntrinsicName(self, isFetchingFromFmask):
         funcName = "llvm.amdgcn.image.load"
 
-        if self._hasLod and not self._supportLzOptimization:
+        if self._hasLod:
             funcName += ".mip"
 
         if isFetchingFromFmask:
@@ -2287,6 +1893,7 @@ class DimAwareImageLoadGen(CodeGen):
             # NOTE: When accessing FMask, DA flag should not be set. To avoid setting DA flag,
             # here 3D intrinsic is used to access 2darray FMask.
             dimName = self._arrayed and AMDGPUDimName.Dim3D or AMDGPUDimName.Dim2D
+            dimName = "." + dimName
         else:
             dimName = self.getDimAwareDimName()
         funcName += dimName
@@ -2335,69 +1942,6 @@ class DimAwareImageLoadGen(CodeGen):
         irOut.write(bitcast)
 
         return temp
-
-# Represents image store intrinsic based code generation.
-class ImageStoreGen(CodeGen):
-    def __init__(self, codeGenBase):
-        super(ImageStoreGen, self).__init__(codeGenBase, codeGenBase._gfxLevel)
-        pass
-
-    # Generates call to amdgcn intrinsic function.
-    def genIntrinsicCall(self, irOut):
-        assert self._dim != SpirvDim.DimBuffer
-        assert self._opKind == SpirvImageOpKind.write
-
-        funcName    = self.getFuncName()
-
-        # Process image write
-        vaddrReg = self.genFillVAddrReg(0, False, irOut)
-        vdataReg = self.genCastTexelToSampledType(VarNames.texel, irOut)
-        flag = LLVM_IMAGE_INTRINSIC_LOADSTORE_FLAGS_DYNAMIC + self.getDAFlag()
-        resourceName = VarNames.resource;
-        if self._dim == SpirvDim.DimCube:
-            resourceName = VarNames.patchedResource
-            irPatchCall = "    %s = call <8 x i32> @%s(<8 x i32> %s)\n" \
-                % (resourceName,
-                   LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE,
-                   VarNames.resource)
-            irOut.write(irPatchCall)
-
-        irCall = "    call void @%s(%s %s, %s %s, <8 x i32> %s, i32 15, %s)\n" \
-            % (funcName,
-               self.getVDataRegType(),
-               vdataReg,
-               self.getVAddrRegType(),
-               vaddrReg,
-               resourceName,
-               flag)
-        irOut.write(irCall)
-
-        return FuncDef.INVALID_VAR
-
-    # Gets image store intrinsic function name
-    def getFuncName(self):
-        funcName = "llvm.amdgcn.image.store"
-
-        if self._hasLod:
-            funcName += ".mip"
-
-        if self._sampledType == SpirvSampledType.f16:
-            funcName += ".v4f16"
-        else:
-            funcName += ".v4f32"
-
-        vaddrRegSize = self.getVAddrRegSize()
-        funcName += vaddrRegSize == 1 and ".i32" or ".v%di32" % (vaddrRegSize)
-
-        funcName += ".v8i32"
-
-        if not hasLlvmDecl(funcName):
-            # Adds LLVM declaration for this function
-            funcExternalDecl = "declare %s @%s(%s, %s, <8 x i32>,  i32, i1, i1, i1, i1) %s\n" % \
-                               (self.getBackendRetType(), funcName, self.getVDataRegType(), self.getVAddrRegType(), \
-                                self._attr)
-            addLlvmDecl(funcName, funcExternalDecl)
-        return funcName
 
 # Represents dimension aware image store intrinsic based code generation.
 class DimAwareImageStoreGen(CodeGen):
@@ -2535,290 +2079,6 @@ class DimAwareImageStoreGen(CodeGen):
             addLlvmDecl(funcName, funcExternalDecl)
         return funcName
 
-# Represents image sample intrinsic based code generation.
-class ImageSampleGen(CodeGen):
-    def __init__(self, codeGenBase):
-        super(ImageSampleGen, self).__init__(codeGenBase, codeGenBase._gfxLevel)
-        pass
-
-    # Generates call to amdgcn intrinsic function.
-    def genIntrinsicCall(self, irOut):
-        assert self._dim != SpirvDim.DimBuffer
-        assert self._opKind == SpirvImageOpKind.sample or self._opKind == SpirvImageOpKind.gather or \
-                self._opKind == SpirvImageOpKind.querylod
-
-        retType     = self.getBackendRetType()
-        retCompType = self.getVDataRegCompType()
-        funcName    = self.getFuncName()
-        resourceName = VarNames.resource
-        # Dmask for gather4 instructions
-        dmask = "15"
-        irNeedPatchDescriptor = FuncDef.INVALID_VAR
-        LABEL_PATCH_DESCRIPTOR                  = "PatchDescriptor"
-        LABEL_PATCH_COORD                       = "PatchCoord"
-        LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD   = "MergePatchDescriptor"
-        if self._opKind == SpirvImageOpKind.gather:
-            if not self._hasDref:
-                # Gather component transformed in to dmask as: dmask = 1 << comp
-                dmask = self.acquireLocalVar()
-                irShiftLeft = "    %s = shl i32 1, %s\n" % (dmask, VarNames.comp)
-                irOut.write(irShiftLeft)
-            else:
-                # Gather component is 1 for shadow textures
-                dmask = "1"
-            # Patch descriptor for integer gather
-            if self._gfxLevel < GFX9:
-                if self._sampledType == SpirvSampledType.i32 or self._sampledType == SpirvSampledType.u32:
-                    irNeedPatchDescriptor = self.acquireLocalVar()
-                    irCheckResourceFormatCall = "    {_irNeedPatchDescriptor} = call i1 @llpc.patch.image.gather.check(<8 x i32> {_resource})\n" \
-                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
-                                _resource = VarNames.resource)
-                    irOut.write(irCheckResourceFormatCall)
-
-                    # For i32 resource format, we patch gather coordinate, for other integer format, we patch descriptor
-                    irBranch = "    br i1 {_irNeedPatchDescriptor}, label %{_labelPatchDescriptor}, label %{_labelPatchCoord}\n" \
-                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
-                                _labelPatchDescriptor  = LABEL_PATCH_DESCRIPTOR,
-                                _labelPatchCoord       = LABEL_PATCH_COORD)
-                    irOut.write(irBranch)
-
-                    # Patch descriptor branch
-                    irOut.write("{_labelPatchDescriptor}:\n".format(_labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR))
-                    patchedResourceName = self.acquireLocalVar()
-                    if self._sampledType == SpirvSampledType.i32:
-                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> " \
-                                              "@llpc.patch.image.gather.descriptor.i32(<8 x i32> {_resource})\n" \
-                            .format(_patchedResourceName = patchedResourceName,
-                                    _resource            = VarNames.resource)
-                        irOut.write(irPatchRsrcCall)
-                    elif self._sampledType == SpirvSampledType.u32:
-                        irPatchRsrcCall = "    {_patchedResourceName} = call <8 x i32> " \
-                                              "@llpc.patch.image.gather.descriptor.u32(<8 x i32> {_resource})\n" \
-                            .format(_patchedResourceName = patchedResourceName,
-                                    _resource            = VarNames.resource)
-                        irOut.write(irPatchRsrcCall)
-                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
-
-                    # Patch coordinate branch
-                    irOut.write("{_labelPatchCoord}:\n".format(_labelPatchCoord = LABEL_PATCH_COORD))
-                    patchedCoord = self.acquireLocalVar()
-
-                    # We need to skip cube dimension and gathering with a specified LOD,
-                    # such cases is not supported
-                    if (self._dim == SpirvDim.DimCube) or self._hasLod:
-                        patchCoordFuncName = "llpc.patch.image.gather.coordinate.skip"
-                    else:
-                        patchCoordFuncName = "llpc.patch.image.gather.coordinate"
-                    irPatchCoordCall = "    {_patchedCoord} = call <2 x float> @{_funcName}(<8 x i32> {_resource}, " \
-                                                                         "float {_x}, " \
-                                                                         "float {_y})\n" \
-                                           .format(_patchedCoord = patchedCoord,
-                                                   _funcName     = patchCoordFuncName,
-                                                   _resource     = VarNames.resource,
-                                                   _x            = self._coordXYZW[0],
-                                                   _y            = self._coordXYZW[1])
-                    irOut.write(irPatchCoordCall)
-                    patchedCoordX  = self.acquireLocalVar()
-                    irExtract = "    {_patchedCoordX} = extractelement <2 x float> {_patchedCoord}, i32 0\n" \
-                       .format(_patchedCoordX = patchedCoordX,
-                               _patchedCoord  =patchedCoord)
-                    irOut.write(irExtract)
-                    patchedCoordY  = self.acquireLocalVar()
-                    irExtract = "    {_patchedCoordY} = extractelement <2 x float> {_patchedCoord}, i32 1\n" \
-                        .format(_patchedCoordY = patchedCoordY,
-                                _patchedCoord  = patchedCoord)
-                    irOut.write(irExtract)
-                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
-
-                    # Merge branch
-                    irOut.write("{_labelMerge}:\n".format(_labelMerge = LABEL_MERGE_PATCH_DESCRIPTOR_OR_COORD))
-                    resourceName = self.acquireLocalVar()
-                    irPhi = "    {_resourceName} = phi <8 x i32> [{_resource}, %{_labelPatchCoord}], [{_patchedResourceName}, %{_labelPatchDescriptor}]\n" \
-                        .format(_resourceName         = resourceName,
-                                _resource             = VarNames.resource,
-                                _labelPatchCoord      = LABEL_PATCH_COORD,
-                                _patchedResourceName  = patchedResourceName,
-                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
-                    irOut.write(irPhi)
-
-                    coordX = self.acquireLocalVar()
-                    irPhi = "    {_coordX} = phi float [{_patchedCoordX}, %{_labelPatchCoord}], [{_unpatchedCoordX}, %{_labelPatchDescriptor}]\n" \
-                        .format(_coordX               = coordX,
-                                _patchedCoordX        = patchedCoordX,
-                                _labelPatchCoord      = LABEL_PATCH_COORD,
-                                _unpatchedCoordX      = self._coordXYZW[0],
-                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
-                    irOut.write(irPhi)
-                    coordY = self.acquireLocalVar()
-                    irPhi = "    {_coordY} = phi float [{_patchedCoordY}, %{_labelPatchCoord}], [{_unpatchedCoordY}, %{_labelPatchDescriptor}]\n" \
-                        .format(_coordY               = coordY,
-                                _patchedCoordY        = patchedCoordY,
-                                _labelPatchCoord      = LABEL_PATCH_COORD,
-                                _unpatchedCoordY      = self._coordXYZW[1],
-                                _labelPatchDescriptor = LABEL_PATCH_DESCRIPTOR)
-                    irOut.write(irPhi)
-
-                    self._coordXYZW[0] = coordX
-                    self._coordXYZW[1] = coordY
-
-        # Process image sample, image gather, image fetch
-        retVals = [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
-                   FuncDef.INVALID_VAR, FuncDef.INVALID_VAR]
-
-        patchedRetVals =  [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
-                           FuncDef.INVALID_VAR, FuncDef.INVALID_VAR]
-
-        # Remove sampler descriptor for OpImageFetch
-        samplerDesc = "<4 x i32> %s," % (VarNames.sampler)
-
-        # First parameter
-        vaddrRegs       = [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
-                           FuncDef.INVALID_VAR, FuncDef.INVALID_VAR]
-        # For OpImageGather* with offsets, we need to generate 4 gather4 instructions, thus introduce 4 vaddrRegs,
-        # other image instructions will only use the first element
-
-        # Label used when need to patch return type for gather
-        LABEL_ENTRY_PATCH_RETURN = "EntryPatchReturnType"
-        LABEL_BEGIN_PATCH_RETURN = "BeginPatchReturnType"
-        LABEL_MERGE_PATCH_RETURN = "MergePatchReturnType"
-
-        callNum     = self._hasConstOffsets and 4 or 1
-        for i in range(callNum):
-            vaddrRegs[i]    = self.genFillVAddrReg(i, False, irOut)
-            retVals[i]      = self.acquireLocalVar()
-
-            # Instruction flags: unorm, glc, slc, lwe
-            flags = "i1 0, i1 0, i1 0, i1 0"
-
-            # Set DA flag for arrayed resource
-            flags += self.getDAFlag()
-
-            # Set entry lable when need to patch return type for gather
-            if (self._gfxLevel < GFX9 and \
-                self._opKind == SpirvImageOpKind.gather and \
-                (self._sampledType == SpirvSampledType.i32 or \
-                 self._sampledType == SpirvSampledType.u32)):
-                labelEntry = "%s%d" % (LABEL_ENTRY_PATCH_RETURN, i)
-                irOut.write("    br label %{_labelEntry}\n".format(_labelEntry = labelEntry))
-                irOut.write("{_labelEntry}:\n".format(_labelEntry = labelEntry))
-
-            irCall     = "    %s = call %s @%s(%s %s, <8 x i32> %s, %s i32 %s, %s)\n" \
-                % (retVals[i],
-                   retType,
-                   funcName,
-                   self.getVAddrRegType(),
-                   vaddrRegs[i],
-                   resourceName,
-                   samplerDesc,
-                   dmask,
-                   flags)
-            irOut.write(irCall)
-            if self._gfxLevel < GFX9 and self._opKind == SpirvImageOpKind.gather:
-                # Patch return type for gather
-                if self._sampledType == SpirvSampledType.i32 or self._sampledType == SpirvSampledType.u32:
-                    assert irNeedPatchDescriptor != FuncDef.INVALID_VAR
-                    labelPatch = "%s%d" % (LABEL_BEGIN_PATCH_RETURN, i)
-                    labelMerge   = "%s%d" % (LABEL_MERGE_PATCH_RETURN,i)
-
-                    irBranch = "    br i1 {_irNeedPatchDescriptor}, label %{_labelPatch}, label %{_labelMerge}\n" \
-                        .format(_irNeedPatchDescriptor = irNeedPatchDescriptor,
-                                _labelPatch = labelPatch,
-                                _labelMerge = labelMerge)
-                    irOut.write(irBranch)
-                    irOut.write("{_labelPatch}:\n".format(_labelPatch = labelPatch))
-                    if self._sampledType == SpirvSampledType.i32:
-                        patchedRetVals[i]  = self.acquireLocalVar()
-                        irPatchCall = "    {_patchedRetVal} = call <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32> {_resource}, <4 x float> {_retVal})\n" \
-                            .format(_patchedRetVal = patchedRetVals[i],
-                                    _resource      = VarNames.resource,
-                                    _retVal        = retVals[i])
-                        irOut.write(irPatchCall)
-                    elif self._sampledType == SpirvSampledType.u32:
-                        patchedRetVals[i]  = self.acquireLocalVar()
-                        irPatchCall = "    {_patchedRetVal} = call <4 x float> @llpc.patch.image.gather.texel.u32(<8 x i32> {_resource}, <4 x float> {_retVal})\n" \
-                            .format(_patchedRetVal = patchedRetVals[i],
-                                    _resource      = VarNames.resource,
-                                    _retVal        = retVals[i])
-                        irOut.write(irPatchCall)
-
-                    irOut.write("    br label %{_labelMerge}\n".format(_labelMerge = labelMerge))
-                    irOut.write("{_labelMerge}:\n".format(_labelMerge = labelMerge))
-                    mergedRetVal = self.acquireLocalVar()
-                    irPhi = "    {_mergedRetVal} = phi <4 x float> [{_retVal}, %{_labelEntry}], [{_patchedRetVal}, %{_labelPatch}]\n" \
-                        .format(_mergedRetVal = mergedRetVal,
-                                _retVal        = retVals[i],
-                                _labelEntry    = labelEntry,
-                                _patchedRetVal = patchedRetVals[i],
-                                _labelPatch    = labelPatch)
-                    irOut.write(irPhi)
-                    retVals[i] = mergedRetVal
-
-        if not self._hasConstOffsets:
-            retVal  = self.genCastReturnValToSampledType(retVals[0], irOut)
-        else:
-            # Extract w component which is i0j0 texel from each gather4 result, and construct the return value
-            tempRetVal = "undef"
-            for i in range(callNum):
-                tempComp   = self.acquireLocalVar()
-                irExtract  = "    %s = extractelement %s %s, i32 3\n" % (tempComp, retType, retVals[i])
-                irOut.write(irExtract)
-                retVal = self.acquireLocalVar()
-                irInsert   = "    %s = insertelement %s %s, %s %s, i32 %d\n" % (retVal, retType, tempRetVal, retCompType, tempComp, i)
-                tempRetVal = retVal
-                irOut.write(irInsert)
-            retVal = self.genCastReturnValToSampledType(retVal, irOut)
-
-        return retVal
-
-    # Gets image sample intrinsic function name
-    def getFuncName(self):
-        funcName = "llvm.amdgcn"
-        if self._opKind == SpirvImageOpKind.sample:
-            funcName += ".image.sample"
-        elif self._opKind == SpirvImageOpKind.gather:
-            funcName += ".image.gather4"
-        elif self._opKind == SpirvImageOpKind.querylod:
-            funcName += ".image.getlod"
-        else:
-            shouldNeverCall()
-
-        if self._hasDref:
-            funcName += ".c"
-
-        if self._opKind == SpirvImageOpKind.gather and not self._hasLod and not self._hasBias:
-            funcName += ".lz"
-
-        if self._hasBias:
-            funcName += ".b"
-        elif self._hasLod and not self._supportLzOptimization:
-            funcName += ".l"
-        elif self._hasLod and self._supportLzOptimization:
-            funcName += ".lz"
-        elif self._hasGrad:
-            funcName += ".d"
-
-        if self._hasMinLod:
-            funcName += ".cl"
-
-        if self._hasConstOffset or self._hasOffset or self._hasConstOffsets:
-            funcName += ".o"
-
-        if self._sampledType == SpirvSampledType.f16:
-            funcName += ".v4f16"
-        else:
-            funcName += ".v4f32"
-        vaddrRegSize = self.getVAddrRegSize()
-        funcName += vaddrRegSize == 1 and ".f32" or ".v%df32" % (vaddrRegSize)
-        funcName += ".v8i32"
-
-        if not hasLlvmDecl(funcName):
-            # Adds LLVM declaration for this function
-            funcExternalDecl = "declare %s @%s(%s, <8 x i32>, <4 x i32>, i32, i1, i1, i1, i1, i1) %s\n" % \
-                               (self.getBackendRetType(), funcName, self.getVAddrRegType(), \
-                                self._attr)
-            addLlvmDecl(funcName, funcExternalDecl)
-        return funcName
-
 # Represents dimension aware image sample intrinsic based code generation.
 class DimAwareImageSampleGen(CodeGen):
     def __init__(self, codeGenBase):
@@ -2884,7 +2144,7 @@ class DimAwareImageSampleGen(CodeGen):
                     if (self._dim == SpirvDim.DimCube) or self._hasLod:
                         patchCoordFuncName = "llpc.patch.image.gather.coordinate.skip"
                     else:
-                        patchCoordFuncName = "llpc.patch.image.gather.coordinate"
+                        patchCoordFuncName = "llpc.patch.image.gather.coordinate" + self.getDimAwareDimName()
                     irPatchCoordCall = "    {_patchedCoord} = call <2 x float> @{_funcName}(<8 x i32> {_resource}, " \
                                                                          "float {_x}, " \
                                                                          "float {_y})\n" \
@@ -3051,15 +2311,13 @@ class DimAwareImageSampleGen(CodeGen):
         if self._hasDref:
             funcName += ".c"
 
-        if self._opKind == SpirvImageOpKind.gather and not self._hasLod and not self._hasBias:
+        if self._opKind == SpirvImageOpKind.gather and not self._hasLod and not self._hasBias and not self._hasLodNz:
             funcName += ".lz"
 
         if self._hasBias:
             funcName += ".b"
-        elif self._hasLod and not self._supportLzOptimization:
+        elif self._hasLod:
             funcName += ".l"
-        elif self._hasLod and self._supportLzOptimization:
-            funcName += ".lz"
         elif self._hasGrad:
             funcName += ".d"
 
@@ -3196,7 +2454,7 @@ class DimAwareImageSampleGen(CodeGen):
                 params += ", float %s" % (self._minlod)
 
         # Lod
-        if self._hasLod and not self._supportLzOptimization:
+        if self._hasLod:
             if paramTypeOnly:
                 params += ", float"
             else:
@@ -3269,9 +2527,7 @@ def processLine(irOut, funcConfig, gfxLevel):
     # 4.  proj                                              (optional)
     # 5.  dref                                              (optional)
     # 6.  bias                                              (optional)
-    # 7.  lod or lod|lodz                                   (optional)
-    #         lod|lodz means lz optimization is enabled for this function, besides normal lod version, an additional
-    #         lodz version will also be generated, which leverages hardware lz instructions.
+    # 7.  lod                                               (optional)
     # 8.  grad                                              (optional)
     # 9.  constoffset                                       (optional)
     # 10. offset                                            (optional)
@@ -3280,6 +2536,8 @@ def processLine(irOut, funcConfig, gfxLevel):
     # 13. minlod                                            (optional)
     # 14. fmaskbased                                        (optional)
     # 15. fmaskid                                           (optional)
+    # 16. lodnz                                             (optional)
+    #         Apply to gather instructions, indicates lz version of instruction should not be used.
     #         returns index of fragment which is encoded in Fmask.
     # Dimension string: All supported dimensions are packed in a dimension string, as a configuration token.
     # Dimension string format:
@@ -3367,141 +2625,6 @@ def outputLlvmAttributes(irOut):
         irOut.write("%s\n" % (LLVM_ATTRIBUTES[i]))
     pass
 
-def outputPreDefinedFunctions(irOut):
-    transformCubeGrad = """\
-define <4 x float> @llpc.image.transformCubeGrad(float %cubeId, float %cubeMa, float %faceCoordX, float %faceCoordY, float %gradX.x, float %gradX.y, float %gradX.z, float %gradY.x, float %gradY.y, float %gradY.z) #0
-{
-    ; When sampling cubemap with explicit gradient value, API supplied gradients are cube vectors,
-    ; need to transform them to face gradients for the selected face.
-    ; Mapping of MajorAxis, U-Axis, V-Axis is (according to DXSDK doc and refrast):
-    ;   face_id | MajorAxis | FaceUAxis | FaceVAxis
-    ;   0       | +X        | -Z        | -Y
-    ;   1       | -X        | +Z        | -Y
-    ;   2       | +Y        | +X        | +Z
-    ;   3       | -Y        | +X        | -Z
-    ;   4       | +Z        | +X        | -Y
-    ;   5       | -Z        | -X        | -Y
-    ;   (Major Axis is defined by enum D3D11_TEXTURECUBE_FACE in d3d ddk header file (d3d11.h in DX11DDK).)
-    ;
-    ; Parameters used to convert cube gradient vector to face gradient (face ids are in floats because HW returns floats):
-    ;   face_id | faceidPos    | faceNeg   | flipU | flipV
-    ;   0.0     | 0.0          | false     | true  | true
-    ;   1.0     | 0.0          | true      | false | true
-    ;   2.0     | 1.0          | false     | false | false
-    ;   3.0     | 1.0          | true      | false | true
-    ;   4.0     | 2.0          | false     | false | true
-    ;   5.0     | 2.0          | true      | true  | true
-
-    ; faceidHalf = faceid * 0.5
-    %1 = fmul float %cubeId, 0.5
-    ; faceidPos = round_zero(faceidHalf)
-    ;   faceidPos is: 0.0 (X axis) when face id is 0.0 or 1.0;
-    ;                 1.0 (Y axis) when face id is 2.0 or 3.0;
-    ;                 2.0 (Z axis) when face id is 4.0 or 5.0;
-    %2 = call float @llvm.trunc.f32(float %1)
-    ; faceNeg = (faceIdPos != faceIdHalf)
-    ;   faceNeg is true when major axis is negative, this corresponds to             face id being 1.0, 3.0, or 5.0
-    %3 = fcmp one float %2, %1
-    ; faceIsY = (faceidPos == 1.0);
-    %4 = fcmp oeq float %2, 1.0
-    ; flipU is true when U-axis is negative, this corresponds to face id being 0.0 or 5.0.
-    %5 = fcmp oeq float %cubeId, 5.0
-    %6 = fcmp oeq float %cubeId, 0.0
-    %7 = or i1 %5, %6
-    ; flipV is true when V-axis is negative, this corresponds to face id being             anything other than 2.0.
-    ; flipV = (faceid != 2.0);
-    %8 = fcmp one float %cubeId, 2.0
-    ; major2.x = 1/major.x * 1/major.x * 0.5;
-    ;          = 1/(2*major.x) * 1/(2*major.x) * 2
-    %9 = fdiv float 1.0, %cubeMa
-    %10 = fmul float %9, %9
-    %11 = fmul float %10, 2.0
-    ; majorDeriv.x = (faceidPos == 0.0) ? grad.x : grad.z;
-    %12 = fcmp oeq float %2, 0.0
-    %13 = select i1 %12, float %gradX.x, float %gradX.z
-    ; majorDeriv.x = (faceIsY == 0) ? majorDeriv.x : grad.y;
-    %14 = icmp eq i1 %4, 0
-    %15 = select i1 %14, float %13, float %gradX.y
-    ; majorDeriv.x = (faceNeg == 0.0) ? majorDeriv.x : (-majorDeriv.x);
-    %16 = icmp eq i1 %3, 0
-    %17 = fmul float %15, -1.0
-    %18 = select i1 %16, float %15, float %17
-    ; faceDeriv.x = (faceidPos == 0.0) ? grad.z : grad.x;
-    %19 = fcmp oeq float %2, 0.0
-    %20 = select i1 %19, float %gradX.z, float %gradX.x
-    ; faceDeriv.x = (flipU == 0) ? faceDeriv.x : (-faceDeriv.x);
-    %21 = icmp eq i1 %7, 0
-    %22 = fmul float %20, -1.0
-    %23 = select i1 %21, float %20, float %22
-    ; faceDeriv.y = (faceIsY == 0) ? grad.y : grad.z;
-    %24 = icmp eq i1 %4, 0
-    %25 = select i1 %24, float %gradX.y, float %gradX.z
-    ; faceDeriv.y = (flipV == 0) ? faceDeriv.y : (-faceDeriv.y);
-    %26 = icmp eq i1 %8, 0
-    %27 = fmul float %25, -1.0
-    %28 = select i1 %26, float %25, float %27
-    ; faceDeriv.xy = major.xx * faceDeriv.xy;
-    %29 = fmul float %cubeMa, 0.5
-    %30 = fmul float %23, %29
-    %31 = fmul float %28, %29
-    ; faceDeriv.xy = (-faceCrd.xy) * majorDeriv.xx + faceDeriv.xy;
-    %32 = fmul float %faceCoordX, -1.0
-    %33 = fmul float %faceCoordY, -1.0
-    %34 = fmul float %32, %18
-    %35 = fmul float %33, %18
-    %36 = fadd float %34, %30
-    %37 = fadd float %35, %31
-    ; grad.xy = faceDeriv.xy * major2.xx;
-    %38 = fmul float %36, %11
-    %39 = fmul float %37, %11
-    ; majorDeriv.x = (faceidPos == 0.0) ? grad.x : grad.z;
-    %40 = fcmp oeq float %2, 0.0
-    %41 = select i1 %40, float %gradY.x, float %gradY.z
-    ; majorDeriv.x = (faceIsY == 0) ? majorDeriv.x : grad.y;
-    %42 = icmp eq i1 %4, 0
-    %43 = select i1 %42, float %41, float %gradY.y
-    ; majorDeriv.x = (faceNeg == 0.0) ? majorDeriv.x : (-majorDeriv.x);
-    %44 = icmp eq i1 %3, 0
-    %45 = fmul float %43, -1.0
-    %46 = select i1 %44, float %43, float %45
-    ; faceDeriv.x = (faceidPos == 0.0) ? grad.z : grad.x;
-    %47 = fcmp oeq float %2, 0.0
-    %48 = select i1 %47, float %gradY.z, float %gradY.x
-    ; faceDeriv.x = (flipU == 0) ? faceDeriv.x : (-faceDeriv.x);
-    %49 = icmp eq i1 %7, 0
-    %50 = fmul float %48, -1.0
-    %51 = select i1 %49, float %48, float %50
-    ; faceDeriv.y = (faceIsY == 0) ? grad.y : grad.z;
-    %52 = icmp eq i1 %4, 0
-    %53 = select i1 %52, float %gradY.y, float %gradY.z
-    ; faceDeriv.y = (flipV == 0) ? faceDeriv.y : (-faceDeriv.y);
-    %54 = icmp eq i1 %8, 0
-    %55 = fmul float %53, -1.0
-    %56 = select i1 %54, float %53, float %55
-    ; faceDeriv.xy = major.xx * faceDeriv.xy;
-    %57 = fmul float %cubeMa, 0.5
-    %58 = fmul float %51, %57
-    %59 = fmul float %56, %57
-    ; faceDeriv.xy = (-faceCrd.xy) * majorDeriv.xx + faceDeriv.xy;
-    %60 = fmul float %faceCoordX, -1.0
-    %61 = fmul float %faceCoordY, -1.0
-    %62 = fmul float %60, %46
-    %63 = fmul float %61, %46
-    %64 = fadd float %62, %58
-    %65 = fadd float %63, %59
-    ; grad.xy = faceDeriv.xy * major2.xx;
-    %66 = fmul float %64, %11
-    %67 = fmul float %65, %11
-    %68 = insertelement <4 x float> undef, float %38, i32 0
-    %69 = insertelement <4 x float> %68, float %39, i32 1
-    %70 = insertelement <4 x float> %69, float %66, i32 2
-    %71 = insertelement <4 x float> %70, float %67, i32 3
-    ret <4 x float> %71
-}
-
-"""
-    irOut.write(transformCubeGrad)
-
 # Outputs header contents.
 def outputLlvmHeader(irOut):
     header = """\
@@ -3533,7 +2656,7 @@ target triple = "spir64-unknown-unknown"
     pass
 
 # Processes each listed image function configuration
-def processList(irOut, listIn, gfxLevel):
+def processList(outDir, listIn, gfxLevel):
     print("===  Process list: " + os.path.split(listIn)[1])
 
     fList = open(listIn, 'rt')
@@ -3542,7 +2665,19 @@ def processList(irOut, listIn, gfxLevel):
         isComment = line.startswith('#')
         isEmpty = len(line.strip()) == 0
         if not isComment and not isEmpty:
+            outFile = outDir + "/g_" + line.replace("|", "_") + ".ll"
+            irOut = open(outFile, 'wt')
+
+            initLlvmDecls(gfxLevel)
+            outputLlvmHeader(irOut)
+
             processLine(irOut, line, gfxLevel)
+
+            outputLlvmDecls(irOut)
+            outputLlvmAttributes(irOut)
+            outputLlvmMetadata(irOut)
+            irOut.close()
+
     fList.close()
 
     print("")
@@ -3550,6 +2685,8 @@ def processList(irOut, listIn, gfxLevel):
 
 # Initializes necessary LLVM function declarations.
 def initLlvmDecls(gfxLevel):
+    global LLVM_DECLS
+    LLVM_DECLS = {}
     addLlvmDecl(LLPC_DESCRIPTOR_LOAD_SAMPLER, "declare <4 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
             LLPC_DESCRIPTOR_LOAD_SAMPLER))
     addLlvmDecl(LLPC_DESCRIPTOR_LOAD_RESOURCE, "declare <8 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
@@ -3568,11 +2705,16 @@ def initLlvmDecls(gfxLevel):
     addLlvmDecl("llvm.trunc.f32", "declare float @llvm.trunc.f32(float) #0\n")
     addLlvmDecl(LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE, "declare <8 x i32> @%s(<8 x i32>) #0\n" % (\
             LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE))
+    addLlvmDecl("llpc.image.transformCubeGrad", "declare <4 x float> @llpc.image.transformCubeGrad(float %cubeId, float %cubeMa, float %faceCoordX, float %faceCoordY, float %gradX.x, float %gradX.y, float %gradX.z, float %gradY.x, float %gradY.y, float %gradY.z) #0\n")
     if gfxLevel < GFX9:
         addLlvmDecl("llpc.patch.image.gather.check",
                     "declare i1 @llpc.patch.image.gather.check(<8 x i32>) #0\n")
-        addLlvmDecl("llpc.patch.image.gather.coordinate",
-                    "declare <2 x float> @llpc.patch.image.gather.coordinate(<8 x i32>, float, float) #0\n")
+        addLlvmDecl("llpc.patch.image.gather.coordinate.2d",
+                    "declare <2 x float> @llpc.patch.image.gather.coordinate.2d(<8 x i32>, float, float) #0\n")
+        addLlvmDecl("llpc.patch.image.gather.coordinate.2darray",
+                    "declare <2 x float> @llpc.patch.image.gather.coordinate.2darray(<8 x i32>, float, float) #0\n")
+        addLlvmDecl("llpc.patch.image.gather.coordinate.3d",
+                    "declare <2 x float> @llpc.patch.image.gather.coordinate.3d(<8 x i32>, float, float) #0\n")
         addLlvmDecl("llpc.patch.image.gather.coordinate.skip",
                     "declare <2 x float> @llpc.patch.image.gather.coordinate.skip(<8 x i32>, float, float) #0\n")
         addLlvmDecl("llpc.patch.image.gather.descriptor.u32",
@@ -3584,20 +2726,10 @@ def initLlvmDecls(gfxLevel):
         addLlvmDecl("llpc.patch.image.gather.texel.i32",
                     "declare <4 x float> @llpc.patch.image.gather.texel.i32(<8 x i32>, <4 x float>) #0\n")
 
-def main(inFile, outFile, gfxLevelStr):
+def main(inFile, outDir, gfxLevelStr):
     gfxLevel = float(gfxLevelStr[3:])
-    irOut = open(outFile, 'wt')
 
-    initLlvmDecls(gfxLevel)
-    outputLlvmHeader(irOut)
-    outputPreDefinedFunctions(irOut)
-
-    processList(irOut, inFile, gfxLevel)
-
-    outputLlvmDecls(irOut)
-    outputLlvmAttributes(irOut)
-    outputLlvmMetadata(irOut)
-    irOut.close()
+    processList(outDir, inFile, gfxLevel)
 
 if __name__ == "__main__":
     main(sys.argv[1], sys.argv[2], sys.argv[3])

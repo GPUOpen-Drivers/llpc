@@ -1750,8 +1750,19 @@ define half @llpc.fmax3.f16(half %x, half %y, half %z)
 ; GLSL: float16_t mid3(float16_t, float16_t, float16_t)
 define half @llpc.fmid3.f16(half %x, half %y, half %z)
 {
-    %1 = call half @llvm.amdgcn.fmed3.f16(half %x, half %y, half %z)
-    ret half %1
+    ; min(x, y)
+    %1 = call half @llvm.minnum.f16(half %x, half %y)
+
+    ; max(x, y)
+    %2 = call half @llvm.maxnum.f16(half %x, half %y)
+
+    ; min(max(x, y), z)
+    %3 = call half @llvm.minnum.f16(half %2, half %z)
+
+    ; max(min(x, y), min(max(x, y), z))
+    %4 = call half @llvm.maxnum.f16(half %1, half %3)
+
+    ret half %4
 }
 
 declare half @llvm.trunc.f16(half) #0

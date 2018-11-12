@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-in-out-import-export"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -329,8 +328,6 @@ bool PatchInOutImportExport::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -1081,7 +1078,6 @@ void PatchInOutImportExport::visitReturnInst(
             // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or gl_CullDistance[]
             // should start from pos2.
             uint32_t pos = (usePointSize || useLayer || useViewportIndex) ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
-
             args.clear();
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pos));   // tgt
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0xF));   // en
@@ -3059,6 +3055,36 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     case BuiltInLocalInvocationId:
         {
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
+
+            if (builtInUsage.workgroupSizeZ > 1)
+            {
+                // XYZ, do nothing
+            }
+            else if (builtInUsage.workgroupSizeY > 1)
+            {
+                // XY
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                   "",
+                                                   pInsertPos);
+            }
+            else
+            {
+                // X
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                   "",
+                                                   pInsertPos);
+
+                pInput = InsertElementInst::Create(pInput,
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                   "",
+                                                   pInsertPos);
+            }
+
             break;
         }
     case BuiltInSubgroupSize:
@@ -4414,13 +4440,16 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
         else
         {
             std::vector<Value*> args;
-            args.push_back(inOutUsage.pEsGsRingBufDesc);
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            args.push_back(pRingOffset);
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // slc
+            args.push_back(inOutUsage.pEsGsRingBufDesc);                                // rsrc
+            args.push_back(pRingOffset);                                                // offset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                 // soffset
+            CoherentFlag coherent = {};
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc slc
+
             pLoadValue = EmitCall(m_pModule,
-                                  "llvm.amdgcn.buffer.load.f32",
+                                  "llvm.amdgcn.raw.buffer.load.f32",
                                   m_pContext->FloatTy(),
                                   args,
                                   NoAttrib,
@@ -4820,7 +4849,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
 // =====================================================================================================================
 // Writes value to LDS.
 void PatchInOutImportExport::WriteValueToLds(
-    Value*        pWriteValue,   // [in] Value Written to LDS
+    Value*        pWriteValue,   // [in] Value written to LDS
     Value*        pLdsOffset,    // [in] Start offset to do LDS write operations
     Instruction*  pInsertPos)    // [in] Where to insert write instructions
 {

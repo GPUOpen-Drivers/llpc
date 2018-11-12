@@ -1195,7 +1195,7 @@ Value* FragColorExport::Run(
         // Dual source blending is enabled
         expFmt= ComputeExportFormat(pOutputTy, 0);
     }
-    else if (pResUsage->inOutUsage.fs.dualSourceBlend == false)
+    else
     {
         expFmt = ComputeExportFormat(pOutputTy, origLoc);
     }

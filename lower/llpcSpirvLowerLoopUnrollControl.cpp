@@ -31,7 +31,6 @@
 #define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-control"
 
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 
 #include <vector>
@@ -118,8 +117,6 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
         }
     }
 
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
-
     return changed;
 }
 
@@ -127,5 +124,5 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering operations for loop unroll control.
-INITIALIZE_PASS(SpirvLowerLoopUnrollControl, "spirv-lower-loop-unroll-control",
+INITIALIZE_PASS(SpirvLowerLoopUnrollControl, "Spirv-lower-loop-unroll-control",
                 "Set metadata to control LLPC loop unrolling", false, false)

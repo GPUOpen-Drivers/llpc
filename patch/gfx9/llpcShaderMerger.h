@@ -60,14 +60,14 @@ enum LsHsSpecialSysValue
 // numbers defined by hardware).
 enum EsGsSpecialSysValue
 {
-    EsGsSysValueUserDataAddrLow     = 0,
-    EsGsSysValueUserDataAddrHigh    = 1,
-    EsGsSysValueGsVsOffset          = 2,
-    EsGsSysValueMergedWaveInfo      = 3,
-    EsGsSysValueOffChipLdsBase      = 4,
-    EsGsSysValueSharedScratchOffset = 5,
-    EsGsSysValueGsShaderAddrLow     = 6,
-    EsGsSysValueGsShaderAddrHigh    = 7,
+    EsGsSysValueUserDataAddrLow         = 0,
+    EsGsSysValueUserDataAddrHigh        = 1,
+    EsGsSysValueGsVsOffset              = 2,
+    EsGsSysValueMergedWaveInfo          = 3,
+    EsGsSysValueOffChipLdsBase          = 4,
+    EsGsSysValueSharedScratchOffset     = 5,
+    EsGsSysValueGsShaderAddrLow         = 6,
+    EsGsSysValueGsShaderAddrHigh        = 7,
 
     EsGsSpecialSysValueCount,
 };

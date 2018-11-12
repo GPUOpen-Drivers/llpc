@@ -34,14 +34,15 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "llpc.h"
+#include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcEmuLib.h"
 #include "llpcInternal.h"
 #include "llpcPassExternalLibLink.h"
 
@@ -59,12 +60,11 @@ char PassExternalLibLink::ID = 0;
 
 // =====================================================================================================================
 PassExternalLibLink::PassExternalLibLink(
-    Module* pExternalLib) // [in] External library
+    bool nativeOnly) // Whether to only link native functions
     :
     llvm::ModulePass(ID),
-    m_pExternalLib(pExternalLib)
+    m_nativeOnly(nativeOnly)
 {
-    LLPC_ASSERT(pExternalLib != nullptr);
     initializePassExternalLibLinkPass(*PassRegistry::getPassRegistry());
 }
 
@@ -74,56 +74,101 @@ bool PassExternalLibLink::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
     TimeProfiler timeProfiler(&g_timeProfileResult.patchLinkTime);
+    auto pContext = static_cast<Context*>(&module.getContext());
+    std::map<Module*, ValueToValueMapTy> valueMaps;
 
     LLVM_DEBUG(dbgs() << "Run the pass Pass-External-Lib-Link\n");
 
-    Result result = Result::Success;
-    auto pGlslEmuLib = m_pExternalLib;
-    ValueToValueMapTy valueMap;
-
-    // Add declarations of those missing functions to module based on what they are in external library
-    for (const Function& libFunc : *pGlslEmuLib)
+    for (;;)
     {
-        if (libFunc.isDeclaration())
+        LLVM_DEBUG(dbgs() << "Iteration\n");
+        // Gather functions that are used and undefined (and not intrinsics).
+        SmallVector<Function*, 4> undefinedFuncs;
+        for (auto& func : module)
         {
-            auto pModuleFunc = module.getFunction(libFunc.getName());
-            if (pModuleFunc == nullptr)
+            if (func.use_empty() || !func.empty() || func.isIntrinsic())
             {
-                pModuleFunc = Function::Create(cast<FunctionType>(libFunc.getValueType()),
-                                               libFunc.getLinkage(),
-                                               libFunc.getName(),
-                                               &module);
-                pModuleFunc->copyAttributesFrom(&libFunc);
+                continue;
             }
-
-            valueMap[&libFunc] = pModuleFunc;
+            undefinedFuncs.push_back(&func);
         }
-    }
-
-    // Add definitions of those missing functions to module based on what they are in external library
-    for (auto& moduleFunc : module)
-    {
-        if (moduleFunc.isDeclaration())
+        // Attempt to link gathered declarations.
+        unsigned satisfiedCount = 0;
+        for (auto pFunc : undefinedFuncs)
         {
-            auto pLibFunc = pGlslEmuLib->getFunction(moduleFunc.getName());
-            if ((pLibFunc != nullptr) && (pLibFunc->isDeclaration() == false))
+            // We have a declaration that we need to satisfy by linking in a function from the
+            // emulation library.
+            LLVM_DEBUG(dbgs() << "Looking for " << pFunc->getName() << "\n");
+            auto pLibFunc = pContext->GetGlslEmuLib()->GetFunction(pFunc->getName(), m_nativeOnly);
+            if (pLibFunc == nullptr)
             {
-                Function::arg_iterator moduleFuncArgIter = moduleFunc.arg_begin();
-                for (Function::const_arg_iterator libFuncArgIter = pLibFunc->arg_begin();
-                         libFuncArgIter != pLibFunc->arg_end();
-                         ++libFuncArgIter)
+                if (m_nativeOnly ||
+                    pFunc->getName().startswith(LlpcName::InputCallPrefix) ||
+                    pFunc->getName().startswith(LlpcName::OutputCallPrefix) ||
+                    pFunc->getName().startswith(LlpcName::DescriptorCallPrefix))
                 {
-                    moduleFuncArgIter->setName(libFuncArgIter->getName());
-                    valueMap[&*libFuncArgIter] = &*moduleFuncArgIter++;
+                    // Allow unsatisfied externals in the first "native only" linking pass,
+                    // or for certain prefixes that are not patched until after linking.
+                    continue;
                 }
-
-                SmallVector<ReturnInst*, 8> retInsts;
-                CloneFunctionInto(&moduleFunc, pLibFunc, valueMap, false, retInsts);
+                llvm_unreachable(("not found in emulation library: " + pFunc->getName()).str().c_str());
             }
+            ValueToValueMapTy* pValueMap = nullptr;
+            auto valueMapsIt = valueMaps.find(pLibFunc->getParent());
+            if (valueMapsIt == valueMaps.end())
+            {
+                // This is the first time we have needed a function from this library module.
+                // Copy all functions as declarations from the library module to our module.
+                pValueMap = &valueMaps[pLibFunc->getParent()];
+                for (auto& libDecl : *pLibFunc->getParent())
+                {
+                    auto pMappedDecl = module.getFunction(libDecl.getName());
+                    if (pMappedDecl == nullptr)
+                    {
+                        pMappedDecl = Function::Create(cast<FunctionType>(libDecl.getValueType()),
+                                                       libDecl.getLinkage(),
+                                                       libDecl.getName(),
+                                                       &module);
+                    }
+                    (*pValueMap)[&libDecl] = pMappedDecl;
+                }
+            }
+            else
+            {
+                pValueMap = &valueMapsIt->second;
+            }
+            // Clone the library function across to our module.
+            ++satisfiedCount;
+            Function::arg_iterator funcArgIter = pFunc->arg_begin();
+            for (Function::const_arg_iterator libFuncArgIter = pLibFunc->arg_begin();
+                     libFuncArgIter != pLibFunc->arg_end();
+                     ++libFuncArgIter)
+            {
+                funcArgIter->setName(libFuncArgIter->getName());
+                (*pValueMap)[&*libFuncArgIter] = &*funcArgIter++;
+            }
+
+            SmallVector<ReturnInst*, 8> retInsts;
+            CloneFunctionInto(pFunc, pLibFunc, *pValueMap, true, retInsts);
+        }
+
+        if (satisfiedCount == 0)
+        {
+            // Finished -- no new externals satisified this time round.
+            break;
         }
     }
 
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
+    // Prune any unused declarations that we added above.
+    for (auto moduleIt = module.begin(), moduleEnd = module.end(); moduleIt != moduleEnd; )
+    {
+        auto moduleNext = std::next(moduleIt);
+        if (moduleIt->empty() && moduleIt->use_empty())
+        {
+            moduleIt->eraseFromParent();
+        }
+        moduleIt = moduleNext;
+    }
 
     return true;
 }

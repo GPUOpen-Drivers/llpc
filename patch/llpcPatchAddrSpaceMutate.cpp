@@ -33,7 +33,6 @@
 #include "llvm/ADT/None.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 
 #include <vector>
@@ -188,8 +187,6 @@ bool PatchAddrSpaceMutate::runOnModule(
 
     m_typeMap.clear();
     m_globalMap.clear();
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }

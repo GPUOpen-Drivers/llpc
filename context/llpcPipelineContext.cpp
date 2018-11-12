@@ -554,8 +554,7 @@ void PipelineContext::InitShaderResourceUsage(
     memset(&pResUsage->builtInUsage, 0, sizeof(pResUsage->builtInUsage));
 
     pResUsage->pushConstSizeInBytes = 0;
-    pResUsage->imageWrite = false;
-    pResUsage->perShaderTable = false;
+    pResUsage->resourceWrite = false;
 
     pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
     pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;
@@ -619,7 +618,6 @@ void PipelineContext::InitShaderResourceUsage(
         }
 
         pResUsage->inOutUsage.fs.cbShaderMask = 0;
-        pResUsage->inOutUsage.fs.dualSourceBlend = false;
         pResUsage->inOutUsage.fs.pViewIndex = nullptr;
     }
 }

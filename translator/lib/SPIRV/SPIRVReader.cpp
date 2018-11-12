@@ -453,6 +453,7 @@ private:
   SPIRVModule *BM;
   bool IsKernel;
   bool EnableVarPtr;
+  bool EnableGatherLodNz;
   SPIRVFunction* EntryTarget;
   const SPIRVSpecConstMap &SpecConstMap;
   SPIRVToLLVMTypeMap TypeMap;
@@ -3268,7 +3269,7 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
 
   if (Info.OpKind != ImageOpQueryNonLod) {
     // Generate name strings for image calls:
-    //    Format: prefix.image[sparse].op.[f32|i32|u32].dim[.proj][.dref][.bias][.lod][.grad]
+    //    Format: prefix.image[sparse].op.[f32|i32|u32].dim[.proj][.dref][.lodnz][.bias][.lod][.grad]
     //                                                      [.constoffset][.offset]
     //                                                      [.constoffsets][.sample][.minlod]
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
@@ -3343,11 +3344,11 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
       BTy = BTy->getPointerElementType();
     const SPIRVTypeImage *ImageTy = nullptr;
 
-    OC = BTy->getOpCode();
-    if (OC == OpTypeSampledImage) {
+    Op TyOC = BTy->getOpCode();
+    if (TyOC == OpTypeSampledImage) {
       ImageTy = static_cast<SPIRVTypeSampledImage *>(BTy)->getImageType();
       Desc    = &ImageTy->getDescriptor();
-    } else if (OC == OpTypeImage) {
+    } else if (TyOC == OpTypeImage) {
       ImageTy = static_cast<SPIRVTypeImage *>(BTy);
       Desc    = &ImageTy->getDescriptor();
     } else
@@ -3359,13 +3360,13 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     } else {
       // Add sampled type
       SPIRVType *SampledTy = ImageTy->getSampledType();
-      OC = SampledTy->getOpCode();
-      if (OC == OpTypeFloat) {
+      TyOC = SampledTy->getOpCode();
+      if (TyOC == OpTypeFloat) {
         if (SampledTy->getBitWidth() == 16)
           SS << ".f16";
         else
           SS << ".f32";
-      } else if (OC == OpTypeInt) {
+      } else if (TyOC == OpTypeInt) {
         if (static_cast<SPIRVTypeInt*>(SampledTy)->isSigned())
           SS << ".i32";
         else
@@ -3398,43 +3399,52 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
       SS << gSPIRVName::ImageCallModDref;
     }
 
+    SPIRVWord Mask = 0;
     auto &OpWords = static_cast<SPIRVInstTemplateBase *>(BI)->getOpWords();
-    if (Info.OperMask < OpWords.size()) {
+    if (Info.OperMask < OpWords.size())
       // Optional image operands are present
-      SPIRVWord Mask = OpWords[Info.OperMask];
+      Mask = OpWords[Info.OperMask];
 
-      // Bias operand
-      if (Mask & ImageOperandsBiasMask)
-        SS << gSPIRVName::ImageCallModBias;
-
-      // Lod operand
-      if (Mask & ImageOperandsLodMask)
-        SS << gSPIRVName::ImageCallModLod;
-
-      // Grad operands
-      if (Mask & ImageOperandsGradMask)
-        SS << gSPIRVName::ImageCallModGrad;
-
-      // ConstOffset operands
-      if (Mask & ImageOperandsConstOffsetMask)
-        SS << gSPIRVName::ImageCallModConstOffset;
-
-      // Offset operand
-      if (Mask & ImageOperandsOffsetMask)
-        SS << gSPIRVName::ImageCallModOffset;
-
-      // ConstOffsets operand
-      if (Mask & ImageOperandsConstOffsetsMask)
-        SS << gSPIRVName::ImageCallModConstOffsets;
-
-      // Sample operand
-      if (Mask & ImageOperandsSampleMask)
-        SS << gSPIRVName::ImageCallModSample;
-
-      // MinLod operand
-      if (Mask & ImageOperandsMinLodMask)
-        SS << gSPIRVName::ImageCallModMinLod;
+    // Lodnz for gather op
+    if ((Info.OpKind == ImageOpGather) && EnableGatherLodNz) {
+      if ((Mask & (ImageOperandsBiasMask |
+                  ImageOperandsLodMask |
+                  ImageOperandsGradMask |
+                  ImageOperandsMinLodMask)) == 0)
+          SS << gSPIRVName::ImageCallModLodNz;
     }
+
+    // Bias operand
+    if (Mask & ImageOperandsBiasMask)
+      SS << gSPIRVName::ImageCallModBias;
+
+    // Lod operand
+    if (Mask & ImageOperandsLodMask)
+      SS << gSPIRVName::ImageCallModLod;
+
+    // Grad operands
+    if (Mask & ImageOperandsGradMask)
+      SS << gSPIRVName::ImageCallModGrad;
+
+    // ConstOffset operands
+    if (Mask & ImageOperandsConstOffsetMask)
+      SS << gSPIRVName::ImageCallModConstOffset;
+
+    // Offset operand
+    if (Mask & ImageOperandsOffsetMask)
+      SS << gSPIRVName::ImageCallModOffset;
+
+    // ConstOffsets operand
+    if (Mask & ImageOperandsConstOffsetsMask)
+      SS << gSPIRVName::ImageCallModConstOffsets;
+
+    // Sample operand
+    if (Mask & ImageOperandsSampleMask)
+      SS << gSPIRVName::ImageCallModSample;
+
+    // MinLod operand
+    if (Mask & ImageOperandsMinLodMask)
+      SS << gSPIRVName::ImageCallModMinLod;
 
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
     if (isAnisoLodOpCode(OC))
@@ -3555,7 +3565,8 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
   // NOTE: Such case is valid and can come from hand written or HLSL generated
   // SPIR-V shader
   uint32_t  DataCompCnt   = 4;
-  if (BI->getOpCode() == OpImageRead) {
+  if ((BI->getOpCode() == OpImageRead) ||
+      ((BI->getOpCode() == OpImageFetch) && SPIRVWorkaroundBadSPIRV)) {
     DataCompCnt = (RetTy->isVectorTy() == false) ?
                     1 : RetTy->getVectorNumElements();
     assert(DataCompCnt <= 4);
@@ -3624,7 +3635,9 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
   // NOTE: Such case is valid and can come from hand written or HLSL generated
   // SPIR-V shader
   Value *RetVal = Call;
-  if ((BI->getOpCode() == OpImageRead) && (DataCompCnt != 4)) {
+  if (((BI->getOpCode() == OpImageRead) ||
+       ((BI->getOpCode() == OpImageFetch) && SPIRVWorkaroundBadSPIRV)) &&
+      (DataCompCnt != 4)) {
     // Need to change return value of library function call from vec4 to the
     // original type specified in SPIR-V.
     assert(DataCompCnt < 4);
@@ -3776,6 +3789,9 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
       CapabilityVariablePointersStorageBuffer) != BM->getCapability().end();
   EnableVarPtr = EnableVarPtr || (BM->getCapability().find(
       CapabilityVariablePointers) != BM->getCapability().end());
+
+  EnableGatherLodNz = BM->hasCapability(CapabilityImageGatherBiasLodAMD) &&
+      (EntryExecModel == ExecutionModelFragment);
 
   DbgTran.createCompileUnit();
   DbgTran.addDbgInfoVersion();

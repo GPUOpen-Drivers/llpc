@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,51 +24,24 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassNonNativeFuncRemove.h
- * @brief LLPC header file: contains declaration of class Llpc::PassNonNativeFuncRemove.
+ * @file  llpcPassManager.h
+ * @brief LLPC header file: legacy::PassManager override
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include "llvm/Pass.h"
-
-#include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcInternal.h"
-
-namespace llvm
-{
-
-class PassRegistry;
-void initializePassNonNativeFuncRemovePass(PassRegistry&);
-
-} // llvm
+#include "llvm/IR/LegacyPassManager.h"
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the LLVM pass for non-native function (not using LLVM native instructions and intrinsics) removal
-class PassNonNativeFuncRemove:
-    public llvm::ModulePass,
-    public llvm::InstVisitor<PassNonNativeFuncRemove>
+// LLPC's legacy::PassManager override
+class PassManager final :
+    public llvm::legacy::PassManager
 {
 public:
-    PassNonNativeFuncRemove();
-
-    virtual bool runOnModule(llvm::Module& module);
-
-    // Pass creator, creates the LLVM pass for non-native function removal
-    static llvm::ModulePass* Create() { return new PassNonNativeFuncRemove(); }
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
-
-private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PassNonNativeFuncRemove);
+    void add(llvm::Pass* pPass) override;
 };
 
 } // Llpc

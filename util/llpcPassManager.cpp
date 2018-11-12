@@ -24,53 +24,43 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopUnrollInfoRectify.h
- * @brief LLPC header file: contains declaration of class Llpc::PassLoopUnrollInfoRectify.
+ * @file  llpcPassManager.cpp
+ * @brief LLPC source file: legacy::PassManager override
  ***********************************************************************************************************************
  */
-#pragma once
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/CommandLine.h"
 
-#include "llvm/Pass.h"
-
-#include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcInternal.h"
+#include "llpcPassManager.h"
 
 namespace llvm
 {
+namespace cl
+{
 
-class PassRegistry;
-void initializePassLoopUnrollInfoRectifyPass(PassRegistry&);
+// -verify-ir : verify the IR after each pass
+static cl::opt<bool> VerifyIr("verify-ir",
+                              cl::desc("Verify IR after each pass"),
+                              cl::init(false));
+
+} // cl
 
 } // llvm
 
-namespace Llpc
-{
+using namespace llvm;
+using namespace Llpc;
 
 // =====================================================================================================================
-// Represents the LLVM pass for rectifying loop unroll information.
-class PassLoopUnrollInfoRectify final:
-    public llvm::FunctionPass
+// Add a pass to the pass manager.
+void Llpc::PassManager::add(
+    Pass* pPass)    // [in] Pass to add to the pass manager
 {
-public:
-    explicit PassLoopUnrollInfoRectify();
+    // Add the pass to the superclass pass manager.
+    legacy::PassManager::add(pPass);
 
-    bool runOnFunction(llvm::Function& function) override;
-
-    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
-
-    // Pass creator, creates the LLVM pass for rectifying unroll information.
-    static llvm::FunctionPass* Create() { return new PassLoopUnrollInfoRectify(); }
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
-
-private:
-
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PassLoopUnrollInfoRectify);
-
-    static constexpr uint32_t MaxLoopUnrollCount = 32;
-};
-
-} // Llpc
+    if (cl::VerifyIr)
+    {
+        // Add a verify pass after it.
+        legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
+    }
+}

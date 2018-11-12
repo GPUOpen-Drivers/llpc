@@ -32,7 +32,6 @@
 
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/PassSupport.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -124,8 +123,6 @@ bool SpirvLowerGlobal::runOnModule(
             LowerOutput();
         }
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -2180,5 +2177,5 @@ void SpirvLowerGlobal::StoreOutputMember(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for globals.
-INITIALIZE_PASS(SpirvLowerGlobal, "spirv-lower-global",
+INITIALIZE_PASS(SpirvLowerGlobal, "Spirv-lower-global",
                 "Lower SPIR-V globals (global variables, inputs, and outputs)", false, false)

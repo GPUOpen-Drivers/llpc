@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-image-op"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -69,7 +68,7 @@ PatchImageOp::PatchImageOp()
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
+// Executes this LLVM patching pass on the specified LLVM module.
 bool PatchImageOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
@@ -85,8 +84,6 @@ bool PatchImageOp::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -201,7 +198,7 @@ void PatchImageOp::visitCallInst(
                     auto fmaskPatchPos = callName.find(gSPIRVName::ImageCallModPatchFmaskUsage);
                     if (fmaskPatchPos != std::string::npos)
                     {
-                        callName = callName.substr(0, fmaskPatchPos);
+                        std::string fmaskPatchString = "";
                         if ((pResourceNode != nullptr) && (pFmaskNode != nullptr))
                         {
                             // Fmask based fetch only can work for texel fetch or load subpass data
@@ -209,13 +206,17 @@ void PatchImageOp::visitCallInst(
                                 ((imageCallMeta.OpKind == ImageOpRead) &&
                                 (imageCallMeta.Dim == DimSubpassData)))
                             {
-                                callName += gSPIRVName::ImageCallModFmaskBased;
+                                fmaskPatchString = gSPIRVName::ImageCallModFmaskBased;
                             }
                         }
                         else if (pFmaskNode != nullptr)
                         {
-                            callName += gSPIRVName::ImageCallModFmaskId;
+                            fmaskPatchString = gSPIRVName::ImageCallModFmaskId;
                         }
+
+                        callName = callName.replace(fmaskPatchPos,
+                                                    strlen(gSPIRVName::ImageCallModPatchFmaskUsage),
+                                                    fmaskPatchString);
                     }
                 }
             }
@@ -378,46 +379,6 @@ void PatchImageOp::visitCallInst(
                 }
             }
         }
-
-        if ((imageCallMeta.OpKind == ImageOpSample) ||
-            (imageCallMeta.OpKind == ImageOpGather) ||
-            (imageCallMeta.OpKind == ImageOpFetch))
-        {
-            // Call optimized version if LOD is provided with constant 0 value
-            if (mangledName.find(gSPIRVName::ImageCallModLod) != std::string::npos)
-            {
-                uint32_t argCount = callInst.getNumArgOperands();
-                bool hasConstOffset = (mangledName.find(gSPIRVName::ImageCallModConstOffset) != std::string::npos);
-                // For all supported image operations, LOD argument is the second to last operand or third to last
-                // operand if constant offset is persent.
-                uint32_t lodArgIdx = hasConstOffset ? (argCount - 3) : (argCount - 2);
-
-                // If LOD argument is constant 0, call zero-LOD version of image operation implementation
-                auto pLod = callInst.getArgOperand(lodArgIdx);
-                if (isa<Constant>(*pLod) && cast<Constant>(pLod)->isZeroValue())
-                {
-                    for (uint32_t i = 0; i < callInst.getNumArgOperands(); ++i)
-                    {
-                        Value* pArg = callInst.getArgOperand(i);
-                        args.push_back(pArg);
-                    }
-
-                    std::string callNameLodz = callName.replace(callName.find(gSPIRVName::ImageCallModLod),
-                                                                strlen(gSPIRVName::ImageCallModLod),
-                                                                gSPIRVName::ImageCallModLodz);
-                    CallInst* pImageCall = cast<CallInst>(EmitCall(m_pModule,
-                                                                   callNameLodz,
-                                                                   callInst.getType(),
-                                                                   args,
-                                                                   NoAttrib,
-                                                                   &callInst));
-
-                    callInst.replaceAllUsesWith(pImageCall);
-
-                    m_imageCalls.insert(&callInst);
-                }
-            }
-        }
     }
 }
 
@@ -425,5 +386,5 @@ void PatchImageOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for image operations.
-INITIALIZE_PASS(PatchImageOp, "patch-image-op",
-                "Patch LLVM for for image operations (F-mask support)", false, false)
+INITIALIZE_PASS(PatchImageOp, "Patch-image-op",
+                "Patch LLVM for image operations (F-mask support)", false, false)

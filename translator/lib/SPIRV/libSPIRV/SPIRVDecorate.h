@@ -193,6 +193,8 @@ public:
   }
 };
 
+typedef SPIRVDecorate SPIRVDecorateStringGOOGLE;
+
 class SPIRVMemberDecorate : public SPIRVDecorateGeneric {
 public:
   static const Op OC = OpMemberDecorate;
@@ -228,6 +230,8 @@ public:
 protected:
   SPIRVWord MemberNumber;
 };
+
+typedef SPIRVMemberDecorate SPIRVMemberDecorateStringGOOGLE;
 
 class SPIRVDecorationGroup : public SPIRVEntry {
 public:
@@ -295,11 +299,11 @@ public:
   // Incomplete constructor
   SPIRVGroupDecorate() : SPIRVGroupDecorateGeneric(OC) {}
 
-  void setWordCount(SPIRVWord WC) {
+  void setWordCount(SPIRVWord WC) override {
     SPIRVEntryNoIdGeneric::setWordCount(WC);
     Targets.resize(WC - FixedWC);
   }
-  virtual void decorateTargets();
+  virtual void decorateTargets() override;
   _SPIRV_DCL_ENCDEC
 };
 
@@ -313,10 +317,10 @@ public:
   // Incomplete constructor
   SPIRVGroupMemberDecorate() : SPIRVGroupDecorateGeneric(OC) {}
 
-  void setWordCount(SPIRVWord WC) {
+  void setWordCount(SPIRVWord WC) override {
     SPIRVEntryNoIdGeneric::setWordCount(WC);
   }
-  virtual void decorateTargets();
+  virtual void decorateTargets() override;
   _SPIRV_DCL_ENCDEC
 protected:
   std::vector<SPIRVWord> MemberNumbers;

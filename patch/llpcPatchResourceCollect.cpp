@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-patch-resource-collect"
 
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -114,8 +113,6 @@ bool PatchResourceCollect::runOnModule(
         pCall->dropAllReferences();
         pCall->eraseFromParent();
     }
-
-    LLPC_VERIFY_MODULE_FOR_PASS(module);
 
     return true;
 }
@@ -1058,7 +1055,7 @@ void PatchResourceCollect::MatchGenericInOut()
             if (m_shaderStage == ShaderStageFragment)
             {
                 uint32_t location = locMap.first;
-                if (inOutUsage.fs.dualSourceBlend && location == 1)
+                if (pPipelineInfo->cbState.dualSourceBlendEnable && (location == 1))
                 {
                     location = 0;
                 }
