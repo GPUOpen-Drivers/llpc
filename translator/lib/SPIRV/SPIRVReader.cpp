@@ -1683,6 +1683,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                           Ty->getArrayElementType()->isIntegerTy(8))
                              ? GlobalValue::UnnamedAddr::Global
                              : GlobalValue::UnnamedAddr::None);
+    if (AddrSpace == SPIRAS_Local)
+        LVar->setAlignment(16);
 
     SPIRVBuiltinVariableKind BVKind;
     if (BVar->isBuiltin(&BVKind))
