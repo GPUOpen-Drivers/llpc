@@ -188,16 +188,16 @@ void PatchPeepholeOpt::visitBitCast(
         Value* const pShuffleVectorLhs = pShuffleVector->getOperand(0);
         Type* const pBitCastLhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
             pShuffleVectorLhs->getType()->getVectorNumElements());
-        const Twine bitCastLhsName(pShuffleVectorLhs->getName(), ".bitcast");
-        BitCastInst* const pBitCastLhs = new BitCastInst(pShuffleVectorLhs, pBitCastLhsType, bitCastLhsName);
+        BitCastInst* const pBitCastLhs = new BitCastInst(pShuffleVectorLhs, pBitCastLhsType,
+                                                         pShuffleVectorLhs->getName() + ".bitcast");
         insertAfter(*pBitCastLhs, *pShuffleVector);
 
         // Bit cast the RHS of the original shuffle.
         Value* const pShuffleVectorRhs = pShuffleVector->getOperand(1);
         Type* const pBitCastRhsType = VectorType::get(bitCast.getDestTy()->getVectorElementType(),
             pShuffleVectorRhs->getType()->getVectorNumElements());
-        const Twine bitCastRhsName(pShuffleVectorRhs->getName(), ".bitcast");
-        BitCastInst* const pBitCastRhs = new BitCastInst(pShuffleVectorRhs, pBitCastRhsType, bitCastRhsName);
+        BitCastInst* const pBitCastRhs = new BitCastInst(pShuffleVectorRhs, pBitCastRhsType,
+                                                         pShuffleVectorRhs->getName() + ".bitcast");
         insertAfter(*pBitCastRhs, *pBitCastLhs);
 
         // Create our new shuffle instruction.
@@ -547,13 +547,11 @@ void PatchPeepholeOpt::visitPHINode(
         for (uint32_t elementIndex = 0; elementIndex < numElements; elementIndex++)
         {
             // We create a new name that is "old name".N, where N is the index of element into the original vector.
-            const Twine phiNodeNamePrefix(phiNode.getName(), ".");
-            const Twine phiNodeNameSuffix(elementIndex);
-            const Twine phiNodeName = phiNodeNamePrefix.concat(phiNodeNameSuffix);
-
             ConstantInt* const pElementIndex = ConstantInt::get(pInt32Type, elementIndex, false);
 
-            PHINode* const pNewPhiNode = PHINode::Create(pElementType, numIncomings, phiNodeName);
+            PHINode* const pNewPhiNode = PHINode::Create(pElementType, numIncomings,
+                                                         phiNode.getName() + "." +
+                                                         Twine(elementIndex));
             insertAfter(*pNewPhiNode, phiNode);
 
             pResult = InsertElementInst::Create(pResult, pNewPhiNode, pElementIndex, "", pInsertPos);
