@@ -32,6 +32,8 @@
 
 #include <stdint.h>
 
+#define LLPC_UNUSED(a) (void(a))
+
 #if PAL_ENABLE_PRINTS_ASSERTS || !defined(NDEBUG)
 #include <cassert>
 

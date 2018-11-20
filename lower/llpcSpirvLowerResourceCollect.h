@@ -70,6 +70,7 @@ private:
     void CollectDescriptorUsage(uint32_t descSet, uint32_t binding, const DescriptorBinding* pBinding);
     void CollectInOutUsage(const llvm::Type* pInOutTy, llvm::Constant* pInOutMeta, SPIRAddressSpace addrSpace);
     void CollectVertexInputUsage(const llvm::Type* pVertexTy, bool signedness, uint32_t startLoc, uint32_t locCount);
+    void CollectGsOutputInfo(uint32_t location, uint32_t builtInId, const ShaderInOutMetadata& outputMeta);
 
     // -----------------------------------------------------------------------------------------------------------------
 

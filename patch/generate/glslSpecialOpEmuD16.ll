@@ -185,7 +185,7 @@ define float @llpc.input.interpolate.adjustij.f16(float %ij, half %offsetX, half
 define <2 x float> @llpc.input.interpolate.evalij.offset.v2f16(<2 x half> %offset) #0
 {
     ; BuiltInInterpPullMode 268435459 = 0x10000003
-    %1 = call <3 x float> @llpc.input.import.builtin.InterpPullMode(i32 268435459)
+    %1 = call <3 x float> @llpc.input.import.builtin.InterpPullMode.v3f32.i32(i32 268435459)
     ; Extract Pull Model I/W, J/W, 1/W
     %2 = extractelement <3 x float> %1, i32 0
     %3 = extractelement <3 x float> %1, i32 1
@@ -215,7 +215,7 @@ define <2 x float> @llpc.input.interpolate.evalij.offset.v2f16(<2 x half> %offse
 define <2 x float> @llpc.input.interpolate.evalij.offset.noperspective.v2f16(<2 x half> %offset) #0
 {
     ; BuiltInInterpLinearCenter 268435461 = 0x10000005
-    %1 = call <2 x float> @llpc.input.import.builtin.InterpLinearCenter(i32 268435461)
+    %1 = call <2 x float> @llpc.input.import.builtin.InterpLinearCenter.v2f32.i32(i32 268435461)
     ; Extract I, J
     %2 = extractelement <2 x float> %1, i32 0
     %3 = extractelement <2 x float> %1, i32 1
@@ -246,8 +246,8 @@ declare i64 @llvm.amdgcn.wwm.i64(i64) #1
 declare i32 @llvm.amdgcn.wwm.i32(i32) #1
 declare float @llpc.dpdxFine.f32(float) #0
 declare float @llpc.dpdyFine.f32(float) #0
-declare <3 x float> @llpc.input.import.builtin.InterpPullMode(i32) #0
-declare <2 x float> @llpc.input.import.builtin.InterpLinearCenter(i32) #0
+declare <3 x float> @llpc.input.import.builtin.InterpPullMode.v3f32.i32(i32) #0
+declare <2 x float> @llpc.input.import.builtin.InterpLinearCenter.v2f32.i32(i32) #0
 declare i32 @llpc.subgroup.reduce.i32(i32 %binaryOp, i32 %value) #0
 declare i32 @llpc.cndmask.i32(i64, i64, i32, i32)
 declare i32 @llpc.sminnum.i32(i32, i32) #0

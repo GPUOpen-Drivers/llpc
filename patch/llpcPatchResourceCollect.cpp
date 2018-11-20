@@ -292,8 +292,7 @@ void PatchResourceCollect::visitCallInst(
         }
         else
         {
-            auto pInputTy = callInst.getType();
-            LLPC_ASSERT(pInputTy->isSingleValueType());
+            LLPC_ASSERT(callInst.getType()->isSingleValueType());
 
             auto pLocOffset = callInst.getOperand(1);
             if (isa<ConstantInt>(pLocOffset))
@@ -303,7 +302,7 @@ void PatchResourceCollect::visitCallInst(
                 auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
                 loc += locOffset;
 
-                LLPC_ASSERT(pInputTy->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
+                LLPC_ASSERT(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
                 m_activeInputLocs.insert(loc);
             }
             else
@@ -396,7 +395,6 @@ void PatchResourceCollect::visitCallInst(
             auto pOutputTy = pOutput->getType();
             LLPC_ASSERT(pOutputTy->isSingleValueType());
 
-            auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
             auto pLocOffset = callInst.getOperand(1);
             auto pCompIdx = callInst.getOperand(2);
 
@@ -928,8 +926,6 @@ void PatchResourceCollect::MatchGenericInOut()
     auto& perPatchInLocMap  = inOutUsage.perPatchInputLocMap;
     auto& perPatchOutLocMap = inOutUsage.perPatchOutputLocMap;
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
-
     // Do input/output matching
     if (m_shaderStage != ShaderStageFragment)
     {
@@ -947,7 +943,13 @@ void PatchResourceCollect::MatchGenericInOut()
             std::vector<uint32_t> unusedLocs;
             for (auto& locMap : outLocMap)
             {
-                const uint32_t loc = locMap.first;
+                uint32_t loc = locMap.first;
+                if (m_shaderStage == ShaderStageGeometry)
+                {
+                    uint32_t outLocInfo = locMap.first;
+                    loc = reinterpret_cast<GsOutLocInfo*>(&outLocInfo)->location;
+                }
+
                 if (nextInLocMap.find(loc) == nextInLocMap.end())
                 {
                     if (m_hasDynIndexedOutput || (m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()))
@@ -1066,22 +1068,33 @@ void PatchResourceCollect::MatchGenericInOut()
                 }
             }
 
-            if (locMap.second == InvalidValue)
+            if (m_shaderStage == ShaderStageGeometry)
             {
-                // Only do location mapping if the output has not been mapped
-                locMap.second = nextMapLoc++;
+                if (locMap.second == InvalidValue)
+                {
+                    uint32_t outLocInfo = locMap.first;
+                    MapGsGenericOutput(*(reinterpret_cast<GsOutLocInfo*>(&outLocInfo)));
+                }
             }
             else
             {
-                LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
-            }
-            inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
-            LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output: loc = "
-                            << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
+                if (locMap.second == InvalidValue)
+                {
+                    // Only do location mapping if the output has not been mapped
+                    locMap.second = nextMapLoc++;
+                }
+                else
+                {
+                    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                }
+                inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output: loc = "
+                    << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
 
-            if (m_shaderStage == ShaderStageFragment)
-            {
-                outOrigLocs[locMap.second] = locMap.first;
+                if (m_shaderStage == ShaderStageFragment)
+                {
+                    outOrigLocs[locMap.second] = locMap.first;
+                }
             }
 
             ++locMapIt;
@@ -1879,7 +1892,6 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     {
         // GS  ==>  XXX
         uint32_t availInMapLoc  = inOutUsage.inputMapLocCount;
-        uint32_t availOutMapLoc = inOutUsage.outputMapLocCount;
 
         // Map built-in inputs to generic ones
         if (builtInUsage.gs.positionIn)
@@ -1913,50 +1925,42 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         // Map built-in outputs to generic ones (for GS)
         if (builtInUsage.gs.position)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
+            MapGsBuiltInOutput(BuiltInPosition, 1);
         }
 
         if (builtInUsage.gs.pointSize)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
+            MapGsBuiltInOutput(BuiltInPointSize, 1);
         }
 
         if (builtInUsage.gs.clipDistance > 0)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
-            if (builtInUsage.gs.clipDistance > 4)
-            {
-                ++availOutMapLoc;
-            }
+            MapGsBuiltInOutput(BuiltInClipDistance, builtInUsage.gs.clipDistance);
         }
 
         if (builtInUsage.gs.cullDistance > 0)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
-            if (builtInUsage.gs.cullDistance > 4)
-            {
-                ++availOutMapLoc;
-            }
+            MapGsBuiltInOutput(BuiltInCullDistance, builtInUsage.gs.cullDistance);
         }
 
         if (builtInUsage.gs.primitiveId)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId] = availOutMapLoc++;
+            MapGsBuiltInOutput(BuiltInPrimitiveId, 1);
         }
 
         if (builtInUsage.gs.layer)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
+            MapGsBuiltInOutput(BuiltInLayer, 1);
         }
 
         if (builtInUsage.gs.viewIndex)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInViewIndex] = availOutMapLoc++;
+            MapGsBuiltInOutput(BuiltInViewIndex, 1);
         }
 
         if (builtInUsage.gs.viewportIndex)
         {
-            inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = availOutMapLoc++;
+            MapGsBuiltInOutput(BuiltInViewportIndex, 1);
         }
 
         // Map built-in outputs to generic ones (for copy shader)
@@ -2068,7 +2072,6 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         }
 
         inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, availInMapLoc);
-        inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, availOutMapLoc);
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
@@ -2132,7 +2135,6 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << GetShaderStageName(m_shaderStage)
               << " shader)\n\n");
-    uint32_t nextMapLoc = 0;
     if (inOutUsage.builtInInputLocMap.empty() == false)
     {
         for (const auto& builtInMap : inOutUsage.builtInInputLocMap)
@@ -2152,9 +2154,21 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         {
             const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
             const uint32_t loc = builtInMap.second;
-            LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output: builtin = "
-                          << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
-                          << "  =>  Mapped = " << loc << "\n");
+
+            if (m_shaderStage == ShaderStageGeometry)
+            {
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
+                    << ") Output: stream = " << inOutUsage.gs.rasterStream << ", "
+                    << "builtin = " << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                    << "  =>  Mapped = " << loc << "\n");
+            }
+            else
+            {
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
+                    << ") Output: builtin = "
+                    << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                    << "  =>  Mapped = " << loc << "\n");
+            }
         }
         LLPC_OUTS("\n");
     }
@@ -2270,6 +2284,58 @@ void PatchResourceCollect::ReviseTessExecutionMode()
             tesBuiltInUsage.primitiveMode = Triangles;
         }
     }
+}
+
+// =====================================================================================================================
+// Map locations of generic outputs of geometry shader to tightly packed ones.
+void PatchResourceCollect::MapGsGenericOutput(
+    GsOutLocInfo outLocInfo)             // GS output location info
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    uint32_t streamId = outLocInfo.streamId;
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto& inOutUsage = pResUsage->inOutUsage.gs;
+
+    pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = inOutUsage.outLocCount[streamId]++;
+
+    uint32_t assignedLocCount = inOutUsage.outLocCount[0] +
+                            inOutUsage.outLocCount[1] +
+                            inOutUsage.outLocCount[2] +
+                            inOutUsage.outLocCount[3];
+
+    pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
+
+    LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
+                << ") Output: stream =" << outLocInfo.streamId << ", "
+                << " loc = " << outLocInfo.location
+                << "  =>  Mapped = "
+                << pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] << "\n");
+}
+
+// =====================================================================================================================
+// Map built-in outputs of geometry shader to tightly packed locations.
+void PatchResourceCollect::MapGsBuiltInOutput(
+    uint32_t builtInId,         // Built-in ID
+    uint32_t elemCount)         // Element count of this built-in
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto& inOutUsage = pResUsage->inOutUsage.gs;
+    uint32_t streamId = inOutUsage.rasterStream;
+
+    pResUsage->inOutUsage.builtInOutputLocMap[builtInId] = inOutUsage.outLocCount[streamId]++;
+
+    if (elemCount > 4)
+    {
+        inOutUsage.outLocCount[streamId]++;
+    }
+
+    uint32_t assignedLocCount = inOutUsage.outLocCount[0] +
+                            inOutUsage.outLocCount[1] +
+                            inOutUsage.outLocCount[2] +
+                            inOutUsage.outLocCount[3];
+
+    pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
 }
 
 } // Llpc

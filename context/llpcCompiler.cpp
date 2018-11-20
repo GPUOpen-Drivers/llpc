@@ -185,6 +185,7 @@ extern opt<std::string> LogFileOuts;
 
 namespace Llpc
 {
+
 llvm::sys::Mutex      Compiler::m_contextPoolMutex;
 std::vector<Context*> Compiler::m_contextPool;
 
@@ -498,6 +499,7 @@ Result Compiler::BuildShaderModule(
     if (result == Result::Success)
     {
         ShaderModuleData* pModuleData = reinterpret_cast<ShaderModuleData*>(pAllocBuf);
+        memset(pModuleData, 0, sizeof(*pModuleData));
 
         pModuleData->binType = binType;
         pModuleData->binCode.codeSize = pShaderInfo->shaderBin.codeSize;
@@ -543,7 +545,6 @@ Result Compiler::BuildGraphicsPipelineInternal(
     BinaryType      binType   = BinaryType::Unknown;
 
     Module* modules[ShaderStageCountInternal] = {};
-    std::unique_ptr<Module> bitcodes[ShaderStageGfxCount];
 
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pGraphicsContext);
@@ -891,7 +892,7 @@ Result Compiler::BuildGraphicsPipeline(
     {
         char pipelineHashString[64];
         int32_t length = snprintf(pipelineHashString, 64, "0x%016" PRIX64, MetroHash::Compact64(&pipelineHash));
-        LLPC_ASSERT(length >= 0);
+        LLPC_UNUSED(length);
 
         bool hashMatch = true;
         if (cl::ShaderReplaceMode == ShaderReplaceShaderPipelineHash)
@@ -927,7 +928,7 @@ Result Compiler::BuildGraphicsPipeline(
                                                   64,
                                                   "0x%016" PRIX64,
                                                   MetroHash::Compact64(pHash));
-                        LLPC_ASSERT(length >= 0);
+                        LLPC_UNUSED(length);
                         LLPC_OUTS("// Shader replacement for shader: " << shaderHash
                                   << ", in pipeline: " << pipelineHashString << "\n");
                     }
@@ -1362,7 +1363,7 @@ Result Compiler::BuildComputePipeline(
     {
         char pipelineHashString[64];
         int32_t length = snprintf(pipelineHashString, 64, "0x%016" PRIX64, MetroHash::Compact64(&pipelineHash));
-        LLPC_ASSERT(length >= 0);
+        LLPC_UNUSED(length);
 
         bool hashMatch = true;
         if (cl::ShaderReplaceMode == ShaderReplaceShaderPipelineHash)
@@ -1392,7 +1393,7 @@ Result Compiler::BuildComputePipeline(
                     char shaderHash[64];
                     auto pHash = reinterpret_cast<const MetroHash::Hash*>(&pRestoreModuleData->hash[0]);
                     int32_t length = snprintf(shaderHash, 64, "0x%016" PRIX64, MetroHash::Compact64(pHash));
-                    LLPC_ASSERT(length >= 0);
+                    LLPC_UNUSED(length);
                     LLPC_OUTS("// Shader replacement for shader: " << shaderHash
                                << ", in pipeline: " << pipelineHashString << "\n");
                 }
@@ -1628,7 +1629,7 @@ Result Compiler::ReplaceShader(
 
     char fileName[64];
     int32_t length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 "_replace.spv", shaderHash);
-    LLPC_ASSERT(length >= 0);
+    LLPC_UNUSED(length);
     std::string replaceFileName = cl::ShaderReplaceDir;
     replaceFileName += "/";
     replaceFileName += fileName;
@@ -2191,7 +2192,7 @@ void Compiler::DumpTimeProfilingResult(
     freq = GetPerfFrequency();
 
     char shaderHash[64] = {};
-    int32_t length = snprintf(shaderHash, 64, "0x%016" PRIX64, MetroHash::Compact64(pHash));
+    snprintf(shaderHash, 64, "0x%016" PRIX64, MetroHash::Compact64(pHash));
 
     // NOTE: To get correct profile result, we have to disable general info output, so we have to output time profile
     // result to LLPC_ERRS
@@ -2214,9 +2215,6 @@ Result Compiler::CollectInfoFromSpirvBinary(
     ) const
 {
     Result result = Result::Success;
-    pModuleData->enableVarPtr = false;
-    pModuleData->enableVarPtrStorageBuf = false;
-    pModuleData->useSubgroupSize = false;
 
     const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pModuleData->binCode.pCode);
     const uint32_t* pEnd = pCode + pModuleData->binCode.codeSize / sizeof(uint32_t);
@@ -2227,6 +2225,8 @@ Result Compiler::CollectInfoFromSpirvBinary(
 
         // Parse SPIR-V instructions
         std::unordered_set<uint32_t> capabilities;
+
+        bool exit = false;
         while (pCodePos < pEnd)
         {
             uint32_t opCode = (pCodePos[0] & OpCodeMask);
@@ -2239,12 +2239,31 @@ Result Compiler::CollectInfoFromSpirvBinary(
                 break;
             }
 
-            if (opCode == spv::OpCapability)
+            // Parse each instruction and find those we are interested in
+
+            // NOTE: SPIR-V binary has fixed instruction layout. This is stated in the spec "2.4 Logical
+            // Layout of a Module". We can simply skip those sections we do not interested in and exit
+            // instruction scan early.
+            switch (opCode)
             {
-                LLPC_ASSERT(wordCount == 2);
-                pCodePos++;
-                spv::Capability capability = static_cast<spv::Capability>(*pCodePos++);
-                capabilities.insert(capability);
+            case spv::OpCapability:
+                {
+                    LLPC_ASSERT(wordCount == 2);
+                    auto capability = static_cast<spv::Capability>(pCodePos[1]);
+                    capabilities.insert(capability);
+                    break;
+                }
+            default:
+                {
+                    // Other instructions beyond info-collecting scope, exit
+                    exit = true;
+                    break;
+                }
+            }
+
+            if (exit)
+            {
+                break;
             }
             else
             {
@@ -2252,8 +2271,7 @@ Result Compiler::CollectInfoFromSpirvBinary(
             }
         }
 
-        if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) !=
-            capabilities.end())
+        if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) != capabilities.end())
         {
             pModuleData->enableVarPtrStorageBuf = true;
         }
@@ -2277,14 +2295,13 @@ Result Compiler::CollectInfoFromSpirvBinary(
         {
             pModuleData->useSubgroupSize = true;
         }
-
-        return result;
     }
     else
     {
         result = Result::ErrorInvalidShader;
         LLPC_ERRS("Invalid SPIR-V binary\n");
     }
+
     return result;
 }
 
@@ -2294,7 +2311,6 @@ bool Compiler::NeedDynamicLoopUnroll(
     Module* pModule  // [in]  LLVM module to check
     ) const
 {
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
     std::vector<LoopAnalysisInfo>  loopInfo;
     bool needDynamicLoopUnroll = false;
     PassLoopInfoCollect* pLoopPass = new PassLoopInfoCollect(&loopInfo);
@@ -2330,6 +2346,7 @@ void Compiler::GetPipelineStatistics(
     ElfReader<Elf64> reader(gfxIp);
     auto result = reader.ReadFromBuffer(pCode, &codeSize);
     LLPC_ASSERT(result == Result::Success);
+    LLPC_UNUSED(result);
 
     pPipelineStats->numAvailVgprs       = 0;
     pPipelineStats->numUsedVgprs        = 0;
@@ -2343,6 +2360,7 @@ void Compiler::GetPipelineStatistics(
         bool isCompute = false;
         Result result = reader.GetSectionDataBySectionIndex(secIdx, &pSection);
         LLPC_ASSERT(result == Result::Success);
+        LLPC_UNUSED(result);
 
         if (strcmp(pSection->pName, NoteName) == 0)
         {

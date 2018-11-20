@@ -39,10 +39,10 @@ namespace Llpc
 class Context;
 
 // Count of user SGPRs used in copy shader
-static const uint32_t CopyShaderUserSgprCount = 3;
+static const uint32_t CopyShaderUserSgprCount = 4;
 
 // User SGPR index for ES-GS LDS size used in copy shader
-static const uint32_t CopyShaderUserSgprIdxEsGsLdsSize = 2;
+static const uint32_t CopyShaderUserSgprIdxEsGsLdsSize = 3;
 
 // =====================================================================================================================
 // Represents the manager of copy shader generation.
@@ -63,10 +63,12 @@ private:
 
     llvm::Value* CalcGsVsRingOffsetForInput(uint32_t           location,
                                             uint32_t           compIdx,
+                                            uint32_t           streamId,
                                             llvm::Instruction* pInsertPos);
 
     llvm::Value* LoadValueFromGsVsRingBuffer(uint32_t           location,
                                              uint32_t           compIdx,
+                                             uint32_t           streamId,
                                              llvm::Instruction* pInsertPos);
 
     void ExportGenericOutput(llvm::Value* pOutputValue, uint32_t location, llvm::Instruction* pInsertPos);
@@ -77,8 +79,20 @@ private:
     // Low part of global internal table pointer
     static const uint32_t EntryArgIdxInternalTablePtrLow = 0;
 
+    // User SGPR index for the stream-out buffer table
+    static const uint32_t  EntryArgIdxStreamOutTable = 2;
+
+    // User SGPR index for the stream info
+    static const uint32_t EntryArgIdxStreamInfo = 4;
+
+    // User SGPR index for the stream-out write index
+    static const uint32_t EntryArgIdxWriteIndex = 5;
+
+    // User SGPR index for the stream offsets
+    static const uint32_t EntryArgIdxStreamOffset = 6;
+
     // Start offset of currently-processed vertex in GS-VS ring buffer
-    static const uint32_t EntryArgIdxVertexOffset = 3;
+    static const uint32_t EntryArgIdxVertexOffset = 10;
 
     llvm::Module*           m_pModule;                      // LLVM module for copy shader
     Context*                m_pContext;                     // LLPC context

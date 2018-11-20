@@ -594,14 +594,13 @@ void ShaderMerger::GenerateLsHsEntryPoint(
         uint32_t userDataIdx = 0;
 
         auto pHsArgBegin = pHsEntryPoint->arg_begin();
-        const uint32_t hsArgCount = pHsEntryPoint->arg_size();
 
         uint32_t hsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            LLPC_ASSERT(hsArgIdx < hsArgCount);
+            LLPC_ASSERT(hsArgIdx < pHsEntryPoint->arg_size());
 
             auto pHsArg = (pHsArgBegin + hsArgIdx);
             LLPC_ASSERT(pHsArg->hasAttribute(Attribute::InReg));
@@ -669,7 +668,7 @@ void ShaderMerger::GenerateLsHsEntryPoint(
         args.push_back(pRelPatchId);
         ++hsArgIdx;
 
-        LLPC_ASSERT(hsArgIdx == hsArgCount); // Must have visit all arguments of HS entry point
+        LLPC_ASSERT(hsArgIdx == pHsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
         EmitCall(pLsHsModule, LlpcName::HsEntryPoint, m_pContext->VoidTy(), args, NoAttrib, pBeginHsBlock);
     }
@@ -1174,14 +1173,13 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         uint32_t userDataIdx = 0;
 
         auto pGsArgBegin = pGsEntryPoint->arg_begin();
-        const uint32_t gsArgCount = pGsEntryPoint->arg_size();
 
         uint32_t gsArgIdx = 0;
 
         // Set up user data SGPRs
         while (userDataIdx < userDataCount)
         {
-            LLPC_ASSERT(gsArgIdx < gsArgCount);
+            LLPC_ASSERT(gsArgIdx < pGsEntryPoint->arg_size());
 
             auto pGsArg = (pGsArgBegin + gsArgIdx);
             LLPC_ASSERT(pGsArg->hasAttribute(Attribute::InReg));
@@ -1262,7 +1260,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(pInvocationId);
         ++gsArgIdx;
 
-        LLPC_ASSERT(gsArgIdx == gsArgCount); // Must have visit all arguments of GS entry point
+        LLPC_ASSERT(gsArgIdx == pGsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
         EmitCall(pEsGsModule, LlpcName::GsEntryPoint, m_pContext->VoidTy(), args, NoAttrib, pBeginGsBlock);
     }

@@ -70,7 +70,6 @@ bool PassDeadFuncRemove::runOnModule(
         for (auto pFunc = module.begin(), pEnd = module.end(); pFunc != pEnd; )
         {
             auto pCurrFunc = pFunc++;
-            auto callConv = pCurrFunc->getCallingConv();
 
             // Ignore entry points
             if (pCurrFunc->getDLLStorageClass() == GlobalValue::DLLExportStorageClass)

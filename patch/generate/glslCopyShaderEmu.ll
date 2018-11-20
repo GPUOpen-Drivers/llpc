@@ -70,7 +70,19 @@ define <4 x i32> @llpc.descriptor.load.gsvsringbuffer(i32 %internalTablePtrLow, 
 }
 
 ; Copy shader skeleton
-define dllexport amdgpu_vs void @_amdgpu_vs_main(i32 inreg, i32 inreg, i32 inreg, i32) #0 !spirv.ExecutionModel !3 {
+define dllexport amdgpu_vs void @_amdgpu_vs_main(
+    i32 inreg,  ; Internal table
+    i32 inreg,  ; Shader table
+    i32 inreg,  ; Stream-out table
+    i32 inreg,  ; ES-GS size
+    i32 inreg,  ; Stream info
+    i32 inreg,  ; Stream-out write index
+    i32 inreg,  ; Stream offset0
+    i32 inreg,  ; Stream offset1
+    i32 inreg,  ; Stream offset2
+    i32 inreg,  ; Stream offset3
+    i32
+    ) #0 !spirv.ExecutionModel !3 {
 .entry:
     ret void
 }

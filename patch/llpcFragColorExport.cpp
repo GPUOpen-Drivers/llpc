@@ -1678,7 +1678,6 @@ ExportFormat FragColorExport::ComputeExportFormat(
     const VkFormat format = pTarget->format;
 
     const bool blendEnabled = pTarget->blendEnable;
-    const bool blendSrcAlphaToColor = pTarget->blendSrcAlphaToColor;
 
     const bool shaderExportsAlpha = (pOutputTy->isVectorTy() && (pOutputTy->getVectorNumElements() == 4));
 

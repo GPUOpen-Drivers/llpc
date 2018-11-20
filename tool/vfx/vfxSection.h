@@ -1183,6 +1183,7 @@ public:
 
  private:
     static const uint32_t  MemberCount = 3;
+
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;

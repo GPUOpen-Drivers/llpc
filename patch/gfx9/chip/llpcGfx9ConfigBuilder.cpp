@@ -68,7 +68,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsFsRegConfig)];
     PipelineVsFsRegConfig* pConfig = reinterpret_cast<PipelineVsFsRegConfig*>(pAllocBuf);
@@ -150,7 +149,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsFsRegConfig)];
     PipelineVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsFsRegConfig*>(pAllocBuf);
@@ -254,7 +252,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsGsFsRegConfig)];
     PipelineVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsGsFsRegConfig*>(pAllocBuf);
@@ -348,7 +345,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsGsFsRegConfig)];
     PipelineVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsGsFsRegConfig*>(pAllocBuf);
@@ -473,8 +469,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
     Result result = Result::Success;
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
-    LLPC_ASSERT(stageMask == ShaderStageToMask(ShaderStageCompute));
+    LLPC_ASSERT(pContext->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
     uint64_t hash64 = 0;
 
@@ -883,11 +878,9 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     const auto pVsResUsage = pContext->GetShaderResourceUsage(ShaderStageVertex);
     const auto& vsBuiltInUsage = pVsResUsage->builtInUsage.vs;
-    const auto& vsInOutUsage   = pVsResUsage->inOutUsage;
 
     const auto pTesResUsage = pContext->GetShaderResourceUsage(ShaderStageTessEval);
     const auto& tesBuiltInUsage = pTesResUsage->builtInUsage.tes;
-    const auto& tesInOutUsage   = pTesResUsage->inOutUsage;
 
     const auto pGsResUsage = pContext->GetShaderResourceUsage(ShaderStageGeometry);
     const auto& gsBuiltInUsage = pGsResUsage->builtInUsage.gs;
@@ -913,10 +906,10 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true); // Follow PAL setting
 
-    const auto& pVsIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
-    const auto& pTesIntfData = pContext->GetShaderInterfaceData(ShaderStageTessEval);
-    const auto& pGsIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
-    uint32_t userDataCount = std::max(hasTs ? pTesIntfData->userDataCount : pVsIntfData->userDataCount,
+    const auto pVsIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
+    const auto pTesIntfData = pContext->GetShaderInterfaceData(ShaderStageTessEval);
+    const auto pGsIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
+    uint32_t userDataCount = std::max((hasTs ? pTesIntfData->userDataCount : pVsIntfData->userDataCount),
                                       pGsIntfData->userDataCount);
 
     const auto pGsShaderInfo = pContext->GetPipelineShaderInfo(ShaderStageGeometry);
@@ -1069,8 +1062,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     Result result = Result::Success;
 
     LLPC_ASSERT(shaderStage == ShaderStageFragment);
-
-    GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
 
     const GraphicsPipelineBuildInfo* pPipelineInfo =
         static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
@@ -1292,8 +1283,6 @@ Result ConfigBuilder::BuildCsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageCompute);
 
-    GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
-
     const auto pIntfData = pContext->GetShaderInterfaceData(shaderStage);
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
@@ -1362,11 +1351,6 @@ Result ConfigBuilder::BuildUserDataConfig(
     LLPC_ASSERT((shaderStage2 == ShaderStageTessControl) || (shaderStage2 == ShaderStageGeometry) ||
                 (shaderStage2 == ShaderStageInvalid));
 
-    uint32_t stageMask = pContext->GetShaderStageMask();
-    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                      ShaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
-
     bool enableMultiView = false;
     if (pContext->IsGraphics())
     {
@@ -1376,14 +1360,13 @@ Result ConfigBuilder::BuildUserDataConfig(
 
     const auto pIntfData1 = pContext->GetShaderInterfaceData(shaderStage1);
     const auto& entryArgIdxs1 = pIntfData1->entryArgIdxs;
+    LLPC_UNUSED(entryArgIdxs1);
 
     const auto pResUsage1 = pContext->GetShaderResourceUsage(shaderStage1);
     const auto& builtInUsage1 = pResUsage1->builtInUsage;
 
     const auto pIntfData2 = (shaderStage2 != ShaderStageInvalid) ?
                                 pContext->GetShaderInterfaceData(shaderStage2) : nullptr;
-    const auto pResUsage2 = (shaderStage2 != ShaderStageInvalid) ?
-                                pContext->GetShaderResourceUsage(shaderStage2) : nullptr;
 
     // Stage-specific processing
     if (shaderStage1 == ShaderStageVertex)
@@ -1426,6 +1409,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                 const auto& entryArgIdxs2 = pIntfData2->entryArgIdxs;
 
                 LLPC_ASSERT((entryArgIdxs1.vs.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
+                LLPC_UNUSED(entryArgIdxs2);
                 LLPC_ASSERT(pIntfData1->userDataUsage.vs.viewIndex == pIntfData2->userDataUsage.gs.viewIndex);
                 SET_DYN_REG(pConfig,
                             startUserData + pIntfData1->userDataUsage.vs.viewIndex,
@@ -1456,6 +1440,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                 const auto& entryArgIdxs2 = pIntfData2->entryArgIdxs;
 
                 LLPC_ASSERT((entryArgIdxs1.tes.viewIndex > 0) && (entryArgIdxs2.gs.viewIndex > 0));
+                LLPC_UNUSED(entryArgIdxs2);
                 LLPC_ASSERT(pIntfData1->userDataUsage.tes.viewIndex == pIntfData2->userDataUsage.gs.viewIndex);
                 SET_DYN_REG(pConfig,
                             startUserData + pIntfData1->userDataUsage.tes.viewIndex,

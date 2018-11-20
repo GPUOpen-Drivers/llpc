@@ -41,7 +41,7 @@ LLVM_LINK_DIR = sys.argv[2]
 OS_TYPE = sys.argv[3]
 
 # LLVM utility binaries
-LLVM_AS = LLVM_AS_DIR + "llvm-as"
+LLVM_OPT = LLVM_AS_DIR + "opt"
 LLVM_LINK = LLVM_LINK_DIR + "llvm-link"
 LLVM_AR = LLVM_LINK_DIR + "llvm-ar"
 
@@ -106,7 +106,8 @@ print("*************************************************************************
 # Assemble .ll files to .bc files
 for f in os.listdir("./"):
     if f.endswith(".ll"):
-        cmd = LLVM_AS + " " + f
+        bcFile = os.path.splitext(f)[0] + ".bc"
+        cmd = LLVM_OPT + " -strip -o " + bcFile + " " + f
         print(">>>  (LL-as) " + cmd)
         if OS_TYPE == "win" :
             subprocess.check_call(cmd)
@@ -226,7 +227,9 @@ for gfx in GFX_EMUS:
     # Assemble .ll files to .bc files
     for f in os.listdir(gfx):
         if f.endswith(".ll"):
-            cmd = LLVM_AS + " " + gfx + "/" + f
+            f = gfx + "/" + f
+            bcFile = os.path.splitext(f)[0] + ".bc"
+            cmd = LLVM_OPT + " -strip -o " + bcFile + " " + f
             print(">>>  (LL-as) " + cmd)
             if OS_TYPE == "win" :
                 subprocess.check_call(cmd)
@@ -296,7 +299,9 @@ for wa in WA_EMUS:
     # Assemble .ll files to .bc files
     for f in os.listdir(workDir):
         if f.endswith(".ll"):
-            cmd = LLVM_AS + " " + workDir + "/" + f
+            f = workDir + "/" + f
+            bcFile = os.path.splitext(f)[0] + ".bc"
+            cmd = LLVM_OPT + " -strip -o " + bcFile + " " + f
             print(">>>  (LL-as) " + cmd)
             if OS_TYPE == "win" :
                 subprocess.check_call(cmd)

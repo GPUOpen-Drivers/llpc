@@ -31,7 +31,7 @@ target triple = "spir64-unknown-unknown"
 ; =====================================================================================================================
 
 ; GLSL: in uint gl_SubGroupInvocation
-define i32 @llpc.input.import.builtin.SubgroupLocalInvocationId(i32 %builtInId) #0
+define i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0) #1
     %2 = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %1) #1
@@ -40,7 +40,7 @@ define i32 @llpc.input.import.builtin.SubgroupLocalInvocationId(i32 %builtInId) 
 }
 
 ; GLSL: in uint64_t gl_SubGroupEqMask
-define i64 @llpc.input.import.builtin.SubgroupEqMaskKHR(i32 %builtInId) #0
+define i64 @llpc.input.import.builtin.SubgroupEqMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0) #1
     %2 = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %1) #1
@@ -54,7 +54,7 @@ define i64 @llpc.input.import.builtin.SubgroupEqMaskKHR(i32 %builtInId) #0
 }
 
 ; GLSL: in uint64_t gl_SubGroupGeMask
-define i64 @llpc.input.import.builtin.SubgroupGeMaskKHR(i32 %builtInId) #0
+define i64 @llpc.input.import.builtin.SubgroupGeMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0) #1
     %2 = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %1) #1
@@ -68,7 +68,7 @@ define i64 @llpc.input.import.builtin.SubgroupGeMaskKHR(i32 %builtInId) #0
 }
 
 ; GLSL: in uint64_t gl_SubGroupGtMask
-define i64 @llpc.input.import.builtin.SubgroupGtMaskKHR(i32 %builtInId) #0
+define i64 @llpc.input.import.builtin.SubgroupGtMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0) #1
     %2 = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %1) #1
@@ -88,7 +88,7 @@ define i64 @llpc.input.import.builtin.SubgroupGtMaskKHR(i32 %builtInId) #0
 }
 
 ; GLSL: in uint64_t gl_SubGroupLeMask
-define i64 @llpc.input.import.builtin.SubgroupLeMaskKHR(i32 %builtInId) #0
+define i64 @llpc.input.import.builtin.SubgroupLeMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0) #1
     %2 = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %1) #1
@@ -111,7 +111,7 @@ define i64 @llpc.input.import.builtin.SubgroupLeMaskKHR(i32 %builtInId) #0
 }
 
 ; GLSL: in uint64_t gl_SubGroupLtMask
-define i64 @llpc.input.import.builtin.SubgroupLtMaskKHR(i32 %builtInId) #0
+define i64 @llpc.input.import.builtin.SubgroupLtMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0) #1
     %2 = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %1) #1
@@ -128,9 +128,9 @@ define i64 @llpc.input.import.builtin.SubgroupLtMaskKHR(i32 %builtInId) #0
 }
 
 ; GLSL: in uvec4 gl_SubgroupEqMask
-define <4 x i32> @llpc.input.import.builtin.SubgroupEqMask(i32 %builtInId) #0
+define <4 x i32> @llpc.input.import.builtin.SubgroupEqMask.v4i32.i32(i32 %builtInId) #0
 {
-    %1 = call i64 @llpc.input.import.builtin.SubgroupEqMaskKHR(i32 %builtInId)
+    %1 = call i64 @llpc.input.import.builtin.SubgroupEqMaskKHR.i64.i32(i32 %builtInId)
     %2 = bitcast i64 %1 to <2 x i32>
     %3 = shufflevector <2 x i32> %2, <2 x i32> <i32 0, i32 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 
@@ -138,9 +138,9 @@ define <4 x i32> @llpc.input.import.builtin.SubgroupEqMask(i32 %builtInId) #0
 }
 
 ; GLSL: in uvec4 gl_SubgroupGeMask
-define <4 x i32> @llpc.input.import.builtin.SubgroupGeMask(i32 %builtInId) #0
+define <4 x i32> @llpc.input.import.builtin.SubgroupGeMask.v4i32.i32(i32 %builtInId) #0
 {
-    %1 = call i64 @llpc.input.import.builtin.SubgroupGeMaskKHR(i32 %builtInId)
+    %1 = call i64 @llpc.input.import.builtin.SubgroupGeMaskKHR.i64.i32(i32 %builtInId)
     %2 = bitcast i64 %1 to <2 x i32>
     %3 = shufflevector <2 x i32> %2, <2 x i32> <i32 0, i32 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 
@@ -148,9 +148,9 @@ define <4 x i32> @llpc.input.import.builtin.SubgroupGeMask(i32 %builtInId) #0
 }
 
 ; GLSL: in uvec4 gl_SubgroupGtMask
-define <4 x i32> @llpc.input.import.builtin.SubgroupGtMask(i32 %builtInId) #0
+define <4 x i32> @llpc.input.import.builtin.SubgroupGtMask.v4i32.i32(i32 %builtInId) #0
 {
-    %1 = call i64 @llpc.input.import.builtin.SubgroupGtMaskKHR(i32 %builtInId)
+    %1 = call i64 @llpc.input.import.builtin.SubgroupGtMaskKHR.i64.i32(i32 %builtInId)
     %2 = bitcast i64 %1 to <2 x i32>
     %3 = shufflevector <2 x i32> %2, <2 x i32> <i32 0, i32 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 
@@ -158,9 +158,9 @@ define <4 x i32> @llpc.input.import.builtin.SubgroupGtMask(i32 %builtInId) #0
 }
 
 ; GLSL: in uvec4 gl_SubgroupLeMask
-define <4 x i32> @llpc.input.import.builtin.SubgroupLeMask(i32 %builtInId) #0
+define <4 x i32> @llpc.input.import.builtin.SubgroupLeMask.v4i32.i32(i32 %builtInId) #0
 {
-    %1 = call i64 @llpc.input.import.builtin.SubgroupLeMaskKHR(i32 %builtInId)
+    %1 = call i64 @llpc.input.import.builtin.SubgroupLeMaskKHR.i64.i32(i32 %builtInId)
     %2 = bitcast i64 %1 to <2 x i32>
     %3 = shufflevector <2 x i32> %2, <2 x i32> <i32 0, i32 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 
@@ -168,9 +168,9 @@ define <4 x i32> @llpc.input.import.builtin.SubgroupLeMask(i32 %builtInId) #0
 }
 
 ; GLSL: in uvec4 gl_SubgroupLtMask
-define <4 x i32> @llpc.input.import.builtin.SubgroupLtMask(i32 %builtInId) #0
+define <4 x i32> @llpc.input.import.builtin.SubgroupLtMask.v4i32.i32(i32 %builtInId) #0
 {
-    %1 = call i64 @llpc.input.import.builtin.SubgroupLtMaskKHR(i32 %builtInId)
+    %1 = call i64 @llpc.input.import.builtin.SubgroupLtMaskKHR.i64.i32(i32 %builtInId)
     %2 = bitcast i64 %1 to <2 x i32>
     %3 = shufflevector <2 x i32> %2, <2 x i32> <i32 0, i32 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 
@@ -182,11 +182,11 @@ define <4 x i32> @llpc.input.import.builtin.SubgroupLtMask(i32 %builtInId) #0
 ; =====================================================================================================================
 
 ; GLSL: in uvec3 gl_GloablInvocationID
-define <3 x i32> @llpc.input.import.builtin.GlobalInvocationId(i32 %builtInId) #0
+define <3 x i32> @llpc.input.import.builtin.GlobalInvocationId.v3i32.i32(i32 %builtInId) #0
 {
-    %1 = call <3 x i32> @llpc.input.import.builtin.WorkgroupSize(i32 25)
-    %2 = call <3 x i32> @llpc.input.import.builtin.WorkgroupId(i32 26)
-    %3 = call <3 x i32> @llpc.input.import.builtin.LocalInvocationId(i32 27)
+    %1 = call <3 x i32> @llpc.input.import.builtin.WorkgroupSize.v3i32.i32(i32 25)
+    %2 = call <3 x i32> @llpc.input.import.builtin.WorkgroupId.v3i32.i32(i32 26)
+    %3 = call <3 x i32> @llpc.input.import.builtin.LocalInvocationId.v3i32.i32(i32 27)
 
     %4 = mul <3 x i32> %1, %2
     %5 = add <3 x i32> %4, %3
@@ -195,10 +195,10 @@ define <3 x i32> @llpc.input.import.builtin.GlobalInvocationId(i32 %builtInId) #
 }
 
 ; GLSL: in uint gl_LocationInvocationIndex
-define i32 @llpc.input.import.builtin.LocalInvocationIndex(i32 %builtInId) #0
+define i32 @llpc.input.import.builtin.LocalInvocationIndex.i32.i32(i32 %builtInId) #0
 {
-    %1 = call <3 x i32> @llpc.input.import.builtin.WorkgroupSize(i32 25)
-    %2 = call <3 x i32> @llpc.input.import.builtin.LocalInvocationId(i32 27)
+    %1 = call <3 x i32> @llpc.input.import.builtin.WorkgroupSize.v3i32.i32(i32 25)
+    %2 = call <3 x i32> @llpc.input.import.builtin.LocalInvocationId.v3i32.i32(i32 27)
 
     %3 = extractelement <3 x i32> %1, i32 0 ; gl_WorkGroupSize.x
     %4 = extractelement <3 x i32> %1, i32 1 ; gl_WorkGroupSize.y
@@ -216,11 +216,11 @@ define i32 @llpc.input.import.builtin.LocalInvocationIndex(i32 %builtInId) #0
 }
 
 ; GLSL: in uint gl_SubgroupID
-define i32 @llpc.input.import.builtin.SubgroupId(i32 %builtInId) #0
+define i32 @llpc.input.import.builtin.SubgroupId.i32.i32(i32 %builtInId) #0
 {
     ; gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
-    %1 = call i32 @llpc.input.import.builtin.LocalInvocationIndex(i32 29)
-    %2 = call i32 @llpc.input.import.builtin.SubgroupSize(i32 36)
+    %1 = call i32 @llpc.input.import.builtin.LocalInvocationIndex.i32.i32(i32 29)
+    %2 = call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32(i32 36)
     %3 = udiv i32 %1, %2
 
     ret i32 %3
@@ -231,12 +231,12 @@ define i32 @llpc.input.import.builtin.SubgroupId(i32 %builtInId) #0
 ; =====================================================================================================================
 
 ; Gets the offset of sample position relative to the pixel center for the specified sample ID
-define <2 x float> @llpc.input.import.builtin.SamplePosOffset(i32 %builtInId, i32 %sampleId) #0
+define <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 %builtInId, i32 %sampleId) #0
 {
     ; BuiltInNumSamples (268435464 = 0x10000008)
-    %1 = call i32 @llpc.input.import.builtin.NumSamples(i32 268435464)
+    %1 = call i32 @llpc.input.import.builtin.NumSamples.i32.i32(i32 268435464)
     ; BuiltInSamplePatternIdx (268435465 = 0x10000009)
-    %2 = call i32 @llpc.input.import.builtin.SamplePatternIdx(i32 268435465)
+    %2 = call i32 @llpc.input.import.builtin.SamplePatternIdx.i32.i32(i32 268435465)
     %3 = add i32 %2, %sampleId
 
     ; offset = (sampleCount > sampleId) ? (samplePatternOffset + sampleId) : 0
@@ -251,22 +251,22 @@ define <2 x float> @llpc.input.import.builtin.SamplePosOffset(i32 %builtInId, i3
 }
 
 ; GLSL: in vec2 gl_SamplePosition
-define <2 x float> @llpc.input.import.builtin.SamplePosition(i32 %builtInId) #0
+define <2 x float> @llpc.input.import.builtin.SamplePosition.v2f32.i32(i32 %builtInId) #0
 {
-    %1 = call i32 @llpc.input.import.builtin.SampleId(i32 18)
+    %1 = call i32 @llpc.input.import.builtin.SampleId.i32.i32(i32 18)
     ; BuiltInSamplePosOffset (268435463 = 0x10000007)
-    %2 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset(i32 268435463, i32 %1) #0
+    %2 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 268435463, i32 %1) #0
     %3 = fadd <2 x float> %2, <float 0.5, float 0.5>
     ret <2 x float> %3
 }
 
-declare <3 x i32> @llpc.input.import.builtin.WorkgroupSize(i32) #0
-declare <3 x i32> @llpc.input.import.builtin.WorkgroupId(i32) #0
-declare <3 x i32> @llpc.input.import.builtin.LocalInvocationId(i32) #0
-declare i32 @llpc.input.import.builtin.SubgroupSize(i32) #0
-declare i32 @llpc.input.import.builtin.NumSamples(i32) #0
-declare i32 @llpc.input.import.builtin.SamplePatternIdx(i32) #0
-declare i32 @llpc.input.import.builtin.SampleId(i32) #0
+declare <3 x i32> @llpc.input.import.builtin.WorkgroupSize.v3i32.i32(i32) #0
+declare <3 x i32> @llpc.input.import.builtin.WorkgroupId.v3i32.i32(i32) #0
+declare <3 x i32> @llpc.input.import.builtin.LocalInvocationId.v3i32.i32(i32) #0
+declare i32 @llpc.input.import.builtin.SubgroupSize.i32.i32(i32) #0
+declare i32 @llpc.input.import.builtin.NumSamples.i32.i32(i32) #0
+declare i32 @llpc.input.import.builtin.SamplePatternIdx.i32.i32(i32) #0
+declare i32 @llpc.input.import.builtin.SampleId.i32.i32(i32) #0
 declare <8 x i8> @llpc.buffer.load.uniform.v8i8(i32, i32, i32, i32, i1, i1, i1, i1)
 declare <8 x i8> @llpc.buffer.load.v8i8(i32, i32, i32, i32, i1, i1, i1, i1)
 declare i32 @llvm.amdgcn.mbcnt.lo(i32, i32) #1

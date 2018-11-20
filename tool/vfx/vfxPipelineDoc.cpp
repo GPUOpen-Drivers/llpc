@@ -131,7 +131,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         ComputePipelineState computeState;
         reinterpret_cast<SectionComputeState*>(m_sections[SectionTypeComputeState][0])->GetSubState(computeState);
         auto pComputePipelineInfo = &m_pipelineState.compPipelineInfo;
-        pComputePipelineInfo->deviceIndex             = computeState.deviceIndex;
+        pComputePipelineInfo->deviceIndex                = computeState.deviceIndex;
         pComputePipelineInfo->options.includeDisassembly = computeState.includeDisassembly ? true : false;
         pComputePipelineInfo->options.autoLayoutDesc     = computeState.autoLayoutDesc ? true : false;
     }

@@ -72,9 +72,7 @@ if(UNIX)
             -Wall
             -Werror
             -Wno-invalid-offsetof
-            -Wno-error=unused-variable
             -Wno-missing-braces
-            -Wno-error=unused-function
         )
         target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++11
@@ -371,7 +369,7 @@ add_custom_command(
     COMMAND ${PYTHON_CMD} ${GEN_GLSL_OP_EMU_LIB_SCRIPT} ${LLVM_BIN_DIR}  ${LLVM_BIN_DIR}  ${BUILD_OS}
     COMMENT "Re-generating GLSL emulation library"
     DEPENDS ${GEN_GLSL_EMU_LIB_DEPS}
-    DEPENDS llvm-ar llvm-link llvm-as
+    DEPENDS llvm-ar llvm-link llvm-as opt
 )
 
 add_dependencies(llpc RunHeapGlslOpEmuLibGenerator)
@@ -421,7 +419,6 @@ if(UNIX)
             -fcolor-diagnostics
             -Wall
             -Werror
-            -Wno-error=unused-variable
         )
         target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++11
@@ -481,7 +478,6 @@ if(UNIX)
             -fcolor-diagnostics
             -Wall
             -Werror
-            -Wno-error=unused-variable
         )
         target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++11

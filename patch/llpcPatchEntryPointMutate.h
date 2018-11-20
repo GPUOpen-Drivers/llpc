@@ -66,7 +66,7 @@ private:
                                       llvm::Type*        pCastTy,
                                       llvm::Instruction* pInsertPos) const;
 
-    bool IsResourceMappingNodeActive(const ResourceMappingNode* pNode) const;
+    bool IsResourceMappingNodeActive(const ResourceMappingNode* pNode, bool isRootNode) const;
 
     llvm::Value* SetRingBufferDataFormat(llvm::Value* pBufDesc,
                                          uint32_t dataFormat,

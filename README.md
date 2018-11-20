@@ -47,11 +47,11 @@ amdllpc [<options>...] [<files>...]
 | `-enable-outs`                   | Enable LLPC-specific debug dump output (to stdout or external     | false                         |
 |                                  | file)                                                             |                               |
 | `-v`                             | Alias for `-enable-outs`                                          | false                         |
-| `-enable-time-profiler`          | Enable time profiler for various compilation phases	       |                               | 
-| `-log-file-dbgs=<filename>`      | Name of the file to log info from dbgs()	llpcLog.txt            |                               |
-| `-log-file-outs=<filename>`      | Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()     |                               |           
+| `-enable-time-profiler`          | Enable time profiler for various compilation phases	       |                               |
+| `-log-file-dbgs=<filename>`      | Name of the file to log info from dbgs()                          | "" (meaning stderr)           |
+| `-log-file-outs=<filename>`      | Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()     |                               |
 | `-enable-pipeline-dump`          | Enable pipeline info dump	                                       |                               |
-| `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped	               |                               |   
+| `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped	               |                               |
 
 
 * Debug & Performance tunning options

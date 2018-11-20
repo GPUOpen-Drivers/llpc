@@ -123,7 +123,9 @@ Result CodeGenManager::CreateTargetMachine(
 {
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
     if ((pContext->GetTargetMachine() != nullptr) &&
-        (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly))
+        (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
+        (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc)
+        )
     {
         return Result::Success;
     }
@@ -136,6 +138,11 @@ Result CodeGenManager::CreateTargetMachine(
     auto pTarget = TargetRegistry::lookupTarget(triple, errMsg);
     if (pTarget != nullptr)
     {
+        // TODO: We should probably be using InitTargetOptionsFromCodeGenFlags() here.
+        // Currently we are not, and it would give an "unused function" warning when compiled with
+        // CLANG. So we avoid the warning by referencing it here.
+        LLPC_UNUSED(&InitTargetOptionsFromCodeGenFlags);
+
         TargetOptions targetOpts;
         auto relocModel = Optional<Reloc::Model>();
         std::string features = "";
@@ -213,6 +220,11 @@ Result CodeGenManager::GenerateCode(
     std::string&       errMsg)    // [out] Error message reported in code generation
 {
     Result result = Result::Success;
+
+    LLPC_OUTS("===============================================================================\n");
+    LLPC_OUTS("// LLPC final pipeline module info\n");
+    LLPC_OUTS(*pModule);
+    LLPC_OUTS("\n");
 
     Context* pContext = static_cast<Context*>(&pModule->getContext());
 

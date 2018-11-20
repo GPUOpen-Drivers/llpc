@@ -74,7 +74,7 @@ opt<bool> EnableErrs(
 opt<std::string> LogFileDbgs("log-file-dbgs",
                              desc("Name of the file to log info from dbgs()"),
                              value_desc("filename"),
-                             init("llpcLog.txt"));
+                             init(""));
 
 // -log-file-outs: name of the file to log info from LLPC_OUTS() and LLPC_ERRS()
 opt<std::string> LogFileOuts("log-file-outs",

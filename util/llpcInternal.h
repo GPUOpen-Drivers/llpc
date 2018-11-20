@@ -80,14 +80,19 @@ namespace LlpcName
     const static char OutputImportBuiltIn[]           = "llpc.output.import.builtin.";
     const static char OutputExportGeneric[]           = "llpc.output.export.generic.";
     const static char OutputExportBuiltIn[]           = "llpc.output.export.builtin.";
+    const static char OutputExportXfb[]               = "llpc.output.export.xfb.";
     const static char InputInterpEval[]               = "llpc.input.interpolate.evalij.";
     const static char BufferCallPrefix[]              = "llpc.buffer.";
     const static char BufferAtomic[]                  = "llpc.buffer.atomic.";
     const static char BufferLoad[]                    = "llpc.buffer.load.";
     const static char BufferLoadDesc[]                = "llpc.buffer.load.desc.";
+    const static char BufferLoadScalarAlignedDesc[]   = "llpc.buffer.load.scalar.aligned.desc.";
     const static char BufferLoadUniform[]             = "llpc.buffer.load.uniform.";
+    const static char BufferLoadScalarAligned[]       = "llpc.buffer.load.scalar.aligned.";
     const static char BufferStore[]                   = "llpc.buffer.store.";
     const static char BufferStoreDesc[]               = "llpc.buffer.store.desc.";
+    const static char BufferStoreScalarAligned[]      = "llpc.buffer.store.scalar.aligned.";
+    const static char BufferStoreScalarAlignedDesc[]  = "llpc.buffer.store.scalar.aligned.desc.";
     const static char BufferArrayLength[]             = "llpc.buffer.arraylength";
     const static char InlineConstLoadUniform[]        = "llpc.inlineconst.load.uniform.";
     const static char InlineConstLoad[]               = "llpc.inlineconst.load.";
@@ -125,6 +130,13 @@ static const uint32_t MaxInOutLocCount = 32;
 
 // Maximum array size of gl_ClipDistance[] and gl_CullDistance[]
 static const uint32_t MaxClipCullDistanceCount = 8;
+
+// Maximum transform feedback buffers
+static const uint32_t MaxTransformFeedbackBuffers = 4;
+
+// Maximum GS output vertex streams
+static const uint32_t MaxGsStreams = 4;
+static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Invalid value");
 
 // Threshold of inline pass
 static const int32_t InlineThreshold = (INT32_MAX / 100);
@@ -172,6 +184,9 @@ llvm::Value* EmitCall(llvm::Module*                             pModule,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
                       llvm::BasicBlock*                         pInsertAtEnd);
 
+// Adds LLVM-style type mangling suffix for the specified return type and args to the name.
+void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);
+
 // Gets LLVM-style name for scalar or vector type.
 std::string GetTypeNameForScalarOrVector(llvm::Type* pTy);
 
@@ -213,6 +228,9 @@ int64_t GetPerfCpuTime();
 
 // Checks whether the input data is actually a ELF binary
 bool IsElfBinary(const void* pData, size_t dataSize);
+
+// Checks whether the output data is actually ISA assembler text
+bool IsIsaText(const void* pData, size_t dataSize);
 
 // =====================================================================================================================
 // Represents the special header of SPIR-V token stream (the first DWORD).

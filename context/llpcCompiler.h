@@ -50,7 +50,7 @@ class GraphicsContext;
 enum class BinaryType : uint32_t
 {
     Unknown = 0,  // Invalid type
-    Spirv,       // SPIR-V binary
+    Spirv,        // SPIR-V binary
     LlvmBc,       // LLVM bitcode
     Elf,          // ELF
 };

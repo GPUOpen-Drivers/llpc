@@ -172,24 +172,64 @@ Value* EmitCall(
 
 // =====================================================================================================================
 // Gets LLVM-style name for scalar or vector type.
+static void GetTypeNameForScalarOrVector(
+    Type*         pTy,         // [in] Type to get mangle name
+    raw_ostream&  nameStream)  // [in,out] Stream to write the type name into
+{
+    if (auto pArrayTy = dyn_cast<ArrayType>(pTy))
+    {
+        nameStream << "a" << pArrayTy->getElementType();
+        pTy = pArrayTy->getElementType();
+    }
+    if (auto pVectorTy = dyn_cast<VectorType>(pTy))
+    {
+        nameStream << "v" << pVectorTy->getNumElements();
+        pTy = pVectorTy->getElementType();
+    }
+    if (pTy->isFloatingPointTy())
+    {
+        nameStream << "f" << pTy->getScalarSizeInBits();
+    }
+    else if (pTy->isIntegerTy())
+    {
+        nameStream << "i" << pTy->getScalarSizeInBits();
+    }
+    else
+    {
+        LLPC_NEVER_CALLED();
+    }
+}
+
+// =====================================================================================================================
+// Gets LLVM-style name for scalar or vector type.
 std::string GetTypeNameForScalarOrVector(
     Type* pTy)  // [in] Type to get mangle name
 {
-    LLPC_ASSERT(pTy->isSingleValueType());
-
     std::string name;
     raw_string_ostream nameStream(name);
 
-    const Type* pScalarTy = pTy->getScalarType();
-    LLPC_ASSERT(pScalarTy->isFloatingPointTy() || pScalarTy->isIntegerTy());
-
-    if (pTy->isVectorTy())
-    {
-        nameStream << "v" << pTy->getVectorNumElements();
-    }
-
-    nameStream << (pScalarTy->isFloatingPointTy() ? "f" : "i") << pScalarTy->getScalarSizeInBits();
+    GetTypeNameForScalarOrVector(pTy, nameStream);
     return nameStream.str();
+}
+
+// =====================================================================================================================
+// Adds LLVM-style type mangling suffix for the specified return type and args to the name.
+void AddTypeMangling(
+    Type* pReturnTy,        // [in] Return type (could be null)
+    ArrayRef<Value*> args,  // Arguments
+    std::string& name)      // [out] String to add mangling to
+{
+    raw_string_ostream nameStream(name);
+    if ((pReturnTy != nullptr) && (pReturnTy->isVoidTy() == false))
+    {
+        nameStream << ".";
+        GetTypeNameForScalarOrVector(pReturnTy, nameStream);
+    }
+    for (auto pArg : args)
+    {
+        nameStream << ".";
+        GetTypeNameForScalarOrVector(pArg->getType(), nameStream);
+    }
 }
 
 // =====================================================================================================================
@@ -584,6 +624,17 @@ bool IsElfBinary(
         isElfBin = pHeader->e_ident32[EI_MAG0] == ElfMagic;
     }
     return isElfBin;
+}
+
+// =====================================================================================================================
+// Checks whether the output data is actually ISA assembler text
+bool IsIsaText(
+    const void* pData,    // [in] Input data to check
+    size_t      dataSize) // Size of the input data
+{
+    // This is called by amdllpc to help distinguish between its three output types of ELF binary, LLVM IR assembler
+    // and ISA assembler. Here we use the fact that ISA assembler is the only one that starts with a tab character.
+    return (dataSize != 0) && ((reinterpret_cast<const char*>(pData))[0] == '\t');
 }
 
 } // Llpc

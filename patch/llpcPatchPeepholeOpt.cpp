@@ -368,8 +368,6 @@ void PatchPeepholeOpt::visitExtractElement(
         return;
     }
 
-    BasicBlock* const pBasicBlock = extractElement.getParent();
-
     Value* const pVector = extractElement.getVectorOperand();
 
     ConstantInt* const pIndex = dyn_cast<ConstantInt>(extractElement.getIndexOperand());

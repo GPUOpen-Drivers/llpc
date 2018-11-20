@@ -332,11 +332,12 @@ bool PatchEntryPointMutate::runOnModule(
         auto pNode = &pShaderInfo->pUserDataNodes[i];
 
         Value* pResNodeValue = nullptr;
-        if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
+        if ((pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr) ||
+            (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr))
         {
             // Do nothing
         }
-        else if (IsResourceMappingNodeActive(pNode) == false)
+        else if (IsResourceMappingNodeActive(pNode, true) == false)
         {
             if  ((pNode->type == ResourceMappingNodeType::DescriptorResource) ||
                  (pNode->type == ResourceMappingNodeType::DescriptorSampler) ||
@@ -435,6 +436,26 @@ bool PatchEntryPointMutate::runOnModule(
                                                                     pDescTablePtrHigh,
                                                                     pVbTablePtrTy,
                                                                     &*pInsertPos);
+                break;
+            }
+        case ResourceMappingNodeType::StreamOutTableVaPtr:
+            {
+                auto pStreamOutTablePtr =
+                    new AllocaInst(m_pContext->Int32x2Ty(),
+                                   dataLayout.getAllocaAddrSpace(),
+                                   "",
+                                   &*pInsertPos);
+                LLPC_ASSERT((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval));
+                auto pStreamOutTablePtrLow = (m_shaderStage == ShaderStageVertex) ?
+                    (GetFunctionArgument(pEntryPoint, pIntfData->entryArgIdxs.vs.streamOutData.tablePtr)) :
+                    (GetFunctionArgument(pEntryPoint, pIntfData->entryArgIdxs.tes.streamOutData.tablePtr));
+                auto pStreamOutTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int32x4Ty(),
+                    MaxTransformFeedbackBuffers), ADDR_SPACE_CONST);
+                pIntfData->streamOutTable.pTablePtr = InitPointerWithValue(pStreamOutTablePtr,
+                                                                           pStreamOutTablePtrLow,
+                                                                           pDescTablePtrHigh,
+                                                                           pStreamOutTablePtrTy,
+                                                                           &*pInsertPos);
                 break;
             }
         case ResourceMappingNodeType::DescriptorResource:
@@ -664,17 +685,19 @@ bool PatchEntryPointMutate::runOnModule(
         pResUsage->inOutUsage.gs.pGsVsRingBufDesc = pGsVsRingBufDesc;
 
         // Setup GS emit vertex counter
-        // TODO: Multiple output streams are not supported (only stream 0 is valid)
-        auto pEmitCounterPtr = new AllocaInst(m_pContext->Int32Ty(),
-                                              dataLayout.getAllocaAddrSpace(),
-                                              "",
-                                              &*pInsertPos);
+        for (int i = 0; i < MaxGsStreams; ++i)
+        {
+            auto pEmitCounterPtr = new AllocaInst(m_pContext->Int32Ty(),
+                                                  dataLayout.getAllocaAddrSpace(),
+                                                  "",
+                                                  &*pInsertPos);
 
-        new StoreInst(ConstantInt::get(m_pContext->Int32Ty(), 0),
-                      pEmitCounterPtr,
-                      &*pInsertPos);
+            new StoreInst(ConstantInt::get(m_pContext->Int32Ty(), 0),
+                          pEmitCounterPtr,
+                          &*pInsertPos);
 
-        pResUsage->inOutUsage.gs.pEmitCounterPtr = pEmitCounterPtr;
+            pResUsage->inOutUsage.gs.pEmitCounterPtr[i] = pEmitCounterPtr;
+        }
     }
 
 	// Setup ES-GS ring buffer descriptor
@@ -773,7 +796,8 @@ bool PatchEntryPointMutate::runOnModule(
 // =====================================================================================================================
 // Checks whether the specified resource mapping node is active.
 bool PatchEntryPointMutate::IsResourceMappingNodeActive(
-    const ResourceMappingNode* pNode        // [in] Resource mapping node
+    const ResourceMappingNode* pNode,        // [in] Resource mapping node
+    bool isRootNode                          // TRUE if node is in root level
     ) const
 {
     bool active = false;
@@ -822,7 +846,7 @@ bool PatchEntryPointMutate::IsResourceMappingNodeActive(
         }
     }
 
-    if (pNode->type == ResourceMappingNodeType::PushConst)
+    if ((pNode->type == ResourceMappingNodeType::PushConst) && isRootNode)
     {
         active = (pResUsage1->pushConstSizeInBytes > 0);
         if ((active == false) && (pResUsage2 != nullptr))
@@ -835,7 +859,7 @@ bool PatchEntryPointMutate::IsResourceMappingNodeActive(
         // Check if any contained descriptor node is active
         for (uint32_t i = 0; i < pNode->tablePtr.nodeCount; ++i)
         {
-            if (IsResourceMappingNodeActive(pNode->tablePtr.pNext + i))
+            if (IsResourceMappingNodeActive(pNode->tablePtr.pNext + i, false))
             {
                 active = true;
                 break;
@@ -847,10 +871,13 @@ bool PatchEntryPointMutate::IsResourceMappingNodeActive(
         // NOTE: We assume indirect user data is always active.
         active = true;
     }
+    else if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+    {
+        active = true;
+    }
     else
     {
-        LLPC_ASSERT((pNode->type != ResourceMappingNodeType::PushConst) &&
-                    (pNode->type != ResourceMappingNodeType::DescriptorTableVaPtr) &&
+        LLPC_ASSERT((pNode->type != ResourceMappingNodeType::DescriptorTableVaPtr) &&
                     (pNode->type != ResourceMappingNodeType::IndirectUserDataVaPtr));
 
         DescriptorPair descPair = {};
@@ -949,7 +976,13 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (IsResourceMappingNodeActive(pNode) == false)
+            if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+            {
+                pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
+                continue;
+            }
+
+            if (IsResourceMappingNodeActive(pNode, true) == false)
             {
                 continue;
             }
@@ -993,6 +1026,12 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
             }
 
+            // Reserve for stream-out table
+            if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+            {
+                availUserDataCount -= 1;
+            }
+
             if (builtInUsage.vs.baseVertex || builtInUsage.vs.baseInstance)
             {
                 availUserDataCount -= 2;
@@ -1008,6 +1047,12 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     case ShaderStageTessEval:
         {
             if (enableMultiView)
+            {
+                availUserDataCount -= 1;
+            }
+
+            // Reserve for stream-out table
+            if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
             {
                 availUserDataCount -= 1;
             }
@@ -1083,7 +1128,12 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             continue;
         }
 
-        if (IsResourceMappingNodeActive(pNode) == false)
+        if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+        {
+            continue;
+        }
+
+        if (IsResourceMappingNodeActive(pNode, true) == false)
         {
             continue;
         }
@@ -1168,6 +1218,42 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         pIntfData->entryArgIdxs.spillTable = argIdx - 1;
 
         pIntfData->spillTable.sizeInDwords = requiredUserDataCount - pIntfData->spillTable.offsetInDwords;
+    }
+
+    // Allocate register for stream-out buffer table
+    for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+    {
+        auto pNode = &pShaderInfo->pUserDataNodes[i];
+        if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+        {
+            argTys.push_back(m_pContext->Int32Ty());
+            LLPC_ASSERT(pNode->sizeInDwords == 1);
+            switch (m_shaderStage)
+            {
+            case ShaderStageVertex:
+                {
+                    pIntfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
+                    pIntfData->entryArgIdxs.vs.streamOutData.tablePtr = argIdx;
+                    break;
+                }
+            case ShaderStageTessEval:
+                {
+                    pIntfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
+                    pIntfData->entryArgIdxs.tes.streamOutData.tablePtr = argIdx;
+                    break;
+                }
+            default:
+                {
+                    LLPC_NEVER_CALLED();
+                    break;
+                }
+            }
+
+            pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+            *pInRegMask |= (1ull << (argIdx++));
+            ++userDataIdx;
+            break;
+        }
     }
 
     switch (m_shaderStage)
@@ -1318,16 +1404,44 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
     pIntfData->userDataCount = userDataIdx;
 
+    // Number of stream-out buffer to write
+    const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
+    bool enableXfb = (xfbStrides[0] > 0) || (xfbStrides[1] > 0) ||
+        (xfbStrides[2] > 0) || (xfbStrides[3] > 0);
+
     // NOTE: Here, we start to add system values, they should be behind user data.
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
         {
-            if (m_hasGs && (m_hasTs == false))
+            if (m_hasGs && (m_hasTs == false))   // VS acts as hardware ES
             {
                 argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset
                 entryArgIdxs.vs.esGsOffset = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
+            }
+            else if ((m_hasGs == false) && (m_hasTs == false))  // VS acts as hardware VS
+            {
+                if (enableXfb)  // If output to stream-out buffer
+                {
+                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out info (ID, vertex count, enablement)
+                    entryArgIdxs.vs.streamOutData.streamInfo = argIdx;
+                    *pInRegMask |= (1ull << (argIdx++));
+
+                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out write Index
+                    entryArgIdxs.vs.streamOutData.writeIndex = argIdx;
+                    *pInRegMask |= (1ull << (argIdx++));
+
+                    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+                    {
+                        if (xfbStrides[i] > 0)
+                        {
+                            argTys.push_back(m_pContext->Int32Ty()); // Stream-out offset
+                            entryArgIdxs.vs.streamOutData.streamOffsets[i] = argIdx;
+                            *pInRegMask |= (1ull << (argIdx++));
+                        }
+                    }
+                }
             }
 
             // NOTE: Order of these arguments could not be changed. The rule is very similar to function default
@@ -1383,24 +1497,58 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     case ShaderStageTessEval:
         {
-            if (m_pContext->IsTessOffChip()) // Off-chip LDS buffer base
+            if (m_hasGs)    // TES acts as hardware ES
             {
-                // NOTE: Off-chip LDS buffer base occupies two SGPRs. When TES acts as hardware VS, use second SGPR.
-                // When TES acts as hardware ES, use first SGPR.
-                entryArgIdxs.tes.offChipLdsBase = m_hasGs ? argIdx : argIdx + 1;
+                if (m_pContext->IsTessOffChip())
+                {
+                    entryArgIdxs.tes.offChipLdsBase = argIdx; // Off-chip LDS buffer base
+                    argTys.push_back(m_pContext->Int32Ty());
+                    *pInRegMask |= (1ull << (argIdx++));
 
-                argTys.push_back(m_pContext->Int32Ty());
-                *pInRegMask |= (1ull << (argIdx++));
-
-                argTys.push_back(m_pContext->Int32Ty());
-                *pInRegMask |= (1ull << (argIdx++));
-            }
-
-            if (m_hasGs)
-            {
+                    argTys.push_back(m_pContext->Int32Ty());  // If is_offchip enabled
+                    *pInRegMask |= (1ull << (argIdx++));
+                }
                 argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset
                 entryArgIdxs.tes.esGsOffset = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
+            }
+            else  // TES acts as hardware VS
+            {
+                if (m_pContext->IsTessOffChip() || enableXfb)
+                {
+                    entryArgIdxs.tes.streamOutData.streamInfo = argIdx;
+                    argTys.push_back(m_pContext->Int32Ty());
+                    *pInRegMask |= (1ull << (argIdx++));
+                }
+
+                if (enableXfb)
+                {
+                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out info (ID, vertex count, enablement)
+                    entryArgIdxs.vs.streamOutData.streamInfo = argIdx;
+                    *pInRegMask |= (1ull << (argIdx++));
+
+                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out write Index
+                    entryArgIdxs.vs.streamOutData.writeIndex = argIdx;
+                    *pInRegMask |= (1ull << (argIdx++));
+
+                    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+                    {
+                        if (xfbStrides[i] > 0)
+                        {
+                            argTys.push_back(m_pContext->Int32Ty()); // Stream-out offset
+                            entryArgIdxs.vs.streamOutData.streamOffsets[i] = argIdx;
+                            *pInRegMask |= (1ull << (argIdx++));
+                        }
+                    }
+                }
+
+                if (m_pContext->IsTessOffChip()) // Off-chip LDS buffer base
+                {
+                    entryArgIdxs.tes.offChipLdsBase = argIdx;
+
+                    argTys.push_back(m_pContext->Int32Ty());
+                    *pInRegMask |= (1ull << (argIdx++));
+                }
             }
 
             argTys.push_back(m_pContext->FloatTy()); // X of TessCoord (U)
