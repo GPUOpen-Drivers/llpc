@@ -1020,10 +1020,14 @@ static Result ProcessPipeline(
     //
     // Translate sources to SPIR-V binary
     //
+
     for (uint32_t i = 0; (i < inFiles.size()) && (result == Result::Success); ++i)
     {
         const std::string& inFile = inFiles[i];
         std::string spvBinFile;
+
+        //LLPC_ERRS("File " << inFile << ": Bad file extension; try -help\n");
+        //result = Result::ErrorInvalidShader;
 
         if (IsGlslTextFile(inFile))
         {
