@@ -157,9 +157,10 @@ struct NoteHeader
     uint32_t                       nameSize;                                   // Byte size of note name
     uint32_t                       descSize;                                   // Descriptor size in byte
     Util::Abi::PipelineAbiNoteType type;                                       // Note type
-    char                           name[sizeof(Util::Abi::AmdGpuVendorName)];  // Note name, include padding
+    char                           name[8];                                    // Note name, include padding
 };
-static_assert(sizeof(Util::Abi::AmdGpuVendorName) == 4, "");
+static_assert(sizeof(Util::Abi::AmdGpuVendorName) < 8, "");
+static_assert(sizeof(Util::Abi::AmdGpuArchName) < 8, "");
 
 #pragma pack (push, 1)
 // Represents the layout of 32-bit ELF
