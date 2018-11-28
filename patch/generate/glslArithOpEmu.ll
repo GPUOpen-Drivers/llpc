@@ -627,6 +627,112 @@ define spir_func <4 x float> @_Z4modfDv4_fPDv4_f(
     ret <4 x float> %16
 }
 
+; GLSL: float modf(float, out float)
+define spir_func { float, float } @_Z10modfStructf(
+    float %x) #0
+{
+    %1 = call float @llvm.trunc.f32(float %x)
+    %2 = fsub float %x, %1
+
+    %3 = insertvalue { float, float } undef, float %2, 0
+    %4 = insertvalue { float, float } %3, float %1, 1
+
+    ret { float, float } %4
+}
+
+; GLSL: fvec2 modf(fvec2, out fvec2)
+define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(
+    <2 x float> %x) #0
+{
+    %x0 = extractelement <2 x float> %x, i32 0
+    %x1 = extractelement <2 x float> %x, i32 1
+
+    %1 = call float @llvm.trunc.f32(float %x0)
+    %2 = fsub float %x0, %1
+
+    %3 = call float @llvm.trunc.f32(float %x1)
+    %4 = fsub float %x1, %3
+
+    %5 = insertelement <2 x float> undef, float %1, i32 0
+    %6 = insertelement <2 x float> %5, float %3, i32 1
+
+    %7 = insertelement <2 x float> undef, float %2, i32 0
+    %8 = insertelement <2 x float> %7, float %4, i32 1
+
+    %9 = insertvalue { <2 x float>, <2 x float> } undef, <2 x float> %8, 0
+    %10 = insertvalue { <2 x float>, <2 x float> } %9, <2 x float> %6, 1
+
+    ret { <2 x float>, <2 x float> } %10
+}
+
+; GLSL: fvec3 modf(fvec3, out fvec3)
+define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(
+    <3 x float> %x) #0
+{
+    %x0 = extractelement <3 x float> %x, i32 0
+    %x1 = extractelement <3 x float> %x, i32 1
+    %x2 = extractelement <3 x float> %x, i32 2
+
+    %1 = call float @llvm.trunc.f32(float %x0)
+    %2 = fsub float %x0, %1
+
+    %3 = call float @llvm.trunc.f32(float %x1)
+    %4 = fsub float %x1, %3
+
+    %5 = call float @llvm.trunc.f32(float %x2)
+    %6 = fsub float %x2, %5
+
+    %7 = insertelement <3 x float> undef, float %1, i32 0
+    %8 = insertelement <3 x float> %7, float %3, i32 1
+    %9 = insertelement <3 x float> %8, float %5, i32 2
+
+    %10 = insertelement <3 x float> undef, float %2, i32 0
+    %11 = insertelement <3 x float> %10, float %4, i32 1
+    %12 = insertelement <3 x float> %11, float %6, i32 2
+
+    %13 = insertvalue { <3 x float>, <3 x float> } undef, <3 x float> %12, 0
+    %14 = insertvalue { <3 x float>, <3 x float> } %13, <3 x float> %9, 1
+
+    ret { <3 x float>, <3 x float> } %14
+}
+
+; GLSL: fvec4 modf(fvec4, out fvec4)
+define spir_func { <4 x float>, <4 x float> } @_Z10modfStructDv4_f(
+    <4 x float> %x) #0
+{
+    %x0 = extractelement <4 x float> %x, i32 0
+    %x1 = extractelement <4 x float> %x, i32 1
+    %x2 = extractelement <4 x float> %x, i32 2
+    %x3 = extractelement <4 x float> %x, i32 3
+
+    %1 = call float @llvm.trunc.f32(float %x0)
+    %2 = fsub float %x0, %1
+
+    %3 = call float @llvm.trunc.f32(float %x1)
+    %4 = fsub float %x1, %3
+
+    %5 = call float @llvm.trunc.f32(float %x2)
+    %6 = fsub float %x2, %5
+
+    %7 = call float @llvm.trunc.f32(float %x3)
+    %8 = fsub float %x3, %7
+
+    %9 = insertelement <4 x float> undef, float %1, i32 0
+    %10 = insertelement <4 x float> %9, float %3, i32 1
+    %11 = insertelement <4 x float> %10, float %5, i32 2
+    %12 = insertelement <4 x float> %11, float %7, i32 3
+
+    %13 = insertelement <4 x float> undef, float %2, i32 0
+    %14 = insertelement <4 x float> %13, float %4, i32 1
+    %15 = insertelement <4 x float> %14, float %6, i32 2
+    %16 = insertelement <4 x float> %15, float %8, i32 3
+
+    %17 = insertvalue { <4 x float>, <4 x float> } undef, <4 x float> %16, 0
+    %18 = insertvalue { <4 x float>, <4 x float> } %17, <4 x float> %12, 1
+
+    ret { <4 x float>, <4 x float> } %18
+}
+
 ; GLSL: float nmin(float, float)
 define float @llpc.nmin.f32(float %x, float %y) #0
 {
