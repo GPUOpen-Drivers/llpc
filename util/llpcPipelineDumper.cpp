@@ -1113,10 +1113,11 @@ OStream& operator<<(
             // Output .note section
             out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
             uint32_t offset = 0;
-            const uint32_t noteHeaderSize = sizeof(NoteHeader);
+            const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
+                const uint32_t noteNameSize = Pow2Align(pNode->nameSize, 4);
                 switch (pNode->type)
                 {
                 case Util::Abi::PipelineAbiNoteType::HsaIsa:
@@ -1125,7 +1126,7 @@ OStream& operator<<(
                             << pNode->name << "  size = "<< pNode->descSize << ")\n";
 
                         auto pGpu = reinterpret_cast<const Util::Abi::AbiAmdGpuVersionNote*>(
-                            pSection->pData + offset + noteHeaderSize);
+                            pSection->pData + offset + noteHeaderSize + noteNameSize);
 
                         out << "        vendorName  = " << pGpu->vendorName << "\n";
                         out << "        archName    = " << pGpu->archName << "\n";
@@ -1140,7 +1141,7 @@ OStream& operator<<(
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
 
                         auto pCodeVersion = reinterpret_cast<const Util::Abi::AbiMinorVersionNote *>(
-                            pSection->pData + offset + noteHeaderSize);
+                            pSection->pData + offset + noteHeaderSize + noteNameSize);
                         out << "        minor = " << pCodeVersion->minorVersion << "\n";
                         break;
                     }
@@ -1156,7 +1157,7 @@ OStream& operator<<(
 
                             const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
                             auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
-                                pSection->pData + offset + noteHeaderSize);
+                                pSection->pData + offset + noteHeaderSize + noteNameSize);
 
                             std::map<uint32_t, uint32_t> sortedConfigs;
                             for (uint32_t i = 0; i < configCount; ++i)
@@ -1190,7 +1191,7 @@ OStream& operator<<(
                             out << "    PalMetadata                  (name = "
                                 << pNode->name << "  size = " << pNode->descSize << ")\n";
 
-                            auto pBuffer = pSection->pData + offset + noteHeaderSize;
+                            auto pBuffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
                             reader.InitMsgPack(pBuffer, pNode->descSize);
 
                             while (reader.GetNextMsgItem())
@@ -1314,7 +1315,7 @@ OStream& operator<<(
                         {
                             out << "    IsaVersion                   (name = "
                             << pNode->name << "  size = " << pNode->descSize << ")\n";
-                            auto pDesc = pSection->pData + offset + noteHeaderSize;
+                            auto pDesc = pSection->pData + offset + noteHeaderSize + noteNameSize;
                             OutputText(pDesc, 0, pNode->descSize, out);
                             out << "\n";
                         }
@@ -1322,13 +1323,13 @@ OStream& operator<<(
                         {
                             out << "    Unknown(" << (uint32_t)pNode->type << ")                (name = "
                                 << pNode->name << "  size = " << pNode->descSize << ")\n";
-                            auto pDesc = pSection->pData + offset + noteHeaderSize;
+                            auto pDesc = pSection->pData + offset + noteHeaderSize + noteNameSize;
                             OutputBinary(pDesc, 0, pNode->descSize, out);
                         }
                         break;
                     }
                 }
-                offset += noteHeaderSize + Pow2Align(pNode->descSize, sizeof(uint32_t));
+                offset += noteHeaderSize + noteNameSize + Pow2Align(pNode->descSize, sizeof(uint32_t));
                 LLPC_ASSERT(offset <= pSection->secHead.sh_size);
             }
         }
