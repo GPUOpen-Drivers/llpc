@@ -124,12 +124,43 @@ bool PatchInOutImportExport::runOnModule(
         }
     }
 
+    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
+                             ShaderStageToMask(ShaderStageTessEval))) != 0);
+    m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+
+    // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
+    bool useThreadId = (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9)));
+
+    // Thread ID will also be used for stream-out buffer export
+    const auto& xfbStrides = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
+    bool enableXfb = (xfbStrides[0] > 0) || (xfbStrides[1] > 0) ||
+        (xfbStrides[2] > 0) || (xfbStrides[3] > 0);
+    useThreadId = useThreadId || enableXfb;
+
+    if (useThreadId)
+    {
+        // Calculate and store thread ID
+        auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
+
+        std::vector<Value*> args;
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
+
+        {
+            args.clear();
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+            args.push_back(m_pThreadId);
+            m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
+        }
+    }
+
     // Initialize calculation factors for tessellation shader
     if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
     {
         const uint32_t stageMask = m_pContext->GetShaderStageMask();
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
-        const bool hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
 
         auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
         if ((calcFactor.inVertexStride              == InvalidValue) &&
@@ -257,31 +288,6 @@ bool PatchInOutImportExport::runOnModule(
         }
     }
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
-    m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                             ShaderStageToMask(ShaderStageTessEval))) != 0);
-    m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
-
-    // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
-    const bool useThreadId = (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9)));
-    if (useThreadId)
-    {
-        // Calculate and store thread ID
-        auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
-
-        std::vector<Value*> args;
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
-
-        {
-            args.clear();
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-            args.push_back(m_pThreadId);
-            m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
-        }
-    }
-
     // Create the global variable that is to model LDS
     // NOTE: ES -> GS ring is always on-chip on GFX9.
     if (m_hasTs || (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))))
@@ -364,15 +370,17 @@ void PatchInOutImportExport::visitCallInst(
 
     auto exportGenericOutput = LlpcName::OutputExportGeneric;
     auto exportBuiltInOutput = LlpcName::OutputExportBuiltIn;
+    auto exportXfbOutput = LlpcName::OutputExportXfb;
 
     const bool isGenericOutputExport = mangledName.startswith(exportGenericOutput);
     const bool isBuiltInOutputExport = mangledName.startswith(exportBuiltInOutput);
+    const bool isXfbOutputExport = mangledName.startswith(exportXfbOutput);
 
-    const bool isExport = (isGenericOutputExport || isBuiltInOutputExport);
+    const bool isExport = (isGenericOutputExport || isBuiltInOutputExport || isXfbOutputExport);
 
     const bool isInput  = (isGenericInputImport || isBuiltInInputImport || isInterpolantInputImport);
     const bool isOutput = (isGenericOutputImport || isBuiltInOutputImport ||
-                           isGenericOutputExport || isBuiltInOutputExport);
+                           isGenericOutputExport || isBuiltInOutputExport || isXfbOutputExport);
 
     if (isImport && isInput)
     {
@@ -383,10 +391,6 @@ void PatchInOutImportExport::visitCallInst(
         // Generic value (location or SPIR-V built-in ID)
         uint32_t value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
 
-        if (isGenericInputImport)
-        {
-            LLPC_ASSERT((importGenericInput + GetTypeNameForScalarOrVector(pInputTy) == mangledName));
-        }
         LLVM_DEBUG(dbgs() << "Find input import call: builtin = " << isBuiltInInputImport
                      << " value = " << value << "\n");
 
@@ -607,10 +611,6 @@ void PatchInOutImportExport::visitCallInst(
         // Generic value (location or SPIR-V built-in ID)
         uint32_t value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
 
-        if (isGenericOutputImport)
-        {
-            LLPC_ASSERT((importGenericOutput + GetTypeNameForScalarOrVector(pOutputTy) == mangledName));
-        }
         LLVM_DEBUG(dbgs() << "Find output import call: builtin = " << isBuiltInOutputImport
                      << " value = " << value << "\n");
 
@@ -673,19 +673,54 @@ void PatchInOutImportExport::visitCallInst(
 
         Value* pOutput = callInst.getOperand(callInst.getNumArgOperands() - 1); // Last argument
 
-        // Generic value (location or SPIR-V built-in ID)
+        // Generic value (location or SPIR-V built-in ID or XFB buffer offset)
         uint32_t value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
 
-        if (isGenericOutputExport)
-        {
-            LLPC_ASSERT(exportGenericOutput + GetTypeNameForScalarOrVector(pOutput->getType()) == mangledName);
-        }
         LLVM_DEBUG(dbgs() << "Find output export call: builtin = " << isBuiltInOutputExport
                      << " value = " << value << "\n");
 
         m_exportCalls.push_back(&callInst);
 
-        if (isBuiltInOutputExport)
+        if (isXfbOutputExport)
+        {
+            uint32_t xfbBuffer = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+            uint32_t xfbOffset = value;
+            switch (m_shaderStage)
+            {
+            case ShaderStageVertex:
+                {
+                    if ((m_hasGs == false) && (m_hasTs == false))
+                    {
+                        PatchVsTesXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                    }
+                    break;
+                }
+            case ShaderStageTessEval:
+                {
+                    if (m_hasGs == false)
+                    {
+                        PatchVsTesXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                    }
+                    break;
+                }
+            case ShaderStageGeometry:
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                    break;
+                }
+            case ShaderStageCopyShader:
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                    break;
+                }
+            default:
+                {
+                    LLPC_NEVER_CALLED();
+                    break;
+                }
+            }
+        }
+        else if (isBuiltInOutputExport)
         {
             const uint32_t builtInId = value;
 
@@ -712,9 +747,7 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageGeometry:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 3);
-                    uint32_t streamId = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-                    PatchGsBuiltInOutputExport(pOutput, builtInId, streamId, &callInst);
+                    PatchGsBuiltInOutputExport(pOutput, builtInId, pResUsage->inOutUsage.gs.rasterStream, &callInst);
                     break;
                 }
             case ShaderStageFragment:
@@ -774,10 +807,22 @@ void PatchInOutImportExport::visitCallInst(
             }
             else if (m_shaderStage == ShaderStageCopyShader)
             {
-                if (pResUsage->inOutUsage.gs.genericOutByteSizes.find(value) != pResUsage->inOutUsage.gs.genericOutByteSizes.end())
+                exist = true;
+                loc = value;
+            }
+            else if (m_shaderStage == ShaderStageGeometry)
+            {
+                LLPC_ASSERT(callInst.getNumArgOperands() == 4);
+                const uint32_t streamId = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
+                GsOutLocInfo outLocInfo = {};
+                outLocInfo.location = value;
+                outLocInfo.streamId = streamId;
+                outLocInfo.isBuiltIn = false;
+
+                if (pResUsage->inOutUsage.outputLocMap.find(outLocInfo.u32All) != pResUsage->inOutUsage.outputLocMap.end())
                 {
                     exist = true;
-                    loc = value;
+                    loc = pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All];
                 }
             }
             else
@@ -878,28 +923,29 @@ void PatchInOutImportExport::visitCallInst(
                 LLPC_ASSERT(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
                 uint32_t loc = builtInOutLocMap[BuiltInViewIndex];
 
-                StoreValueToGsVsRingBuffer(pViewIndex, loc, 0, &callInst);
+                auto rasterStream = pResUsage->inOutUsage.gs.rasterStream;
+                StoreValueToGsVsRingBuffer(pViewIndex, loc, 0, rasterStream, &callInst);
             }
 
-            bool isEmitStream0 = false;
+            uint32_t emitStream = InvalidValue;
 
             uint64_t message = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
-            if (message == GS_EMIT_STREAM0)
+            if ((message == GS_EMIT_STREAM0)|| (message == GS_EMIT_STREAM1) || (message == GS_EMIT_STREAM2) || (message == GS_EMIT_STREAM3))
             {
-                // NOTE: Only stream 0 is supported.
-                isEmitStream0 = true;
+                // NOTE: MSG[9:8] = STREAM_ID
+                emitStream = (message &GS_EMIT_STREAM_ID_MASK) >> GS_EMIT_STREAM_ID_SHIFT;
             }
 
-            if (isEmitStream0)
+            if (emitStream != InvalidValue)
             {
                 // Increment emit vertex counter
                 const auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
-                Value* pEmitCounter = new LoadInst(inOutUsage.gs.pEmitCounterPtr, "", &callInst);
+                Value* pEmitCounter = new LoadInst(inOutUsage.gs.pEmitCounterPtr[emitStream], "", &callInst);
                 pEmitCounter = BinaryOperator::CreateAdd(pEmitCounter,
                                                          ConstantInt::get(m_pContext->Int32Ty(), 1),
                                                          "",
                                                          &callInst);
-                new StoreInst(pEmitCounter, inOutUsage.gs.pEmitCounterPtr, &callInst);
+                new StoreInst(pEmitCounter, inOutUsage.gs.pEmitCounterPtr[emitStream], &callInst);
             }
         }
     }
@@ -990,7 +1036,6 @@ void PatchInOutImportExport::visitReturnInst(
         {
             LLPC_ASSERT(m_shaderStage == ShaderStageCopyShader);
             auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader)->builtInUsage.gs;
-            auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
 
             usePosition       = builtInUsage.position;
             usePointSize      = builtInUsage.pointSize;
@@ -1468,12 +1513,14 @@ void PatchInOutImportExport::visitReturnInst(
             if (m_pFragDepth != nullptr)
             {
                 LLPC_ASSERT(builtInUsage.fragDepth);
+                LLPC_UNUSED(builtInUsage);
                 pFragDepth = m_pFragDepth;
             }
 
             if (m_pFragStencilRef != nullptr)
             {
                 LLPC_ASSERT(builtInUsage.fragStencilRef);
+                LLPC_UNUSED(builtInUsage);
                 channelMask |= 2;
                 pFragStencilRef = m_pFragStencilRef;
             }
@@ -1481,6 +1528,7 @@ void PatchInOutImportExport::visitReturnInst(
             if (m_pSampleMask != nullptr)
             {
                 LLPC_ASSERT(builtInUsage.sampleMask);
+                LLPC_UNUSED(builtInUsage);
                 channelMask |= 4;
                 pSampleMask = m_pSampleMask;
             }
@@ -1833,6 +1881,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
         if ((interpMode != InterpModeFlat) && (interpMode != InterpModeCustom))
         {
             LLPC_ASSERT((pBasicTy->isHalfTy() || pBasicTy->isFloatTy()) && (numChannels <= 4));
+            LLPC_UNUSED(pBasicTy);
 
             if (bitWidth == 16)
             {
@@ -2101,8 +2150,6 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     uint32_t     streamId,       // ID of output vertex stream
     Instruction* pInsertPos)     // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT(streamId == 0); // TODO: Multiple output streams are not supported.
-
     auto pOutputTy = pOutput->getType();
 
     // Cast double or double vector to float vector.
@@ -2136,11 +2183,11 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     LLPC_ASSERT(compIdx <= 4);
     auto& genericOutByteSizes =
         m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
-    genericOutByteSizes[location][compIdx] = byteSize;
+    genericOutByteSizes[streamId][location][compIdx] = byteSize;
 
     if (compCount == 1)
     {
-        StoreValueToGsVsRingBuffer(pOutput, location, compIdx, pInsertPos);
+        StoreValueToGsVsRingBuffer(pOutput,location, compIdx, streamId, pInsertPos);
     }
     else
     {
@@ -2150,7 +2197,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
                                                     ConstantInt::get(m_pContext->Int32Ty(), i),
                                                     "",
                                                     pInsertPos);
-            StoreValueToGsVsRingBuffer(pComp, location + ((compIdx + i) / 4), (compIdx + i) % 4, pInsertPos);
+            StoreValueToGsVsRingBuffer(pComp, location + ((compIdx + i) / 4), (compIdx + i) % 4, streamId, pInsertPos);
         }
     }
 
@@ -2168,6 +2215,7 @@ void PatchInOutImportExport::PatchFsGenericOutputExport(
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
     LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+    LLPC_UNUSED(bitWidth);
 
     auto pCompTy = pOutputTy->isVectorTy() ? pOutputTy->getVectorElementType() : pOutputTy;
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
@@ -2215,7 +2263,6 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
     Value* pInput = UndefValue::get(pInputTy);
 
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
 
     switch (builtInId)
     {
@@ -3135,7 +3182,6 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
 
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl);
     auto& builtInUsage = pResUsage->builtInUsage.tcs;
-    auto& inoutUsage = pResUsage->inOutUsage;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
     auto& perPatchBuiltInOutLocMap = pResUsage->inOutUsage.perPatchBuiltInOutputLocMap;
 
@@ -3144,6 +3190,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
     case BuiltInPosition:
         {
             LLPC_ASSERT(builtInUsage.position);
+            LLPC_UNUSED(builtInUsage);
 
             LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
             uint32_t loc = builtInOutLocMap[builtInId];
@@ -3156,6 +3203,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
     case BuiltInPointSize:
         {
             LLPC_ASSERT(builtInUsage.pointSize);
+            LLPC_UNUSED(builtInUsage);
 
             LLPC_ASSERT(pElemIdx == nullptr);
             LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
@@ -3172,11 +3220,13 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
             if (builtInId == BuiltInClipDistance)
             {
                 LLPC_ASSERT(builtInUsage.clipDistance > 0);
+                LLPC_UNUSED(builtInUsage);
             }
             else
             {
                 LLPC_ASSERT(builtInId == BuiltInCullDistance);
                 LLPC_ASSERT(builtInUsage.cullDistance > 0);
+                LLPC_UNUSED(builtInUsage);
             }
 
             LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
@@ -3214,11 +3264,13 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
             if (builtInId == BuiltInTessLevelOuter)
             {
                 LLPC_ASSERT(builtInUsage.tessLevelOuter);
+                LLPC_UNUSED(builtInUsage);
             }
             else
             {
                 LLPC_ASSERT(builtInId == BuiltInTessLevelInner);
                 LLPC_ASSERT(builtInUsage.tessLevelInner);
+                LLPC_UNUSED(builtInUsage);
             }
 
             LLPC_ASSERT(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
@@ -3282,7 +3334,6 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
         {
             if (builtInUsage.position == false)
             {
-                const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
                 return;
             }
 
@@ -3980,10 +4031,6 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     uint32_t     streamId,       // ID of output vertex stream
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
-    LLPC_ASSERT(streamId == 0); // NOTE: Currently, all built-in outputs are bound to vertex stream 0.
-
-    auto pOutputTy = pOutput->getType();
-
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
     auto& builtInUsage = pResUsage->builtInUsage.gs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
@@ -4005,7 +4052,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
                                                         ConstantInt::get(m_pContext->Int32Ty(), i),
                                                         "",
                                                         pInsertPos);
-                StoreValueToGsVsRingBuffer(pComp, loc, i, pInsertPos);
+                StoreValueToGsVsRingBuffer(pComp, loc, i, streamId, pInsertPos);
             }
             break;
         }
@@ -4013,7 +4060,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
         {
             LLPC_ASSERT(builtInUsage.pointSize);
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, pInsertPos);
+            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
             break;
         }
     case BuiltInClipDistance:
@@ -4029,7 +4076,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
                                                       "",
                                                       pInsertPos);
 
-                StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, pInsertPos);
+                StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
             }
 
             break;
@@ -4046,7 +4093,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
                                                       idxs,
                                                       "",
                                                       pInsertPos);
-                StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, pInsertPos);
+                StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
             }
 
             break;
@@ -4055,21 +4102,21 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
         {
             LLPC_ASSERT(builtInUsage.primitiveId);
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, pInsertPos);
+            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
             break;
         }
     case BuiltInLayer:
         {
             LLPC_ASSERT(builtInUsage.layer);
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, pInsertPos);
+            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
             break;
         }
     case BuiltInViewportIndex:
         {
             LLPC_ASSERT(builtInUsage.viewportIndex);
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, pInsertPos);
+            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
             break;
         }
     default:
@@ -4088,8 +4135,6 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
     auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
-
-    auto pOutputTy = pOutput->getType();
 
     const auto pUndef = UndefValue::get(m_pContext->FloatTy());
 
@@ -4126,7 +4171,7 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
         }
     case BuiltInSampleMask:
         {
-            LLPC_ASSERT(pOutputTy->isArrayTy());
+            LLPC_ASSERT(pOutput->getType()->isArrayTy());
 
             // NOTE: Only gl_SampleMask[0] is valid for us.
             std::vector<uint32_t> idxs;
@@ -4275,6 +4320,222 @@ void PatchInOutImportExport::PatchCopyShaderBuiltInOutputExport(
             break;
         }
     }
+}
+
+// =====================================================================================================================
+// Patch export calls for transform feedback outputs of vertex shader and tessellation evaluation shader.
+void PatchInOutImportExport::PatchVsTesXfbOutputExport(
+    Value*        pOutput,         // [in] Output value
+    uint32_t      xfbBuffer,       // Transform feedback buffer ID
+    uint32_t      xfbOffset,       // Transform feedback offset
+    Instruction*  pInsertPos)      // [in] Where to insert the store instruction
+{
+    LLPC_ASSERT((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval));
+
+    auto pOutputTy = pOutput->getType();
+    const auto& xfbStrides = m_pContext->
+        GetShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
+
+    uint32_t xfbStride = xfbStrides[xfbBuffer];
+
+    Value* pXfbOffset = ConstantInt::get(m_pContext->Int32Ty(), xfbOffset);
+    auto pXfbBuffer = ConstantInt::get(m_pContext->Int32Ty(), xfbBuffer);
+    uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
+
+    // NOTE: x3 vector value is split to x2 and a scalar.
+    if (compCount == 3)
+    {
+        std::vector<Constant*> shuffleMask;
+        shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
+        auto pCompX2 = new ShuffleVectorInst(pOutput, pOutput,
+            ConstantVector::get(shuffleMask), "", pInsertPos);
+        StoreValueToStreamOutBuffer(pCompX2, pXfbBuffer, pXfbOffset, xfbStride, pInsertPos);
+
+        auto pComp = ExtractElementInst::Create(pOutput,
+                                                ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                "",
+                                                pInsertPos);
+
+        pXfbOffset = BinaryOperator::CreateAdd(pXfbOffset,
+                                               ConstantInt::get(m_pContext->Int32Ty(), 2 * sizeof(uint32_t)),
+                                               "",
+                                               pInsertPos);
+
+        StoreValueToStreamOutBuffer(pComp, pXfbBuffer, pXfbOffset, xfbStride, pInsertPos);
+    }
+    else
+    {
+        StoreValueToStreamOutBuffer(pOutput, pXfbBuffer, pXfbOffset, xfbStride, pInsertPos);
+    }
+}
+
+// =====================================================================================================================
+// Store value to stream-out buffer
+void PatchInOutImportExport::StoreValueToStreamOutBuffer(
+    Value *       pStoreValue,   // [in] Value to store
+    Value *       pXfbBuffer,    // [in] Transform feedback buffer
+    Value *       pXfbOffset,    // [in] Offset of the store value within transform feedback buffer
+    uint32_t      xfbStride,     // Transform feedback stride
+    Instruction * pInsertPos)    // [in] Where to insert the store instruction
+{
+    auto pStoreTy = pStoreValue->getType();
+    uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
+    const uint64_t bitWidth = pStoreTy->getScalarSizeInBits();
+    LLPC_ASSERT(bitWidth == 32);
+
+    if (pStoreTy->isIntOrIntVectorTy())
+    {
+        if (compCount == 4)
+        {
+            pStoreValue = new BitCastInst(pStoreValue, m_pContext->Floatx4Ty(), "", pInsertPos);
+        }
+        else if(compCount == 2)
+        {
+            pStoreValue = new BitCastInst(pStoreValue, m_pContext->Floatx2Ty(), "", pInsertPos);
+        }
+        else
+        {
+            pStoreValue = new BitCastInst(pStoreValue, m_pContext->FloatTy(), "", pInsertPos);
+        }
+    }
+
+    auto pStreamOutBufDesc = LoadStreamOutBufferDescriptor(pXfbBuffer, pInsertPos);
+
+    const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+
+    uint32_t streamOffsets[MaxTransformFeedbackBuffers] = {};
+    uint32_t writeIndex = 0;
+    uint32_t streamInfo = 0;
+
+    if (m_shaderStage == ShaderStageVertex)
+    {
+        memcpy(streamOffsets, entryArgIdxs.vs.streamOutData.streamOffsets, sizeof(streamOffsets));
+        writeIndex = entryArgIdxs.vs.streamOutData.writeIndex;
+        streamInfo = entryArgIdxs.vs.streamOutData.streamInfo;
+    }
+    else
+    {
+        LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
+        memcpy(streamOffsets, entryArgIdxs.tes.streamOutData.streamOffsets, sizeof(streamOffsets));
+        writeIndex = entryArgIdxs.tes.streamOutData.writeIndex;
+        streamInfo = entryArgIdxs.tes.streamOutData.streamInfo;
+    }
+
+    ConstantInt* pBuffer = dyn_cast<ConstantInt>(pXfbBuffer);
+    LLPC_ASSERT(pBuffer != nullptr);
+    uint32_t xfbBuffer = pBuffer->getZExtValue();
+    LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
+
+    auto pStreamOffset = GetFunctionArgument(m_pEntryPoint, streamOffsets[xfbBuffer]);
+
+    pStreamOffset = BinaryOperator::CreateMul(pStreamOffset,
+                                              ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                              "",
+                                              pInsertPos);
+
+    // vertexCount = streamInfo[22:16]
+    // threadValid = threadId < vertexCount
+    // writeIndex = threadValid ? writeIndex : outOfRangeValue
+    auto pStreamInfo = GetFunctionArgument(m_pEntryPoint, streamInfo);
+
+    // vertexCount = streamInfo[22:16]
+    std::vector<Value*> args;
+    args.push_back(pStreamInfo);
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 7));
+    Value* pVertexCount = EmitCall(m_pModule,
+                                   "llvm.amdgcn.ubfe.i32",
+                                   m_pContext->Int32Ty(),
+                                   args,
+                                   NoAttrib,
+                                   &*pInsertPos);
+
+    // Setup out-of-range value. GPU will drop stream-out buffer writing when the thread is invalid.
+    uint32_t outofRangeValue = 0xFFFFFFFF;
+    outofRangeValue /= xfbStride;
+    outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
+    Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
+
+    auto pThreadValid = new ICmpInst(pInsertPos, ICmpInst::ICMP_UGT, pVertexCount, m_pThreadId);
+    // Setup write index for stream-out
+    auto pWriteIndex = GetFunctionArgument(m_pEntryPoint, writeIndex);
+    pWriteIndex = SelectInst::Create(pThreadValid, pOutofRangeValue, pWriteIndex, "", pInsertPos);
+
+    uint32_t format = 0;
+    std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
+
+    CombineFormat formatOprd = {};
+    formatOprd.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
+    switch (compCount)
+    {
+    case 1:
+        {
+            formatOprd.bits.dfmt = BUF_DATA_FORMAT_32;
+            callName += "f32";
+            break;
+        }
+    case 2:
+        {
+            formatOprd.bits.dfmt = BUF_DATA_FORMAT_32_32;
+            callName += "v2f32";
+            break;
+        }
+    case 4:
+        {
+            formatOprd.bits.dfmt = BUF_DATA_FORMAT_32_32_32_32;
+            callName += "v4f32";
+            break;
+        }
+    default:
+        {
+            LLPC_NEVER_CALLED();
+            break;
+        }
+    }
+    format = formatOprd.u32All;
+
+    // byteOffset = streamOffsets[xfbBuffer] * 4 +
+    //          (writeIndex + threadId) * bufferStride[bufferId] +
+    //          + xfbOffset
+    args.clear();
+    args.push_back(pStoreValue);
+    args.push_back(pStreamOutBufDesc);                                // desc
+    args.push_back(pWriteIndex);                                      // vindex
+    args.push_back(pXfbOffset);                                       // offset
+    args.push_back(pStreamOffset);                                    // soffset
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), format));  // format
+
+    CoherentFlag coherent = {};
+    coherent.bits.glc = true;
+    coherent.bits.slc = true;
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));           // glc, slc
+    EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+}
+
+// =====================================================================================================================
+// Loads stream-out buffer descriptor based on the specified buffer
+Value * PatchInOutImportExport::LoadStreamOutBufferDescriptor(
+    Value*        pXfbBuffer,   // Transform feedback buffer
+    Instruction * pInsertPos   // [in] Where to insert instructions
+    ) const
+{
+    std::vector<Value*> idxs;
+    idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
+
+    LLPC_ASSERT(pXfbBuffer->getType() == m_pContext->Int32Ty());
+    pXfbBuffer = new ZExtInst(pXfbBuffer, m_pContext->Int64Ty(), "", pInsertPos);
+    idxs.push_back(pXfbBuffer);
+
+    auto pStreamOutTablePtr = m_pContext->GetShaderInterfaceData(m_shaderStage)->streamOutTable.pTablePtr;
+    auto pStreamOutBufDescPtr = GetElementPtrInst::Create(nullptr, pStreamOutTablePtr, idxs, "", pInsertPos);
+    pStreamOutBufDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+
+    auto pStreamOutBufDesc = new LoadInst(pStreamOutBufDescPtr, "", pInsertPos);
+    pStreamOutBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+    pStreamOutBufDesc->setAlignment(16);
+
+    return pStreamOutBufDesc;
 }
 
 // =====================================================================================================================
@@ -4485,6 +4746,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
     Value*       pStoreValue,   // [in] Value to store
     uint32_t     location,      // Output location
     uint32_t     compIdx,       // Output component index
+    uint32_t     streamId,      // Output stream ID
     Instruction* pInsertPos)    // [in] Where to insert the store instruction
 {
     auto pStoreTy = pStoreValue->getType();
@@ -4522,9 +4784,9 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
     const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
     Value* pGsVsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.gs.gsVsOffset);
 
-    auto pEmitCounter = new LoadInst(inOutUsage.gs.pEmitCounterPtr, "", pInsertPos);
+    auto pEmitCounter = new LoadInst(inOutUsage.gs.pEmitCounterPtr[streamId], "", pInsertPos);
 
-    auto pRingOffset = CalcGsVsRingOffsetForOutput(location, compIdx, pEmitCounter, pGsVsOffset, pInsertPos);
+    auto pRingOffset = CalcGsVsRingOffsetForOutput(location, compIdx, streamId, pEmitCounter, pGsVsOffset, pInsertPos);
 
     if (m_pContext->IsGsOnChip())
     {
@@ -4660,6 +4922,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForInput(
 Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
     uint32_t        location,    // Output location
     uint32_t        compIdx,     // Output component
+    uint32_t        streamId,    // Output stream ID
     Value*          pVertexIdx,  // [in] Vertex index
     Value*          pGsVsOffset, // [in] ES-GS ring offset in bytes
     Instruction*    pInsertPos)  // [in] Where to insert the instruction
@@ -4667,12 +4930,22 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
 
     Value* pRingOffset = nullptr;
+
+    uint32_t streamBases[MaxGsStreams];
+    uint32_t streamBase = 0;
+    for (int i = 0; i < MaxGsStreams; ++i)
+    {
+        streamBases[i] = streamBase;
+        streamBase += ( pResUsage->inOutUsage.gs.outLocCount[i] *
+            pResUsage->builtInUsage.gs.outputVertices * 4);
+    }
+
     if (m_pContext->IsGsOnChip())
     {
         // ringOffset = esGsLdsSize +
         //              gsVsOffset +
         //              threadId * gsVsRingItemSize +
-        //              (vertexIdx * vertexSize) + location * 4 + compIdx
+        //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase
 
         auto pEsGsLdsSize = ConstantInt::get(m_pContext->Int32Ty(), pResUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
 
@@ -4689,7 +4962,8 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
                                       "",
                                       pInsertPos);
 
-        uint32_t vertexSize = pResUsage->inOutUsage.outputMapLocCount * 4;
+        // VertexSize is stream output vertexSize x 4
+        uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
         auto pVertexItemOffset = BinaryOperator::CreateMul(pVertexIdx,
                                                            ConstantInt::get(m_pContext->Int32Ty(), vertexSize),
                                                            "",
@@ -4701,11 +4975,11 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
 
         pRingOffset = BinaryOperator::CreateAdd(pRingOffset, pVertexItemOffset, "", pInsertPos);
 
+        uint32_t attribOffset = (location * 4) + compIdx + streamBases[streamId];
         pRingOffset = BinaryOperator::CreateAdd(pRingOffset,
-                                                ConstantInt::get(m_pContext->Int32Ty(), (location * 4) + compIdx),
+                                                ConstantInt::get(m_pContext->Int32Ty(), attribOffset),
                                                 "",
                                                 pInsertPos);
-
     }
     else
     {
@@ -4973,7 +5247,6 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
     //      tessFactor[4] = gl_TessLevelInner[0]
     //      tessFactor[5] = gl_TessLevelInner[1]
 
-    auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     uint32_t primitiveMode = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.primitiveMode;
 
     uint32_t tessFactorCount = 0;
@@ -5635,6 +5908,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
                               (m_shaderStage == ShaderStageCopyShader)) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
     LLPC_ASSERT(useExpInst);
+    LLPC_UNUSED(useExpInst);
 
     auto pOutputTy = pOutput->getType();
 
@@ -5655,8 +5929,6 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         if (bitWidth == 16)
         {
             // NOTE: For 16-bit output export, we have to cast the 16-bit value to 32-bit floating-point value.
-            auto pCompTy = pOutputTy->getScalarType();
-
             if (pOutputTy->isFPOrFPVectorTy())
             {
                 pExport = new BitCastInst(pOutput,
@@ -5805,6 +6077,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                               (m_shaderStage == ShaderStageCopyShader)) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
     LLPC_ASSERT(useExpInst);
+    LLPC_UNUSED(useExpInst);
 
     auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 

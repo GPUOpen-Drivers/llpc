@@ -219,6 +219,7 @@ std::string PipelineDumper::GetSpirvBinaryFileName(
     uint64_t hashCode64 = MetroHash::Compact64(pHash);
     char     fileName[64] = {};
     auto     length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 ".spv", hashCode64);
+    LLPC_UNUSED(length);
     return std::string(fileName);
 }
 
@@ -234,6 +235,7 @@ std::string PipelineDumper::GetPipelineInfoFileName(
     if (pComputePipelineInfo != nullptr)
     {
         auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
+        LLPC_UNUSED(length);
     }
     else
     {
@@ -257,6 +259,7 @@ std::string PipelineDumper::GetPipelineInfoFileName(
         }
 
         auto length = snprintf(fileName, 64, "%s_0x%016" PRIX64, pFileNamePrefix, hashCode64);
+        LLPC_UNUSED(length);
     }
 
     return std::string(fileName);
@@ -431,8 +434,14 @@ void PipelineDumper::DumpResourceMappingNode(
             dumpFile << pPrefix << ".indirectUserDataCount = " << pUserDataNode->userDataPtr.sizeInDwords << "\n";
             break;
         }
+    case ResourceMappingNodeType::StreamOutTableVaPtr:
+        {
+            break;
+        }
     case ResourceMappingNodeType::PushConst:
         {
+            dumpFile << pPrefix << ".set = " << pUserDataNode->srdRange.set << "\n";
+            dumpFile << pPrefix << ".binding = " << pUserDataNode->srdRange.binding << "\n";
             break;
         }
     default:
@@ -527,6 +536,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
         {
             auto pUserDataNode = &pShaderInfo->pUserDataNodes[i];
             auto length = snprintf(prefixBuff, 64, "userDataNode[%u]", i);
+            LLPC_UNUSED(length);
             DumpResourceMappingNode(pUserDataNode, prefixBuff, dumpFile);
         }
         dumpFile << "\n";
@@ -573,6 +583,7 @@ void PipelineDumper::DumpPipelineBinary(
     size_t codeSize = pPipelineBin->codeSize;
     auto result = reader.ReadFromBuffer(pPipelineBin->pCode, &codeSize);
     LLPC_ASSERT(result == Result::Success);
+    LLPC_UNUSED(result);
 
     pDumpFile->dumpFile << "\n[CompileLog]\n";
     pDumpFile->dumpFile << reader;
@@ -911,7 +922,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
             {
                 auto pUserDataNode = &pShaderInfo->pUserDataNodes[i];
-                UpdateHashForResourceMappingNode(pUserDataNode, pHasher);
+                UpdateHashForResourceMappingNode(pUserDataNode, true, pHasher);
             }
         }
 
@@ -935,6 +946,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 // NOTE: This function will be called recusively if node's type is "DescriptorTableVaPtr"
 void PipelineDumper::UpdateHashForResourceMappingNode(
     const ResourceMappingNode* pUserDataNode,    // [in] Resource mapping node
+    bool                       isRootNode,       // TRUE if the node is in root level
     MetroHash::MetroHash64*    pHasher           // [in,out] Haher to generate hash code
     )
 {
@@ -959,7 +971,7 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
         {
             for (uint32_t i = 0; i < pUserDataNode->tablePtr.nodeCount; ++i)
             {
-                UpdateHashForResourceMappingNode(&pUserDataNode->tablePtr.pNext[i], pHasher);
+                UpdateHashForResourceMappingNode(&pUserDataNode->tablePtr.pNext[i], false, pHasher);
             }
             break;
         }
@@ -968,9 +980,17 @@ void PipelineDumper::UpdateHashForResourceMappingNode(
             pHasher->Update(pUserDataNode->userDataPtr);
             break;
         }
+    case ResourceMappingNodeType::StreamOutTableVaPtr:
+        {
+            // Do nothing for the stream-out table
+            break;
+        }
     case ResourceMappingNodeType::PushConst:
         {
-            // Do nothing for push constant
+            if (isRootNode == false)
+            {
+                pHasher->Update(pUserDataNode->srdRange);
+            }
             break;
         }
     default:
@@ -1025,6 +1045,7 @@ void OutputBinary(
             out << "        ";
         }
         auto length = snprintf(formatBuf, sizeof(formatBuf), "%08X", pStartPos[i]);
+        LLPC_UNUSED(length);
         out << formatBuf;
 
         if (i % 8 == 7)
@@ -1043,6 +1064,7 @@ void OutputBinary(
         for (int32_t i = padPos; i < endPos; ++i)
         {
             auto length = snprintf(formatBuf, sizeof(formatBuf), "%02X", pData[i]);
+            LLPC_UNUSED(length);
             out << formatBuf;
         }
     }
@@ -1071,6 +1093,7 @@ OStream& operator<<(
         uint32_t secIdx = 0;
         Result result = reader.GetSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
         LLPC_ASSERT(result == Result::Success);
+        LLPC_UNUSED(result);
         if ((strcmp(pSection->pName, ShStrTabName) == 0) ||
             (strcmp(pSection->pName, StrTabName) == 0) ||
             (strcmp(pSection->pName, SymTabName) == 0))
@@ -1150,6 +1173,7 @@ OStream& operator<<(
                                     "        %-45s = 0x%08X\n",
                                     pRegName,
                                     config.second);
+                                LLPC_UNUSED(length);
                                 out << formatBuf;
                             }
                         }
@@ -1232,6 +1256,7 @@ OStream& operator<<(
                                                                    sizeof(formatBuf),
                                                                    "%-45s ",
                                                                    pRegName);
+                                            LLPC_UNUSED(length);
                                             out << formatBuf;
                                         }
                                         else
@@ -1240,6 +1265,7 @@ OStream& operator<<(
                                                                    sizeof(formatBuf),
                                                                    "0x%016" PRIX64 " ",
                                                                    pItem->as.u64);
+                                            LLPC_UNUSED(length);
                                             out << formatBuf;
                                         }
                                         break;
@@ -1311,6 +1337,7 @@ OStream& operator<<(
                 ElfSymbol elfSym = {};
                 reader.GetSymbol(reloc.symIdx, &elfSym);
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
+                LLPC_UNUSED(length);
                 out << "#" << i << "    " << formatBuf
                     << "    offset = " << reloc.offset << "\n";
             }
@@ -1334,6 +1361,7 @@ OStream& operator<<(
                     pRegName = Gfx9::GetRegisterNameString(gfxIp, pConfig[2 * i]);
                 }
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "        %-45s = 0x%08X\n", pRegName, pConfig[2 * i + 1]);
+                LLPC_UNUSED(length);
                 out << formatBuf;
             }
         }
@@ -1456,6 +1484,7 @@ std::ostream& operator<<(
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, IndirectUserDataVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
         break;
     default:
         LLPC_NEVER_CALLED();

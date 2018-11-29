@@ -100,7 +100,6 @@ void PatchBufferOp::visitCallInst(
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-        auto pOffset = callInst.getOperand(3);     // Byte offset within a block
         auto isNonUniform = cast<ConstantInt>(callInst.getOperand(callInst.getNumArgOperands() - 1))->getZExtValue();
         bool isInlineConst = IsInlineConst(descSet, binding);
 
@@ -109,7 +108,11 @@ void PatchBufferOp::visitCallInst(
             AddWaterFallInst(2, -1, &callInst);
         }
 
-        if (mangledName.startswith(LlpcName::BufferLoad))
+        if (mangledName.startswith(LlpcName::BufferLoadScalarAligned))
+        {
+            // We do not replace scalar aligned buffer loads.
+        }
+        else if (mangledName.startswith(LlpcName::BufferLoad))
         {
             bool bufferReadOnly = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
             if (isInlineConst)

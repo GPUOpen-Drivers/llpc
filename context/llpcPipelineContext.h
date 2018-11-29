@@ -109,7 +109,33 @@ union DescriptorPair
     uint64_t u64All;
 };
 
+// Represents GS output location info (including location, built-in ID, and vertex stream ID)
+
+union GsOutLocInfo
+{
+    struct
+    {
+        uint32_t location :  16;  // Location of the output
+        uint32_t isBuiltIn : 1;   // Whether location is builtIn id
+        uint32_t streamId :  2;   // Output vertex stream ID
+    };
+    uint32_t  u32All;
+};
+
+// Represents transform feedback output info
+union XfbOutInfo
+{
+    struct
+    {
+        uint32_t xfbBuffer : 2;  // Transform feedback buffer
+        uint32_t xfbOffset : 30; // Transform feedback offset
+    };
+    uint32_t u32All;
+};
+
 // Represents the usage info of shader resources.
+//
+// NOTE: All fields must be initialized in InitShaderResourceUsage().
 struct ResourceUsage
 {
     std::vector<DescriptorSet> descSets;              // Info array of descriptor sets and bindings
@@ -349,6 +375,12 @@ struct ResourceUsage
         std::unordered_map<uint32_t, uint32_t> perPatchBuiltInInputLocMap;
         std::unordered_map<uint32_t, uint32_t> perPatchBuiltInOutputLocMap;
 
+        // Transform feedback strides
+        uint32_t xfbStrides[MaxTransformFeedbackBuffers];
+
+        // Transform feedback enablement
+        bool enableXfb;
+
         // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
         // are mapped)
         uint32_t    inputMapLocCount;
@@ -425,11 +457,17 @@ struct ResourceUsage
             // Map from tightly packed locations to byte sizes of generic outputs (used by copy shader to
             // export generic outputs to fragment shader, always from vertex stream 0):
             //   <location, <component, byteSize>>
-            std::unordered_map<uint32_t, uint32_t[4]> genericOutByteSizes;
+            std::unordered_map<uint32_t, uint32_t[4]> genericOutByteSizes[MaxGsStreams];
+
+            // Map from output location to the transform feedback info
+            std::map<uint32_t, uint32_t> xfbOutsInfo;
+
+            // ID of the vertex stream sent to rasterizor
+            uint32_t rasterStream;
 
             llvm::Value* pEsGsOffsets;          // ES -> GS offsets (GS in)
             llvm::Value* pGsVsRingBufDesc;      // GS -> VS ring buffer descriptor (GS out)
-            llvm::Value* pEmitCounterPtr;       // Pointer to emit counter
+            llvm::Value* pEmitCounterPtr[MaxGsStreams];       // Pointer to emit counter
 
             struct
             {
@@ -441,6 +479,8 @@ struct ResourceUsage
                 uint32_t gsOnChipLdsSize;           // Total LDS size for GS on-chip mode.
                 uint32_t inputVertices;             // Number of GS input vertices
             } calcFactor;
+
+            uint32_t    outLocCount[MaxGsStreams];
         } gs;
 
         struct
@@ -462,7 +502,18 @@ struct ResourceUsage
     } inOutUsage;
 };
 
+// Represents stream-out data
+struct StreamOutData
+{
+    uint32_t tablePtr;                                    // Table pointer for stream-out
+    uint32_t streamInfo;                                  // Stream-out info (ID, vertex count, enablement)
+    uint32_t writeIndex;                                  // Write index for stream-out
+    uint32_t streamOffsets[MaxTransformFeedbackBuffers];  // Stream-out Offset
+};
+
 // Represents interface data used by shader stages
+//
+// NOTE: All fields must be initialized in InitShaderInterfaceData().
 struct InterfaceData
 {
     static const uint32_t MaxDescTableCount  = 16;
@@ -501,7 +552,13 @@ struct InterfaceData
     {
         llvm::Value*            pTablePtr;                      // Vertex buffer table pointer
         uint32_t                resNodeIdx;                     // Resource node index for vertex buffer table
-    }  vbTable;
+    } vbTable;
+
+    struct
+    {
+        llvm::Value*           pTablePtr;                       // Stream-out buffer table pointer
+        uint32_t               resNodeIdx;                      // Resource node index for stream-out table
+    } streamOutTable;
 
     // Usage of user data registers for internal-use variables
     struct
@@ -516,11 +573,13 @@ struct InterfaceData
                 uint32_t drawIndex;                 // Draw index
                 uint32_t vbTablePtr;                // Pointer of vertex buffer table
                 uint32_t viewIndex;                 // View Index
+                uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
             } vs;
 
             struct
             {
                 uint32_t viewIndex;                 // View Index
+                uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
             } tes;
 
             // Geometry shader
@@ -559,6 +618,7 @@ struct InterfaceData
                 uint32_t viewIndex;                 // View Index
                 uint32_t vbTablePtr;                // Pointer of vertex buffer table
                 uint32_t esGsOffset;                // ES-GS ring buffer offset
+                StreamOutData streamOutData;        // Stream-out Data
             } vs;
 
             // Tessellation control shader
@@ -580,6 +640,7 @@ struct InterfaceData
                 uint32_t esGsOffset;          // ES-GS ring buffer offset
                 uint32_t offChipLdsBase;      // Base offset of off-chip LDS buffer
                 uint32_t viewIndex;           // View Index
+                StreamOutData streamOutData;  // Stream-out Data
             } tes;
 
             // Geometry shader
@@ -591,6 +652,7 @@ struct InterfaceData
                 uint32_t primitiveId;                       // Primitive ID
                 uint32_t invocationId;                      // Invocation ID
                 uint32_t viewIndex;                         // View Index
+                StreamOutData streamOutData;                // Stream-out Data
             } gs;
 
             // Fragment shader

@@ -82,7 +82,6 @@ Result CopyShader::Run(
     auto pInsertPos = &*m_pEntryPoint->begin()->getFirstInsertionPt();
 
     // Load GS-VS ring buffer descriptor
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
     Value* pInternalTablePtrLo = GetFunctionArgument(m_pEntryPoint, EntryArgIdxInternalTablePtrLow);
     std::vector<Value*> args;
     args.push_back(pInternalTablePtrLo);
@@ -194,35 +193,43 @@ void CopyShader::ExportOutput()
     auto& builtInUsage = pResUsage->builtInUsage.gs;
     const auto& genericOutByteSizes = pResUsage->inOutUsage.gs.genericOutByteSizes;
 
-    for (auto& byteSizeMap : genericOutByteSizes)
+    uint32_t locOffset = 0;
+    for (uint32_t streamId = 0; streamId < MaxGsStreams; ++streamId)
     {
-        // <location, <component, byteSize>>
-        uint32_t loc = byteSizeMap.first;
-
-        uint32_t byteSize = 0;
-        for (uint32_t i = 0; i < 4; ++i)
+        uint32_t genericOutSizes = 0;
+        for (auto& byteSizeMap : genericOutByteSizes[streamId])
         {
-            byteSize += byteSizeMap.second[i];
+            // <location, <component, byteSize>>
+            uint32_t loc = byteSizeMap.first;
+
+            uint32_t byteSize = 0;
+            for (uint32_t i = 0; i < 4; ++i)
+            {
+                byteSize += byteSizeMap.second[i];
+            }
+
+            LLPC_ASSERT(byteSize % 4 == 0);
+            uint32_t dwordSize = byteSize / 4;
+            auto pOutputTy = VectorType::get(m_pContext->FloatTy(), dwordSize);
+            pOutputValue = UndefValue::get(pOutputTy);
+
+            for (uint32_t i = 0; i < dwordSize; ++i)
+            {
+                auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
+                pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                         pLoadValue,
+                                                         ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                         "",
+                                                         pInsertPos);
+            }
+
+            ExportGenericOutput(pOutputValue, loc + locOffset, pInsertPos);
+            genericOutSizes = std::max(genericOutSizes, loc + dwordSize);
         }
-
-        LLPC_ASSERT(byteSize % 4 == 0);
-        uint32_t dwordSize = byteSize / 4;
-        auto pOutputTy = VectorType::get(m_pContext->FloatTy(), dwordSize);
-        pOutputValue = UndefValue::get(pOutputTy);
-
-        for (uint32_t i = 0; i < dwordSize; ++i)
-        {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, pInsertPos);
-            pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                     pLoadValue,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                     "",
-                                                     pInsertPos);
-        }
-
-        ExportGenericOutput(pOutputValue, loc, pInsertPos);
+        locOffset += genericOutSizes;
     }
 
+    auto rasterStream = pResUsage->inOutUsage.gs.rasterStream;
     if (builtInUsage.position)
     {
         LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPosition) !=
@@ -230,10 +237,9 @@ void CopyShader::ExportOutput()
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPosition];
         pOutputValue = UndefValue::get(m_pContext->Floatx4Ty());
-
         for (uint32_t i = 0; i < 4; ++i)
         {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, i, pInsertPos);
+            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, i, rasterStream, pInsertPos);
             pOutputValue = InsertElementInst::Create(pOutputValue,
                                                      pLoadValue,
                                                      ConstantInt::get(m_pContext->Int32Ty(), i),
@@ -250,8 +256,7 @@ void CopyShader::ExportOutput()
             pResUsage->inOutUsage.builtInOutputLocMap.end());
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPointSize];
-
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, pInsertPos);
+        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, rasterStream, pInsertPos);
 
         ExportBuiltInOutput(pLoadValue, BuiltInPointSize, pInsertPos);
     }
@@ -262,12 +267,11 @@ void CopyShader::ExportOutput()
             pResUsage->inOutUsage.builtInOutputLocMap.end());
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInClipDistance];
-
         pOutputValue = UndefValue::get(ArrayType::get(m_pContext->FloatTy(), builtInUsage.clipDistance));
 
         for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
         {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, pInsertPos);
+            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, rasterStream, pInsertPos);
             std::vector<uint32_t> idxs;
             idxs.push_back(i);
             pOutputValue = InsertValueInst::Create(pOutputValue,
@@ -286,12 +290,12 @@ void CopyShader::ExportOutput()
             pResUsage->inOutUsage.builtInOutputLocMap.end());
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
-
         pOutputValue = UndefValue::get(ArrayType::get(m_pContext->FloatTy(), builtInUsage.cullDistance));
 
         for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
         {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, pInsertPos);
+            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, rasterStream, pInsertPos);
+
             std::vector<uint32_t> idxs;
             idxs.push_back(i);
             pOutputValue = InsertValueInst::Create(pOutputValue,
@@ -311,7 +315,7 @@ void CopyShader::ExportOutput()
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
 
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, pInsertPos);
+        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, rasterStream, pInsertPos);
         pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
 
         ExportBuiltInOutput(pLoadValue, BuiltInPrimitiveId, pInsertPos);
@@ -328,7 +332,7 @@ void CopyShader::ExportOutput()
 
         uint32_t loc = builtInOutLocMap[builtInId];
 
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, pInsertPos);
+        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, rasterStream, pInsertPos);
         pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
 
         ExportBuiltInOutput(pLoadValue, BuiltInLayer, pInsertPos);
@@ -340,8 +344,7 @@ void CopyShader::ExportOutput()
             pResUsage->inOutUsage.builtInOutputLocMap.end());
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
-
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, pInsertPos);
+        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, rasterStream, pInsertPos);
         pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
 
         ExportBuiltInOutput(pLoadValue, BuiltInViewportIndex, pInsertPos);
@@ -395,6 +398,7 @@ Result CopyShader::DoPatch()
 Value* CopyShader::CalcGsVsRingOffsetForInput(
     uint32_t        location,    // Output location
     uint32_t        compIdx,     // Output component
+    uint32_t        streamId,    // Output stream ID
     Instruction*    pInsertPos)  // [in] Where to insert the instruction
 {
     Value* pVertexOffset = GetFunctionArgument(m_pEntryPoint, EntryArgIdxVertexOffset);
@@ -440,10 +444,11 @@ Value* CopyShader::CalcGsVsRingOffsetForInput(
 Value* CopyShader::LoadValueFromGsVsRingBuffer(
     uint32_t        location,   // Output location
     uint32_t        compIdx,    // Output component
+    uint32_t        streamId,   // Output stream ID
     Instruction*    pInsertPos) // [in] Where to insert the load instruction
 {
     Value* pLoadValue = nullptr;
-    Value* pRingOffset = CalcGsVsRingOffsetForInput(location, compIdx, pInsertPos);
+    Value* pRingOffset = CalcGsVsRingOffsetForInput(location, compIdx, streamId, pInsertPos);
 
     if (m_pContext->IsGsOnChip())
     {

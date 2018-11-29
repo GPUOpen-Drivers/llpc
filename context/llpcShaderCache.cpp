@@ -46,8 +46,6 @@ static const char CacheFileSubPath[] = "/AMD/LlpcCache/";
 static const char ClientStr[] = "LLPC";
 
 static constexpr uint64_t CrcWidth         = sizeof(uint64_t) * 8;
-static constexpr uint64_t CrcTopBit        = (static_cast<uint64_t>(1) << (CrcWidth - 1));
-static constexpr uint64_t CrcPolynomial    = 0xAD93D23594C935A9;
 static constexpr uint64_t CrcInitialValue  = 0xFFFFFFFFFFFFFFFF;
 
 static const uint64_t CrcLookup[256] =
@@ -117,8 +115,6 @@ static const uint64_t CrcLookup[256] =
     0x0F3DAD1425E60E99, 0xA2AE7F21B12F3B30, 0xF989DB4A98BD5062, 0x541A097F0C7465CB,
     0x4FC6939CCB9986C6, 0xE25541A95F50B36F, 0xB972E5C276C2D83D, 0x14E137F7E20BED94
 };
-
-static constexpr uint32_t ShaderCacheTimeout = 500;
 
 // =====================================================================================================================
 ShaderCache::ShaderCache()
@@ -429,6 +425,7 @@ void ShaderCache::ResetCacheFile()
     m_onDiskFile.Close();
     Result fileResult = m_onDiskFile.Open(m_fileFullPath, (FileAccessRead | FileAccessWrite | FileAccessBinary));
     LLPC_ASSERT(fileResult == Result::Success);
+    LLPC_UNUSED(fileResult);
 
     ShaderCacheSerializedHeader header = {};
     header.headerSize    = sizeof(ShaderCacheSerializedHeader);
@@ -713,7 +710,6 @@ Result ShaderCache::RetrieveShader(
     const void**       ppBlob,   // [out] Shader data
     size_t*            pSize)    // [out] size of shader data in bytes
 {
-    Result result = Result::Success;
     const auto*const pIndex = static_cast<ShaderIndex*>(hEntry);
 
     LLPC_ASSERT(m_disableCache == false);
@@ -888,7 +884,6 @@ Result ShaderCache::PopulateIndexMap(
         {
             // It all checks out, so add this shader to the hash map!
             ShaderIndex* pIndex = nullptr;
-            bool existed = false;
             auto indexMap = m_shaderIndexMap.find(pHeader->key);
             if (indexMap == m_shaderIndexMap.end())
             {

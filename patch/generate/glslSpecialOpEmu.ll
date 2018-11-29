@@ -171,42 +171,26 @@ define float @llpc.fwidthCoarse.f32(float %p) #0
 ; GLSL: void EmitStreamVertex(int)
 define spir_func void @_Z16EmitStreamVertexi(i32 %stream) #0
 {
-    ; TODO: Multiple output streams are not supported.
-    %cmp = icmp eq i32 %stream, 0
-    br i1 %cmp, label %.sendmsg, label %.end
-
-.sendmsg:
     ; [9:8] = stream
     %1 = shl i32 %stream, 8
     ; 34 = 0x22, [3:0] = 2 (GS), [5:4] = 2 (emit)
     %2 = or i32 %1, 34
     ; BuiltInWaveId (268435466 = 0x1000000A)
-    %3 = call i32 @llpc.input.import.builtin.GsWaveId(i32 268435466)
+    %3 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
     call void @llvm.amdgcn.s.sendmsg(i32 %2, i32 %3)
-    br label %.end
-
-.end:
     ret void
 }
 
 ; GLSL: void EndStreamPrimitive(int)
 define spir_func void @_Z18EndStreamPrimitivei(i32 %stream) #0
 {
-    ; TODO: Multiple output streams are not supported.
-    %cmp = icmp eq i32 %stream, 0
-    br i1 %cmp, label %.sendmsg, label %.end
-
-.sendmsg:
     ; [9:8] = stream
     %1 = shl i32 %stream, 8
     ; 18 = 0x12, [3:0] = 2 (GS), [5:4] = 1 (cut)
     %2 = or i32 %1, 18
     ; BuiltInWaveId (268435466 = 0x1000000A)
-    %3 = call i32 @llpc.input.import.builtin.GsWaveId(i32 268435466)
+    %3 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
     call void @llvm.amdgcn.s.sendmsg(i32 %2, i32 %3)
-    br label %.end
-
-.end:
     ret void
 }
 
@@ -214,7 +198,7 @@ define spir_func void @_Z18EndStreamPrimitivei(i32 %stream) #0
 define spir_func void @_Z10EmitVertexv() #0
 {
     ; BuiltInWaveId (268435466 = 0x1000000A)
-    %1 = call i32 @llpc.input.import.builtin.GsWaveId(i32 268435466)
+    %1 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
     ; 34 = 0x22, [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 0 (stream = 0)
     call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %1)
     ret void
@@ -224,7 +208,7 @@ define spir_func void @_Z10EmitVertexv() #0
 define spir_func void @_Z12EndPrimitivev() #0
 {
     ; BuiltInWaveId (268435466 = 0x1000000A)
-    %1 = call i32 @llpc.input.import.builtin.GsWaveId(i32 268435466)
+    %1 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
     ; 18 = 0x12, [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 0 (stream = 0)
     call void @llvm.amdgcn.s.sendmsg(i32 18, i32 %1)
     ret void
@@ -298,7 +282,7 @@ define float @llpc.input.interpolate.adjustij.f32(float %ij, float %offsetX, flo
 define <2 x float> @llpc.input.interpolate.evalij.offset.v2f32(<2 x float> %offset) #0
 {
     ; BuiltInInterpPullMode 268435459 = 0x10000003
-    %1 = call <3 x float> @llpc.input.import.builtin.InterpPullMode(i32 268435459)
+    %1 = call <3 x float> @llpc.input.import.builtin.InterpPullMode.v3f32.i32(i32 268435459)
     ; Extract Pull Model I/W, J/W, 1/W
     %2 = extractelement <3 x float> %1, i32 0
     %3 = extractelement <3 x float> %1, i32 1
@@ -328,7 +312,7 @@ define <2 x float> @llpc.input.interpolate.evalij.offset.v2f32(<2 x float> %offs
 define <2 x float> @llpc.input.interpolate.evalij.offset.noperspective.v2f32(<2 x float> %offset) #0
 {
     ; BuiltInInterpLinearCenter 268435461 = 0x10000005
-    %1 = call <2 x float> @llpc.input.import.builtin.InterpLinearCenter(i32 268435461)
+    %1 = call <2 x float> @llpc.input.import.builtin.InterpLinearCenter.v2f32.i32(i32 268435461)
     ; Extract I, J
     %2 = extractelement <2 x float> %1, i32 0
     %3 = extractelement <2 x float> %1, i32 1
@@ -351,7 +335,7 @@ define <2 x float> @llpc.input.interpolate.evalij.offset.noperspective.v2f32(<2 
 define <2 x float> @llpc.input.interpolate.evalij.sample(i32 %sample) #0
 {
     ; BuiltInSamplePosOffset 268435463 = 0x10000007
-    %1 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset(i32 268435463, i32 %sample)
+    %1 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 268435463, i32 %sample)
     %2 = call <2 x float> @llpc.input.interpolate.evalij.offset.v2f32(<2 x float> %1)
     ret <2 x float> %2
 }
@@ -361,7 +345,7 @@ define <2 x float> @llpc.input.interpolate.evalij.sample(i32 %sample) #0
 define <2 x float> @llpc.input.interpolate.evalij.sample.noperspective(i32 %sample) #0
 {
     ; BuiltInSamplePosOffset 268435463 = 0x10000007
-    %1 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset(i32 268435463, i32 %sample)
+    %1 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 268435463, i32 %sample)
     %2 = call <2 x float> @llpc.input.interpolate.evalij.offset.noperspective.v2f32(<2 x float> %1)
     ret <2 x float> %2
 }
@@ -420,10 +404,10 @@ declare i32 @llvm.amdgcn.ds.swizzle(i32, i32) #2
 declare void @llvm.amdgcn.s.waitcnt(i32) #0
 declare void @llvm.amdgcn.s.barrier() #3
 declare void @llvm.amdgcn.s.sendmsg(i32, i32) #0
-declare <3 x float> @llpc.input.import.builtin.InterpPullMode(i32) #0
-declare <2 x float> @llpc.input.import.builtin.InterpLinearCenter(i32) #0
-declare <2 x float> @llpc.input.import.builtin.SamplePosOffset(i32, i32) #0
-declare i32 @llpc.input.import.builtin.GsWaveId(i32) #0
+declare <3 x float> @llpc.input.import.builtin.InterpPullMode.v3f32.i32(i32) #0
+declare <2 x float> @llpc.input.import.builtin.InterpLinearCenter.v2f32.i32(i32) #0
+declare <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32, i32) #0
+declare i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32) #0
 declare i32 @llvm.amdgcn.readlane(i32, i32) #2
 declare i32 @llvm.amdgcn.readfirstlane(i32) #2
 declare i32 @llvm.amdgcn.writelane(i32, i32, i32) #2

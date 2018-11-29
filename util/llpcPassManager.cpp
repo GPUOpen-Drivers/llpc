@@ -55,6 +55,12 @@ using namespace Llpc;
 void Llpc::PassManager::add(
     Pass* pPass)    // [in] Pass to add to the pass manager
 {
+    // Skip the jump threading pass as it interacts really badly with the structurizer.
+    if (pPass->getPassName().equals("Jump Threading"))
+    {
+        return;
+    }
+
     // Add the pass to the superclass pass manager.
     legacy::PassManager::add(pPass);
 

@@ -996,6 +996,7 @@ void InitEnumMap()
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, IndirectUserDataVaPtr)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, PushConst)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBufferCompact)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, StreamOutTableVaPtr)
 };
 
 }

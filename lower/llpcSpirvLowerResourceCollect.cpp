@@ -217,7 +217,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                     if (isGsInput || isTcsInput || isTcsOutput || isTesInput)
                     {
                         ShaderInOutMetadata inOutMeta = {};
-                        inOutMeta.U32All = cast<ConstantInt>(pMeta->getOperand(1))->getZExtValue();
+                        inOutMeta.U64All = cast<ConstantInt>(pMeta->getOperand(1))->getZExtValue();
 
                         if (inOutMeta.IsBuiltIn)
                         {
@@ -296,13 +296,13 @@ bool SpirvLowerResourceCollect::runOnModule(
         std::vector<Metadata*> viewIndexMeta;
 
         ShaderInOutMetadata viewIndexMetaValue = {};
-        viewIndexMetaValue.U32All = 0;
+        viewIndexMetaValue.U64All = 0;
         viewIndexMetaValue.IsBuiltIn = true;
         viewIndexMetaValue.Value = BuiltInViewIndex;
         viewIndexMetaValue.InterpMode = InterpModeSmooth;
         viewIndexMetaValue.InterpLoc = InterpLocCenter;
 
-        auto pViewIndexMetaValue = ConstantInt::get(m_pContext->Int32Ty(), viewIndexMetaValue.U32All);
+        auto pViewIndexMetaValue = ConstantInt::get(m_pContext->Int32Ty(), viewIndexMetaValue.U64All);
         viewIndexMeta.push_back(ConstantAsMetadata::get(pViewIndexMetaValue));
         auto pViewIndexMetaNode = MDNode::get(*m_pContext, viewIndexMeta);
         pViewIndex->addMetadata(gSPIRVMD::InOut, *pViewIndexMetaNode);
@@ -616,7 +616,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
     if (pInOutTy->isArrayTy())
     {
         // Input/output is array type
-        inOutMeta.U32All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
         if (inOutMeta.IsBuiltIn)
         {
@@ -789,6 +789,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
                             m_pResUsage->builtInUsage.gs.clipDistance = elemCount;
+                            CollectGsOutputInfo(InvalidValue, BuiltInClipDistance, inOutMeta);
                         }
                         break;
                     }
@@ -805,6 +806,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
                             m_pResUsage->builtInUsage.gs.cullDistance = elemCount;
+                            CollectGsOutputInfo(InvalidValue, BuiltInCullDistance, inOutMeta);
                         }
                         break;
                     }
@@ -922,9 +924,14 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                 }
                 else
                 {
-                    // TODO: Multiple output streams are not supported.
-                    if (m_shaderStage != ShaderStageGeometry ||
-                        ((m_shaderStage == ShaderStageGeometry) && (inOutMeta.StreamId == 0)))
+                    if (m_shaderStage == ShaderStageGeometry)
+                    {
+                        for (uint32_t i = 0; i < locCount; ++i)
+                        {
+                            CollectGsOutputInfo(startLoc + i, InvalidValue, inOutMeta);
+                        }
+                    }
+                    else
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
@@ -995,7 +1002,23 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         // Input/output is scalar or vector type
         LLPC_ASSERT(pInOutTy->isSingleValueType());
 
-        inOutMeta.U32All = cast<ConstantInt>(pInOutMeta)->getZExtValue();
+        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta)->getZExtValue();
+
+        // Transform feedback input/output
+        if (inOutMeta.IsXfb)
+        {
+            LLPC_ASSERT(inOutMeta.XfbBuffer < MaxTransformFeedbackBuffers);
+            m_pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer] = inOutMeta.XfbStride;
+            m_pResUsage->inOutUsage.enableXfb = (m_pResUsage->inOutUsage.enableXfb || (inOutMeta.XfbStride > 0));
+
+            if (inOutMeta.XfbStride <= inOutMeta.XfbOffset)
+            {
+                uint32_t elemCount = pInOutTy->isVectorTy() ? pInOutTy->getVectorNumElements() : 1;
+                uint32_t inOutTySize = elemCount * pInOutTy->getScalarSizeInBits() / 8;
+                m_pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer]
+                    = RoundUpToMultiple(inOutMeta.XfbOffset + inOutTySize, 4u);
+            }
+        }
 
         if (inOutMeta.IsBuiltIn)
         {
@@ -1217,6 +1240,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
                         m_pResUsage->builtInUsage.gs.position = true;
+                        CollectGsOutputInfo(InvalidValue, BuiltInPosition, inOutMeta);
                     }
                     break;
                 case BuiltInPointSize:
@@ -1228,6 +1252,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
                         m_pResUsage->builtInUsage.gs.pointSize = true;
+                        CollectGsOutputInfo(InvalidValue, BuiltInPointSize, inOutMeta);
                     }
                     break;
                 case BuiltInInvocationId:
@@ -1235,12 +1260,15 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     break;
                 case BuiltInViewportIndex:
                     m_pResUsage->builtInUsage.gs.viewportIndex = true;
+                    CollectGsOutputInfo(InvalidValue, BuiltInViewportIndex, inOutMeta);
                     break;
                 case BuiltInLayer:
                     m_pResUsage->builtInUsage.gs.layer = true;
+                    CollectGsOutputInfo(InvalidValue, BuiltInLayer, inOutMeta);
                     break;
                 case BuiltInViewIndex:
                     m_pResUsage->builtInUsage.gs.viewIndex = true;
+                    CollectGsOutputInfo(InvalidValue, BuiltInViewIndex, inOutMeta);
                     break;
                 case BuiltInPrimitiveId:
                     if (addrSpace == SPIRAS_Input)
@@ -1251,6 +1279,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
                         m_pResUsage->builtInUsage.gs.primitiveId = true;
+                        CollectGsOutputInfo(InvalidValue, BuiltInPrimitiveId, inOutMeta);
                     }
                     break;
                 case BuiltInSubgroupSize:
@@ -1486,9 +1515,19 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                 }
                 else
                 {
-                    for (uint32_t i = 0; i < locCount; ++i)
+                    if (m_shaderStage == ShaderStageGeometry)
                     {
-                        m_pResUsage->inOutUsage.outputLocMap[startLoc + i] = InvalidValue;
+                        for (uint32_t i = 0; i < locCount; ++i)
+                        {
+                            CollectGsOutputInfo(startLoc + i, InvalidValue, inOutMeta);
+                        }
+                    }
+                    else
+                    {
+                        for (uint32_t i = 0; i < locCount; ++i)
+                        {
+                            m_pResUsage->inOutUsage.outputLocMap[startLoc + i] = InvalidValue;
+                        }
                     }
                 }
             }
@@ -1667,6 +1706,31 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
     for (uint32_t i = 0; i < locCount; ++i)
     {
         vsInputTypes[startLoc + i] = basicTy;
+    }
+}
+
+// =====================================================================================================================
+// Collects output info for geometry shader.
+void SpirvLowerResourceCollect::CollectGsOutputInfo(
+    uint32_t                   location,    // Location of output
+    uint32_t                   builtIn,     // ID of the built-in output
+    const ShaderInOutMetadata& inOutMeta)   // [out] Metadata of the built-in output
+{
+    XfbOutInfo xfbOutInfo = {};
+    xfbOutInfo.xfbBuffer = inOutMeta.XfbBuffer;
+    xfbOutInfo.xfbOffset = inOutMeta.XfbOffset;
+
+    GsOutLocInfo outLocInfo = {};
+    bool isBuiltIn = (location == InvalidValue);
+    outLocInfo.streamId = inOutMeta.StreamId;
+    outLocInfo.isBuiltIn = isBuiltIn;
+    outLocInfo.location = (isBuiltIn ? builtIn:location);
+    m_pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    m_pResUsage->inOutUsage.gs.rasterStream = inOutMeta.StreamId;
+
+    if (isBuiltIn == false)
+    {
+        m_pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = InvalidValue;
     }
 }
 

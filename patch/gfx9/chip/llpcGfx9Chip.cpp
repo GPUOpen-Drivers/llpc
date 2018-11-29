@@ -586,6 +586,7 @@ const char* GetRegisterNameString(
     {
         static char unknownRegNameBuf[256] = {};
         int32_t length = snprintf(unknownRegNameBuf, 256, "UNKNOWN(0x%08X)", regId);
+        LLPC_UNUSED(length);
         pNameString = unknownRegNameBuf;
     }
 

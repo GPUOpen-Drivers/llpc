@@ -73,8 +73,6 @@ bool PatchOpt::runOnModule(
 {
     TimeProfiler timeProfiler(&g_timeProfileResult.lowerOptTime);
 
-    bool changed = false;
-
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Opt\n");
 
     Patch::Init(&module);

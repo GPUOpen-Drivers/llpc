@@ -293,7 +293,6 @@ void SpirvLowerImageOp::visitCallInst(
             {
                 // NOTE: Here, we reduce the size of coordinate to its actual size. According to SPIR-V spec, coordinate
                 // is allowed to be a vector larger than needed, this will cause LLVM type mismatch when linking.
-                Type* pImageTy = cast<PointerType>(callInst.getOperand(0)->getType())->getContainedType(0);
                 Dim dim = static_cast<Dim>(imageCallMeta.Dim);
                 uint32_t requiredCompCount;
                 SPIRVDimCoordNumMap::find(dim, &requiredCompCount);

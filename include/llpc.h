@@ -41,7 +41,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 14;
+static const uint32_t  Version = 15;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
@@ -108,10 +108,11 @@ enum class ResourceMappingNodeType : uint32_t
     IndirectUserDataVaPtr,          ///< Indirect user data VA pointer
     PushConst,                      ///< Push constant
     DescriptorBufferCompact,        ///< Compact buffer descriptor, only contains the buffer address
+    StreamOutTableVaPtr,            ///< Stream-out buffer table VA pointer
     Count,                          ///< Count of resource mapping node types.
 };
 
-/// Represents graphics IP version info. See http://confluence.amd.com/display/ASLC/AMDGPU+Target+Names  for more
+/// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
 /// details.
 struct GfxIpVersion
 {

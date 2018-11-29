@@ -809,7 +809,6 @@ bool SectionShader::AssembleSpirv(
         return false;
     }
 
-    void* pProgram = nullptr;
     const char* pLog = nullptr;
     uint32_t bufSize = static_cast<uint32_t>(shaderSource.size()) * 4 + 1024;
     uint32_t* pBuffer = new uint32_t[bufSize / 4];

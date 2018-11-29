@@ -98,7 +98,6 @@ Result SpirvLower::Run(
     uint32_t forceLoopUnrollCount)  // 0 or force loop unroll count
 {
     Result result = Result::Success;
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
 
     if (cl::EnableDumpCfg)
     {

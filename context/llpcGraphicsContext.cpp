@@ -340,7 +340,6 @@ bool GraphicsContext::CheckGsOnChipValidity()
     uint32_t stageMask = GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     auto pEsResUsage = GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     auto pGsResUsage = GetShaderResourceUsage(ShaderStageGeometry);
@@ -582,7 +581,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
                 esGsLdsSize     = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
                 gsOnChipLdsSize =
                     RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords,
-                                      1u << static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift));
+                                      static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift));
                 LLPC_ASSERT(gsOnChipLdsSize <= maxLdsSize);
             }
 
@@ -628,6 +627,12 @@ bool GraphicsContext::CheckGsOnChipValidity()
     LLPC_OUTS("\n");
     LLPC_OUTS("ES-GS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
     LLPC_OUTS("GS-VS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
+    for (uint32_t i = 0; i < MaxGsStreams; ++i)
+    {
+        uint32_t streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
+            pGsResUsage->builtInUsage.gs.outputVertices * 4;
+        LLPC_OUTS("GS stream item size (stream " << i << "): " << streamItemSize << "\n");
+    }
     LLPC_OUTS("\n");
     if (gsOnChip || (m_gfxIp.major >= 9))
     {

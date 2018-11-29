@@ -1203,10 +1203,13 @@ union ShaderInOutMetadata {
     uint32_t PerPatch           : 1;  // Whether this is a per-patch input/
                                       // output (tessellation shader)
     uint32_t StreamId           : 2;  // ID of output stream (geometry shader)
-
-    uint32_t Unused             : 5;
+    uint32_t IsXfb              : 1;  // Whether this is for transform feedback
+    uint32_t XfbBuffer          : 2;  // Transform feedback buffer ID
+    uint32_t XfbOffset          : 16; // Transform feedback offset
+    uint32_t XfbStride          : 17; // Transform feedback stride
+    uint32_t Unused             : 1;
   };
-  uint32_t U32All;
+  uint64_t U64All;
 };
 
 /// Info structure for all decorations applied to shader inputs and outputs.
@@ -1223,6 +1226,8 @@ struct ShaderInOutDecorate {
 
   bool           IsBuiltIn;         // Whether this is a SPIR-V built-in
 
+  bool           IsXfb;             // Whether this is a for transform feedback
+
   uint32_t       Component;         // Component offset of inputs and outputs
 
   bool           PerPatch;          // Whether this is a per-patch input/output
@@ -1234,6 +1239,9 @@ struct ShaderInOutDecorate {
   } Interp;
 
   uint32_t       StreamId;          // ID of output stream (geometry shader)
+  uint32_t       XfbBuffer;         // Transform feedback buffer ID
+  uint32_t       XfbOffset;         // Transform feedback offset
+  uint32_t       XfbStride;         // Transform feedback stride
 };
 
 /// Metadata for shader block.

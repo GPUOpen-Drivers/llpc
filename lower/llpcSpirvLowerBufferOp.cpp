@@ -232,10 +232,10 @@ void SpirvLowerBufferOp::visitCallInst(
 
             auto descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
             auto binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
-            SPIRVBlockTypeKind blockKind = static_cast<SPIRVBlockTypeKind>(
+            LLPC_ASSERT(static_cast<SPIRVBlockTypeKind>(
                 mdconst::dyn_extract<ConstantInt>(
-                pResMetaNode->getOperand(2))->getZExtValue());
-            LLPC_ASSERT(blockKind == BlockTypeShaderStorage);
+                pResMetaNode->getOperand(2))->getZExtValue())
+                        == BlockTypeShaderStorage);
 
             // Ignore array dimensions, block must start with structure type
             while (pBlockTy->isArrayTy())
@@ -345,10 +345,10 @@ void SpirvLowerBufferOp::visitCallInst(
 
                 auto descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
                 auto binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
-                SPIRVBlockTypeKind blockKind = static_cast<SPIRVBlockTypeKind>(
-                  mdconst::dyn_extract<ConstantInt>(
-                    pResMetaNode->getOperand(2))->getZExtValue());
-                LLPC_ASSERT(blockKind == BlockTypeShaderStorage);
+                LLPC_ASSERT(static_cast<SPIRVBlockTypeKind>(
+                                mdconst::dyn_extract<ConstantInt>(
+                                  pResMetaNode->getOperand(2))->getZExtValue())
+                            == BlockTypeShaderStorage);
 
                 // Ignore array dimensions, block must start with structure type
                 uint32_t operandIdx = 0;
@@ -416,7 +416,6 @@ void SpirvLowerBufferOp::visitCallInst(
         std::vector<Value*> indexOperands(callInst.getNumOperands() - 3);
         std::copy(callInst.op_begin() + 2, callInst.op_end() - 1, indexOperands.begin());
 
-        Value* pBlockOffset = getInt32(m_pModule, 0);
         auto pLoadTy = callInst.getOperand(1)->getType();
 
         LLPC_ASSERT(DescriptorSizeBuffer == 4);
@@ -575,6 +574,7 @@ void SpirvLowerBufferOp::visitLoadInst(
                                                    mdconst::dyn_extract<ConstantInt>(
                                                        pResMetaNode->getOperand(2))->getZExtValue());
                 LLPC_ASSERT((blockKind == BlockTypeUniform) || (blockKind == BlockTypeShaderStorage));
+                LLPC_UNUSED(blockKind);
 
                 // Ignore array dimensions, block must start with structure type
                 while (pBlockTy->isArrayTy())
@@ -595,11 +595,15 @@ void SpirvLowerBufferOp::visitLoadInst(
                                                              &loadInst,
                                                              &pResultMeta);
 
+            const bool isScalarAligned = NeedScalarAlignment(
+                loadInst.getType(), pBlockTy, indexOperands, operandIdx, pBlockMeta);
+
             // Load variable from buffer block
             Value* pLoadDest = AddBufferLoadInst(loadInst.getType(),
                                                  descSet,
                                                  binding,
                                                  isPushConst,
+                                                 isScalarAligned,
                                                  pBlockOffset,
                                                  pMemberOffset,
                                                  pResultMeta,
@@ -684,10 +688,10 @@ void SpirvLowerBufferOp::visitStoreInst(
 
             auto descSet   = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
             auto binding   = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
-            SPIRVBlockTypeKind blockKind = static_cast<SPIRVBlockTypeKind>(
+            LLPC_ASSERT(static_cast<SPIRVBlockTypeKind>(
                                                mdconst::dyn_extract<ConstantInt>(
-                                                   pResMetaNode->getOperand(2))->getZExtValue());
-            LLPC_ASSERT(blockKind == BlockTypeShaderStorage); // Must be shader storage block
+                                                   pResMetaNode->getOperand(2))->getZExtValue())
+                        == BlockTypeShaderStorage); // Must be shader storage block
 
             // Ignore array dimensions, block must start with structure type
             uint32_t operandIdx = 0;
@@ -708,10 +712,14 @@ void SpirvLowerBufferOp::visitStoreInst(
                                                              &storeInst,
                                                              &pResultMeta);
 
+            const bool isScalarAligned = NeedScalarAlignment(
+                pStoreSrc->getType(), pBlockTy, indexOperands, operandIdx, pBlockMeta);
+
             // Store variable to buffer block
             AddBufferStoreInst(pStoreSrc,
                                descSet,
                                binding,
+                               isScalarAligned,
                                pBlockOffset,
                                pMemberOffset,
                                pResultMeta,
@@ -724,7 +732,6 @@ void SpirvLowerBufferOp::visitStoreInst(
             LLPC_ASSERT(isa<GlobalVariable>(pStoreDest));
 
             auto pBlock = cast<GlobalVariable>(pStoreDest);
-            auto pBlockTy = pBlock->getType()->getPointerElementType();
 
             std::vector<Value*> indexOperands;
             indexOperands.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
@@ -772,6 +779,118 @@ Value* SpirvLowerBufferOp::CalcBlockOffset(
         *pStride = 1;
         return indexOperands[operandIdx];
     }
+}
+
+// =====================================================================================================================
+// Determines if a value needs a scalar aligned load or not.
+bool SpirvLowerBufferOp::NeedScalarAlignment(
+    const Type* const      pValueTy,        // [in] The data type we are going to load/store
+    const Type*            pBlockTy,        // [in] Type of this block
+    const ArrayRef<Value*> indexOperands,   // The index operands
+    const uint32_t         startOperandIdx, // The initial index into indexOperands
+    const Constant* const  pBlockMeta)      // [in] The block metadata
+{
+    // If the elements of our load/store type are 4 bytes (32-bits) or less, we never need scalar alignment.
+    if (pValueTy->getScalarSizeInBits() >= 32)
+    {
+        return false;
+    }
+
+    // If our load/store is not a vector type, we do not need scalar alignment.
+    if (pValueTy->isVectorTy() == false)
+    {
+        return false;
+    }
+
+    // Our required alignment is 2 for < 4 bytes, otherwise 4 (dword aligned).
+    const uint32_t requiredAlignmentForNonScalarLoads = (pValueTy->getPrimitiveSizeInBits() < 4) ? 2 : 4;
+
+    const Constant* pValueMeta = pBlockMeta;
+
+    for (uint32_t operandIdx = startOperandIdx; operandIdx < indexOperands.size(); operandIdx++)
+    {
+        ShaderBlockMetadata blockMeta = {};
+        if (pBlockTy->isStructTy())
+        {
+            LLPC_ASSERT(pValueMeta->getNumOperands() == 2);
+
+            blockMeta.U64All = cast<ConstantInt>(pValueMeta->getOperand(0))->getZExtValue();
+
+            // If the offset of the struct does not meet the required alignment, we need a scalar aligned load!
+            if ((blockMeta.offset % requiredAlignmentForNonScalarLoads) != 0)
+            {
+                return true;
+            }
+
+            const uint32_t memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
+
+            pValueMeta = cast<Constant>(pValueMeta->getOperand(1))->getAggregateElement(memberIdx);
+            pBlockTy = pBlockTy->getStructElementType(memberIdx);
+        }
+        else if (pBlockTy->isArrayTy())
+        {
+            LLPC_ASSERT(pValueMeta->getNumOperands() == 3);
+
+            const uint32_t stride = cast<ConstantInt>(pValueMeta->getOperand(0))->getZExtValue();
+
+            // If the stride of the array does not meet the required alignment, we need a scalar aligned load!
+            if ((stride % requiredAlignmentForNonScalarLoads) != 0)
+            {
+                return true;
+            }
+
+            blockMeta.U64All = cast<ConstantInt>(pValueMeta->getOperand(1))->getZExtValue();
+
+            // If the offset of the array does not meet the required alignment, we need a scalar aligned load!
+            if ((blockMeta.offset % requiredAlignmentForNonScalarLoads) != 0)
+            {
+                return true;
+            }
+
+            pValueMeta = cast<Constant>(pValueMeta->getOperand(2));
+            pBlockTy = pBlockTy->getArrayElementType();
+        }
+        else if (pBlockTy->isPointerTy())
+        {
+            LLPC_ASSERT(pValueMeta->getNumOperands() == 3);
+
+            const uint32_t stride = cast<ConstantInt>(pValueMeta->getOperand(0))->getZExtValue();
+
+            // If the stride of the pointer does not meet the required alignment, we need a scalar aligned load!
+            if ((stride % requiredAlignmentForNonScalarLoads) != 0)
+            {
+                return true;
+            }
+
+            blockMeta.U64All = cast<ConstantInt>(pValueMeta->getOperand(1))->getZExtValue();
+
+            // If the offset of the pointer does not meet the required alignment, we need a scalar aligned load!
+            if ((blockMeta.offset % requiredAlignmentForNonScalarLoads) != 0)
+            {
+                return true;
+            }
+
+            pValueMeta = cast<Constant>(pValueMeta->getOperand(2));
+            pBlockTy = pBlockTy->getPointerElementType();
+        }
+        else
+        {
+            LLPC_ASSERT(pValueMeta->getNumOperands() == 0);
+
+            blockMeta.U64All = cast<ConstantInt>(pValueMeta)->getZExtValue();
+
+            // If the offset of the pointer does not meet the required alignment, we need a scalar aligned load!
+            if ((blockMeta.offset % requiredAlignmentForNonScalarLoads) != 0)
+            {
+                return true;
+            }
+
+            break;
+        }
+    }
+
+    // We do not need a scalar aligned load!
+    return false;
 }
 
 // =====================================================================================================================
@@ -931,6 +1050,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
     uint32_t     descSet,            // Descriptor set of buffer block
     uint32_t     binding,            // Descriptor binding of buffer block
     bool         isPushConst,        // Whether the block is actually a push constant
+    bool         isScalarAligned,    // Whether scalar alignment has to be used for the load.
     Value*       pBlockOffset,       // [in] Block offset
     Value*       pBlockMemberOffset, // [in] Block member offset
     Constant*    pBlockMemberMeta,   // [in] Block member metadata
@@ -1008,8 +1128,31 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
         else
         {
             // Cast type of the load type to <n x i8>
-            uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = (loadSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), loadSize);
+            const uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
+
+            Type* pActualLoadTy = nullptr;
+
+            // If we don't have a push constant, and need a scalar aligned load.
+            if ((isPushConst == false) && isScalarAligned)
+            {
+                if (pLoadTy->getVectorElementType()->isHalfTy())
+                {
+                    pActualLoadTy = VectorType::get(m_pContext->Int16Ty(), pLoadTy->getVectorNumElements());
+                }
+                else
+                {
+                    LLPC_ASSERT(pLoadTy->isIntOrIntVectorTy(8) || pLoadTy->isIntOrIntVectorTy(16));
+                    pActualLoadTy = pLoadTy;
+                }
+            }
+            else if (loadSize == 1)
+            {
+                pActualLoadTy = pLoadTy;
+            }
+            else
+            {
+                pActualLoadTy = VectorType::get(m_pContext->Int8Ty(), loadSize);
+            }
 
             const char* pInstName = nullptr;
 
@@ -1022,7 +1165,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             }
             else
             {
-                pInstName = LlpcName::BufferLoad;
+                pInstName = isScalarAligned ? LlpcName::BufferLoadScalarAligned : LlpcName::BufferLoad;
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), descSet));
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), binding));
                 args.push_back(pBlockOffset);
@@ -1038,12 +1181,15 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
-            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
+            std::string suffix = GetTypeNameForScalarOrVector(pActualLoadTy);
 
-            pLoadValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
+            pLoadValue = EmitCall(m_pModule, pInstName + suffix, pActualLoadTy, args, NoAttrib, pInsertPos);
 
-            LLPC_ASSERT(CanBitCast(pCastTy, pLoadTy));
-            pLoadValue = new BitCastInst(pLoadValue, pLoadTy, "", pInsertPos);
+            if (pActualLoadTy != pLoadTy)
+            {
+                LLPC_ASSERT(CanBitCast(pActualLoadTy, pLoadTy));
+                pLoadValue = new BitCastInst(pLoadValue, pLoadTy, "", pInsertPos);
+            }
         }
     }
     else if (pLoadTy->isArrayTy())
@@ -1108,6 +1254,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                                            descSet,
                                            binding,
                                            isPushConst,
+                                           isScalarAligned,
                                            pBlockOffset,
                                            pElemOffset,
                                            pElemMeta,
@@ -1137,7 +1284,6 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
         for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             auto pMemberTy = pLoadTy->getStructElementType(memberIdx);
-            auto pMemberIdx = ConstantInt::get(m_pContext->Int32Ty(), memberIdx);
             auto pStruct = cast<Constant>(pBlockMemberMeta->getOperand(1));
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
@@ -1167,6 +1313,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                                              descSet,
                                              binding,
                                              isPushConst,
+                                             isScalarAligned,
                                              pBlockOffset,
                                              pMemberOffset,
                                              pMemberMeta,
@@ -1245,11 +1392,40 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
         }
         else
         {
-            // Cast type of the load type to <n x i8>
-            uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = (loadSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), loadSize);
+            const uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
 
-            const char* pInstName = LlpcName::BufferLoadDesc;
+            // If scalar block layout is enabled, we need to treat vector types with 1 / 2 byte components differently.
+            const bool isScalarBlockLayout = false;
+            const bool isSmallVector = pLoadTy->isVectorTy() && (pLoadTy->getScalarSizeInBits() < 32);
+            const bool needScalarAlignedLoad = isScalarBlockLayout && isSmallVector;
+
+            Type* pActualLoadTy = nullptr;
+
+            // If we need a scalar aligned load.
+            if (needScalarAlignedLoad)
+            {
+                if (pLoadTy->getVectorElementType()->isHalfTy())
+                {
+                    pActualLoadTy = VectorType::get(m_pContext->Int16Ty(), pLoadTy->getVectorNumElements());
+                }
+                else
+                {
+                    LLPC_ASSERT(pLoadTy->isIntOrIntVectorTy(8) || pLoadTy->isIntOrIntVectorTy(16));
+                    pActualLoadTy = pLoadTy;
+                }
+            }
+            else if (loadSize == 1)
+            {
+                pActualLoadTy = pLoadTy;
+            }
+            else
+            {
+                // Cast type of the load type to <n x i8>
+                pActualLoadTy = VectorType::get(m_pContext->Int8Ty(), loadSize);
+            }
+
+            const char* pInstName = needScalarAlignedLoad ?
+                LlpcName::BufferLoadScalarAlignedDesc : LlpcName::BufferLoadDesc;
 
             // Build arguments for buffer load
             std::vector<Value*> args;
@@ -1261,12 +1437,15 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
 
-            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
+            std::string suffix = GetTypeNameForScalarOrVector(pActualLoadTy);
 
-            pLoadValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
+            pLoadValue = EmitCall(m_pModule, pInstName + suffix, pActualLoadTy, args, NoAttrib, pInsertPos);
 
-            LLPC_ASSERT(CanBitCast(pCastTy, pLoadTy));
-            pLoadValue = new BitCastInst(pLoadValue, pLoadTy, "", pInsertPos);
+            if (pActualLoadTy != pLoadTy)
+            {
+                LLPC_ASSERT(CanBitCast(pActualLoadTy, pLoadTy));
+                pLoadValue = new BitCastInst(pLoadValue, pLoadTy, "", pInsertPos);
+            }
         }
     }
     else if (pLoadTy->isArrayTy())
@@ -1347,7 +1526,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
     }
     else
     {
-        // Load sructure type
+        // Load structure type
 
         // NOTE: Calculated block member offset is 0 when the member type is aggregate. So the specified
         // "pBlockMemberOffset" does not include the offset of the structure. We have to add it here.
@@ -1357,7 +1536,6 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
         for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             auto pMemberTy = pLoadTy->getStructElementType(memberIdx);
-            auto pMemberIdx = ConstantInt::get(m_pContext->Int32Ty(), memberIdx);
             auto pStruct = cast<Constant>(pBlockMemberMeta->getOperand(1));
             auto pMemberMeta = cast<Constant>(pStruct->getAggregateElement(memberIdx));
 
@@ -1405,6 +1583,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
     Value*       pStoreValue,        // [in] Value stored to buffer block
     uint32_t     descSet,            // Descriptor set of buffer block
     uint32_t     binding,            // Descriptor binding of buffer block
+    bool         isScalarAligned,    // Is the store scalar aligned
     Value*       pBlockOffset,       // [in] Block offset
     Value*       pBlockMemberOffset, // [in] Block member offset
     Constant*    pBlockMemberMeta,   // [in] Metadata of buffer block
@@ -1464,12 +1643,38 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
         }
         else
         {
-            // Cast type of the store value to <n x i8>
-            uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = (storeSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), storeSize);
+            const uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
 
-            LLPC_ASSERT(CanBitCast(pStoreTy, pCastTy));
-            pStoreValue = new BitCastInst(pStoreValue, pCastTy, "", pInsertPos);
+            Type* pActualStoreTy = nullptr;
+
+            // If we need a scalar aligned store.
+            if (isScalarAligned)
+            {
+                if (pStoreTy->getVectorElementType()->isHalfTy())
+                {
+                    pActualStoreTy = VectorType::get(m_pContext->Int16Ty(), pStoreTy->getVectorNumElements());
+                }
+                else
+                {
+                    LLPC_ASSERT(pStoreTy->isIntOrIntVectorTy(8) || pStoreTy->isIntOrIntVectorTy(16));
+                    pActualStoreTy = pStoreTy;
+                }
+            }
+            else if (storeSize == 1)
+            {
+                pActualStoreTy = pStoreTy;
+            }
+            else
+            {
+                // Cast type of the store value to <n x i8>
+                pActualStoreTy = VectorType::get(m_pContext->Int8Ty(), storeSize);
+            }
+
+            if (pActualStoreTy != pStoreTy)
+            {
+                LLPC_ASSERT(CanBitCast(pStoreTy, pActualStoreTy));
+                pStoreValue = new BitCastInst(pStoreValue, pActualStoreTy, "", pInsertPos);
+            }
 
             // Build arguments for buffer store
             std::vector<Value*> args;
@@ -1482,9 +1687,11 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
-            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
+            std::string suffix = GetTypeNameForScalarOrVector(pActualStoreTy);
+            const char* pInstName = isScalarAligned ?
+                LlpcName::BufferStoreScalarAligned : LlpcName::BufferStore;
 
-            EmitCall(m_pModule, LlpcName::BufferStore + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall(m_pModule, pInstName + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
     else if (pStoreTy->isArrayTy())
@@ -1552,6 +1759,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             AddBufferStoreInst(pElem,
                                descSet,
                                binding,
+                               isScalarAligned,
                                pBlockOffset,
                                pElemOffset,
                                pElemMeta,
@@ -1570,7 +1778,6 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
         for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             auto pMemberTy = pStoreTy->getStructElementType(memberIdx);
-            auto pMemberIdx = ConstantInt::get(m_pContext->Int32Ty(), memberIdx);
 
             // Extract structure member from store value
             std::vector<uint32_t> idxs;
@@ -1604,6 +1811,7 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             AddBufferStoreInst(pMember,
                                descSet,
                                binding,
+                               isScalarAligned,
                                pBlockOffset,
                                pMemberOffset,
                                pMemberMeta,
@@ -1789,6 +1997,7 @@ Value* SpirvLowerBufferOp::LoadEntireBlock(
                                                mdconst::dyn_extract<ConstantInt>(
                                                    pResMetaNode->getOperand(2))->getZExtValue());
             LLPC_ASSERT((blockKind == BlockTypeUniform) || (blockKind == BlockTypeShaderStorage));
+            LLPC_UNUSED(blockKind);
 
             // Ignore array dimensions, block must start with structure type
             while (pBlockTy->isArrayTy())
@@ -1809,11 +2018,15 @@ Value* SpirvLowerBufferOp::LoadEntireBlock(
                                                          pInsertPos,
                                                          &pResultMeta);
 
+        const bool isScalarAligned = NeedScalarAlignment(
+            pLoadTy, pBlockTy, indexOperands, operandIdx, pBlockMeta);
+
         // Load variable from buffer block
         pLoadValue = AddBufferLoadInst(pLoadTy,
                                        descSet,
                                        binding,
                                        isPushConst,
+                                       isScalarAligned,
                                        pBlockOffset,
                                        pMemberOffset,
                                        pResultMeta,
@@ -1864,10 +2077,10 @@ void SpirvLowerBufferOp::StoreEntireBlock(
 
         auto descSet   = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
         auto binding   = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
-        SPIRVBlockTypeKind blockKind = static_cast<SPIRVBlockTypeKind>(
+        LLPC_ASSERT(static_cast<SPIRVBlockTypeKind>(
                                            mdconst::dyn_extract<ConstantInt>(
-                                               pResMetaNode->getOperand(2))->getZExtValue());
-        LLPC_ASSERT(blockKind == BlockTypeShaderStorage); // Must be shader storage block
+                                               pResMetaNode->getOperand(2))->getZExtValue())
+                    == BlockTypeShaderStorage); // Must be shader storage block
 
         // Ignore array dimensions, block must start with structure type
         uint32_t operandIdx = 0;
@@ -1888,10 +2101,14 @@ void SpirvLowerBufferOp::StoreEntireBlock(
                                                          pInsertPos,
                                                          &pResultMeta);
 
+        const bool isScalarAligned = NeedScalarAlignment(
+            pStoreValue->getType(), pBlockTy, indexOperands, operandIdx, pBlockMeta);
+
         // Store variable to buffer block
         AddBufferStoreInst(pStoreValue,
                            descSet,
                            binding,
+                           isScalarAligned,
                            pBlockOffset,
                            pMemberOffset,
                            pResultMeta,
@@ -1956,12 +2173,43 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
         }
         else
         {
-            // Cast type of the store value to <n x i8>
-            uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
-            Type* pCastTy = (storeSize == 1) ? m_pContext->Int8Ty() : VectorType::get(m_pContext->Int8Ty(), storeSize);
+            const uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
 
-            LLPC_ASSERT(CanBitCast(pStoreTy, pCastTy));
-            pStoreValue = new BitCastInst(pStoreValue, pCastTy, "", pInsertPos);
+            // If scalar block layout is enabled, we need to treat vector types with 1 / 2 byte components differently.
+            const bool isScalarBlockLayout = false;
+            const bool isSmallVector = pStoreTy->isVectorTy() && (pStoreTy->getScalarSizeInBits() < 32);
+            const bool needScalarAlignedStore = isScalarBlockLayout && isSmallVector;
+
+            Type* pActualStoreTy = nullptr;
+
+            // If we need a scalar aligned store.
+            if (needScalarAlignedStore)
+            {
+                if (pStoreTy->getVectorElementType()->isHalfTy())
+                {
+                    pActualStoreTy = VectorType::get(m_pContext->Int16Ty(), pStoreTy->getVectorNumElements());
+                }
+                else
+                {
+                    LLPC_ASSERT(pStoreTy->isIntOrIntVectorTy(8) || pStoreTy->isIntOrIntVectorTy(16));
+                    pActualStoreTy = pStoreTy;
+                }
+            }
+            else if (storeSize == 1)
+            {
+                pActualStoreTy = pStoreTy;
+            }
+            else
+            {
+                // Cast type of the store value to <n x i8>
+                pActualStoreTy = VectorType::get(m_pContext->Int8Ty(), storeSize);
+            }
+
+            if (pActualStoreTy != pStoreTy)
+            {
+                LLPC_ASSERT(CanBitCast(pStoreTy, pActualStoreTy));
+                pStoreValue = new BitCastInst(pStoreValue, pActualStoreTy, "", pInsertPos);
+            }
 
             // Build arguments for buffer store
             std::vector<Value*> args;
@@ -1970,9 +2218,12 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             args.push_back(pStoreValue);
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
-            std::string suffix = GetTypeNameForScalarOrVector(pCastTy);
 
-            EmitCall(m_pModule, LlpcName::BufferStoreDesc + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            std::string suffix = GetTypeNameForScalarOrVector(pActualStoreTy);
+            const char* pInstName = needScalarAlignedStore ?
+                LlpcName::BufferStoreScalarAlignedDesc : LlpcName::BufferStoreDesc;
+
+            EmitCall(m_pModule, pInstName + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
     else if (pStoreTy->isArrayTy())
@@ -2056,7 +2307,6 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
         for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             auto pMemberTy = pStoreTy->getStructElementType(memberIdx);
-            auto pMemberIdx = ConstantInt::get(m_pContext->Int32Ty(), memberIdx);
 
             // Extract structure member from store value
             std::vector<uint32_t> idxs;

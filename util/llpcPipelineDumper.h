@@ -111,6 +111,7 @@ private:
                                                 MetroHash::MetroHash64*   pHasher);
 
     static void UpdateHashForResourceMappingNode(const ResourceMappingNode* pUserDataNode,
+                                                 bool                       isRootNode,
                                                  MetroHash::MetroHash64*    pHasher);
 };
 

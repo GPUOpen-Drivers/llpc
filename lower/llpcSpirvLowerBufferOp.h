@@ -62,6 +62,12 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerBufferOp);
 
+    bool NeedScalarAlignment(const llvm::Type* const            pValueTy,
+                             const llvm::Type*                  pBlockTy,
+                             const llvm::ArrayRef<llvm::Value*> indexOperands,
+                             const uint32_t                     startOperandIdx,
+                             const llvm::Constant* const        pBlockMeta);
+
     llvm::Value* CalcBlockOffset(const llvm::Type*                pBlockTy,
                                  const std::vector<llvm::Value*>& indexOperands,
                                  uint32_t                         operandIdx,
@@ -79,6 +85,7 @@ private:
                                    uint32_t           descSet,
                                    uint32_t           binding,
                                    bool               isPushConst,
+                                   bool               isScalarAligned,
                                    llvm::Value*       pBlockOffset,
                                    llvm::Value*       pBlockMemberOffset,
                                    llvm::Constant*    pBlockMemberMeta,
@@ -93,6 +100,7 @@ private:
     void AddBufferStoreInst(llvm::Value*        pStoreValue,
                             uint32_t            descSet,
                             uint32_t            binding,
+                            bool                isScalarAligned,
                             llvm::Value*        pBlockOffset,
                             llvm::Value*        pBlockMemberOffset,
                             llvm::Constant*     pBlockMemberMeta,

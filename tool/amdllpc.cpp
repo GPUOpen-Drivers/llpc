@@ -825,8 +825,6 @@ static Result BuildPipeline(
 {
     Result result = Result::Success;
 
-    BinaryData pipelinBin = {};
-
     bool isGraphics = (pCompileInfo->stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
     if (isGraphics)
     {
@@ -928,6 +926,10 @@ static Result OutputElf(
         if (IsElfBinary(pPipelineBin->pCode, pPipelineBin->codeSize))
         {
             pExt = ".elf";
+        }
+        else if (IsIsaText(pPipelineBin->pCode, pPipelineBin->codeSize))
+        {
+            pExt = ".s";
         }
         else
         {

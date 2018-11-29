@@ -125,12 +125,6 @@ const static char *Pipe = "pipe";
 
 typedef std::pair<unsigned, AttributeList> AttributeWithIndex;
 
-static bool isOpenCLKernel(SPIRVFunction *BF) {
-  auto EntryPoint = BF->getModule()->getEntryPoint(BF->getId());
-  return (EntryPoint != nullptr) &&
-    (EntryPoint->getExecModel() == ExecutionModelKernel);
-}
-
 static void dumpLLVM(Module *M, const std::string &FName) {
   std::error_code EC;
   static int dumpIdx = 0;
@@ -168,14 +162,6 @@ static MDNode *getMDTwoInt(LLVMContext *Context, unsigned Int1, unsigned Int2) {
       ConstantInt::get(Type::getInt32Ty(*Context), Int1)));
   ValueVec.push_back(ConstantAsMetadata::get(
       ConstantInt::get(Type::getInt32Ty(*Context), Int2)));
-  return MDNode::get(*Context, ValueVec);
-}
-
-static MDNode*
-getMDString(LLVMContext *Context, const std::string& Str) {
-  std::vector<Metadata*> ValueVec;
-  if (!Str.empty())
-    ValueVec.push_back(MDString::get(*Context, Str));
   return MDNode::get(*Context, ValueVec);
 }
 
@@ -1697,6 +1683,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                           Ty->getArrayElementType()->isIntegerTy(8))
                              ? GlobalValue::UnnamedAddr::Global
                              : GlobalValue::UnnamedAddr::None);
+    if (AddrSpace == SPIRAS_Local)
+        LVar->setAlignment(16);
 
     SPIRVBuiltinVariableKind BVKind;
     if (BVar->isBuiltin(&BVKind))
@@ -2099,7 +2087,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       // NOTE: For variable pointer storage buffer, create special calls instead of using GEP instruction.
       // <descriptor, offset> = @spirv.AccessChain(...)
       assert(BB != nullptr);
-      auto BBTy = AC->getBase()->getType();
 
       assert(DescriptorSizeBuffer == 4);
       auto Vec4Ty = VectorType::get(Type::getInt32Ty(*Context), DescriptorSizeBuffer);
@@ -2200,7 +2187,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       auto MatCount = BVTy->getMatrixColumnCount();
       auto MatTy = ArrayType::get(MatClmTy, MatCount);
 
-      auto MatCountVal = ConstantInt::get(*Context, APInt(32, MatCount));
       Value* V = UndefValue::get(MatTy);
       for (uint32_t I = 0, E = Constituents.size(); I < E; ++I) {
           V = InsertValueInst::Create(V, widenBoolValue(Constituents[I], BB),
@@ -2314,7 +2300,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto V2 = transValue(VS->getVector2(), F, BB);
 
     auto Vec1CompCount = VS->getVector1ComponentCount();
-    auto Vec2CompCount = VS->getVector2ComponentCount();
     auto NewVecCompCount = VS->getComponents().size();
 
     IntegerType *Int32Ty = IntegerType::get(*Context, 32);
@@ -3939,7 +3924,6 @@ bool SPIRVToLLVM::transNonTemporalMetadata(Instruction *I) {
 }
 
 bool SPIRVToLLVM::transKernelMetadata() {
-  NamedMDNode *KernelMDs = M->getOrInsertNamedMetadata(SPIR_MD_KERNELS);
   for (unsigned I = 0, E = BM->getNumFunctions(); I != E; ++I) {
     SPIRVFunction *BF = BM->getFunction(I);
     auto EntryPoint = BM->getEntryPoint(BF->getId());
@@ -4242,6 +4226,10 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       InOutDec.PerPatch = false;
       InOutDec.StreamId = 0;
       InOutDec.Index = 0;
+      InOutDec.IsXfb = false;
+      InOutDec.XfbBuffer = 0;
+      InOutDec.XfbStride = 0;
+      InOutDec.XfbOffset = 0;
 
       SPIRVWord Loc = SPIRVID_INVALID;
       if (BV->hasDecorate(DecorationLocation, 0, &Loc)) {
@@ -4290,6 +4278,21 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       SPIRVWord StreamId = SPIRVID_INVALID;
       if (BV->hasDecorate(DecorationStream, 0, &StreamId))
         InOutDec.StreamId = StreamId;
+
+      SPIRVWord XfbBuffer = SPIRVID_INVALID;
+      if (BV->hasDecorate(DecorationXfbBuffer, 0, &XfbBuffer)) {
+        InOutDec.IsXfb = true;
+        InOutDec.XfbBuffer = XfbBuffer;
+      }
+      SPIRVWord XfbStride = SPIRVID_INVALID;
+      if (BV->hasDecorate(DecorationXfbStride, 0, &XfbStride)){
+        InOutDec.IsXfb = true;
+        InOutDec.XfbStride = XfbStride;
+      }
+
+      SPIRVWord XfbOffset = SPIRVID_INVALID;
+      if (BV->hasDecorate(DecorationOffset, 0, &XfbOffset))
+          InOutDec.XfbOffset = XfbOffset;
 
       Type* MDTy = nullptr;
       SPIRVType* BT = BV->getType()->getPointerElementType();
@@ -4469,8 +4472,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
     // NOTE: storage pointer could be null pointer in some tests,
     // so instruction should be ignored in this case
     if (Inst != nullptr) {
-      auto BTy = transType(BV->getType());
-
       // Build block metadata
       ShaderBlockDecorate BlockDec = {};
       Type *BlockMDTy = nullptr;
@@ -4496,7 +4497,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       // needed.
       mangleGlslBuiltin(gSPIRVMD::NonUniform, Types, MangledFuncName);
       auto F = getOrCreateFunction(M, VoidTy, Types, MangledFuncName);
-      auto CI = CallInst::Create(F, Args, "", BB);
+      CallInst::Create(F, Args, "", BB);
     }
   }
 
@@ -4617,12 +4618,23 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
   if (BT->hasDecorate(DecorationStream, 0, &StreamId))
     InOutDec.StreamId = StreamId;
 
+  SPIRVWord XfbBuffer = SPIRVID_INVALID;
+  if (BT->hasDecorate(DecorationXfbBuffer, 0, &XfbBuffer))
+      InOutDec.XfbBuffer = XfbBuffer;
+
+  SPIRVWord XfbStride = SPIRVID_INVALID;
+  if (BT->hasDecorate(DecorationXfbStride, 0, &XfbStride))
+      InOutDec.XfbStride = XfbStride;
+
   if (BT->isTypeScalar() || BT->isTypeVector()) {
     // Hanlde scalar or vector type
     assert(InOutDec.Value.U32All != SPIRVID_INVALID);
 
     // Build metadata for the scala/vector
     ShaderInOutMetadata InOutMD = {};
+    if (InOutDec.IsXfb)
+      InOutMD.IsXfb = true;
+
     if (InOutDec.IsBuiltIn) {
       InOutMD.IsBuiltIn = true;
       InOutMD.IsLoc = false;
@@ -4639,6 +4651,9 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.InterpLoc = InOutDec.Interp.Loc;
     InOutMD.PerPatch = InOutDec.PerPatch;
     InOutMD.StreamId = InOutDec.StreamId;
+    InOutMD.XfbBuffer = InOutDec.XfbBuffer;
+    InOutMD.XfbStride = InOutDec.XfbStride;
+    InOutMD.XfbOffset = InOutDec.XfbOffset;
 
     // Check signedness for generic input/output
     if (!InOutDec.IsBuiltIn) {
@@ -4658,12 +4673,13 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       InOutDec.Value.Loc += (Width <= 32 * 4) ? 1 : 2;
     }
 
-    MDTy = Type::getInt32Ty(*Context);
-    return ConstantInt::get(MDTy, InOutMD.U32All);
+    MDTy = Type::getInt64Ty(*Context);
+    return ConstantInt::get(MDTy, InOutMD.U64All);
 
   } else if (BT->isTypeArray() || BT->isTypeMatrix()) {
     // Handle array or matrix type
     auto Int32Ty = Type::getInt32Ty(*Context);
+    auto Int64Ty = Type::getInt64Ty(*Context);
 
     // Build element metadata
     auto ElemTy = BT->isTypeArray() ? BT->getArrayElementType() :
@@ -4687,11 +4703,13 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     // Built metadata for the array/matrix
     std::vector<Type *> MDTys;
     MDTys.push_back(Int32Ty);     // Stride
-    MDTys.push_back(Int32Ty);     // Content of "ShaderInOutMetadata"
+    MDTys.push_back(Int64Ty);     // Content of "ShaderInOutMetadata"
     MDTys.push_back(ElemMDTy);    // Element MD type
     MDTy = StructType::get(*Context, MDTys);
 
     ShaderInOutMetadata InOutMD = {};
+    if (InOutDec.IsXfb)
+      InOutMD.IsXfb = true;
     if (InOutDec.IsBuiltIn) {
       InOutMD.IsBuiltIn = true;
       InOutMD.IsLoc = false;
@@ -4707,10 +4725,13 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.InterpLoc = InOutDec.Interp.Loc;
     InOutMD.PerPatch = InOutDec.PerPatch;
     InOutMD.StreamId = InOutDec.StreamId;
+    InOutMD.XfbBuffer = InOutDec.XfbBuffer;
+    InOutMD.XfbStride = InOutDec.XfbStride;
+    InOutMD.XfbOffset = InOutDec.XfbOffset;
 
     std::vector<Constant *> MDValues;
     MDValues.push_back(ConstantInt::get(Int32Ty, Stride));
-    MDValues.push_back(ConstantInt::get(Int32Ty, InOutMD.U32All));
+    MDValues.push_back(ConstantInt::get(Int64Ty, InOutMD.U64All));
     MDValues.push_back(ElemMD);
     return ConstantStruct::get(static_cast<StructType *>(MDTy), MDValues);
 
@@ -4762,6 +4783,10 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 
       if (BT->hasMemberDecorate(MemberIdx, DecorationPatch))
         MemberDec.PerPatch = true;
+
+      SPIRVWord XfbOffset = SPIRVID_INVALID;
+      if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset))
+        MemberDec.XfbOffset = XfbOffset;
 
       SPIRVWord MemberStreamId = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(
@@ -4887,7 +4912,6 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
     uint32_t NumMembers = BT->getStructMemberCount();
     for (uint32_t MemberIdx = 0; MemberIdx < NumMembers; ++MemberIdx) {
       SPIRVWord MemberOffset       = 0;
-      SPIRVWord MemberArrayStride  = 0;
       SPIRVWord MemberMatrixStride = 0;
 
       // Check member decorations
@@ -5433,7 +5457,6 @@ Instruction *SPIRVToLLVM::transOCLRelational(SPIRVInstruction *I,
       I, mutateCallInstOCL(
              M, CI,
              [=](CallInst *, std::vector<Value *> &Args, llvm::Type *&RetTy) {
-               Type *IntTy = Type::getInt32Ty(*Context);
                RetTy = Type::getInt1Ty(*Context);
                if (CI->getType()->isVectorTy())
                  RetTy =

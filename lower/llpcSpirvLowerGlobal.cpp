@@ -145,7 +145,7 @@ void SpirvLowerGlobal::visitReturnInst(
     }
 
     LLPC_ASSERT(m_pRetBlock != nullptr); // Must have been created
-    auto pBranch = BranchInst::Create(m_pRetBlock, retInst.getParent());
+    BranchInst::Create(m_pRetBlock, retInst.getParent());
     m_retInsts.insert(&retInst);
 }
 
@@ -319,7 +319,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
             LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U32All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+            inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
             if (inOutMeta.IsBuiltIn)
             {
@@ -378,7 +378,7 @@ void SpirvLowerGlobal::visitLoadInst(
             // Arrayed input/output
             LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U32All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+            inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
             // If the input/output is arrayed, the outermost dimension might for vertex indexing
             if (inOutMeta.IsBuiltIn)
@@ -484,7 +484,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
             LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U32All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+            outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -539,7 +539,7 @@ void SpirvLowerGlobal::visitStoreInst(
         {
             LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U32All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+            outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -958,12 +958,6 @@ void SpirvLowerGlobal::LowerOutput()
                     LLPC_ASSERT(mangledName.startswith("_Z10EmitVertex"));
                 }
 
-                // TODO: Multiple output streams are not supported.
-                if (emitStreamId != 0)
-                {
-                    continue;
-                }
-
                 Value* pOutputValue = new LoadInst(pProxy, "", pEmitCall);
                 AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, nullptr, nullptr, emitStreamId, pEmitCall);
             }
@@ -1128,7 +1122,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 
         LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
         uint32_t stride = cast<ConstantInt>(pInOutMeta->getOperand(0))->getZExtValue();
-        inOutMeta.U32All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
         if (inOutMeta.IsBuiltIn)
         {
@@ -1212,6 +1206,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     LLPC_ASSERT(pVertexIdx == nullptr);
                 }
 
+                AddTypeMangling(pInOutTy, args, instName);
                 pInOutValue = EmitCall(m_pModule, instName, pInOutTy, args, NoAttrib, pInsertPos);
             }
         }
@@ -1311,7 +1306,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     {
         std::vector<Value*> args;
 
-        inOutMeta.U32All = cast<ConstantInt>(pInOutMeta)->getZExtValue();
+        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta)->getZExtValue();
 
         LLPC_ASSERT(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
@@ -1388,7 +1383,6 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 
             // Prepare arguments for input import call
             instName  = LlpcName::InputImportInterpolant;
-            instName += GetTypeNameForScalarOrVector(pInOutTy);
 
             auto pLoc = ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.Value);
 
@@ -1410,18 +1404,12 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 
             LLPC_ASSERT(builtInName.find("BuiltIn") == 0);
             instName += builtInName.substr(strlen("BuiltIn"));
-            if (pElemIdx != nullptr)
-            {
-                // Add this suffix when element indexing is specified for built-in import
-                instName += "." + GetTypeNameForScalarOrVector(pInOutTy);
-            }
 
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
         }
         else
         {
             instName = (addrSpace == SPIRAS_Input) ? LlpcName::InputImportGeneric : LlpcName::OutputImportGeneric;
-            instName += GetTypeNameForScalarOrVector(pInOutTy);
 
             auto pLoc = ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.Value);
 
@@ -1539,31 +1527,31 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         }
 
         //
-        // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%(i32 builtInId)
+        // VS:  @llpc.input.import.generic.%Type%.i32.i32(i32 location, i32 elemIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
         //
-        // TCS: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
+        // TCS: @llpc.input.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32.i32.i32(i32 builtInId, i32 elemIdx, i32 vertexIdx)
         //
-        //      @llpc.output.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.output.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.output.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.output.import.builtin.%BuiltIn%.%Type%.i32.i32.i32(i32 builtInId, i32 elemIdx, i32 vertexIdx)
         //
         //
-        // TES: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
+        // TES: @llpc.input.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32.i32.i32(i32 builtInId, i32 elemIdx, i32 vertexIdx)
 
-        // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%(i32 builtInId, i32 vertexIdx)
+        // GS:  @llpc.input.import.generic.%Type%.i32.i32.i32(i32 location, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32.i32(i32 builtInId, i32 vertexIdx)
         //
-        // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-        //      @llpc.input.import.builtin.%BuiltIn%(i32 builtInId)
+        // FS:  @llpc.input.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
         //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
         //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
         //
-        // CS:  @llpc.input.import.builtin.%BuiltIn%(i32 builtInId)
+        // CS:  @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
         //
         //
-        // Common: @llpc.input.import.builtin.%BuiltIn%(i32 builtInId)
+        // Common: @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
         //
         if (inOutMeta.IsBuiltIn)
         {
@@ -1602,6 +1590,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             }
         }
 
+        AddTypeMangling(pInOutTy, args, instName);
         pInOutValue = EmitCall(m_pModule, instName, pInOutTy, args, NoAttrib, pInsertPos);
     }
 
@@ -1633,7 +1622,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
         LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
         uint32_t stride = cast<ConstantInt>(pOutputMeta->getOperand(0))->getZExtValue();
-        outputMeta.U32All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+        outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1668,8 +1657,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 {
                     // When vertex indexing is not specified, we set it to don't-care value
                     pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                }
-                args.push_back(pVertexIdx);
+                    }
+                    args.push_back(pVertexIdx);
             }
             else
             {
@@ -1691,6 +1680,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
             args.push_back(pOutputValue);
 
+            AddTypeMangling(nullptr, args, instName);
             EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
         else
@@ -1702,7 +1692,6 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             }
 
             auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(2));
-            auto pElemTy   = pOutputTy->getArrayElementType();
 
             const uint64_t elemCount = pOutputTy->getArrayNumElements();
             for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
@@ -1738,7 +1727,6 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             // Handle structure member recursively
-            auto pMemberTy = pOutputTy->getStructElementType(memberIdx);
             auto pMemberMeta = cast<Constant>(pOutputMeta->getOperand(memberIdx));
 
             std::vector<uint32_t> idxs;
@@ -1753,7 +1741,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         // Normal scalar or vector type
         std::vector<Value*> args;
 
-        outputMeta.U32All = cast<ConstantInt>(pOutputMeta)->getZExtValue();
+        outputMeta.U64All = cast<ConstantInt>(pOutputMeta)->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1761,9 +1749,22 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             return;
         }
 
-        LLPC_ASSERT(outputMeta.IsLoc || outputMeta.IsBuiltIn);
+        LLPC_ASSERT(outputMeta.IsLoc || outputMeta.IsBuiltIn || outputMeta.IsXfb);
 
         std::string instName;
+
+        // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
+        if (outputMeta.IsXfb)
+        {
+            instName = LlpcName::OutputExportXfb;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbOffset));
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbBuffer));
+            args.push_back(pOutputValue);
+            AddTypeMangling(nullptr, args, instName);
+            EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        }
+
+        args.clear();
         if (outputMeta.IsBuiltIn)
         {
             instName = LlpcName::OutputExportBuiltIn;
@@ -1772,18 +1773,12 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
             LLPC_ASSERT(builtInName.find("BuiltIn")  == 0);
             instName += builtInName.substr(strlen("BuiltIn"));
-            if (pElemIdx != nullptr)
-            {
-                // Add this suffix when element indexing is specified for built-in export
-                instName += "." + GetTypeNameForScalarOrVector(pOutputTy);
-            }
 
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
         }
         else
         {
             instName = LlpcName::OutputExportGeneric;
-            instName += GetTypeNameForScalarOrVector(pOutputTy);
 
             LLPC_ASSERT(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
             auto pLoc = ConstantInt::get(m_pContext->Int32Ty(), outputMeta.Value + outputMeta.Index);
@@ -1916,6 +1911,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         // FS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
         //      @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
         //
+        AddTypeMangling(nullptr, args, instName);
         EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
 }
@@ -1942,8 +1938,6 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                 (m_shaderStage == ShaderStageTessEval) ||
                 (m_shaderStage == ShaderStageFragment));
 
-    Value* pLoadValue = nullptr;
-
     if (operandIdx < indexOperands.size() - 1)
     {
         if (pInOutTy->isArrayTy())
@@ -1951,7 +1945,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
             // Array type
             LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U32All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+            inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
             auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(2));
             auto pElemTy   = pInOutTy->getArrayElementType();
@@ -2076,7 +2070,7 @@ void SpirvLowerGlobal::StoreOutputMember(
         {
             LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U32All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+            outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
 
             auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(2));
             auto pElemTy   = pOutputTy->getArrayElementType();
@@ -2142,8 +2136,6 @@ void SpirvLowerGlobal::StoreOutputMember(
         else if (pOutputTy->isVectorTy())
         {
             // Vector type
-            auto pCompTy = pOutputTy->getVectorElementType();
-
             LLPC_ASSERT(operandIdx + 1 == indexOperands.size() - 1);
             auto pCompIdx = indexOperands[operandIdx + 1];
 

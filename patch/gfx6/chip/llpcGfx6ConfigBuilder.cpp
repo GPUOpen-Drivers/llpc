@@ -67,7 +67,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     Result result = Result::Success;
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint64_t hash64 = 0;
 
@@ -97,6 +96,11 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
+        }
+
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
     }
 
@@ -137,7 +141,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
 {
     Result result = Result::Success;
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint64_t hash64 = 0;
 
@@ -167,6 +170,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
+        }
+
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
     }
 
@@ -244,7 +252,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
     Result result = Result::Success;
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint64_t hash64 = 0;
 
@@ -274,6 +281,11 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
+        }
+
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
     }
 
@@ -333,7 +345,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
     Result result = Result::Success;
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
-    uint32_t dataEntryIdx = 0;
 
     uint64_t hash64 = 0;
 
@@ -363,6 +374,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
+        }
+
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
     }
 
@@ -458,8 +474,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
 {
     Result result = Result::Success;
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
-    LLPC_ASSERT(stageMask == ShaderStageToMask(ShaderStageCompute));
+    LLPC_ASSERT(pContext->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
     uint64_t hash64 = 0;
 
@@ -511,8 +526,6 @@ Result ConfigBuilder::BuildVsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
-    regSPI_TMPRING_SIZE spiTmpRingSize = {};
-
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
@@ -529,6 +542,26 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
 
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
+
+        const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
+        bool enableXfb = (xfbStrides[0] > 0) || (xfbStrides[1] > 0) || (xfbStrides[2] > 0) ||
+            (xfbStrides[3]) > 0;
+
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_EN, enableXfb);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE0_EN, (xfbStrides[0] > 0));
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE1_EN, (xfbStrides[1] > 0));
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
+
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, enableXfb);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
+
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0]);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1]);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2]);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3]);
 
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
@@ -926,7 +959,6 @@ Result ConfigBuilder::BuildLsRegConfig(
     }
 
     uint32_t ldsSize = 0;
-    const auto gfxIp = pContext->GetGfxIpVersion();
 
     // NOTE: On GFX6, granularity for the LDS_SIZE field is 64. The range is 0~128 which allocates 0 to 8K DWORDs.
     // On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K DWORDs.
@@ -1092,8 +1124,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
-
-    regSPI_TMPRING_SIZE spiTmpRingSize = {};
 
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
@@ -1347,13 +1377,8 @@ Result ConfigBuilder::BuildUserDataConfig(
     }
 
     const auto pIntfData = pContext->GetShaderInterfaceData(shaderStage);
-    const auto& entryArgIdxs = pIntfData->entryArgIdxs;
-
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
-
-    const uint32_t stageMask = pContext->GetShaderStageMask();
-    bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     // Stage-specific processing
     if (shaderStage == ShaderStageVertex)
@@ -1361,12 +1386,12 @@ Result ConfigBuilder::BuildUserDataConfig(
         // TODO: PAL only check BaseVertex now, we need update code once PAL check them separately.
         if (builtInUsage.vs.baseVertex || builtInUsage.vs.baseInstance)
         {
-            LLPC_ASSERT(entryArgIdxs.vs.baseVertex > 0);
+            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.baseVertex > 0);
             SET_DYN_REG(pConfig,
                         startUserData + pIntfData->userDataUsage.vs.baseVertex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::BaseVertex));
 
-            LLPC_ASSERT(entryArgIdxs.vs.baseInstance > 0);
+            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.baseInstance > 0);
             SET_DYN_REG(pConfig,
                         startUserData + pIntfData->userDataUsage.vs.baseInstance,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::BaseInstance));
@@ -1374,7 +1399,7 @@ Result ConfigBuilder::BuildUserDataConfig(
 
         if (builtInUsage.vs.drawIndex)
         {
-            LLPC_ASSERT(entryArgIdxs.vs.drawIndex > 0);
+            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.drawIndex > 0);
             SET_DYN_REG(pConfig,
                         startUserData + pIntfData->userDataUsage.vs.drawIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::DrawIndex));
@@ -1382,7 +1407,7 @@ Result ConfigBuilder::BuildUserDataConfig(
 
         if (enableMultiView)
         {
-            LLPC_ASSERT(entryArgIdxs.vs.viewIndex > 0);
+            LLPC_ASSERT(pIntfData->entryArgIdxs.vs.viewIndex > 0);
             SET_DYN_REG(pConfig,
                         startUserData + pIntfData->userDataUsage.vs.viewIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
@@ -1392,7 +1417,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     {
         if (enableMultiView)
         {
-            LLPC_ASSERT(entryArgIdxs.tes.viewIndex > 0);
+            LLPC_ASSERT(pIntfData->entryArgIdxs.tes.viewIndex > 0);
             SET_DYN_REG(pConfig,
                         startUserData + pIntfData->userDataUsage.tes.viewIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
@@ -1402,7 +1427,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     {
         if (builtInUsage.gs.viewIndex)
         {
-            LLPC_ASSERT(entryArgIdxs.gs.viewIndex > 0);
+            LLPC_ASSERT(pIntfData->entryArgIdxs.gs.viewIndex > 0);
             SET_DYN_REG(pConfig,
                         startUserData + pIntfData->userDataUsage.gs.viewIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));

@@ -167,6 +167,19 @@ private:
     void PatchCopyShaderGenericOutputExport(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
     void PatchCopyShaderBuiltInOutputExport(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
 
+    void PatchVsTesXfbOutputExport(llvm::Value*       pOutput,
+                                   uint32_t           xfbBuffer,
+                                   uint32_t           xfbOffset,
+                                   llvm::Instruction* pInsertPos);
+
+    void StoreValueToStreamOutBuffer(llvm::Value*       pStoreValue,
+                                     llvm::Value*       pXfbBuffer,
+                                     llvm::Value*       pXfbOffset,
+                                     uint32_t           xfbStride,
+                                     llvm::Instruction* pInsertPos);
+
+    llvm::Value* LoadStreamOutBufferDescriptor(llvm::Value* pXfbBuffer, llvm::Instruction* pInsertPos) const;
+
     void StoreValueToEsGsRing(llvm::Value*        pStoreValue,
                               uint32_t            location,
                               uint32_t            compIdx,
@@ -181,6 +194,7 @@ private:
     void StoreValueToGsVsRingBuffer(llvm::Value*        pStoreValue,
                                     uint32_t            location,
                                     uint32_t            compIdx,
+                                    uint32_t            streamId,
                                     llvm::Instruction*  pInsertPos);
 
     llvm::Value* CalcEsGsRingOffsetForOutput(uint32_t           location,
@@ -195,6 +209,7 @@ private:
 
     llvm::Value* CalcGsVsRingOffsetForOutput(uint32_t           location,
                                              uint32_t           compIdx,
+                                             uint32_t           streamId,
                                              llvm::Value*       pVertexIdx,
                                              llvm::Value*       pGsVsOffset,
                                              llvm::Instruction* pInsertPos);

@@ -64,7 +64,7 @@ OUTPUT_DIR = os.path.abspath(sys.argv[4]) if len(sys.argv) == 5 else INPUT_DIR
 SRC_DIRS = sorted(set([INPUT_DIR, OUTPUT_DIR]))
 
 # LLVM utility binaries
-LLVM_AS = os.path.join(LLVM_AS_DIR, "llvm-as")
+LLVM_OPT = os.path.join(LLVM_AS_DIR, "opt")
 LLVM_LINK = os.path.join(LLVM_LINK_DIR, "llvm-link")
 LLVM_AR = os.path.join(LLVM_LINK_DIR, "llvm-ar")
 
@@ -139,7 +139,7 @@ for srcDir in SRC_DIRS:
   for f in os.listdir(srcDir):
       if f.endswith(".ll"):
         outF = f.replace(".ll", ".bc")
-        cmd = LLVM_AS + " " + f + " -o " + os.path.join(OUTPUT_DIR, outF)
+        cmd = LLVM_OPT + " -strip -o " + os.path.join(OUTPUT_DIR, outF) + " " + f
         print(">>>  (LL-as) " + cmd)
         if OS_TYPE == "win":
           subprocess.check_call(cmd, cwd = srcDir)
@@ -229,7 +229,7 @@ for gfx in GFX_EMUS:
       for f in os.listdir(gfxSubdir):
           if f.endswith(".ll"):
               outF = f.replace(".ll", ".bc")
-              cmd = LLVM_AS + " " + os.path.join(gfx, f) + " -o " + os.path.join(outDir, outF)
+              cmd = LLVM_OPT + " -strip -o " + os.path.join(outDir, outF) + " " + os.path.join(gfx, f)
               print(">>>  (LL-as) " + cmd)
               if OS_TYPE == "win" :
                   subprocess.check_call(cmd, cwd = srcDir)
@@ -285,7 +285,7 @@ for wa in WA_EMUS:
     for f in os.listdir(os.path.join(INPUT_DIR, workDir)):
         if f.endswith(".ll"):
             outF = f.replace(".ll", ".bc")
-            cmd = LLVM_AS + " " + os.path.join(workDir, f) + " -o " + os.path.join(outDir, outF)
+            cmd = LLVM_OPT + " -strip -o " + os.path.join(outDir, outF) + " " + os.path.join(workDir, f)
             print(">>>  (LL-as) " + cmd)
             if OS_TYPE == "win" :
                 subprocess.check_call(cmd, cwd = INPUT_DIR)

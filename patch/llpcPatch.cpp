@@ -124,7 +124,6 @@ Result Patch::Run(
     Module* pModule)    // [in,out] LLVM module to be run on
 {
     Result result = Result::Success;
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
     // Do patching opertions
     PassManager passMgr;
 

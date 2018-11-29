@@ -72,10 +72,11 @@ const char* PipelineContext::GetGpuNameString() const
     {   // Graphics IP  Target Name   Compatible Target Name
         { { 6, 0, 0 }, "tahiti"   },  // [6.0.0] gfx600, tahiti
         { { 6, 0, 1 }, "pitcairn" },  // [6.0.1] gfx601, pitcairn, verde, oland, hainan
-        { { 7, 0, 0 }, "bonaire"  },  // [7.0.0] gfx700, bonaire, kaveri
+        { { 7, 0, 0 }, "kaveri"  },   // [7.0.0] gfx700, kaveri
         { { 7, 0, 1 }, "hawaii"   },  // [7.0.1] gfx701, hawaii
         { { 7, 0, 2 }, "gfx702"   },  // [7.0.2] gfx702
         { { 7, 0, 3 }, "kabini"   },  // [7.0.3] gfx703, kabini, mullins
+        { { 7, 0, 4 }, "bonaire"  },  // [7.0.4] gfx704, bonaire
         { { 8, 0, 0 }, "iceland"  },  // [8.0.0] gfx800, iceland
         { { 8, 0, 1 }, "carrizo"  },  // [8.0.1] gfx801, carrizo
         { { 8, 0, 2 }, "tonga"    },  // [8.0.2] gfx802, tonga
@@ -100,6 +101,8 @@ const char* PipelineContext::GetGpuNameString() const
             break;
         }
     }
+
+    LLPC_ASSERT(pNameMap != nullptr);
 
     return (pNameMap != nullptr) ? pNameMap->pNameString : "";
 }
@@ -155,6 +158,19 @@ void PipelineContext::AutoLayoutDescriptor(
             pDummyResNodes->push_back(setNode);
             ++setNodeCount;
         }
+    }
+
+    const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
+    bool enableXfb = (xfbStrides[0] > 0) || (xfbStrides[1] > 0) ||
+        (xfbStrides[2] > 0) || (xfbStrides[3] > 0);
+
+    if (enableXfb)
+    {
+        ResourceMappingNode streamOutNode = {};
+        streamOutNode.type = ResourceMappingNodeType::StreamOutTableVaPtr;
+        streamOutNode.sizeInDwords = 1;
+        streamOutNode.offsetInDwords = userDataIdx++;
+        pDummyResNodes->push_back(streamOutNode);
     }
 
     // Add node for vertex buffer table
@@ -290,7 +306,8 @@ void PipelineContext::AutoLayoutDescriptor(
     uint32_t nodeOffset = userDataNodeCount;
     for (uint32_t setNodeIdx = 0; setNodeIdx < setNodeCount; ++setNodeIdx)
     {
-        LLPC_ASSERT((*pDummyResNodes)[setNodeIdx].type == ResourceMappingNodeType::DescriptorTableVaPtr);
+        LLPC_ASSERT((*pDummyResNodes)[setNodeIdx].type ==
+            ResourceMappingNodeType::DescriptorTableVaPtr);
         (*pDummyResNodes)[setNodeIdx].tablePtr.pNext = &(*pDummyResNodes)[0] + nodeOffset;
         nodeOffset += (*pDummyResNodes)[setNodeIdx].tablePtr.nodeCount;
     }
@@ -555,18 +572,24 @@ void PipelineContext::InitShaderResourceUsage(
 
     pResUsage->pushConstSizeInBytes = 0;
     pResUsage->resourceWrite = false;
+    pResUsage->perShaderTable = false;
 
     pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
     pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;
 
     pResUsage->inOutUsage.inputMapLocCount = 0;
     pResUsage->inOutUsage.outputMapLocCount = 0;
+    memset(pResUsage->inOutUsage.gs.outLocCount, 0, sizeof(pResUsage->inOutUsage.gs.outLocCount));
     pResUsage->inOutUsage.perPatchInputMapLocCount = 0;
     pResUsage->inOutUsage.perPatchOutputMapLocCount = 0;
 
     pResUsage->inOutUsage.expCount = 0;
 
     pResUsage->inOutUsage.pEsGsRingBufDesc = nullptr;
+
+    memset(pResUsage->inOutUsage.xfbStrides, 0, sizeof(pResUsage->inOutUsage.xfbStrides));
+
+    pResUsage->inOutUsage.enableXfb = false;
 
     if (shaderStage == ShaderStageVertex)
     {
@@ -602,9 +625,14 @@ void PipelineContext::InitShaderResourceUsage(
     }
     else if (shaderStage == ShaderStageGeometry)
     {
-        pResUsage->inOutUsage.gs.pEsGsOffsets           = nullptr;
-        pResUsage->inOutUsage.gs.pGsVsRingBufDesc       = nullptr;
-        pResUsage->inOutUsage.gs.pEmitCounterPtr        = nullptr;
+        pResUsage->inOutUsage.gs.rasterStream        = 0;
+        pResUsage->inOutUsage.gs.pEsGsOffsets        = nullptr;
+        pResUsage->inOutUsage.gs.pGsVsRingBufDesc    = nullptr;
+
+        pResUsage->inOutUsage.gs.pEmitCounterPtr[0]  = nullptr;
+        pResUsage->inOutUsage.gs.pEmitCounterPtr[1] = nullptr;
+        pResUsage->inOutUsage.gs.pEmitCounterPtr[2] = nullptr;
+        pResUsage->inOutUsage.gs.pEmitCounterPtr[3] = nullptr;
 
         auto& calcFactor = pResUsage->inOutUsage.gs.calcFactor;
         memset(&calcFactor, 0, sizeof(calcFactor));
@@ -631,23 +659,32 @@ void PipelineContext::InitShaderInterfaceData(
 
     memset(pIntfData->descTablePtrs, 0, sizeof(pIntfData->descTablePtrs));
     memset(pIntfData->shadowDescTablePtrs, 0, sizeof(pIntfData->shadowDescTablePtrs));
-    memset(pIntfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(pIntfData->userDataMap));
     memset(pIntfData->dynDescs, 0, sizeof(pIntfData->dynDescs));
 
     pIntfData->pInternalTablePtr = nullptr;
     pIntfData->pInternalPerShaderTablePtr = nullptr;
-    pIntfData->vbTable.pTablePtr = nullptr;
+
     pIntfData->pNumWorkgroups = nullptr;
 
-    memset(&pIntfData->entryArgIdxs, 0, sizeof(pIntfData->entryArgIdxs));
+    pIntfData->userDataCount = 0;
+    memset(pIntfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(pIntfData->userDataMap));
+
     memset(&pIntfData->pushConst, 0, sizeof(pIntfData->pushConst));
+    pIntfData->pushConst.resNodeIdx = InvalidValue;
+
     memset(&pIntfData->spillTable, 0, sizeof(pIntfData->spillTable));
+    pIntfData->spillTable.offsetInDwords = InvalidValue;
+
+    memset(&pIntfData->vbTable, 0, sizeof(pIntfData->vbTable));
+    pIntfData->vbTable.resNodeIdx = InvalidValue;
+
+    memset(&pIntfData->streamOutTable, 0, sizeof(pIntfData->streamOutTable));
+    pIntfData->streamOutTable.resNodeIdx = InvalidValue;
+
     memset(&pIntfData->userDataUsage, 0, sizeof(pIntfData->userDataUsage));
 
+    memset(&pIntfData->entryArgIdxs, 0, sizeof(pIntfData->entryArgIdxs));
     pIntfData->entryArgIdxs.spillTable = InvalidValue;
-    pIntfData->pushConst.resNodeIdx = InvalidValue;
-    pIntfData->spillTable.offsetInDwords = InvalidValue;
-    pIntfData->vbTable.resNodeIdx = InvalidValue;
 }
 
 } // Llpc

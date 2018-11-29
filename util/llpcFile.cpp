@@ -371,6 +371,7 @@ void File::Seek(
         int32_t ret = fseek(m_pFileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
 
         LLPC_ASSERT(ret == 0);
+        LLPC_UNUSED(ret);
     }
 }
 

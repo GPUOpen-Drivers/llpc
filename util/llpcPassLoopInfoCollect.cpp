@@ -82,7 +82,6 @@ bool PassLoopInfoCollect::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Pass-Loop-Info-Collect\n");
 
-    uint32_t loopCounter = 0;
     for (Function& function : module)
     {
         if (function.empty())

@@ -109,6 +109,12 @@ struct VsRegConfig
     DEF_REG(VGT_PRIMITIVEID_EN);
     DEF_REG(VGT_REUSE_OFF);
     DEF_REG(VGT_VERTEX_REUSE_BLOCK_CNTL);
+    DEF_REG(VGT_STRMOUT_CONFIG);
+    DEF_REG(VGT_STRMOUT_BUFFER_CONFIG);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_0);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_1);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_2);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_3);
     DEF_REG(VS_SCRATCH_BYTE_SIZE);
     DEF_REG(VS_NUM_USED_VGPRS);
     DEF_REG(VS_NUM_USED_SGPRS);
@@ -254,6 +260,7 @@ struct PipelineVsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -293,6 +300,7 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
@@ -331,6 +339,7 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -376,6 +385,7 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
