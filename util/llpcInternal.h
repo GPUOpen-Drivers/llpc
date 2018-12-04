@@ -109,7 +109,7 @@ namespace LlpcName
     const static char DescriptorLoadInlineBuffer[]    = "llpc.descriptor.load.inlinebuffer";
     const static char DescriptorLoadTexelBuffer[]     = "llpc.descriptor.load.texelbuffer";
     const static char DescriptorLoadSpillTable[]      = "llpc.descriptor.load.spilltable";
-    const static char DescriptorLoadGsVsRingBuffer[]  = "llpc.descriptor.load.gsvsringbuffer";
+    const static char DescriptorLoadInternalBuffer[]  = "llpc.descriptor.load.internalbuffer";
 
     const static char ImageCallPrefix[]               = "llpc.image";
 
@@ -118,11 +118,12 @@ namespace LlpcName
     const static char OutputProxyPrefix[]             = "__llpc_output_proxy_";
 
     // Names of entry-points for merged shader
-    const static char LsEntryPoint[]                  = "llpc.ls.main";
-    const static char HsEntryPoint[]                  = "llpc.hs.main";
-    const static char EsEntryPoint[]                  = "llpc.es.main";
-    const static char GsEntryPoint[]                  = "llpc.gs.main";
+    const static char EsGsEntryPoint[]                = "llpc.shader.ESGS.main";
+    const static char LsHsEntryPoint[]                = "llpc.shader.LSHS.main";
 
+    const static char EntryPointPrefix[]              = "llpc.shader.";
+    const static char CopyShaderEntryPoint[]          = "llpc.shader.COPY.main";
+    const static char NullFsEntryPoint[]              = "llpc.shader.FS.null.main";
 } // LlpcName
 
 // Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify
@@ -136,7 +137,7 @@ static const uint32_t MaxTransformFeedbackBuffers = 4;
 
 // Maximum GS output vertex streams
 static const uint32_t MaxGsStreams = 4;
-static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Invalid value");
+static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 
 // Threshold of inline pass
 static const int32_t InlineThreshold = (INT32_MAX / 100);
@@ -159,6 +160,8 @@ static const uint32_t SI_DRV_TABLE_TF_BUFFER_OFFS       = 9;
 static const uint32_t SI_DRV_TABLE_HS_BUFFER0_OFFS      = 10;
 static const uint32_t SI_DRV_TABLE_OFF_CHIP_PARAM_CACHE = 11;
 static const uint32_t SI_DRV_TABLE_SAMPLEPOS            = 12;
+
+static const uint32_t SI_STREAMOUT_TABLE_OFFS           = 0;
 
 // No attribute
 static const std::vector<llvm::Attribute::AttrKind>   NoAttrib;
@@ -192,6 +195,9 @@ std::string GetTypeNameForScalarOrVector(llvm::Type* pTy);
 
 // Gets the shader stage from the specified LLVM module.
 ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
+
+// Gets the shader stage from the specified LLVM function.
+ShaderStage GetShaderStageFromFunction(llvm::Function* pFunc);
 
 // Gets the argument from the specified function according to the argument index.
 llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx);
@@ -276,9 +282,3 @@ public:
 };
 
 } // Llpc
-
-// Initialize optimizer
-void InitOptimizer();
-
-// Do optimization for the specified LLVM mode, codes are ported from LLVM "opt.exe"
-bool OptimizeModule(llvm::Module* M);

@@ -225,6 +225,12 @@ public:
         m_pPipelineContext->DoUserDataNodeMerge();
     }
 
+    // Gets the count of vertices per primitive
+    uint32_t GetVerticesPerPrimitive()
+    {
+        return m_pPipelineContext->GetVerticesPerPrimitive();
+    }
+
     // Gets wave size for the specified shader stage
     uint32_t GetShaderWaveSize(ShaderStage stage)
     {

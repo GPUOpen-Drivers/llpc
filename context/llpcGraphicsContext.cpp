@@ -515,6 +515,8 @@ bool GraphicsContext::CheckGsOnChipValidity()
     else
     {
         {
+            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift);
+
             uint32_t gsPrimsPerSubgroup = m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup;
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
@@ -523,6 +525,10 @@ bool GraphicsContext::CheckGsOnChipValidity()
             const uint32_t gsVsRingItemSize = 4 * std::max(1u,
                                                            (pGsResUsage->inOutUsage.outputMapLocCount *
                                                             pGsResUsage->builtInUsage.gs.outputVertices));
+
+            // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
+            const uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
+
             const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
 
             // TODO: Confirm no ES-GS extra LDS space used.
@@ -554,9 +560,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
             uint32_t esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
 
             // Total LDS use per subgroup aligned to the register granularity.
-            uint32_t gsOnChipLdsSize =
-                RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords,
-                                  static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift));
+            uint32_t gsOnChipLdsSize = RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
             // Use the client-specified amount of LDS space per sub-group. If they specified zero, they want us to
             // choose a reasonable default. The final amount must be 128-DWORD aligned.
@@ -579,13 +583,72 @@ bool GraphicsContext::CheckGsOnChipValidity()
                 LLPC_ASSERT(gsPrimsPerSubgroup > 0);
 
                 esGsLdsSize     = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
-                gsOnChipLdsSize =
-                    RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords,
-                                      static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift));
+                gsOnChipLdsSize = RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+
                 LLPC_ASSERT(gsOnChipLdsSize <= maxLdsSize);
             }
 
-            // TODO: Check GS -> VS ring on-chip validity
+            if (hasTs || cl::DisableGsOnChip)
+            {
+                gsOnChip = false;
+            }
+            else
+            {
+                // Now let's calculate the onchip GSVS info and determine if it should be on or off chip.
+                uint32_t gsVsItemSize = gsVsRingItemSizeOnChip * gsInstanceCount;
+
+                // Compute GSVS LDS size based on target GS prims per subgroup.
+                uint32_t gsVsLdsSize = gsVsItemSize * gsPrimsPerSubgroup;
+
+                // Start out with the assumption that our GS prims per subgroup won't change.
+                uint32_t onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
+
+                // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
+                uint32_t onchipEsGsVsLdsSize = RoundUpToMultiple(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
+                uint32_t onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
+
+                if (onchipEsGsVsLdsSize > maxLdsSize)
+                {
+                    // TODO: This code only allocates the minimum required LDS to hit the on chip GS prims per subgroup
+                    //       threshold. This leaves some LDS space unused. The extra space could potentially be used to
+                    //       increase the GS Prims per subgroup.
+
+                    // Set the threshold at the minimum to keep things on chip.
+                    onchipGsPrimsPerSubgroup = maxGsPrimsPerSubgroup;
+
+                    if (onchipGsPrimsPerSubgroup > 0)
+                    {
+                        worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup,
+                                                               maxEsVertsPerSubgroup);
+
+                        // Calculate the LDS sizes required to hit this threshold.
+                        onchipEsGsLdsSizeOnchipGsVs = Pow2Align(esGsRingItemSize * worstCaseEsVertsPerSubgroup,
+                                                                ldsSizeDwordGranularity);
+                        gsVsLdsSize = gsVsItemSize * onchipGsPrimsPerSubgroup;
+                        onchipEsGsVsLdsSize = onchipEsGsLdsSizeOnchipGsVs + gsVsLdsSize;
+
+                        if (onchipEsGsVsLdsSize > maxLdsSize)
+                        {
+                            // LDS isn't big enough to hit the target GS prim per subgroup count for on chip GSVS.
+                            gsOnChip = false;
+                        }
+                    }
+                    else
+                    {
+                        // With high GS instance counts, it is possible that the number of on chip GS prims
+                        // calculated is zero. If this is the case, we can't expect to use on chip GS.
+                        gsOnChip = false;
+                    }
+                }
+
+                // If on chip GSVS is optimal, update the ESGS parameters with any changes that allowed for GSVS data.
+                if (gsOnChip)
+                {
+                    gsOnChipLdsSize    = onchipEsGsVsLdsSize;
+                    esGsLdsSize        = onchipEsGsLdsSizeOnchipGsVs;
+                    gsPrimsPerSubgroup = onchipGsPrimsPerSubgroup;
+                }
+            }
 
             uint32_t esVertsPerSubgroup = std::min(esGsLdsSize / esGsRingItemSize, maxEsVertsPerSubgroup);
 
@@ -610,11 +673,10 @@ bool GraphicsContext::CheckGsOnChipValidity()
             pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
 
             pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
-            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsOnChip ?
+                                                                         gsVsRingItemSizeOnChip :
+                                                                         gsVsRingItemSize;
         }
-
-        // TODO: GFX9 GS -> VS ring on chip is not supported yet
-        gsOnChip = false;
     }
 
     LLPC_OUTS("===============================================================================\n");
@@ -632,6 +694,15 @@ bool GraphicsContext::CheckGsOnChipValidity()
         uint32_t streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
             pGsResUsage->builtInUsage.gs.outputVertices * 4;
         LLPC_OUTS("GS stream item size (stream " << i << "): " << streamItemSize << "\n");
+        LLPC_OUTS("    XFB buffer =");
+        for (uint32_t j = 0; j < MaxTransformFeedbackBuffers; ++j)
+        {
+            if ((pGsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
+            {
+                LLPC_OUTS(" " << j);
+            }
+        }
+        LLPC_OUTS("\n");
     }
     LLPC_OUTS("\n");
     if (gsOnChip || (m_gfxIp.major >= 9))
@@ -708,6 +779,55 @@ void GraphicsContext::DoUserDataNodeMerge()
             pShaderInfo2->pUserDataNodes    = pMergedNodes;
         }
     }
+}
+
+// =====================================================================================================================
+// Gets the count of vertices per primitive
+uint32_t GraphicsContext::GetVerticesPerPrimitive() const
+{
+    uint32_t vertsPerPrim = 0;
+
+    switch (m_pPipelineInfo->iaState.topology)
+    {
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+        vertsPerPrim = 1;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+        vertsPerPrim = 2;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+        vertsPerPrim = 2;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+        vertsPerPrim = 3;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+        vertsPerPrim = 3;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+        vertsPerPrim = 3;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+        vertsPerPrim = 4;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+        vertsPerPrim = 4;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+        vertsPerPrim = 6;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+        vertsPerPrim = 6;
+        break;
+    case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+        vertsPerPrim = m_pPipelineInfo->iaState.patchControlPoints;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return vertsPerPrim;
 }
 
 // =====================================================================================================================
@@ -802,7 +922,7 @@ void GraphicsContext::MergeUserDataNode(
             {
                 LLPC_ASSERT(pNode2->offsetInDwords >= nodeOffset);
                 LLPC_ASSERT(pNode2->offsetInDwords + pNode2->sizeInDwords <= pNode1->offsetInDwords); // Not overlapped
-                mergedNode = *pNode1;
+                mergedNode = *pNode2;
 
                 nodeOffset = pNode2->offsetInDwords + pNode2->sizeInDwords;
                 ++nodeIdx2;

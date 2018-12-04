@@ -81,7 +81,7 @@ Function* GetEntryPoint(
 
     for (auto pFunc = pModule->begin(), pEnd = pModule->end(); pFunc != pEnd; ++pFunc)
     {
-        if (pFunc->getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
+        if ((pFunc->empty() == false) && (pFunc->getLinkage() == GlobalValue::ExternalLinkage))
         {
             pEntryPoint = &*pFunc;
             break;
@@ -178,7 +178,7 @@ static void GetTypeNameForScalarOrVector(
 {
     if (auto pArrayTy = dyn_cast<ArrayType>(pTy))
     {
-        nameStream << "a" << pArrayTy->getElementType();
+        nameStream << "a" << pArrayTy->getNumElements();
         pTy = pArrayTy->getElementType();
     }
     if (auto pVectorTy = dyn_cast<VectorType>(pTy))
@@ -233,15 +233,25 @@ void AddTypeMangling(
 }
 
 // =====================================================================================================================
-// Gets the shader stage from the specified LLVM module.
+// Gets the shader stage from the specified single-shader LLVM module.
 ShaderStage GetShaderStageFromModule(
     Module* pModule)  // [in] LLVM module
 {
+    return GetShaderStageFromFunction(GetEntryPoint(pModule));
+}
+
+// =====================================================================================================================
+// Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
+ShaderStage GetShaderStageFromFunction(
+    Function* pFunc)  // [in] LLVM function
+{
     ShaderStage stage = ShaderStageInvalid;
 
-    Function* pEntryPoint = GetEntryPoint(pModule);
-    MDNode* pExecModelNode = pEntryPoint->getMetadata(gSPIRVMD::ExecutionModel);
-    LLPC_ASSERT(pExecModelNode != nullptr);
+    MDNode* pExecModelNode = pFunc->getMetadata(gSPIRVMD::ExecutionModel);
+    if (pExecModelNode == nullptr)
+    {
+        return ShaderStageInvalid;
+    }
     auto execModel = mdconst::dyn_extract<ConstantInt>(pExecModelNode->getOperand(0))->getZExtValue();
 
     switch (execModel)
@@ -268,7 +278,7 @@ ShaderStage GetShaderStageFromModule(
         stage = ShaderStageCopyShader;
         break;
     default:
-        LLPC_NEVER_CALLED();
+        stage = ShaderStageInvalid;
         break;
     }
     return stage;

@@ -141,7 +141,8 @@ struct ResourceUsage
     std::vector<DescriptorSet> descSets;              // Info array of descriptor sets and bindings
     std::unordered_set<uint64_t> descPairs;           // Pairs of descriptor set/binding
     uint32_t                   pushConstSizeInBytes;  // Push constant size (in bytes)
-    bool                       resourceWrite;         // Whether shader does resource-write operations
+    bool                       resourceWrite;         // Whether shader does resource-write operations (UAV)
+    bool                       resourceRead;          // Whether shader does resource-read operrations (UAV)
     bool                       perShaderTable;        // Whether per shader stage table is used
     uint32_t                   numSgprsAvailable;     // Number of available SGPRs
     uint32_t                   numVgprsAvailable;     // Number of available VGPRs
@@ -381,6 +382,9 @@ struct ResourceUsage
         // Transform feedback enablement
         bool enableXfb;
 
+        // Stream to transform feedback buffers
+        uint32_t streamXfbBuffers[MaxGsStreams];
+
         // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
         // are mapped)
         uint32_t    inputMapLocCount;
@@ -466,7 +470,8 @@ struct ResourceUsage
             uint32_t rasterStream;
 
             llvm::Value* pEsGsOffsets;          // ES -> GS offsets (GS in)
-            llvm::Value* pGsVsRingBufDesc;      // GS -> VS ring buffer descriptor (GS out)
+            llvm::Value* gsVsOutRingBufDesc[MaxGsStreams];    // GS -> VS ring buffer descriptor (GS out)
+            llvm::Value* pGsVsInRingBufDesc;                  // GS -> VS ring buffer descriptor (VS in)
             llvm::Value* pEmitCounterPtr[MaxGsStreams];       // Pointer to emit counter
 
             struct
@@ -497,7 +502,6 @@ struct ResourceUsage
             ExportFormat expFmts[MaxColorTargets];      // Shader export formats
             BasicType    outputTypes[MaxColorTargets];  // Array of basic types of fragment outputs
             uint32_t     cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
-            llvm::Value* pViewIndex;                    // View Index
         } fs;
     } inOutUsage;
 };
@@ -556,8 +560,8 @@ struct InterfaceData
 
     struct
     {
-        llvm::Value*           pTablePtr;                       // Stream-out buffer table pointer
-        uint32_t               resNodeIdx;                      // Resource node index for stream-out table
+        llvm::Value*           bufDescs[MaxTransformFeedbackBuffers];  // Stream-out buffer descriptors
+        uint32_t               resNodeIdx;                             // Resource node index for stream-out table
     } streamOutTable;
 
     // Usage of user data registers for internal-use variables
@@ -574,6 +578,7 @@ struct InterfaceData
                 uint32_t vbTablePtr;                // Pointer of vertex buffer table
                 uint32_t viewIndex;                 // View Index
                 uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
+                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX9 and NGG)
             } vs;
 
             struct
@@ -587,6 +592,8 @@ struct InterfaceData
             {
                 uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for GFX8 and NGG)
                 uint32_t viewIndex;                 // View Index
+                uint32_t copyShaderEsGsLdsSize;     // ES -> GS ring LDS size (for copy shader)
+                uint32_t copyShaderStreamOutTable;  // Stream-out table (for copy shader)
             } gs;
 
             // Compute shader
@@ -758,6 +765,9 @@ public:
 
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
+
+    // Gets the count of vertices per primitive
+    virtual uint32_t GetVerticesPerPrimitive() const = 0;
 
     // Gets wave size for the specified shader stage
     virtual uint32_t GetShaderWaveSize(ShaderStage stage) = 0;

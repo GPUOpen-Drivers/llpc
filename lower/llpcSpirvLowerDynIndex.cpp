@@ -76,6 +76,7 @@ bool SpirvLowerDynIndex::runOnModule(
         pInst->dropAllReferences();
         pInst->eraseFromParent();
     }
+    m_loadInsts.clear();
 
     for (auto pInst : m_getElemPtrInsts)
     {
@@ -83,15 +84,9 @@ bool SpirvLowerDynIndex::runOnModule(
         pInst->dropAllReferences();
         pInst->eraseFromParent();
     }
+    m_getElemPtrInsts.clear();
 
     LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Dyn-Index: " << module);
-
-    std::string errMsg;
-    raw_string_ostream errStream(errMsg);
-    if (verifyModule(module, &errStream))
-    {
-        LLPC_ERRS("Fails to verify module (" DEBUG_TYPE "): " << errStream.str() << "\n");
-    }
 
     return true;
 }

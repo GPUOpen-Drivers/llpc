@@ -189,7 +189,6 @@ target_sources(llpc PRIVATE
     context/llpcComputeContext.cpp
     context/llpcGraphicsContext.cpp
     context/llpcShaderCache.cpp
-    context/llpcCopyShader.cpp
     context/llpcPipelineContext.cpp
     context/llpcShaderCacheManager.cpp
 )
@@ -222,15 +221,18 @@ target_sources(llpc PRIVATE
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
     patch/llpcPatchAddrSpaceMutate.cpp
+    patch/llpcPatchAutoLayoutDesc.cpp
     patch/llpcPatchBufferOp.cpp
+    patch/llpcPatchCopyShader.cpp
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
     patch/llpcPatchGroupOp.cpp
     patch/llpcPatchInOutImportExport.cpp
     patch/llpcPatchImageOp.cpp
     patch/llpcPatchLoopUnrollInfoRectify.cpp
-    patch/llpcPatchOpt.cpp
+    patch/llpcPatchNullFragShader.cpp
     patch/llpcPatchPeepholeOpt.cpp
+    patch/llpcPatchPrepareAbi.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
     patch/llpcVertexFetch.cpp
@@ -288,6 +290,7 @@ target_sources(llpc PRIVATE
     util/llpcPassLoopInfoCollect.cpp
     util/llpcPassManager.cpp
     util/llpcPipelineDumper.cpp
+    util/llpcPipelineShaders.cpp
     util/llpcUtil.cpp
 )
 
@@ -324,7 +327,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmuF16.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslPushConstOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslNullFsEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
@@ -345,9 +347,7 @@ set(GEN_GLSL_EMU_LIB_DEPS
 )
 
 set(GEN_GLSL_EMU_LIB_OUTPUTS
-    ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslCopyShaderEmuLib.h
     ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslEmuLib.h
-    ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslNullFsEmuLib.h
     ${OP_EMU_LIB_GEN_DIR}/gfx8/g_llpcGlslEmuLibGfx8.h
     ${OP_EMU_LIB_GEN_DIR}/gfx9/g_llpcGlslEmuLibGfx9.h
     ${OP_EMU_LIB_GEN_DIR}/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h

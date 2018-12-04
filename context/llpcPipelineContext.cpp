@@ -572,6 +572,7 @@ void PipelineContext::InitShaderResourceUsage(
 
     pResUsage->pushConstSizeInBytes = 0;
     pResUsage->resourceWrite = false;
+    pResUsage->resourceRead = false;
     pResUsage->perShaderTable = false;
 
     pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
@@ -588,8 +589,9 @@ void PipelineContext::InitShaderResourceUsage(
     pResUsage->inOutUsage.pEsGsRingBufDesc = nullptr;
 
     memset(pResUsage->inOutUsage.xfbStrides, 0, sizeof(pResUsage->inOutUsage.xfbStrides));
-
     pResUsage->inOutUsage.enableXfb = false;
+
+    memset(pResUsage->inOutUsage.streamXfbBuffers, 0, sizeof(pResUsage->inOutUsage.streamXfbBuffers));
 
     if (shaderStage == ShaderStageVertex)
     {
@@ -627,9 +629,13 @@ void PipelineContext::InitShaderResourceUsage(
     {
         pResUsage->inOutUsage.gs.rasterStream        = 0;
         pResUsage->inOutUsage.gs.pEsGsOffsets        = nullptr;
-        pResUsage->inOutUsage.gs.pGsVsRingBufDesc    = nullptr;
+        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[0] = nullptr;
+        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[1] = nullptr;
+        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[2] = nullptr;
+        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[3] = nullptr;
+        pResUsage->inOutUsage.gs.pGsVsInRingBufDesc = nullptr;
 
-        pResUsage->inOutUsage.gs.pEmitCounterPtr[0]  = nullptr;
+        pResUsage->inOutUsage.gs.pEmitCounterPtr[0] = nullptr;
         pResUsage->inOutUsage.gs.pEmitCounterPtr[1] = nullptr;
         pResUsage->inOutUsage.gs.pEmitCounterPtr[2] = nullptr;
         pResUsage->inOutUsage.gs.pEmitCounterPtr[3] = nullptr;
@@ -646,7 +652,6 @@ void PipelineContext::InitShaderResourceUsage(
         }
 
         pResUsage->inOutUsage.fs.cbShaderMask = 0;
-        pResUsage->inOutUsage.fs.pViewIndex = nullptr;
     }
 }
 

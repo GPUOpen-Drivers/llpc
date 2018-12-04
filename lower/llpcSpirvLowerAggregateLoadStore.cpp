@@ -76,6 +76,7 @@ bool SpirvLowerAggregateLoadStore::runOnModule(
         pLoadInst->dropAllReferences();
         pLoadInst->eraseFromParent();
     }
+    m_loadInsts.clear();
 
     // Remove unnecessary "store" instructions
     for (auto pStoreInst : m_storeInsts)
@@ -83,6 +84,7 @@ bool SpirvLowerAggregateLoadStore::runOnModule(
         pStoreInst->dropAllReferences();
         pStoreInst->eraseFromParent();
     }
+    m_storeInsts.clear();
 
     return true;
 }

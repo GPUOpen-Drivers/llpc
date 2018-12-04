@@ -194,7 +194,9 @@ class SpirvImageOpKind:
     atomicand           = 17
     atomicor            = 18
     atomicxor           = 19
-    undef               = 20
+    atomicload          = 20
+    atomicstore         = 21
+    undef               = 22
 SPIRV_IMAGE_INST_KIND_DICT = setupClassNameToAttrMap(SpirvImageOpKind)
 
 # Function attributes based on image operation kind
@@ -221,7 +223,9 @@ SPIRV_IMAGE_INST_KIND_ATTR_DICT = { \
     SpirvImageOpKind.atomicumax          : "#2", \
     SpirvImageOpKind.atomicand           : "#2", \
     SpirvImageOpKind.atomicor            : "#2", \
-    SpirvImageOpKind.atomicxor           : "#2"}
+    SpirvImageOpKind.atomicxor           : "#2", \
+    SpirvImageOpKind.atomicload          : "#0", \
+    SpirvImageOpKind.atomicstore         : "#1"}
 
 class SpirvSampledType:
     f32         = 0
@@ -389,7 +393,7 @@ class FuncDef(object):
 
     def isAtomicOp(self):
         return self._opKind >= SpirvImageOpKind.atomicexchange and \
-            self._opKind <= SpirvImageOpKind.atomicxor
+            self._opKind <= SpirvImageOpKind.atomicstore
 
     # Returns string representation of this object, used for debug purpose.
     def __repr__(self):
@@ -563,6 +567,8 @@ class CodeGen(FuncDef):
         ret = "void"
         if self._opKind == SpirvImageOpKind.write:
             pass
+        elif self._opKind == SpirvImageOpKind.atomicstore:
+            pass
         elif self.isAtomicOp():
             ret = self._sampledType == SpirvSampledType.f32 and "float" or "i32"
         elif self._opKind == SpirvImageOpKind.querylod:
@@ -682,7 +688,9 @@ class CodeGen(FuncDef):
             params.append("float %s" % (VarNames.minlod))
 
         if self.isAtomicOp():
-            if self._sampledType == SpirvSampledType.f32:
+            if self._opKind == SpirvImageOpKind.atomicload:
+                pass
+            elif self._sampledType == SpirvSampledType.f32:
                 params.append("float %s" % (VarNames.atomicData))
             else:
                 params.append("i32 %s" % (VarNames.atomicData))
@@ -768,6 +776,9 @@ class CodeGen(FuncDef):
             retVal = self.acquireLocalVar()
             irOut.write("    %s = insertvalue %s %s, %s %s, 1\n" % (retVal, sparseRetType, tempRetVal, retType, dataRetVal))
             irOut.write("    ret %s %s\n" % (sparseRetType, retVal))
+            pass
+        elif retType == "void":
+            irOut.write("    ret %s\n" % (retType))
             pass
         else:
             irOut.write("    ret %s %s\n" % (retType, retVal))
@@ -1078,7 +1089,9 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
            self._opKind == SpirvImageOpKind.atomicumax or           \
            self._opKind == SpirvImageOpKind.atomicand or            \
            self._opKind == SpirvImageOpKind.atomicor or             \
-           self._opKind == SpirvImageOpKind.atomicxor:
+           self._opKind == SpirvImageOpKind.atomicxor or            \
+           self._opKind == SpirvImageOpKind.atomicload or           \
+           self._opKind == SpirvImageOpKind.atomicstore:
             coordElemType = "i32"
         return coordElemType
 
@@ -1413,7 +1426,11 @@ class BufferAtomicGen(CodeGen):
 
         # Process buffer atomic operations
         atomicData = VarNames.atomicData
-        if self._sampledType == SpirvSampledType.f32:
+
+        if self._opKind == SpirvImageOpKind.atomicload:
+            # We use a constant 0 for atomic load, since we are doing an add
+            atomicData = "0"
+        elif self._sampledType == SpirvSampledType.f32:
             # Cast atomic value operand type to i32
             atomicData = self.acquireLocalVar()
             irBitcast = "    %s = bitcast float %s to i32\n" % (atomicData, VarNames.atomicData)
@@ -1464,6 +1481,8 @@ class BufferAtomicGen(CodeGen):
             SpirvImageOpKind.atomicand           : ".and",      \
             SpirvImageOpKind.atomicor            : ".or",       \
             SpirvImageOpKind.atomicxor           : ".xor",      \
+            SpirvImageOpKind.atomicload          : ".add",      \
+            SpirvImageOpKind.atomicstore         : ".swap",     \
         }
 
         funcName += intrinsicNames[self._opKind]
@@ -1527,7 +1546,9 @@ class DimAwareImageAtomicGen(CodeGen):
             params = "i32"
         else:
             atomicData = VarNames.atomicData
-            if self._sampledType == SpirvSampledType.f32:
+            if self._opKind == SpirvImageOpKind.atomicload:
+                atomicData = 0
+            elif self._sampledType == SpirvSampledType.f32:
                 # Cast atomic value operand type to i32
                 atomicData = self.acquireLocalVar()
                 irBitcast = "    %s = bitcast float %s to i32\n" % (atomicData, VarNames.atomicData)
@@ -1618,6 +1639,8 @@ class DimAwareImageAtomicGen(CodeGen):
             SpirvImageOpKind.atomicand           : ".and",      \
             SpirvImageOpKind.atomicor            : ".or",       \
             SpirvImageOpKind.atomicxor           : ".xor",      \
+            SpirvImageOpKind.atomicload          : ".add",      \
+            SpirvImageOpKind.atomicstore         : ".swap",     \
         }
 
         funcName += intrinsicNames[self._opKind]
@@ -2523,6 +2546,8 @@ def processLine(irOut, funcConfig, gfxLevel):
     #       atomicand
     #       atomicor
     #       atomicxor
+    #       atomicload
+    #       atomicstore
     # 3.  Dimension string                                  (mandatory, see below)
     # 4.  proj                                              (optional)
     # 5.  dref                                              (optional)

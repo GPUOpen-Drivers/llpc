@@ -40,6 +40,7 @@ namespace Llpc
 {
 
 class FragColorExport;
+class PipelineShaders;
 class VertexFetch;
 
 // =====================================================================================================================
@@ -50,11 +51,17 @@ class PatchInOutImportExport:
 {
 public:
     PatchInOutImportExport();
-    virtual ~PatchInOutImportExport();
+    ~PatchInOutImportExport();
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitCallInst(llvm::CallInst& callInst);
-    virtual void visitReturnInst(llvm::ReturnInst& retInst);
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+    }
+
+    bool runOnModule(llvm::Module& module) override;
+    void visitCallInst(llvm::CallInst& callInst);
+    void visitReturnInst(llvm::ReturnInst& retInst);
 
     // Pass creator, creates the pass of LLVM patching opertions for input import and output export
     static llvm::ModulePass* Create() { return new PatchInOutImportExport(); }
@@ -65,6 +72,10 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchInOutImportExport);
+
+    void InitPerShader();
+
+    void ProcessShader();
 
     llvm::Value* PatchVsGenericInputImport(llvm::Type*        pInputTy,
                                            uint32_t           location,
@@ -167,18 +178,18 @@ private:
     void PatchCopyShaderGenericOutputExport(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
     void PatchCopyShaderBuiltInOutputExport(llvm::Value* pOutput, uint32_t builtInId, llvm::Instruction* pInsertPos);
 
-    void PatchVsTesXfbOutputExport(llvm::Value*       pOutput,
-                                   uint32_t           xfbBuffer,
-                                   uint32_t           xfbOffset,
-                                   llvm::Instruction* pInsertPos);
+    void PatchXfbOutputExport(llvm::Value*       pOutput,
+                              uint32_t           xfbBuffer,
+                              uint32_t           xfbOffset,
+                              llvm::Value*       pStreamOutBufDesc,
+                              llvm::Instruction* pInsertPos);
 
     void StoreValueToStreamOutBuffer(llvm::Value*       pStoreValue,
-                                     llvm::Value*       pXfbBuffer,
-                                     llvm::Value*       pXfbOffset,
+                                     uint32_t           xfbBuffer,
+                                     uint32_t           xfbOffset,
                                      uint32_t           xfbStride,
+                                     llvm::Value*       pStreamOutBufDesc,
                                      llvm::Instruction* pInsertPos);
-
-    llvm::Value* LoadStreamOutBufferDescriptor(llvm::Value* pXfbBuffer, llvm::Instruction* pInsertPos) const;
 
     void StoreValueToEsGsRing(llvm::Value*        pStoreValue,
                               uint32_t            location,
@@ -291,7 +302,7 @@ private:
 
     bool                    m_hasGs;                    // Whether the pipeline has geometry shader
 
-    GlobalVariable*         m_pLds;                     // Global variable to model LDS
+    llvm::GlobalVariable*   m_pLds;                     // Global variable to model LDS
     llvm::Value*            m_pThreadId;                // Thread ID
 
     std::vector<Value*>     m_expFragColors[MaxColorTargets]; // Exported fragment colors

@@ -32,6 +32,7 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcDebug.h"
 
 namespace Llpc
 {

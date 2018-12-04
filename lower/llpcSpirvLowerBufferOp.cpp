@@ -523,8 +523,12 @@ void SpirvLowerBufferOp::visitLoadInst(
     if ((pLoadSrc->getType()->getPointerAddressSpace() == SPIRAS_Uniform) ||
         (pLoadSrc->getType()->getPointerAddressSpace() == SPIRAS_PushConst))
     {
-
         // Load from buffer block
+        if (pLoadSrc->getType()->getPointerAddressSpace() == SPIRAS_Uniform)
+        {
+            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
+        }
+
         GetElementPtrInst* pGetElemInst = nullptr;
         Instruction*       pConstExpr   = nullptr;
 
@@ -1395,7 +1399,9 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             const uint32_t loadSize = pLoadTy->getPrimitiveSizeInBits() / 8;
 
             // If scalar block layout is enabled, we need to treat vector types with 1 / 2 byte components differently.
-            const bool isScalarBlockLayout = false;
+
+            const bool isScalarBlockLayout = m_pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout;
+
             const bool isSmallVector = pLoadTy->isVectorTy() && (pLoadTy->getScalarSizeInBits() < 32);
             const bool needScalarAlignedLoad = isScalarBlockLayout && isSmallVector;
 
@@ -2176,7 +2182,8 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             const uint32_t storeSize = pStoreTy->getPrimitiveSizeInBits() / 8;
 
             // If scalar block layout is enabled, we need to treat vector types with 1 / 2 byte components differently.
-            const bool isScalarBlockLayout = false;
+            const bool isScalarBlockLayout = m_pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout;
+
             const bool isSmallVector = pStoreTy->isVectorTy() && (pStoreTy->getScalarSizeInBits() < 32);
             const bool needScalarAlignedStore = isScalarBlockLayout && isSmallVector;
 

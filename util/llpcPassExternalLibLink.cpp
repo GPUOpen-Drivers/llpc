@@ -129,6 +129,7 @@ bool PassExternalLibLink::runOnModule(
                                                        libDecl.getLinkage(),
                                                        libDecl.getName(),
                                                        &module);
+                        pMappedDecl->setAttributes(libDecl.getAttributes());
                     }
                     (*pValueMap)[&libDecl] = pMappedDecl;
                 }
@@ -150,6 +151,7 @@ bool PassExternalLibLink::runOnModule(
 
             SmallVector<ReturnInst*, 8> retInsts;
             CloneFunctionInto(pFunc, pLibFunc, *pValueMap, true, retInsts);
+            pFunc->setLinkage(GlobalValue::InternalLinkage);
         }
 
         if (satisfiedCount == 0)

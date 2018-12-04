@@ -888,15 +888,14 @@ const VertexCompFormatInfo VertexFetch::m_vertexCompFormatInfo[] =
 
 // =====================================================================================================================
 VertexFetch::VertexFetch(
-    Module* pModule) // [in] LLVM module
+    Function* pEntryPoint) // [in] Entry-point of API vertex shader
     :
-    m_pModule(pModule),
-    m_pContext(static_cast<Context*>(&pModule->getContext())),
+    m_pModule(pEntryPoint->getParent()),
+    m_pContext(static_cast<Context*>(&m_pModule->getContext())),
     m_pVertexInput(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo())->pVertexInput)
 {
-    LLPC_ASSERT(GetShaderStageFromModule(m_pModule) == ShaderStageVertex); // Must be vertex shader
+    LLPC_ASSERT(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
 
-    auto pEntryPoint = GetEntryPoint(m_pModule);
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
     auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
     auto pInsertPos = pEntryPoint->begin()->getFirstInsertionPt();

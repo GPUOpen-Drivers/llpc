@@ -136,13 +136,14 @@ def genLlvmArithFunc(compCount, retType, funcName, genTypedArgs, intrinsic):
 
         # Insert computed components into the destination vector
         func += "\n    ; Insert computed components into the destination vector\n"
-        func += "    %" + str(tmpVar) + " = alloca " + operandType + "\n"
-        tmpVar += 1
-        func += "    %" + str(tmpVar) + " = load " + operandType + ", " + operandType + "* %" + str(tmpVar - 1) + "\n"
         for i in range(compCount):
-            func += "    %" + str(tmpVar + 1) + " = insertelement " + operandType + \
-                    " %" + str(tmpVar) + ", " + compType + " %" + str(i + 1) + ", i32 " + str(i) + "\n"
-            tmpVar += 1
+            if i == 0:
+                func += "    %" + str(tmpVar) + " = insertelement " + operandType + \
+                        " undef, " + compType + " %" + str(i + 1) + ", i32 " + str(i) + "\n"
+            else:
+                func += "    %" + str(tmpVar + 1) + " = insertelement " + operandType + \
+                        " %" + str(tmpVar) + ", " + compType + " %" + str(i + 1) + ", i32 " + str(i) + "\n"
+                tmpVar += 1
     else:
         func += "    %" + str(tmpVar) + " = call " + compType + " @" + intrinsic + "("
         for j, arg in enumerate(args):

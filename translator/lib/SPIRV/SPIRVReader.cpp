@@ -2519,6 +2519,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
             static_cast<SPIRVInstruction *>(BV),
             BB));
   }
+  case OpAtomicLoad:
+  case OpAtomicStore:
   case OpAtomicExchange:
   case OpAtomicCompareExchange:
   case OpAtomicIIncrement:
@@ -3540,7 +3542,7 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
 
   Function *F = M->getFunction(SS.str());
   Type *RetTy = Type::getVoidTy(*Context);
-  if (Info.OpKind != ImageOpWrite) {
+  if ((Info.OpKind != ImageOpAtomicStore) && (Info.OpKind != ImageOpWrite)) {
     assert(BI->hasType());
     RetTy = transType(BI->getType());
   }
@@ -5218,7 +5220,7 @@ CallInst *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
   Constant *MemFenceFlags =
       ConstantInt::get(Int32Ty, rmapBitMask<OCLMemFenceMap>(MemSema));
 
-  if (Ver > 0 && Ver <= kOCLVer::CL12) {
+  if ((Ver > 0 && Ver <= kOCLVer::CL12) || !IsKernel) {
     FuncName = kOCLBuiltinName::MemFence;
     ArgTy.push_back(Int32Ty);
     Arg.push_back(MemFenceFlags);

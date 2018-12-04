@@ -114,56 +114,6 @@ for f in os.listdir("./"):
         else :
             subprocess.check_call(cmd, shell = True)
 
-# Link special emulation .bc files to libraries (null fragment shader, copy shader)
-SPECIAL_EMUS = ["NullFs", "CopyShader"]
-for feature in SPECIAL_EMUS:
-    # Search for the .bc file
-    bcFile = ""
-    for f in os.listdir("./"):
-        if f.startswith("glsl" + feature) and f.endswith("Emu.bc"):
-            bcFile = f
-
-    if bcFile == "": # Not found
-        continue
-
-    # Link .bc files to .lib file
-    libFile = "glsl" + feature + "Emu.lib"
-    cmd = LLVM_LINK + " -o=" + libFile + " " + bcFile
-    print(">>>  (LL-link) " + cmd)
-    if OS_TYPE == "win" :
-        subprocess.check_call(cmd)
-    else :
-        subprocess.check_call(cmd, shell = True)
-
-    # Convert .lib file to a hex file
-    hFile = "g_llpcGlsl" + feature + "EmuLib.h"
-    print(">>>  (LL-bin2hex) " + libFile + "  ==>  " + hFile)
-    fBin = open(libFile, "rb")
-    binData = fBin.read()
-    fBin.close()
-
-    hexData = binascii.hexlify(binData).decode()
-    fHex = open(hFile, "w")
-    hexText = ""
-    i = 0
-    while i < len(hexData):
-        hexText += "0x"
-        hexText += hexData[i]
-        hexText += hexData[i + 1]
-        i += 2
-        if (i != len(hexData)):
-            hexText += ", "
-        if (i % 32 == 0):
-            hexText += "\n"
-    fHex.write(hexText)
-    fHex.close()
-
-    # Cleanup, remove those temporary files
-    print(">>>  (LL-clean) remove " + bcFile)
-    os.remove(bcFile)
-    print(">>>  (LL-clean) remove " + libFile)
-    os.remove(libFile)
-
 # Add general emulation .bc files to a .lib archive (GLSL operations and built-ins)
 # Collect .bc files
 bcFiles = ""

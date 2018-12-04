@@ -65,6 +65,7 @@ PatchDescriptorLoad::PatchDescriptorLoad()
     :
     Patch(ID)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchDescriptorLoadPass(*PassRegistry::getPassRegistry());
 }
 
@@ -76,9 +77,19 @@ bool PatchDescriptorLoad::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Descriptor-Load\n");
 
     Patch::Init(&module);
+    m_changed = false;
 
     // Invoke handling of "call" instruction
-    visit(*m_pModule);
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            visit(*m_pEntryPoint);
+        }
+    }
 
     // Remove unnecessary descriptor load calls
     for (auto pCallInst : m_descLoadCalls)
@@ -86,6 +97,7 @@ bool PatchDescriptorLoad::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
+    m_descLoadCalls.clear();
 
     // Remove unnecessary descriptor load functions
     for (auto pFunc : m_descLoadFuncs)
@@ -96,8 +108,9 @@ bool PatchDescriptorLoad::runOnModule(
             pFunc->eraseFromParent();
         }
     }
+    m_descLoadFuncs.clear();
 
-    return true;
+    return m_changed;
 }
 
 // =====================================================================================================================
@@ -124,6 +137,7 @@ void PatchDescriptorLoad::visitCallInst(
     // Descriptor loading should be inlined and stay in shader entry-point
     LLPC_ASSERT(callInst.getParent()->getParent() == m_pEntryPoint);
 
+    m_changed = true;
     Type* pDescPtrTy = nullptr;
     ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
 

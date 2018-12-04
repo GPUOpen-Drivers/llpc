@@ -42,6 +42,10 @@ class PassManager final :
 {
 public:
     void add(llvm::Pass* pPass) override;
+    void stop();
+
+private:
+    bool              m_stopped = false;    // Whether we have already stopped adding new passes.
 };
 
 } // Llpc

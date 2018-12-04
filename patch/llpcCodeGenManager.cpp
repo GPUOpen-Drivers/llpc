@@ -34,6 +34,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -46,8 +47,6 @@
 #include "llpcContext.h"
 #include "llpcElf.h"
 #include "llpcFile.h"
-#include "llpcGfx6ConfigBuilder.h"
-#include "llpcGfx9ConfigBuilder.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 
@@ -125,6 +124,7 @@ Result CodeGenManager::CreateTargetMachine(
     if ((pContext->GetTargetMachine() != nullptr) &&
         (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
         (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc)
+        && (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout)
         )
     {
         return Result::Success;
@@ -177,7 +177,7 @@ void CodeGenManager::SetupTargetFeatures(
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
 
-    std::string globalFeatures = "+vgpr-spilling";
+    std::string globalFeatures = "";
 
     if (cl::EnablePipelineDump ||
         EnableOuts() ||
@@ -199,7 +199,7 @@ void CodeGenManager::SetupTargetFeatures(
 
     for (auto pFunc = pModule->begin(), pEnd = pModule->end(); pFunc != pEnd; ++pFunc)
     {
-        if (pFunc->getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
+        if ((pFunc->empty() == false) && (pFunc->getLinkage() == GlobalValue::ExternalLinkage))
         {
             {
                 AttrBuilder builder;
@@ -212,58 +212,59 @@ void CodeGenManager::SetupTargetFeatures(
 }
 
 // =====================================================================================================================
-// Generates GPU ISA codes (ELF binary, ISA assembly text, or LLVM bitcode, depending on "-filetype" and
-// "-emit-llvm" options)
-Result CodeGenManager::GenerateCode(
-    Module*            pModule,   // [in] LLVM module
-    raw_pwrite_stream& outStream, // [out] Output stream
-    std::string&       errMsg)    // [out] Error message reported in code generation
+// Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
+Result CodeGenManager::AddTargetPasses(
+    Context*              pContext,   // [in] LLPC context
+    PassManager&          passMgr,    // [in/out] pass manager to add passes to
+    raw_pwrite_stream&    outStream)  // [out] Output stream
 {
     Result result = Result::Success;
 
-    LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// LLPC final pipeline module info\n");
-    LLPC_OUTS(*pModule);
-    LLPC_OUTS("\n");
-
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
-
-    result = AddAbiMetadata(pContext, pModule);
-
     if (cl::EmitLlvm)
     {
-        outStream << *pModule;
-        return result;
+        // For -emit-llvm, add a pass to output the LLVM IR, then tell the pass manager to stop adding
+        // passes. We do it this way to ensure that we still get the immutable passes from
+        // TargetMachine::addPassesToEmitFile, as they can affect LLVM middle-end optimizations.
+        passMgr.add(createPrintModulePass(outStream));
+        passMgr.stop();
     }
 
     auto pTargetMachine = pContext->GetTargetMachine();
 
     pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
-    Llpc::PassManager passMgr;
-    if (result == Result::Success)
+
+#if LLPC_ENABLE_EXCEPTION
+    try
+#endif
     {
-        bool success = true;
-#if LLPC_ENABLE_EXCEPTION
-        try
-#endif
-        {
-            if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
-            {
-                success = false;
-            }
-        }
-#if LLPC_ENABLE_EXCEPTION
-        catch (const char*)
-        {
-            success = false;
-        }
-#endif
-        if (success == false)
+        if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
         {
             LLPC_ERRS("Target machine cannot emit a file of this type\n");
             result = Result::ErrorInvalidValue;
         }
     }
+#if LLPC_ENABLE_EXCEPTION
+    catch (const char*)
+    {
+        result = Result::ErrorInvalidValue;
+    }
+#endif
+
+    pContext->setDiagnosticHandlerCallBack(nullptr);
+    return result;
+}
+
+// =====================================================================================================================
+// Runs passes on the module, with the diagnostic handler installed
+Result CodeGenManager::Run(
+    Module*               pModule,  // [in] LLVM module
+    legacy::PassManager&  passMgr)  // [in] pass manager to run
+{
+    Result result = Result::Success;
+
+    Context* pContext = static_cast<Context*>(&pModule->getContext());
+
+    pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
 
     if (result == Result::Success)
     {
@@ -274,7 +275,8 @@ Result CodeGenManager::GenerateCode(
         try
 #endif
         {
-            success = passMgr.run(*pModule);
+            passMgr.run(*pModule);
+            success = true;
         }
 #if LLPC_ENABLE_EXCEPTION
         catch (const char*)
@@ -285,161 +287,11 @@ Result CodeGenManager::GenerateCode(
 
         if (success == false)
         {
-            LLPC_ERRS("LLVM back-end fail to generate codes\n");
             result = Result::ErrorInvalidShader;
         }
     }
 
     pContext->setDiagnosticHandlerCallBack(nullptr);
-    return result;
-}
-
-// =====================================================================================================================
-// Adds metadata (not from code generation) required by PAL ABI.
-Result CodeGenManager::AddAbiMetadata(
-    Context*  pContext, // [in] LLPC context
-    Module*   pModule)  // [in] LLVM module
-{
-    uint8_t* pConfig = nullptr;
-    size_t configSize = 0;
-
-    Result result = Result::Success;
-    if (pContext->IsGraphics())
-    {
-        result = BuildGraphicsPipelineRegConfig(pContext, &pConfig, &configSize);
-    }
-    else
-    {
-        result = BuildComputePipelineRegConfig(pContext, &pConfig, &configSize);
-    }
-    if (result == Result::Success)
-    {
-        std::vector<Metadata*> abiMeta;
-        size_t sizeInDword = configSize / sizeof(uint32_t);
-        // Configs are composed of DWORD key/value pair, the size should be even
-        LLPC_ASSERT((sizeInDword % 2) == 0);
-        for (size_t i = 0; i < sizeInDword; i += 2)
-        {
-            uint32_t key   = (reinterpret_cast<uint32_t*>(pConfig))[i];
-            uint32_t value = (reinterpret_cast<uint32_t*>(pConfig))[i + 1];
-            // Don't export invalid metadata key and value
-            if (key == InvalidMetadataKey)
-            {
-                LLPC_ASSERT(value == InvalidMetadataValue);
-            }
-            else
-            {
-                abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(pContext->Int32Ty(), key, false)));
-                abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(pContext->Int32Ty(), value, false)));
-            }
-        }
-        auto pAbiMetaTuple = MDTuple::get(*pContext, abiMeta);
-        auto pAbiMetaNode = pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata");
-        pAbiMetaNode->addOperand(pAbiMetaTuple);
-        delete[] pConfig;
-    }
-    return result;
-}
-
-// =====================================================================================================================
-// Builds register configuration for graphics pipeline.
-//
-// NOTE: This function will create pipeline register configuration. The caller has the responsibility of destroying it.
-Result CodeGenManager::BuildGraphicsPipelineRegConfig(
-    Context*            pContext,       // [in] LLPC context
-    uint8_t**           ppConfig,       // [out] Register configuration for VS-FS pipeline
-    size_t*             pConfigSize)    // [out] Size of register configuration
-{
-    Result result = Result::Success;
-
-    const uint32_t stageMask = pContext->GetShaderStageMask();
-    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                                      ShaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
-
-    GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
-
-    if ((hasTs == false) && (hasGs == false))
-    {
-        // VS-FS pipeline
-        if (gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsFsRegConfig(pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsFsRegConfig(pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-    else if (hasTs && (hasGs == false))
-    {
-        // VS-TS-FS pipeline
-        if (gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsTsFsRegConfig(pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsTsFsRegConfig(pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-    else if ((hasTs == false) && hasGs)
-    {
-        // VS-GS-FS pipeline
-        if (gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsGsFsRegConfig(pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsGsFsRegConfig(pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-    else
-    {
-        // VS-TS-GS-FS pipeline
-        if (gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-
-    return result;
-}
-
-// =====================================================================================================================
-// Builds register configuration for computer pipeline.
-//
-// NOTE: This function will create pipeline register configuration. The caller has the responsibility of destroying it.
-Result CodeGenManager::BuildComputePipelineRegConfig(
-    Context*            pContext,     // [in] LLPC context
-    uint8_t**           ppConfig,     // [out] Register configuration for compute pipeline
-    size_t*             pConfigSize)  // [out] Size of register configuration
-{
-    Result result = Result::Success;
-
-    GfxIpVersion gfxIp =pContext->GetGfxIpVersion();
-    if (gfxIp.major <= 8)
-    {
-        result = Gfx6::ConfigBuilder::BuildPipelineCsRegConfig(pContext, ppConfig, pConfigSize);
-    }
-    else
-    {
-        result = Gfx9::ConfigBuilder::BuildPipelineCsRegConfig(pContext, ppConfig, pConfigSize);
-    }
-
     return result;
 }
 

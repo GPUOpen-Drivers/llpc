@@ -34,6 +34,7 @@
 
 #include "llpc.h"
 #include "llpcInternal.h"
+#include "llpcPipelineShaders.h"
 
 namespace Llpc
 {
@@ -77,25 +78,23 @@ enum EsGsSpecialSysValue
 class ShaderMerger
 {
 public:
-    ShaderMerger(Context* pContext);
+    ShaderMerger(Context* pContext, PipelineShaders* pPipelineShaders);
 
-    Result BuildLsHsMergedShader(llvm::Module* pLsModule, llvm::Module* pHsModule, llvm::Module** ppLsHsModule) const;
-    Result BuildEsGsMergedShader(llvm::Module* pEsModule, llvm::Module* pGsModule, llvm::Module** ppEsGsModule) const;
+    llvm::Function* GenerateLsHsEntryPoint(llvm::Function* pLsEntryPoint, llvm::Function* pHsEntryPoint);
+    llvm::Function* GenerateEsGsEntryPoint(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ShaderMerger);
     LLPC_DISALLOW_COPY_AND_ASSIGN(ShaderMerger);
 
     llvm::FunctionType* GenerateLsHsEntryPointType(uint64_t* pInRegMask) const;
-    void GenerateLsHsEntryPoint(llvm::Module* pLsHsModule) const;
-
     llvm::FunctionType* GenerateEsGsEntryPointType(uint64_t* pInRegMask) const;
-    void GenerateEsGsEntryPoint(llvm::Module* pEsGsModule) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    Context*        m_pContext; // LLPC context
-    GfxIpVersion    m_gfxIp;    // Graphics IP version info
+    Context*          m_pContext;           // LLPC context
+    GfxIpVersion      m_gfxIp;              // Graphics IP version info
+    PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline
 
     bool        m_hasVs;        // Whether the pipeline has vertex shader
     bool        m_hasTcs;       // Whether the pipeline has tessellation control shader

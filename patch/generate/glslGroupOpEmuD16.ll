@@ -170,8 +170,10 @@ define spir_func i32 @llpc.subgroup.set.inactive.i16(i32 %binaryOp, i32 %value)
 {
     ; Get identity value of binary operations
     %identity = call i32 @llpc.subgroup.identity.i16(i32 %binaryOp)
+    ; Prevent optimization of backend compiler on the control flow
+    %1 = call i32 asm sideeffect "; %1", "=v,0"(i32 %value)
     ; Set identity value for the inactive threads
-    %activeValue = call i32 @llvm.amdgcn.set.inactive.i32(i32 %value, i32 %identity)
+    %activeValue = call i32 @llvm.amdgcn.set.inactive.i32(i32 %1, i32 %identity)
 
     ret i32 %activeValue
 }

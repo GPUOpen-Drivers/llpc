@@ -34,7 +34,6 @@
 #include "llpcAbiMetadata.h"
 #include "llpcContext.h"
 #include "llpcCodeGenManager.h"
-#include "llpcCopyShader.h"
 #include "llpcGfx6ConfigBuilder.h"
 
 namespace llvm
@@ -171,11 +170,6 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
         }
-
-        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
-        {
-            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
-        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessControl)))
@@ -198,6 +192,12 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageTessEval);
         SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
+        const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageTessEval);
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
+        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -282,11 +282,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
         }
-
-        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
-        {
-            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
-        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageGeometry)))
@@ -298,6 +293,12 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
         SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
+        const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
+        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -413,6 +414,12 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
         SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
+
+        const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
+        if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+        {
+            SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
+        }
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -529,11 +536,33 @@ Result ConfigBuilder::BuildVsRegConfig(
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
+    const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
+    bool enableXfb = pResUsage->inOutUsage.enableXfb;
+
     if (shaderStage == ShaderStageCopyShader)
     {
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pContext->GetGpuProperty()->maxSgprsAvailable);
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pContext->GetGpuProperty()->maxVgprsAvailable);
+
+        if (enableXfb)
+        {
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
+                pResUsage->inOutUsage.gs.outLocCount[0] > 0);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
+                pResUsage->inOutUsage.gs.outLocCount[1] > 0);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG,
+                STREAMOUT_2_EN, pResUsage->inOutUsage.gs.outLocCount[2] > 0);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
+                pResUsage->inOutUsage.gs.outLocCount[3] > 0);
+        }
+        else
+        {
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, true);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
+        }
     }
     else
     {
@@ -543,29 +572,32 @@ Result ConfigBuilder::BuildVsRegConfig(
 
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
 
-        const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
-        bool enableXfb = (xfbStrides[0] > 0) || (xfbStrides[1] > 0) || (xfbStrides[2] > 0) ||
-            (xfbStrides[3]) > 0;
-
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_EN, enableXfb);
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE0_EN, (xfbStrides[0] > 0));
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE1_EN, (xfbStrides[1] > 0));
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
-
         SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, enableXfb);
         SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
         SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
         SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
 
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0]);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1]);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2]);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3]);
-
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
     }
+
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_EN, enableXfb);
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE0_EN, (xfbStrides[0] > 0));
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE1_EN, (xfbStrides[1] > 0));
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
+
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(int));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(int));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(int));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(int));
+
+    uint32_t streamBufferConfig = 0;
+    for (auto i = 0; i < MaxGsStreams; ++i)
+    {
+        streamBufferConfig |= (pResUsage->inOutUsage.streamXfbBuffers[i] << (i * 4));
+    }
+    SET_REG(&pConfig->m_vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
     auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
 
@@ -658,11 +690,19 @@ Result ConfigBuilder::BuildVsRegConfig(
         clipDistanceCount = builtInUsage.gs.clipDistance;
         cullDistanceCount = builtInUsage.gs.cullDistance;
 
+        const auto pGsIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
         if (cl::InRegEsGsLdsSize && pContext->IsGsOnChip())
         {
             SET_DYN_REG(pConfig,
-                        mmSPI_SHADER_USER_DATA_VS_0 + Llpc::CopyShaderUserSgprIdxEsGsLdsSize,
+                        mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
+        }
+
+        if (enableXfb)
+        {
+            SET_DYN_REG(pConfig,
+                        mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
+                        0);
         }
     }
 
@@ -1072,8 +1112,26 @@ Result ConfigBuilder::BuildGsRegConfig(
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
     }
 
-    uint32_t gsVertItemSize = 4 * std::max(1u, inOutUsage.outputMapLocCount);
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize);
+    uint32_t gsVertItemSize0 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[0];
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize0);
+
+    uint32_t gsVertItemSize1 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[1];
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE_1, ITEMSIZE, gsVertItemSize1);
+
+    uint32_t gsVertItemSize2 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[2];
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE_2, ITEMSIZE, gsVertItemSize2);
+
+    uint32_t gsVertItemSize3 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[3];
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE_3, ITEMSIZE, gsVertItemSize3);
+
+    uint32_t gsVsRingOffset = gsVertItemSize0 * maxVertOut;
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_1, OFFSET, gsVsRingOffset);
+
+    gsVsRingOffset += gsVertItemSize1 * maxVertOut;
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_2, OFFSET, gsVsRingOffset);
+
+    gsVsRingOffset += gsVertItemSize2 * maxVertOut;
+    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, gsVsRingOffset);
 
     if ((builtInUsage.invocations > 1) || builtInUsage.invocationId)
     {
@@ -1228,7 +1286,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG(&pConfig->m_psRegs, CB_SHADER_MASK, cbShaderMask);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, pResUsage->inOutUsage.fs.interpInfo.size());
 
-    const auto& interpInfo = pResUsage->inOutUsage.fs.interpInfo;
     uint32_t pointCoordLoc = InvalidValue;
     if (pResUsage->inOutUsage.builtInInputLocMap.find(spv::BuiltInPointCoord) !=
         pResUsage->inOutUsage.builtInInputLocMap.end())
@@ -1237,18 +1294,25 @@ Result ConfigBuilder::BuildPsRegConfig(
         pointCoordLoc = pResUsage->inOutUsage.builtInInputLocMap[spv::BuiltInPointCoord];
     }
 
-    for (uint32_t i = 0; i < interpInfo.size(); ++i)
+    // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
+    // were identified in the shader.
+    const std::vector<FsInterpInfo> dummyInterpInfo {{ 0, false, false, false }};
+    const auto& fsInterpInfo = pResUsage->inOutUsage.fs.interpInfo;
+    const auto* pInterpInfo = (fsInterpInfo.size() == 0) ? &dummyInterpInfo : &fsInterpInfo;
+
+    for (uint32_t i = 0; i < pInterpInfo->size(); ++i)
     {
-        LLPC_ASSERT(((interpInfo[i].loc     == InvalidFsInterpInfo.loc) &&
-                     (interpInfo[i].flat    == InvalidFsInterpInfo.flat) &&
-                     (interpInfo[i].custom  == InvalidFsInterpInfo.custom) &&
-                     (interpInfo[i].is16bit == InvalidFsInterpInfo.is16bit)) == false);
+        const auto& interpInfoElem = (*pInterpInfo)[i];
+        LLPC_ASSERT(((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
+                     (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
+                     (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
+                     (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)) == false);
 
         regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
-        spiPsInputCntl.bits.FLAT_SHADE = interpInfo[i].flat;
-        spiPsInputCntl.bits.OFFSET = interpInfo[i].loc;
+        spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;
+        spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
 
-        if (interpInfo[i].custom)
+        if (interpInfoElem.custom)
         {
             // NOTE: Force parameter cache data to be read in passthrough mode.
             static const uint32_t PassThroughMode = (1 << 5);
@@ -1257,7 +1321,7 @@ Result ConfigBuilder::BuildPsRegConfig(
         }
         else
         {
-            if (interpInfo[i].is16bit)
+            if (interpInfoElem.is16bit)
             {
                 // NOTE: Enable 16-bit interpolation mode for non-passthrough mode. Attribute 0 is always valid.
                 spiPsInputCntl.bits.FP16_INTERP_MODE__VI = true;
@@ -1286,7 +1350,15 @@ Result ConfigBuilder::BuildPsRegConfig(
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, SPI_PNT_SPRITE_SEL_1);
     }
 
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
+    SET_REG(&pConfig->m_psRegs, PS_USES_UAVS, static_cast<uint32_t>((pResUsage->resourceWrite ||
+                                                                     pResUsage->resourceRead)));
+    SET_REG(&pConfig->m_psRegs, PS_WRITES_UAVS, static_cast<uint32_t>(pResUsage->resourceWrite));
+    SET_REG(&pConfig->m_psRegs, PS_WRITES_DEPTH, static_cast<uint32_t>(builtInUsage.fragDepth));
+#else
     SET_REG(&pConfig->m_psRegs, PS_USES_UAVS, static_cast<uint32_t>(pResUsage->resourceWrite));
+#endif
+
     SET_REG(&pConfig->m_psRegs, PS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);
     SET_REG(&pConfig->m_psRegs, PS_NUM_AVAIL_VGPRS, pResUsage->numVgprsAvailable);
 

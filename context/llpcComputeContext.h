@@ -79,6 +79,9 @@ public:
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() { LLPC_NEVER_CALLED(); }
 
+    // Gets the count of vertices per primitive
+    virtual uint32_t GetVerticesPerPrimitive() const { LLPC_NEVER_CALLED(); return 0; }
+
     // Gets wave size for the specified shader stage
     virtual uint32_t GetShaderWaveSize(ShaderStage stage);
 

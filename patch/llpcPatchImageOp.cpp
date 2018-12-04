@@ -36,6 +36,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcPatchImageOp.h"
+#include "llpcPipelineShaders.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -64,6 +65,7 @@ PatchImageOp::PatchImageOp()
     :
     Patch(ID)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchImageOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -77,13 +79,23 @@ bool PatchImageOp::runOnModule(
     Patch::Init(&module);
 
     // Invoke handling of "call" instruction
-    visit(m_pModule);
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            visit(*m_pEntryPoint);
+        }
+    }
 
     for (auto pCallInst: m_imageCalls)
     {
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
+    m_imageCalls.clear();
 
     return true;
 }

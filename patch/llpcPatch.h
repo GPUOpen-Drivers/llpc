@@ -33,15 +33,26 @@
 #include "llvm/Pass.h"
 
 #include "llpc.h"
+#include "llpcContext.h"
 #include "llpcDebug.h"
 
 namespace llvm
 {
 
+class CallInst;
 class PassRegistry;
 
+namespace legacy
+{
+
+class PassManager;
+
+} // legacy
+
 void initializePatchAddrSpaceMutatePass(PassRegistry&);
+void initializePatchAutoLayoutDescPass(PassRegistry&);
 void initializePatchBufferOpPass(PassRegistry&);
+void initializePatchCopyShaderPass(PassRegistry&);
 void initializePatchDeadFuncRemovePass(PassRegistry&);
 void initializePatchDescriptorLoadPass(PassRegistry&);
 void initializePatchEntryPointMutatePass(PassRegistry&);
@@ -50,6 +61,8 @@ void initializePatchGroupOpPass(PassRegistry&);
 void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
 void initializePatchOptPass(PassRegistry&);
+void initializePatchNullFragShaderPass(PassRegistry&);
+void initializePatchPrepareAbiPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);
 void initializePatchResourceCollectPass(PassRegistry&);
 
@@ -57,6 +70,11 @@ void initializePatchResourceCollectPass(PassRegistry&);
 
 namespace Llpc
 {
+
+llvm::ModulePass* CreatePatchAutoLayoutDesc();
+llvm::ModulePass* CreatePatchCopyShader();
+llvm::ModulePass* CreatePatchNullFragShader();
+llvm::ModulePass* CreatePatchPrepareAbi();
 
 class Context;
 
@@ -77,7 +95,9 @@ public:
     virtual ~Patch() {}
 
     static Result PreRun(llvm::Module* pModule);
-    static Result Run(llvm::Module* pModule);
+    static void AddPasses(Context* pContext, llvm::legacy::PassManager&  passMgr);
+
+    static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
 
 protected:
     void Init(llvm::Module* pModule);
@@ -94,8 +114,9 @@ protected:
     llvm::Function* m_pEntryPoint;  // Entry-point
 
 private:
+    static void AddOptimizationPasses(Context* pContext, llvm::legacy::PassManager& passMgr);
+
     LLPC_DISALLOW_DEFAULT_CTOR(Patch);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Patch);
 };
-
 } // Llpc

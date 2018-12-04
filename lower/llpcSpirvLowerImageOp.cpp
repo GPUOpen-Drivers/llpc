@@ -79,6 +79,7 @@ bool SpirvLowerImageOp::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
+    m_imageCalls.clear();
 
     for (auto pInst : m_imageLoads)
     {
@@ -89,6 +90,7 @@ bool SpirvLowerImageOp::runOnModule(
             m_imageLoadOperands.erase(pInst);
         }
     }
+    m_imageLoads.clear();
 
     // NOTE: The set of image load operands is the operands of image load instructions. We must free image load
     // instructions first. Otherwise, the user of those image load operands will not be empty.
@@ -100,6 +102,7 @@ bool SpirvLowerImageOp::runOnModule(
             pOperand->eraseFromParent();
         }
     }
+    m_imageLoadOperands.clear();
 
     return true;
 }
@@ -116,7 +119,7 @@ void SpirvLowerImageOp::visitCallInst(
     }
 
     // Skip image lowering operations except entry-points
-    if (callInst.getParent()->getParent()->getDLLStorageClass() != GlobalValue::DLLExportStorageClass)
+    if (callInst.getParent()->getParent()->getLinkage() == GlobalValue::InternalLinkage)
     {
         return;
     }
@@ -146,6 +149,10 @@ void SpirvLowerImageOp::visitCallInst(
         if ((imageCallMeta.OpKind == ImageOpWrite) || isImageAtomicOp(imageCallMeta.OpKind))
         {
             m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+        }
+        else if (imageCallMeta.OpKind == ImageOpRead)
+        {
+            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
         }
 
         ConstantInt* pMemoryQualifier = nullptr;
@@ -353,9 +360,19 @@ void SpirvLowerImageOp::visitCallInst(
 
                         if (enableMultiView)
                         {
-                            const auto& pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+                            auto pInt32Ty = m_pContext->Int32Ty();
+                            auto pBuiltInViewIndex = ConstantInt::get(pInt32Ty, BuiltInViewIndex);
+                            auto instName = std::string(LlpcName::InputImportBuiltIn) + "ViewIndex";
+                            AddTypeMangling(pInt32Ty, pBuiltInViewIndex, instName);
+                            auto pModule = pCallee->getParent();
+                            auto pViewIndex = EmitCall(pModule,
+                                                       instName,
+                                                       pInt32Ty,
+                                                       pBuiltInViewIndex,
+                                                       NoAttrib,
+                                                       &callInst);
                             pCoord = InsertElementInst::Create(pCoord,
-                                                               pResUsage->inOutUsage.fs.pViewIndex,
+                                                               pViewIndex,
                                                                ConstantInt::get(m_pContext->Int32Ty(), 0, true),
                                                                "",
                                                                &callInst);

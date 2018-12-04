@@ -93,40 +93,34 @@ define spir_func float @_Z7radiansf(float %degrees) #0
 ; GLSL: vec2 radians(vec2)
 define spir_func <2 x float> @_Z7radiansDv2_f(<2 x float> %degrees) #0
 {
-    %1 = alloca <2 x float>
-    %2 = load <2 x float>, <2 x float>* %1
     ; 0x3F91DF46A0000000: PI/180, 0.017453292
-    %3 = insertelement <2 x float> %2, float 0x3F91DF46A0000000, i32 0
-    %4 = insertelement <2 x float> %3, float 0x3F91DF46A0000000, i32 1
-    %5 = fmul <2 x float> %4, %degrees
-    ret <2 x float> %5
+    %1 = insertelement <2 x float> undef, float 0x3F91DF46A0000000, i32 0
+    %2 = insertelement <2 x float> %1, float 0x3F91DF46A0000000, i32 1
+    %3 = fmul <2 x float> %2, %degrees
+    ret <2 x float> %3
 }
 
 ; GLSL: vec3 radians(vec3)
 define spir_func <3 x float> @_Z7radiansDv3_f(<3 x float> %degrees) #0
 {
-    %1 = alloca <3 x float>
-    %2 = load <3 x float>, <3 x float>* %1
     ; 0x3F91DF46A0000000: PI/180, 0.017453292
-    %3 = insertelement <3 x float> %2, float 0x3F91DF46A0000000, i32 0
-    %4 = insertelement <3 x float> %3, float 0x3F91DF46A0000000, i32 1
-    %5 = insertelement <3 x float> %4, float 0x3F91DF46A0000000, i32 2
-    %6 = fmul <3 x float> %5, %degrees
-    ret <3 x float> %6
+    %1 = insertelement <3 x float> undef, float 0x3F91DF46A0000000, i32 0
+    %2 = insertelement <3 x float> %1, float 0x3F91DF46A0000000, i32 1
+    %3 = insertelement <3 x float> %2, float 0x3F91DF46A0000000, i32 2
+    %4 = fmul <3 x float> %3, %degrees
+    ret <3 x float> %4
 }
 
 ; GLSL: vec4 radians(vec4)
 define spir_func <4 x float> @_Z7radiansDv4_f(<4 x float> %degrees) #0
 {
-    %1 = alloca <4 x float>
-    %2 = load <4 x float>, <4 x float>* %1
     ; 0x3F91DF46A0000000: PI/180, 0.017453292
-    %3 = insertelement <4 x float> %2, float 0x3F91DF46A0000000, i32 0
-    %4 = insertelement <4 x float> %3, float 0x3F91DF46A0000000, i32 1
-    %5 = insertelement <4 x float> %4, float 0x3F91DF46A0000000, i32 2
-    %6 = insertelement <4 x float> %5, float 0x3F91DF46A0000000, i32 3
-    %7 = fmul <4 x float> %6, %degrees
-    ret <4 x float> %7
+    %1 = insertelement <4 x float> undef, float 0x3F91DF46A0000000, i32 0
+    %2 = insertelement <4 x float> %1, float 0x3F91DF46A0000000, i32 1
+    %3 = insertelement <4 x float> %2, float 0x3F91DF46A0000000, i32 2
+    %4 = insertelement <4 x float> %3, float 0x3F91DF46A0000000, i32 3
+    %5 = fmul <4 x float> %4, %degrees
+    ret <4 x float> %5
 }
 
 ; GLSL: float degrees(float)
@@ -140,40 +134,34 @@ define spir_func float @_Z7degreesf(float %radians) #0
 ; GLSL: vec2 degrees(vec2)
 define spir_func <2 x float> @_Z7degreesDv2_f(<2 x float> %radians) #0
 {
-    %1 = alloca <2 x float>
-    %2 = load <2 x float>, <2 x float>* %1
     ; 0x404CA5DC20000000: 180/PI, 57.29577951308232
-    %3 = insertelement <2 x float> %2, float 0x404CA5DC20000000, i32 0
-    %4 = insertelement <2 x float> %3, float 0x404CA5DC20000000, i32 1
-    %5 = fmul <2 x float> %4, %radians
-    ret <2 x float> %5
+    %1 = insertelement <2 x float> undef, float 0x404CA5DC20000000, i32 0
+    %2 = insertelement <2 x float> %1, float 0x404CA5DC20000000, i32 1
+    %3 = fmul <2 x float> %2, %radians
+    ret <2 x float> %3
 }
 
 ; GLSL: vec3 degrees(vec3)
 define spir_func <3 x float> @_Z7degreesDv3_f(<3 x float> %radians) #0
 {
-    %1 = alloca <3 x float>
-    %2 = load <3 x float>, <3 x float>* %1
     ; 0x404CA5DC20000000: 180/PI, 57.29577951308232
-    %3 = insertelement <3 x float> %2, float 0x404CA5DC20000000, i32 0
-    %4 = insertelement <3 x float> %3, float 0x404CA5DC20000000, i32 1
-    %5 = insertelement <3 x float> %4, float 0x404CA5DC20000000, i32 2
-    %6 = fmul <3 x float> %5, %radians
-    ret <3 x float> %6
+    %1 = insertelement <3 x float> undef, float 0x404CA5DC20000000, i32 0
+    %2 = insertelement <3 x float> %1, float 0x404CA5DC20000000, i32 1
+    %3 = insertelement <3 x float> %2, float 0x404CA5DC20000000, i32 2
+    %4 = fmul <3 x float> %3, %radians
+    ret <3 x float> %4
 }
 
 ; GLSL: vec4 degrees(vec4)
 define spir_func <4 x float> @_Z7degreesDv4_f(<4 x float> %radians) #0
 {
-    %1 = alloca <4 x float>
-    %2 = load <4 x float>, <4 x float>* %1
     ; 0x404CA5DC20000000: 180/PI, 57.29577951308232
-    %3 = insertelement <4 x float> %2, float 0x404CA5DC20000000, i32 0
-    %4 = insertelement <4 x float> %3, float 0x404CA5DC20000000, i32 1
-    %5 = insertelement <4 x float> %4, float 0x404CA5DC20000000, i32 2
-    %6 = insertelement <4 x float> %5, float 0x404CA5DC20000000, i32 3
-    %7 = fmul <4 x float> %6, %radians
-    ret <4 x float> %7
+    %1 = insertelement <4 x float> undef, float 0x404CA5DC20000000, i32 0
+    %2 = insertelement <4 x float> %1, float 0x404CA5DC20000000, i32 1
+    %3 = insertelement <4 x float> %2, float 0x404CA5DC20000000, i32 2
+    %4 = insertelement <4 x float> %3, float 0x404CA5DC20000000, i32 3
+    %5 = fmul <4 x float> %4, %radians
+    ret <4 x float> %5
 }
 
 ; GLSL: float tan(float)
@@ -1001,10 +989,8 @@ define <2 x float> @_Z15unpackUnorm2x16i(i32 %p) #0
     %req = fdiv float 1.0, 65535.0
     %vlf0 = fmul float %vlf, %req
     %vsf0 = fmul float %vsf, %req
-    %vec2ptr = alloca <2 x float>
-    %vec2 = load <2 x float>, <2 x float>* %vec2ptr
 
-    %vec20 = insertelement <2 x float> %vec2, float %vlf0, i32 0
+    %vec20 = insertelement <2 x float> undef, float %vlf0, i32 0
     %vec21 = insertelement <2 x float> %vec20, float %vsf0, i32 1
 
     ret <2 x float> %vec21
@@ -1031,10 +1017,7 @@ define <2 x float> @_Z15unpackSnorm2x16i(i32 %p) #0
     %vln = call float @llpc.fclamp.f32(float %vln0, float -1.0, float 1.0)
     %vmn = call float @llpc.fclamp.f32(float %vmn0, float -1.0, float 1.0)
 
-    %vec2ptr = alloca <2 x float>
-    %vec2 = load <2 x float>, <2 x float>* %vec2ptr
-
-    %vec20 = insertelement <2 x float> %vec2, float %vln, i32 0
+    %vec20 = insertelement <2 x float> undef, float %vln, i32 0
     %vec21 = insertelement <2 x float> %vec20, float %vmn, i32 1
 
     ret <2 x float> %vec21
@@ -1061,10 +1044,7 @@ define <4 x float> @_Z14unpackUnorm4x8i(i32 %p) #0
     %p2u = fmul float %p2f, %req
     %p3u = fmul float %p3f, %req
 
-    %vec4ptr = alloca <4 x float>
-    %vec4 = load <4 x float>, <4 x float>* %vec4ptr
-
-    %vec40 = insertelement <4 x float> %vec4, float %p0u, i32 0
+    %vec40 = insertelement <4 x float> undef, float %p0u, i32 0
     %vec41 = insertelement <4 x float> %vec40, float %p1u, i32 1
     %vec42 = insertelement <4 x float> %vec41, float %p2u, i32 2
     %vec43 = insertelement <4 x float> %vec42, float %p3u, i32 3
@@ -1106,10 +1086,7 @@ define <4 x float> @_Z14unpackSnorm4x8i(i32 %p) #0
     %p2u = call float @llpc.fclamp.f32(float %p02u, float -1.0, float 1.0)
     %p3u = call float @llpc.fclamp.f32(float %p03u, float -1.0, float 1.0)
 
-    %vec4ptr = alloca <4 x float>
-    %vec4 = load <4 x float>, <4 x float>* %vec4ptr
-
-    %vec40 = insertelement <4 x float> %vec4, float %p0u, i32 0
+    %vec40 = insertelement <4 x float> undef, float %p0u, i32 0
     %vec41 = insertelement <4 x float> %vec40, float %p1u, i32 1
     %vec42 = insertelement <4 x float> %vec41, float %p2u, i32 2
     %vec43 = insertelement <4 x float> %vec42, float %p3u, i32 3
@@ -1151,10 +1128,7 @@ define <2 x float> @_Z14unpackHalf2x16i(i32 %v) #0
     %v032 = fpext half %v0 to float
     %v132 = fpext half %v1 to float
 
-    %vec2ptr = alloca <2 x float>
-    %vec2 = load <2 x float>, <2 x float>* %vec2ptr
-
-    %vec20 = insertelement <2 x float> %vec2, float %v032, i32 0
+    %vec20 = insertelement <2 x float> undef, float %v032, i32 0
     %vec21 = insertelement <2 x float> %vec20, float %v132, i32 1
 
     ret <2 x float> %vec21
@@ -1343,13 +1317,11 @@ define spir_func <3 x float> @_Z5crossDv3_fDv3_f(<3 x float> %x, <3 x float> %y)
     %2 = fsub float %l1, %r1
     %3 = fsub float %l2, %r2
 
-    %4 = alloca <3 x float>
-    %5 = load <3 x float>, <3 x float>* %4
-    %6 = insertelement <3 x float> %5, float %1, i32 0
-    %7 = insertelement <3 x float> %6, float %2, i32 1
-    %8 = insertelement <3 x float> %7, float %3, i32 2
+    %4 = insertelement <3 x float> undef, float %1, i32 0
+    %5 = insertelement <3 x float> %4, float %2, i32 1
+    %6 = insertelement <3 x float> %5, float %3, i32 2
 
-    ret <3 x float> %8
+    ret <3 x float> %6
 }
 
 ; GLSL: float normalize(float)
@@ -1374,12 +1346,10 @@ define spir_func <2 x float> @_Z9normalizeDv2_f(<2 x float> %x) #0
     %1 = call float @llvm.amdgcn.fmul.legacy(float %x.x, float %rsq)
     %2 = call float @llvm.amdgcn.fmul.legacy(float %x.y, float %rsq)
 
-    %3 = alloca <2 x float>
-    %4 = load <2 x float>, <2 x float>* %3
-    %5 = insertelement <2 x float> %4, float %1, i32 0
-    %6 = insertelement <2 x float> %5, float %2, i32 1
+    %3 = insertelement <2 x float> undef, float %1, i32 0
+    %4 = insertelement <2 x float> %3, float %2, i32 1
 
-    ret <2 x float> %6
+    ret <2 x float> %4
 }
 
 ; GLSL: vec3 normalize(vec3)
@@ -1398,13 +1368,11 @@ define spir_func <3 x float> @_Z9normalizeDv3_f(<3 x float> %x) #0
     %2 = call float @llvm.amdgcn.fmul.legacy(float %x.y, float %rsq)
     %3 = call float @llvm.amdgcn.fmul.legacy(float %x.z, float %rsq)
 
-    %4 = alloca <3 x float>
-    %5 = load <3 x float>, <3 x float>* %4
-    %6 = insertelement <3 x float> %5, float %1, i32 0
-    %7 = insertelement <3 x float> %6, float %2, i32 1
-    %8 = insertelement <3 x float> %7, float %3, i32 2
+    %4 = insertelement <3 x float> undef, float %1, i32 0
+    %5 = insertelement <3 x float> %4, float %2, i32 1
+    %6 = insertelement <3 x float> %5, float %3, i32 2
 
-    ret <3 x float> %8
+    ret <3 x float> %6
 }
 
 ; GLSL: vec4 normalize(vec4)
@@ -1425,14 +1393,12 @@ define spir_func <4 x float> @_Z9normalizeDv4_f(<4 x float> %x) #0
     %3 = call float @llvm.amdgcn.fmul.legacy(float %x.z, float %rsq)
     %4 = call float @llvm.amdgcn.fmul.legacy(float %x.w, float %rsq)
 
-    %5 = alloca <4 x float>
-    %6 = load <4 x float>, <4 x float>* %5
-    %7 = insertelement <4 x float> %6, float %1, i32 0
-    %8 = insertelement <4 x float> %7, float %2, i32 1
-    %9 = insertelement <4 x float> %8, float %3, i32 2
-    %10 = insertelement <4 x float> %9, float %4, i32 3
+    %5 = insertelement <4 x float> undef, float %1, i32 0
+    %6 = insertelement <4 x float> %5, float %2, i32 1
+    %7 = insertelement <4 x float> %6, float %3, i32 2
+    %8 = insertelement <4 x float> %7, float %4, i32 3
 
-    ret <4 x float> %10
+    ret <4 x float> %8
 }
 
 ; GLSL: float faceforward(float, float, float)
@@ -1467,12 +1433,10 @@ define spir_func <2 x float> @_Z11faceForwardDv2_fDv2_fDv2_f(<2 x float> %N, <2 
     %1 = select i1 %con ,float %N.x, float %NN.x
     %2 = select i1 %con ,float %N.y, float %NN.y
 
-    %3 = alloca <2 x float>
-    %4 = load <2 x float>, <2 x float>* %3
-    %5 = insertelement <2 x float> %4, float %1, i32 0
-    %6 = insertelement <2 x float> %5, float %2, i32 1
+    %3 = insertelement <2 x float> undef, float %1, i32 0
+    %4 = insertelement <2 x float> %3, float %2, i32 1
 
-    ret <2 x float> %6
+    ret <2 x float> %4
 }
 
 ; GLSL: vec3 faceforward(vec3, vec3, vec3)
@@ -1495,13 +1459,11 @@ define spir_func <3 x float> @_Z11faceForwardDv3_fDv3_fDv3_f(<3 x float> %N, <3 
     %2 = select i1 %con ,float %N.y, float %NN.y
     %3 = select i1 %con ,float %N.z, float %NN.z
 
-    %4 = alloca <3 x float>
-    %5 = load <3 x float>, <3 x float>* %4
-    %6 = insertelement <3 x float> %5, float %1, i32 0
-    %7 = insertelement <3 x float> %6, float %2, i32 1
-    %8 = insertelement <3 x float> %7, float %3, i32 2
+    %4 = insertelement <3 x float> undef, float %1, i32 0
+    %5 = insertelement <3 x float> %4, float %2, i32 1
+    %6 = insertelement <3 x float> %5, float %3, i32 2
 
-    ret <3 x float> %8
+    ret <3 x float> %6
 }
 
 ; GLSL: vec4 faceforward(vec4, vec4, vec4)
@@ -1527,14 +1489,12 @@ define spir_func <4 x float> @_Z11faceForwardDv4_fDv4_fDv4_f(<4 x float> %N, <4 
     %3 = select i1 %con ,float %N.z,  float %NN.z
     %4 = select i1 %con ,float %N.w,  float %NN.w
 
-    %5 = alloca <4 x float>
-    %6 = load <4 x float>, <4 x float>* %5
-    %7 = insertelement <4 x float> %6, float %1, i32 0
-    %8 = insertelement <4 x float> %7, float %2, i32 1
-    %9 = insertelement <4 x float> %8, float %3, i32 2
-    %10 = insertelement <4 x float> %9, float %4, i32 3
+    %5 = insertelement <4 x float> undef, float %1, i32 0
+    %6 = insertelement <4 x float> %5, float %2, i32 1
+    %7 = insertelement <4 x float> %6, float %3, i32 2
+    %8 = insertelement <4 x float> %7, float %4, i32 3
 
-    ret <4 x float> %10
+    ret <4 x float> %8
 }
 
 ; GLSL: float reflect(float, float)
@@ -1556,10 +1516,8 @@ define spir_func <2 x float> @_Z7reflectDv2_fDv2_f(<2 x float> %I, <2 x float> %
     %dotin = call float @_Z3dotDv2_fDv2_f(<2 x float> %I, <2 x float> %N)
     %dot = fmul float %dotin, 2.0
 
-    %1 = alloca <2 x float>
-    %2 = load <2 x float>, <2 x float>* %1
-    %3 = insertelement <2 x float> %2, float %dot, i32 0
-    %dotv = insertelement <2 x float> %3, float %dot, i32 1
+    %1 = insertelement <2 x float> undef, float %dot, i32 0
+    %dotv = insertelement <2 x float> %1, float %dot, i32 1
 
     ; 2 * dot(N, I) * N
     %right = fmul <2 x float> %dotv, %N
@@ -1574,11 +1532,9 @@ define spir_func <3 x float> @_Z7reflectDv3_fDv3_f(<3 x float> %I, <3 x float> %
     %dotin = call float @_Z3dotDv3_fDv3_f(<3 x float> %I, <3 x float> %N)
     %dot = fmul float %dotin, 2.0
 
-    %1 = alloca <3 x float>
-    %2 = load <3 x float>, <3 x float>* %1
-    %3 = insertelement <3 x float> %2, float %dot, i32 0
-    %4 = insertelement <3 x float> %3, float %dot, i32 1
-    %dotv = insertelement <3 x float> %4, float %dot, i32 2
+    %1 = insertelement <3 x float> undef, float %dot, i32 0
+    %2 = insertelement <3 x float> %1, float %dot, i32 1
+    %dotv = insertelement <3 x float> %2, float %dot, i32 2
 
     ; 2 * dot(N, I) * N
     %right = fmul <3 x float> %dotv, %N
@@ -1593,12 +1549,10 @@ define spir_func <4 x float> @_Z7reflectDv4_fDv4_f(<4 x float> %I, <4 x float> %
     %dotin = call float @_Z3dotDv4_fDv4_f(<4 x float> %I, <4 x float> %N)
     %dot = fmul float %dotin, 2.0
 
-    %1 = alloca <4 x float>
-    %2 = load <4 x float>, <4 x float>* %1
-    %3 = insertelement <4 x float> %2, float %dot, i32 0
-    %4 = insertelement <4 x float> %3, float %dot, i32 1
-    %5 = insertelement <4 x float> %4, float %dot, i32 2
-    %dotv = insertelement <4 x float> %5, float %dot, i32 3
+    %1 = insertelement <4 x float> undef, float %dot, i32 0
+    %2 = insertelement <4 x float> %1, float %dot, i32 1
+    %3 = insertelement <4 x float> %2, float %dot, i32 2
+    %dotv = insertelement <4 x float> %3, float %dot, i32 3
 
     ; 2 * dot(N, I) * N
     %right = fmul <4 x float> %dotv, %N
@@ -1664,12 +1618,10 @@ define spir_func <2 x float> @_Z7refractDv2_fDv2_ff(<2 x float> %I, <2 x float> 
     %1 = select i1 %con, float 0.0, float %S0
     %2 = select i1 %con, float 0.0, float %S1
 
-    %3 = alloca <2 x float>
-    %4 = load <2 x float>, <2 x float>* %3
-    %5 = insertelement <2 x float> %4, float %1, i32 0
-    %6 = insertelement <2 x float> %5, float %2, i32 1
+    %3 = insertelement <2 x float> undef, float %1, i32 0
+    %4 = insertelement <2 x float> %3, float %2, i32 1
 
-    ret <2 x float> %6
+    ret <2 x float> %4
 }
 
 ; GLSL: vec3 refract(vec3, vec3, float)
@@ -1712,13 +1664,11 @@ define spir_func <3 x float> @_Z7refractDv3_fDv3_ff(<3 x float> %I, <3 x float> 
     %2 = select i1 %con, float 0.0, float %S1
     %3 = select i1 %con, float 0.0, float %S2
 
-    %4 = alloca <3 x float>
-    %5 = load <3 x float>, <3 x float>* %4
-    %6 = insertelement <3 x float> %5, float %1, i32 0
-    %7 = insertelement <3 x float> %6, float %2, i32 1
-    %8 = insertelement <3 x float> %7, float %3, i32 2
+    %4 = insertelement <3 x float> undef, float %1, i32 0
+    %5 = insertelement <3 x float> %4, float %2, i32 1
+    %6 = insertelement <3 x float> %5, float %3, i32 2
 
-    ret <3 x float> %8
+    ret <3 x float> %6
 }
 
 ; GLSL: vec4 refract(vec4, vec4, float)
@@ -1767,14 +1717,12 @@ define spir_func <4 x float> @_Z7refractDv4_fDv4_ff(<4 x float> %I, <4 x float> 
     %3 = select i1 %con, float 0.0, float %S2
     %4 = select i1 %con, float 0.0, float %S3
 
-    %5 = alloca <4 x float>
-    %6 = load <4 x float>, <4 x float>* %5
-    %7 = insertelement <4 x float> %6, float %1, i32 0
-    %8 = insertelement <4 x float> %7, float %2, i32 1
-    %9 = insertelement <4 x float> %8, float %3, i32 2
-    %10 = insertelement <4 x float> %9, float %4, i32 3
+    %5 = insertelement <4 x float> undef, float %1, i32 0
+    %6 = insertelement <4 x float> %5, float %2, i32 1
+    %7 = insertelement <4 x float> %6, float %3, i32 2
+    %8 = insertelement <4 x float> %7, float %4, i32 3
 
-    ret <4 x float> %10
+    ret <4 x float> %8
 }
 
 ; =====================================================================================================================

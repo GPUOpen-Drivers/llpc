@@ -55,6 +55,12 @@ using namespace Llpc;
 void Llpc::PassManager::add(
     Pass* pPass)    // [in] Pass to add to the pass manager
 {
+    // Do not add any passes after calling stop(), except immutable passes.
+    if (m_stopped && (pPass->getAsImmutablePass() == nullptr))
+    {
+        return;
+    }
+
     // Skip the jump threading pass as it interacts really badly with the structurizer.
     if (pPass->getPassName().equals("Jump Threading"))
     {
@@ -70,3 +76,11 @@ void Llpc::PassManager::add(
         legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
     }
 }
+
+// =====================================================================================================================
+// Stop adding passes to the pass manager, except immutable ones.
+void Llpc::PassManager::stop()
+{
+    m_stopped = true;
+}
+

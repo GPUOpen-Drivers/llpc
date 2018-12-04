@@ -1009,15 +1009,19 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         {
             LLPC_ASSERT(inOutMeta.XfbBuffer < MaxTransformFeedbackBuffers);
             m_pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer] = inOutMeta.XfbStride;
-            m_pResUsage->inOutUsage.enableXfb = (m_pResUsage->inOutUsage.enableXfb || (inOutMeta.XfbStride > 0));
 
             if (inOutMeta.XfbStride <= inOutMeta.XfbOffset)
             {
                 uint32_t elemCount = pInOutTy->isVectorTy() ? pInOutTy->getVectorNumElements() : 1;
                 uint32_t inOutTySize = elemCount * pInOutTy->getScalarSizeInBits() / 8;
                 m_pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer]
-                    = RoundUpToMultiple(inOutMeta.XfbOffset + inOutTySize, 4u);
+                    = RoundUpToMultiple(uint32_t(inOutMeta.XfbOffset) + inOutTySize, 4u);
             }
+
+            m_pResUsage->inOutUsage.enableXfb = (m_pResUsage->inOutUsage.enableXfb || (inOutMeta.XfbStride > 0));
+
+            LLPC_ASSERT(inOutMeta.StreamId < MaxGsStreams);
+            m_pResUsage->inOutUsage.streamXfbBuffers[inOutMeta.StreamId] = 1 << (inOutMeta.XfbBuffer);
         }
 
         if (inOutMeta.IsBuiltIn)
@@ -1726,9 +1730,13 @@ void SpirvLowerResourceCollect::CollectGsOutputInfo(
     outLocInfo.isBuiltIn = isBuiltIn;
     outLocInfo.location = (isBuiltIn ? builtIn:location);
     m_pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
-    m_pResUsage->inOutUsage.gs.rasterStream = inOutMeta.StreamId;
 
-    if (isBuiltIn == false)
+    if (isBuiltIn)
+    {
+        // Collect raster stream Id for the export GL builtIn value
+        m_pResUsage->inOutUsage.gs.rasterStream = inOutMeta.StreamId;
+    }
+    else
     {
         m_pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = InvalidValue;
     }

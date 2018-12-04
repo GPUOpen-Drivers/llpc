@@ -32,6 +32,7 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
@@ -40,7 +41,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Utils.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
@@ -55,7 +58,8 @@
 #include "llpcPatchGroupOp.h"
 #include "llpcPatchImageOp.h"
 #include "llpcPatchInOutImportExport.h"
-#include "llpcPatchOpt.h"
+#include "llpcPatchLoopUnrollInfoRectify.h"
+#include "llpcPatchPeepholeOpt.h"
 #include "llpcPatchPushConstOp.h"
 #include "llpcPatchResourceCollect.h"
 
@@ -86,46 +90,25 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Executes LLVM preliminary patching opertions for LLVM module.
-Result Patch::PreRun(
-    Module* pModule)    // [in,out] LLVM module to be run on
+// Add whole-pipeline patch passes to pass manager
+void Patch::AddPasses(
+    Context*              pContext, // [in] LLPC context
+    legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
 {
-    Result result = Result::Success;
+    // Build null fragment shader if necessary
+    passMgr.add(CreatePatchNullFragShader());
 
-    auto pContext = static_cast<Context*>(&pModule->getContext());
-    ShaderStage shaderStage = GetShaderStageFromModule(pModule);
-
+    // Automatically layout descriptor
     if (pContext->NeedAutoLayoutDesc())
     {
-        // Automatically layout descriptor
-        pContext->AutoLayoutDescriptor(shaderStage);
+        passMgr.add(CreatePatchAutoLayoutDesc());
     }
 
-    // Do patching opertions
-    if (result == Result::Success)
-    {
-        PassManager passMgr;
+    // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
+    passMgr.add(PatchResourceCollect::Create());
 
-        // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
-        passMgr.add(PatchResourceCollect::Create());
-
-        if (passMgr.run(*pModule) == false)
-        {
-            result = Result::ErrorInvalidShader;
-        }
-    }
-
-    return result;
-}
-
-// =====================================================================================================================
-// Executes LLVM patching opertions for LLVM module and links it with external LLVM libraries.
-Result Patch::Run(
-    Module* pModule)    // [in,out] LLVM module to be run on
-{
-    Result result = Result::Success;
-    // Do patching opertions
-    PassManager passMgr;
+    // Generate copy shader if necessary.
+    passMgr.add(CreatePatchCopyShader());
 
     // Lower SPIRAS address spaces to AMDGPU address spaces
     passMgr.add(PatchAddrSpaceMutate::Create());
@@ -170,26 +153,57 @@ Result Patch::Run(
 
     if (cl::DisablePatchOpt == false)
     {
-        passMgr.add(PatchOpt::Create());
+        AddOptimizationPasses(pContext, passMgr);
     }
 
-    if (passMgr.run(*pModule) == false)
-    {
-        result = Result::ErrorInvalidShader;
-    }
+    // Prepare pipeline ABI.
+    passMgr.add(CreatePatchPrepareAbi());
+}
 
-    if (result == Result::Success)
-    {
-        std::string errMsg;
-        raw_string_ostream errStream(errMsg);
-        if (verifyModule(*pModule, &errStream))
+// =====================================================================================================================
+// Add optimization passes to pass manager
+void Patch::AddOptimizationPasses(
+    Context*              pContext, // [in] LLPC context
+    legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
+{
+    // Set up standard optimization passes.
+    // NOTE: Doing this here is temporary; really the whole of LLPC should be using the
+    // PassManagerBuilder mechanism, adding its own passes at the provided hook points.
+    PassManagerBuilder passBuilder;
+    passBuilder.OptLevel = 3; // -O3
+    passBuilder.DisableGVNLoadPRE = true;
+    passBuilder.DivergentTarget = true;
+
+    passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
+        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
         {
-            LLPC_ERRS("Fails to verify module (" DEBUG_TYPE "): " << errStream.str() << "\n");
-            result = Result::ErrorInvalidShader;
-        }
-    }
+            passMgr.add(PatchPeepholeOpt::Create());
+            passMgr.add(createInstSimplifyLegacyPass());
+        });
+    passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
+        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+        {
+            // We run our peephole pass just before the scalarizer to ensure that our simplification optimizations are
+            // performed before the scalarizer. One important case this helps with is when you have bit casts whose
+            // source is a PHI - we want to make sure that the PHI does not have an i8 type before the scalarizer is
+            // called, otherwise a different kind of PHI mess is generated.
+            passMgr.add(PatchPeepholeOpt::Create());
 
-    return result;
+            // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer allows
+            // us to much more easily identify dead parts of vectors that we do not need to do any computation for.
+            passMgr.add(createScalarizerPass());
+
+            // We add an extra inst simplify here to make sure that dead PHI nodes that are easily identified post
+            // running the scalarizer can be folded away before instruction combining tries to re-create them.
+            passMgr.add(createInstSimplifyLegacyPass());
+        });
+    passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
+        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+        {
+            passMgr.add(PatchLoopUnrollInfoRectify::Create());
+        });
+
+    passBuilder.populateModulePassManager(passMgr);
 }
 
 // =====================================================================================================================
@@ -350,6 +364,38 @@ void Patch::AddWaterFallInst(
             cast<CallInst>(pResult)->setOperand(1, pCallInst);
         }
     }
+}
+
+// =====================================================================================================================
+// Get or create global variable for LDS.
+GlobalVariable* Patch::GetLdsVariable(
+    Module* pModule)  // [in/out] Module to get or create LDS in
+{
+    auto pContext = static_cast<Context*>(&pModule->getContext());
+
+    // See if this module already has LDS.
+    auto pOldLds = pModule->getNamedValue("lds");
+    if (pOldLds != nullptr)
+    {
+        // We already have LDS.
+        return cast<GlobalVariable>(pOldLds);
+    }
+    // Now we can create LDS.
+    // Construct LDS type: [ldsSize * i32], address space 3
+    auto ldsSize = pContext->GetGpuProperty()->ldsSizePerCu;
+    auto pLdsTy = ArrayType::get(pContext->Int32Ty(), ldsSize / sizeof(uint32_t));
+
+    auto pLds = new GlobalVariable(*pModule,
+                                   pLdsTy,
+                                   false,
+                                   GlobalValue::ExternalLinkage,
+                                   nullptr,
+                                   "lds",
+                                   nullptr,
+                                   GlobalValue::NotThreadLocal,
+                                   ADDR_SPACE_LOCAL);
+    pLds->setAlignment(sizeof(uint32_t));
+    return pLds;
 }
 
 } // Llpc

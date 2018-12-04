@@ -37,6 +37,8 @@
 namespace Llpc
 {
 
+class PipelineShaders;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for entry-point mutation.
 class PatchEntryPointMutate:
@@ -46,7 +48,13 @@ class PatchEntryPointMutate:
 public:
     PatchEntryPointMutate();
 
-    virtual bool runOnModule(llvm::Module& module);
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        // Does not preserve PipelineShaders because it replaces the entrypoints.
+    }
+
+    virtual bool runOnModule(llvm::Module& module) override;
 
     // Pass creator, creates the pass of LLVM patching opertions for entry-point mutation
     static llvm::ModulePass* Create() { return new PatchEntryPointMutate(); }
@@ -57,6 +65,8 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchEntryPointMutate);
+
+    void ProcessShader();
 
     llvm::FunctionType* GenerateEntryPointType(uint64_t* pInRegMask) const;
 
@@ -71,6 +81,10 @@ private:
     llvm::Value* SetRingBufferDataFormat(llvm::Value* pBufDesc,
                                          uint32_t dataFormat,
                                          llvm::Instruction* pInsertPos) const;
+
+    llvm::Value* LoadStreamOutBufferDescriptor(uint32_t           xfbBuffer,
+                                               llvm::Value*       pStreamOutTablePtr,
+                                               llvm::Instruction* pInsertPos) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

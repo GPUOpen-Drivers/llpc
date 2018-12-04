@@ -1174,7 +1174,6 @@ FragColorExport::FragColorExport(
     m_pContext(static_cast<Context*>(&pModule->getContext())),
     pPipelineInfo(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo()))
 {
-    LLPC_ASSERT(GetShaderStageFromModule(m_pModule) == ShaderStageFragment); // Must be fragment shader
 }
 
 // =====================================================================================================================

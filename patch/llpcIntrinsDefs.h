@@ -407,4 +407,20 @@ union CombineFormat
 
     uint32_t u32All;
 };
+
+// Count of user SGPRs used in copy shader
+static const uint32_t CopyShaderUserSgprCount = 4;
+
+// User SGPR index for the stream info in copy shader
+static const uint32_t CopyShaderUserSgprIdxStreamInfo = 4;
+
+// User SGPR index for the stream-out write index in copy shader
+static const uint32_t CopyShaderUserSgprIdxWriteIndex = 5;
+
+// User SGPR index for the stream offsets in copy shader
+static const uint32_t CopyShaderUserSgprIdxStreamOffset = 6;
+
+// Start offset of currently-processed vertex in GS-VS ring buffer
+static const uint32_t CopyShaderUserSgprIdxVertexOffset = 10;
+
 } // Llpc

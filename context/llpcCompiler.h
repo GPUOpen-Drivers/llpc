@@ -130,6 +130,7 @@ struct WorkaroundFlags
         };
         uint32_t  u32All;
     } gfx9;
+
 };
 
 // Represents statistics info for pipeline module
@@ -160,17 +161,23 @@ public:
     virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pPipelineInfo,
                                         ComputePipelineBuildOut*        pPipelineOut);
 
-    Result BuildGraphicsPipelineInternal(GraphicsContext*          pGraphicsContext,
-                                         const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount],
-                                         uint32_t                  forceLoopUnrollCount,
-                                         ElfPackage*               pPipelineElf,
-                                         bool*                     pDynamicLoopUnroll);
+    Result BuildGraphicsPipelineInternal(GraphicsContext*                           pGraphicsContext,
+                                         llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
+                                         uint32_t                                   forceLoopUnrollCount,
+                                         ElfPackage*                                pPipelineElf,
+                                         bool*                                      pDynamicLoopUnroll);
 
     Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
                                         const ComputePipelineBuildInfo* pPipelineInfo,
                                         uint32_t                        forceLoopUnrollCount,
                                         ElfPackage*                     pPipelineElf,
                                         bool*                           pDynamicLoopUnroll);
+
+    Result BuildPipelineInternal(Context*                                   pContext,
+                                 llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
+                                 uint32_t                                   forceLoopUnrollCount,
+                                 ElfPackage*                                pPipelineElf,
+                                 bool*                                      pDynamicLoopUnroll);
 
     // Gets the count of compiler instance.
     static uint32_t GetInstanceCount() { return m_instanceCount; }
@@ -197,7 +204,6 @@ private:
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
     Result BuildNullFs(Context* pContext, std::unique_ptr<llvm::Module>& pNullFsModule) const;
-    Result BuildCopyShader(Context* pContext, llvm::Module** ppCopyShaderModule) const;
 
     Result ReplaceShader(const ShaderModuleData* pOrigModuleData, ShaderModuleData** ppModuleData) const;
 

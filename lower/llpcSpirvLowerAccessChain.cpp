@@ -108,66 +108,80 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
 {
     GetElementPtrInst* pCoalescedGetElemPtr = pGetElemPtr;
 
-    std::stack<GetElementPtrInst*> chainedInsts; // Order: from top to bottom
+    std::stack<User*>              chainedInsts; // Order: from top to bottom
     std::stack<GetElementPtrInst*> removedInsts; // Order: from botton to top
-    GetElementPtrInst* pPtrVal = pGetElemPtr;
 
-    // Collect chained "getelementptr" instructions from bottom to top
-    do
+    // Collect chained "getelementptr" instructions and constants from bottom to top.
+    auto pPtrVal = cast<User>(pGetElemPtr);
+    for (;;)
     {
         chainedInsts.push(pPtrVal);
-        auto pPointer = pPtrVal->getPointerOperand();
-        if (isa<ConstantExpr>(pPointer))
+        auto pNext = pPtrVal->getOperand(0);
+        if (isa<GetElementPtrInst>(pNext))
         {
-            pPtrVal = dyn_cast<GetElementPtrInst>(cast<ConstantExpr>(pPointer)->getAsInstruction());
+            pPtrVal = cast<User>(pNext);
+            continue;
         }
-        else
+        auto pConst = dyn_cast<ConstantExpr>(pNext);
+        if ((pConst == nullptr) || (pConst->getOpcode() != Instruction::GetElementPtr))
         {
-            pPtrVal = dyn_cast<GetElementPtrInst>(pPointer);
+            break;
         }
-    } while ((pPtrVal != nullptr) && (pPtrVal->getType()->getPointerAddressSpace() == addrSpace));
+        pPtrVal = cast<User>(pNext);
+    }
 
-    // If there are more than one "getelementptr" instructions, do coalescing
+    // If there are more than one "getelementptr" instructions/constants, do coalescing
     if (chainedInsts.size() > 1)
     {
         std::vector<Value*> idxs;
+        uint32_t startOperand = 1;
+        Value* pBlockPtr = nullptr;
 
-        GetElementPtrInst* pInst = chainedInsts.top();
-        auto pBlockPtr = pInst->getPointerOperand();
-        idxs.push_back(pInst->getOperand(1)); // Pointer to the block
-
-        while (chainedInsts.empty() == false)
+        do
         {
-            pInst = chainedInsts.top();
-            for (uint32_t i = 2, operandCount = pInst->getNumOperands(); i < operandCount; ++i)
-            {
-                // NOTE: We skip the first two operands here. The first one is the pointer value from which
-                // the element pointer is constructed. And the second one is always 0 to dereference the
-                // pointer value.
-                idxs.push_back(pInst->getOperand(i));
-            }
+            pPtrVal = chainedInsts.top();
             chainedInsts.pop();
-            removedInsts.push(pInst);
+            if (pBlockPtr == nullptr)
+            {
+                pBlockPtr = pPtrVal->getOperand(0);
+            }
+            for (uint32_t i = startOperand; i != pPtrVal->getNumOperands(); ++i)
+            {
+                idxs.push_back(pPtrVal->getOperand(i));
+            }
+            // NOTE: For subsequent "getelementptr" instructions/constants, we skip the first two operands. The first
+            // operand is the pointer value from which the element pointer is constructed. And the second one is always
+            // 0 to dereference the pointer value.
+            startOperand = 2;
+
+            auto pInst = dyn_cast<GetElementPtrInst>(pPtrVal);
+            if (pInst != nullptr)
+            {
+                removedInsts.push(pInst);
+            }
         }
+        while (chainedInsts.empty() == false);
 
         // Create the coalesced "getelementptr" instruction (do combining)
         pCoalescedGetElemPtr = GetElementPtrInst::Create(nullptr, pBlockPtr, idxs, "", pGetElemPtr);
         pGetElemPtr->replaceAllUsesWith(pCoalescedGetElemPtr);
 
-        // Try to drop references and see if we could remove some dead "getelementptr" instructions
+        // Remove dead "getelementptr" instructions where possible.
         while (removedInsts.empty() == false)
         {
             GetElementPtrInst* pInst = removedInsts.top();
             if (pInst->user_empty())
             {
-                pInst->dropAllReferences();
-                if (pInst->getParent() != nullptr)
+                if (pInst == pGetElemPtr)
                 {
-                    pInst->eraseFromParent();
+                    // We cannot remove the current instruction that InstWalker is on. Just stop it using its
+                    // pointer operand, and it will be DCEd later.
+                    auto& operand = pInst->getOperandUse(0);
+                    operand = UndefValue::get(operand->getType());
                 }
                 else
                 {
-                    pInst->deleteValue();
+                    pInst->eraseFromParent();
                 }
             }
             removedInsts.pop();

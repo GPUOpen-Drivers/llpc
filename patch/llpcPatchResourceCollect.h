@@ -38,6 +38,8 @@
 namespace Llpc
 {
 
+class PipelineShaders;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
 class PatchResourceCollect:
@@ -47,7 +49,13 @@ class PatchResourceCollect:
 public:
     PatchResourceCollect();
 
-    virtual bool runOnModule(llvm::Module& module);
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+    }
+
+    virtual bool runOnModule(llvm::Module& module) override;
     virtual void visitCallInst(llvm::CallInst& callInst);
 
     // Pass creator, creates the pass of LLVM patching opertions for resource collecting
@@ -59,6 +67,8 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchResourceCollect);
+
+    void ProcessShader();
 
     void ClearInactiveInput();
     void ClearInactiveOutput();

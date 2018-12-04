@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,38 +24,55 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPatchOpt.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchOpt.
+ * @file  llpcPipelineShaders.h
+ * @brief LLPC header file: simple analysis pass that finds the shaders in the pipeline module
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Pass.h"
+#include <map>
 
-#include "llpcPatch.h"
+#include "llpc.h"
+
+namespace llvm
+{
+
+void initializePipelineShadersPass(PassRegistry&);
+
+} // llvm
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of general optimizations for SPIR-V patching.
-class PatchOpt:
-    public Patch
+// Simple analysis pass that finds the shaders in the pipeline module
+class PipelineShaders : public llvm::ModulePass
 {
 public:
-    PatchOpt();
+    static char ID;
+    PipelineShaders() : ModulePass(ID)
+    {
+        initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
+    }
 
-    virtual bool runOnModule(llvm::Module& module);
+    bool runOnModule(llvm::Module& module) override;
 
-    // Pass creator, creates the pass of general optimizations for LLVM patching.
-    static llvm::ModulePass* Create() { return new PatchOpt(); }
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.setPreservesAll();
+    }
 
-    // -----------------------------------------------------------------------------------------------------------------
+    llvm::Function* GetEntryPoint(ShaderStage shaderStage) const;
 
-    static char ID;   // ID of this pass
+    ShaderStage GetShaderStage(const llvm::Function* pFunc) const;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchOpt);
+    llvm::Function* m_entryPoints[ShaderStageCountInternal];      // The entry-point for each shader stage.
+    std::map<const llvm::Function*, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
 };
+
+llvm::ModulePass* CreatePipelineShaders();
 
 } // Llpc

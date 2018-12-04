@@ -41,7 +41,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 15;
+static const uint32_t  Version = 16;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
@@ -140,7 +140,7 @@ struct ShaderModuleBuildInfo
     BinaryData           shaderBin;         ///< Shader binary data (SPIR-V binary)
 };
 
-/// Represents the header part of LLPC shader module data, should be identical to Bil::BilModuleMetadataHeader
+/// Represents the header part of LLPC shader module data
 struct ShaderModuleDataHeader
 {
     uint32_t hash[4];       // Shader hash code
@@ -199,6 +199,7 @@ struct PipelineOptions
                               ///  the pipeline ELF.
     bool autoLayoutDesc;      ///< If set, the LLPC standalone compiler is compiling individual shader(s)
                               ///  without pipeline info, so LLPC needs to do auto descriptor layout.
+    bool scalarBlockLayout;   ///< If set, allows scalar block layout of types.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
@@ -334,7 +335,7 @@ struct GraphicsPipelineBuildInfo
         } target[MaxColorTargets];              ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
 
-    PipelineOptions     options;                ///< Per pipeline tuning/debugging options
+    PipelineOptions     options;            ///< Per pipeline tuning/debugging options
 };
 
 /// Represents info to build a compute pipeline.

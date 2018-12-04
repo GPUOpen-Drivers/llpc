@@ -241,7 +241,6 @@ declare i32 @llvm.amdgcn.ds.swizzle(i32, i32) #2
 declare i32 @llvm.amdgcn.readlane(i32, i32) #2
 declare i32 @llvm.amdgcn.mbcnt.lo(i32, i32) #1
 declare i32 @llvm.amdgcn.mbcnt.hi(i32, i32) #1
-declare i32 @llvm.amdgcn.set.inactive.i32(i32, i32) #2
 declare i64 @llvm.amdgcn.wwm.i64(i64) #1
 declare i32 @llvm.amdgcn.wwm.i32(i32) #1
 declare float @llpc.dpdxFine.f32(float) #0

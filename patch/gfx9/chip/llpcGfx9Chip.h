@@ -37,8 +37,8 @@
 namespace Llpc
 {
 
-namespace Gfx9
-{
+    namespace Gfx9
+    {
 
 #undef CS_ENABLE
 
@@ -59,6 +59,9 @@ namespace Gfx9
 // Initializes register ID and its value
 #define INIT_REG(_reg)            { _reg##_ID = mm##_reg; _reg##_VAL.u32All = 0; }
 
+// Initializes register to invalid ID and value
+#define INIT_REG_TO_INVALID(_reg) { _reg##_ID = InvalidMetadataKey; _reg##_VAL.u32All = InvalidMetadataValue; }
+
 // Initializes GFX-dependent register ID and its value
 #define INIT_REG_GFX9_PLUS(_gfx, _reg) \
 { \
@@ -69,8 +72,7 @@ namespace Gfx9
     } \
     else \
     { \
-        _reg##_ID         = InvalidMetadataKey; \
-        _reg##_VAL.u32All = InvalidMetadataValue; \
+        INIT_REG_TO_INVALID(_reg); \
     } \
 }
 
@@ -84,8 +86,7 @@ namespace Gfx9
     } \
     else \
     { \
-        _reg##_ID         = InvalidMetadataKey; \
-        _reg##_VAL.u32All = InvalidMetadataValue; \
+        INIT_REG_TO_INVALID(_reg); \
     } \
 }
 
@@ -93,9 +94,9 @@ namespace Gfx9
 #define CASE_SET_REG(_stage, _reg, _val)   case (mm##_reg * 4): { (_stage)->_reg##_VAL.u32All = (_val); break; }
 
 // Adds an entry for the map from register ID to its name string
-#define ADD_REG_MAP(_reg)           RegNameMap[mm##_reg * 4] = #_reg;
+#define ADD_REG_MAP(_reg)               RegNameMap[mm##_reg * 4] = #_reg;
 
-#define ADD_REG_MAP_GFX9(_reg)      RegNameMapGfx9[Gfx09::mm##_reg * 4] = #_reg;
+#define ADD_REG_MAP_GFX9(_reg)          RegNameMapGfx9[Gfx09::mm##_reg * 4] = #_reg;
 
 // Gets register value
 #define GET_REG(_stage, _reg)                      ((_stage)->_reg##_VAL.u32All)
@@ -126,6 +127,9 @@ constexpr uint32_t GsPrimsPerEsThread = 256;
 
 // Preferred number of GS threads per VS thread.
 constexpr uint32_t GsThreadsPerVsThread = 2;
+
+// Preferred number of GS threads per subgroup.
+constexpr uint32_t MaxGsThreadsPerSubgroup = 256;
 
 // Max number of threads per subgroup in NGG mode.
 constexpr uint32_t NggMaxThreadsPerSubgroup = 256;
@@ -174,6 +178,12 @@ struct VsRegConfig
     DEF_REG(PA_SU_VTX_CNTL);
     DEF_REG(VGT_PRIMITIVEID_EN);
     DEF_REG(VGT_REUSE_OFF);
+    DEF_REG(VGT_STRMOUT_CONFIG);
+    DEF_REG(VGT_STRMOUT_BUFFER_CONFIG);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_0);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_1);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_2);
+    DEF_REG(VGT_STRMOUT_VTX_STRIDE_3);
     DEF_REG(VS_SCRATCH_BYTE_SIZE);
     DEF_REG(VS_NUM_USED_VGPRS);
     DEF_REG(VS_NUM_USED_SGPRS);
@@ -231,6 +241,7 @@ struct EsGsRegConfig
     DEF_REG(VGT_GS_MODE);
     DEF_REG(VGT_ESGS_RING_ITEMSIZE);
     DEF_REG(VGT_GS_MAX_PRIMS_PER_SUBGROUP);
+    DEF_REG(ES_GS_LDS_BYTE_SIZE);
 
     void Init(GfxIpVersion gfxIp);
 };
@@ -251,6 +262,10 @@ struct PsRegConfig
     DEF_REG(PA_SC_MODE_CNTL_1);
     DEF_REG(DB_SHADER_CONTROL);
     DEF_REG(CB_SHADER_MASK);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
+    DEF_REG(PS_WRITES_UAVS);
+    DEF_REG(PS_WRITES_DEPTH);
+#endif
     DEF_REG(PS_USES_UAVS);
     DEF_REG(PS_SCRATCH_BYTE_SIZE);
     DEF_REG(PS_NUM_USED_VGPRS);
@@ -294,6 +309,8 @@ struct PipelineVsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
+    DEF_REG(VGT_GS_ONCHIP_CNTL);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -332,6 +349,7 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -368,6 +386,7 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -410,6 +429,7 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
     DEF_REG(INDIRECT_TABLE_ENTRY);
+    DEF_REG(STREAM_OUT_TABLE_ENTRY);
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -439,6 +459,7 @@ struct CsRegConfig
     DEF_REG(CS_NUM_USED_SGPRS);
     DEF_REG(CS_NUM_AVAIL_VGPRS);
     DEF_REG(CS_NUM_AVAIL_SGPRS);
+    DEF_REG(COMPUTE_DISPATCH_INITIATOR);
 
     void Init(GfxIpVersion gfxIp);
 };

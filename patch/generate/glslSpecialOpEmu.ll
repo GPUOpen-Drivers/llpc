@@ -426,11 +426,6 @@ declare i64 @llvm.amdgcn.s.memtime() #0
 declare i32 @llvm.amdgcn.wwm.i32(i32) #1
 declare i64 @llvm.amdgcn.wwm.i64(i64) #1
 declare <2 x i32> @llvm.amdgcn.wwm.v2i32(<2 x i32>) #1
-declare i32 @llvm.amdgcn.set.inactive.i32(i32, i32) #2
-declare i64 @llvm.amdgcn.set.inactive.i64(i64, i64) #2
-declare <2 x i32> @llvm.amdgcn.set.inactive.v2i32(<2 x i32>, <2 x i32>) #2
-declare <3 x i32> @llvm.amdgcn.set.inactive.v3i32(<3 x i32>, <3 x i32>) #2
-declare <4 x i32> @llvm.amdgcn.set.inactive.v4i32(<4 x i32>, <4 x i32>) #2
 declare i32 @llpc.sminnum.i32(i32, i32) #0
 declare i32 @llpc.smaxnum.i32(i32, i32) #0
 declare i32 @llpc.uminnum.i32(i32, i32) #0

@@ -37,6 +37,7 @@
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchPushConstOp.h"
+#include "llpcPipelineShaders.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -53,6 +54,7 @@ PatchPushConstOp::PatchPushConstOp()
     :
     Patch(ID)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchPushConstOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -66,7 +68,16 @@ bool PatchPushConstOp::runOnModule(
     Patch::Init(&module);
 
     // Invoke handling of "call" instruction
-    visit(m_pModule);
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            visit(*m_pEntryPoint);
+        }
+    }
 
     // Remove unnecessary push constant load calls
     for (auto pCallInst: m_pushConstCalls)
@@ -74,6 +85,7 @@ bool PatchPushConstOp::runOnModule(
         pCallInst->dropAllReferences();
         pCallInst->eraseFromParent();
     }
+    m_pushConstCalls.clear();
 
     // Remove unnecessary push constant load functions
     for (auto pFunc : m_descLoadFuncs)
@@ -84,6 +96,7 @@ bool PatchPushConstOp::runOnModule(
             pFunc->eraseFromParent();
         }
     }
+    m_descLoadFuncs.clear();
 
     return true;
 }

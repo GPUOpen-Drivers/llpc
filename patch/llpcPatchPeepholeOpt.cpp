@@ -72,6 +72,7 @@ bool PatchPeepholeOpt::runOnFunction(
         // Lastly delete any instructions we replaced.
         pInst->eraseFromParent();
     }
+    m_instsToErase.clear();
 
     return changed;
 }

@@ -65,7 +65,7 @@ struct VertexCompFormatInfo
 class VertexFetch
 {
 public:
-    VertexFetch(llvm::Module* pModule);
+    VertexFetch(llvm::Function* pEntrypoint);
 
     static const VertexFormatInfo* GetVertexFormatInfo(VkFormat format);
 

@@ -55,7 +55,8 @@ public:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID;   // ID of this pass
+    static char   ID;         // ID of this pass
+    bool          m_changed;  // Whether the pass has modified any code so far
     std::unordered_set<llvm::Instruction*>   m_groupCalls; // List of "call" instructions to emulate SPIR-V group operations
 
 private:

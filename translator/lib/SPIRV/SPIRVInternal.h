@@ -197,7 +197,7 @@ template <> inline void SPIRVMap<SPIRAddressSpace, std::string>::init() {
   add(SPIRAS_Generic, "Generic");
   add(SPIRAS_Input, "Input");
   add(SPIRAS_Output, "Output");
-  add(SPIRAS_Output, "Uniform");
+  add(SPIRAS_Uniform, "Uniform");
 }
 typedef SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>
     SPIRAddrSpaceCapitalizedNameMap;
@@ -502,6 +502,8 @@ enum SPIRVImageOpKind {
   ImageOpQueryLod,
   ImageOpRead,
   ImageOpWrite,
+  ImageOpAtomicLoad,
+  ImageOpAtomicStore,
   ImageOpAtomicExchange,
   ImageOpAtomicCompareExchange,
   ImageOpAtomicIIncrement,
@@ -534,6 +536,8 @@ SPIRVMap<SPIRVImageOpKind, std::string>::init() {
   add(ImageOpQueryLod,              "querylod");
   add(ImageOpRead,                  "read");
   add(ImageOpWrite,                 "write");
+  add(ImageOpAtomicLoad,            "atomicload");
+  add(ImageOpAtomicStore,           "atomicstore");
   add(ImageOpAtomicExchange,        "atomicexchange");
   add(ImageOpAtomicCompareExchange, "atomiccompexchange");
   add(ImageOpAtomicIIncrement,      "atomiciincrement");
@@ -626,6 +630,8 @@ SPIRVMap<Op, SPIRVImageOpInfo>::init() {
   add(OpImageQueryLevels,                     { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
   add(OpImageQuerySamples,                    { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
 
+  add(OpAtomicLoad,                           { ImageOpAtomicLoad,              InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
+  add(OpAtomicStore,                          { ImageOpAtomicStore,             InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
   add(OpAtomicExchange,                       { ImageOpAtomicExchange,          InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
   add(OpAtomicCompareExchange,                { ImageOpAtomicCompareExchange,   InvalidOperIdx, InvalidOperIdx, false,  false,  4,              5              });
   add(OpAtomicIIncrement,                     { ImageOpAtomicIIncrement,        InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
@@ -1190,24 +1196,23 @@ template <> inline void SPIRVMap<std::string, Op, SPIRVOpaqueType>::init() {
 union ShaderInOutMetadata {
   struct
   {
-    uint32_t Value              : 16; // Generic location or SPIR-V built-in ID
-    uint32_t Index              : 1;  // Output index for dual source blending
-    uint32_t IsLoc              : 1;  // Whether value is a location
-    uint32_t IsBuiltIn          : 1;  // Whether value is a SPIR-V built-in ID
-    uint32_t Component          : 2;  // Component offset of inputs and outputs
-    uint32_t Signedness         : 1;  // Signedness of the input/output, valid
+    uint64_t Value              : 16; // Generic location or SPIR-V built-in ID
+    uint64_t Index              : 1;  // Output index for dual source blending
+    uint64_t IsLoc              : 1;  // Whether value is a location
+    uint64_t IsBuiltIn          : 1;  // Whether value is a SPIR-V built-in ID
+    uint64_t Component          : 2;  // Component offset of inputs and outputs
+    uint64_t Signedness         : 1;  // Signedness of the input/output, valid
                                       // for integer (0 - unsigned, 1 - signed)
-    uint32_t InterpMode         : 2;  // Interpolation mode (fragment shader)
-    uint32_t InterpLoc          : 3;  // Interpolation location (fragment
+    uint64_t InterpMode         : 2;  // Interpolation mode (fragment shader)
+    uint64_t InterpLoc          : 3;  // Interpolation location (fragment
                                       // shader)
-    uint32_t PerPatch           : 1;  // Whether this is a per-patch input/
+    uint64_t PerPatch           : 1;  // Whether this is a per-patch input/
                                       // output (tessellation shader)
-    uint32_t StreamId           : 2;  // ID of output stream (geometry shader)
-    uint32_t IsXfb              : 1;  // Whether this is for transform feedback
-    uint32_t XfbBuffer          : 2;  // Transform feedback buffer ID
-    uint32_t XfbOffset          : 16; // Transform feedback offset
-    uint32_t XfbStride          : 17; // Transform feedback stride
-    uint32_t Unused             : 1;
+    uint64_t StreamId           : 2;  // ID of output stream (geometry shader)
+    uint64_t IsXfb              : 1;  // Whether this is for transform feedback
+    uint64_t XfbBuffer          : 2;  // Transform feedback buffer ID
+    uint64_t XfbOffset          : 15; // Transform feedback offset
+    uint64_t XfbStride          : 16; // Transform feedback stride
   };
   uint64_t U64All;
 };

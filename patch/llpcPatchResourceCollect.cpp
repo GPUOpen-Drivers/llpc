@@ -37,6 +37,7 @@
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchResourceCollect.h"
+#include "llpcPipelineShaders.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -57,6 +58,7 @@ PatchResourceCollect::PatchResourceCollect()
     m_hasDynIndexedOutput(false),
     m_pResUsage(nullptr)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchResourceCollectPass(*PassRegistry::getPassRegistry());
 }
 
@@ -69,10 +71,53 @@ bool PatchResourceCollect::runOnModule(
 
     Patch::Init(&module);
 
+    // Process each shader stage, in reverse order.
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            ProcessShader();
+        }
+    }
+
+    if (m_pContext->IsGraphics())
+    {
+
+        // Determine whether or not GS on-chip mode is valid for this pipeline
+        bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+        bool checkGsOnChip = hasGs;
+        if (checkGsOnChip)
+        {
+            // NOTE: Always call CheckGsOnChipValidity() even when GS on-chip mode is disabled, because that method
+            // also computes esGsRingItemSize and gsVsRingItemSize.
+            bool gsOnChip = m_pContext->CheckGsOnChipValidity();
+            m_pContext->SetGsOnChip(gsOnChip);
+        }
+
+        // Do user data node merge for merged shader
+        if (m_pContext->GetGfxIpVersion().major >= 9)
+        {
+            m_pContext->DoUserDataNodeMerge();
+        }
+    }
+
+    return true;
+}
+
+// =====================================================================================================================
+// Process one shader stage
+void PatchResourceCollect::ProcessShader()
+{
+    m_hasPushConstOp = false;
+    m_hasDynIndexedInput = false;
+    m_hasDynIndexedOutput = false;
     m_pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
     // Invoke handling of "call" instruction
-    visit(m_pModule);
+    visit(m_pEntryPoint);
 
     // Disable push constant if not used
     if (m_hasPushConstOp == false)
@@ -113,8 +158,7 @@ bool PatchResourceCollect::runOnModule(
         pCall->dropAllReferences();
         pCall->eraseFromParent();
     }
-
-    return true;
+    m_deadCalls.clear();
 }
 
 // =====================================================================================================================

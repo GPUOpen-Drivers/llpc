@@ -1471,6 +1471,8 @@ isImageAtomicOp(SPIRVImageOpKind ImageOp)
   bool IsAtomicOp = false;
 
   switch (ImageOp) {
+  case ImageOpAtomicLoad:
+  case ImageOpAtomicStore:
   case ImageOpAtomicExchange:
   case ImageOpAtomicCompareExchange:
   case ImageOpAtomicIIncrement:

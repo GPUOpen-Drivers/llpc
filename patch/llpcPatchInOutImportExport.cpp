@@ -39,6 +39,7 @@
 #include "llpcFragColorExport.h"
 #include "llpcGraphicsContext.h"
 #include "llpcPatchInOutImportExport.h"
+#include "llpcPipelineShaders.h"
 #include "llpcVertexFetch.h"
 
 using namespace llvm;
@@ -55,32 +56,38 @@ char PatchInOutImportExport::ID = 0;
 PatchInOutImportExport::PatchInOutImportExport()
     :
     Patch(ID),
-    m_pVertexFetch(nullptr),
-    m_pFragColorExport(nullptr),
-    m_pLastExport(nullptr),
-    m_pClipDistance(nullptr),
-    m_pCullDistance(nullptr),
-    m_pPrimitiveId(nullptr),
-    m_pFragDepth(nullptr),
-    m_pFragStencilRef(nullptr),
-    m_pSampleMask(nullptr),
-    m_pViewportIndex(nullptr),
-    m_pLayer(nullptr),
-    m_hasTs(false),
-    m_hasGs(false),
-    m_pLds(nullptr),
-    m_pThreadId(nullptr)
+    m_pLds(nullptr)
 {
     memset(&m_gfxIp, 0, sizeof(m_gfxIp));
+    InitPerShader();
 
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchInOutImportExportPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 PatchInOutImportExport::~PatchInOutImportExport()
 {
-    delete m_pFragColorExport;
-    delete m_pVertexFetch;
+    LLPC_ASSERT(m_pFragColorExport == nullptr);
+    LLPC_ASSERT(m_pVertexFetch == nullptr);
+}
+
+// =====================================================================================================================
+// Initialize per-shader members
+void PatchInOutImportExport::InitPerShader()
+{
+    m_pVertexFetch = nullptr;
+    m_pFragColorExport = nullptr;
+    m_pLastExport = nullptr;
+    m_pClipDistance = nullptr;
+    m_pCullDistance = nullptr;
+    m_pPrimitiveId = nullptr;
+    m_pFragDepth = nullptr;
+    m_pFragStencilRef = nullptr;
+    m_pSampleMask = nullptr;
+    m_pViewportIndex = nullptr;
+    m_pLayer = nullptr;
+    m_pThreadId = nullptr;
 }
 
 // =====================================================================================================================
@@ -94,10 +101,72 @@ bool PatchInOutImportExport::runOnModule(
 
     m_gfxIp = m_pContext->GetGfxIpVersion();
 
+    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
+                             ShaderStageToMask(ShaderStageTessEval))) != 0);
+    m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+
+    // Create the global variable that is to model LDS
+    // NOTE: ES -> GS ring is always on-chip on GFX9.
+    if (m_hasTs || (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))))
+    {
+        m_pLds = Patch::GetLdsVariable(m_pModule);
+    }
+
+    // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
+    // set by TCS).
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
+    {
+        auto pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (pEntryPoint != nullptr)
+        {
+            InitPerShader();
+            m_pEntryPoint = pEntryPoint;
+            m_shaderStage = ShaderStage(shaderStage);
+            ProcessShader();
+
+            // Now process the call and return instructions.
+            visit(*m_pEntryPoint);
+        }
+    }
+
+    for (auto pCallInst : m_importCalls)
+    {
+        pCallInst->dropAllReferences();
+        pCallInst->eraseFromParent();
+    }
+    m_importCalls.clear();
+
+    for (auto pCallInst : m_exportCalls)
+    {
+        pCallInst->dropAllReferences();
+        pCallInst->eraseFromParent();
+    }
+    m_exportCalls.clear();
+
+    delete m_pFragColorExport;
+    m_pFragColorExport = nullptr;
+
+    delete m_pVertexFetch;
+    m_pVertexFetch = nullptr;
+
+    for (auto& fragColors : m_expFragColors)
+    {
+        fragColors.clear();
+    }
+
+    return true;
+}
+
+// =====================================================================================================================
+// Process a single shader
+void PatchInOutImportExport::ProcessShader()
+{
     if (m_shaderStage == ShaderStageVertex)
     {
         // Create vertex fetch manager
-        m_pVertexFetch = new VertexFetch(m_pModule);
+        m_pVertexFetch = new VertexFetch(m_pEntryPoint);
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
@@ -123,11 +192,6 @@ bool PatchInOutImportExport::runOnModule(
             m_pPrimitiveId = UndefValue::get(m_pContext->Int32Ty());
         }
     }
-
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
-    m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
-                             ShaderStageToMask(ShaderStageTessEval))) != 0);
-    m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
     bool useThreadId = (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9)));
@@ -287,55 +351,6 @@ bool PatchInOutImportExport::runOnModule(
             LLPC_OUTS(")\n\n");
         }
     }
-
-    // Create the global variable that is to model LDS
-    // NOTE: ES -> GS ring is always on-chip on GFX9.
-    if (m_hasTs || (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))))
-    {
-        // Construct LDS type: [ldsSize * i32], address space 3
-        auto ldsSize = m_pContext->GetGpuProperty()->ldsSizePerCu;
-        auto pLdsTy = ArrayType::get(m_pContext->Int32Ty(), ldsSize / sizeof(uint32_t));
-
-        m_pLds = new GlobalVariable(*m_pModule,
-                                    pLdsTy,
-                                    false,
-                                    GlobalValue::ExternalLinkage,
-                                    nullptr,
-                                    "lds",
-                                    nullptr,
-                                    GlobalValue::NotThreadLocal,
-                                    ADDR_SPACE_LOCAL);
-        LLPC_ASSERT(m_pLds != nullptr);
-        m_pLds->setAlignment(sizeof(uint32_t));
-    }
-
-    // Invoke handling of "call" instruction
-    visit(*m_pModule);
-
-    // Collect to-be-removed call instructions (keep unique copy)
-    std::unordered_set<Function*> removedCalls;
-    for (auto pCallInst : m_importCalls)
-    {
-        removedCalls.insert(pCallInst->getCalledFunction());
-        pCallInst->dropAllReferences();
-        pCallInst->eraseFromParent();
-    }
-
-    for (auto pCallInst : m_exportCalls)
-    {
-        removedCalls.insert(pCallInst->getCalledFunction());
-        pCallInst->dropAllReferences();
-        pCallInst->eraseFromParent();
-    }
-
-    // Remove unnecessary call instructions
-    for (auto pCallInst : removedCalls)
-    {
-        pCallInst->dropAllReferences();
-        pCallInst->eraseFromParent();
-    }
-
-    return true;
 }
 
 // =====================================================================================================================
@@ -685,13 +700,17 @@ void PatchInOutImportExport::visitCallInst(
         {
             uint32_t xfbBuffer = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
             uint32_t xfbOffset = value;
+
+            LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
+            auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+            Value* pStreamOutBufDesc = pIntfData->streamOutTable.bufDescs[xfbBuffer];
             switch (m_shaderStage)
             {
             case ShaderStageVertex:
                 {
                     if ((m_hasGs == false) && (m_hasTs == false))
                     {
-                        PatchVsTesXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, pStreamOutBufDesc, &callInst);
                     }
                     break;
                 }
@@ -699,18 +718,19 @@ void PatchInOutImportExport::visitCallInst(
                 {
                     if (m_hasGs == false)
                     {
-                        PatchVsTesXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, pStreamOutBufDesc, &callInst);
                     }
                     break;
                 }
             case ShaderStageGeometry:
                 {
-                    LLPC_NOT_IMPLEMENTED();
+                    // Doing nothing of xfb output in the Geometry shader
                     break;
                 }
             case ShaderStageCopyShader:
                 {
-                    LLPC_NOT_IMPLEMENTED();
+                    pStreamOutBufDesc = callInst.getOperand(2);
+                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, pStreamOutBufDesc, &callInst);
                     break;
                 }
             default:
@@ -957,12 +977,10 @@ void PatchInOutImportExport::visitReturnInst(
     ReturnInst& retInst)  // [in] "Ret" instruction
 {
     // We only handle the "ret" of shader entry point
-    if (retInst.getParent()->getParent()->getDLLStorageClass() != GlobalValue::DLLExportStorageClass)
+    if (m_shaderStage == ShaderStageInvalid)
     {
         return;
     }
-
-    LLPC_ASSERT(retInst.getParent()->getParent() == m_pEntryPoint);
 
     const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
 
@@ -2183,7 +2201,9 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     LLPC_ASSERT(compIdx <= 4);
     auto& genericOutByteSizes =
         m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
-    genericOutByteSizes[streamId][location][compIdx] = byteSize;
+    // Field "genericOutByteSizes" now gets set when generating the copy shader. Just assert that we agree on the
+    // byteSize.
+    LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
 
     if (compCount == 1)
     {
@@ -3816,7 +3836,6 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                     auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, nullptr, pInsertPos);
                     WriteValueToLds(pOutput, pLdsOffset, pInsertPos);
                 }
-
             }
 
             break;
@@ -4324,13 +4343,15 @@ void PatchInOutImportExport::PatchCopyShaderBuiltInOutputExport(
 
 // =====================================================================================================================
 // Patch export calls for transform feedback outputs of vertex shader and tessellation evaluation shader.
-void PatchInOutImportExport::PatchVsTesXfbOutputExport(
-    Value*        pOutput,         // [in] Output value
-    uint32_t      xfbBuffer,       // Transform feedback buffer ID
-    uint32_t      xfbOffset,       // Transform feedback offset
-    Instruction*  pInsertPos)      // [in] Where to insert the store instruction
+void PatchInOutImportExport::PatchXfbOutputExport(
+    Value*        pOutput,            // [in] Output value
+    uint32_t      xfbBuffer,          // Transform feedback buffer ID
+    uint32_t      xfbOffset,          // Transform feedback offset
+    Value*        pStreamOutBufDesc,  // [in] Transform feedback buffer descriptor
+    Instruction*  pInsertPos)         // [in] Where to insert the store instruction
 {
-    LLPC_ASSERT((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval));
+    LLPC_ASSERT((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
+    (m_shaderStage == ShaderStageCopyShader));
 
     auto pOutputTy = pOutput->getType();
     const auto& xfbStrides = m_pContext->
@@ -4338,8 +4359,6 @@ void PatchInOutImportExport::PatchVsTesXfbOutputExport(
 
     uint32_t xfbStride = xfbStrides[xfbBuffer];
 
-    Value* pXfbOffset = ConstantInt::get(m_pContext->Int32Ty(), xfbOffset);
-    auto pXfbBuffer = ConstantInt::get(m_pContext->Int32Ty(), xfbBuffer);
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
 
     // NOTE: x3 vector value is split to x2 and a scalar.
@@ -4350,34 +4369,38 @@ void PatchInOutImportExport::PatchVsTesXfbOutputExport(
         shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
         auto pCompX2 = new ShuffleVectorInst(pOutput, pOutput,
             ConstantVector::get(shuffleMask), "", pInsertPos);
-        StoreValueToStreamOutBuffer(pCompX2, pXfbBuffer, pXfbOffset, xfbStride, pInsertPos);
+        StoreValueToStreamOutBuffer(pCompX2, xfbBuffer, xfbOffset, xfbStride, pStreamOutBufDesc, pInsertPos);
 
         auto pComp = ExtractElementInst::Create(pOutput,
                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
                                                 "",
                                                 pInsertPos);
 
-        pXfbOffset = BinaryOperator::CreateAdd(pXfbOffset,
-                                               ConstantInt::get(m_pContext->Int32Ty(), 2 * sizeof(uint32_t)),
-                                               "",
-                                               pInsertPos);
-
-        StoreValueToStreamOutBuffer(pComp, pXfbBuffer, pXfbOffset, xfbStride, pInsertPos);
+        StoreValueToStreamOutBuffer(pComp, xfbBuffer, xfbOffset + 2 * sizeof(uint32_t), xfbStride,
+            pStreamOutBufDesc, pInsertPos);
     }
     else
     {
-        StoreValueToStreamOutBuffer(pOutput, pXfbBuffer, pXfbOffset, xfbStride, pInsertPos);
+        if (pOutputTy->isVectorTy() && (compCount == 1))
+        {
+            pOutput = ExtractElementInst::Create(pOutput,
+                                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                 "",
+                                                 pInsertPos);
+        }
+        StoreValueToStreamOutBuffer(pOutput, xfbBuffer, xfbOffset, xfbStride, pStreamOutBufDesc, pInsertPos);
     }
 }
 
 // =====================================================================================================================
 // Store value to stream-out buffer
 void PatchInOutImportExport::StoreValueToStreamOutBuffer(
-    Value *       pStoreValue,   // [in] Value to store
-    Value *       pXfbBuffer,    // [in] Transform feedback buffer
-    Value *       pXfbOffset,    // [in] Offset of the store value within transform feedback buffer
-    uint32_t      xfbStride,     // Transform feedback stride
-    Instruction * pInsertPos)    // [in] Where to insert the store instruction
+    Value *       pStoreValue,        // [in] Value to store
+    uint32_t      xfbBuffer,          // Transform feedback buffer
+    uint32_t      xfbOffset,          // Offset of the store value within transform feedback buffer
+    uint32_t      xfbStride,          // Transform feedback stride
+    Value*        pStreamOutBufDesc,  // [in] Transform feedback buffer descriptor
+    Instruction * pInsertPos)         // [in] Where to insert the store instruction
 {
     auto pStoreTy = pStoreValue->getType();
     uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
@@ -4400,10 +4423,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         }
     }
 
-    auto pStreamOutBufDesc = LoadStreamOutBufferDescriptor(pXfbBuffer, pInsertPos);
-
     const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
-
     uint32_t streamOffsets[MaxTransformFeedbackBuffers] = {};
     uint32_t writeIndex = 0;
     uint32_t streamInfo = 0;
@@ -4414,18 +4434,31 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         writeIndex = entryArgIdxs.vs.streamOutData.writeIndex;
         streamInfo = entryArgIdxs.vs.streamOutData.streamInfo;
     }
-    else
+    else if(m_shaderStage == ShaderStageTessEval)
     {
-        LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
         memcpy(streamOffsets, entryArgIdxs.tes.streamOutData.streamOffsets, sizeof(streamOffsets));
         writeIndex = entryArgIdxs.tes.streamOutData.writeIndex;
         streamInfo = entryArgIdxs.tes.streamOutData.streamInfo;
     }
+    else
+    {
+        LLPC_ASSERT(m_shaderStage == ShaderStageCopyShader);
 
-    ConstantInt* pBuffer = dyn_cast<ConstantInt>(pXfbBuffer);
-    LLPC_ASSERT(pBuffer != nullptr);
-    uint32_t xfbBuffer = pBuffer->getZExtValue();
+        writeIndex = CopyShaderUserSgprIdxWriteIndex;
+        streamInfo = CopyShaderUserSgprIdxStreamInfo;
+        auto& inoutUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+        uint32_t streamOffset = CopyShaderUserSgprIdxStreamOffset;
+        for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+        {
+            if (inoutUsage.xfbStrides[i] > 0)
+            {
+                streamOffsets[i] = streamOffset++;
+            }
+        }
+    }
+
     LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
+    LLPC_ASSERT(streamOffsets[xfbBuffer] != 0);
 
     auto pStreamOffset = GetFunctionArgument(m_pEntryPoint, streamOffsets[xfbBuffer]);
 
@@ -4434,9 +4467,6 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
                                               "",
                                               pInsertPos);
 
-    // vertexCount = streamInfo[22:16]
-    // threadValid = threadId < vertexCount
-    // writeIndex = threadValid ? writeIndex : outOfRangeValue
     auto pStreamInfo = GetFunctionArgument(m_pEntryPoint, streamInfo);
 
     // vertexCount = streamInfo[22:16]
@@ -4457,10 +4487,16 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
     Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
 
-    auto pThreadValid = new ICmpInst(pInsertPos, ICmpInst::ICMP_UGT, pVertexCount, m_pThreadId);
+    // writeIndex = (threadId < vertexCount) ? writeIndex : outOfRangeValue
+    auto pThreadValid = new ICmpInst(pInsertPos, ICmpInst::ICMP_ULT, m_pThreadId, pVertexCount);
     // Setup write index for stream-out
     auto pWriteIndex = GetFunctionArgument(m_pEntryPoint, writeIndex);
-    pWriteIndex = SelectInst::Create(pThreadValid, pOutofRangeValue, pWriteIndex, "", pInsertPos);
+    pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pInsertPos);
+
+    if (m_gfxIp.major >= 9)
+    {
+        pWriteIndex = BinaryOperator::CreateAdd(pWriteIndex, m_pThreadId, "", pInsertPos);
+    }
 
     uint32_t format = 0;
     std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
@@ -4500,42 +4536,17 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     //          + xfbOffset
     args.clear();
     args.push_back(pStoreValue);
-    args.push_back(pStreamOutBufDesc);                                // desc
-    args.push_back(pWriteIndex);                                      // vindex
-    args.push_back(pXfbOffset);                                       // offset
-    args.push_back(pStreamOffset);                                    // soffset
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), format));  // format
+    args.push_back(pStreamOutBufDesc);                                   // desc
+    args.push_back(pWriteIndex);                                         // vindex
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), xfbOffset));  // offset
+    args.push_back(pStreamOffset);                                       // soffset
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), format));     // format
 
     CoherentFlag coherent = {};
     coherent.bits.glc = true;
     coherent.bits.slc = true;
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));           // glc, slc
     EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
-}
-
-// =====================================================================================================================
-// Loads stream-out buffer descriptor based on the specified buffer
-Value * PatchInOutImportExport::LoadStreamOutBufferDescriptor(
-    Value*        pXfbBuffer,   // Transform feedback buffer
-    Instruction * pInsertPos   // [in] Where to insert instructions
-    ) const
-{
-    std::vector<Value*> idxs;
-    idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
-
-    LLPC_ASSERT(pXfbBuffer->getType() == m_pContext->Int32Ty());
-    pXfbBuffer = new ZExtInst(pXfbBuffer, m_pContext->Int64Ty(), "", pInsertPos);
-    idxs.push_back(pXfbBuffer);
-
-    auto pStreamOutTablePtr = m_pContext->GetShaderInterfaceData(m_shaderStage)->streamOutTable.pTablePtr;
-    auto pStreamOutBufDescPtr = GetElementPtrInst::Create(nullptr, pStreamOutTablePtr, idxs, "", pInsertPos);
-    pStreamOutBufDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
-
-    auto pStreamOutBufDesc = new LoadInst(pStreamOutBufDescPtr, "", pInsertPos);
-    pStreamOutBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
-    pStreamOutBufDesc->setAlignment(16);
-
-    return pStreamOutBufDesc;
 }
 
 // =====================================================================================================================
@@ -4779,7 +4790,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
 
     // Call buffer store intrinsic
     const auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
-    LLPC_ASSERT(inOutUsage.gs.pGsVsRingBufDesc != nullptr);
+    LLPC_ASSERT(inOutUsage.gs.gsVsOutRingBufDesc[streamId] != nullptr);
 
     const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
     Value* pGsVsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.gs.gsVsOffset);
@@ -4804,7 +4815,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         // complied with.
         std::vector<Value*> args;
         args.push_back(pStoreValue);                                                    // vdata
-        args.push_back(inOutUsage.gs.pGsVsRingBufDesc);                                 // rsrc
+        args.push_back(inOutUsage.gs.gsVsOutRingBufDesc[streamId]);                       // rsrc
         if (m_gfxIp.major <= 9)
         {
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
@@ -5170,7 +5181,7 @@ void PatchInOutImportExport::WriteValueToLds(
         }
     }
 
-    if (m_pContext->IsTessOffChip() && m_shaderStage == ShaderStageTessControl)     // Write to off-chip LDS buffer
+    if (m_pContext->IsTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
     {
         auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
         const auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.tcs;
@@ -5230,7 +5241,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
 
-    // NOTE: Tessellation factors are from tessellation level arry and we have:
+    // NOTE: Tessellation factors are from tessellation level array and we have:
     //   (1) Isoline
     //      tessFactor[0] = gl_TessLevelOuter[1]
     //      tessFactor[1] = gl_TessLevelOuter[0]
@@ -5383,17 +5394,16 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         for (uint32_t i = 0; i < tessFactors.size(); ++i)
         {
             uint32_t  tessFactorByteOffset = i * 4 + tessFactorOffset * 4;
-            if (m_pContext->GetGfxIpVersion().major <= 8)
+            if (m_gfxIp.major <= 8)
             {
-                // NOTE: GFX9 does not support dynamic tessellation control, so additional 4-byte offset is not required for
-                // tessellation off-chip mode.
+                // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
                 tessFactorByteOffset += (m_pContext->IsTessOffChip() ? 4 : 0);
             }
 
             std::vector<Value*> args;
 
-            args.push_back(tessFactors[i]);                                                 // vdata
-            args.push_back(inOutUsage.pTessFactorBufDesc);                                  // rsrc
+            args.push_back(tessFactors[i]);                                                     // vdata
+            args.push_back(inOutUsage.pTessFactorBufDesc);                                      // rsrc
             if (m_gfxIp.major <= 9)
             {
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
@@ -5424,8 +5434,9 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
 
         if (m_pContext->IsTessOffChip())
         {
-            if (m_pContext->GetGfxIpVersion().major != 9)
+            if (m_gfxIp.major <= 8)
             {
+                // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
                 pTfBufferBase = BinaryOperator::CreateAdd(pTfBufferBase,
                                                           ConstantInt::get(m_pContext->Int32Ty(), 4),
                                                           "",
@@ -5480,7 +5491,7 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     argTys.push_back(m_pContext->FloatTy());    // TF value
 
     auto pFuncTy = FunctionType::get(m_pContext->VoidTy(), argTys, false);
-    auto pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, LlpcName::TfBufferStore, m_pModule);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::TfBufferStore, m_pModule);
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::NoUnwind);
@@ -5855,8 +5866,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     // NOTE: Performance analysis shows that 16 patches per thread group is an optimal upper-bound. The value is only
     // an experimental number. For GFX9. 64 is an optimal number instead.
-    const auto gfxIp = m_pContext->GetGfxIpVersion();
-    const uint32_t optimalPatchCountPerThreadGroup = (gfxIp.major >= 9) ? 64 : 16;
+    const uint32_t optimalPatchCountPerThreadGroup = (m_gfxIp.major >= 9) ? 64 : 16;
 
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
 

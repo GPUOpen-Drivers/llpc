@@ -38,6 +38,18 @@
 #include "llpcDebug.h"
 #include "llpcElf.h"
 
+namespace llvm
+{
+
+namespace legacy
+{
+
+class PassManager;
+
+} // legacy
+
+} // llvm
+
 namespace Llpc
 {
 
@@ -48,6 +60,7 @@ namespace Gfx6
 }
 
 class Context;
+class PassManager;
 
 // Represents data entry in a ELF section, including associated ELF symbols.
 struct ElfDataEntry
@@ -68,7 +81,12 @@ public:
 
     static void SetupTargetFeatures(llvm::Module* pModule);
 
-    static Result GenerateCode(llvm::Module* pModule, llvm::raw_pwrite_stream& outStream, std::string& errMsg);
+    static Result AddTargetPasses(Context*                    pContext,
+                                  PassManager&                passMgr,
+                                  llvm::raw_pwrite_stream&    outStream);
+
+    static Result Run(llvm::Module*               pModule,
+                      llvm::legacy::PassManager&  passMgr);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(CodeGenManager);
@@ -78,15 +96,6 @@ private:
 
     static void FatalErrorHandler(void* userData, const std::string& reason, bool gen_crash_diag);
 
-    static Result AddAbiMetadata(Context* pContext, llvm::Module* pModule);
-
-    static Result BuildGraphicsPipelineRegConfig(Context*            pContext,
-                                                 uint8_t**           ppConfig,
-                                                 size_t*             pConfigSize);
-
-    static Result BuildComputePipelineRegConfig(Context*            pContext,
-                                                uint8_t**           ppConfig,
-                                                size_t*             pConfigSize);
 };
 
 } // Llpc

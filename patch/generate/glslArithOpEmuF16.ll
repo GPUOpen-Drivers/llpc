@@ -171,6 +171,78 @@ define spir_func <4 x half> @_Z17convert_half4_rtnDv4_f(<4 x float> %x) #0
     ret <4 x half> %1
 }
 
+; GLSL: float16_t = float16_t(double) (rounding mode: RTZ)
+define spir_func half @_Z16convert_half_rtzd(double %x) #0
+{
+    %1 = fptrunc double %x to float
+    %2 = call half @_Z16convert_half_rtzf(float %1)
+
+    ret half %2
+}
+
+; GLSL: f16vec2 = f16vec2(dvec2) (rounding mode: RTZ)
+define spir_func <2 x half> @_Z17convert_half2_rtzDv2_d(<2 x double> %x) #0
+{
+    %1 = fptrunc <2 x double> %x to <2 x float>
+    %2 = call <2 x half> @_Z17convert_half2_rtzDv2_f(<2 x float> %1)
+
+    ret <2 x half> %2
+}
+
+; GLSL: f16vec3 = f16vec3(dvec3) (rounding mode: RTZ)
+define spir_func <3 x half> @_Z17convert_half3_rtzDv3_d(<3 x double> %x) #0
+{
+    %1 = fptrunc <3 x double> %x to <3 x float>
+    %2 = call <3 x half> @_Z17convert_half3_rtzDv3_f(<3 x float> %1)
+
+    ret <3 x half> %2
+}
+
+; GLSL: f16vec4 = f16vec4(dvec4) (rounding mode: RTZ)
+define spir_func <4 x half> @_Z17convert_half4_rtzDv4_d(<4 x double> %x) #0
+{
+    %1 = fptrunc <4 x double> %x to <4 x float>
+    %2 = call <4 x half> @_Z17convert_half4_rtzDv4_f(<4 x float> %1)
+
+    ret <4 x half> %2
+}
+
+; GLSL: float16_t = float16_t(double) (rounding mode: RTE)
+define spir_func half @_Z16convert_half_rted(double %x) #0
+{
+    %1 = fptrunc double %x to float
+    %2 = call half @_Z16convert_half_rtef(float %1)
+
+    ret half %2
+}
+
+; GLSL: f16vec2 = f16vec2(dvec2) (rounding mode: RTE)
+define spir_func <2 x half> @_Z17convert_half2_rteDv2_d(<2 x double> %x) #0
+{
+    %1 = fptrunc <2 x double> %x to <2 x float>
+    %2 = call <2 x half> @_Z17convert_half2_rteDv2_f(<2 x float> %1)
+
+    ret <2 x half> %2
+}
+
+; GLSL: f16vec3 = f16vec3(dvec3) (rounding mode: RTE)
+define spir_func <3 x half> @_Z17convert_half3_rteDv3_d(<3 x double> %x) #0
+{
+    %1 = fptrunc <3 x double> %x to <3 x float>
+    %2 = call <3 x half> @_Z17convert_half3_rteDv3_f(<3 x float> %1)
+
+    ret <3 x half> %2
+}
+
+; GLSL: f16vec4 = f16vec4(dvec4) (rounding mode: RTE)
+define spir_func <4 x half> @_Z17convert_half4_rteDv4_d(<4 x double> %x) #0
+{
+    %1 = fptrunc <4 x double> %x to <4 x float>
+    %2 = call <4 x half> @_Z17convert_half4_rteDv4_f(<4 x float> %1)
+
+    ret <4 x half> %2
+}
+
 ; =====================================================================================================================
 ; >>>  Angle and Trigonometry Functions
 ; =====================================================================================================================
@@ -714,6 +786,112 @@ define spir_func <4 x half> @_Z4modfDv4_DhPDv4_Dh(
 
     store <4 x half> %12, <4 x half>* %i
     ret <4 x half> %16
+}
+
+; GLSL: float16_t modf(float16_t, out float16_t)
+define spir_func { half, half } @_Z10modfStructDh(
+    half %x) #0
+{
+    %1 = call half @llvm.trunc.f16(half %x)
+    %2 = fsub half %x, %1
+
+    %3 = insertvalue { half, half } undef, half %2, 0
+    %4 = insertvalue { half, half } %3, half %1, 1
+
+    ret { half, half } %4
+}
+
+; GLSL: f16vec2 modf(f16vec2, out f16vec2)
+define spir_func { <2 x half>, <2 x half> } @_Z10modfStructDv2_Dh(
+    <2 x half> %x) #0
+{
+    %x0 = extractelement <2 x half> %x, i32 0
+    %x1 = extractelement <2 x half> %x, i32 1
+
+    %1 = call half @llvm.trunc.f16(half %x0)
+    %2 = fsub half %x0, %1
+
+    %3 = call half @llvm.trunc.f16(half %x1)
+    %4 = fsub half %x1, %3
+
+    %5 = insertelement <2 x half> undef, half %1, i32 0
+    %6 = insertelement <2 x half> %5, half %3, i32 1
+
+    %7 = insertelement <2 x half> undef, half %2, i32 0
+    %8 = insertelement <2 x half> %7, half %4, i32 1
+
+    %9 = insertvalue { <2 x half>, <2 x half> } undef, <2 x half> %8, 0
+    %10 = insertvalue { <2 x half>, <2 x half> } %9, <2 x half> %6, 1
+
+    ret { <2 x half>, <2 x half> } %10
+}
+
+; GLSL: f16vec3 modf(f16vec3, out f16vec3)
+define spir_func { <3 x half>, <3 x half> } @_Z10modfStructDv3_Dh(
+    <3 x half> %x) #0
+{
+    %x0 = extractelement <3 x half> %x, i32 0
+    %x1 = extractelement <3 x half> %x, i32 1
+    %x2 = extractelement <3 x half> %x, i32 2
+
+    %1 = call half @llvm.trunc.f16(half %x0)
+    %2 = fsub half %x0, %1
+
+    %3 = call half @llvm.trunc.f16(half %x1)
+    %4 = fsub half %x1, %3
+
+    %5 = call half @llvm.trunc.f16(half %x2)
+    %6 = fsub half %x2, %5
+
+    %7 = insertelement <3 x half> undef, half %1, i32 0
+    %8 = insertelement <3 x half> %7, half %3, i32 1
+    %9 = insertelement <3 x half> %8, half %5, i32 2
+
+    %10 = insertelement <3 x half> undef, half %2, i32 0
+    %11 = insertelement <3 x half> %10, half %4, i32 1
+    %12 = insertelement <3 x half> %11, half %6, i32 2
+
+    %13 = insertvalue { <3 x half>, <3 x half> } undef, <3 x half> %12, 0
+    %14 = insertvalue { <3 x half>, <3 x half> } %13, <3 x half> %9, 1
+
+    ret { <3 x half>, <3 x half> } %14
+}
+
+; GLSL: f16vec4 modf(f16vec4, out f16vec4)
+define spir_func { <4 x half>, <4 x half> } @_Z10modfStructDv4_Dh(
+    <4 x half> %x) #0
+{
+    %x0 = extractelement <4 x half> %x, i32 0
+    %x1 = extractelement <4 x half> %x, i32 1
+    %x2 = extractelement <4 x half> %x, i32 2
+    %x3 = extractelement <4 x half> %x, i32 3
+
+    %1 = call half @llvm.trunc.f16(half %x0)
+    %2 = fsub half %x0, %1
+
+    %3 = call half @llvm.trunc.f16(half %x1)
+    %4 = fsub half %x1, %3
+
+    %5 = call half @llvm.trunc.f16(half %x2)
+    %6 = fsub half %x2, %5
+
+    %7 = call half @llvm.trunc.f16(half %x3)
+    %8 = fsub half %x3, %7
+
+    %9 = insertelement <4 x half> undef, half %1, i32 0
+    %10 = insertelement <4 x half> %9, half %3, i32 1
+    %11 = insertelement <4 x half> %10, half %5, i32 2
+    %12 = insertelement <4 x half> %11, half %7, i32 3
+
+    %13 = insertelement <4 x half> undef, half %2, i32 0
+    %14 = insertelement <4 x half> %13, half %4, i32 1
+    %15 = insertelement <4 x half> %14, half %6, i32 2
+    %16 = insertelement <4 x half> %15, half %8, i32 3
+
+    %17 = insertvalue { <4 x half>, <4 x half> } undef, <4 x half> %16, 0
+    %18 = insertvalue { <4 x half>, <4 x half> } %17, <4 x half> %12, 1
+
+    ret { <4 x half>, <4 x half> } %18
 }
 
 ; GLSL: float16_t mix(float16_t, float16_t, float16_t)
@@ -1550,6 +1728,107 @@ define spir_func <4 x half> @_Z7refractDv4_DhDv4_DhDh(<4 x half> %I, <4 x half> 
     %10 = insertelement <4 x half> %9, half %4, i32 3
 
     ret <4 x half> %10
+}
+
+; GLSL: float16_t frexp(float16_t, out int)
+define spir_func half @_Z5frexpDhPi(
+    half %x, i32* %i)
+{
+    %1 = call half @llvm.amdgcn.frexp.mant.f16(half %x)
+    %2 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x)
+    %3 = sext i16 %2 to i32
+    store i32 %3, i32* %i
+    ret half %1
+}
+
+; GLSL: f16vec2 frexp(f16vec2, out ivec2)
+define spir_func <2 x half> @_Z5frexpDv2_DhPDv2_i
+    (<2 x half> %x, <2 x i32>* %i)
+{
+    %x0 = extractelement <2 x half> %x, i32 0
+    %x1 = extractelement <2 x half> %x, i32 1
+
+    %1 = call half @llvm.amdgcn.frexp.mant.f16(half %x0)
+    %2 = call half @llvm.amdgcn.frexp.mant.f16(half %x1)
+
+    %3 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x0)
+    %4 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x1)
+
+    %5 = insertelement <2 x half> undef, half %1, i32 0
+    %6 = insertelement <2 x half> %5, half %2, i32 1
+
+    %7 = insertelement <2 x i16> undef, i16 %3, i32 0
+    %8 = insertelement <2 x i16> %7, i16 %4, i32 1
+
+    %9 = sext <2 x i16> %8 to <2 x i32>
+    store <2 x i32> %9, <2 x i32>* %i
+
+    ret <2 x half> %6
+}
+
+; GLSL: f16vec3 frexp(f16vec3, out ivec3)
+define spir_func <3 x half> @_Z5frexpDv3_DhPDv3_i
+    (<3 x half> %x, <3 x i32>* %i)
+{
+    %x0 = extractelement <3 x half> %x, i32 0
+    %x1 = extractelement <3 x half> %x, i32 1
+    %x2 = extractelement <3 x half> %x, i32 2
+
+    %1 = call half @llvm.amdgcn.frexp.mant.f16(half %x0)
+    %2 = call half @llvm.amdgcn.frexp.mant.f16(half %x1)
+    %3 = call half @llvm.amdgcn.frexp.mant.f16(half %x2)
+
+    %4 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x0)
+    %5 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x1)
+    %6 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x2)
+
+    %7 = insertelement <3 x half> undef, half %1, i32 0
+    %8 = insertelement <3 x half> %7, half %2, i32 1
+    %9 = insertelement <3 x half> %8, half %3, i32 2
+
+    %10 = insertelement <3 x i16> undef, i16 %4, i32 0
+    %11 = insertelement <3 x i16> %10, i16 %5, i32 1
+    %12 = insertelement <3 x i16> %11, i16 %6, i32 2
+
+    %13 = sext <3 x i16> %12 to <3 x i32>
+    store <3 x i32> %13, <3 x i32>* %i
+
+    ret <3 x half> %9
+}
+
+; GLSL: f16vec4 frexp(f16vec4, out ivec4)
+define spir_func <4 x half> @_Z5frexpDv4_DhPDv4_i
+    (<4 x half> %x, <4 x i32>* %i)
+{
+    %x0 = extractelement <4 x half> %x, i32 0
+    %x1 = extractelement <4 x half> %x, i32 1
+    %x2 = extractelement <4 x half> %x, i32 2
+    %x3 = extractelement <4 x half> %x, i32 3
+
+    %1 = call half @llvm.amdgcn.frexp.mant.f16(half %x0)
+    %2 = call half @llvm.amdgcn.frexp.mant.f16(half %x1)
+    %3 = call half @llvm.amdgcn.frexp.mant.f16(half %x2)
+    %4 = call half @llvm.amdgcn.frexp.mant.f16(half %x3)
+
+    %5 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x0)
+    %6 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x1)
+    %7 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x2)
+    %8 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x3)
+
+    %9  = insertelement <4 x half> undef, half %1, i32 0
+    %10 = insertelement <4 x half> %9, half %2, i32 1
+    %11 = insertelement <4 x half> %10, half %3, i32 2
+    %12 = insertelement <4 x half> %11, half %4, i32 3
+
+    %13 = insertelement <4 x i16> undef, i16 %5, i32 0
+    %14 = insertelement <4 x i16> %13, i16 %6, i32 1
+    %15 = insertelement <4 x i16> %14, i16 %7, i32 2
+    %16 = insertelement <4 x i16> %15, i16 %8, i32 3
+
+    %17 = sext <4 x i16> %16 to <4 x i32>
+    store <4 x i32> %17, <4 x i32>* %i
+
+    ret <4 x half> %12
 }
 
 ; GLSL: float16_t frexp(float16_t, out int16_t)

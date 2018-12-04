@@ -178,6 +178,10 @@ llpc.image.write.Dim1D|2D|3D|Cube|1DArray|2DArray|CubeArray.lod
 llpc.image.querylod.Dim1D|2D|3D|Cube
 
 # Image atomic instruction
+llpc.image.atomicload.Dim1D|2D|3D|Rect|Cube|Buffer|1DArray|2DArray|CubeArray
+llpc.image.atomicload.Dim2D|2DArray.sample
+llpc.image.atomicstore.Dim1D|2D|3D|Rect|Cube|Buffer|1DArray|2DArray|CubeArray
+llpc.image.atomicstore.Dim2D|2DArray.sample
 llpc.image.atomicexchange.Dim1D|2D|3D|Rect|Cube|Buffer|1DArray|2DArray|CubeArray
 llpc.image.atomicexchange.Dim2D|2DArray.sample
 llpc.image.atomiccompexchange.Dim1D|2D|3D|Rect|Cube|Buffer|1DArray|2DArray|CubeArray

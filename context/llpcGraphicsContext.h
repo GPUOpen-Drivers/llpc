@@ -84,6 +84,9 @@ public:
 
     virtual void DoUserDataNodeMerge();
 
+    // Gets the count of vertices per primitive
+    virtual uint32_t GetVerticesPerPrimitive() const;
+
     // Gets wave size for the specified shader stage
     virtual uint32_t GetShaderWaveSize(ShaderStage stage);
 

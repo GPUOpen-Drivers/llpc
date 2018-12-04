@@ -37,6 +37,7 @@
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchBufferOp.h"
+#include "llpcPipelineShaders.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -53,6 +54,7 @@ PatchBufferOp::PatchBufferOp()
     :
     Patch(ID)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchBufferOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -64,9 +66,19 @@ bool PatchBufferOp::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
     Patch::Init(&module);
+    m_changed = false;
 
     // Invoke handling of "call" instruction
-    visit(m_pModule);
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            visit(*m_pEntryPoint);
+        }
+    }
 
     for (auto pCall : m_replacedCalls)
     {
@@ -74,8 +86,9 @@ bool PatchBufferOp::runOnModule(
         pCall->dropAllReferences();
         pCall->eraseFromParent();
     }
+    m_replacedCalls.clear();
 
-    return true;
+    return m_changed;
 }
 
 // =====================================================================================================================
@@ -98,6 +111,7 @@ void PatchBufferOp::visitCallInst(
     }
     else if (mangledName.startswith(LlpcName::BufferCallPrefix))
     {
+        m_changed = true;
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
         auto isNonUniform = cast<ConstantInt>(callInst.getOperand(callInst.getNumArgOperands() - 1))->getZExtValue();

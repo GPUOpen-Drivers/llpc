@@ -45,11 +45,8 @@ target triple = "spir64-unknown-unknown"
 ; }
 ;
 
-target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024"
-target triple = "spir64-unknown-unknown"
-
 ; Loads descriptor of GS-VS ring buffer (only stream 0 is supported)
-define <4 x i32> @llpc.descriptor.load.gsvsringbuffer(i32 %internalTablePtrLow, i64 %ringOutOffset) #0
+define <4 x i32> @llpc.descriptor.load.internalbuffer(i32 %internalTablePtrLow, i64 %offset) #0
 {
     ; Get address high word from program counter
     %1 = call i64 @llvm.amdgcn.s.getpc()
@@ -59,46 +56,17 @@ define <4 x i32> @llpc.descriptor.load.gsvsringbuffer(i32 %internalTablePtrLow, 
     %4 = insertelement <2 x i32> undef, i32 %internalTablePtrLow, i32 0
     %5 = insertelement <2 x i32> %4, i32 %3, i32 1
     %6 = bitcast <2 x i32> %5 to i64
-    %7 = shl i64 %ringOutOffset, 4
+    %7 = shl i64 %offset, 4
     %8 = add i64 %6, %7
-    ; This uses addrspace(2), which is SPIRAS::Constant. The PatchAddrSpaceMutate pass then changes
-    ; it to addrspace(4), which is AMDGPUAS::Constant.
-    %9 = inttoptr i64 %8 to <4 x i32> addrspace(2)*, !amdgpu.uniform !1
-    %10 = load <4 x i32>, <4 x i32> addrspace(2)* %9
+    ; This uses addrspace(4), which is AMDGPUAS::Constant.
+    %9 = inttoptr i64 %8 to <4 x i32> addrspace(4)*, !amdgpu.uniform !0
+    %10 = load <4 x i32>, <4 x i32> addrspace(4)* %9
 
     ret <4 x i32> %10
-}
-
-; Copy shader skeleton
-define dllexport amdgpu_vs void @_amdgpu_vs_main(
-    i32 inreg,  ; Internal table
-    i32 inreg,  ; Shader table
-    i32 inreg,  ; Stream-out table
-    i32 inreg,  ; ES-GS size
-    i32 inreg,  ; Stream info
-    i32 inreg,  ; Stream-out write index
-    i32 inreg,  ; Stream offset0
-    i32 inreg,  ; Stream offset1
-    i32 inreg,  ; Stream offset2
-    i32 inreg,  ; Stream offset3
-    i32
-    ) #0 !spirv.ExecutionModel !3 {
-.entry:
-    ret void
 }
 
 declare i64 @llvm.amdgcn.s.getpc() #0
 
 attributes #0 = { nounwind }
 
-!opencl.kernels = !{}
-!opencl.enable.FP_CONTRACT = !{}
-!spirv.Source = !{!0}
-!opencl.used.extensions = !{!1}
-!opencl.used.optional.core.features = !{!1}
-!spirv.Generator = !{!2}
-
-!0 = !{i32 2, i32 450}
-!1 = !{}
-!2 = !{i16 8, i16 1}
-!3 = !{i32 1024}
+!0 = !{}

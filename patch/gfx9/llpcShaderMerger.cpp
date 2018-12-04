@@ -28,28 +28,32 @@
  * @brief LLPC source file: contains implementation of class Llpc::ShaderMerger.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-shader-merger"
-
-#include "llvm/Linker/Linker.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 
+#include "llpcCodeGenManager.h"
 #include "llpcContext.h"
+#include "llpcPassDeadFuncRemove.h"
+#include "llpcPassExternalLibLink.h"
+#include "llpcPatch.h"
+#include "llpcPipelineShaders.h"
 #include "llpcShaderMerger.h"
 
-using namespace llvm;
+#define DEBUG_TYPE "llpc-shader-merger"
 
-namespace Llpc
-{
+using namespace llvm;
+using namespace Llpc;
 
 // =====================================================================================================================
 ShaderMerger::ShaderMerger(
-    Context* pContext)  // [in] LLPC context
+    Context*          pContext,           // [in] LLPC context
+    PipelineShaders*  pPipelineShaders)   // [in] API shaders in the pipeline
     :
     m_pContext(pContext),
-    m_gfxIp(m_pContext->GetGfxIpVersion())
+    m_gfxIp(m_pContext->GetGfxIpVersion()),
+    m_pPipelineShaders(pPipelineShaders)
 {
     LLPC_ASSERT(m_gfxIp.major >= 9);
     LLPC_ASSERT(m_pContext->IsGraphics());
@@ -59,198 +63,6 @@ ShaderMerger::ShaderMerger(
     m_hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
     m_hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
     m_hasGs  = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
-}
-
-// =====================================================================================================================
-// Builds LLVM module for hardware LS-HS merged shader.
-Result ShaderMerger::BuildLsHsMergedShader(
-    Module*  pLsModule,     // [in] Hardware local shader (LS)
-    Module*  pHsModule,     // [in] Hardware hull shader (HS)
-    Module** ppLsHsModule   // [out] Hardware LS-HS merged shader
-    ) const
-{
-    Result result = Result::Success;
-
-    LLPC_ASSERT((pLsModule != nullptr) || (pHsModule != nullptr)); // At least, one of them must be present
-
-    Module* pLsHsModule = new Module("llpcLsHsMergeShader", *m_pContext);
-    if (pLsHsModule != nullptr)
-    {
-        m_pContext->SetModuleTargetMachine(pLsHsModule);
-    }
-    else
-    {
-        result = Result::ErrorOutOfMemory;
-    }
-
-    if (result == Result::Success)
-    {
-        Linker linker(*pLsHsModule);
-
-        if (pLsModule != nullptr)
-        {
-            auto pLsEntryPoint = GetEntryPoint(pLsModule);
-            pLsEntryPoint->setName(LlpcName::LsEntryPoint);
-            pLsEntryPoint->setCallingConv(CallingConv::C);
-            pLsEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
-
-            if (linker.linkInModule(std::unique_ptr<Module>(pLsModule)))
-            {
-                LLPC_ERRS("Fails to link LS into LS-HS merged shader\n");
-                result = Result::ErrorInvalidShader;
-            }
-            else
-            {
-                // Set "private" keyword to make this function as locally accessible
-                pLsEntryPoint = pLsHsModule->getFunction(LlpcName::LsEntryPoint);
-                LLPC_ASSERT(pLsEntryPoint != nullptr);
-                pLsEntryPoint->setLinkage(GlobalValue::PrivateLinkage);
-            }
-        }
-
-        if ((result == Result::Success) && (pHsModule != nullptr))
-        {
-            auto pHsEntryPoint = GetEntryPoint(pHsModule);
-            pHsEntryPoint->setName(LlpcName::HsEntryPoint);
-            pHsEntryPoint->setCallingConv(CallingConv::C);
-            pHsEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
-
-            if (linker.linkInModule(std::unique_ptr<Module>(pHsModule)))
-            {
-                LLPC_ERRS("Fails to link HS into LS-HS merged shader\n");
-                result = Result::ErrorInvalidShader;
-            }
-            else
-            {
-                // Set "private" keyword to make this function as locally accessible
-                pHsEntryPoint = pLsHsModule->getFunction(LlpcName::HsEntryPoint);
-                LLPC_ASSERT(pHsEntryPoint != nullptr);
-                pHsEntryPoint->setLinkage(GlobalValue::PrivateLinkage);
-            }
-        }
-
-        if (result == Result::Success)
-        {
-            GenerateLsHsEntryPoint(pLsHsModule);
-
-            std::string errMsg;
-            raw_string_ostream errStream(errMsg);
-            if (verifyModule(*pLsHsModule, &errStream))
-            {
-                LLPC_ERRS("Fails to verify LS-HS merged shader: " << errStream.str() << "\n");
-                result = Result::ErrorInvalidShader;
-            }
-        }
-    }
-
-    if (result != Result::Success)
-    {
-        if (pLsHsModule != nullptr)
-        {
-            delete pLsHsModule;
-            pLsHsModule = nullptr;
-        }
-    }
-
-    *ppLsHsModule = pLsHsModule;
-
-    return result;
-}
-
-// =====================================================================================================================
-// Builds LLVM module for hardware ES-GS merged shader.
-Result ShaderMerger::BuildEsGsMergedShader(
-    Module*  pEsModule,     // [in] Hardware export shader (ES)
-    Module*  pGsModule,     // [in] Hardware geometry shader (GS)
-    Module** ppEsGsModule   // [out] Hardware ES-GS merged shader
-    ) const
-{
-    Result result = Result::Success;
-
-    LLPC_ASSERT(pGsModule != nullptr); // At least, GS module must be present
-
-    Module* pEsGsModule = new Module("llpcEsGsMergeShader", *m_pContext);
-    if (pEsGsModule != nullptr)
-    {
-        m_pContext->SetModuleTargetMachine(pEsGsModule);
-    }
-    else
-    {
-        result = Result::ErrorOutOfMemory;
-    }
-
-    if (result == Result::Success)
-    {
-        Linker linker(*pEsGsModule);
-
-        if (pEsModule != nullptr)
-        {
-            auto pEsEntryPoint = GetEntryPoint(pEsModule);
-            pEsEntryPoint->setName(LlpcName::EsEntryPoint);
-            pEsEntryPoint->setCallingConv(CallingConv::C);
-            pEsEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
-
-            if (linker.linkInModule(std::unique_ptr<Module>(pEsModule)))
-            {
-                LLPC_ERRS("Fails to link ES into ES-GS merged shader\n");
-                result = Result::ErrorInvalidShader;
-            }
-            else
-            {
-                // Set "private" keyword to make this function as locally accessible
-                pEsEntryPoint = pEsGsModule->getFunction(LlpcName::EsEntryPoint);
-                LLPC_ASSERT(pEsEntryPoint != nullptr);
-                pEsEntryPoint->setLinkage(GlobalValue::PrivateLinkage);
-            }
-        }
-
-        if (result == Result::Success)
-        {
-            auto pGsEntryPoint = GetEntryPoint(pGsModule);
-            pGsEntryPoint->setName(LlpcName::GsEntryPoint);
-            pGsEntryPoint->setCallingConv(CallingConv::C);
-            pGsEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
-
-            if (linker.linkInModule(std::unique_ptr<Module>(pGsModule)))
-            {
-                LLPC_ERRS("Fails to link GS into ES-GS merged shader\n");
-                result = Result::ErrorInvalidShader;
-            }
-            else
-            {
-                // Set "private" keyword to make this function as locally accessible
-                pGsEntryPoint = pEsGsModule->getFunction(LlpcName::GsEntryPoint);
-                LLPC_ASSERT(pGsEntryPoint != nullptr);
-                pGsEntryPoint->setLinkage(GlobalValue::PrivateLinkage);
-            }
-        }
-
-        if (result == Result::Success)
-        {
-            GenerateEsGsEntryPoint(pEsGsModule);
-
-            std::string errMsg;
-            raw_string_ostream errStream(errMsg);
-            if (verifyModule(*pEsGsModule, &errStream))
-            {
-                LLPC_ERRS("Fails to verify ES-GS merged shader: " << errStream.str() << "\n");
-                result = Result::ErrorInvalidShader;
-            }
-        }
-    }
-
-    if (result != Result::Success)
-    {
-        if (pEsGsModule != nullptr)
-        {
-            delete pEsGsModule;
-            pEsGsModule = nullptr;
-        }
-    }
-
-    *ppEsGsModule = pEsGsModule;
-
-    return result;
 }
 
 // =====================================================================================================================
@@ -317,23 +129,26 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
 
 // =====================================================================================================================
 // Generates the new entry-point for LS-HS merged shader.
-void ShaderMerger::GenerateLsHsEntryPoint(
-    Module* pLsHsModule   // [in,out] Hardware LS-HS merged shader
-    ) const
+Function* ShaderMerger::GenerateLsHsEntryPoint(
+    Function* pLsEntryPoint,  // [in] Entry-point of hardware local shader (LS)
+    Function* pHsEntryPoint)  // [in] Entry-point of hardware hull shader (HS), could be null
 {
+    if (pLsEntryPoint != nullptr)
+    {
+        pLsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    }
+    pHsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+
     uint64_t inRegMask = 0;
     auto pEntryPointTy = GenerateLsHsEntryPointType(&inRegMask);
 
-    const char* pEntryName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::HsMainEntry)];
-
+    // Create the entrypoint for the merged shader, and insert it just before the old HS.
     Function* pEntryPoint = Function::Create(pEntryPointTy,
                                              GlobalValue::ExternalLinkage,
-                                             pEntryName,
-                                             pLsHsModule);
+                                             LlpcName::LsHsEntryPoint);
+    auto pModule = pHsEntryPoint->getParent();
+    pModule->getFunctionList().insert(pHsEntryPoint->getIterator(), pEntryPoint);
 
-    pEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
-    pEntryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
     pEntryPoint->addFnAttr("amdgpu-max-work-group-size", "128"); // Force s_barrier to be present (ignore optimization)
 
     for (auto& arg : pEntryPoint->args())
@@ -415,7 +230,7 @@ void ShaderMerger::GenerateLsHsEntryPoint(
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    EmitCall(pLsHsModule, "llvm.amdgcn.init.exec", m_pContext->VoidTy(), args, attribs, pEntryBlock);
+    EmitCall(pModule, "llvm.amdgcn.init.exec", m_pContext->VoidTy(), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
@@ -424,14 +239,14 @@ void ShaderMerger::GenerateLsHsEntryPoint(
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    auto pThreadId = EmitCall(pLsHsModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     {
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
         args.push_back(pThreadId);
 
-        pThreadId = EmitCall(pLsHsModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     }
 
     args.clear();
@@ -442,7 +257,7 @@ void ShaderMerger::GenerateLsHsEntryPoint(
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
 
-    auto pLsVertCount = EmitCall(pLsHsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pLsVertCount = EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     Value* pPatchId     = pArg;
     Value* pRelPatchId  = (pArg + 1);
@@ -456,8 +271,7 @@ void ShaderMerger::GenerateLsHsEntryPoint(
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
 
-    auto pHsVertCount =
-        EmitCall(pLsHsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pHsVertCount = EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
     auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
@@ -486,9 +300,6 @@ void ShaderMerger::GenerateLsHsEntryPoint(
 
         auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
         const uint32_t userDataCount = pIntfData->userDataCount;
-
-        auto pLsEntryPoint = pLsHsModule->getFunction(LlpcName::LsEntryPoint);
-        LLPC_ASSERT(pLsEntryPoint != nullptr);
 
         uint32_t userDataIdx = 0;
 
@@ -566,7 +377,7 @@ void ShaderMerger::GenerateLsHsEntryPoint(
 
         LLPC_ASSERT(lsArgIdx == lsArgCount); // Must have visit all arguments of LS entry point
 
-        EmitCall(pLsHsModule, LlpcName::LsEntryPoint, m_pContext->VoidTy(), args, NoAttrib, pBeginLsBlock);
+        CallInst::Create(pLsEntryPoint, args, "", pBeginLsBlock);
     }
     BranchInst::Create(pEndLsBlock, pBeginLsBlock);
 
@@ -574,7 +385,7 @@ void ShaderMerger::GenerateLsHsEntryPoint(
     args.clear();
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
-    EmitCall(pLsHsModule, "llvm.amdgcn.s.barrier", m_pContext->VoidTy(), args, attribs, pEndLsBlock);
+    EmitCall(pModule, "llvm.amdgcn.s.barrier", m_pContext->VoidTy(), args, attribs, pEndLsBlock);
 
     auto pHsEnable = new ICmpInst(*pEndLsBlock, ICmpInst::ICMP_ULT, pThreadId, pHsVertCount, "");
     BranchInst::Create(pBeginHsBlock, pEndHsBlock, pHsEnable, pEndLsBlock);
@@ -587,9 +398,6 @@ void ShaderMerger::GenerateLsHsEntryPoint(
 
         auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessControl);
         const uint32_t userDataCount = pIntfData->userDataCount;
-
-        auto pHsEntryPoint = pLsHsModule->getFunction(LlpcName::HsEntryPoint);
-        LLPC_ASSERT(pHsEntryPoint != nullptr);
 
         uint32_t userDataIdx = 0;
 
@@ -670,12 +478,14 @@ void ShaderMerger::GenerateLsHsEntryPoint(
 
         LLPC_ASSERT(hsArgIdx == pHsEntryPoint->arg_size()); // Must have visit all arguments of HS entry point
 
-        EmitCall(pLsHsModule, LlpcName::HsEntryPoint, m_pContext->VoidTy(), args, NoAttrib, pBeginHsBlock);
+        CallInst::Create(pHsEntryPoint, args, "", pBeginHsBlock);
     }
     BranchInst::Create(pEndHsBlock, pBeginHsBlock);
 
     // Construct ".endhs" block
     ReturnInst::Create(*m_pContext, pEndHsBlock);
+
+    return pEntryPoint;
 }
 
 // =====================================================================================================================
@@ -717,9 +527,6 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
 
     const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
     userDataCount = std::max(pIntfData->userDataCount, userDataCount);
-
-    // The user data register for ES-GS LDS size is not used for GFX9+
-    LLPC_ASSERT(pIntfData->userDataUsage.gs.esGsLdsSize == 0);
 
     if (hasTs)
     {
@@ -785,25 +592,28 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
 
 // =====================================================================================================================
 // Generates the new entry-point for ES-GS merged shader.
-void ShaderMerger::GenerateEsGsEntryPoint(
-    Module* pEsGsModule   // [in,out] Hardware ES-GS merged shader
-    ) const
+Function* ShaderMerger::GenerateEsGsEntryPoint(
+    Function* pEsEntryPoint,  // [in] Entry-point of hardware export shader (ES), can be null
+    Function* pGsEntryPoint)  // [in] Entry-point of hardware geometry shader (GS)
 {
+    if (pEsEntryPoint != nullptr)
+    {
+        pEsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    }
+    pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+
+    auto pModule = pGsEntryPoint->getParent();
     const bool hasTs = (m_hasTcs || m_hasTes);
 
     uint64_t inRegMask = 0;
     auto pEntryPointTy = GenerateEsGsEntryPointType(&inRegMask);
 
-    const char* pEntryName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::GsMainEntry)];
-
+    // Create the entrypoint for the merged shader, and insert it just before the old GS.
     Function* pEntryPoint = Function::Create(pEntryPointTy,
                                              GlobalValue::ExternalLinkage,
-                                             pEntryName,
-                                             pEsGsModule);
+                                             LlpcName::EsGsEntryPoint);
+    pModule->getFunctionList().insert(pGsEntryPoint->getIterator(), pEntryPoint);
 
-    pEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-    pEntryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
     pEntryPoint->addFnAttr("amdgpu-max-work-group-size", "128"); // Force s_barrier to be present (ignore optimization)
 
     for (auto& arg : pEntryPoint->args())
@@ -881,7 +691,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    EmitCall(pEsGsModule, "llvm.amdgcn.init.exec", m_pContext->VoidTy(), args, attribs, pEntryBlock);
+    EmitCall(pModule, "llvm.amdgcn.init.exec", m_pContext->VoidTy(), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
@@ -890,14 +700,14 @@ void ShaderMerger::GenerateEsGsEntryPoint(
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    auto pThreadId = EmitCall(pEsGsModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     {
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
         args.push_back(pThreadId);
 
-        pThreadId = EmitCall(pEsGsModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     }
 
     args.clear();
@@ -908,21 +718,21 @@ void ShaderMerger::GenerateEsGsEntryPoint(
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
 
-    auto pEsVertCount = EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pEsVertCount = EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(pMergedWaveInfo);
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
 
-    auto pGsPrimCount = EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pGsPrimCount = EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(pMergedWaveInfo);
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
 
-    auto pGsWaveId = EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pGsWaveId = EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(pMergedWaveInfo);
@@ -930,7 +740,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 4));
 
     auto pWaveInSubgroup =
-        EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
     auto pEsGsOffset =
         BinaryOperator::CreateMul(pWaveInSubgroup,
@@ -980,9 +790,6 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         auto pIntfData = m_pContext->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
         const uint32_t userDataCount = pIntfData->userDataCount;
         spillTableIdx = pIntfData->userDataUsage.spillTable;
-
-        auto pEsEntryPoint = pEsGsModule->getFunction(LlpcName::EsEntryPoint);
-        LLPC_ASSERT(pEsEntryPoint != nullptr);
 
         uint32_t userDataIdx = 0;
 
@@ -1095,7 +902,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
 
         LLPC_ASSERT(esArgIdx == esArgCount); // Must have visit all arguments of ES entry point
 
-        EmitCall(pEsGsModule, LlpcName::EsEntryPoint, m_pContext->VoidTy(), args, NoAttrib, pBeginEsBlock);
+        CallInst::Create(pEsEntryPoint, args, "", pBeginEsBlock);
     }
     BranchInst::Create(pEndEsBlock, pBeginEsBlock);
 
@@ -1103,7 +910,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
     args.clear();
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
-    EmitCall(pEsGsModule, "llvm.amdgcn.s.barrier", m_pContext->VoidTy(), args, attribs, pEndEsBlock);
+    EmitCall(pModule, "llvm.amdgcn.s.barrier", m_pContext->VoidTy(), args, attribs, pEndEsBlock);
 
     auto pGsEnable = new ICmpInst(*pEndEsBlock, ICmpInst::ICMP_ULT, pThreadId, pGsPrimCount, "");
     BranchInst::Create(pBeginGsBlock, pEndGsBlock, pGsEnable, pEndEsBlock);
@@ -1119,7 +926,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
 
         auto pEsGsOffset0 =
-            EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets01);
@@ -1127,7 +934,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
 
         auto pEsGsOffset1 =
-            EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets23);
@@ -1135,7 +942,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
 
         auto pEsGsOffset2 =
-            EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets23);
@@ -1143,7 +950,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
 
         auto pEsGsOffset3 =
-            EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets45);
@@ -1151,7 +958,7 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
 
         auto pEsGsOffset4 =
-            EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets45);
@@ -1159,16 +966,13 @@ void ShaderMerger::GenerateEsGsEntryPoint(
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
 
         auto pEsGsOffset5 =
-            EmitCall(pEsGsModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
 
         // Call GS main function
         args.clear();
 
         auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
         const uint32_t userDataCount = pIntfData->userDataCount;
-
-        auto pGsEntryPoint = pEsGsModule->getFunction(LlpcName::GsEntryPoint);
-        LLPC_ASSERT(pGsEntryPoint != nullptr);
 
         uint32_t userDataIdx = 0;
 
@@ -1262,12 +1066,12 @@ void ShaderMerger::GenerateEsGsEntryPoint(
 
         LLPC_ASSERT(gsArgIdx == pGsEntryPoint->arg_size()); // Must have visit all arguments of GS entry point
 
-        EmitCall(pEsGsModule, LlpcName::GsEntryPoint, m_pContext->VoidTy(), args, NoAttrib, pBeginGsBlock);
+        CallInst::Create(pGsEntryPoint, args, "", pBeginGsBlock);
     }
     BranchInst::Create(pEndGsBlock, pBeginGsBlock);
 
     // Construct ".endgs" block
     ReturnInst::Create(*m_pContext, pEndGsBlock);
-}
 
-} // Llpc
+    return pEntryPoint;
+}

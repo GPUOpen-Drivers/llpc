@@ -59,9 +59,12 @@ namespace Llpc
 {
 
 // Forward declaration
-std::ostream& operator<<(std::ostream& out, VkVertexInputRate  inputRate);
-std::ostream& operator<<(std::ostream& out, VkFormat           format);
-std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology topology);
+std::ostream& operator<<(std::ostream& out, VkVertexInputRate       inputRate);
+std::ostream& operator<<(std::ostream& out, VkFormat                format);
+std::ostream& operator<<(std::ostream& out, VkPrimitiveTopology     topology);
+std::ostream& operator<<(std::ostream& out, VkPolygonMode           polygonMode);
+std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits      cullMode);
+std::ostream& operator<<(std::ostream& out, VkFrontFace             frontFace);
 std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType type);
 
 template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
@@ -621,6 +624,7 @@ void PipelineDumper::DumpComputeStateInfo(
     dumpFile << "deviceIndex = " << pPipelineInfo->deviceIndex << "\n";
     dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
     dumpFile << "autoLayoutDesc = " << pPipelineInfo->options.autoLayoutDesc << "\n";
+    dumpFile << "scalarBlockLayout = " << pPipelineInfo->options.scalarBlockLayout << "\n";
 }
 
 // =====================================================================================================================
@@ -661,12 +665,13 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "samplePatternIdx = " << pPipelineInfo->rsState.samplePatternIdx << "\n";
     dumpFile << "usrClipPlaneMask = " << static_cast<uint32_t>(pPipelineInfo->rsState.usrClipPlaneMask) << "\n";
     dumpFile << "polygonMode = " << pPipelineInfo->rsState.polygonMode << "\n";
-    dumpFile << "cullMode = " << pPipelineInfo->rsState.cullMode << "\n";
+    dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pPipelineInfo->rsState.cullMode) << "\n";
     dumpFile << "frontFace = " << pPipelineInfo->rsState.frontFace << "\n";
     dumpFile << "depthBiasEnable = " << pPipelineInfo->rsState.depthBiasEnable << "\n";
 
     dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
     dumpFile << "autoLayoutDesc = " << pPipelineInfo->options.autoLayoutDesc << "\n";
+    dumpFile << "scalarBlockLayout = " << pPipelineInfo->options.scalarBlockLayout << "\n";
 
     dumpFile << "alphaToCoverageEnable = " << pPipelineInfo->cbState.alphaToCoverageEnable << "\n";
     dumpFile << "dualSourceBlendEnable = " << pPipelineInfo->cbState.dualSourceBlendEnable << "\n";
@@ -830,6 +835,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
 
     hasher.Update(pPipeline->options.includeDisassembly);
     hasher.Update(pPipeline->options.autoLayoutDesc);
+    hasher.Update(pPipeline->options.scalarBlockLayout);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -850,6 +856,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     hasher.Update(pPipeline->deviceIndex);
     hasher.Update(pPipeline->options.includeDisassembly);
     hasher.Update(pPipeline->options.autoLayoutDesc);
+    hasher.Update(pPipeline->options.scalarBlockLayout);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -1524,10 +1531,77 @@ std::ostream& operator<<(
 }
 
 // =====================================================================================================================
+// Translates enum "VkPolygonMode" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&       out,            // [out] Output stream
+    VkPolygonMode       polygonMode)    // Rendering mode
+{
+    const char* pString = nullptr;
+    switch (polygonMode)
+    {
+    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL)
+    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_LINE)
+    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_POINT)
+    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL_RECTANGLE_NV)
+    CASE_ENUM_TO_STRING(VK_POLYGON_MODE_MAX_ENUM)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return out << pString;
+}
+
+// =====================================================================================================================
+// Translates enum "VkCullModeFlagBits" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&       out,         // [out] Output stream
+    VkCullModeFlagBits  cullMode)    // Culling mode
+{
+    const char* pString = nullptr;
+    switch (cullMode)
+    {
+    CASE_ENUM_TO_STRING(VK_CULL_MODE_NONE)
+    CASE_ENUM_TO_STRING(VK_CULL_MODE_FRONT_BIT)
+    CASE_ENUM_TO_STRING(VK_CULL_MODE_BACK_BIT)
+    CASE_ENUM_TO_STRING(VK_CULL_MODE_FRONT_AND_BACK)
+    CASE_ENUM_TO_STRING(VK_CULL_MODE_FLAG_BITS_MAX_ENUM)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return out << pString;
+}
+
+// =====================================================================================================================
+// Translates enum "VkFrontFace" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&       out,         // [out] Output stream
+    VkFrontFace         frontFace)   // Front facing orientation
+{
+    const char* pString = nullptr;
+    switch (frontFace)
+    {
+    CASE_ENUM_TO_STRING(VK_FRONT_FACE_COUNTER_CLOCKWISE)
+    CASE_ENUM_TO_STRING(VK_FRONT_FACE_CLOCKWISE)
+    CASE_ENUM_TO_STRING(VK_FRONT_FACE_MAX_ENUM)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return out << pString;
+}
+
+// =====================================================================================================================
 // Translates enum "VkFormat" to string and output to ostream.
 std::ostream& operator<<(
     std::ostream&       out,     // [out] Output stream
-    VkFormat           format)  // Resource format
+    VkFormat            format)  // Resource format
 {
     const char* pString = nullptr;
     switch (format)

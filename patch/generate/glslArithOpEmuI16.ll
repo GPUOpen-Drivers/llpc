@@ -336,12 +336,10 @@ define spir_func <2 x half> @_Z5ldexpDv2_DhDv2_s(
     %2 = call half @llvm.amdgcn.ldexp.f16(half %x1, i32 %exp1s)
 
     ; Insert computed components into the destination vector
-    %3 = alloca <2 x half>
-    %4 = load <2 x half>, <2 x half>* %3
-    %5 = insertelement <2 x half> %4, half %1, i16 0
-    %6 = insertelement <2 x half> %5, half %2, i16 1
+    %3 = insertelement <2 x half> undef, half %1, i16 0
+    %4 = insertelement <2 x half> %3, half %2, i16 1
 
-    ret <2 x half> %6
+    ret <2 x half> %4
 }
 
 ; <3 x half> ldexp()  =>  llvm.amdgcn.ldexp.f16
@@ -367,13 +365,11 @@ define spir_func <3 x half> @_Z5ldexpDv3_DhDv3_s(
     %3 = call half @llvm.amdgcn.ldexp.f16(half %x2, i32 %exp2s)
 
     ; Insert computed components into the destination vector
-    %4 = alloca <3 x half>
-    %5 = load <3 x half>, <3 x half>* %4
-    %6 = insertelement <3 x half> %5, half %1, i16 0
-    %7 = insertelement <3 x half> %6, half %2, i16 1
-    %8 = insertelement <3 x half> %7, half %3, i16 2
+    %4 = insertelement <3 x half> undef, half %1, i16 0
+    %5 = insertelement <3 x half> %4, half %2, i16 1
+    %6 = insertelement <3 x half> %5, half %3, i16 2
 
-    ret <3 x half> %8
+    ret <3 x half> %6
 }
 
 ; <4 x half> ldexp()  =>  llvm.amdgcn.ldexp.f16
@@ -403,14 +399,12 @@ define spir_func <4 x half> @_Z5ldexpDv4_DhDv4_s(
     %4 = call half @llvm.amdgcn.ldexp.f16(half %x3, i32 %exp3s)
 
     ; Insert computed components into the destination vector
-    %5 = alloca <4 x half>
-    %6 = load <4 x half>, <4 x half>* %5
-    %7 = insertelement <4 x half> %6, half %1, i16 0
-    %8 = insertelement <4 x half> %7, half %2, i16 1
-    %9 = insertelement <4 x half> %8, half %3, i16 2
-    %10 = insertelement <4 x half> %9, half %4, i16 3
+    %5 = insertelement <4 x half> undef, half %1, i16 0
+    %6 = insertelement <4 x half> %5, half %2, i16 1
+    %7 = insertelement <4 x half> %6, half %3, i16 2
+    %8 = insertelement <4 x half> %7, half %4, i16 3
 
-    ret <4 x half> %10
+    ret <4 x half> %8
 }
 
 ; =====================================================================================================================

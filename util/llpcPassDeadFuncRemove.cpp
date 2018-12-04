@@ -72,7 +72,7 @@ bool PassDeadFuncRemove::runOnModule(
             auto pCurrFunc = pFunc++;
 
             // Ignore entry points
-            if (pCurrFunc->getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
+            if (pCurrFunc->getLinkage() != GlobalValue::InternalLinkage)
             {
                 continue;
             }

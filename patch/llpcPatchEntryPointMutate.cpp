@@ -40,6 +40,7 @@
 #include "llpcGfx9Chip.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchEntryPointMutate.h"
+#include "llpcPipelineShaders.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -90,6 +91,7 @@ PatchEntryPointMutate::PatchEntryPointMutate()
     m_hasTs(false),
     m_hasGs(false)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchEntryPointMutatePass(*PassRegistry::getPassRegistry());
 }
 
@@ -107,6 +109,25 @@ bool PatchEntryPointMutate::runOnModule(
                              ShaderStageToMask(ShaderStageTessEval))) != 0);
     m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
+    // Process each shader in turn, but not the copy shader.
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageCount; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            ProcessShader();
+        }
+    }
+
+    return true;
+}
+
+// =====================================================================================================================
+// Process a single shader
+void PatchEntryPointMutate::ProcessShader()
+{
     const auto& dataLayout = m_pModule->getDataLayout();
 
     // Create new entry-point from the original one (mutate it)
@@ -114,14 +135,15 @@ bool PatchEntryPointMutate::runOnModule(
     uint64_t inRegMask = 0;
     FunctionType* pEntryPointTy = GenerateEntryPointType(&inRegMask);
 
-    Function* pOrigEntryPoint = GetEntryPoint(m_pModule);
+    Function* pOrigEntryPoint = m_pEntryPoint;
 
     Function* pEntryPoint = Function::Create(pEntryPointTy,
                                              GlobalValue::ExternalLinkage,
-                                             "main",
+                                             "",
                                              m_pModule);
     pEntryPoint->setCallingConv(pOrigEntryPoint->getCallingConv());
     pEntryPoint->addFnAttr(Attribute::NoUnwind);
+    pEntryPoint->takeName(pOrigEntryPoint);
 
     ValueToValueMapTy valueMap;
     SmallVector<ReturnInst*, 8> retInsts;
@@ -440,22 +462,37 @@ bool PatchEntryPointMutate::runOnModule(
             }
         case ResourceMappingNodeType::StreamOutTableVaPtr:
             {
-                auto pStreamOutTablePtr =
-                    new AllocaInst(m_pContext->Int32x2Ty(),
-                                   dataLayout.getAllocaAddrSpace(),
-                                   "",
-                                   &*pInsertPos);
-                LLPC_ASSERT((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval));
-                auto pStreamOutTablePtrLow = (m_shaderStage == ShaderStageVertex) ?
-                    (GetFunctionArgument(pEntryPoint, pIntfData->entryArgIdxs.vs.streamOutData.tablePtr)) :
-                    (GetFunctionArgument(pEntryPoint, pIntfData->entryArgIdxs.tes.streamOutData.tablePtr));
-                auto pStreamOutTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int32x4Ty(),
-                    MaxTransformFeedbackBuffers), ADDR_SPACE_CONST);
-                pIntfData->streamOutTable.pTablePtr = InitPointerWithValue(pStreamOutTablePtr,
-                                                                           pStreamOutTablePtrLow,
-                                                                           pDescTablePtrHigh,
-                                                                           pStreamOutTablePtrTy,
-                                                                           &*pInsertPos);
+                if ((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval))
+                {
+                    Value* pStreamOutTablePtr =
+                        new AllocaInst(m_pContext->Int32x2Ty(),
+                                       dataLayout.getAllocaAddrSpace(),
+                                       "",
+                                       &*pInsertPos);
+                    auto pStreamOutTablePtrLow = (m_shaderStage == ShaderStageVertex) ?
+                        (GetFunctionArgument(pEntryPoint, pIntfData->entryArgIdxs.vs.streamOutData.tablePtr)) :
+                        (GetFunctionArgument(pEntryPoint, pIntfData->entryArgIdxs.tes.streamOutData.tablePtr));
+                    auto pStreamOutTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int32x4Ty(),
+                        MaxTransformFeedbackBuffers), ADDR_SPACE_CONST);
+                    pStreamOutTablePtr = InitPointerWithValue(pStreamOutTablePtr,
+                                                              pStreamOutTablePtrLow,
+                                                              pDescTablePtrHigh,
+                                                              pStreamOutTablePtrTy,
+                                                              &*pInsertPos);
+
+                    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+                    {
+                        if (pResUsage->inOutUsage.xfbStrides[i] > 0)
+                        {
+                            pIntfData->streamOutTable.bufDescs[i] =
+                                LoadStreamOutBufferDescriptor(i,
+                                                              pStreamOutTablePtr,
+                                                              &*pInsertPos);
+                        }
+                    }
+
+                }
+
                 break;
             }
         case ResourceMappingNodeType::DescriptorResource:
@@ -634,59 +671,86 @@ bool PatchEntryPointMutate::runOnModule(
 
         pResUsage->inOutUsage.pEsGsRingBufDesc = pEsGsRingBufDesc;
 
-        // Setup GS-VS ring buffer descriptor for GS ouput
-        args[1] = ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_GS_RING_OUT0_OFFS);
-        auto pGsVsRingBufDesc = EmitCall(m_pModule,
-                                         LlpcName::DescriptorLoadBuffer,
-                                         m_pContext->Int32x4Ty(),
-                                         args,
-                                         NoAttrib,
-                                         &*pInsertPos);
-
-        // Patch GS-VS ring buffer descriptor stride for GS output
-        Value* pGsVsRingBufDescElem1 = ExtractElementInst::Create(pGsVsRingBufDesc,
-                                                               ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                               "",
-                                                               &*pInsertPos);
-
-        // Clear stride in SRD DWORD1
-        SqBufRsrcWord1 strideClearMask = {};
-        strideClearMask.u32All         = UINT32_MAX;
-        strideClearMask.bits.STRIDE    = 0;
-        pGsVsRingBufDescElem1 = BinaryOperator::CreateAnd(pGsVsRingBufDescElem1,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), strideClearMask.u32All),
-                                                          "",
-                                                          &*pInsertPos);
-
-        // Calculate and set stride in SRD dword1
-        uint32_t gsVsStride = pResUsage->builtInUsage.gs.outputVertices *
-                              pResUsage->inOutUsage.outputMapLocCount *
-                              sizeof(uint32_t) * 4;
-
-        SqBufRsrcWord1 strideSetValue = {};
-        strideSetValue.bits.STRIDE = gsVsStride;
-        pGsVsRingBufDescElem1 = BinaryOperator::CreateOr(pGsVsRingBufDescElem1,
-                                                         ConstantInt::get(m_pContext->Int32Ty(), strideSetValue.u32All),
-                                                         "",
-                                                         &*pInsertPos);
-
-        pGsVsRingBufDesc = InsertElementInst::Create(pGsVsRingBufDesc,
-                                                     pGsVsRingBufDescElem1,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                     "",
-                                                     &*pInsertPos);
-
-        if (m_pContext->GetGfxIpVersion().major >= 8)
-        {
-            // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
-            pGsVsRingBufDesc = SetRingBufferDataFormat(pGsVsRingBufDesc, BUF_DATA_FORMAT_32, &*pInsertPos);
-        }
-
-        pResUsage->inOutUsage.gs.pGsVsRingBufDesc = pGsVsRingBufDesc;
-
-        // Setup GS emit vertex counter
+        uint32_t outLocCount = 0;
         for (int i = 0; i < MaxGsStreams; ++i)
         {
+            for (int j = 0; j < i; ++j)
+            {
+                outLocCount += pResUsage->inOutUsage.gs.outLocCount[j];
+            }
+            // Setup GS-VS ring buffer descriptor for GS ouput
+            args[1] = ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_GS_RING_OUT0_OFFS + i);
+            auto gsVsOutRingBufDesc = EmitCall(m_pModule,
+                                             LlpcName::DescriptorLoadBuffer,
+                                             m_pContext->Int32x4Ty(),
+                                             args,
+                                             NoAttrib,
+                                             &*pInsertPos);
+
+            // Patch GS-VS ring buffer descriptor base for GS output
+            Value* pGsVsOutRingBufDescElem0 = ExtractElementInst::Create(gsVsOutRingBufDesc,
+                                                                         ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                                         "",
+                                                                         &*pInsertPos);
+
+            // VtxSize[stream] = outLocCount[stream] * 4 * sizeof(uint32_t)
+            // Stream Offset = (VtxSize[0] + ... + VtxSize[stream_id - 1]) * 64 * MaxVtx
+            uint32_t baseAddrOffset = outLocCount * pResUsage->builtInUsage.gs.outputVertices
+                * sizeof(uint32_t) * 4 * 64;
+
+            pGsVsOutRingBufDescElem0 = BinaryOperator::CreateAdd(pGsVsOutRingBufDescElem0,
+                                                                 ConstantInt::get(m_pContext->Int32Ty(), baseAddrOffset),
+                                                                 "",
+                                                                 &*pInsertPos);
+
+            gsVsOutRingBufDesc = InsertElementInst::Create(gsVsOutRingBufDesc,
+                                                           pGsVsOutRingBufDescElem0,
+                                                           ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                           "",
+                                                           &*pInsertPos);
+
+            // Patch GS-VS ring buffer descriptor stride for GS output
+            Value* pGsVsOutRingBufDescElem1 = ExtractElementInst::Create(gsVsOutRingBufDesc,
+                                                                         ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                                         "",
+                                                                         &*pInsertPos);
+
+            // Clear stride in SRD DWORD1
+            SqBufRsrcWord1 strideClearMask = {};
+            strideClearMask.u32All = UINT32_MAX;
+            strideClearMask.bits.STRIDE = 0;
+            pGsVsOutRingBufDescElem1 = BinaryOperator::CreateAnd(pGsVsOutRingBufDescElem1,
+                                                                 ConstantInt::get(m_pContext->Int32Ty(), strideClearMask.u32All),
+                                                                 "",
+                                                                 &*pInsertPos);
+
+            // Calculate and set stride in SRD dword1
+            uint32_t gsVsStride = pResUsage->builtInUsage.gs.outputVertices *
+                                    pResUsage->inOutUsage.gs.outLocCount[i] *
+                                    sizeof(uint32_t) * 4;
+
+            SqBufRsrcWord1 strideSetValue = {};
+            strideSetValue.bits.STRIDE = gsVsStride;
+            pGsVsOutRingBufDescElem1 = BinaryOperator::CreateOr(pGsVsOutRingBufDescElem1,
+                                                                ConstantInt::get(m_pContext->Int32Ty(), strideSetValue.u32All),
+                                                                "",
+                                                                &*pInsertPos);
+
+            gsVsOutRingBufDesc = InsertElementInst::Create(gsVsOutRingBufDesc,
+                                                           pGsVsOutRingBufDescElem1,
+                                                           ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                           "",
+                                                           &*pInsertPos);
+
+            if (m_pContext->GetGfxIpVersion().major >= 8)
+            {
+                // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
+                gsVsOutRingBufDesc = SetRingBufferDataFormat(gsVsOutRingBufDesc, BUF_DATA_FORMAT_32, &*pInsertPos);
+            }
+
+            pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[i] = gsVsOutRingBufDesc;
+
+            // Setup GS emit vertex counter
             auto pEmitCounterPtr = new AllocaInst(m_pContext->Int32Ty(),
                                                   dataLayout.getAllocaAddrSpace(),
                                                   "",
@@ -732,65 +796,6 @@ bool PatchEntryPointMutate::runOnModule(
     // Remove original entry-point
     pOrigEntryPoint->dropAllReferences();
     pOrigEntryPoint->eraseFromParent();
-
-    // Set calling convention for appropriate hardware shader stage. Also remove the dllexport that
-    // we were using to identify the entrypoint.
-    auto callingConv = CallingConv::AMDGPU_CS;
-    switch (m_shaderStage)
-    {
-    case ShaderStageVertex:
-        callingConv = m_hasTs ? CallingConv::AMDGPU_LS :
-                                (m_hasGs ? CallingConv::AMDGPU_ES : CallingConv::AMDGPU_VS);
-        break;
-    case ShaderStageTessControl:
-        callingConv = CallingConv::AMDGPU_HS;
-        break;
-    case ShaderStageTessEval:
-        callingConv = m_hasGs ? CallingConv::AMDGPU_ES : CallingConv::AMDGPU_VS;
-        break;
-    case ShaderStageGeometry:
-        callingConv = CallingConv::AMDGPU_GS;
-        break;
-    case ShaderStageFragment:
-        callingConv = CallingConv::AMDGPU_PS;
-        break;
-    default:
-        break;
-    }
-    pEntryPoint->setCallingConv(callingConv);
-    pEntryPoint->setDLLStorageClass(GlobalValue::DefaultStorageClass);
-
-    // Set the entry name required by PAL ABI
-    auto entryStage = Util::Abi::PipelineSymbolType::CsMainEntry;
-    switch (callingConv)
-    {
-    case CallingConv::AMDGPU_PS:
-        entryStage = Util::Abi::PipelineSymbolType::PsMainEntry;
-        break;
-    case CallingConv::AMDGPU_VS:
-        entryStage = Util::Abi::PipelineSymbolType::VsMainEntry;
-        break;
-    case CallingConv::AMDGPU_GS:
-        entryStage = Util::Abi::PipelineSymbolType::GsMainEntry;
-        break;
-    case CallingConv::AMDGPU_ES:
-        entryStage = Util::Abi::PipelineSymbolType::EsMainEntry;
-        break;
-    case CallingConv::AMDGPU_HS:
-        entryStage = Util::Abi::PipelineSymbolType::HsMainEntry;
-        break;
-    case CallingConv::AMDGPU_LS:
-        entryStage = Util::Abi::PipelineSymbolType::LsMainEntry;
-        break;
-    default:
-        break;
-    }
-
-    const char* pEntryName = Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(entryStage)];
-    pEntryPoint->setName(pEntryName);
-    pEntryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-
-    return true;
 }
 
 // =====================================================================================================================
@@ -1116,6 +1121,46 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     }
 
+    // Allocate register for stream-out buffer table
+    for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+    {
+        auto pNode = &pShaderInfo->pUserDataNodes[i];
+        if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+        {
+            argTys.push_back(m_pContext->Int32Ty());
+            LLPC_ASSERT(pNode->sizeInDwords == 1);
+            switch (m_shaderStage)
+            {
+            case ShaderStageVertex:
+                {
+                    pIntfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
+                    pIntfData->entryArgIdxs.vs.streamOutData.tablePtr = argIdx;
+                    break;
+                }
+            case ShaderStageTessEval:
+                {
+                    pIntfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
+                    pIntfData->entryArgIdxs.tes.streamOutData.tablePtr = argIdx;
+                    break;
+                }
+            // Allocate dummpy stream-out register for Geometry shader
+            case ShaderStageGeometry:
+                {
+                    break;
+                }
+            default:
+                {
+                    LLPC_NEVER_CALLED();
+                    break;
+                }
+            }
+            pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+            *pInRegMask |= (1ull << (argIdx++));
+            ++userDataIdx;
+            break;
+        }
+    }
+
     // Descriptor table and vertex buffer table
     uint32_t actualAvailUserDataCount = 0;
     for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
@@ -1220,42 +1265,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         pIntfData->spillTable.sizeInDwords = requiredUserDataCount - pIntfData->spillTable.offsetInDwords;
     }
 
-    // Allocate register for stream-out buffer table
-    for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
-    {
-        auto pNode = &pShaderInfo->pUserDataNodes[i];
-        if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
-        {
-            argTys.push_back(m_pContext->Int32Ty());
-            LLPC_ASSERT(pNode->sizeInDwords == 1);
-            switch (m_shaderStage)
-            {
-            case ShaderStageVertex:
-                {
-                    pIntfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
-                    pIntfData->entryArgIdxs.vs.streamOutData.tablePtr = argIdx;
-                    break;
-                }
-            case ShaderStageTessEval:
-                {
-                    pIntfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
-                    pIntfData->entryArgIdxs.tes.streamOutData.tablePtr = argIdx;
-                    break;
-                }
-            default:
-                {
-                    LLPC_NEVER_CALLED();
-                    break;
-                }
-            }
-
-            pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
-            *pInRegMask |= (1ull << (argIdx++));
-            ++userDataIdx;
-            break;
-        }
-    }
-
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
@@ -1268,6 +1277,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 entryArgIdxs.vs.viewIndex = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
                 pIntfData->userDataUsage.vs.viewIndex = userDataIdx;
+                ++userDataIdx;
+            }
+
+            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+            // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
+            const auto gfxIp = m_pContext->GetGfxIpVersion();
+            if (((gfxIp.major == 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+                )
+            {
+                argTys.push_back(m_pContext->Int32Ty());
+                *pInRegMask |= (1ull << (argIdx++));
+                pIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
 
@@ -1341,18 +1362,16 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
+            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+            // with PAL's GS on-chip behavior. i.e. GS is GFX8
             const auto gfxIp = m_pContext->GetGfxIpVersion();
-            if (gfxIp.major <= 8)
+            if (((gfxIp.major <= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+                )
             {
-                // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-                // with PAL's GS on-chip behavior.
-                if (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
-                {
-                    argTys.push_back(m_pContext->Int32Ty());
-                    *pInRegMask |= (1ull << (argIdx++));
-                    pIntfData->userDataUsage.gs.esGsLdsSize = userDataIdx;
-                    ++userDataIdx;
-                }
+                argTys.push_back(m_pContext->Int32Ty());
+                *pInRegMask |= (1ull << (argIdx++));
+                pIntfData->userDataUsage.gs.esGsLdsSize = userDataIdx;
+                ++userDataIdx;
             }
             break;
         }
@@ -1714,6 +1733,28 @@ Value* PatchEntryPointMutate::InitPointerWithValue(
     auto pInt64Value = new BitCastInst(pIntValue, m_pContext->Int64Ty(), "", pInsertPos);
 
     return CastInst::Create(Instruction::IntToPtr, pInt64Value, pCastedPtrTy, "", pInsertPos);
+}
+
+// =====================================================================================================================
+// Loads stream-out buffer descriptor based on the specified buffer
+Value * PatchEntryPointMutate::LoadStreamOutBufferDescriptor(
+    uint32_t      xfbBuffer,            // Transform feedback buffer
+    Value*        pStreamOutTablePtr,   // [in] Transform feedback buffer table pointer
+    Instruction * pInsertPos            // [in] Where to insert instructions
+    ) const
+{
+    std::vector<Value*> idxs;
+    idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
+    idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), xfbBuffer, false));
+
+    auto pStreamOutBufDescPtr = GetElementPtrInst::Create(nullptr, pStreamOutTablePtr, idxs, "", pInsertPos);
+    pStreamOutBufDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+
+    auto pStreamOutBufDesc = new LoadInst(pStreamOutBufDescPtr, "", pInsertPos);
+    pStreamOutBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+    pStreamOutBufDesc->setAlignment(16);
+
+    return pStreamOutBufDesc;
 }
 
 } // Llpc

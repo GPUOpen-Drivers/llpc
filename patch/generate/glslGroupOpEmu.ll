@@ -250,9 +250,10 @@ define spir_func i1 @_Z18GroupNonUniformAnyib(i32 %scope, i1 %value)
 ; GLSL: bool subgroupAllEqual(int/uint)
 define spir_func i1 @_Z23GroupNonUniformAllEqualii(i32 %scope, i32 %value)
 {
-    %1 = icmp ne i32 %value, 0
-    %2 = call i1 @_Z19SubgroupAllEqualKHRb(i1 %1)
-    ret i1 %2
+    %1 = call i32 @_Z26SubgroupFirstInvocationKHRi(i32 %value)
+    %2 = icmp ne i32 %value, %1
+    %3 = call i1 @_Z19SubgroupAllEqualKHRb(i1 %2)
+    ret i1 %3
 }
 
 ; GLSL: bool subgroupAllEqual(ivec2/uvec2)
@@ -2011,8 +2012,10 @@ define spir_func i32 @llpc.subgroup.set.inactive.i32(i32 %binaryOp, i32 %value)
 {
     ; Get identity value of binary operations
     %identity = call i32 @llpc.subgroup.identity.i32(i32 %binaryOp)
+    ; Prevent optimization of backend compiler on the control flow
+    %1 = call i32 asm sideeffect "; %1", "=v,0"(i32 %value)
     ; Set identity value for the inactive threads
-    %activeValue = call i32 @llvm.amdgcn.set.inactive.i32(i32 %value, i32 %identity)
+    %activeValue = call i32 @llvm.amdgcn.set.inactive.i32(i32 %1, i32 %identity)
 
     ret i32 %activeValue
 }

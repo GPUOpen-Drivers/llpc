@@ -62,7 +62,7 @@ bool PatchGroupOp::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Group-Op\n");
 
     Patch::Init(&module);
-    m_groupCalls.clear();
+    m_changed = false;
 
     // Invoke handling of "callInst" instruction
     visit(m_pModule);
@@ -73,8 +73,9 @@ bool PatchGroupOp::runOnModule(
         pGroupCall->dropAllReferences();
         pGroupCall->eraseFromParent();
     }
+    m_groupCalls.clear();
 
-    return true;
+    return m_changed;
 }
 
 // =====================================================================================================================
@@ -97,6 +98,7 @@ void PatchGroupOp::visitCallInst(
         auto pos = mangledName.find("wave");
         if (pos != std::string::npos)
         {
+            m_changed = true;
             std::string preStr = mangledName.substr(0, pos);
             pos += strlen("waveSz");
             std::string postStr = mangledName.substr(pos);

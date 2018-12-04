@@ -219,3 +219,36 @@ define spir_func i64 @_Z21AtomicCompareExchangePU3AS3liiill(
     %2 = extractvalue { i64, i1 } %1, 0
     ret i64 %2
 }
+
+; GLSL: uint atomicLoad(in uint, int, int, int)
+;       int  atomicLoad(in int, int, int, int)
+define spir_func i32 @_Z10AtomicLoadPU3AS3iii(i32 addrspace(3)* %mem, i32 %scope, i32 %semantics)
+{
+    %1 = atomicrmw volatile add i32 addrspace(3)* %mem, i32 0 seq_cst
+    ret i32 %1
+}
+
+
+; GLSL: uint64_t atomicLoad(in uint64_t, int, int, int)
+;       int64_t  atomicLoad(in int64_t, int, int, int)
+define spir_func i64 @_Z10AtomicLoadPU3AS3lii(i64 addrspace(3)* %mem, i32 %scope, i32 %semantics)
+{
+    %1 = atomicrmw volatile add i64 addrspace(3)* %mem, i64 0 seq_cst
+    ret i64 %1
+}
+
+; GLSL: void atomicStore(out uint, uint, int, int, int)
+;       void atomicStore(out int, int, int, int, int)
+define spir_func void @_Z11AtomicStorePU3AS3iiii(i32 addrspace(3)* %mem, i32 %scope, i32 %semantics, i32 %data)
+{
+    %1 = atomicrmw volatile xchg i32 addrspace(3)* %mem, i32 %data seq_cst
+    ret void
+}
+
+; GLSL: void atomicStore(out uint64_t, uint64_t, int, int, int)
+;       void atomicStore(out int64_t, int64_t, int, int, int)
+define spir_func void @_Z11AtomicStorePU3AS3liil(i64 addrspace(3)* %mem, i32 %scope, i32 %semantics, i64 %data)
+{
+    %1 = atomicrmw volatile xchg i64 addrspace(3)* %mem, i64 %data seq_cst
+    ret void
+}

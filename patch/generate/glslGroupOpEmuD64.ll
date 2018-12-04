@@ -152,7 +152,9 @@ define spir_func i64 @llpc.subgroup.arithmetic.i64(i32 %binaryOp, i64 %x, i64 %y
 define spir_func i64 @llpc.subgroup.set.inactive.i64(i32 %binaryOp, i64 %value)
 {
     %identity = call i64 @llpc.subgroup.identity.i64(i32 %binaryOp)
-    %activeValue = call i64 @llvm.amdgcn.set.inactive.i64(i64 %value, i64 %identity)
+    ; Prevent optimization of backend compiler on the control flow
+    %1 = call i64 asm sideeffect "; %1", "=v,0"(i64 %value)
+    %activeValue = call i64 @llvm.amdgcn.set.inactive.i64(i64 %1, i64 %identity)
 
     ret i64 %activeValue
 }

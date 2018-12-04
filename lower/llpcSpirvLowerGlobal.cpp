@@ -139,7 +139,7 @@ void SpirvLowerGlobal::visitReturnInst(
     }
 
     // We only handle the "return" in entry point
-    if (retInst.getParent()->getParent()->getDLLStorageClass() != GlobalValue::DLLExportStorageClass)
+    if (retInst.getParent()->getParent()->getLinkage() == GlobalValue::InternalLinkage)
     {
         return;
     }
@@ -651,13 +651,6 @@ void SpirvLowerGlobal::MapInputToProxy(
                                                  nullptr,
                                                  &*pInsertPos);
     new StoreInst(pInputValue, pProxy, &*pInsertPos);
-
-    bool useViewIndex = (pInput->getName().find("ViewIndex") != std::string::npos);
-    if (useViewIndex)
-    {
-        auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
-        pResUsage->inOutUsage.fs.pViewIndex = pInputValue;
-    }
 
     m_inputProxyMap[pInput] = pProxy;
 }

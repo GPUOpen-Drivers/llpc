@@ -38,6 +38,8 @@
 namespace Llpc
 {
 
+class PipelineShaders;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for image operations (F-mask support).
 class PatchImageOp:
@@ -47,7 +49,13 @@ class PatchImageOp:
 public:
     PatchImageOp();
 
-    virtual bool runOnModule(llvm::Module& module);
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+    }
+
+    virtual bool runOnModule(llvm::Module& module) override;
     virtual void visitCallInst(llvm::CallInst& callInst);
 
     // Pass creator, creates the pass of LLVM patching opertions for image operations
