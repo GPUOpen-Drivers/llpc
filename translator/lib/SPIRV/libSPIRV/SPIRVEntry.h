@@ -628,6 +628,15 @@ public:
     }
   }
 
+  void mergeExecutionMode(SPIRVExecutionMode *EM)
+  {
+    assert(WordLiterals.size() == 1);
+    assert(ExecMode == EM->ExecMode);
+    assert(EM->WordLiterals[0] == 16 ||
+           EM->WordLiterals[0] == 32 ||
+           EM->WordLiterals[0] == 64);
+    WordLiterals[0] |= EM->WordLiterals[0];
+  }
 protected:
   _SPIRV_DCL_ENCDEC
   SPIRVExecutionModeKind ExecMode;
@@ -642,6 +651,16 @@ public:
   void addExecutionMode(SPIRVExecutionMode *ExecMode) {
     ExecModes[ExecMode->getExecutionMode()] = ExecMode;
   }
+
+  void mergeExecutionMode(SPIRVExecutionMode *ExecMode) {
+    auto EMKind = ExecMode->getExecutionMode();
+    auto OrigExecMode = getExecutionMode(EMKind);
+    if (OrigExecMode != nullptr)
+      OrigExecMode->mergeExecutionMode(ExecMode);
+    else
+      ExecModes[EMKind] = ExecMode;
+  }
+
   SPIRVExecutionMode *getExecutionMode(SPIRVExecutionModeKind EMK) const {
     auto Loc = ExecModes.find(EMK);
     if (Loc == ExecModes.end())

@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  llpcPatchPrepareAbi.cpp
-* @brief LLPC source file: pass to prepare the pipeline ABI
+* @brief LLPC source file: contains declaration and implementation of class Llpc::PatchPreparePipelineAbi.
 ***********************************************************************************************************************
 */
 #include "llvm/IR/Constants.h"
@@ -42,23 +42,24 @@
 #include "llpcPipelineShaders.h"
 #include "llpcShaderMerger.h"
 
-#define DEBUG_TYPE "llpc-patch-prepare-abi"
+#define DEBUG_TYPE "llpc-patch-prepare-pipeline-abi"
 
 using namespace llvm;
 using namespace Llpc;
 
-namespace
+namespace Llpc
 {
+
 // =====================================================================================================================
 // Pass to prepare the pipeline ABI
-class PatchPrepareAbi : public Patch
+class PatchPreparePipelineAbi : public Patch
 {
 public:
     static char ID;
-    PatchPrepareAbi() : Patch(ID)
+    PatchPreparePipelineAbi() : Patch(ID)
     {
         initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
-        initializePatchPrepareAbiPass(*PassRegistry::getPassRegistry());
+        initializePatchPreparePipelineAbiPass(*PassRegistry::getPassRegistry());
     }
 
     bool runOnModule(Module& module) override;
@@ -69,6 +70,8 @@ public:
     }
 
 private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchPreparePipelineAbi);
+
     void SetCallingConvs(Module& module);
 
     void MergeShaderAndSetCallingConvs(Module& module);
@@ -89,40 +92,42 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline
+
     bool              m_hasVs;              // Whether the pipeline has vertex shader
     bool              m_hasTcs;             // Whether the pipeline has tessellation control shader
     bool              m_hasTes;             // Whether the pipeline has tessellation evaluation shader
-    bool              m_hasTs;              // Whether the pipeline has tessellation shader
     bool              m_hasGs;              // Whether the pipeline has geometry shader
+
     GfxIpVersion      m_gfxIp;              // Graphics IP version info
 };
 
-char PatchPrepareAbi::ID = 0;
+char PatchPreparePipelineAbi::ID = 0;
 
-} // anonymous namespace
+} // Llpc
 
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
-ModulePass* Llpc::CreatePatchPrepareAbi()
+ModulePass* Llpc::CreatePatchPreparePipelineAbi()
 {
-    return new PatchPrepareAbi();
+    return new PatchPreparePipelineAbi();
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
-bool PatchPrepareAbi::runOnModule(
-    llvm::Module& module)  // [in,out] LLVM module to be run on
+bool PatchPreparePipelineAbi::runOnModule(
+    Module& module)  // [in,out] LLVM module to be run on
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Abi\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
     Patch::Init(&module);
 
     m_pPipelineShaders = &getAnalysis<PipelineShaders>();
+
     m_hasVs  = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
     m_hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
     m_hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
     m_hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
-    m_hasTs = (m_hasTcs || m_hasTes);
+
     m_gfxIp = m_pContext->GetGfxIpVersion();
 
     if (m_gfxIp.major >= 9)
@@ -145,54 +150,58 @@ bool PatchPrepareAbi::runOnModule(
 
 // =====================================================================================================================
 // Set calling convention for the entry-point of each shader (pre-GFX9)
-void PatchPrepareAbi::SetCallingConvs(
+void PatchPreparePipelineAbi::SetCallingConvs(
     Module& module)   // [in] LLVM module
 {
     LLPC_ASSERT(m_gfxIp.major < 9);
 
-    // For each entrypoint, set the calling convention appropriate to the hardware shader stage. The action here
+    const bool hasTs = (m_hasTcs || m_hasTes);
+
+    // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
     // depends on the pipeline type.
     SetCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
     SetCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
 
-    if (m_hasTs && m_hasGs)
+    if (hasTs && m_hasGs)
     {
-        // TS-GS pipeline.
+        // TS-GS pipeline
         SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
         SetCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
         SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_ES);
         SetCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
         SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
     }
-    else if (m_hasTs)
+    else if (hasTs)
     {
-        // TS-only pipeline.
+        // TS-only pipeline
         SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_LS);
         SetCallingConv(ShaderStageTessControl, CallingConv::AMDGPU_HS);
         SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
     }
     else if (m_hasGs)
     {
-        // GS-only pipeline.
+        // GS-only pipeline
         SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_ES);
         SetCallingConv(ShaderStageGeometry, CallingConv::AMDGPU_GS);
         SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
     }
     else if (m_hasVs)
     {
-        // VS pipeine
+        // VS-FS pipeine
         SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
     }
 }
 
 // =====================================================================================================================
 // Merge shaders and set calling convention for the entry-point of each each shader (GFX9+)
-void PatchPrepareAbi::MergeShaderAndSetCallingConvs(
+void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
     Module& module)   // [in] LLVM module
 {
     LLPC_ASSERT(m_gfxIp.major >= 9);
 
-    // For each entrypoint, set the calling convention appropriate to the hardware shader stage. The action here
+    const bool hasTs = (m_hasTcs || m_hasTes);
+
+    // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
     // depends on the pipeline type, and, for GFX9+, may involve merging shaders.
     SetCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
     SetCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
@@ -201,45 +210,60 @@ void PatchPrepareAbi::MergeShaderAndSetCallingConvs(
     {
         ShaderMerger shaderMerger(m_pContext, m_pPipelineShaders);
 
-        if (m_hasTs && m_hasGs)
+        if (hasTs && m_hasGs)
         {
-            // TS-and-GS pipeline.
-            shaderMerger.GenerateLsHsEntryPoint(m_pPipelineShaders->GetEntryPoint(ShaderStageVertex),
-                                                m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl))
-                              ->setCallingConv(CallingConv::AMDGPU_HS);
+            // TS-GS pipeline
+            if (m_hasTcs)
             {
-                shaderMerger.GenerateEsGsEntryPoint(m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval),
-                                                    m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry))
-                              ->setCallingConv(CallingConv::AMDGPU_GS);
+                auto pLsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
+                auto pHsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl);
+
+                auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
+                pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+            }
+
+            auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
+            auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
+
+            {
+                auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
+                pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+
                 SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
             }
         }
-        else if (m_hasTs)
+        else if (hasTs)
         {
-            // TS-only pipeline.
+            // TS-only pipeline
             if (m_hasTcs)
             {
-                shaderMerger.GenerateLsHsEntryPoint(m_pPipelineShaders->GetEntryPoint(ShaderStageVertex),
-                                                    m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl))
-                                  ->setCallingConv(CallingConv::AMDGPU_HS);
+                auto pLsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
+                auto pHsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl);
+
+                auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
+                pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
             }
+
             {
                 SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
             }
         }
         else if (m_hasGs)
         {
-            // GS-only pipeline.
+            // GS-only pipeline
+            auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
+            auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
+
             {
-                shaderMerger.GenerateEsGsEntryPoint(m_pPipelineShaders->GetEntryPoint(ShaderStageVertex),
-                                                    m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry))
-                              ->setCallingConv(CallingConv::AMDGPU_GS);
+                auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
+                pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+
                 SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
             }
         }
         else if (m_hasVs)
         {
-            // VS pipeline.
+            // VS_FS pipeline
             {
                 SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
             }
@@ -249,8 +273,8 @@ void PatchPrepareAbi::MergeShaderAndSetCallingConvs(
 
 // =====================================================================================================================
 // Set calling convention on a particular API shader stage, if that stage has a shader
-void PatchPrepareAbi::SetCallingConv(
-    ShaderStage     shaderStage,  // API shader stage to set calling convention to
+void PatchPreparePipelineAbi::SetCallingConv(
+    ShaderStage     shaderStage,  // Shader stage
     CallingConv::ID callingConv)  // Calling convention to set it to
 {
     auto pEntryPoint = m_pPipelineShaders->GetEntryPoint(shaderStage);
@@ -262,7 +286,7 @@ void PatchPrepareAbi::SetCallingConv(
 
 // =====================================================================================================================
 // Set ABI-specified entrypoint name for each shader
-void PatchPrepareAbi::SetAbiEntryNames(
+void PatchPreparePipelineAbi::SetAbiEntryNames(
     Module& module)   // [in] LLVM module
 {
     for (auto& func : module)
@@ -306,7 +330,7 @@ void PatchPrepareAbi::SetAbiEntryNames(
 
 // =====================================================================================================================
 // Add ABI metadata
-void PatchPrepareAbi::AddAbiMetadata(
+void PatchPreparePipelineAbi::AddAbiMetadata(
     Module& module)   // [in] LLVM module
 {
     uint8_t* pConfig = nullptr;
@@ -354,13 +378,15 @@ void PatchPrepareAbi::AddAbiMetadata(
 // Builds register configuration for graphics pipeline.
 //
 // NOTE: This function will create pipeline register configuration. The caller has the responsibility of destroying it.
-Result PatchPrepareAbi::BuildGraphicsPipelineRegConfig(
+Result PatchPreparePipelineAbi::BuildGraphicsPipelineRegConfig(
     uint8_t**           ppConfig,       // [out] Register configuration for VS-FS pipeline
     size_t*             pConfigSize)    // [out] Size of register configuration
 {
     Result result = Result::Success;
 
-    if ((m_hasTs == false) && (m_hasGs == false))
+    const bool hasTs = (m_hasTcs || m_hasTes);
+
+    if ((hasTs == false) && (m_hasGs == false))
     {
         // VS-FS pipeline
         if (m_gfxIp.major <= 8)
@@ -374,7 +400,7 @@ Result PatchPrepareAbi::BuildGraphicsPipelineRegConfig(
             }
         }
     }
-    else if (m_hasTs && (m_hasGs == false))
+    else if (hasTs && (m_hasGs == false))
     {
         // VS-TS-FS pipeline
         if (m_gfxIp.major <= 8)
@@ -388,7 +414,7 @@ Result PatchPrepareAbi::BuildGraphicsPipelineRegConfig(
             }
         }
     }
-    else if ((m_hasTs == false) && m_hasGs)
+    else if ((hasTs == false) && m_hasGs)
     {
         // VS-GS-FS pipeline
         if (m_gfxIp.major <= 8)
@@ -424,7 +450,7 @@ Result PatchPrepareAbi::BuildGraphicsPipelineRegConfig(
 // Builds register configuration for compute pipeline.
 //
 // NOTE: This function will create pipeline register configuration. The caller has the responsibility of destroying it.
-Result PatchPrepareAbi::BuildComputePipelineRegConfig(
+Result PatchPreparePipelineAbi::BuildComputePipelineRegConfig(
     uint8_t**           ppConfig,     // [out] Register configuration for compute pipeline
     size_t*             pConfigSize)  // [out] Size of register configuration
 {
@@ -444,5 +470,5 @@ Result PatchPrepareAbi::BuildComputePipelineRegConfig(
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PatchPrepareAbi, DEBUG_TYPE, "LLPC prepare ABI", false, false)
+INITIALIZE_PASS(PatchPreparePipelineAbi, DEBUG_TYPE, "Patch LLVM for preparing pipeline ABI", false, false)
 

@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 
 #include "llpcSpirvLower.h"
 
@@ -45,6 +46,11 @@ class SpirvLowerAlgebraTransform:
 {
 public:
     SpirvLowerAlgebraTransform();
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const
+    {
+        analysisUsage.addRequired<llvm::TargetLibraryInfoWrapperPass>();
+    }
 
     virtual bool runOnModule(llvm::Module& module);
     virtual void visitBinaryOperator(llvm::BinaryOperator& binaryOp);

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPassManager.cpp
- * @brief LLPC source file: legacy::PassManager override
+ * @brief LLPC source file: contains implementation of class Llpc::PassManager.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Verifier.h"

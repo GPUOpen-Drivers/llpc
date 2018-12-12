@@ -671,13 +671,9 @@ void PatchEntryPointMutate::ProcessShader()
 
         pResUsage->inOutUsage.pEsGsRingBufDesc = pEsGsRingBufDesc;
 
-        uint32_t outLocCount = 0;
+        uint32_t outLocStart = 0;
         for (int i = 0; i < MaxGsStreams; ++i)
         {
-            for (int j = 0; j < i; ++j)
-            {
-                outLocCount += pResUsage->inOutUsage.gs.outLocCount[j];
-            }
             // Setup GS-VS ring buffer descriptor for GS ouput
             args[1] = ConstantInt::get(m_pContext->Int32Ty(), SI_DRV_TABLE_GS_RING_OUT0_OFFS + i);
             auto gsVsOutRingBufDesc = EmitCall(m_pModule,
@@ -693,11 +689,13 @@ void PatchEntryPointMutate::ProcessShader()
                                                                          "",
                                                                          &*pInsertPos);
 
-            // VtxSize[stream] = outLocCount[stream] * 4 * sizeof(uint32_t)
-            // Stream Offset = (VtxSize[0] + ... + VtxSize[stream_id - 1]) * 64 * MaxVtx
-            uint32_t baseAddrOffset = outLocCount * pResUsage->builtInUsage.gs.outputVertices
+            // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(uint32_t)
+            // streamOffset = (streamSize[0] + ... + streamSize[streamId - 1]) * 64 * outputVertices
+            uint32_t baseAddrOffset = outLocStart * pResUsage->builtInUsage.gs.outputVertices
                 * sizeof(uint32_t) * 4 * 64;
+            outLocStart += pResUsage->inOutUsage.gs.outLocCount[i];
 
+            // Patch GS-VS ring buffer descriptor base address for GS output
             pGsVsOutRingBufDescElem0 = BinaryOperator::CreateAdd(pGsVsOutRingBufDescElem0,
                                                                  ConstantInt::get(m_pContext->Int32Ty(), baseAddrOffset),
                                                                  "",
@@ -1283,7 +1281,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
             const auto gfxIp = m_pContext->GetGfxIpVersion();
-            if (((gfxIp.major == 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+            if (((gfxIp.major >= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
                 )
             {
                 argTys.push_back(m_pContext->Int32Ty());
@@ -1365,7 +1363,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior. i.e. GS is GFX8
             const auto gfxIp = m_pContext->GetGfxIpVersion();
-            if (((gfxIp.major <= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+            if ((m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
                 )
             {
                 argTys.push_back(m_pContext->Int32Ty());

@@ -339,16 +339,24 @@ struct ResourceUsage
         {
             struct
             {
-                uint32_t subgroupSize         : 1;      // Whether gl_SubGroupSize is used
-                uint32_t subgroupLocalInvocationId : 1; // Whether gl_SubGroupInvocation is used
-                uint32_t subgroupEqMask       : 1;      // Whether gl_SubGroupEqMask is used
-                uint32_t subgroupGeMask       : 1;      // Whether gl_SubGroupGeMask is used
-                uint32_t subgroupGtMask       : 1;      // Whether gl_SubGroupGtMask is used
-                uint32_t subgroupLeMask       : 1;      // Whether gl_SubGroupLeMask is used
-                uint32_t subgroupLtMask       : 1;      // Whether gl_SubGroupLtMask is used
-                uint32_t deviceIndex          : 1;      // Whether gl_DeviceIndex is used
-
-                uint64_t unused               : 56;
+                uint32_t subgroupSize              : 1;  // Whether gl_SubGroupSize is used
+                uint32_t subgroupLocalInvocationId : 1;  // Whether gl_SubGroupInvocation is used
+                uint32_t subgroupEqMask            : 1;  // Whether gl_SubGroupEqMask is used
+                uint32_t subgroupGeMask            : 1;  // Whether gl_SubGroupGeMask is used
+                uint32_t subgroupGtMask            : 1;  // Whether gl_SubGroupGtMask is used
+                uint32_t subgroupLeMask            : 1;  // Whether gl_SubGroupLeMask is used
+                uint32_t subgroupLtMask            : 1;  // Whether gl_SubGroupLtMask is used
+                uint32_t deviceIndex               : 1;  // Whether gl_DeviceIndex is used
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+                uint32_t denormPerserve            : 4;  // Bitmask of denormPerserve flags
+                uint32_t denormFlushToZero         : 4;  // Bitmask of denormFlushToZero flags
+                uint32_t signedZeroInfNanPreserve  : 4;  // Bitmask of signedZeroInfNanPreserve flags
+                uint32_t roundingModeRTE           : 4;  // Bitmask of roundingModeRTE flags
+                uint32_t roundingModeRTZ           : 4;  // Bitmask of roundingModeRTZ flags
+                uint64_t unused                    : 36;
+#else
+                uint64_t unused                    : 56;
+#endif
             } common;
 
             struct
@@ -461,7 +469,7 @@ struct ResourceUsage
             // Map from tightly packed locations to byte sizes of generic outputs (used by copy shader to
             // export generic outputs to fragment shader, always from vertex stream 0):
             //   <location, <component, byteSize>>
-            std::unordered_map<uint32_t, uint32_t[4]> genericOutByteSizes[MaxGsStreams];
+            std::unordered_map<uint32_t, std::vector<uint32_t>> genericOutByteSizes[MaxGsStreams];
 
             // Map from output location to the transform feedback info
             std::map<uint32_t, uint32_t> xfbOutsInfo;

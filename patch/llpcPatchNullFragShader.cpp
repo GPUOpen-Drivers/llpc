@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchNullFragShader.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchNullFragShader.
+ * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchNullFragShader.
  ***********************************************************************************************************************
  */
 #define DEBUG_TYPE "llpc-patch-null-frag-shader"
@@ -45,7 +45,7 @@
 using namespace Llpc;
 using namespace llvm;
 
-namespace
+namespace Llpc
 {
 
 // =====================================================================================================================
@@ -60,11 +60,14 @@ public:
     }
 
     bool runOnModule(Module& module) override;
+
+private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchNullFragShader);
 };
 
 char PatchNullFragShader::ID = 0;
 
-} // anonymous namespace
+} // Llpc
 
 // =====================================================================================================================
 // Create the pass that generates a null fragment shader if required.

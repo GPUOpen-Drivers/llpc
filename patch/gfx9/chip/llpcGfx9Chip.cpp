@@ -148,7 +148,9 @@ void PsRegConfig::Init(
     INIT_REG(PS_NUM_AVAIL_SGPRS);
     INIT_REG(PA_SC_AA_CONFIG);
     INIT_REG(PA_SC_SHADER_CONTROL);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
     INIT_REG(PA_SC_CONSERVATIVE_RASTERIZATION_CNTL);
+#endif
 }
 
 // =====================================================================================================================
@@ -506,7 +508,9 @@ void InitRegisterNameMap(
     ADD_REG_MAP(VGT_HOS_MAX_TESS_LEVEL);
     ADD_REG_MAP(PA_SC_AA_CONFIG);
     ADD_REG_MAP(PA_SC_SHADER_CONTROL);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
     ADD_REG_MAP(PA_SC_CONSERVATIVE_RASTERIZATION_CNTL);
+#endif
     ADD_REG_MAP(COMPUTE_DISPATCH_INITIATOR);
 
     if (gfxIp.major == 9)

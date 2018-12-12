@@ -238,7 +238,7 @@ for gfx in GFX_EMUS:
 # =====================================================================================================================
 
 # Assemble .ll files to .bc files and link emulation .bc files to libraries
-WA_EMUS = ["treat1dImagesAs2d"]
+WA_EMUS = ["treat1dImagesAs2d", "disableI32ModToI16Mod"]
 WA_ROOT="wa"
 for wa in WA_EMUS:
     print("*******************************************************************************")

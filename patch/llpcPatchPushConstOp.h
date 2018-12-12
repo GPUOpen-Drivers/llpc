@@ -70,7 +70,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    std::unordered_set<llvm::CallInst*>          m_pushConstCalls; // List of "call" instructions to emulate push constant
+    std::unordered_set<llvm::CallInst*> m_pushConstCalls; // List of "call" instructions to emulate push constant
                                                           // operations
     std::unordered_set<llvm::Function*> m_descLoadFuncs;  // Set of descriptor load functions
 };

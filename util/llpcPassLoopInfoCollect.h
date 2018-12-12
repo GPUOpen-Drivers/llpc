@@ -71,6 +71,10 @@ public:
     static char ID;   // ID of this pass
 
 private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PassLoopInfoCollect);
+
+    // -----------------------------------------------------------------------------------------------------------------
+
     std::vector<LoopAnalysisInfo>*  m_pLoopInfo;
 };
 

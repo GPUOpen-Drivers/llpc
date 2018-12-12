@@ -30,12 +30,19 @@
  */
 #define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"
 
+#include "hex_float.h"
+
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Analysis/ConstantFolding.h"
 
 #include "SPIRVInternal.h"
+#include "llpcContext.h"
 #include "llpcSpirvLowerAlgebraTransform.h"
 
 using namespace llvm;
@@ -63,11 +70,130 @@ SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform()
 bool SpirvLowerAlgebraTransform::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Algebra-Transform\n");
 
     SpirvLower::Init(&module);
     m_changed = false;
+
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+    // Do constant folding if we need flush denorm to zero.
+    auto& targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+    auto& dataLayout = m_pModule->getDataLayout();
+
+    auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
+
+    if (pFpControlFlags->denormFlushToZero != 0)
+    {
+        for (auto& func : *m_pModule)
+        {
+            for (auto& block : func)
+            {
+                for (auto instIter = block.begin(), instEnd = block.end(); instIter != instEnd;)
+                {
+                    Instruction* pInst = &(*instIter++);
+
+                    // DCE instruction if trivially dead.
+                    if (isInstructionTriviallyDead(pInst, &targetLibInfo))
+                    {
+                        LLVM_DEBUG(dbgs() << "Algebriac transform: DCE: " << *pInst << '\n');
+                        pInst->eraseFromParent();
+                        m_changed = true;
+                        continue;
+                    }
+
+                    // Skip Constant folding if it isn't floating point const expression
+                    auto pDestType = pInst->getType();
+                    if (pInst->use_empty() ||
+                        (pInst->getNumOperands() == 0) ||
+                        (pDestType->isFPOrFPVectorTy() == false) ||
+                        (isa<Constant>(pInst->getOperand(0))== false))
+                    {
+                        continue;
+                    }
+
+                    // ConstantProp instruction if trivially constant.
+                    if (Constant* pConst = ConstantFoldInstruction(pInst, dataLayout, &targetLibInfo))
+                    {
+                        LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConst << " from: " << *pInst
+                            << '\n');
+                        if ((pDestType->isHalfTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0)) ||
+                            (pDestType->isFloatTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_32Bit) != 0)) ||
+                            (pDestType->isDoubleTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_64Bit) != 0)))
+                        {
+                            // Replace denorm value with zero
+                            if (pConst->isFiniteNonZeroFP() && (pConst->isNormalFP() == false))
+                            {
+                                pConst = ConstantFP::get(pDestType, 0.0);
+                            }
+                        }
+
+                        pInst->replaceAllUsesWith(pConst);
+                        if (isInstructionTriviallyDead(pInst, &targetLibInfo))
+                        {
+                            pInst->eraseFromParent();
+                        }
+
+                        m_changed = true;
+                        continue;
+                    }
+
+                    if (isa<CallInst>(pInst))
+                    {
+                        CallInst* pCallInst = cast<CallInst>(pInst);
+                        // LLVM inline pass will do constant folding for _Z14unpackHalf2x16i.
+                        // To support floating control correctly, we have to do it by ourselves.
+                        if (((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0) &&
+                            (pCallInst->getCalledFunction()->getName() == "_Z14unpackHalf2x16i"))
+                        {
+                            auto pSrc = pCallInst->getOperand(0);
+                            if (isa<ConstantInt>(pSrc))
+                            {
+                                auto pConst = cast<ConstantInt>(pSrc);
+                                uint64_t constVal = pConst->getZExtValue();
+                                APFloat fVal0(APFloat::IEEEhalf(), APInt(16, constVal & 0xFFFF));
+                                APFloat fVal1(APFloat::IEEEhalf(), APInt(16, (constVal >> 16) & 0xFFFF));
+
+                                // Flush denorm input value to zero
+                                if (fVal0.isDenormal())
+                                {
+                                    fVal0 = APFloat(APFloat::IEEEhalf(), 0);
+                                }
+
+                                if (fVal1.isDenormal())
+                                {
+                                    fVal1 = APFloat(APFloat::IEEEhalf(), 0);
+                                }
+
+                                bool looseInfo = false;
+                                fVal0.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
+                                fVal1.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
+
+                                Constant* constVals[] =
+                                {
+                                    ConstantFP::get(m_pContext->FloatTy(), fVal0.convertToFloat()),
+                                    ConstantFP::get(m_pContext->FloatTy(), fVal1.convertToFloat())
+                                };
+
+                                Constant* pConstVals = ConstantVector::get(constVals);
+                                pInst->replaceAllUsesWith(pConstVals);
+                                LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConstVals << " from: "
+                                    << *pInst  << '\n');
+
+                                if (isInstructionTriviallyDead(pInst, &targetLibInfo))
+                                {
+                                    pInst->eraseFromParent();
+                                }
+
+                                m_changed = true;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+#endif
 
     visit(m_pModule);
 
@@ -89,72 +215,101 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
                           (isa<ConstantFP>(pSrc2) && cast<ConstantFP>(pSrc2)->isZero());
     Value* pDest = nullptr;
 
-    switch (opCode)
+    if (opCode == Instruction::FAdd)
     {
-    case Instruction::FAdd:
+        // Recursively find backward if the operand "does not" specify contract flags
+        auto fastMathFlags = binaryOp.getFastMathFlags();
+        if (fastMathFlags.allowContract())
         {
-            if (src1IsConstZero)
-            {
-                pDest = pSrc2;
-            }
-            else if (src2IsConstZero)
-            {
-                pDest = pSrc1;
-            }
-            // Recursively find backward if the operand "does not" specify contract flags
-            auto fastMathFlags = binaryOp.getFastMathFlags();
-            if (fastMathFlags.allowContract())
-            {
-                bool hasNoContract = IsOperandNoContract(pSrc1) || IsOperandNoContract(pSrc2);
-                bool allowContract = !hasNoContract;
+            bool hasNoContract = IsOperandNoContract(pSrc1) || IsOperandNoContract(pSrc2);
+            bool allowContract = !hasNoContract;
 
-                // Reassocation and contract should be same
-                fastMathFlags.setAllowReassoc(allowContract);
-                fastMathFlags.setAllowContract(allowContract);
-                binaryOp.copyFastMathFlags(fastMathFlags);
-            }
-            break;
-        }
-    case Instruction::FMul:
-        {
-            if (src1IsConstZero)
-            {
-                pDest = pSrc1;
-            }
-            else if (src2IsConstZero)
-            {
-                pDest = pSrc2;
-            }
-            break;
-        }
-    case Instruction::FDiv:
-        {
-            if (src1IsConstZero)
-            {
-                pDest = pSrc1;
-            }
-            break;
-        }
-    case Instruction::FSub:
-        {
-            if (src2IsConstZero)
-            {
-                pDest = pSrc1;
-            }
-            break;
-        }
-    default:
-        {
-            break;
+            // Reassocation and contract should be same
+            fastMathFlags.setAllowReassoc(allowContract);
+            fastMathFlags.setAllowContract(allowContract);
+            binaryOp.copyFastMathFlags(fastMathFlags);
         }
     }
 
-    if (pDest != nullptr)
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+    auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
+
+    // NOTE: We can't skip following floating operations if we need flush denorm or preserve NAN.
+    if ((pFpControlFlags->denormFlushToZero == 0) && (pFpControlFlags->signedZeroInfNanPreserve == 0))
+#endif
     {
-        m_changed = true;
-        binaryOp.replaceAllUsesWith(pDest);
+        switch (opCode)
+        {
+        case Instruction::FAdd:
+            {
+                if (src1IsConstZero)
+                {
+                    pDest = pSrc2;
+                }
+                else if (src2IsConstZero)
+                {
+                    pDest = pSrc1;
+                }
+
+                break;
+            }
+        case Instruction::FMul:
+            {
+                if (src1IsConstZero)
+                {
+                    pDest = pSrc1;
+                }
+                else if (src2IsConstZero)
+                {
+                    pDest = pSrc2;
+                }
+                break;
+            }
+        case Instruction::FDiv:
+            {
+                if (src1IsConstZero && (src2IsConstZero == false))
+                {
+                    pDest = pSrc1;
+                }
+                break;
+            }
+        case Instruction::FSub:
+            {
+                if (src2IsConstZero)
+                {
+                    pDest = pSrc1;
+                }
+                break;
+            }
+        default:
+            {
+                break;
+            }
+        }
+
+        if (pDest != nullptr)
+        {
+            m_changed = true;
+            binaryOp.replaceAllUsesWith(pDest);
+            binaryOp.dropAllReferences();
+            binaryOp.eraseFromParent();
+        }
+    }
+
+    // Replace fdiv with function call if it isn't optimized
+    if ((opCode == Instruction::FDiv) && (pDest == nullptr) && (pSrc1 != nullptr) && (pSrc2 != nullptr))
+    {
+        BuiltinFuncMangleInfo Info("fdiv");
+        Type* argTypes[] = { pSrc1->getType(), pSrc2->getType() };
+        Value* args[] = { pSrc1, pSrc2 };
+        auto mangledName = SPIRV::mangleBuiltin("fdiv", argTypes, &Info);
+        auto pFDiv = EmitCall(m_pModule, mangledName, binaryOp.getType(), args, NoAttrib, &binaryOp);
+
+        binaryOp.replaceAllUsesWith(pFDiv);
         binaryOp.dropAllReferences();
         binaryOp.eraseFromParent();
+
+        m_changed = true;
     }
 }
 

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPatchCopyShader.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchCopyShader.
+ * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchCopyShader.
  ***********************************************************************************************************************
  */
 #define DEBUG_TYPE "llpc-patch-copy-shader"
@@ -68,6 +68,8 @@ public:
     }
 
 private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchCopyShader);
+
     void ExportOutput(uint32_t streamId, Instruction* pInsertPos);
     void CollectGsGenericOutputInfo(Function* pGsEntryPoint);
 
@@ -162,9 +164,13 @@ bool PatchCopyShader::runOnModule(
         }
     }
 
-    // Create its basic block, and terminate it with return.
-    auto pBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, nullptr);
-    auto pInsertPos = ReturnInst::Create(*m_pContext, pBlock);
+    // Create ending basic block, and terminate it with return.
+    auto pEndBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, nullptr);
+    ReturnInst::Create(*m_pContext, pEndBlock);
+
+    // Create entry basic block
+    auto pEntryBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, pEndBlock);
+    auto pInsertPos = BranchInst::Create(pEndBlock, pEntryBlock);
 
     const auto gfxIp = m_pContext->GetGfxIpVersion();
     auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
@@ -273,9 +279,6 @@ bool PatchCopyShader::runOnModule(
         //    ret void
 
         // Entry block
-        BasicBlock* pEntryBlock = &*(pEntryPoint->getBasicBlockList().begin());
-        // Get last block as ending block
-        BasicBlock* pEndBlock = &*(pEntryPoint->getBasicBlockList().rbegin());
 
         // Remove entry block terminator
         auto pTerminator = pEntryBlock->getTerminator();
@@ -371,6 +374,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
                 LLPC_ASSERT(compIdx <= 4);
                 auto& genericOutByteSizes =
                     m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
+                genericOutByteSizes[streamId][location].resize(4);
                 genericOutByteSizes[streamId][location][compIdx] = byteSize;
             }
         }
@@ -421,22 +425,53 @@ void PatchCopyShader::ExportOutput(
         ExportGenericOutput(pOutputValue, loc, streamId, pInsertPos);
     }
 
+    pOutputValue = UndefValue::get(m_pContext->Floatx4Ty());
     if (builtInUsage.position)
     {
         LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPosition) !=
             pResUsage->inOutUsage.builtInOutputLocMap.end());
 
         uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPosition];
-        pOutputValue = UndefValue::get(m_pContext->Floatx4Ty());
+
         for (uint32_t i = 0; i < 4; ++i)
         {
             auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, i, streamId, pInsertPos);
-            pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                     pLoadValue,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                     "",
-                                                     pInsertPos);
+                                                          pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                          pLoadValue,
+                                                          ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                          "",
+                                                          pInsertPos);
         }
+        ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
+    }
+    // Generate dummy gl_position vec4(0,0,0,1) for the raster stream
+    else if (pResUsage->inOutUsage.enableXfb)
+    {
+        auto pZero = ConstantFP::get(m_pContext->FloatTy(), 0.0);
+        auto pOne = ConstantFP::get(m_pContext->FloatTy(), 1.0);
+        pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                 pZero,
+                                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                 "",
+                                                 pInsertPos);
+
+        pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                 pZero,
+                                                 ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                 "",
+                                                 pInsertPos);
+
+        pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                 pZero,
+                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                 "",
+                                                 pInsertPos);
+
+        pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                 pOne,
+                                                 ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                                 "",
+                                                 pInsertPos);
 
         ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
     }
@@ -655,8 +690,13 @@ void PatchCopyShader::ExportGenericOutput(
         auto& xfbOutsInfo = pResUsage->inOutUsage.gs.xfbOutsInfo;
 
         // Find original location in outLocMap which equals used location in copy shader
-        auto locIter = find_if(outLocMap.begin(), outLocMap.end(), [location]
-            (const std::pair<uint32_t, uint32_t>& outLoc) { return outLoc.second == location; });
+        auto locIter = find_if(outLocMap.begin(), outLocMap.end(), [location, streamId]
+            (const std::pair<uint32_t, uint32_t>& outLoc)
+        {
+            uint32_t outLocInfo = outLoc.first;
+            bool isStreamId = (reinterpret_cast<GsOutLocInfo*>(&outLocInfo))->streamId == streamId;
+            return ((outLoc.second == location) && isStreamId);
+        });
 
         LLPC_ASSERT(locIter != outLocMap.end());
         if (xfbOutsInfo.find(locIter->first) != xfbOutsInfo.end())
@@ -740,7 +780,6 @@ void PatchCopyShader::ExportBuiltInOutput(
         instName = LlpcName::OutputExportBuiltIn + builtInName.substr(strlen("BuiltIn"));
         EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
-    EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 }
 
 // =====================================================================================================================

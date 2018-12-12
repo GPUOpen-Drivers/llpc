@@ -124,6 +124,7 @@ Context::Context(
         m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibWaTreat1dImagesAs2d),
                 sizeof(GlslEmuLibWaTreat1dImagesAs2d)), "GlslEmuLibWaTreat1dImagesAs2d"));
     }
+
     if (gfxIp.major >= 9)
     {
         m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),

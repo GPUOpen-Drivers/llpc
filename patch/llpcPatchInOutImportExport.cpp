@@ -983,10 +983,11 @@ void PatchInOutImportExport::visitReturnInst(
     }
 
     const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    bool enableXfb = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
 
     // Whether this shader stage has to use "exp" instructions to export outputs
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
-                              (m_shaderStage == ShaderStageCopyShader)) &&
+                              ((m_shaderStage == ShaderStageCopyShader) && (enableXfb == false))) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
 
     auto pZero  = ConstantFP::get(m_pContext->FloatTy(), 0.0);
@@ -4956,7 +4957,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
         // ringOffset = esGsLdsSize +
         //              gsVsOffset +
         //              threadId * gsVsRingItemSize +
-        //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase
+        //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase (in DWORDS)
 
         auto pEsGsLdsSize = ConstantInt::get(m_pContext->Int32Ty(), pResUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
 
@@ -4973,7 +4974,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
                                       "",
                                       pInsertPos);
 
-        // VertexSize is stream output vertexSize x 4
+        // VertexSize is stream output vertexSize x 4 (in DWORDS)
         uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
         auto pVertexItemOffset = BinaryOperator::CreateMul(pVertexIdx,
                                                            ConstantInt::get(m_pContext->Int32Ty(), vertexSize),
@@ -4994,7 +4995,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
     }
     else
     {
-        // ringOffset = ((location * 4 + compIdx) * maxVertices + vertexIdx) * 4;
+        // ringOffset = ((location * 4 + compIdx) * maxVertices + vertexIdx) * 4 (in bytes);
 
         uint32_t outputVertices = pResUsage->builtInUsage.gs.outputVertices;
 
@@ -5193,22 +5194,104 @@ void PatchInOutImportExport::WriteValueToLds(
                                                "",
                                                pInsertPos);
 
-        for (uint32_t i = 0; i < numChannels; ++i)
+        uint32_t stride = 0;
+
+        for (uint32_t i = 0; i < numChannels; i += stride)
         {
+            Value* pStoreValue = nullptr;
+
+            BufDataFormat dfmt;
+
+            StringRef funcName;
+
+            if (i + 3 < numChannels)
+            {
+                // Merge values[i:i+3] into a <4 x i32> vector
+                auto pStoreValueTy = VectorType::get(m_pContext->Int32Ty(), 4);
+                pStoreValue = UndefValue::get(pStoreValueTy);
+
+                for (uint32_t j = 0; j < 4; ++j)
+                {
+                    pStoreValue = InsertElementInst::Create(pStoreValue,
+                                                            storeValues[i+j],
+                                                            ConstantInt::get(m_pContext->Int32Ty(), j),
+                                                            "",
+                                                            pInsertPos);
+                }
+
+                if (m_gfxIp.major <= 9)
+                {
+                    dfmt = BUF_DATA_FORMAT_32_32_32_32;
+                    funcName = "llvm.amdgcn.tbuffer.store.v4i32";
+                }
+                else
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                }
+
+                stride = 4;
+            }
+            else if (i + 1 < numChannels)
+            {
+                // Merge values[i:i+1] into a <2 x i32> vector
+                auto pStoreValueTy = VectorType::get(m_pContext->Int32Ty(), 2);
+                pStoreValue = UndefValue::get(pStoreValueTy);
+
+                for (uint32_t j = 0; j < 2; ++j)
+                {
+                    pStoreValue = InsertElementInst::Create(pStoreValue,
+                                                            storeValues[i+j],
+                                                            ConstantInt::get(m_pContext->Int32Ty(), j),
+                                                            "",
+                                                            pInsertPos);
+                }
+
+                if (m_gfxIp.major <= 9)
+                {
+                    dfmt = BUF_DATA_FORMAT_32_32;
+                    funcName = "llvm.amdgcn.tbuffer.store.v2i32";
+                }
+                else
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                }
+
+                stride = 2;
+            }
+            else
+            {
+                // No need to merge for a single value
+                pStoreValue = storeValues[i];
+
+                if (m_gfxIp.major <= 9)
+                {
+                    dfmt = BUF_DATA_FORMAT_32;
+                    funcName = "llvm.amdgcn.tbuffer.store.i32";
+                }
+                else
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                }
+
+                stride = 1;
+            }
+
             std::vector<Value*> args;
-            args.push_back(storeValues[i]);                                                    // vdata
-            args.push_back(inOutUsage.pOffChipLdsDesc);                                        // rsrc
+
+            args.push_back(pStoreValue);                                                           // vdata
+            args.push_back(inOutUsage.pOffChipLdsDesc);                                            // rsrc
             if (m_gfxIp.major <= 9)
             {
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                        // vindex
                 args.push_back(pLdsOffset);                                                        // voffset
                 args.push_back(pOffChipLdsBase);                                                   // soffset
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                    // offset
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));       // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), dfmt));                     // dfmt
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));     // nfmt
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                      // glc
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                     // slc
-                EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+
+                EmitCall(m_pModule, funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
             }
             else
             {

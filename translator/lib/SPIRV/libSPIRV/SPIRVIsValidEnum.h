@@ -141,6 +141,13 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeFinalizer:
   case ExecutionModeSubgroupSize:
   case ExecutionModeSubgroupsPerWorkgroup:
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  case ExecutionModeDenormPreserve:
+  case ExecutionModeDenormFlushToZero:
+  case ExecutionModeSignedZeroInfNanPreserve:
+  case ExecutionModeRoundingModeRTE:
+  case ExecutionModeRoundingModeRTZ:
+#endif
     return true;
   default:
     return false;
@@ -600,6 +607,13 @@ inline bool isValid(spv::Capability V) {
   case CapabilityStorageBuffer8BitAccess:
   case CapabilityUniformAndStorageBuffer8BitAccess:
   case CapabilityStoragePushConstant8:
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  case CapabilityDenormPreserve:
+  case CapabilityDenormFlushToZero:
+  case CapabilitySignedZeroInfNanPreserve:
+  case CapabilityRoundingModeRTE:
+  case CapabilityRoundingModeRTZ:
+#endif
   case CapabilityImageGatherBiasLodAMD:
   case CapabilityFragmentMaskAMD:
   case CapabilityFloat16ImageAMD:

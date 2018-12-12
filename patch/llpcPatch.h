@@ -62,7 +62,7 @@ void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
 void initializePatchOptPass(PassRegistry&);
 void initializePatchNullFragShaderPass(PassRegistry&);
-void initializePatchPrepareAbiPass(PassRegistry&);
+void initializePatchPreparePipelineAbiPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);
 void initializePatchResourceCollectPass(PassRegistry&);
 
@@ -74,7 +74,7 @@ namespace Llpc
 llvm::ModulePass* CreatePatchAutoLayoutDesc();
 llvm::ModulePass* CreatePatchCopyShader();
 llvm::ModulePass* CreatePatchNullFragShader();
-llvm::ModulePass* CreatePatchPrepareAbi();
+llvm::ModulePass* CreatePatchPreparePipelineAbi();
 
 class Context;
 

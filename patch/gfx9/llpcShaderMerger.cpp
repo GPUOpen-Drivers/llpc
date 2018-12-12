@@ -130,13 +130,15 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
 // =====================================================================================================================
 // Generates the new entry-point for LS-HS merged shader.
 Function* ShaderMerger::GenerateLsHsEntryPoint(
-    Function* pLsEntryPoint,  // [in] Entry-point of hardware local shader (LS)
-    Function* pHsEntryPoint)  // [in] Entry-point of hardware hull shader (HS), could be null
+    Function* pLsEntryPoint,  // [in] Entry-point of hardware local shader (LS) (could be null)
+    Function* pHsEntryPoint)  // [in] Entry-point of hardware hull shader (HS)
 {
     if (pLsEntryPoint != nullptr)
     {
         pLsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     }
+
+    LLPC_ASSERT(pHsEntryPoint != nullptr);
     pHsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
 
     uint64_t inRegMask = 0;
@@ -593,13 +595,15 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
 // =====================================================================================================================
 // Generates the new entry-point for ES-GS merged shader.
 Function* ShaderMerger::GenerateEsGsEntryPoint(
-    Function* pEsEntryPoint,  // [in] Entry-point of hardware export shader (ES), can be null
+    Function* pEsEntryPoint,  // [in] Entry-point of hardware export shader (ES) (could be null)
     Function* pGsEntryPoint)  // [in] Entry-point of hardware geometry shader (GS)
 {
     if (pEsEntryPoint != nullptr)
     {
         pEsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     }
+
+    LLPC_ASSERT(pGsEntryPoint != nullptr);
     pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
 
     auto pModule = pGsEntryPoint->getParent();

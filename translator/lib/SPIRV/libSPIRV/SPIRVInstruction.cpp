@@ -307,7 +307,8 @@ SPIRVValue * constantCompositeInsert(SPIRVValue *Composite, SPIRVValue *Object,
   return BM->addCompositeConstant(CompositeTy, Elements);
 }
 
-SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
+SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
+                                           uint32_t RoundingTypeMask) {
   assert(Inst->getOpCode() == OpSpecConstantOp &&
       "Not OpSpecConstantOp");
   auto Ops = Inst->getOpWords();
@@ -558,14 +559,16 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
             spvutils::HexFloat<spvutils::FloatProxy<float>> FVal(SrcVal[0].FloatVal);
             spvutils::HexFloat<spvutils::FloatProxy<spvutils::Float16>> F16Val(0);
 
-            FVal.castTo(F16Val, spvutils::kRoundToZero);
+            FVal.castTo(F16Val, (RoundingTypeMask & SPIRVTW_16Bit) ?
+                spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
             DestVal.Float16Val = F16Val.getBits();
           } else if (SrcCompTy->isTypeFloat(64)) {
             // Float16 <- Double
             spvutils::HexFloat<spvutils::FloatProxy<double>> F64Val(SrcVal[0].DoubleVal);
             spvutils::HexFloat<spvutils::FloatProxy<spvutils::Float16>> F16Val(0);
 
-            F64Val.castTo(F16Val, spvutils::kRoundToZero);
+            F64Val.castTo(F16Val, (RoundingTypeMask & SPIRVTW_16Bit) ?
+                spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
             DestVal.Float16Val = F16Val.getBits();
           } else
             llvm_unreachable("Invalid type");
@@ -577,10 +580,15 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst) {
 
             F16Val.castTo(FVal, spvutils::kRoundToZero);
             DestVal.FloatVal = FVal.value().getAsFloat();
-          } else if (SrcCompTy->isTypeFloat(64))
+          } else if (SrcCompTy->isTypeFloat(64)) {
             // Float <- double
-            DestVal.FloatVal = static_cast<float>(SrcVal[0].DoubleVal);
-          else
+            spvutils::HexFloat<spvutils::FloatProxy<double>> F64Val(SrcVal[0].DoubleVal);
+            spvutils::HexFloat<spvutils::FloatProxy<float>> FVal(0.0f);
+
+            F64Val.castTo(FVal, (RoundingTypeMask & SPIRVTW_32Bit) ?
+                spvutils::kRoundToNearestEven : spvutils::kRoundToZero);
+            DestVal.FloatVal = FVal.value().getAsFloat();
+          } else
             llvm_unreachable("Invalid type");
         } else {
           assert(DestCompTy->isTypeFloat(64));

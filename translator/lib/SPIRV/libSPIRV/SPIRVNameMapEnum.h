@@ -120,6 +120,13 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeOutputTriangleStrip, "OutputTriangleStrip");
   add(ExecutionModeVecTypeHint, "VecTypeHint");
   add(ExecutionModeContractionOff, "ContractionOff");
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  add(ExecutionModeDenormPreserve, "DenormPreserve");
+  add(ExecutionModeDenormFlushToZero, "DenormFlushToZero");
+  add(ExecutionModeSignedZeroInfNanPreserve, "SignedZeroInfNanPreserve");
+  add(ExecutionModeRoundingModeRTE, "RoundingModeRTE");
+  add(ExecutionModeRoundingModeRTZ, "RoundingModeRTZ");
+#endif
 }
 SPIRV_DEF_NAMEMAP(ExecutionMode, SPIRVExecutionModeNameMap)
 
@@ -512,6 +519,13 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityStorageBuffer8BitAccess, "StorageBuffer8BitAccess");
   add(CapabilityUniformAndStorageBuffer8BitAccess, "UniformAndStorageBuffer8BitAccess");
   add(CapabilityStoragePushConstant8, "StoragePushConstant8");
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  add(CapabilityDenormPreserve, "DenormPreserve");
+  add(CapabilityDenormFlushToZero, "DenormFlushToZero");
+  add(CapabilitySignedZeroInfNanPreserve, "SignedZeroInfNanPreserve");
+  add(CapabilityRoundingModeRTE, "RoundingModeRTE");
+  add(CapabilityRoundingModeRTZ, "RoundingModeRTZ");
+#endif
   add(CapabilityImageGatherBiasLodAMD, "ImageGatherBiasLodAMD");
   add(CapabilityFragmentMaskAMD, "FragmentMaskAMD");
   add(CapabilityFloat16ImageAMD, "Float16ImageAMD");

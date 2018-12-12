@@ -44,21 +44,6 @@ using namespace Llpc;
 using namespace llvm;
 using namespace object;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-// -disable-llvm-patch: disable the patch for LLVM back-end issues.
-static opt<bool> DisableLlvmPatch("disable-llvm-patch",
-                                  desc("Disable the patch for LLVM back-end issues"),
-                                  init(false));
-
-} // cl
-
-} // llvm
-
 // =====================================================================================================================
 // Adds an archive to the emulation library.
 void EmuLib::AddArchive(
@@ -105,23 +90,18 @@ Function* EmuLib::GetFunction(
               MemoryBufferRef(child, ""), *pContext), "Failed to parse archive bitcode");
 
         // Find and mark the non-native library functions. A library function is non-native if:
-        //   it references llpc.*
         //   it references llvm.amdgcn.*
-        //   it references llvm.fabs.* (subject to cl::DisableLlvmPatch == false)
-        //   it is _Z14unpackHalf2x16i* (subject to cl::DisableLlvmPatch == false)
+        //   it references llpc.* and it isn't implemented in the library
+        //   it is _Z14unpackHalf2x16i*
         std::unordered_set<Function*> nonNativeFuncs;
+        std::unordered_map<Function*, std::vector<Function*>> unknownKindFuncs;
         for (auto& libFunc : *libModule)
         {
             if (libFunc.isDeclaration())
             {
                 auto libFuncName = libFunc.getName();
 
-                // TODO: "llvm.fabs." is to pass
-                // CTS dEQP-VK.ssbo.layout.single_basic_type.std430/std140.row_major_lowp_mat4.
-                // We should remove it once the bug in LLVM back-end is fixed.
-                if (libFuncName.startswith("llpc.") ||
-                    libFuncName.startswith("llvm.amdgcn.") ||
-                    ((cl::DisableLlvmPatch == false) && libFuncName.startswith("llvm.fabs.")))
+                if (libFuncName.startswith("llvm.amdgcn."))
                 {
                     for (auto pUser : libFunc.users())
                     {
@@ -130,14 +110,22 @@ Function* EmuLib::GetFunction(
                         nonNativeFuncs.insert(pNonNativeFunc);
                     }
                 }
+                else if (libFuncName.startswith("llpc."))
+                {
+                    for (auto pUser : libFunc.users())
+                    {
+                        auto pInst = dyn_cast<Instruction>(pUser);
+                        auto pUnknownKindFunc = pInst->getParent()->getParent();
+                        unknownKindFuncs[pUnknownKindFunc].push_back(&libFunc);
+                    }
+                }
             }
 
-            if (cl::DisableLlvmPatch == false)
+            // NOTE: It is to pass CTS floating point control test. If input is constant, LLVM inline pass will do
+            // constant folding for this function, and it will causes floating point control doesn't work correctly.
+            if (libFunc.getName().startswith("_Z14unpackHalf2x16i"))
             {
-                if (libFunc.getName().startswith("_Z14unpackHalf2x16i"))
-                {
-                    nonNativeFuncs.insert(&libFunc);
-                }
+                nonNativeFuncs.insert(&libFunc);
             }
         }
 
@@ -148,7 +136,34 @@ Function* EmuLib::GetFunction(
             if (libFunc.empty() == false)
             {
                 bool isNative = nonNativeFuncs.find(&libFunc) == nonNativeFuncs.end();
-                archive.functions[libFunc.getName()] = EmuLibFunction(&libFunc, isNative);
+                if (isNative == false)
+                {
+                    // Non-native if it is in non-native list
+                    archive.functions[libFunc.getName()] = EmuLibFunction(&libFunc, false);
+                }
+                else
+                {
+                    auto funcIt = unknownKindFuncs.find(&libFunc);
+                    if (funcIt == unknownKindFuncs.end())
+                    {
+                        // Native if isn't in non-native list and unknonw list
+                        archive.functions[libFunc.getName()] = EmuLibFunction(&libFunc, true);
+                    }
+                    else
+                    {
+                        // Non-native if any referenced unknown kind function is non-natigve.
+                        for (auto pFunc : funcIt->second)
+                        {
+                            if (GetFunction(pFunc->getName(), true) == nullptr)
+                            {
+                                isNative = false;
+                                break;
+                            }
+                        }
+                        archive.functions[libFunc.getName()] = EmuLibFunction(&libFunc, isNative);
+                    }
+                }
+
                 if ((libFunc.getName() == funcName) && ((nativeOnly == false) || isNative))
                 {
                     pRequestedFunc = &libFunc;

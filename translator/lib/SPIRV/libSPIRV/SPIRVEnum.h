@@ -100,6 +100,13 @@ enum SPIRVSamplerFilterModeKind {
   SPIRVSFM_Invalid = 255,
 };
 
+enum SPIRVTypeWidthKind {
+    SPIRVTW_8Bit = 0x1,
+    SPIRVTW_16Bit = 0x2,
+    SPIRVTW_32Bit = 0x4,
+    SPIRVTW_64Bit = 0x8,
+};
+
 typedef spv::Capability SPIRVCapabilityKind;
 typedef spv::ExecutionModel SPIRVExecutionModelKind;
 typedef spv::ExecutionMode SPIRVExecutionModeKind;
@@ -201,6 +208,13 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityStorageBuffer8BitAccess, { CapabilityShader });
   ADD_VEC_INIT(CapabilityUniformAndStorageBuffer8BitAccess, { CapabilityStorageBuffer8BitAccess });
   ADD_VEC_INIT(CapabilityStoragePushConstant8, { CapabilityShader });
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  ADD_VEC_INIT(CapabilityDenormPreserve, { CapabilityShader });
+  ADD_VEC_INIT(CapabilityDenormFlushToZero, { CapabilityShader });
+  ADD_VEC_INIT(CapabilitySignedZeroInfNanPreserve, { CapabilityShader });
+  ADD_VEC_INIT(CapabilityRoundingModeRTE, { CapabilityShader });
+  ADD_VEC_INIT(CapabilityRoundingModeRTZ, { CapabilityShader });
+#endif
   ADD_VEC_INIT(CapabilityImageGatherBiasLodAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityFragmentMaskAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityFloat16ImageAMD, { CapabilityShader });
@@ -269,6 +283,13 @@ template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModeOutputTriangleStrip, {CapabilityGeometry});
   ADD_VEC_INIT(ExecutionModeVecTypeHint, {CapabilityKernel});
   ADD_VEC_INIT(ExecutionModeContractionOff, {CapabilityKernel});
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  ADD_VEC_INIT(ExecutionModeDenormPreserve, {CapabilityDenormPreserve});
+  ADD_VEC_INIT(ExecutionModeDenormFlushToZero, {CapabilityDenormFlushToZero});
+  ADD_VEC_INIT(ExecutionModeSignedZeroInfNanPreserve, {CapabilitySignedZeroInfNanPreserve});
+  ADD_VEC_INIT(ExecutionModeRoundingModeRTE, {CapabilityRoundingModeRTE});
+  ADD_VEC_INIT(ExecutionModeRoundingModeRTZ, {CapabilityRoundingModeRTZ});
+#endif
 }
 
 template <> inline void SPIRVMap<SPIRVMemoryModelKind, SPIRVCapVec>::init() {

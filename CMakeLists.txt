@@ -232,7 +232,7 @@ target_sources(llpc PRIVATE
     patch/llpcPatchLoopUnrollInfoRectify.cpp
     patch/llpcPatchNullFragShader.cpp
     patch/llpcPatchPeepholeOpt.cpp
-    patch/llpcPatchPrepareAbi.cpp
+    patch/llpcPatchPreparePipelineAbi.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
     patch/llpcVertexFetch.cpp

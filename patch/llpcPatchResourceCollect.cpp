@@ -89,10 +89,9 @@ bool PatchResourceCollect::runOnModule(
         // Determine whether or not GS on-chip mode is valid for this pipeline
         bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
         bool checkGsOnChip = hasGs;
+
         if (checkGsOnChip)
         {
-            // NOTE: Always call CheckGsOnChipValidity() even when GS on-chip mode is disabled, because that method
-            // also computes esGsRingItemSize and gsVsRingItemSize.
             bool gsOnChip = m_pContext->CheckGsOnChipValidity();
             m_pContext->SetGsOnChip(gsOnChip);
         }
@@ -108,7 +107,7 @@ bool PatchResourceCollect::runOnModule(
 }
 
 // =====================================================================================================================
-// Process one shader stage
+// Process a single shader
 void PatchResourceCollect::ProcessShader()
 {
     m_hasPushConstOp = false;

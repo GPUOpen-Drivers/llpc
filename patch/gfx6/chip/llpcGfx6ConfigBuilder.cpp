@@ -533,7 +533,8 @@ Result ConfigBuilder::BuildVsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
@@ -813,7 +814,8 @@ Result ConfigBuilder::BuildHsRegConfig(
     const auto& calcFactor = pResUsage->inOutUsage.tcs.calcFactor;
     const auto& builtInUsage = pResUsage->builtInUsage.tcs;
 
-    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
@@ -867,7 +869,8 @@ Result ConfigBuilder::BuildEsRegConfig(
     LLPC_ASSERT((pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
     const auto& calcFactor = pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, DX10_CLAMP, true); // Follow PAL setting
 
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
@@ -945,7 +948,8 @@ Result ConfigBuilder::BuildLsRegConfig(
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.vs;
 
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, DEBUG_MODE, pShaderInfo->options.debugMode);
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
@@ -1034,7 +1038,8 @@ Result ConfigBuilder::BuildGsRegConfig(
     const auto& builtInUsage = pResUsage->builtInUsage.gs;
     const auto& inOutUsage   = pResUsage->inOutUsage;
 
-    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
@@ -1183,7 +1188,8 @@ Result ConfigBuilder::BuildPsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
 
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, pShaderInfo->options.debugMode);
 
@@ -1387,7 +1393,8 @@ Result ConfigBuilder::BuildCsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
 
-    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DEBUG_MODE, pShaderInfo->options.debugMode);
 
@@ -1663,6 +1670,55 @@ void ConfigBuilder::BuildApiHwShaderMapping(
 
     SET_REG(pConfig, API_HW_SHADER_MAPPING_LO, apiHwShaderMapping.u32Lo);
     SET_REG(pConfig, API_HW_SHADER_MAPPING_HI, apiHwShaderMapping.u32Hi);
+}
+
+// =====================================================================================================================
+// Sets up floating point mode from the specified floating point control flags.
+uint32_t ConfigBuilder::SetupFloatingPointMode(
+    ResourceUsage* pResUsage)  // [in] Shader resource usage
+{
+    uint32_t floatMode = 0xC0;
+
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+    auto fpControlFlags = pResUsage->builtInUsage.common;
+    if (fpControlFlags.roundingModeRTE & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode &= ~0xC;
+    }
+    else if (fpControlFlags.roundingModeRTZ & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode |= 0xC;
+    }
+
+    if (fpControlFlags.roundingModeRTE & SPIRVTW_32Bit)
+    {
+        floatMode &= ~0x3;
+    }
+    else if (fpControlFlags.roundingModeRTZ & SPIRVTW_32Bit)
+    {
+        floatMode |= 0x3;
+    }
+
+    if (fpControlFlags.denormPerserve & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode |= 0xC0;
+    }
+    else if (fpControlFlags.denormFlushToZero & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode &= ~0xC0;
+    }
+
+    if (fpControlFlags.denormPerserve & SPIRVTW_32Bit)
+    {
+        floatMode |= 0x30;
+    }
+    else if (fpControlFlags.denormFlushToZero & SPIRVTW_32Bit)
+    {
+        floatMode &= ~0x30;
+    }
+#endif
+
+    return floatMode;
 }
 
 } // Gfx6

@@ -372,12 +372,15 @@ void PatchImageOp::visitCallInst(
                     const uint32_t texelOffset = cast<ConstantInt>(*pTexelOffset).getZExtValue();
                     if (texelOffset == 0)
                     {
-                        Value* pPc = EmitCall(m_pModule, "llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), args, NoAttrib, &callInst);
+                        Value* pPc = EmitCall(
+                            m_pModule, "llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), args, NoAttrib, &callInst);
                         pPc = new BitCastInst(pPc, m_pContext->Int32x2Ty(), "", &callInst);
+
                         Value* pPcHigh = ExtractElementInst::Create(pPc,
                                                                     ConstantInt::get(m_pContext->Int32Ty(), 1),
                                                                     "",
                                                                     &callInst);
+
                         // NOTE: Here, we construct a non-constant zero value to disable the mistaken optimization in
                         // backend compiler. The most significant 8 bits of PC is always equal to zero. It is safe to
                         // do this.

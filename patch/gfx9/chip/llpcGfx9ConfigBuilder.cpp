@@ -548,7 +548,8 @@ Result ConfigBuilder::BuildVsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
@@ -864,7 +865,8 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     const auto& vsBuiltInUsage = pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
     const auto& tcsBuiltInUsage = pTcsResUsage->builtInUsage.tcs;
 
-    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pTcsResUsage);
+    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true); // Follow PAL setting
 
     uint32_t lsVgtCompCnt = 1;
@@ -992,7 +994,8 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
 
-    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pGsResUsage);
+    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true); // Follow PAL setting
 
     const auto pVsIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
@@ -1082,12 +1085,12 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
-    SET_REG_FIELD(&pConfig->m_esGsRegs,
-                  VGT_GS_ONCHIP_CNTL,
-                  GS_INST_PRIMS_IN_SUBGRP,
-                  (gsBuiltInUsage.invocations > 1) ?
-                      (calcFactor.gsPrimsPerSubgroup * gsBuiltInUsage.invocations) :
-                      calcFactor.gsPrimsPerSubgroup);
+
+    // NOTE: The value of field "GS_INST_PRIMS_IN_SUBGRP" should be strictly equal to the product of
+    // VGT_GS_ONCHIP_CNTL.GS_PRIMS_PER_SUBGRP * VGT_GS_INSTANCE_CNT.CNT.
+    const uint32_t gsInstPrimsInSubgrp =
+        (gsBuiltInUsage.invocations > 1) ? (calcFactor.gsPrimsPerSubgroup * gsBuiltInUsage.invocations) : 0;
+    SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP, gsInstPrimsInSubgrp);
 
     uint32_t gsVertItemSize0 = sizeof(uint32_t) * gsInOutUsage.gs.outLocCount[0];
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize0);
@@ -1136,9 +1139,6 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, calcFactor.esGsRingItemSize);
 
-    const uint32_t gsInstPrimsInSubgrp =
-        GET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_ONCHIP_CNTL, GS_INST_PRIMS_IN_SUBGRP);
-
     const uint32_t maxPrimsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, MaxGsThreadsPerSubgroup);
 
     if (gfxIp.major == 9)
@@ -1185,8 +1185,6 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageFragment);
 
-    GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
-
     const GraphicsPipelineBuildInfo* pPipelineInfo =
         static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
 
@@ -1195,7 +1193,8 @@ Result ConfigBuilder::BuildPsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
 
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, pShaderInfo->options.debugMode);
 
@@ -1369,14 +1368,18 @@ Result ConfigBuilder::BuildPsRegConfig(
     if (pPipelineInfo->rsState.innerCoverage)
     {
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, INPUT_INNER_COVERAGE);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL, COVERAGE_AA_MASK_ENABLE, false);
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL, UNDER_RAST_ENABLE, true);
+#endif
     }
     else
     {
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_AA_CONFIG, COVERAGE_TO_SHADER_SELECT, INPUT_COVERAGE);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL, COVERAGE_AA_MASK_ENABLE, true);
         SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_CONSERVATIVE_RASTERIZATION_CNTL, UNDER_RAST_ENABLE, false);
+#endif
     }
 
     const uint32_t loadCollisionWaveId =
@@ -1414,14 +1417,13 @@ Result ConfigBuilder::BuildCsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageCompute);
 
-    GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
-
     const auto pIntfData = pContext->GetShaderInterfaceData(shaderStage);
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
 
-    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, FLOAT_MODE, 0xC0); // 0xC0: Disable denorm
+    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DEBUG_MODE, pShaderInfo->options.debugMode);
 
@@ -1773,6 +1775,55 @@ void ConfigBuilder::BuildApiHwShaderMapping(
 
     SET_REG(pConfig, API_HW_SHADER_MAPPING_LO, apiHwShaderMapping.u32Lo);
     SET_REG(pConfig, API_HW_SHADER_MAPPING_HI, apiHwShaderMapping.u32Hi);
+}
+
+// =====================================================================================================================
+// Sets up floating point mode from the specified floating point control flags.
+uint32_t ConfigBuilder::SetupFloatingPointMode(
+    ResourceUsage* pResUsage)  // [in] Shader resource usage
+{
+    uint32_t floatMode = 0xC0;
+
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+    auto fpControlFlags = pResUsage->builtInUsage.common;
+    if (fpControlFlags.roundingModeRTE & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode &= ~0xC;
+    }
+    else if (fpControlFlags.roundingModeRTZ & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode |= 0xC;
+    }
+
+    if (fpControlFlags.roundingModeRTE & SPIRVTW_32Bit)
+    {
+        floatMode &= ~0x3;
+    }
+    else if (fpControlFlags.roundingModeRTZ & SPIRVTW_32Bit)
+    {
+        floatMode |= 0x3;
+    }
+
+    if (fpControlFlags.denormPerserve & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode |= 0xC0;
+    }
+    else if (fpControlFlags.denormFlushToZero & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    {
+        floatMode &= ~0xC0;
+    }
+
+    if (fpControlFlags.denormPerserve & SPIRVTW_32Bit)
+    {
+        floatMode |= 0x30;
+    }
+    else if (fpControlFlags.denormFlushToZero & SPIRVTW_32Bit)
+    {
+        floatMode &= ~0x30;
+    }
+#endif
+
+    return floatMode;
 }
 
 } // Gfx9

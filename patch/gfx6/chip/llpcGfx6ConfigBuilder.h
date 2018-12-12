@@ -37,6 +37,7 @@ namespace Llpc
 
 class Context;
 struct ElfDataEntry;
+struct ResourceUsage;
 
 namespace Gfx6
 {
@@ -120,6 +121,8 @@ private:
                                         uint32_t           fsHwShader,
                                         uint32_t           csHwShader,
                                         PipelineRegConfig* pConfig);
+
+    static uint32_t SetupFloatingPointMode(ResourceUsage* pResUsage);
 
 };
 

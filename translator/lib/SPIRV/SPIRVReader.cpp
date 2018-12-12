@@ -440,6 +440,7 @@ private:
   bool IsKernel;
   bool EnableVarPtr;
   bool EnableGatherLodNz;
+  ShaderFloatControlFlags FpControlFlags;
   SPIRVFunction* EntryTarget;
   const SPIRVSpecConstMap &SpecConstMap;
   SPIRVToLLVMTypeMap TypeMap;
@@ -1152,7 +1153,9 @@ BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
   // flags on the handled instruction
   if (SPIRVGenFastMath && isa<FPMathOperator>(Inst)) {
     llvm::FastMathFlags FMF;
-    FMF.setNoNaNs();
+    // Enable "no NaN" only if there isn't any floating point control flags
+    if (FpControlFlags.U32All == 0)
+      FMF.setNoNaNs();
     FMF.setAllowReciprocal();
     // Enable contraction when "NoContraction" decoration is not specified
     bool AllowContract = !BV->hasDecorate(DecorationNoContraction);
@@ -2416,10 +2419,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(
         BV, BinaryOperator::CreateFNeg(transValue(BC->getOperand(0), F, BB),
                                        BV->getName(), BB));
-  }
-  case OpFDiv: {
-    return mapValue(BV, transBuiltinFromInst(
-      "fdiv", static_cast<SPIRVInstruction *>(BV), BB));
   }
   case OpQuantizeToF16: {
     return mapValue(BV, transBuiltinFromInst(
@@ -3768,6 +3767,29 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
   if (EntryTarget == nullptr)
     return false;
 
+  FpControlFlags.U32All = 0;
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  static_assert(SPIRVTW_8Bit == (8 >> 3),  "Unexpected value!");
+  static_assert(SPIRVTW_16Bit == (16 >> 3), "Unexpected value!");
+  static_assert(SPIRVTW_32Bit == (32 >> 3), "Unexpected value!");
+  static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
+
+  if (auto EM = EntryTarget->getExecutionMode(ExecutionModeDenormPreserve))
+      FpControlFlags.DenormPerserve = EM->getLiterals()[0] >> 3;
+
+  if (auto EM = EntryTarget->getExecutionMode(ExecutionModeDenormFlushToZero))
+      FpControlFlags.DenormFlushToZero = EM->getLiterals()[0] >> 3;
+
+  if (auto EM = EntryTarget->getExecutionMode(ExecutionModeSignedZeroInfNanPreserve))
+      FpControlFlags.SignedZeroInfNanPreserve = EM->getLiterals()[0] >> 3;
+
+  if (auto EM = EntryTarget->getExecutionMode(ExecutionModeRoundingModeRTE))
+      FpControlFlags.RoundingModeRTE = EM->getLiterals()[0] >> 3;
+
+  if (auto EM = EntryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
+      FpControlFlags.RoundingModeRTZ = EM->getLiterals()[0] >> 3;
+#endif
+
   // Check if the SPIR-V corresponds to OpenCL kernel
   IsKernel = (EntryExecModel == ExecutionModelKernel);
 
@@ -3813,7 +3835,12 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
         // time, specialization info is obtained and all specialization constants
         // get their own finalized specialization values.
         auto BI = static_cast<SPIRVSpecConstantOp *>(BV);
-        BV = createValueFromSpecConstantOp(BI);
+        BV = createValueFromSpecConstantOp(BI,
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+            FpControlFlags.RoundingModeRTE);
+#else
+            0);
+#endif
         BI->mapToConstant(BV);
       }
     }
@@ -3947,6 +3974,7 @@ bool SPIRVToLLVM::transKernelMetadata() {
 
       // Generate metadata for execution modes
       ShaderExecModeMetadata ExecModeMD = {};
+      ExecModeMD.common.FpControlFlags = FpControlFlags;
 
       if (ExecModel == ExecutionModelVertex) {
         if (BF->getExecutionMode(ExecutionModeXfb))
@@ -4075,12 +4103,13 @@ bool SPIRVToLLVM::transKernelMetadata() {
       } else
         llvm_unreachable("Invalid execution model");
 
-      static_assert(sizeof(ExecModeMD) == 3 * sizeof(uint32_t),
+      static_assert(sizeof(ExecModeMD) == 4 * sizeof(uint32_t),
           "Unexpected size");
       std::vector<uint32_t> MDVec;
       MDVec.push_back(ExecModeMD.U32All[0]);
       MDVec.push_back(ExecModeMD.U32All[1]);
       MDVec.push_back(ExecModeMD.U32All[2]);
+      MDVec.push_back(ExecModeMD.U32All[3]);
 
       EntryMD.push_back(getMDNodeStringIntVec(Context,
           gSPIRVMD::ExecutionMode + std::string(".") + getName(ExecModel),

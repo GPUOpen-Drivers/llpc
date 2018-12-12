@@ -2489,7 +2489,8 @@ _SPIRV_OP(SubgroupImageBlockWriteINTEL, false, 4)
 
 SPIRVSpecConstantOp *createSpecConstantOpInst(SPIRVInstruction *Inst);
 SPIRVInstruction *createInstFromSpecConstantOp(SPIRVSpecConstantOp *C);
-SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst);
+SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
+  uint32_t RoundingTypeMask);
 } // namespace SPIRV
 
 #endif // SPIRV_LIBSPIRV_SPIRVINSTRUCTION_H

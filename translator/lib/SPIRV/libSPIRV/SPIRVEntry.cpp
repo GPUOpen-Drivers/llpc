@@ -418,6 +418,7 @@ void SPIRVExecutionMode::encode(spv_ostream &O) const {
 
 void SPIRVExecutionMode::decode(std::istream &I) {
   getDecoder(I) >> Target >> ExecMode;
+  bool MergeEM = false;
   switch (ExecMode) {
   case ExecutionModeLocalSize:
   case ExecutionModeLocalSizeHint:
@@ -428,12 +429,25 @@ void SPIRVExecutionMode::decode(std::istream &I) {
   case ExecutionModeVecTypeHint:
     WordLiterals.resize(1);
     break;
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  case ExecutionModeDenormPreserve:
+  case ExecutionModeDenormFlushToZero:
+  case ExecutionModeSignedZeroInfNanPreserve:
+  case ExecutionModeRoundingModeRTE:
+  case ExecutionModeRoundingModeRTZ:
+    WordLiterals.resize(1);
+    MergeEM = true;
+    break;
+#endif
   default:
     // Do nothing. Keep this to avoid VS2013 warning.
     break;
   }
   getDecoder(I) >> WordLiterals;
-  getOrCreateTarget()->addExecutionMode(this);
+  if (MergeEM)
+    getOrCreateTarget()->mergeExecutionMode(this);
+  else
+    getOrCreateTarget()->addExecutionMode(this);
 }
 
 SPIRVForward *SPIRVAnnotationGeneric::getOrCreateTarget() const {

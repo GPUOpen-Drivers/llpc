@@ -258,7 +258,7 @@ Result CodeGenManager::AddTargetPasses(
 // Runs passes on the module, with the diagnostic handler installed
 Result CodeGenManager::Run(
     Module*               pModule,  // [in] LLVM module
-    legacy::PassManager&  passMgr)  // [in] pass manager to run
+    legacy::PassManager&  passMgr)  // [in] Pass manager to run
 {
     Result result = Result::Success;
 

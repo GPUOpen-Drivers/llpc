@@ -157,7 +157,8 @@ void Patch::AddPasses(
     }
 
     // Prepare pipeline ABI.
-    passMgr.add(CreatePatchPrepareAbi());
+    passMgr.add(CreatePatchPreparePipelineAbi());
+
 }
 
 // =====================================================================================================================

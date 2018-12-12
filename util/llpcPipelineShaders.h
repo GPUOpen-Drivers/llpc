@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPipelineShaders.h
- * @brief LLPC header file: simple analysis pass that finds the shaders in the pipeline module
+ * @brief LLPC header file: contains declaration of class Llpc::PipelineShaders
  ***********************************************************************************************************************
  */
 #pragma once
@@ -69,6 +69,10 @@ public:
     ShaderStage GetShaderStage(const llvm::Function* pFunc) const;
 
 private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PipelineShaders);
+
+    // -----------------------------------------------------------------------------------------------------------------
+
     llvm::Function* m_entryPoints[ShaderStageCountInternal];      // The entry-point for each shader stage.
     std::map<const llvm::Function*, ShaderStage> m_entryPointMap; // Map from shader entry-point to shader stage.
 };

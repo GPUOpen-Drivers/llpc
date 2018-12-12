@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  llpcPatchAutoLayoutDesc.cpp
-* @brief LLPC source file: pass to auto-layout descriptors when amdllpc is compiling shaders outside a pipeline
+* @brief LLPC source file: contains declaration and implementation of class Llpc::PatchAutoLayoutDesc.
 ***********************************************************************************************************************
 */
 #include "llvm/Pass.h"
@@ -41,6 +41,7 @@ using namespace Llpc;
 
 namespace Llpc
 {
+
 // =====================================================================================================================
 // Pass to auto-layout descriptors when AMDLLPC is compiling shaders outside a pipeline
 class PatchAutoLayoutDesc : public Patch
@@ -59,6 +60,9 @@ public:
     }
 
     bool runOnModule(Module& module) override;
+
+private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchAutoLayoutDesc);
 };
 
 char PatchAutoLayoutDesc::ID = 0;

@@ -825,7 +825,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 
- private:
+private:
     static const uint32_t     MemberCount = 3;
     static StrToMemberAddr    m_addrTable[MemberCount];
 
@@ -1085,7 +1085,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 
- private:
+private:
     static const uint32_t  MemberCount = 4;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1146,7 +1146,7 @@ public:
         state = m_state;
     };
 
- private:
+private:
     static const uint32_t  MemberCount = 21;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1181,7 +1181,7 @@ public:
         state = m_state;
     };
 
- private:
+private:
     static const uint32_t  MemberCount = 3;
 
     static StrToMemberAddr m_addrTable[MemberCount];
@@ -1213,7 +1213,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 
- private:
+private:
     static const uint32_t  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1245,7 +1245,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 
- private:
+private:
     static const uint32_t  MemberCount = 4;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1275,7 +1275,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 
- private:
+private:
     static const uint32_t  MemberCount = 2;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1337,7 +1337,7 @@ public:
             m_vkDivisorState.pVertexBindingDivisors = &m_vkDivisors[0];
         }
     };
- private:
+private:
     static const uint32_t  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1375,7 +1375,7 @@ public:
 
     void GetSubState(SubState& state)  { state = m_state; };
 
- private:
+private:
     static const uint32_t  MemberCount = 3;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1435,7 +1435,7 @@ public:
         }
     }
 
- private:
+private:
     static const uint32_t  MemberCount = 8;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1484,7 +1484,7 @@ public:
         state.pValue = m_bufMem.size() > 0 ? (const uint32_t *)(&m_bufMem[0]) : nullptr;
     };
 
- private:
+private:
     static const uint32_t  MemberCount = 6;
     static StrToMemberAddr m_addrTable[MemberCount];
 
@@ -1548,6 +1548,7 @@ public:
         }
         state = m_state;
     };
+
 private:
     static const uint32_t                   MemberCount = 7;
     static StrToMemberAddr                  m_addrTable[MemberCount];
@@ -1572,18 +1573,17 @@ public:
     static void InitialAddrTable()
     {
         StrToMemberAddr* pTableItem = m_addrTable;
-        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, entryPoint,  MemberTypeString,    false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, entryPoint,  MemberTypeString, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, specConst,   MemberTypeSpecInfo, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, descriptorRangeValue, MemberTypeDescriptorRangeValue, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, userDataNode, MemberTypeResourceMappingNode, true);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, trapPresent, options.trapPresent, MemberTypeBool,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, debugMode, options.debugMode, MemberTypeBool,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, enablePerformanceData, options.enablePerformanceData, MemberTypeBool,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, allowReZ, options.allowReZ, MemberTypeBool,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, vgprLimit, options.vgprLimit, MemberTypeInt,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, sgprLimit, options.sgprLimit, MemberTypeInt,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, maxThreadGroupsPerComputeUnit, options.maxThreadGroupsPerComputeUnit, MemberTypeInt,false);
-
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, trapPresent, options.trapPresent, MemberTypeBool ,false);
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, debugMode, options.debugMode, MemberTypeBool, false);
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, enablePerformanceData, options.enablePerformanceData, MemberTypeBool, false);
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, allowReZ, options.allowReZ, MemberTypeBool, false);
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, vgprLimit, options.vgprLimit, MemberTypeInt, false);
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, sgprLimit, options.sgprLimit, MemberTypeInt, false);
+        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, maxThreadGroupsPerComputeUnit, options.maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
@@ -1619,7 +1619,7 @@ public:
         }
     };
 
- private:
+private:
     static const uint32_t  MemberCount = 11;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState        m_state;

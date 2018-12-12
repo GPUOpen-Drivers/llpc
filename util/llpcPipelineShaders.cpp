@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  llpcPipelineShaders.cpp
-* @brief LLPC source file: simple analysis pass that finds the shaders in the pipeline module
+* @brief LLPC source file: contains implementation of class Llpc::PipelineShaders
 ***********************************************************************************************************************
 */
 #define DEBUG_TYPE "llpc-pipeline-shaders"
@@ -60,12 +60,12 @@ bool PipelineShaders::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
     m_entryPointMap.clear();
-    for (auto &pEntryPoint : m_entryPoints)
+    for (auto& pEntryPoint : m_entryPoints)
     {
         pEntryPoint = nullptr;
     }
 
-    for (auto &func : module)
+    for (auto& func : module)
     {
         if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
         {
@@ -78,9 +78,9 @@ bool PipelineShaders::runOnModule(
 }
 
 // =====================================================================================================================
-// Get the shader for a particular ABI shader stage, or nullptr if none
+// Get the shader for a particular API shader stage, or nullptr if none
 Function* PipelineShaders::GetEntryPoint(
-    ShaderStage shaderStage     // API shader stage to get shader function for
+    ShaderStage shaderStage     // Shader stage
     ) const
 {
     LLPC_ASSERT((uint32_t)shaderStage < ShaderStageCountInternal);
@@ -103,5 +103,5 @@ ShaderStage PipelineShaders::GetShaderStage(
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PipelineShaders, DEBUG_TYPE, "LLPC get pipeline shaders", false, true)
+INITIALIZE_PASS(PipelineShaders, DEBUG_TYPE, "LLVM pass for getting pipeline shaders", false, true)
 

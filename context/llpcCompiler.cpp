@@ -676,10 +676,15 @@ Result Compiler::BuildPipelineInternal(
     }
 
     // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-    // That includes all the target passes.
+    //
+    // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
+    // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
+    // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
+    // manager.
     PassManager passMgr;
-    raw_svector_ostream elfStream(*pPipelineElf);
     passMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
+
+    raw_svector_ostream elfStream(*pPipelineElf);
 
     if (result == Result::Success)
     {
@@ -690,15 +695,12 @@ Result Compiler::BuildPipelineInternal(
         if (EnableOuts())
         {
             passMgr.add(createPrintModulePass(outs(),
-                    "===============================================================================\n"
-                    "// LLPC final pipeline module info\n"));
+                        "===============================================================================\n"
+                        "// LLPC final pipeline module info\n"));
         }
-
-        // Code generation.
-        result = CodeGenManager::AddTargetPasses(pContext, passMgr, elfStream);
     }
 
-    // Run the "whole pipeline" passes, including the target backend.
+    // Run the "whole pipeline" passes, excluding the target backend.
     if (result == Result::Success)
     {
         TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
@@ -706,9 +708,31 @@ Result Compiler::BuildPipelineInternal(
         result = CodeGenManager::Run(pPipelineModule, passMgr);
         if (result != Result::Success)
         {
+            LLPC_ERRS("Fails to run whole pipeline passes\n");
+        }
+    }
+
+    // A separate "whole pipeline" pass manager for code generation.
+    PassManager codeGenPassMgr;
+
+    if (result == Result::Success)
+    {
+        // Code generation.
+        result = CodeGenManager::AddTargetPasses(pContext, codeGenPassMgr, elfStream);
+    }
+
+    // Run the target backend codegen passes.
+    if (result == Result::Success)
+    {
+        TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
+
+        result = CodeGenManager::Run(pPipelineModule, codeGenPassMgr);
+        if (result != Result::Success)
+        {
             LLPC_ERRS("Fails to generate GPU ISA codes\n");
         }
     }
+
     delete pPipelineModule;
     pPipelineModule = nullptr;
 

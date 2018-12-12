@@ -1311,63 +1311,86 @@ union ShaderImageMemoryMetadata {
   uint32_t U32All;
 };
 
+/// Flags used for floating-point control
+union ShaderFloatControlFlags {
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+  struct {
+  uint32_t DenormPerserve           : 4;
+  uint32_t DenormFlushToZero        : 4;
+  uint32_t SignedZeroInfNanPreserve : 4;
+  uint32_t RoundingModeRTE          : 4;
+  uint32_t RoundingModeRTZ          : 4;
+  uint32_t Unused                   : 12;
+  };
+#endif
+  uint32_t U32All;
+};
+
 /// Metadata for execution modes of each shader entry-point
 union ShaderExecModeMetadata {
   struct {
-    uint32_t xfb                      : 1;  // Transform feedback mode
-    uint32_t Unused                   : 31;
-  } vs;
+    struct
+    {
+      ShaderFloatControlFlags FpControlFlags; // Floating-point control flags
+    } common;
 
-  struct {
-    uint32_t SpacingEqual             : 1;  // Layout "equal_spacing"
-    uint32_t SpacingFractionalEven    : 1;  // Layout "fractional_even_spacing"
-    uint32_t SpacingFractionalOdd     : 1;  // Layout "fractional_odd_spacing"
-    uint32_t VertexOrderCw            : 1;  // Layout "cw"
-    uint32_t VertexOrderCcw           : 1;  // Layout "ccw"
-    uint32_t PointMode                : 1;  // Layout "point_mode"
-    uint32_t Triangles                : 1;  // Layout "triangles"
-    uint32_t Quads                    : 1;  // Layout "quads"
-    uint32_t Isolines                 : 1;  // Layout "isolines"
-    uint32_t xfb                      : 1;  // Transform feedback mode
-    uint32_t Unused                   : 22;
+    union {
+      struct {
+        uint32_t xfb                      : 1;  // Transform feedback mode
+        uint32_t Unused                   : 31;
+      } vs;
 
-    uint32_t OutputVertices;                // Layout "vertices ="
-  } ts;
+      struct {
+        uint32_t SpacingEqual             : 1;  // Layout "equal_spacing"
+        uint32_t SpacingFractionalEven    : 1;  // Layout "fractional_even_spacing"
+        uint32_t SpacingFractionalOdd     : 1;  // Layout "fractional_odd_spacing"
+        uint32_t VertexOrderCw            : 1;  // Layout "cw"
+        uint32_t VertexOrderCcw           : 1;  // Layout "ccw"
+        uint32_t PointMode                : 1;  // Layout "point_mode"
+        uint32_t Triangles                : 1;  // Layout "triangles"
+        uint32_t Quads                    : 1;  // Layout "quads"
+        uint32_t Isolines                 : 1;  // Layout "isolines"
+        uint32_t xfb                      : 1;  // Transform feedback mode
+        uint32_t Unused                   : 22;
 
-  struct {
-    uint32_t InputPoints              : 1;  // Layout "points"
-    uint32_t InputLines               : 1;  // Layout "lines"
-    uint32_t InputLinesAdjacency      : 1;  // Layout "lines_adjacency"
-    uint32_t Triangles                : 1;  // Layout "triangles"
-    uint32_t InputTrianglesAdjacency  : 1;  // Layout "triangles_adjacency"
-    uint32_t OutputPoints             : 1;  // Layout "points"
-    uint32_t OutputLineStrip          : 1;  // Layout "line_strip"
-    uint32_t OutputTriangleStrip      : 1;  // Layout "triangle_strip"
-    uint32_t xfb                      : 1;  // Transform feedback mode
-    uint32_t Unused                   : 23;
+        uint32_t OutputVertices;                // Layout "vertices ="
+      } ts;
 
-    uint32_t Invocations;                   // Layout "invocations ="
-    uint32_t OutputVertices;                // Layout "max_vertices ="
-  } gs;
+      struct {
+        uint32_t InputPoints              : 1;  // Layout "points"
+        uint32_t InputLines               : 1;  // Layout "lines"
+        uint32_t InputLinesAdjacency      : 1;  // Layout "lines_adjacency"
+        uint32_t Triangles                : 1;  // Layout "triangles"
+        uint32_t InputTrianglesAdjacency  : 1;  // Layout "triangles_adjacency"
+        uint32_t OutputPoints             : 1;  // Layout "points"
+        uint32_t OutputLineStrip          : 1;  // Layout "line_strip"
+        uint32_t OutputTriangleStrip      : 1;  // Layout "triangle_strip"
+        uint32_t xfb                      : 1;  // Transform feedback mode
+        uint32_t Unused                   : 23;
 
-  struct {
-    uint32_t OriginUpperLeft          : 1;  // Layout "origin_upper_left"
-    uint32_t PixelCenterInteger       : 1;  // Layout "pixel_center_integer"
-    uint32_t EarlyFragmentTests       : 1;  // Layout "early_fragment_tests"
-    uint32_t DepthUnchanged           : 1;  // Layout "depth_unchanged"
-    uint32_t DepthGreater             : 1;  // Layout "depth_greater"
-    uint32_t DepthLess                : 1;  // Layout "depth_less"
-    uint32_t DepthReplacing           : 1;  // Layout "depth_any"
-    uint32_t Unused                   : 25;
-  } fs;
+        uint32_t Invocations;                   // Layout "invocations ="
+        uint32_t OutputVertices;                // Layout "max_vertices ="
+      } gs;
 
-  struct {
-    uint32_t LocalSizeX;                    // Layout "local_size_x ="
-    uint32_t LocalSizeY;                    // Layout "local_size_y ="
-    uint32_t LocalSizeZ;                    // Layout "local_size_z ="
-  } cs;
+      struct {
+        uint32_t OriginUpperLeft          : 1;  // Layout "origin_upper_left"
+        uint32_t PixelCenterInteger       : 1;  // Layout "pixel_center_integer"
+        uint32_t EarlyFragmentTests       : 1;  // Layout "early_fragment_tests"
+        uint32_t DepthUnchanged           : 1;  // Layout "depth_unchanged"
+        uint32_t DepthGreater             : 1;  // Layout "depth_greater"
+        uint32_t DepthLess                : 1;  // Layout "depth_less"
+        uint32_t DepthReplacing           : 1;  // Layout "depth_any"
+        uint32_t Unused                   : 25;
+      } fs;
 
-  uint32_t U32All[3];
+      struct {
+        uint32_t LocalSizeX;                    // Layout "local_size_x ="
+        uint32_t LocalSizeY;                    // Layout "local_size_y ="
+        uint32_t LocalSizeZ;                    // Layout "local_size_z ="
+      } cs;
+    };
+  };
+  uint32_t U32All[4];
 };
 
 } // namespace SPIRV

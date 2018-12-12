@@ -132,6 +132,9 @@ Result SpirvLower::Run(
     // Lower SPIR-V constant immediate store.
     passMgr.add(SpirvLowerConstImmediateStore::Create());
 
+    // Lower SPIR-V algebraic transforms, must be done before istruction combining pass.
+    passMgr.add(SpirvLowerAlgebraTransform::Create());
+
     // Remove reduant load/store operations and do minimal optimization
     // It is required by SpirvLowerImageOp.
     passMgr.add(createSROAPass());
@@ -157,9 +160,6 @@ Result SpirvLower::Run(
     {
         passMgr.add(SpirvLowerDynIndex::Create());
     }
-
-    // Lower SPIR-V algebraic transforms
-    passMgr.add(SpirvLowerAlgebraTransform::Create());
 
     // Lower SPIR-V load/store operations on aggregate type
     passMgr.add(SpirvLowerAggregateLoadStore::Create());
