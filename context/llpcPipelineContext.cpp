@@ -103,7 +103,7 @@ const char* PipelineContext::GetGpuNameString() const
     }
 
     LLPC_ASSERT(pNameMap != nullptr);
-
+    buildErrorOnPurpose = 0;
     return (pNameMap != nullptr) ? pNameMap->pNameString : "";
 }
 
