@@ -131,6 +131,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcShaderMerger.cpp                \
         \
         llpcCodeGenManager.cpp              \
+        llpcConfigBuilderBase.cpp           \
         llpcFragColorExport.cpp             \
         llpcPatch.cpp                       \
         llpcPatchBufferOp.cpp               \

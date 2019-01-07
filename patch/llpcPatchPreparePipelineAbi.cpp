@@ -28,9 +28,6 @@
 * @brief LLPC source file: contains declaration and implementation of class Llpc::PatchPreparePipelineAbi.
 ***********************************************************************************************************************
 */
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
@@ -329,140 +326,18 @@ void PatchPreparePipelineAbi::SetAbiEntryNames(
 void PatchPreparePipelineAbi::AddAbiMetadata(
     Module& module)   // [in] LLVM module
 {
-    uint8_t* pConfig = nullptr;
-    size_t configSize = 0;
-
-    Result result = Result::Success;
-    if (m_pContext->IsGraphics())
-    {
-        result = BuildGraphicsPipelineRegConfig(&pConfig, &configSize);
-    }
-    else
-    {
-        result = BuildComputePipelineRegConfig(&pConfig, &configSize);
-    }
-    LLPC_ASSERT(result == Result::Success);
-    LLPC_UNUSED(result);
-
-    std::vector<Metadata*> abiMeta;
-    size_t sizeInDword = configSize / sizeof(uint32_t);
-    // Configs are composed of DWORD key/value pair, the size should be even
-    LLPC_ASSERT((sizeInDword % 2) == 0);
-    for (size_t i = 0; i < sizeInDword; i += 2)
-    {
-        uint32_t key   = (reinterpret_cast<uint32_t*>(pConfig))[i];
-        uint32_t value = (reinterpret_cast<uint32_t*>(pConfig))[i + 1];
-        // Don't export invalid metadata key and value
-        if (key == InvalidMetadataKey)
-        {
-            LLPC_ASSERT(value == InvalidMetadataValue);
-        }
-        else
-        {
-            abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), key, false)));
-            abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), value, false)));
-        }
-    }
-
-    auto pAbiMetaTuple = MDTuple::get(*m_pContext, abiMeta);
-    auto pAbiMetaNode = module.getOrInsertNamedMetadata("amdgpu.pal.metadata");
-    pAbiMetaNode->addOperand(pAbiMetaTuple);
-    delete[] pConfig;
-}
-
-// =====================================================================================================================
-// Builds register configuration for graphics pipeline.
-//
-// NOTE: This function will create pipeline register configuration. The caller has the responsibility of destroying it.
-Result PatchPreparePipelineAbi::BuildGraphicsPipelineRegConfig(
-    uint8_t**           ppConfig,       // [out] Register configuration for VS-FS pipeline
-    size_t*             pConfigSize)    // [out] Size of register configuration
-{
-    Result result = Result::Success;
-
-    const bool hasTs = (m_hasTcs || m_hasTes);
-
-    if ((hasTs == false) && (m_hasGs == false))
-    {
-        // VS-FS pipeline
-        if (m_gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-    else if (hasTs && (m_hasGs == false))
-    {
-        // VS-TS-FS pipeline
-        if (m_gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsTsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsTsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-    else if ((hasTs == false) && m_hasGs)
-    {
-        // VS-GS-FS pipeline
-        if (m_gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsGsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsGsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-    else
-    {
-        // VS-TS-GS-FS pipeline
-        if (m_gfxIp.major <= 8)
-        {
-            result = Gfx6::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-        }
-        else
-        {
-            {
-                result = Gfx9::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(m_pContext, ppConfig, pConfigSize);
-            }
-        }
-    }
-
-    return result;
-}
-
-// =====================================================================================================================
-// Builds register configuration for compute pipeline.
-//
-// NOTE: This function will create pipeline register configuration. The caller has the responsibility of destroying it.
-Result PatchPreparePipelineAbi::BuildComputePipelineRegConfig(
-    uint8_t**           ppConfig,     // [out] Register configuration for compute pipeline
-    size_t*             pConfigSize)  // [out] Size of register configuration
-{
-    Result result = Result::Success;
-
     if (m_gfxIp.major <= 8)
     {
-        result = Gfx6::ConfigBuilder::BuildPipelineCsRegConfig(m_pContext, ppConfig, pConfigSize);
+        Gfx6::ConfigBuilder configBuilder(&module);
+        configBuilder.BuildPalMetadata();
     }
     else
     {
-        result = Gfx9::ConfigBuilder::BuildPipelineCsRegConfig(m_pContext, ppConfig, pConfigSize);
+        Gfx9::ConfigBuilder configBuilder(&module);
+        configBuilder.BuildPalMetadata();
     }
-
-    return result;
 }
+
 
 // =====================================================================================================================
 // Initializes the pass

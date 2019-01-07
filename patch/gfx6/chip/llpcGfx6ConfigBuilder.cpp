@@ -57,6 +57,48 @@ namespace Gfx6
 #include "si_ci_vi_merged_offset.h"
 
 // =====================================================================================================================
+// Builds PAL metadata for pipeline.
+void ConfigBuilder::BuildPalMetadata()
+{
+    Result result = Result::Success;
+
+    if (m_pContext->IsGraphics() == false)
+    {
+        result = BuildPipelineCsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+    }
+    else
+    {
+        const bool hasTs = (m_hasTcs || m_hasTes);
+
+        if ((hasTs == false) && (m_hasGs == false))
+        {
+            // VS-FS pipeline
+            result = BuildPipelineVsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+        }
+        else if (hasTs && (m_hasGs == false))
+        {
+            // VS-TS-FS pipeline
+            result = BuildPipelineVsTsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+        }
+        else if ((hasTs == false) && m_hasGs)
+        {
+            // VS-GS-FS pipeline
+            result = BuildPipelineVsGsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+        }
+        else
+        {
+            // VS-TS-GS-FS pipeline
+            result = BuildPipelineVsTsGsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+        }
+    }
+
+    LLPC_ASSERT(result == Result::Success);
+    LLPC_UNUSED(result);
+
+    WritePalMetadata();
+}
+
+// =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS).
 Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     Context*            pContext,         // [in] LLPC context

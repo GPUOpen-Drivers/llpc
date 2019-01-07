@@ -58,6 +58,87 @@ namespace Gfx9
 #include "gfx9_plus_merged_offset.h"
 
 // =====================================================================================================================
+// Builds PAL metadata for pipeline.
+void ConfigBuilder::BuildPalMetadata()
+{
+    Result result = Result::Success;
+
+    if (m_pContext->IsGraphics() == false)
+    {
+        result = BuildPipelineCsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+    }
+    else
+    {
+        const bool hasTs = (m_hasTcs || m_hasTes);
+#if LLPC_BUILD_GFX10
+        const bool enableNgg = m_pContext->GetNggControl()->enableNgg;
+#endif
+
+        if ((hasTs == false) && (m_hasGs == false))
+        {
+            // VS-FS pipeline
+#if LLPC_BUILD_GFX10
+            if ((m_gfxIp.major >= 10) && enableNgg)
+            {
+                result = BuildPipelineNggVsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+            else
+#endif
+            {
+                result = BuildPipelineVsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+        }
+        else if (hasTs && (m_hasGs == false))
+        {
+            // VS-TS-FS pipeline
+#if LLPC_BUILD_GFX10
+            if ((m_gfxIp.major >= 10) && enableNgg)
+            {
+                result = BuildPipelineNggVsTsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+            else
+#endif
+            {
+                result = BuildPipelineVsTsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+        }
+        else if ((hasTs == false) && m_hasGs)
+        {
+            // VS-GS-FS pipeline
+#if LLPC_BUILD_GFX10
+            if ((m_gfxIp.major >= 10) && enableNgg)
+            {
+                result = BuildPipelineNggVsGsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+            else
+#endif
+            {
+                result = BuildPipelineVsGsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+        }
+        else
+        {
+            // VS-TS-GS-FS pipeline
+#if LLPC_BUILD_GFX10
+            if ((m_gfxIp.major >= 10) && enableNgg)
+            {
+                result = Gfx9::ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+            else
+#endif
+            {
+                result = Gfx9::ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(m_pContext, &m_pConfig, &m_configSize);
+            }
+        }
+    }
+
+    LLPC_ASSERT(result == Result::Success);
+    LLPC_UNUSED(result);
+
+    WritePalMetadata();
+}
+
+// =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS).
 Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     Context*            pContext,         // [in] LLPC context

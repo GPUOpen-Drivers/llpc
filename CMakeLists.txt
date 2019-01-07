@@ -246,6 +246,7 @@ target_sources(llpc PRIVATE
     patch/gfx9/chip/llpcGfx9ConfigBuilder.cpp
     patch/gfx9/llpcShaderMerger.cpp
     patch/llpcCodeGenManager.cpp
+    patch/llpcConfigBuilderBase.cpp
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
     patch/llpcPatchBufferOp.cpp
