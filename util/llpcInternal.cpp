@@ -54,21 +54,6 @@
 
 using namespace llvm;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-// -dump-cfg: enable to dump CFG into a .dot graph.
-opt<bool> EnableDumpCfg("dump-cfg", desc("Enable to dump Cfg into a .dot graph."), init(false));
-
-extern opt<std::string> PipelineDumpDir;
-
-} // cl
-
-} // llvm
-
 namespace Llpc
 {
 
@@ -95,7 +80,7 @@ Function* GetEntryPoint(
 // =====================================================================================================================
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
-Value* EmitCall(
+CallInst* EmitCall(
     Module*                       pModule,          // [in] LLVM module
     StringRef                     funcName,         // Name string of the function
     Type*                         pRetTy,           // [in] Return type
@@ -134,7 +119,7 @@ Value* EmitCall(
 // =====================================================================================================================
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
-Value* EmitCall(
+CallInst* EmitCall(
     Module*                       pModule,          // [in] LLVM module
     StringRef                     funcName,         // Name string of the function
     Type*                         pRetTy,           // [in] Return type
@@ -215,16 +200,24 @@ std::string GetTypeNameForScalarOrVector(
 // =====================================================================================================================
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
 void AddTypeMangling(
-    Type* pReturnTy,        // [in] Return type (could be null)
-    ArrayRef<Value*> args,  // Arguments
-    std::string& name)      // [out] String to add mangling to
+    Type*            pReturnTy,     // [in] Return type (could be null)
+    ArrayRef<Value*> args,          // Arguments
+    std::string&     name)          // [out] String to add mangling to
 {
+    size_t nameLen = name.length();
+    if (name[nameLen - 1] == '.')
+    {
+        // NOTE: If the specified name is ended with ".", we remove it in that mangling suffix starts with "." as well.
+        name.erase(nameLen - 1, 1);
+    }
+
     raw_string_ostream nameStream(name);
     if ((pReturnTy != nullptr) && (pReturnTy->isVoidTy() == false))
     {
         nameStream << ".";
         GetTypeNameForScalarOrVector(pReturnTy, nameStream);
     }
+
     for (auto pArg : args)
     {
         nameStream << ".";

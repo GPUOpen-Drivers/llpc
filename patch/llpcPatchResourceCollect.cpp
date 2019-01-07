@@ -50,6 +50,13 @@ namespace Llpc
 char PatchResourceCollect::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching operations for resource collecting
+ModulePass* CreatePatchResourceCollect()
+{
+    return new PatchResourceCollect();
+}
+
+// =====================================================================================================================
 PatchResourceCollect::PatchResourceCollect()
     :
     Patch(ID),
@@ -188,10 +195,11 @@ void PatchResourceCollect::visitCallInst(
         }
     }
     else if (mangledName.startswith(LlpcName::BufferLoadDesc) ||
-            mangledName.startswith(LlpcName::BufferStoreDesc))
+            mangledName.startswith(LlpcName::BufferStoreDesc) ||
+            mangledName.startswith(LlpcName::BufferAtomicDesc))
     {
         if (isDeadCall &&
-            (mangledName.startswith(LlpcName::BufferStoreDesc) == false))
+            (mangledName.startswith(LlpcName::BufferLoadDesc) == true))
         {
             m_deadCalls.insert(&callInst);
         }
@@ -2201,7 +2209,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             if (m_shaderStage == ShaderStageGeometry)
             {
                 LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
-                    << ") Output: stream = " << inOutUsage.gs.rasterStream << ", "
+                    << ") Output: stream = " << inOutUsage.gs.rasterStream << " , "
                     << "builtin = " << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
                     << "  =>  Mapped = " << loc << "\n");
             }
@@ -2349,7 +2357,7 @@ void PatchResourceCollect::MapGsGenericOutput(
     pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
 
     LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
-                << ") Output: stream =" << outLocInfo.streamId << ", "
+                << ") Output: stream = " << outLocInfo.streamId << ", "
                 << " loc = " << outLocInfo.location
                 << "  =>  Mapped = "
                 << pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] << "\n");
@@ -2385,5 +2393,5 @@ void PatchResourceCollect::MapGsBuiltInOutput(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for resource collecting.
-INITIALIZE_PASS(PatchResourceCollect, "Patch-resource-collect",
+INITIALIZE_PASS(PatchResourceCollect, DEBUG_TYPE,
                 "Patch LLVM for resource collecting", false, false)

@@ -58,6 +58,13 @@ namespace Llpc
 char PatchLoopUnrollInfoRectify::ID;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching operations for rectifying unroll information.
+FunctionPass* CreatePatchLoopUnrollInfoRectify()
+{
+    return new PatchLoopUnrollInfoRectify();
+}
+
+// =====================================================================================================================
 PatchLoopUnrollInfoRectify::PatchLoopUnrollInfoRectify()
     :
     FunctionPass(ID)
@@ -170,7 +177,7 @@ void PatchLoopUnrollInfoRectify::getAnalysisUsage(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for rectifying unroll information.
-INITIALIZE_PASS(PatchLoopUnrollInfoRectify, "Patch-loop-unroll-info-rectify",
+INITIALIZE_PASS(PatchLoopUnrollInfoRectify, DEBUG_TYPE,
     "Patch LLVM for loop unroll info rectifying", false, false)
 
 // =====================================================================================================================

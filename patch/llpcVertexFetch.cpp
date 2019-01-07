@@ -36,6 +36,7 @@
 
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcSystemValues.h"
 #include "llpcVertexFetch.h"
 
 using namespace llvm;
@@ -888,10 +889,12 @@ const VertexCompFormatInfo VertexFetch::m_vertexCompFormatInfo[] =
 
 // =====================================================================================================================
 VertexFetch::VertexFetch(
-    Function* pEntryPoint) // [in] Entry-point of API vertex shader
+    Function*           pEntryPoint,      // [in] Entry-point of API vertex shader
+    ShaderSystemValues* pShaderSysValues) // [in] ShaderSystemValues object for getting vertex buffer pointer from
     :
     m_pModule(pEntryPoint->getParent()),
     m_pContext(static_cast<Context*>(&m_pModule->getContext())),
+    m_pShaderSysValues(pShaderSysValues),
     m_pVertexInput(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo())->pVertexInput)
 {
     LLPC_ASSERT(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
@@ -1448,7 +1451,7 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
     idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
     idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), binding, false));
 
-    auto pVbTablePtr = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->vbTable.pTablePtr;
+    auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr();
     auto pVbDescPtr = GetElementPtrInst::Create(nullptr, pVbTablePtr, idxs, "", pInsertPos);
     pVbDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
 

@@ -307,6 +307,7 @@ const static char Sampler[] = "Sampler";
 const static char ConstantSampler[] = "ConstantSampler";
 const static char PipeStorage[] = "PipeStorage";
 const static char ConstantPipeStorage[] = "ConstantPipeStorage";
+const static char VariablePtr[] = "VarPtr";
 } // namespace kSPIRVTypeName
 
 namespace kSPR2TypeName {
@@ -1336,7 +1337,7 @@ union ShaderExecModeMetadata {
 
     union {
       struct {
-        uint32_t xfb                      : 1;  // Transform feedback mode
+        uint32_t Xfb                      : 1;  // Transform feedback mode
         uint32_t Unused                   : 31;
       } vs;
 
@@ -1350,7 +1351,7 @@ union ShaderExecModeMetadata {
         uint32_t Triangles                : 1;  // Layout "triangles"
         uint32_t Quads                    : 1;  // Layout "quads"
         uint32_t Isolines                 : 1;  // Layout "isolines"
-        uint32_t xfb                      : 1;  // Transform feedback mode
+        uint32_t Xfb                      : 1;  // Transform feedback mode
         uint32_t Unused                   : 22;
 
         uint32_t OutputVertices;                // Layout "vertices ="
@@ -1365,7 +1366,7 @@ union ShaderExecModeMetadata {
         uint32_t OutputPoints             : 1;  // Layout "points"
         uint32_t OutputLineStrip          : 1;  // Layout "line_strip"
         uint32_t OutputTriangleStrip      : 1;  // Layout "triangle_strip"
-        uint32_t xfb                      : 1;  // Transform feedback mode
+        uint32_t Xfb                      : 1;  // Transform feedback mode
         uint32_t Unused                   : 23;
 
         uint32_t Invocations;                   // Layout "invocations ="

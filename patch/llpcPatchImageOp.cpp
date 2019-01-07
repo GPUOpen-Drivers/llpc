@@ -61,6 +61,13 @@ namespace Llpc
 char PatchImageOp::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching opertions for image operations
+ModulePass* CreatePatchImageOp()
+{
+    return new PatchImageOp();
+}
+
+// =====================================================================================================================
 PatchImageOp::PatchImageOp()
     :
     Patch(ID)
@@ -401,5 +408,5 @@ void PatchImageOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for image operations.
-INITIALIZE_PASS(PatchImageOp, "Patch-image-op",
+INITIALIZE_PASS(PatchImageOp, DEBUG_TYPE,
                 "Patch LLVM for image operations (F-mask support)", false, false)

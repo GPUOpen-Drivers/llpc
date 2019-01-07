@@ -59,9 +59,6 @@ public:
 
     void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
 
-    // Pass creator, creates the pass of LLVM patching operations for rectifying unroll information.
-    static llvm::FunctionPass* Create() { return new PatchLoopUnrollInfoRectify(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

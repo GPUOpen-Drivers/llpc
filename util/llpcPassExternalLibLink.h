@@ -60,9 +60,6 @@ public:
 
     virtual bool runOnModule(llvm::Module& module);
 
-    // Pass creator, creates the LLVM pass for linking external library of LLVM IR
-    static llvm::ModulePass* Create(bool nativeOnly) { return new PassExternalLibLink(nativeOnly); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

@@ -189,17 +189,16 @@ public:
                                                          const char*const* pOptions);
 
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
+
+    static llvm::Module* TranslateSpirvToLlvm(const BinaryData*            pSpirvBin,
+                                              ShaderStage                  shaderStage,
+                                              const char*                  pEntryTarget,
+                                              const VkSpecializationInfo*  pSpecializationInfo,
+                                              llvm::LLVMContext*           pContext);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Compiler);
-
-    Result TranslateSpirvToLlvm(const BinaryData*            pSpirvBin,
-                                ShaderStage                  shaderStage,
-                                const char*                  pEntryTarget,
-                                const VkSpecializationInfo*  pSpecializationInfo,
-                                llvm::LLVMContext*           pContext,
-                                uint32_t                     forceLoopUnrollCount,
-                                llvm::Module**               ppModule) const;
 
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
@@ -214,11 +213,9 @@ private:
     Context* AcquireContext();
     void ReleaseContext(Context* pContext);
 
-    Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut) const;
-    void CleanOptimizedSpirv(BinaryData* pSpirvBin) const;
+    static Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut);
+    static void CleanOptimizedSpirv(BinaryData* pSpirvBin);
     Result CollectInfoFromSpirvBinary(ShaderModuleData* pModuleData) const;
-
-    bool NeedDynamicLoopUnroll(llvm::Module* pModule) const;
 
     void GetPipelineStatistics(const void*             pCode,
                                size_t                  codeSize,

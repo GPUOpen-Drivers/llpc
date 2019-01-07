@@ -567,8 +567,8 @@ Result ConfigBuilder::BuildVsRegConfig(
                 pResUsage->inOutUsage.gs.outLocCount[0] > 0);
             SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
                 pResUsage->inOutUsage.gs.outLocCount[1] > 0);
-            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG,
-                STREAMOUT_2_EN, pResUsage->inOutUsage.gs.outLocCount[2] > 0);
+            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN,
+                pResUsage->inOutUsage.gs.outLocCount[2] > 0);
             SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
                 pResUsage->inOutUsage.gs.outLocCount[3] > 0);
         }
@@ -603,10 +603,10 @@ Result ConfigBuilder::BuildVsRegConfig(
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(int));
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(int));
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(int));
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(int));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(uint32_t));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(uint32_t));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(uint32_t));
+    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(uint32_t));
 
     uint32_t streamBufferConfig = 0;
     for (auto i = 0; i < MaxGsStreams; ++i)

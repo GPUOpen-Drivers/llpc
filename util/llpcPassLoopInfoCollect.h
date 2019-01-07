@@ -30,36 +30,35 @@
  */
 #pragma once
 
+#include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/LoopPass.h"
 #include "llpc.h"
+#include "llpcPipelineShaders.h"
+
+namespace llvm
+{
+
+class PassRegistry;
+void initializePassLoopInfoCollectPass(PassRegistry&);
+
+} // llvm
 
 namespace Llpc
 {
 
-// Represents the info of loop analysis
-struct LoopAnalysisInfo
-{
-    uint32_t numAluInsts;               // Number of ALU instructions
-    uint32_t numBasicBlocks;            // Number of basic blocks
-    uint32_t nestedLevel;               // Nested loop level
-};
-
 // =====================================================================================================================
-// Represents the LLVM pass for loop info collecting.
+// Represents the LLVM pass for determining whether dynamic loop unroll is needed
 class PassLoopInfoCollect : public llvm::ModulePass
 {
 public:
-    PassLoopInfoCollect() : ModulePass(ID) {};
-    PassLoopInfoCollect(std::vector<LoopAnalysisInfo>* pInfo) : ModulePass(ID)
-    {
-        m_pLoopInfo = pInfo;
-    };
-
-    void HandleLoop(llvm::Loop* loop, uint32_t nestedLevel);
+    PassLoopInfoCollect() : ModulePass(ID) {}
+    PassLoopInfoCollect(bool* pNeedDynamicLoopUnroll);
 
     // Gets loop analysis usage
     virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override
     {
+        analysisUsage.addRequired<llvm::CallGraphWrapperPass>();
+        analysisUsage.addRequired<PipelineShaders>();
         analysisUsage.addRequired<llvm::LoopInfoWrapperPass>();
         analysisUsage.setPreservesAll();
     }
@@ -73,9 +72,11 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PassLoopInfoCollect);
 
+    bool NeedDynamicLoopUnroll(const llvm::Loop* pLoop);
+
     // -----------------------------------------------------------------------------------------------------------------
 
-    std::vector<LoopAnalysisInfo>*  m_pLoopInfo;
+    bool*                           m_pNeedDynamicLoopUnroll;   // Pointer to flag that this pass writes to say whether
 };
 
 } // Llpc

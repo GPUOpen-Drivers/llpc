@@ -28,6 +28,7 @@
  * @brief LLPC source file: contains implementation of class Llpc::PassManager.
  ***********************************************************************************************************************
  */
+#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -43,12 +44,57 @@ static cl::opt<bool> VerifyIr("verify-ir",
                               cl::desc("Verify IR after each pass"),
                               cl::init(false));
 
+// -dump-cfg-after : dump CFG as .dot files after specified pass
+static cl::opt<std::string> DumpCfgAfter("dump-cfg-after",
+                                         cl::desc("Dump CFG as .dot files after specified pass"),
+                                         cl::init(""));
+
 } // cl
 
 } // llvm
 
 using namespace llvm;
 using namespace Llpc;
+
+// =====================================================================================================================
+// Get the PassInfo for a registered pass given short name
+static const PassInfo* GetPassInfo(
+    StringRef passName)   // Short name of pass
+{
+    if (passName.empty())
+    {
+        return nullptr;
+    }
+
+    const PassRegistry& passRegistry = *PassRegistry::getPassRegistry();
+    const PassInfo* pPassInfo = passRegistry.getPassInfo(passName);
+    if (pPassInfo == nullptr)
+    {
+        report_fatal_error(Twine('\"') + Twine(passName) +
+                           Twine("\" pass is not registered."));
+    }
+    return pPassInfo;
+}
+
+// =====================================================================================================================
+// Get the ID for a registered pass given short name
+static AnalysisID GetPassIdFromName(
+    StringRef passName)   // Short name of pass
+{
+  const PassInfo* pPassInfo = GetPassInfo(passName);
+  return pPassInfo ? pPassInfo->getTypeInfo() : nullptr;
+}
+
+// =====================================================================================================================
+// Constructor
+Llpc::PassManager::PassManager() :
+    legacy::PassManager()
+{
+    if (cl::DumpCfgAfter.empty() == false)
+    {
+        m_dumpCfgAfter = GetPassIdFromName(cl::DumpCfgAfter);
+    }
+}
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
@@ -74,6 +120,13 @@ void Llpc::PassManager::add(
     {
         // Add a verify pass after it.
         legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
+    }
+
+    AnalysisID passId = pPass->getPassID();
+    if (passId == m_dumpCfgAfter)
+    {
+        // Add a CFG printer pass after it.
+        legacy::PassManager::add(createCFGPrinterLegacyPassPass());
     }
 }
 

@@ -50,6 +50,13 @@ namespace Llpc
 char PatchBufferOp::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching opertions for buffer operations
+ModulePass* CreatePatchBufferOp()
+{
+    return new PatchBufferOp();
+}
+
+// =====================================================================================================================
 PatchBufferOp::PatchBufferOp()
     :
     Patch(ID)
@@ -105,9 +112,10 @@ void PatchBufferOp::visitCallInst(
     auto mangledName = pCallee->getName();
 
     if (mangledName.startswith(LlpcName::BufferLoadDesc) ||
-        mangledName.startswith(LlpcName::BufferStoreDesc))
+        mangledName.startswith(LlpcName::BufferStoreDesc) ||
+        mangledName.startswith(LlpcName::BufferAtomicDesc))
     {
-        // TODO: Use uniform load/store operations.
+        // Variable pointer does not support nonuniform descriptor
     }
     else if (mangledName.startswith(LlpcName::BufferCallPrefix))
     {
@@ -262,5 +270,5 @@ void PatchBufferOp::ReplaceCallee(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for buffer operations.
-INITIALIZE_PASS(PatchBufferOp, "Patch-buffer-op",
+INITIALIZE_PASS(PatchBufferOp, DEBUG_TYPE,
                 "Patch LLVM for buffer operations", false, false)

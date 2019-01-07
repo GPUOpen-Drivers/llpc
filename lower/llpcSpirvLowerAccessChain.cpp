@@ -50,6 +50,13 @@ namespace Llpc
 char SpirvLowerAccessChain::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of SPIR-V lowering operations for access chain
+ModulePass* CreateSpirvLowerAccessChain()
+{
+    return new SpirvLowerAccessChain();
+}
+
+// =====================================================================================================================
 SpirvLowerAccessChain::SpirvLowerAccessChain()
     :
     SpirvLower(ID)
@@ -195,5 +202,5 @@ llvm::GetElementPtrInst* SpirvLowerAccessChain::TryToCoalesceChain(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for access chain.
-INITIALIZE_PASS(SpirvLowerAccessChain, "Spirv-lower-access-chain",
+INITIALIZE_PASS(SpirvLowerAccessChain, DEBUG_TYPE,
                 "Lower SPIR-V access chain", false, false)

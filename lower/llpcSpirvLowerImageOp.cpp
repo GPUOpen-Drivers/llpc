@@ -49,11 +49,19 @@ namespace Llpc
 char SpirvLowerImageOp::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of SPIR-V lowering operations for image operations
+ModulePass* CreateSpirvLowerImageOp()
+{
+    return new SpirvLowerImageOp();
+}
+
+// =====================================================================================================================
 SpirvLowerImageOp::SpirvLowerImageOp()
     :
     SpirvLower(ID),
     m_restoreMeta(false)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializeSpirvLowerImageOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -66,13 +74,32 @@ bool SpirvLowerImageOp::runOnModule(
 
     SpirvLower::Init(&module);
 
+    // Process each shader stage in turn.
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            ProcessShader();
+        }
+    }
+
+    return true;
+}
+
+// =====================================================================================================================
+// Process one shader stage
+void SpirvLowerImageOp::ProcessShader()
+{
     // Visit module to restore per-instruction metadata
     m_restoreMeta = true;
-    visit(m_pModule);
+    visit(m_pEntryPoint);
     m_restoreMeta = false;
 
     // Invoke handling of "call" instruction
-    visit(m_pModule);
+    visit(m_pEntryPoint);
 
     for (auto pCallInst: m_imageCalls)
     {
@@ -103,8 +130,6 @@ bool SpirvLowerImageOp::runOnModule(
         }
     }
     m_imageLoadOperands.clear();
-
-    return true;
 }
 
 // =====================================================================================================================
@@ -594,5 +619,5 @@ void SpirvLowerImageOp::ExtractBindingInfo(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for image operations.
-INITIALIZE_PASS(SpirvLowerImageOp, "Spirv-lower-image-op",
+INITIALIZE_PASS(SpirvLowerImageOp, DEBUG_TYPE,
                 "Lower SPIR-V image operations (sample, fetch, gather, read/write)", false, false)

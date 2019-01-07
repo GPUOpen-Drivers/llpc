@@ -137,9 +137,6 @@ constexpr uint32_t NggMaxThreadsPerSubgroup = 256;
 // Max number of waves per subgroup in NGG mode.
 constexpr uint32_t NggMaxWavesPerSubgroup = NggMaxThreadsPerSubgroup / 32;
 
-// Max number of  output primitives in NGG mode.
-constexpr uint32_t NggMaxOutPrims = 256;
-
 // Max size of primitives per subgroup for adjacency primitives or when GS instancing is used. This restriction is
 // applicable only when onchip GS is used.
 constexpr uint32_t OnChipGsMaxPrimPerSubgroup    = 255;

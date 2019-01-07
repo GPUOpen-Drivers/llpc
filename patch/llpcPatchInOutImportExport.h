@@ -35,12 +35,13 @@
 #include "SPIRVInternal.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatch.h"
+#include "llpcPipelineShaders.h"
+#include "llpcSystemValues.h"
 
 namespace Llpc
 {
 
 class FragColorExport;
-class PipelineShaders;
 class VertexFetch;
 
 // =====================================================================================================================
@@ -62,9 +63,6 @@ public:
     bool runOnModule(llvm::Module& module) override;
     void visitCallInst(llvm::CallInst& callInst);
     void visitReturnInst(llvm::ReturnInst& retInst);
-
-    // Pass creator, creates the pass of LLVM patching opertions for input import and output export
-    static llvm::ModulePass* Create() { return new PatchInOutImportExport(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -181,7 +179,6 @@ private:
     void PatchXfbOutputExport(llvm::Value*       pOutput,
                               uint32_t           xfbBuffer,
                               uint32_t           xfbOffset,
-                              llvm::Value*       pStreamOutBufDesc,
                               llvm::Instruction* pInsertPos);
 
     void StoreValueToStreamOutBuffer(llvm::Value*       pStoreValue,
@@ -279,6 +276,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     GfxIpVersion            m_gfxIp;                    // Graphics IP version info
+    PipelineSystemValues    m_pipelineSysValues;        // Cache of ShaderSystemValues objects, one per shader stage
 
     VertexFetch*            m_pVertexFetch;             // Vertex fetch manager
     FragColorExport*        m_pFragColorExport;         // Fragment color export manager

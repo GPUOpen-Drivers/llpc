@@ -689,22 +689,35 @@ bool GraphicsContext::CheckGsOnChipValidity()
     LLPC_OUTS("\n");
     LLPC_OUTS("ES-GS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
     LLPC_OUTS("GS-VS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
+    LLPC_OUTS("\n");
+
+    LLPC_OUTS("GS stream item size:\n");
     for (uint32_t i = 0; i < MaxGsStreams; ++i)
     {
         uint32_t streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
-            pGsResUsage->builtInUsage.gs.outputVertices * 4;
-        LLPC_OUTS("GS stream item size (stream " << i << "): " << streamItemSize << "\n");
-        LLPC_OUTS("    XFB buffer =");
-        for (uint32_t j = 0; j < MaxTransformFeedbackBuffers; ++j)
+                                    pGsResUsage->builtInUsage.gs.outputVertices * 4;
+        LLPC_OUTS("    stream " << i << " = " << streamItemSize);
+
+        if (pGsResUsage->inOutUsage.enableXfb)
         {
-            if ((pGsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
+            LLPC_OUTS(", XFB buffer = ");
+            for (uint32_t j = 0; j < MaxTransformFeedbackBuffers; ++j)
             {
-                LLPC_OUTS(" " << j);
+                if ((pGsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
+                {
+                    LLPC_OUTS(j);
+                    if (j != MaxTransformFeedbackBuffers - 1)
+                    {
+                        LLPC_OUTS(", ");
+                    }
+                }
             }
         }
+
         LLPC_OUTS("\n");
     }
     LLPC_OUTS("\n");
+
     if (gsOnChip || (m_gfxIp.major >= 9))
     {
         {
@@ -785,7 +798,7 @@ void GraphicsContext::DoUserDataNodeMerge()
 // Gets the count of vertices per primitive
 uint32_t GraphicsContext::GetVerticesPerPrimitive() const
 {
-    uint32_t vertsPerPrim = 0;
+    uint32_t vertsPerPrim = 1;
 
     switch (m_pPipelineInfo->iaState.topology)
     {

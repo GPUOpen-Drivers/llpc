@@ -49,40 +49,41 @@ namespace Llpc
 char SpirvLowerPushConst::ID = 0;
 
 // =====================================================================================================================
-SpirvLowerPushConst::SpirvLowerPushConst()
-    :
-    SpirvLower(ID)
+// Pass creator, creates the pass of SPIR-V lowering opertions for push constant
+FunctionPass* CreateSpirvLowerPushConst()
 {
+    return new SpirvLowerPushConst();
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-bool SpirvLowerPushConst::runOnModule(
-    Module& module)  // [in,out] LLVM module to be run on
+SpirvLowerPushConst::SpirvLowerPushConst()
+    :
+    FunctionPass(ID)
+{
+    initializeSpirvLowerPushConstPass(*PassRegistry::getPassRegistry());
+}
+
+// =====================================================================================================================
+// Executes this SPIR-V lowering pass on the specified LLVM function.
+bool SpirvLowerPushConst::runOnFunction(
+    Function& func)  // [in,out] LLVM function to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Push-Const\n");
 
-    SpirvLower::Init(&module);
+    m_changed = false;
+    Instruction& insertPos = func.getEntryBlock().getInstList().back();
 
-    for (Function& func : module)
+    LoopInfoWrapperPass& loopInfoPass = getAnalysis<LoopInfoWrapperPass>();
+    LoopInfo& loopInfo = loopInfoPass.getLoopInfo();
+
+    for (Loop* pLoop : loopInfo)
     {
-        if (func.empty())
-        {
-            continue;
-        }
-
-        Instruction& insertPos = func.getEntryBlock().getInstList().back();
-
-        LoopInfoWrapperPass& loopInfoPass = getAnalysis<LoopInfoWrapperPass>(func);
-        LoopInfo& loopInfo = loopInfoPass.getLoopInfo();
-
-        for (Loop* pLoop : loopInfo)
-        {
-            HandleLoop(pLoop, &insertPos);
-        }
+        HandleLoop(pLoop, &insertPos);
     }
 
-    return true;
+    m_pushConstLoadMap.clear();
+
+    return m_changed;
 }
 
 // =====================================================================================================================
@@ -118,6 +119,7 @@ void SpirvLowerPushConst::HandleLoop(
                     auto pSrc = pCall->getArgOperand(0);
                     if (ConstantInt* pOffset = dyn_cast<ConstantInt>(pSrc))
                     {
+                        m_changed = true;
                         Type* pLoadTy = pCall->getType();
                         uint32_t offset = static_cast<uint32_t>(pOffset->getZExtValue());
 
@@ -151,5 +153,5 @@ void SpirvLowerPushConst::HandleLoop(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for push constant.
-INITIALIZE_PASS(SpirvLowerPushConst, "Spirv-lower-push-const",
+INITIALIZE_PASS(SpirvLowerPushConst, DEBUG_TYPE,
                 "Lower SPIR-V push Constant", false, false)

@@ -39,6 +39,13 @@
 namespace llvm
 {
 
+namespace legacy
+{
+
+class PassManager;
+
+} // legacy
+
 class PassRegistry;
 void initializeSpirvLowerAccessChainPass(PassRegistry&);
 void initializeSpirvLowerAggregateLoadStorePass(PassRegistry&);
@@ -47,18 +54,55 @@ void initializeSpirvLowerBufferOpPass(PassRegistry&);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
 void initializeSpirvLowerDynIndexPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
+void initializeSpirvLowerGlobalConstExprRemovePass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
 void initializeSpirvLowerPushConstPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
+void initializeSpirvLowerTranslatorPass(PassRegistry&);
 
 } // llvm
 
 namespace Llpc
 {
 
+// Initialize passes for SPIR-V lowering
+inline static void InitializeLowerPasses(
+    llvm::PassRegistry& passRegistry)   // Pass registry
+{
+  initializeSpirvLowerAccessChainPass(passRegistry);
+  initializeSpirvLowerAggregateLoadStorePass(passRegistry);
+  initializeSpirvLowerAlgebraTransformPass(passRegistry);
+  initializeSpirvLowerBufferOpPass(passRegistry);
+  initializeSpirvLowerConstImmediateStorePass(passRegistry);
+  initializeSpirvLowerDynIndexPass(passRegistry);
+  initializeSpirvLowerGlobalPass(passRegistry);
+  initializeSpirvLowerGlobalConstExprRemovePass(passRegistry);
+  initializeSpirvLowerImageOpPass(passRegistry);
+  initializeSpirvLowerInstMetaRemovePass(passRegistry);
+  initializeSpirvLowerLoopUnrollControlPass(passRegistry);
+  initializeSpirvLowerPushConstPass(passRegistry);
+  initializeSpirvLowerResourceCollectPass(passRegistry);
+  initializeSpirvLowerTranslatorPass(passRegistry);
+}
+
 class Context;
+
+llvm::ModulePass* CreateSpirvLowerAccessChain();
+llvm::ModulePass* CreateSpirvLowerAggregateLoadStore();
+llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding , bool enableFloatOpt);
+llvm::ModulePass* CreateSpirvLowerBufferOp();
+llvm::FunctionPass* CreateSpirvLowerConstImmediateStore();
+llvm::ModulePass* CreateSpirvLowerDynIndex();
+llvm::ModulePass* CreateSpirvLowerGlobal();
+llvm::ModulePass* CreateSpirvLowerGlobalConstExprRemove();
+llvm::ModulePass* CreateSpirvLowerImageOp();
+llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
+llvm::FunctionPass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
+llvm::FunctionPass* CreateSpirvLowerPushConst();
+llvm::ModulePass* CreateSpirvLowerResourceCollect();
+llvm::ModulePass* CreateSpirvLowerTranslator(llvm::ArrayRef<const PipelineShaderInfo*> shaderInfo);
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations, as the base class.
@@ -75,12 +119,13 @@ public:
     {
     }
 
-    static Result Run(llvm::Module* pModule, uint32_t forceLoopUnrollCount);
+    static void AddPasses(Context*                    pContext,
+                          llvm::legacy::PassManager&  passMgr,
+                          uint32_t                    forceLoopUnrollCount,
+                          bool*                       pNeedDynamicLoopUnroll);
 
 protected:
     void Init(llvm::Module* pModule);
-
-    static void DumpCfg(const char* pPostfix, llvm::Module* pModule);
 
     // -----------------------------------------------------------------------------------------------------------------
 

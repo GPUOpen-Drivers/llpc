@@ -58,9 +58,6 @@ public:
     virtual bool runOnModule(llvm::Module& module) override;
     virtual void visitCallInst(llvm::CallInst& callInst);
 
-    // Pass creator, creates the pass of LLVM patching opertions for buffer operations
-    static llvm::ModulePass* Create() { return new PatchBufferOp(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

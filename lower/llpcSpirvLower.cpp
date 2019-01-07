@@ -30,6 +30,7 @@
  */
 
 #include "llvm/Analysis/CFGPrinter.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
@@ -47,22 +48,10 @@
 #include "llvm/Transforms/Vectorize.h"
 
 #include "llpcContext.h"
-#include "llpcPassDeadFuncRemove.h"
-#include "llpcPassExternalLibLink.h"
+#include "llpcInternal.h"
+#include "llpcPassLoopInfoCollect.h"
 #include "llpcPassManager.h"
 #include "llpcSpirvLower.h"
-#include "llpcSpirvLowerAccessChain.h"
-#include "llpcSpirvLowerAggregateLoadStore.h"
-#include "llpcSpirvLowerAlgebraTransform.h"
-#include "llpcSpirvLowerBufferOp.h"
-#include "llpcSpirvLowerConstImmediateStore.h"
-#include "llpcSpirvLowerDynIndex.h"
-#include "llpcSpirvLowerGlobal.h"
-#include "llpcSpirvLowerImageOp.h"
-#include "llpcSpirvLowerInstMetaRemove.h"
-#include "llpcSpirvLowerLoopUnrollControl.h"
-#include "llpcSpirvLowerPushConst.h"
-#include "llpcSpirvLowerResourceCollect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
 
@@ -80,10 +69,6 @@ static opt<bool> LowerDynIndex("lower-dyn-index", desc("Lower SPIR-V dynamic (no
 // -disable-lower-opt: disable optimization for SPIR-V lowering
 static opt<bool> DisableLowerOpt("disable-lower-opt", desc("Disable optimization for SPIR-V lowering"));
 
-extern opt<bool> EnableDumpCfg;
-
-extern opt<std::string> PipelineDumpDir;
-
 } // cl
 
 } // llvm
@@ -92,48 +77,52 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Executes various passes that do SPIR-V lowering opertions for LLVM module.
-Result SpirvLower::Run(
-    Module* pModule,                // [in,out] LLVM module to be run on
-    uint32_t forceLoopUnrollCount)  // 0 or force loop unroll count
+// Add whole-pipeline lowering passes to pass manager
+void SpirvLower::AddPasses(
+    Context*              pContext,               // [in] LLPC context
+    legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
+    uint32_t              forceLoopUnrollCount,   // 0 or force loop unroll count
+    bool*                 pNeedDynamicLoopUnroll) // nullptr or where to store flag of whether dynamic loop unrolling
+                                                  //  is needed
 {
-    Result result = Result::Success;
-
-    if (cl::EnableDumpCfg)
+    // Check if this module needs dynamic loop unroll. Only do this check when caller has passed
+    // in pNeedDynamicLoopUnroll.
+    if (pNeedDynamicLoopUnroll != nullptr)
     {
-        DumpCfg("Original", pModule);
+        passMgr.add(new PassLoopInfoCollect(pNeedDynamicLoopUnroll));
     }
 
-    PassManager passMgr;
-
-    // Control loop unrolling
-    passMgr.add(SpirvLowerLoopUnrollControl::Create(forceLoopUnrollCount));
-
     // Lower SPIR-V resource collecting
-    passMgr.add(SpirvLowerResourceCollect::Create());
+    passMgr.add(CreateSpirvLowerResourceCollect());
 
     // Link external native library for constant folding
-    passMgr.add(PassExternalLibLink::Create(true)); // Native only
-    passMgr.add(PassDeadFuncRemove::Create());
+    passMgr.add(CreatePassExternalLibLink(true)); // Native only
+    passMgr.add(CreatePassDeadFuncRemove());
 
     // Function inlining
     passMgr.add(createFunctionInliningPass(InlineThreshold));
-    passMgr.add(PassDeadFuncRemove::Create());
+    passMgr.add(CreatePassDeadFuncRemove());
+
+    // Control loop unrolling
+    passMgr.add(CreateSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
 
     // Lower SPIR-V access chain
-    passMgr.add(SpirvLowerAccessChain::Create());
+    passMgr.add(CreateSpirvLowerAccessChain());
 
     // Lower SPIR-V buffer operations (load and store)
-    passMgr.add(SpirvLowerBufferOp::Create());
+    passMgr.add(CreateSpirvLowerBufferOp());
+
+    // Remove constant exprs that involve global variables that will be lowered by the next pass.
+    passMgr.add(CreateSpirvLowerGlobalConstExprRemove());
 
     // Lower SPIR-V global variables, inputs, and outputs
-    passMgr.add(SpirvLowerGlobal::Create());
+    passMgr.add(CreateSpirvLowerGlobal());
 
     // Lower SPIR-V constant immediate store.
-    passMgr.add(SpirvLowerConstImmediateStore::Create());
+    passMgr.add(CreateSpirvLowerConstImmediateStore());
 
-    // Lower SPIR-V algebraic transforms, must be done before istruction combining pass.
-    passMgr.add(SpirvLowerAlgebraTransform::Create());
+    // Lower SPIR-V algebraic transforms, constant folding must be done before istruction combining pass.
+    passMgr.add(CreateSpirvLowerAlgebraTransform(true, false));
 
     // Remove reduant load/store operations and do minimal optimization
     // It is required by SpirvLowerImageOp.
@@ -149,46 +138,34 @@ Result SpirvLower::Run(
     passMgr.add(createCFGSimplificationPass());
     passMgr.add(createIPConstantPropagationPass());
 
+    // Lower SPIR-V algebraic transforms
+    passMgr.add(CreateSpirvLowerAlgebraTransform(false, true));
+
     // Lower SPIR-V push constant load
-    passMgr.add(SpirvLowerPushConst::Create());
+    passMgr.add(CreateSpirvLowerPushConst());
 
     // Lower SPIR-V image operations (sample, fetch, gather, read/write),
-    passMgr.add(SpirvLowerImageOp::Create());
+    passMgr.add(CreateSpirvLowerImageOp());
 
     // Lower SPIR-V dynamic index in access chain
     if (cl::LowerDynIndex)
     {
-        passMgr.add(SpirvLowerDynIndex::Create());
+        passMgr.add(CreateSpirvLowerDynIndex());
     }
 
     // Lower SPIR-V load/store operations on aggregate type
-    passMgr.add(SpirvLowerAggregateLoadStore::Create());
+    passMgr.add(CreateSpirvLowerAggregateLoadStore());
 
     // Lower SPIR-V instruction metadata remove
-    passMgr.add(SpirvLowerInstMetaRemove::Create());
+    passMgr.add(CreateSpirvLowerInstMetaRemove());
 
-    if (passMgr.run(*pModule) == false)
+    // Dump the result
+    if (EnableOuts())
     {
-        result = Result::ErrorInvalidShader;
+        passMgr.add(createPrintModulePass(outs(),
+                    "===============================================================================\n"
+                    "// LLPC pipeline SPIR-V lowering results\n\n"));
     }
-
-    if (result == Result::Success)
-    {
-        if (cl::EnableDumpCfg)
-        {
-            DumpCfg("Lowered", pModule);
-        }
-
-        std::string errMsg;
-        raw_string_ostream errStream(errMsg);
-        if (verifyModule(*pModule, &errStream))
-        {
-            LLPC_ERRS("Fails to verify module (" DEBUG_TYPE "): " << errStream.str() << "\n");
-            result = Result::ErrorInvalidShader;
-        }
-    }
-
-    return result;
 }
 
 // =====================================================================================================================
@@ -200,50 +177,8 @@ void SpirvLower::Init(
 {
     m_pModule  = pModule;
     m_pContext = static_cast<Context*>(&m_pModule->getContext());
-    m_shaderStage = GetShaderStageFromModule(m_pModule);
-    m_pEntryPoint = GetEntryPoint(m_pModule);
-}
-
-// =====================================================================================================================
-// Dumps module's CFG graph
-void SpirvLower::DumpCfg(
-    const char*  pPostfix,   // [in] A postfix string
-    Module*      pModule)    // [in] LLVM module for dump
-{
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
-    std::string cfgFileName;
-    char str[256] = {};
-
-    uint64_t hash = pContext->GetPiplineHashCode();
-    snprintf(str, 256, "Pipe_0x%016" PRIX64 "_%s_%s_", hash,
-        GetShaderStageName(GetShaderStageFromModule(pModule)),
-        pPostfix);
-
-    for (Function &function : *pModule)
-    {
-        if (function.empty())
-        {
-            continue;
-        }
-
-        cfgFileName = str;
-        cfgFileName += function.getName();
-        cfgFileName += ".dot";
-        cfgFileName = cl::PipelineDumpDir + "/" + cfgFileName;
-
-        LLPC_OUTS("Dumping CFG '" << cfgFileName << "'...\n");
-
-        std::error_code errCode;
-        raw_fd_ostream cfgFile(cfgFileName, errCode, sys::fs::F_Text);
-        if (!errCode)
-        {
-            WriteGraph(cfgFile, static_cast<const Function*>(&function));
-        }
-        else
-        {
-            LLPC_ERRS(" Error: fail to open file for writing!");
-        }
-    }
+    m_shaderStage = ShaderStageInvalid;
+    m_pEntryPoint = nullptr;
 }
 
 } // Llpc

@@ -60,9 +60,6 @@ public:
 
     virtual bool runOnModule(llvm::Module& module);
 
-    // Pass creator, creates the LLVM pass for dead function removal
-    static llvm::ModulePass* Create() { return new PassDeadFuncRemove(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

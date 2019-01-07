@@ -160,9 +160,7 @@ void PipelineContext::AutoLayoutDescriptor(
         }
     }
 
-    const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
-    bool enableXfb = (xfbStrides[0] > 0) || (xfbStrides[1] > 0) ||
-        (xfbStrides[2] > 0) || (xfbStrides[3] > 0);
+    const bool enableXfb = pResUsage->inOutUsage.enableXfb;
 
     if (enableXfb)
     {
@@ -586,8 +584,6 @@ void PipelineContext::InitShaderResourceUsage(
 
     pResUsage->inOutUsage.expCount = 0;
 
-    pResUsage->inOutUsage.pEsGsRingBufDesc = nullptr;
-
     memset(pResUsage->inOutUsage.xfbStrides, 0, sizeof(pResUsage->inOutUsage.xfbStrides));
     pResUsage->inOutUsage.enableXfb = false;
 
@@ -613,32 +609,10 @@ void PipelineContext::InitShaderResourceUsage(
         calcFactor.onChip.patchConstStart   = InvalidValue;
         calcFactor.outPatchSize             = InvalidValue;
         calcFactor.patchConstSize           = InvalidValue;
-
-        pResUsage->inOutUsage.tcs.pTessFactorBufDesc    = nullptr;
-        pResUsage->inOutUsage.tcs.pPrimitiveId          = nullptr;
-        pResUsage->inOutUsage.tcs.pInvocationId         = nullptr;
-        pResUsage->inOutUsage.tcs.pRelativeId           = nullptr;
-        pResUsage->inOutUsage.tcs.pOffChipLdsDesc       = nullptr;
-    }
-    else if (shaderStage == ShaderStageTessEval)
-    {
-        pResUsage->inOutUsage.tes.pTessCoord            = nullptr;
-        pResUsage->inOutUsage.tes.pOffChipLdsDesc       = nullptr;
     }
     else if (shaderStage == ShaderStageGeometry)
     {
         pResUsage->inOutUsage.gs.rasterStream        = 0;
-        pResUsage->inOutUsage.gs.pEsGsOffsets        = nullptr;
-        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[0] = nullptr;
-        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[1] = nullptr;
-        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[2] = nullptr;
-        pResUsage->inOutUsage.gs.gsVsOutRingBufDesc[3] = nullptr;
-        pResUsage->inOutUsage.gs.pGsVsInRingBufDesc = nullptr;
-
-        pResUsage->inOutUsage.gs.pEmitCounterPtr[0] = nullptr;
-        pResUsage->inOutUsage.gs.pEmitCounterPtr[1] = nullptr;
-        pResUsage->inOutUsage.gs.pEmitCounterPtr[2] = nullptr;
-        pResUsage->inOutUsage.gs.pEmitCounterPtr[3] = nullptr;
 
         auto& calcFactor = pResUsage->inOutUsage.gs.calcFactor;
         memset(&calcFactor, 0, sizeof(calcFactor));
@@ -661,15 +635,6 @@ void PipelineContext::InitShaderInterfaceData(
     ShaderStage shaderStage)  // Shader stage
 {
     auto pIntfData = GetShaderInterfaceData(shaderStage);
-
-    memset(pIntfData->descTablePtrs, 0, sizeof(pIntfData->descTablePtrs));
-    memset(pIntfData->shadowDescTablePtrs, 0, sizeof(pIntfData->shadowDescTablePtrs));
-    memset(pIntfData->dynDescs, 0, sizeof(pIntfData->dynDescs));
-
-    pIntfData->pInternalTablePtr = nullptr;
-    pIntfData->pInternalPerShaderTablePtr = nullptr;
-
-    pIntfData->pNumWorkgroups = nullptr;
 
     pIntfData->userDataCount = 0;
     memset(pIntfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(pIntfData->userDataMap));

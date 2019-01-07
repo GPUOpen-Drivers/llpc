@@ -61,6 +61,13 @@ namespace Llpc
 char PatchDescriptorLoad::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching operations for descriptor load
+ModulePass* CreatePatchDescriptorLoad()
+{
+    return new PatchDescriptorLoad();
+}
+
+// =====================================================================================================================
 PatchDescriptorLoad::PatchDescriptorLoad()
     :
     Patch(ID)
@@ -110,6 +117,7 @@ bool PatchDescriptorLoad::runOnModule(
     }
     m_descLoadFuncs.clear();
 
+    m_pipelineSysValues.Clear();
     return m_changed;
 }
 
@@ -192,8 +200,8 @@ void PatchDescriptorLoad::visitCallInst(
 
     if (loadSpillTable)
     {
-        auto pIntfData   = m_pContext->GetShaderInterfaceData(m_shaderStage);
-        callInst.replaceAllUsesWith(pIntfData->pushConst.pTablePtr);
+        auto pSpilledPushConstTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
+        callInst.replaceAllUsesWith(pSpilledPushConstTablePtr);
         m_descLoadCalls.push_back(&callInst);
         m_descLoadFuncs.insert(pCallee);
     }
@@ -336,11 +344,10 @@ void PatchDescriptorLoad::visitCallInst(
             if (dynDescIdx != InvalidValue)
             {
                 // Dynamic descriptors
-                auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
-                if ((dynDescIdx < InterfaceData::MaxDynDescCount) && (pIntfData->dynDescs[dynDescIdx] != nullptr))
+                pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(dynDescIdx);
+                if (pDesc != nullptr)
                 {
                     auto pDescTy = VectorType::get(m_pContext->Int32Ty(), descSizeInDword);
-                    pDesc = pIntfData->dynDescs[dynDescIdx];
                     if (pDesc->getType() != pDescTy)
                     {
                         // Array dynamic descriptor
@@ -442,7 +449,7 @@ void PatchDescriptorLoad::visitCallInst(
             else if (nodeType == ResourceMappingNodeType::PushConst)
             {
                 auto pDescTablePtr =
-                    m_pContext->GetShaderInterfaceData(m_shaderStage)->descTablePtrs[pDescSet->getZExtValue()];
+                    m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(pDescSet->getZExtValue());
 
                 Value* pDescTableAddr = new PtrToIntInst(pDescTablePtr,
                                                          m_pContext->Int64Ty(),
@@ -549,19 +556,19 @@ void PatchDescriptorLoad::visitCallInst(
 
                 if (descSet == InternalResourceTable)
                 {
-                    pDescTablePtr = m_pContext->GetShaderInterfaceData(m_shaderStage)->pInternalTablePtr;
+                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalGlobalTablePtr();
                 }
                 else if (descSet == InternalPerShaderTable)
                 {
-                    pDescTablePtr = m_pContext->GetShaderInterfaceData(m_shaderStage)->pInternalPerShaderTablePtr;
+                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
                 }
                 else if ((cl::EnableShadowDescriptorTable) && (nodeType == ResourceMappingNodeType::DescriptorFmask))
                 {
-                    pDescTablePtr = m_pContext->GetShaderInterfaceData(m_shaderStage)->shadowDescTablePtrs[descSet];
+                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetShadowDescTablePtr(descSet);
                 }
                 else
                 {
-                    pDescTablePtr = m_pContext->GetShaderInterfaceData(m_shaderStage)->descTablePtrs[descSet];
+                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(descSet);
                 }
                 auto pDescPtr = GetElementPtrInst::Create(nullptr, pDescTablePtr, idxs, "", &callInst);
                 auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", &callInst);
@@ -823,5 +830,5 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching opertions for descriptor load.
-INITIALIZE_PASS(PatchDescriptorLoad, "Patch-descriptor-load",
+INITIALIZE_PASS(PatchDescriptorLoad, DEBUG_TYPE,
                 "Patch LLVM for descriptor load operations", false, false)

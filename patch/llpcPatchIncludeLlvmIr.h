@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,51 +24,37 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerDynIndex.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerDynIndex.
+ * @file  llpcPatchIncludeLlvmIr.h
+ * @brief LLPC header file: contains declaration of class Llpc::IncludeLlvmIr.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include <unordered_set>
-#include "llpcSpirvLower.h"
+#include "llpcPatch.h"
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for dynamic index in access chain.
-class SpirvLowerDynIndex:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerDynIndex>
+// Represents the pass of LLVM patch operations of including llvm-ir as a separate section in the ELF binary.
+class PatchIncludeLlvmIr: public Patch
 {
 public:
-    SpirvLowerDynIndex();
+    PatchIncludeLlvmIr();
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
+    bool runOnModule(llvm::Module& module) override;
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.setPreservesAll();
+    }
 
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerDynIndex);
-
-    bool NeedExpandDynamicIndex(llvm::GetElementPtrInst* pGetElemPtr,
-                                uint32_t*                pOperandIndex,
-                                uint32_t*                pDynIndexBound) const;
-    void ExpandLoadInst(llvm::LoadInst*                          pLoadInst,
-                        llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                        llvm::Value*                             pDynIndex);
-    void ExpandStoreInst(llvm::StoreInst*                         pStoreInst,
-                         llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                         llvm::Value*                             pDynIndex);
-
-    std::unordered_set<llvm::Instruction*> m_getElemPtrInsts;
-    std::unordered_set<llvm::Instruction*> m_loadInsts;
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchIncludeLlvmIr);
 };
 
 } // Llpc

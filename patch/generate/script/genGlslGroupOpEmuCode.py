@@ -301,6 +301,9 @@ def expandFunc(binOp, binType, binOpEnum, commentType, glslFuncType, waveSize):
     return outString
 
 def main(bitWidth, waveSize, directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
     funcOps = funcOpsTable[bitWidth]
     outString = ""
     for i in funcOps:
@@ -308,7 +311,7 @@ def main(bitWidth, waveSize, directory):
             for k in j.items():
                 outString += expandFunc(k[0], k[1][0], k[1][1], k[1][2], KHR, waveSize)
     dataType = "{}bit".format(bitWidth)
-    outFile = directory + "g_glslGroupOpEmuD{0}W{1}.ll".format(bitWidth, waveSize)
+    outFile = os.path.join(directory, "g_glslGroupOpEmuD{0}W{1}.ll".format(bitWidth, waveSize))
     irOut = open(outFile, "wt")
     header = """\
 ;**********************************************************************************************************************

@@ -46,6 +46,13 @@ namespace Llpc
 char PassDeadFuncRemove::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the LLVM pass for dead function removal
+ModulePass* CreatePassDeadFuncRemove()
+{
+    return new PassDeadFuncRemove();
+}
+
+// =====================================================================================================================
 PassDeadFuncRemove::PassDeadFuncRemove()
     :
     llvm::ModulePass(ID)
@@ -99,5 +106,5 @@ bool PassDeadFuncRemove::runOnModule(
 
 // =====================================================================================================================
 // Initializes the LLVM pass for dead function removal.
-INITIALIZE_PASS(PassDeadFuncRemove, "Pass-dead-func-remove",
+INITIALIZE_PASS(PassDeadFuncRemove, DEBUG_TYPE,
                 "LLVM pass for dead function removal", false, false)

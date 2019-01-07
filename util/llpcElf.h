@@ -54,6 +54,7 @@ namespace Llpc
 static const char   AmdGpuDisasmName[] = ".AMDGPU.disasm"; // Name of ".AMDGPU.disasm" section
 static const char   AmdGpuCsdataName[] = ".AMDGPU.csdata"; // Name of ".AMDGPU.csdata" section
 static const char   AmdGpuConfigName[] = ".AMDGPU.config"; // Name of ".AMDGPU.config" section
+static const char   AmdGpuMetadataName[] = ".AMDGPU.metadata."; // Name of ".AMDGPU.metadata.*" section
 
 // e_ident size and indices
 enum

@@ -50,9 +50,6 @@ public:
     virtual bool runOnModule(llvm::Module& module);
     virtual void visitCallInst(llvm::CallInst& callInst);
 
-    // Pass creator, creates the pass of LLVM patching opertions for group operations.
-    static llvm::ModulePass* Create() { return new PatchGroupOp(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char   ID;         // ID of this pass

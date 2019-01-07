@@ -49,9 +49,6 @@ public:
     virtual bool runOnModule(llvm::Module& module);
     virtual void visitCallInst(llvm::CallInst& callInst);
 
-    // Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
-    static llvm::ModulePass* Create() { return new SpirvLowerInstMetaRemove(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

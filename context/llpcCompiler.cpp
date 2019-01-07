@@ -31,10 +31,7 @@
 #define DEBUG_TYPE "llpc-compiler"
 
 #include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -43,10 +40,10 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
 
-#include <sstream>
 #include "LLVMSPIRVLib.h"
 #include "spirvExt.h"
 #include "SPIRVInternal.h"
+
 #include "llpcCodeGenManager.h"
 #include "llpcCompiler.h"
 #include "llpcComputeContext.h"
@@ -62,6 +59,7 @@
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcVertexFetch.h"
+#include <set>
 #include <unordered_set>
 
 #ifdef LLPC_ENABLE_SPIRV_OPT
@@ -71,6 +69,7 @@
 
 using namespace llvm;
 using namespace SPIRV;
+using namespace spv;
 
 namespace llvm
 {
@@ -79,10 +78,10 @@ namespace cl
 {
 
 // -pipeline-dump-dir: directory where pipeline info are dumped
-opt<std::string> PipelineDumpDir("pipeline-dump-dir",
-                                 desc("Directory where pipeline shader info are dumped"),
-                                 value_desc("dir"),
-                                 init("."));
+static opt<std::string> PipelineDumpDir("pipeline-dump-dir",
+                                        desc("Directory where pipeline shader info are dumped"),
+                                        value_desc("dir"),
+                                        init("."));
 
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
                                               desc("Filter which types of pipeline dump are disabled\n"
@@ -329,12 +328,14 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
 
+        // Initialize passes so they can be referenced by -llpc-stop-before etc.
+        auto& passRegistry = *PassRegistry::getPassRegistry();
+        InitializeUtilPasses(passRegistry);
+        InitializeLowerPasses(passRegistry);
+        InitializePatchPasses(passRegistry);
+
         // LLVM fatal error handler only can be installed once.
         install_fatal_error_handler(FatalErrorHandler);
-
-#ifdef LLPC_ENABLE_SPIRV_OPT
-        InitSpvGen();
-#endif
     }
 
     // Initialize shader cache
@@ -535,143 +536,51 @@ Result Compiler::BuildPipelineInternal(
     bool*                               pDynamicLoopUnroll)         // [out] Need dynamic loop unroll or not
 {
     Result          result    = Result::Success;
-    bool            skipLower = false;
-    bool            skipPatch = false;
-    BinaryType      binType   = BinaryType::Unknown;
-
-    Module* modules[ShaderStageCountInternal] = {};
 
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext);
 
-    // Translate SPIR-V binary to machine-independent LLVM module
-    for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+    Module* pPipelineModule = nullptr;
+
+    // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
+    // whole pipeline.
+    bool IsLlvmBc = false;
+    const PipelineShaderInfo* pShaderInfo = shaderInfo[0];
+    if (pShaderInfo != nullptr)
     {
-        const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
-        if ((pShaderInfo == nullptr) || (pShaderInfo->pModuleData == nullptr))
-        {
-            continue;
-        }
-
-        Module* pModule = nullptr;
-
         const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-        // Binary type must same for all shader stages
-        LLPC_ASSERT((binType == BinaryType::Unknown) || (pModuleData->binType == binType));
-        binType = pModuleData->binType;
-        if (binType == BinaryType::Spirv)
+        if ((pModuleData != nullptr) && (pModuleData->binType == BinaryType::LlvmBc))
         {
-            TimeProfiler timeProfiler(&g_timeProfileResult.translateTime);
-            result = TranslateSpirvToLlvm(&pModuleData->binCode,
-                                          static_cast<ShaderStage>(stage),
-                                          pShaderInfo->pEntryTarget,
-                                          pShaderInfo->pSpecializationInfo,
-                                          pContext,
-                                          forceLoopUnrollCount,
-                                          &pModule);
-
-            // Check if this module needs dynamic loop unroll. Only do this check when forceLoopUnrollCount is 0. Dynamic loop unroll is only enabled for fragment shader and compute shader.
-            if (cl::EnableDynamicLoopUnroll && (result == Result::Success) &&
-                (stage == ShaderStageFragment) && (forceLoopUnrollCount == 0))
-            {
-                *pDynamicLoopUnroll = NeedDynamicLoopUnroll(pModule);
-            }
+            IsLlvmBc = true;
+            pPipelineModule = pContext->LoadLibary(&pModuleData->binCode).release();
         }
-        else if (binType == BinaryType::LlvmBc)
-        {
-            // Skip lower and patch phase if input is LLVM IR
-            skipLower = true;
-            skipPatch = true;
-            pModule = pContext->LoadLibary(&pModuleData->binCode).release();
-        }
-        else
-        {
-            LLPC_NEVER_CALLED();
-        }
-
-        // Verify this LLVM module
-        if (result == Result::Success)
-        {
-            LLPC_OUTS("===============================================================================\n");
-            LLPC_OUTS("// LLPC SPIRV-to-LLVM translation results (" <<
-                      GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-            LLPC_OUTS(*pModule);
-            LLPC_OUTS("\n");
-            std::string errMsg;
-            raw_string_ostream errStream(errMsg);
-            if (verifyModule(*pModule, &errStream))
-            {
-                LLPC_ERRS("Fails to verify module after translation (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader): " <<
-                          errStream.str() << "\n");
-                result = Result::ErrorInvalidShader;
-            }
-        }
-
-        // Do SPIR-V lowering operations for this LLVM module
-        if ((result == Result::Success) && (skipLower == false))
-        {
-            TimeProfiler timeProfiler(&g_timeProfileResult.lowerTime);
-            result = SpirvLower::Run(pModule, forceLoopUnrollCount);
-            if (result != Result::Success)
-            {
-                LLPC_ERRS("Fails to do SPIR-V lowering operations (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-            }
-            else
-            {
-                LLPC_OUTS("===============================================================================\n");
-                LLPC_OUTS("// LLPC SPIRV-lowering results (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-                LLPC_OUTS(*pModule);
-                LLPC_OUTS("\n");
-            }
-        }
-
-        modules[stage] = pModule;
     }
 
-    // Create an empty module then link each shader module into it.
-    auto pPipelineModule = new Module("llpcPipeline", *pContext);
+    // If not IR input, create an empty module.
+    if (pPipelineModule == nullptr)
     {
-        Linker linker(*pPipelineModule);
-        for (int32_t stage = 0; (stage < ShaderStageCountInternal) && (result == Result::Success); ++stage)
+        pPipelineModule = new Module("llpcPipeline", *pContext);
+    }
+
+    // Unfortunately we have to have SPIR-V translation in its own pass manager, otherwise MachineModuleInfo
+    // gets confused by having an empty module at the start when the immutable passes get run.
+    if (IsLlvmBc == false)
+    {
+        PassManager passMgr;
+        passMgr.add(CreateSpirvLowerTranslator(shaderInfo));
+
+        // Dump the result
+        if (EnableOuts())
         {
-            Module* pShaderModule = modules[stage];
-            if (pShaderModule == nullptr)
-            {
-                continue;
-            }
-
-            // Ensure the name of the shader entrypoint of this shader does not clash with any other, by qualifying
-            // the name with the shader stage.
-            for (auto& func : *pShaderModule)
-            {
-                if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
-                {
-                    func.setName(Twine(LlpcName::EntryPointPrefix) +
-                                 GetShaderStageAbbreviation(ShaderStage(stage), true) +
-                                 "." +
-                                 func.getName());
-                }
-            }
-
-            // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
-            // linked into pipeline module.
-            if (linker.linkInModule(std::unique_ptr<Module>(pShaderModule)))
-            {
-                LLPC_ERRS("Fails to link shader module into pipeline module (" <<
-                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader)\n");
-                result = Result::ErrorInvalidShader;
-            }
+            passMgr.add(createPrintModulePass(outs(),
+                        "===============================================================================\n"
+                        "// LLPC SPIRV-to-LLVM translation results\n\n"));
         }
 
-        if (result == Result::Success)
+        result = CodeGenManager::Run(pPipelineModule, passMgr);
+        if (result != Result::Success)
         {
-            LLPC_OUTS("===============================================================================\n");
-            LLPC_OUTS("// LLPC linking results\n");
-            LLPC_OUTS(*pPipelineModule);
-            LLPC_OUTS("\n");
+            LLPC_ERRS("Failed to translate SPIR-V\n");
         }
     }
 
@@ -688,7 +597,14 @@ Result Compiler::BuildPipelineInternal(
 
     if (result == Result::Success)
     {
-        // Patching
+        // SPIR-V lowering.
+        if ((forceLoopUnrollCount != 0) || (cl::EnableDynamicLoopUnroll == false))
+        {
+            pDynamicLoopUnroll = nullptr;
+        }
+        SpirvLower::AddPasses(pContext, passMgr, forceLoopUnrollCount, pDynamicLoopUnroll);
+
+        // Patching.
         Patch::AddPasses(pContext, passMgr);
 
         // Dump the module just before codegen.
@@ -696,7 +612,7 @@ Result Compiler::BuildPipelineInternal(
         {
             passMgr.add(createPrintModulePass(outs(),
                         "===============================================================================\n"
-                        "// LLPC final pipeline module info\n"));
+                        "// LLPC final pipeline module info\n\n"));
         }
     }
 
@@ -848,7 +764,7 @@ Result Compiler::BuildGraphicsPipeline(
     if ((result == Result::Success) && EnableOuts())
     {
         LLPC_OUTS("===============================================================================\n");
-        LLPC_OUTS("// LLPC calculated hash results (graphics pipline)\n");
+        LLPC_OUTS("// LLPC calculated hash results (graphics pipline)\n\n");
         LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::Compact64(&pipelineHash)) << "\n");
         for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
         {
@@ -924,7 +840,6 @@ Result Compiler::BuildGraphicsPipeline(
 
     if (cacheEntryState == ShaderEntryState::Compiling)
     {
-        std::vector<LoopAnalysisInfo> loopInfo;
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
@@ -1163,8 +1078,8 @@ Result Compiler::BuildComputePipeline(
     {
         const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
         auto pModuleHash = reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash[0]);
-        LLPC_OUTS("===============================================================================\n");
-        LLPC_OUTS("// LLPC calculated hash results (compute pipline)\n");
+        LLPC_OUTS("\n===============================================================================\n");
+        LLPC_OUTS("// LLPC calculated hash results (compute pipline)\n\n");
         LLPC_OUTS("PIPE : " << format("0x%016" PRIX64, MetroHash::Compact64(&pipelineHash)) << "\n");
         LLPC_OUTS(format("%-4s : ", GetShaderStageAbbreviation(ShaderStageCompute, true)) <<
                   format("0x%016" PRIX64, MetroHash::Compact64(pModuleHash)) << "\n");
@@ -1230,7 +1145,6 @@ Result Compiler::BuildComputePipeline(
 
     if (cacheEntryState == ShaderEntryState::Compiling)
     {
-        std::vector<LoopAnalysisInfo> loopInfo;
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
@@ -1420,18 +1334,13 @@ Result Compiler::ReplaceShader(
 
 // =====================================================================================================================
 // Translates SPIR-V binary to machine-independent LLVM module.
-Result Compiler::TranslateSpirvToLlvm(
+Module* Compiler::TranslateSpirvToLlvm(
     const BinaryData*           pSpirvBin,           // [in] SPIR-V binary
     ShaderStage                 shaderStage,         // Shader stage
     const char*                 pEntryTarget,        // [in] SPIR-V entry point
     const VkSpecializationInfo* pSpecializationInfo, // [in] Specialization info
-    LLVMContext*                pContext,            // [in] LLPC pipeline context
-    uint32_t                    forceLoopUnrollCount,// [in] Force loop unroll count
-    Module**                    ppModule             // [out] Created LLVM module after this translation
-    ) const
+    LLVMContext*                pContext)            // [in] LLPC pipeline context
 {
-    Result result = Result::Success;
-
     BinaryData  optSpirvBin = {};
 
     if (OptimizeSpirv(pSpirvBin, &optSpirvBin) == Result::Success)
@@ -1457,20 +1366,26 @@ Result Compiler::TranslateSpirvToLlvm(
         }
     }
 
+    Module* pModule = nullptr;
     if (readSpirv(*pContext,
-                    spirvStream,
-                    static_cast<spv::ExecutionModel>(shaderStage),
-                    pEntryTarget,
-                    specConstMap,
-                    *ppModule,
-                    errMsg) == false)
+                  spirvStream,
+                  static_cast<spv::ExecutionModel>(shaderStage),
+                  pEntryTarget,
+                  specConstMap,
+                  pModule,
+                  errMsg) == false)
     {
-        LLPC_ERRS("Fails to translate SPIR-V to LLVM (" <<
-                    GetShaderStageName(static_cast<ShaderStage>(shaderStage)) << " shader): " << errMsg << "\n");
-        result = Result::ErrorInvalidShader;
+        report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
+                            GetShaderStageName(ShaderStage(shaderStage)) + " shader): " + errMsg,
+                           false);
     }
 
     CleanOptimizedSpirv(&optSpirvBin);
+
+    if (pModule == nullptr)
+    {
+        return nullptr;
+    }
 
     // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we mark it as follows:
     //   * remove the dllexport;
@@ -1483,36 +1398,31 @@ Result Compiler::TranslateSpirvToLlvm(
     //   3. remove the code we added to the spir-v reader to detect the required entrypoint and mark it as DLLExport;
     //   4. remove the required entrypoint name and execution model args that we added to the spir-v reader API, to
     //      make it closer to the upstream Khronos copy of that code.
-    if (result == Result::Success)
+    for (auto& func : *pModule)
     {
-        for (auto& func : **ppModule)
+        if (func.empty())
         {
-            if (func.empty())
-            {
-                continue;
-            }
-
-            if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
-            {
-                func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
-                func.setLinkage(GlobalValue::ExternalLinkage);
-            }
-            else
-            {
-                func.setLinkage(GlobalValue::InternalLinkage);
-            }
+            continue;
+        }
+        if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
+        {
+            func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
+            func.setLinkage(GlobalValue::ExternalLinkage);
+        }
+        else
+        {
+            func.setLinkage(GlobalValue::InternalLinkage);
         }
     }
 
-    return result;
+    return pModule;
 }
 
 // =====================================================================================================================
 // Optimizes SPIR-V binary
 Result Compiler::OptimizeSpirv(
     const BinaryData* pSpirvBinIn,     // [in] Input SPIR-V binary
-    BinaryData*       pSpirvBinOut     // [out] Optimized SPIR-V binary
-    ) const
+    BinaryData*       pSpirvBinOut)    // [out] Optimized SPIR-V binary
 {
     bool success = false;
     uint32_t optBinSize = 0;
@@ -1532,7 +1442,9 @@ Result Compiler::OptimizeSpirv(
                                    logBuf);
         if (success == false)
         {
-            LLPC_ERRS(logBuf);
+            report_fatal_error(Twine("Failed to optimize SPIR-V (") +
+                                GetShaderStageName(ShaderStage(shaderStage) + " shader): " + logBuf,
+                               false);
         }
     }
 #endif
@@ -1547,14 +1459,14 @@ Result Compiler::OptimizeSpirv(
         pSpirvBinOut->codeSize = 0;
         pSpirvBinOut->pCode = nullptr;
     }
+
     return success ? Result::Success : Result::ErrorInvalidShader;
 }
 
 // =====================================================================================================================
 // Cleanup work for SPIR-V binary, freeing the allocated buffer by OptimizeSpirv()
 void Compiler::CleanOptimizedSpirv(
-    BinaryData* pSpirvBin   // [in] Optimized SPIR-V binary
-    ) const
+    BinaryData* pSpirvBin)  // [in] Optimized SPIR-V binary
 {
 #ifdef LLPC_ENABLE_SPIRV_OPT
     if (pSpirvBin->pCode)
@@ -2026,35 +1938,6 @@ Result Compiler::CollectInfoFromSpirvBinary(
 }
 
 // =====================================================================================================================
-// Checks if dynamic loop unroll is needed for this module.
-bool Compiler::NeedDynamicLoopUnroll(
-    Module* pModule  // [in]  LLVM module to check
-    ) const
-{
-    std::vector<LoopAnalysisInfo>  loopInfo;
-    bool needDynamicLoopUnroll = false;
-    PassLoopInfoCollect* pLoopPass = new PassLoopInfoCollect(&loopInfo);
-
-    PassManager passMgr;
-    passMgr.add(pLoopPass);
-    passMgr.run(*pModule);
-
-    for (uint32_t i = 0; i < loopInfo.size(); i++)
-    {
-        // These conditions mean the loop is a complex loop.
-        if ((loopInfo[i].numAluInsts > 20) ||
-            (loopInfo[i].nestedLevel >= 3) ||
-            (loopInfo[i].numBasicBlocks > 8))
-        {
-            needDynamicLoopUnroll = true;
-            break;
-        }
-    }
-
-    return needDynamicLoopUnroll;
-}
-
-// =====================================================================================================================
 // Gets the statistics info for the specified pipeline binary.
 void Compiler::GetPipelineStatistics(
     const void*             pCode,                  // [in]  Pipeline ISA code
@@ -2085,19 +1968,17 @@ void Compiler::GetPipelineStatistics(
         if (strcmp(pSection->pName, NoteName) == 0)
         {
             uint32_t offset = 0;
-            const uint32_t noteHeaderSize = sizeof(NoteHeader);
+            const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-                if (pNode->type == Util::Abi::PipelineAbiNoteType::LegacyMetadata)
-#else
-                if (pNode->type == LegacyMetadata)
-#endif
+                if (strncmp(pNode->name, "AMD", pNode->nameSize) == 0 &&
+                    (pNode->type == Util::Abi::PipelineAbiNoteType::LegacyMetadata))
                 {
                     const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
                     auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
-                                   pSection->pData + offset + noteHeaderSize);
+                                   pSection->pData + offset +
+                                     noteHeaderSize + Pow2Align(pNode->nameSize, sizeof(uint32_t)));
                     for (uint32_t i = 0; i < configCount; ++i)
                     {
                         uint32_t regId = pConfig[i].key;
@@ -2123,7 +2004,8 @@ void Compiler::GetPipelineStatistics(
                     }
                 }
 
-                offset += noteHeaderSize + Pow2Align(pNode->descSize, sizeof(uint32_t));
+                offset += noteHeaderSize + Pow2Align(pNode->nameSize, sizeof(uint32_t)) +
+                          Pow2Align(pNode->descSize, sizeof(uint32_t));
                 LLPC_ASSERT(offset <= pSection->secHead.sh_size);
             }
         }

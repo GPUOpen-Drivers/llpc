@@ -354,63 +354,23 @@ define half @llpc.tan.f16(half %angle) #0
 ; GLSL: float16_t asin(float16_t)
 define half @llpc.asin.f16(half %x)
 {
-    ; asin(x) = sgn(x) * (PI/2 - sqrt(1 - |x|) * (PI/2 + |x| * (PI/4 - 1 + |x| * (p0 + |x| * p1))))
-    ;   p0 = 0.086566724, p1 = -0.0310
+    ; For precision: float16_t(asin(float(%x)))
 
-    %1 = call half @llvm.fabs.f16(half %x)
-    ; 0xBF9FC40000000000: p1 = -0.03102955
-    %2 = fmul half %1, 0xBF9FC40000000000
-    ; 0x3FB6280000000000: p0 = 0.08656672
-    %3 = fadd half %2, 0x3FB6280000000000
-    %4 = fmul half %1, %3
-    ; 0xBFCB780000000000: PI/4 - 1 = -0.21460181
-    %5 = fadd half %4, 0xBFCB780000000000
-    %6 = fmul half %1, %5
-    ; 0x3FF9200000000000: PI/2 = 1.57079637
-    %7 = fadd half %6, 0x3FF9200000000000
-    %8 = fsub half 1.0, %1
-    %9 = call half @llvm.sqrt.f16(half %8)
-    %10 = fmul half %9, %7
-    ; 0x3FF9200000000000: PI/4 = 1.57079637
-    %11 = fsub half 0x3FF9200000000000, %10
-    %12 = fcmp ogt half %x, 0.0
-    %13 = select i1 %12, half 1.0, half %x
-    %14 = fcmp oge half %13, 0.0
-    %15 = select i1 %14, half %13, half -1.0
-    %16 = fmul half %15, %11
-    ret half %16
+    %1 = fpext half %x to float
+    %2 = call float @llpc.asin.f32(float %1)
+    %3 = fptrunc float %2 to half
+    ret half %3
 }
 
 ; GLSL: float16_t acos(float16_t)
 define half @llpc.acos.f16(half %x)
 {
-    ; acos(x) = PI/2 - sgn(x) * (PI/2 - sqrt(1 - |x|) * (PI/2 + |x| * (PI/4 - 1 + |x| * (p0 + |x| * p1))))
-    ;   p0 = 0.08132463, p1 = -0.02363318
+    ; For precision: float16_t(acos(float(%x)))
 
-    %1 = call half @llvm.fabs.f16(half %x)
-    ; 0xBF9FC40000000000: p1 = -0.02363318
-    %2 = fmul half %1, 0xBF9FC40000000000
-    ; 0x3FB6280000000000: p0 = 0.08654785
-    %3 = fadd half %2, 0x3FB6280000000000
-    %4 = fmul half %1, %3
-    ; 0xBFCB780000000000: PI/4 - 1 = -0.21460181
-    %5 = fadd half %4, 0xBFCB780000000000
-    %6 = fmul half %1, %5
-    ; 0x3FF9200000000000: PI/2 = 1.57079637
-    %7 = fadd half %6, 0x3FF9200000000000
-    %8 = fsub half 1.0, %1
-    %9 = call half @llvm.sqrt.f16(half %8)
-    %10 = fmul half %9, %7
-    ; 0x3FF9200000000000: PI/2 = 1.57079637
-    %11 = fsub half 0x3FF9200000000000, %10
-    %12 = fcmp ogt half %x, 0.0
-    %13 = select i1 %12, half 1.0, half %x
-    %14 = fcmp oge half %13, 0.0
-    %15 = select i1 %14, half %13, half -1.0
-    %16 = fmul half %15, %11
-    ; 0x3FF9200000000000: PI/2 = 1.57079637
-    %17 = fsub half 0x3FF9200000000000, %16
-    ret half %17
+    %1 = fpext half %x to float
+    %2 = call float @llpc.acos.f32(float %1)
+    %3 = fptrunc float %2 to half
+    ret half %3
 }
 
 ; GLSL: float16_t atan(float16_t)
@@ -2052,6 +2012,8 @@ declare half @llvm.exp2.f16(half) #0
 declare half @llvm.log2.f16(half) #0
 declare half @llvm.sin.f16(half) #0
 declare half @llvm.cos.f16(half) #0
+declare float @llpc.asin.f32(float) #0
+declare float @llpc.acos.f32(float) #0
 
 declare half @llvm.minnum.f16(half, half) #0
 declare <2 x half> @llvm.minnum.v2f16(<2 x half>, <2 x half>) #0

@@ -51,6 +51,13 @@ namespace Llpc
 char SpirvLowerAggregateLoadStore::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of SPIR-V lowering operations for load and store operations on aggregate type
+ModulePass* CreateSpirvLowerAggregateLoadStore()
+{
+    return new SpirvLowerAggregateLoadStore();
+}
+
+// =====================================================================================================================
 SpirvLowerAggregateLoadStore::SpirvLowerAggregateLoadStore()
     :
     SpirvLower(ID)
@@ -230,5 +237,5 @@ Value* SpirvLowerAggregateLoadStore::ExpandLoadInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for load and store operations on aggregate type.
-INITIALIZE_PASS(SpirvLowerAggregateLoadStore, "Spirv-lower-aggregate-load-store",
+INITIALIZE_PASS(SpirvLowerAggregateLoadStore, DEBUG_TYPE,
                 "Lower SPIR-V load and store operations on aggregate type", false, false)

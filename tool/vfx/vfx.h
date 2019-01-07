@@ -573,6 +573,7 @@ struct GraphicsPipelineState
     uint32_t    enableMultiView;              // Whether to enable multi-view support
     uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
     uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
+    uint32_t    scalarBlockLayout;            // Whether to use scalar block layout
 
     ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
 };
@@ -584,6 +585,7 @@ struct ComputePipelineState
     uint32_t    deviceIndex;                  // Device index for device group
     uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
     uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
+    uint32_t    scalarBlockLayout;            // Whether to use scalar block layout
 };
 
 };

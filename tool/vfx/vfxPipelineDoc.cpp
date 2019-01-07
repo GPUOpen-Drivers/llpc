@@ -122,6 +122,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
 
         pGfxPipelineInfo->options.includeDisassembly      = graphicState.includeDisassembly ? true : false;
         pGfxPipelineInfo->options.autoLayoutDesc          = graphicState.autoLayoutDesc ? true : false;
+        pGfxPipelineInfo->options.scalarBlockLayout       = graphicState.scalarBlockLayout ? true : false;
 
     }
 
@@ -134,6 +135,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         pComputePipelineInfo->deviceIndex                = computeState.deviceIndex;
         pComputePipelineInfo->options.includeDisassembly = computeState.includeDisassembly ? true : false;
         pComputePipelineInfo->options.autoLayoutDesc     = computeState.autoLayoutDesc ? true : false;
+        pComputePipelineInfo->options.scalarBlockLayout  = computeState.scalarBlockLayout ? true : false;
     }
 
     // Section "VertexInputState"

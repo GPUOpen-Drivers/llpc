@@ -44,9 +44,6 @@ public:
 
     virtual bool runOnModule(llvm::Module& module);
 
-    // Pass creator, creates the pass of LLVM patching operations of mutating address spaces from SPIRAS to AMDGPU
-    static llvm::ModulePass* Create() { return new PatchAddrSpaceMutate(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

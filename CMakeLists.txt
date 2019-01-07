@@ -203,11 +203,13 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
+    lower/llpcSpirvLowerGlobalConstExprRemove.cpp
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
     lower/llpcSpirvLowerPushConst.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
+    lower/llpcSpirvLowerTranslator.cpp
 )
 
 # llpc/patch
@@ -227,14 +229,16 @@ target_sources(llpc PRIVATE
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
     patch/llpcPatchGroupOp.cpp
-    patch/llpcPatchInOutImportExport.cpp
     patch/llpcPatchImageOp.cpp
+    patch/llpcPatchInOutImportExport.cpp
+    patch/llpcPatchIncludeLlvmIr.cpp
     patch/llpcPatchLoopUnrollInfoRectify.cpp
     patch/llpcPatchNullFragShader.cpp
     patch/llpcPatchPeepholeOpt.cpp
     patch/llpcPatchPreparePipelineAbi.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
+    patch/llpcSystemValues.cpp
     patch/llpcVertexFetch.cpp
 )
 
@@ -317,7 +321,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslCopyShaderEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD16.ll
     ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD64.ll

@@ -38,6 +38,7 @@
 #include <stack>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcPipelineShaders.h"
 #include "llpcSpirvLowerBufferOp.h"
 
 using namespace llvm;
@@ -52,11 +53,19 @@ namespace Llpc
 char SpirvLowerBufferOp::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of SPIR-V lowering operations for buffer operations
+ModulePass* CreateSpirvLowerBufferOp()
+{
+    return new SpirvLowerBufferOp();
+}
+
+// =====================================================================================================================
 SpirvLowerBufferOp::SpirvLowerBufferOp()
     :
     SpirvLower(ID),
     m_restoreMeta(false)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializeSpirvLowerBufferOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -69,13 +78,32 @@ bool SpirvLowerBufferOp::runOnModule(
 
     SpirvLower::Init(&module);
 
-    // Visit module to restore per-instruction metadata
+    // Process each shader stage in turn.
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            ProcessShader();
+        }
+    }
+
+    return true;
+}
+
+// =====================================================================================================================
+// Process a single shader
+void SpirvLowerBufferOp::ProcessShader()
+{
+    // Visit function to restore per-instruction metadata
     m_restoreMeta = true;
-    visit(m_pModule);
+    visit(m_pEntryPoint);
     m_restoreMeta = false;
 
     // Invoke handling of "load" and "store" instruction
-    visit(m_pModule);
+    visit(m_pEntryPoint);
 
     std::unordered_set<GetElementPtrInst*> getElemInsts;
 
@@ -150,8 +178,6 @@ bool SpirvLowerBufferOp::runOnModule(
     }
     m_callInsts.clear();
     getElemInsts.clear();
-
-    return true;
 }
 
 // =====================================================================================================================
@@ -285,6 +311,54 @@ void SpirvLowerBufferOp::visitCallInst(
                 pConstExpr->deleteValue();
             }
         }
+    }
+    else if ((mangledName.find("Atomic") != std::string::npos) &&
+             (mangledName.find(kSPIRVTypeName::VariablePtr) != std::string::npos))
+    {
+        Value* pStruct = callInst.getOperand(0);
+        auto pInst = dyn_cast<Instruction>(pStruct);
+        auto pBlockMetaNode = pInst->getMetadata(gSPIRVMD::Block);
+        Constant* pBlockMeta = mdconst::dyn_extract<Constant>(pBlockMetaNode->getOperand(0));
+
+        // Implicit pointType block result metadata
+        auto pResultMeta = cast<Constant>(pBlockMeta->getOperand(1));
+
+        Value* pDesc = ExtractValueInst::Create(pStruct, { 0 }, "", &callInst);
+        Value* pOffset = ExtractValueInst::Create(pStruct, { 1 }, "", &callInst);
+
+        auto startPos = mangledName.find("Atomic");
+        auto endPos = mangledName.find(kSPIRVTypeName::VariablePtr);
+
+        startPos += strlen("Atomic");
+        std::string atomicOpName = mangledName.substr(startPos, endPos - startPos);
+        std::transform(atomicOpName.begin(), atomicOpName.end(), atomicOpName.begin(), ::tolower);
+
+        Type* pDataTy = (atomicOpName != "store") ? callInst.getType() : callInst.getOperand(3)->getType();
+        std::vector<Value*> data;
+
+        if (atomicOpName == "compareexchange")
+        {
+            data.push_back(callInst.getOperand(4));
+            data.push_back(callInst.getOperand(5));
+        }
+        else if ((atomicOpName != "iincrement") && (atomicOpName != "idecrement") && (atomicOpName != "load"))
+        {
+            data.push_back(callInst.getOperand(3));
+        }
+
+        Value* pAtomicValue = AddBufferAtomicDescInst(atomicOpName,
+                                                        pDataTy,
+                                                        data,
+                                                        pDesc,
+                                                        pOffset,
+                                                        pResultMeta,
+                                                        &callInst);
+        if (atomicOpName != "store")
+        {
+            LLPC_ASSERT(pAtomicValue != nullptr);
+            callInst.replaceAllUsesWith(pAtomicValue);
+        }
+        m_callInsts.insert(&callInst);
     }
     else if ((mangledName.find("Atomic") != std::string::npos) &&
              ((mangledName.find("Pi") != std::string::npos) ||
@@ -451,6 +525,9 @@ void SpirvLowerBufferOp::visitCallInst(
         auto pBlockMetaNode = callInst.getMetadata(gSPIRVMD::Block);
         Constant* pBlockMeta = mdconst::dyn_extract<Constant>(pBlockMetaNode->getOperand(0));
 
+        // Implicit pointType block result metadata
+        auto pResultMeta = cast<Constant>(pBlockMeta->getOperand(1));
+
         Value* pDesc = ExtractValueInst::Create(pStruct, { 0 }, "", &callInst);
         Value* pOffset = ExtractValueInst::Create(pStruct, { 1 }, "", &callInst);
 
@@ -458,7 +535,7 @@ void SpirvLowerBufferOp::visitCallInst(
         auto pLoadValue = AddBufferLoadDescInst(callInst.getType(),
                                                 pDesc,
                                                 pOffset,
-                                                pBlockMeta,
+                                                pResultMeta,
                                                 &callInst);
         callInst.replaceAllUsesWith(pLoadValue);
         m_callInsts.insert(&callInst);
@@ -469,6 +546,9 @@ void SpirvLowerBufferOp::visitCallInst(
         auto pBlockMetaNode = callInst.getMetadata(gSPIRVMD::Block);
         Constant* pBlockMeta = mdconst::dyn_extract<Constant>(pBlockMetaNode->getOperand(0));
 
+        // Implicit pointType block result metadata
+        auto pResultMeta = cast<Constant>(pBlockMeta->getOperand(1));
+
         Value* pDesc = ExtractValueInst::Create(pStruct, { 0 }, "", &callInst);
         Value* pOffset = ExtractValueInst::Create(pStruct, { 1 }, "", &callInst);
         Value* pStoreValue = callInst.getOperand(0);
@@ -477,7 +557,7 @@ void SpirvLowerBufferOp::visitCallInst(
         AddBufferStoreDescInst(pStoreValue,
                                pDesc,
                                pOffset,
-                               pBlockMeta,
+                               pResultMeta,
                                &callInst);
         m_callInsts.insert(&callInst);
     }
@@ -1110,7 +1190,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
-                auto pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
+                Value* pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
                 LLPC_ASSERT(CanBitCast(pCastTy, pCompTy));
                 pCompValue = new BitCastInst(pCompValue, pCompTy, "", pInsertPos);
@@ -1348,6 +1428,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
     {
         // Load scalar or vector type
         ShaderBlockMetadata blockMeta = {};
+        blockMeta.U64All = cast<ConstantInt>(pBlockMemberMeta)->getZExtValue();
+
         if (blockMeta.IsRowMajor && pLoadTy->isVectorTy())
         {
             // NOTE: For row-major matrix, loading a column vector is done by loading its own components separately.
@@ -1375,7 +1457,7 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
 
-                auto pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
+                Value* pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
                 LLPC_ASSERT(CanBitCast(pCastTy, pCompTy));
                 pCompValue = new BitCastInst(pCompValue, pCompTy, "", pInsertPos);
@@ -1825,7 +1907,6 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
         }
     }
 }
-
 // =====================================================================================================================
 // Inserts instructions to do atomic operations on buffer block.
 Value* SpirvLowerBufferOp::AddBufferAtomicInst(
@@ -1878,6 +1959,59 @@ Value* SpirvLowerBufferOp::AddBufferAtomicInst(
     {
         pAtomicValue = EmitCall(m_pModule,
                                 LlpcName::BufferAtomic + atomicOpName + suffix,
+                                pDataTy,
+                                args,
+                                NoAttrib,
+                                pInsertPos);
+    }
+
+    return pAtomicValue;
+}
+
+// =====================================================================================================================
+// Inserts instructions to do atomic operations on buffer block.
+llvm::Value* SpirvLowerBufferOp::AddBufferAtomicDescInst(
+    std::string                      atomicOpName,       // Name of atomic operation
+    llvm::Type*                      pDataTy,            // [in] Type of data involved in atomic operations
+    const std::vector<llvm::Value*>& data,               // [in] Data involved in atomic operations
+    llvm::Value*                     pDesc,              // Descriptor of buffer block
+    llvm::Value*                     pBlockMemberOffset, // [in] Block member offset
+    llvm::Constant*                  pBlockMemberMeta,   // [in] Metadata of buffer block
+    llvm::Instruction*               pInsertPos)         // [in] Where to insert instructions
+{
+    LLPC_ASSERT(pDataTy->isIntegerTy() || pDataTy->isFloatingPointTy());
+    const uint32_t bitWidth = pDataTy->getScalarSizeInBits();
+    LLPC_ASSERT((bitWidth == 32) || (bitWidth == 64));
+
+    Value* pAtomicValue = nullptr;
+
+    std::string suffix = ".i" + std::to_string(bitWidth);
+
+    ShaderBlockMetadata blockMeta = {};
+    blockMeta.U64All = cast<ConstantInt>(pBlockMemberMeta)->getZExtValue();
+
+    std::vector<Value*> args;
+    args.push_back(pDesc);
+    args.push_back(pBlockMemberOffset);
+    for (auto pData : data)
+    {
+        args.push_back(pData);
+    }
+    args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+
+    if (atomicOpName == "store")
+    {
+        EmitCall(m_pModule,
+                 LlpcName::BufferAtomicDesc + atomicOpName + suffix,
+                 m_pContext->VoidTy(),
+                 args,
+                 NoAttrib,
+                 pInsertPos);
+    }
+    else
+    {
+        pAtomicValue = EmitCall(m_pModule,
+                                LlpcName::BufferAtomicDesc + atomicOpName + suffix,
                                 pDataTy,
                                 args,
                                 NoAttrib,
@@ -2137,6 +2271,8 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
         // Store scalar or vector type
 
         ShaderBlockMetadata blockMeta = {};
+        blockMeta.U64All = cast<ConstantInt>(pBlockMemberMeta)->getZExtValue();
+
         if (blockMeta.IsRowMajor && pStoreTy->isVectorTy())
         {
             // NOTE: For row-major matrix, storing a column vector is done by storing its own components separately.
@@ -2357,5 +2493,5 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for buffer operations.
-INITIALIZE_PASS(SpirvLowerBufferOp, "Spirv-lower-buffer-op",
+INITIALIZE_PASS(SpirvLowerBufferOp, DEBUG_TYPE,
                 "Lower SPIR-V buffer operations (load and store)", false, false)

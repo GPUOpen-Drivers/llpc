@@ -221,6 +221,9 @@ def parseLine(line, funcNo):
 def main(inFile, outDir, dataType):
     print("===  Process list: " + os.path.split(inFile)[1])
 
+    if not os.path.exists(outDir):
+        os.makedirs(outDir)
+
     fList = open(inFile, "rt")
     header ="""\
 ;**********************************************************************************************************************
@@ -253,7 +256,7 @@ target triple = "spir64-unknown-unknown"
         if not line.startswith('#'):
             (funcGroup, funcNo, intrinsic) = parseLine(line, funcNo)
             if intrinsic != "":
-                outFile = outDir + "/g_" + intrinsic + ".ll"
+                outFile = os.path.join(outDir, "g_" + intrinsic + ".ll")
                 irOut = open(outFile, "wt")
                 formattedHeader = header.format(outFile, dataType)
                 irOut.write(formattedHeader)

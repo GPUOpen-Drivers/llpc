@@ -2544,9 +2544,29 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   // For non-image atomic ops, fall through to atomic op common path
   case OpAtomicCompareExchangeWeak: {
     SPIRVInstruction *BI = static_cast<SPIRVInstruction *>(BV);
-    string OpName = getName(BI->getOpCode());
-    return mapValue(BV,
-      transBuiltinFromInst(OpName, BI, BB));
+    // Atomic Op first Operand
+    SPIRVValue* Ptr = BI->getOperands()[0];
+    SPIRVStorageClassKind StorageClass =
+        Ptr->getType()->getPointerStorageClass();
+    string AtomicOpName = getName(BI->getOpCode());
+
+    // For variable pointer
+    if ((StorageClass == StorageClassStorageBuffer) && EnableVarPtr) {
+      auto OpTys = transTypeVector(BI->getOperandTypes());
+      // Don't use first structure type operand as mangle type
+      auto MangledTy = std::vector<Type*>(OpTys.begin() + 1, OpTys.end());
+      std::string FuncName = AtomicOpName + kSPIRVTypeName::VariablePtr;
+      std::string MangledFuncName = "";
+      mangleGlslBuiltin(FuncName, MangledTy, MangledFuncName);
+      auto RetTy = transType(BI->getType());
+      auto NewF = getOrCreateFunction(M, RetTy, OpTys, MangledFuncName);
+      NewF->setCallingConv(CallingConv::SPIR_FUNC);
+      std::vector<Value*> Args = transValue(BI->getOperands(), BB->getParent(), BB);
+      auto Call = CallInst::Create(NewF, Args, "", BB);
+      return mapValue(BV, Call);
+    } else // For normal pointer
+      return mapValue(BV,
+        transBuiltinFromInst(AtomicOpName, BI, BB));
   }
   case OpFragmentMaskFetchAMD:
   case OpFragmentFetchAMD:
@@ -3978,7 +3998,7 @@ bool SPIRVToLLVM::transKernelMetadata() {
 
       if (ExecModel == ExecutionModelVertex) {
         if (BF->getExecutionMode(ExecutionModeXfb))
-          ExecModeMD.vs.xfb = true;
+          ExecModeMD.vs.Xfb = true;
 
       } else if (ExecModel == ExecutionModelTessellationControl ||
                  ExecModel == ExecutionModelTessellationEvaluation) {
@@ -4005,7 +4025,7 @@ bool SPIRVToLLVM::transKernelMetadata() {
           ExecModeMD.ts.Isolines = true;
 
         if (BF->getExecutionMode(ExecutionModeXfb))
-          ExecModeMD.ts.xfb = true;
+          ExecModeMD.ts.Xfb = true;
 
         if (auto EM = BF->getExecutionMode(ExecutionModeOutputVertices))
           ExecModeMD.ts.OutputVertices = EM->getLiterals()[0];
@@ -4030,7 +4050,7 @@ bool SPIRVToLLVM::transKernelMetadata() {
           ExecModeMD.gs.OutputTriangleStrip = true;
 
         if (BF->getExecutionMode(ExecutionModeXfb))
-          ExecModeMD.gs.xfb = true;
+          ExecModeMD.gs.Xfb = true;
 
         if (auto EM = BF->getExecutionMode(ExecutionModeInvocations))
           ExecModeMD.gs.Invocations = EM->getLiterals()[0];
@@ -4312,18 +4332,20 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
 
       SPIRVWord XfbBuffer = SPIRVID_INVALID;
       if (BV->hasDecorate(DecorationXfbBuffer, 0, &XfbBuffer)) {
-        InOutDec.IsXfb = true;
         InOutDec.XfbBuffer = XfbBuffer;
       }
       SPIRVWord XfbStride = SPIRVID_INVALID;
-      if (BV->hasDecorate(DecorationXfbStride, 0, &XfbStride)){
-        InOutDec.IsXfb = true;
+      if (BV->hasDecorate(DecorationXfbStride, 0, &XfbStride)) {
         InOutDec.XfbStride = XfbStride;
       }
 
       SPIRVWord XfbOffset = SPIRVID_INVALID;
-      if (BV->hasDecorate(DecorationOffset, 0, &XfbOffset))
-          InOutDec.XfbOffset = XfbOffset;
+      if (BV->hasDecorate(DecorationOffset, 0, &XfbOffset)) {
+        // NOTE: Transform feedback is triggered only if "xfb_offset"
+        // is specified.
+        InOutDec.IsXfb = true;
+        InOutDec.XfbOffset = XfbOffset;
+      }
 
       Type* MDTy = nullptr;
       SPIRVType* BT = BV->getType()->getPointerElementType();

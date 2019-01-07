@@ -28,78 +28,112 @@
  * @brief LLPC source file: contains implementation of class Llpc::PassLoopInfoCollect.
  ***********************************************************************************************************************
  */
+#include "llvm/ADT/SetVector.h"
+
+#include "llpcDebug.h"
+#include "llpcInternal.h"
+#include "llpcPassLoopInfoCollect.h"
 
 #define DEBUG_TYPE "llpc-pass-loop-info-collect"
 
-#include "llpcDebug.h"
-#include "llpcPassLoopInfoCollect.h"
-
+using namespace Llpc;
 using namespace llvm;
-
-namespace Llpc
-{
 
 // =====================================================================================================================
 // Initializes static members.
 char PassLoopInfoCollect::ID = 0;
 
 // =====================================================================================================================
-// Gather various infomation for one loop.
-// It will also gather infomation for this loop's children by calling itself recursively.
-void PassLoopInfoCollect::HandleLoop(
-    Loop*    loop,                          // [in] Loop block to gather infomation
-    uint32_t nestedLevel)                   // [in] Nested level of this loop
+PassLoopInfoCollect::PassLoopInfoCollect(
+    bool* pNeedDynamicLoopUnroll)   // [out] Whether dynamic unrolling is required, set when the pass is run
+    :
+    ModulePass(ID),
+    m_pNeedDynamicLoopUnroll(pNeedDynamicLoopUnroll)
 {
-    LoopAnalysisInfo loopInfo = { 0 };
-    loopInfo.nestedLevel = nestedLevel;
+    initializeLoopInfoWrapperPassPass(*PassRegistry::getPassRegistry());
+    initializePassLoopInfoCollectPass(*PassRegistry::getPassRegistry());
+}
 
-    for (Loop::block_iterator block = loop->block_begin(); block != loop->block_end(); ++block)
+// =====================================================================================================================
+// Decide whether one loop satisfies the criteria for needing dynamic loop unrolling.
+bool PassLoopInfoCollect::NeedDynamicLoopUnroll(
+    const Loop*    pLoop)                          // [in] Loop block to gather infomation
+{
+    if (pLoop->getLoopDepth() >= 4)
     {
-        loopInfo.numBasicBlocks++;
+        return true;
+    }
+
+    uint32_t numBasicBlocks = 0;
+    uint32_t numAluInsts = 0;
+
+    for (Loop::block_iterator block = pLoop->block_begin(); block != pLoop->block_end(); ++block)
+    {
+        numBasicBlocks++;
 
         for (BasicBlock::iterator inst = (*block)->begin(); inst != (*block)->end(); ++inst)
         {
             if (inst->isBinaryOp())
             {
-                loopInfo.numAluInsts++;
+                numAluInsts++;
             }
         }
     }
 
-    m_pLoopInfo->push_back(loopInfo);
-
-    std::vector<Loop*> subLoops = loop->getSubLoops();
-    for (Loop* subLoop : subLoops)
-    {
-        HandleLoop(subLoop, nestedLevel + 1);
-    }
+    // These conditions mean the loop is a complex loop.
+    return (numAluInsts > 20) || (numBasicBlocks > 8);
 }
 
 // =====================================================================================================================
-// Executes the get loop info pass on the specified LLVM module.
+// Executes the get loop info pass on the specified LLVM module
+//
+// If any function that is the fragment shader or can be called by it, and it contains a loop deemed here to be a
+// "complex loop", then we set *m_pNeedDynamicLoopUnroll to true.
 bool PassLoopInfoCollect::runOnModule(
-    llvm::Module& module)                       // [in,out] LLVM module to be run on
+    llvm::Module& module)                       // [in] LLVM module to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Pass-Loop-Info-Collect\n");
 
-    for (Function& function : module)
+    // Find the fragment shader and all functions that can be called from it (ignoring function pointers).
+    Function* pEntryPoint = getAnalysis<PipelineShaders>().GetEntryPoint(ShaderStageFragment);
+    SetVector<CallGraphNode*> callGraphNodes;
+
+    if (pEntryPoint != nullptr)
     {
-        if (function.empty())
+        auto& callGraph = getAnalysis<CallGraphWrapperPass>().getCallGraph();
+        callGraphNodes.insert(callGraph[pEntryPoint]);
+        for (uint32_t i = 0; i < callGraphNodes.size(); ++i)
         {
-            continue;
+            auto pCallGraphNode = callGraphNodes[i];
+            for (auto childNodeIt : *pCallGraphNode)
+            {
+                auto pChildNode = childNodeIt.second;
+                if (pChildNode->getFunction()->empty() == false)
+                {
+                    callGraphNodes.insert(pChildNode);
+                }
+            }
         }
+    }
 
-        LoopInfoWrapperPass& loopInfoPass = getAnalysis<LoopInfoWrapperPass>(function);
-        LoopInfo& loopInfo = loopInfoPass.getLoopInfo();
+    for (auto pCallGraphNode : callGraphNodes)
+    {
+        auto *pFunc = pCallGraphNode->getFunction();
+        auto& loopInfo = getAnalysis<LoopInfoWrapperPass>(*pFunc).getLoopInfo();
 
-        for (LoopInfo::iterator loopIt = loopInfo.begin(), loopItEnd = loopInfo.end();
-             loopIt != loopItEnd; ++loopIt)
+        for (auto loop : loopInfo)
         {
-            HandleLoop(*loopIt, 0);
+            if (NeedDynamicLoopUnroll(loop))
+            {
+                *m_pNeedDynamicLoopUnroll = true;
+                break;
+            }
         }
     }
 
     return false;
 }
 
-} // Llpc
+// =====================================================================================================================
+INITIALIZE_PASS(PassLoopInfoCollect, DEBUG_TYPE,
+                "Determine whether dynamic loop unrolling is needed", false, false)

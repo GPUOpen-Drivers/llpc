@@ -53,6 +53,13 @@ namespace Llpc
 char PatchAddrSpaceMutate::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching operations of mutating address spaces from SPIRAS to AMDGPU
+ModulePass* CreatePatchAddrSpaceMutate()
+{
+    return new PatchAddrSpaceMutate();
+}
+
+// =====================================================================================================================
 PatchAddrSpaceMutate::PatchAddrSpaceMutate()
     :
     Patch(ID)
@@ -316,6 +323,6 @@ Type* PatchAddrSpaceMutate::MapType(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations of mutate address spaces from SPIRAS to AMDGPU.
-INITIALIZE_PASS(PatchAddrSpaceMutate, "Patch-addr-space-mutate",
+INITIALIZE_PASS(PatchAddrSpaceMutate, DEBUG_TYPE,
                 "Patch LLVM for addr space mutation (from SPIRAS to AMDGPU)", false, false)
 

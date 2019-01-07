@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llvm/Analysis/CallGraph.h"
 #include "llvm/IR/InstVisitor.h"
 
 #include "SPIRVInternal.h"
@@ -40,6 +41,7 @@ namespace Llpc
 {
 
 struct DescriptorBinding;
+class PipelineShaders;
 struct ResourceUsage;
 
 // =====================================================================================================================
@@ -51,10 +53,15 @@ class SpirvLowerResourceCollect:
 public:
     SpirvLowerResourceCollect();
 
-    virtual bool runOnModule(llvm::Module& module);
+    void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+        analysisUsage.addRequired<CallGraphWrapperPass>();
+        analysisUsage.addPreserved<CallGraphWrapperPass>();
+    }
 
-    // Pass creator, creates the pass of SPIR-V lowering opertions for resource collecting
-    static llvm::ModulePass* Create() { return new SpirvLowerResourceCollect(); }
+    virtual bool runOnModule(llvm::Module& module) override;
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -66,15 +73,25 @@ private:
     uint32_t GetFlattenArrayElementCount(const llvm::Type* pTy) const;
     const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
 
-    void CollectExecutionModeUsage();
-    void CollectDescriptorUsage(uint32_t descSet, uint32_t binding, const DescriptorBinding* pBinding);
-    void CollectInOutUsage(const llvm::Type* pInOutTy, llvm::Constant* pInOutMeta, SPIRAddressSpace addrSpace);
+    void CollectExecutionModeUsage(ShaderStage shaderStage);
+    void CollectDescriptorUsage(ShaderStage               shaderStage,
+                                uint32_t                  descSet,
+                                uint32_t                  binding,
+                                const DescriptorBinding*  pBinding);
+    void CollectInOutUsage(ShaderStage        shaderStage,
+                           const llvm::Type*  pInOutTy,
+                           llvm::Constant*    pInOutMeta,
+                           SPIRAddressSpace   addrSpace);
     void CollectVertexInputUsage(const llvm::Type* pVertexTy, bool signedness, uint32_t startLoc, uint32_t locCount);
-    void CollectGsOutputInfo(uint32_t location, uint32_t builtInId, const ShaderInOutMetadata& outputMeta);
+    void CollectGsOutputInfo(const Type* pOutputTy, uint32_t location, const ShaderInOutMetadata& outputMeta);
+
+    uint32_t GetGlobalShaderUse(GlobalValue* pGlobal);
+    void SetFunctionShaderUse();
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    ResourceUsage*  m_pResUsage;    // Resource usage of the shader stage
+    PipelineShaders*                        m_pPipelineShaders;   // Pipeline shaders analysis
+    std::unordered_map<Function*, uint32_t> m_funcShaderUseMap;   // Map of which shader(s) use a function
 };
 
 } // Llpc

@@ -1128,6 +1128,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView,         MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, includeDisassembly,      MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, autoLayoutDesc,          MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, scalarBlockLayout,       MemberTypeInt, false);
 
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState,
                                        colorBuffer,
@@ -1147,7 +1148,7 @@ public:
     };
 
 private:
-    static const uint32_t  MemberCount = 21;
+    static const uint32_t  MemberCount = 22;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;

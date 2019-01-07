@@ -43,6 +43,7 @@
 
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcPipelineShaders.h"
 #include "llpcSpirvLowerAlgebraTransform.h"
 
 using namespace llvm;
@@ -57,9 +58,20 @@ namespace Llpc
 char SpirvLowerAlgebraTransform::ID = 0;
 
 // =====================================================================================================================
-SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform()
+// Pass creator, creates the pass of SPIR-V lowering opertions for algebraic transformation.
+ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding , bool enableFloatOpt)
+{
+    return new SpirvLowerAlgebraTransform(enableConstFolding, enableFloatOpt);
+}
+
+// =====================================================================================================================
+SpirvLowerAlgebraTransform::SpirvLowerAlgebraTransform(
+    bool enableConstFolding, // Whether enable constant folding
+    bool enableFloatOpt)     // Whether enable floating point optimization
     :
     SpirvLower(ID),
+    m_enableConstFolding(enableConstFolding),
+    m_enableFloatOpt(enableFloatOpt),
     m_changed(false)
 {
     initializeSpirvLowerAlgebraTransformPass(*PassRegistry::getPassRegistry());
@@ -75,118 +87,134 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     SpirvLower::Init(&module);
     m_changed = false;
 
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
-    // Do constant folding if we need flush denorm to zero.
-    auto& targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
-    auto& dataLayout = m_pModule->getDataLayout();
-
-    auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
-
-    if (pFpControlFlags->denormFlushToZero != 0)
+    // Process one function (shader entrypoint) at a time. (We cannot make this a function pass because it creates
+    // new external function declarations.)
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
-        for (auto& func : *m_pModule)
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
         {
-            for (auto& block : func)
-            {
-                for (auto instIter = block.begin(), instEnd = block.end(); instIter != instEnd;)
-                {
-                    Instruction* pInst = &(*instIter++);
+            m_shaderStage = ShaderStage(shaderStage);
+            ProcessShader();
+        }
+    }
 
-                    // DCE instruction if trivially dead.
+    return m_changed;
+}
+
+// =====================================================================================================================
+// Process a single shader
+void SpirvLowerAlgebraTransform::ProcessShader()
+{
+#if VKI_KHR_SHADER_FLOAT_CONTROLS
+    auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
+    if (m_enableConstFolding && (pFpControlFlags->denormFlushToZero != 0))
+    {
+        // Do constant folding if we need flush denorm to zero.
+        auto& targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+        auto& dataLayout = m_pModule->getDataLayout();
+
+        for (auto& block : *m_pEntryPoint)
+        {
+            for (auto instIter = block.begin(), instEnd = block.end(); instIter != instEnd;)
+            {
+                Instruction* pInst = &(*instIter++);
+
+                // DCE instruction if trivially dead.
+                if (isInstructionTriviallyDead(pInst, &targetLibInfo))
+                {
+                    LLVM_DEBUG(dbgs() << "Algebriac transform: DCE: " << *pInst << '\n');
+                    pInst->eraseFromParent();
+                    m_changed = true;
+                    continue;
+                }
+
+                // Skip Constant folding if it isn't floating point const expression
+                auto pDestType = pInst->getType();
+                if (pInst->use_empty() ||
+                    (pInst->getNumOperands() == 0) ||
+                    (pDestType->isFPOrFPVectorTy() == false) ||
+                    (isa<Constant>(pInst->getOperand(0))== false))
+                {
+                    continue;
+                }
+
+                // ConstantProp instruction if trivially constant.
+                if (Constant* pConst = ConstantFoldInstruction(pInst, dataLayout, &targetLibInfo))
+                {
+                    LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConst << " from: " << *pInst
+                        << '\n');
+                    if ((pDestType->isHalfTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0)) ||
+                        (pDestType->isFloatTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_32Bit) != 0)) ||
+                        (pDestType->isDoubleTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_64Bit) != 0)))
+                    {
+                        // Replace denorm value with zero
+                        if (pConst->isFiniteNonZeroFP() && (pConst->isNormalFP() == false))
+                        {
+                            pConst = ConstantFP::get(pDestType, 0.0);
+                        }
+                    }
+
+                    pInst->replaceAllUsesWith(pConst);
                     if (isInstructionTriviallyDead(pInst, &targetLibInfo))
                     {
-                        LLVM_DEBUG(dbgs() << "Algebriac transform: DCE: " << *pInst << '\n');
                         pInst->eraseFromParent();
-                        m_changed = true;
-                        continue;
                     }
 
-                    // Skip Constant folding if it isn't floating point const expression
-                    auto pDestType = pInst->getType();
-                    if (pInst->use_empty() ||
-                        (pInst->getNumOperands() == 0) ||
-                        (pDestType->isFPOrFPVectorTy() == false) ||
-                        (isa<Constant>(pInst->getOperand(0))== false))
-                    {
-                        continue;
-                    }
+                    m_changed = true;
+                    continue;
+                }
 
-                    // ConstantProp instruction if trivially constant.
-                    if (Constant* pConst = ConstantFoldInstruction(pInst, dataLayout, &targetLibInfo))
+                if (isa<CallInst>(pInst))
+                {
+                    CallInst* pCallInst = cast<CallInst>(pInst);
+                    // LLVM inline pass will do constant folding for _Z14unpackHalf2x16i.
+                    // To support floating control correctly, we have to do it by ourselves.
+                    if (((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0) &&
+                        (pCallInst->getCalledFunction()->getName() == "_Z14unpackHalf2x16i"))
                     {
-                        LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConst << " from: " << *pInst
-                            << '\n');
-                        if ((pDestType->isHalfTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0)) ||
-                            (pDestType->isFloatTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_32Bit) != 0)) ||
-                            (pDestType->isDoubleTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_64Bit) != 0)))
+                        auto pSrc = pCallInst->getOperand(0);
+                        if (isa<ConstantInt>(pSrc))
                         {
-                            // Replace denorm value with zero
-                            if (pConst->isFiniteNonZeroFP() && (pConst->isNormalFP() == false))
+                            auto pConst = cast<ConstantInt>(pSrc);
+                            uint64_t constVal = pConst->getZExtValue();
+                            APFloat fVal0(APFloat::IEEEhalf(), APInt(16, constVal & 0xFFFF));
+                            APFloat fVal1(APFloat::IEEEhalf(), APInt(16, (constVal >> 16) & 0xFFFF));
+
+                            // Flush denorm input value to zero
+                            if (fVal0.isDenormal())
                             {
-                                pConst = ConstantFP::get(pDestType, 0.0);
+                                fVal0 = APFloat(APFloat::IEEEhalf(), 0);
                             }
-                        }
 
-                        pInst->replaceAllUsesWith(pConst);
-                        if (isInstructionTriviallyDead(pInst, &targetLibInfo))
-                        {
-                            pInst->eraseFromParent();
-                        }
-
-                        m_changed = true;
-                        continue;
-                    }
-
-                    if (isa<CallInst>(pInst))
-                    {
-                        CallInst* pCallInst = cast<CallInst>(pInst);
-                        // LLVM inline pass will do constant folding for _Z14unpackHalf2x16i.
-                        // To support floating control correctly, we have to do it by ourselves.
-                        if (((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0) &&
-                            (pCallInst->getCalledFunction()->getName() == "_Z14unpackHalf2x16i"))
-                        {
-                            auto pSrc = pCallInst->getOperand(0);
-                            if (isa<ConstantInt>(pSrc))
+                            if (fVal1.isDenormal())
                             {
-                                auto pConst = cast<ConstantInt>(pSrc);
-                                uint64_t constVal = pConst->getZExtValue();
-                                APFloat fVal0(APFloat::IEEEhalf(), APInt(16, constVal & 0xFFFF));
-                                APFloat fVal1(APFloat::IEEEhalf(), APInt(16, (constVal >> 16) & 0xFFFF));
-
-                                // Flush denorm input value to zero
-                                if (fVal0.isDenormal())
-                                {
-                                    fVal0 = APFloat(APFloat::IEEEhalf(), 0);
-                                }
-
-                                if (fVal1.isDenormal())
-                                {
-                                    fVal1 = APFloat(APFloat::IEEEhalf(), 0);
-                                }
-
-                                bool looseInfo = false;
-                                fVal0.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
-                                fVal1.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
-
-                                Constant* constVals[] =
-                                {
-                                    ConstantFP::get(m_pContext->FloatTy(), fVal0.convertToFloat()),
-                                    ConstantFP::get(m_pContext->FloatTy(), fVal1.convertToFloat())
-                                };
-
-                                Constant* pConstVals = ConstantVector::get(constVals);
-                                pInst->replaceAllUsesWith(pConstVals);
-                                LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConstVals << " from: "
-                                    << *pInst  << '\n');
-
-                                if (isInstructionTriviallyDead(pInst, &targetLibInfo))
-                                {
-                                    pInst->eraseFromParent();
-                                }
-
-                                m_changed = true;
-                                continue;
+                                fVal1 = APFloat(APFloat::IEEEhalf(), 0);
                             }
+
+                            bool looseInfo = false;
+                            fVal0.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
+                            fVal1.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
+
+                            Constant* constVals[] =
+                            {
+                                ConstantFP::get(m_pContext->FloatTy(), fVal0.convertToFloat()),
+                                ConstantFP::get(m_pContext->FloatTy(), fVal1.convertToFloat())
+                            };
+
+                            Constant* pConstVals = ConstantVector::get(constVals);
+                            pInst->replaceAllUsesWith(pConstVals);
+                            LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConstVals << " from: "
+                                << *pInst  << '\n');
+
+                            if (isInstructionTriviallyDead(pInst, &targetLibInfo))
+                            {
+                                pInst->eraseFromParent();
+                            }
+
+                            m_changed = true;
+                            continue;
                         }
                     }
                 }
@@ -195,9 +223,10 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     }
 #endif
 
-    visit(m_pModule);
-
-    return m_changed;
+    if (m_enableFloatOpt)
+    {
+        visit(m_pEntryPoint);
+    }
 }
 
 // =====================================================================================================================
@@ -345,5 +374,5 @@ bool SpirvLowerAlgebraTransform::IsOperandNoContract(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for algebraic transformation.
-INITIALIZE_PASS(SpirvLowerAlgebraTransform, "Spirv-lower-algebra-transform",
+INITIALIZE_PASS(SpirvLowerAlgebraTransform, DEBUG_TYPE,
                 "Lower SPIR-V algebraic transforms", false, false)

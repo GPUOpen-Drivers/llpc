@@ -48,6 +48,13 @@ namespace Llpc
 char PatchPeepholeOpt::ID;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
+FunctionPass* CreatePatchPeepholeOpt()
+{
+    return new PatchPeepholeOpt();
+}
+
+// =====================================================================================================================
 PatchPeepholeOpt::PatchPeepholeOpt()
     :
     FunctionPass(ID)
@@ -879,5 +886,5 @@ void PatchPeepholeOpt::insertAfter(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching operations for peephole optimizations.
-INITIALIZE_PASS(PatchPeepholeOpt, "Patch-peephole-opt",
+INITIALIZE_PASS(PatchPeepholeOpt, DEBUG_TYPE,
     "Patch LLVM for peephole optimizations", false, false)

@@ -47,21 +47,9 @@
 #include "llvm/Transforms/Utils.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
-#include "llpcPassDeadFuncRemove.h"
-#include "llpcPassExternalLibLink.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
-#include "llpcPatchAddrSpaceMutate.h"
-#include "llpcPatchBufferOp.h"
-#include "llpcPatchDescriptorLoad.h"
-#include "llpcPatchEntryPointMutate.h"
-#include "llpcPatchGroupOp.h"
-#include "llpcPatchImageOp.h"
-#include "llpcPatchInOutImportExport.h"
-#include "llpcPatchLoopUnrollInfoRectify.h"
-#include "llpcPatchPeepholeOpt.h"
-#include "llpcPatchPushConstOp.h"
-#include "llpcPatchResourceCollect.h"
+#include "SPIRVInternal.h"
 
 #define DEBUG_TYPE "llpc-patch"
 
@@ -81,6 +69,9 @@ static opt<bool> AutoLayoutDesc("auto-layout-desc",
 
 // -disable-patch-opt: disable optimization for LLVM patching
 opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
+
+// -include-llvm-ir: include llvm-ir as a separate section in the ELF binary
+opt<bool> IncludeLlvmIr("include-llvm-ir", desc("Include llvm-ir as a separate section in the ELF binary"), init(false));
 
 } // cl
 
@@ -105,46 +96,46 @@ void Patch::AddPasses(
     }
 
     // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
-    passMgr.add(PatchResourceCollect::Create());
+    passMgr.add(CreatePatchResourceCollect());
 
     // Generate copy shader if necessary.
     passMgr.add(CreatePatchCopyShader());
 
     // Lower SPIRAS address spaces to AMDGPU address spaces
-    passMgr.add(PatchAddrSpaceMutate::Create());
+    passMgr.add(CreatePatchAddrSpaceMutate());
 
     // Patch entry-point mutation (should be done before external library link)
-    passMgr.add(PatchEntryPointMutate::Create());
+    passMgr.add(CreatePatchEntryPointMutate());
 
     // Patch image operations (should be done before external library link)
-    passMgr.add(PatchImageOp::Create());
+    passMgr.add(CreatePatchImageOp());
 
     // Patch push constant loading (should be done before external library link)
-    passMgr.add(PatchPushConstOp::Create());
+    passMgr.add(CreatePatchPushConstOp());
 
     // Patch buffer operations (should be done before external library link)
-    passMgr.add(PatchBufferOp::Create());
+    passMgr.add(CreatePatchBufferOp());
 
     // Patch group operations (should be done before external library link)
-    passMgr.add(PatchGroupOp::Create());
+    passMgr.add(CreatePatchGroupOp());
 
     // Link external libraries and remove dead functions after it
-    passMgr.add(PassExternalLibLink::Create(false)); // Not native only
-    passMgr.add(PassDeadFuncRemove::Create());
+    passMgr.add(CreatePassExternalLibLink(false)); // Not native only
+    passMgr.add(CreatePassDeadFuncRemove());
 
     // Function inlining and remove dead functions after it
     passMgr.add(createFunctionInliningPass(InlineThreshold));
-    passMgr.add(PassDeadFuncRemove::Create());
+    passMgr.add(CreatePassDeadFuncRemove());
 
     // Patch input import and output export operations
-    passMgr.add(PatchInOutImportExport::Create());
+    passMgr.add(CreatePatchInOutImportExport());
 
     // Patch descriptor load operations
-    passMgr.add(PatchDescriptorLoad::Create());
+    passMgr.add(CreatePatchDescriptorLoad());
 
     // Prior to general optimization, do function inlining and dead function removal once again
     passMgr.add(createFunctionInliningPass(InlineThreshold));
-    passMgr.add(PassDeadFuncRemove::Create());
+    passMgr.add(CreatePassDeadFuncRemove());
 
     // Add some optimization passes
 
@@ -159,6 +150,19 @@ void Patch::AddPasses(
     // Prepare pipeline ABI.
     passMgr.add(CreatePatchPreparePipelineAbi());
 
+    // Include llvm-ir as a separate section in the ELF binary
+    if (cl::IncludeLlvmIr)
+    {
+        passMgr.add(CreatePatchIncludeLlvmIr());
+    }
+
+    // Dump the result
+    if (EnableOuts())
+    {
+        passMgr.add(createPrintModulePass(outs(),
+                    "===============================================================================\n"
+                    "// LLPC pipeline patching results\n\n"));
+    }
 }
 
 // =====================================================================================================================
@@ -178,7 +182,7 @@ void Patch::AddOptimizationPasses(
     passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
         [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
         {
-            passMgr.add(PatchPeepholeOpt::Create());
+            passMgr.add(CreatePatchPeepholeOpt());
             passMgr.add(createInstSimplifyLegacyPass());
         });
     passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
@@ -188,7 +192,7 @@ void Patch::AddOptimizationPasses(
             // performed before the scalarizer. One important case this helps with is when you have bit casts whose
             // source is a PHI - we want to make sure that the PHI does not have an i8 type before the scalarizer is
             // called, otherwise a different kind of PHI mess is generated.
-            passMgr.add(PatchPeepholeOpt::Create());
+            passMgr.add(CreatePatchPeepholeOpt());
 
             // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer allows
             // us to much more easily identify dead parts of vectors that we do not need to do any computation for.
@@ -201,7 +205,7 @@ void Patch::AddOptimizationPasses(
     passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
         [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
         {
-            passMgr.add(PatchLoopUnrollInfoRectify::Create());
+            passMgr.add(CreatePatchLoopUnrollInfoRectify());
         });
 
     passBuilder.populateModulePassManager(passMgr);
@@ -216,8 +220,8 @@ void Patch::Init(
 {
     m_pModule  = pModule;
     m_pContext = static_cast<Context*>(&m_pModule->getContext());
-    m_shaderStage = GetShaderStageFromModule(m_pModule);
-    m_pEntryPoint = GetEntryPoint(m_pModule);
+    m_shaderStage = ShaderStageInvalid;
+    m_pEntryPoint = nullptr;
 }
 
 // =====================================================================================================================

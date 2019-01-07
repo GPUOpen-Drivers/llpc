@@ -35,8 +35,10 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <algorithm>
+#include <queue>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcPipelineShaders.h"
 #include "llpcSpirvLowerResourceCollect.h"
 
 using namespace llvm;
@@ -51,10 +53,19 @@ namespace Llpc
 char SpirvLowerResourceCollect::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of SPIR-V lowering opertions for resource collecting
+ModulePass* CreateSpirvLowerResourceCollect()
+{
+    return new SpirvLowerResourceCollect();
+}
+
+// =====================================================================================================================
 SpirvLowerResourceCollect::SpirvLowerResourceCollect()
     :
     SpirvLower(ID)
 {
+    initializeCallGraphWrapperPassPass(*PassRegistry::getPassRegistry());
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializeSpirvLowerResourceCollectPass(*PassRegistry::getPassRegistry());
 }
 
@@ -66,14 +77,24 @@ bool SpirvLowerResourceCollect::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Resource-Collect\n");
 
     SpirvLower::Init(&module);
+    m_pPipelineShaders = &getAnalysis<PipelineShaders>();
+    SetFunctionShaderUse();
 
-    m_pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    {
+        auto shaderStage = ShaderStage(stage);
+        if (m_pPipelineShaders->GetEntryPoint(shaderStage) != nullptr)
+        {
+            CollectExecutionModeUsage(shaderStage);
+        }
+    }
 
-    CollectExecutionModeUsage();
+    const uint32_t stageMask = m_pContext->GetShaderStageMask();
 
-    if (m_shaderStage == ShaderStageVertex)
+    if ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0)
     {
         // Collect resource usages from vertex input create info
+        auto pVsResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
         auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
         auto pVertexInput = pPipelineInfo->pVertexInput;
 
@@ -86,25 +107,27 @@ bool SpirvLowerResourceCollect::runOnModule(
                 auto pBinding = &pVertexInput->pVertexBindingDescriptions[i];
                 if (pBinding->inputRate == VK_VERTEX_INPUT_RATE_VERTEX)
                 {
-                    m_pResUsage->builtInUsage.vs.vertexIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseVertex = true;
+                    pVsResUsage->builtInUsage.vs.vertexIndex = true;
+                    pVsResUsage->builtInUsage.vs.baseVertex = true;
                 }
                 else
                 {
                     LLPC_ASSERT(pBinding->inputRate == VK_VERTEX_INPUT_RATE_INSTANCE);
-                    m_pResUsage->builtInUsage.vs.instanceIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseInstance = true;
+                    pVsResUsage->builtInUsage.vs.instanceIndex = true;
+                    pVsResUsage->builtInUsage.vs.baseInstance = true;
                 }
             }
         }
     }
-    else if (m_shaderStage == ShaderStageFragment)
+
+    if ((stageMask & ShaderStageToMask(ShaderStageFragment)) != 0)
     {
         for (auto& func : *m_pModule)
         {
             if (func.getName() == "_Z4Killv")
             {
-                m_pResUsage->builtInUsage.fs.discard = true;
+                auto pFsResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+                pFsResUsage->builtInUsage.fs.discard = true;
             }
         }
     }
@@ -136,9 +159,17 @@ bool SpirvLowerResourceCollect::runOnModule(
 
     bool useViewIndex = false;
 
-    // Collect resource usages from globals
+    // Collect resource usages from globals.
     for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
     {
+        // Currently, there can never be more than one shader using a global, because each shader comes from
+        // a separate SPIR-V module. The code here allows for a global to be used in more than one shader,
+        // which could happen if we do an optimization in the future where the same SPIR-V module containing
+        // more than one shader stage is translated only once. For now, we assert that the global is used
+        // in only one shader stage.
+        auto shaderUseMask = GetGlobalShaderUse(&*pGlobal);
+        LLPC_ASSERT(!shaderUseMask || isPowerOf2_32(shaderUseMask));
+
         const Type* pGlobalTy = pGlobal->getType()->getContainedType(0);
 
         auto addrSpace = pGlobal->getType()->getAddressSpace();
@@ -173,8 +204,9 @@ bool SpirvLowerResourceCollect::runOnModule(
                         }
                         else if (dim == DimSubpassData)
                         {
-                            LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
-                            m_pResUsage->builtInUsage.fs.fragCoord = true;
+                            LLPC_ASSERT(shaderUseMask == 1U << ShaderStageFragment);
+                            auto pFsResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+                            pFsResUsage->builtInUsage.fs.fragCoord = true;
                             useViewIndex = true;
                         }
                     }
@@ -184,7 +216,14 @@ bool SpirvLowerResourceCollect::runOnModule(
                 bindingInfo.descType  = descType;
                 bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
 
-                CollectDescriptorUsage(descSet, binding, &bindingInfo);
+                for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+                {
+                    auto shaderStage = ShaderStage(stage);
+                    if ((shaderUseMask >> shaderStage) & 1)
+                    {
+                        CollectDescriptorUsage(shaderStage, descSet, binding, &bindingInfo);
+                    }
+                }
                 break;
             }
         case SPIRAS_Private:
@@ -198,52 +237,63 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Output:
             {
                 MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::InOut);
-                auto pMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
 
-                if (pGlobalTy->isArrayTy())
+                for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
                 {
-                    // NOTE: For tessellation shader and geometry shader, the outermost array index might be
-                    // used for vertex indexing. Thus, it should be counted out when collect input/output usage
-                    // info.
-                    const bool isGsInput   = ((m_shaderStage == ShaderStageGeometry) && (addrSpace == SPIRAS_Input));
-                    const bool isTcsInput  = ((m_shaderStage == ShaderStageTessControl) &&
-                                              (addrSpace == SPIRAS_Input));
-                    const bool isTcsOutput = ((m_shaderStage == ShaderStageTessControl) &&
-                                              (addrSpace == SPIRAS_Output));
-                    const bool isTesInput  = ((m_shaderStage == ShaderStageTessEval) && (addrSpace == SPIRAS_Input));
-
-                    bool isVertexIdx = false;
-
-                    if (isGsInput || isTcsInput || isTcsOutput || isTesInput)
+                    auto shaderStage = ShaderStage(stage);
+                    if ((shaderUseMask >> shaderStage) & 1)
                     {
-                        ShaderInOutMetadata inOutMeta = {};
-                        inOutMeta.U64All = cast<ConstantInt>(pMeta->getOperand(1))->getZExtValue();
+                        auto pMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
 
-                        if (inOutMeta.IsBuiltIn)
+                        auto pInOutTy = pGlobalTy;
+                        if (pInOutTy->isArrayTy())
                         {
-                            const BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
-                            isVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
-                                           (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
-                                           (builtInId == BuiltInPointSize)    ||
-                                           (builtInId == BuiltInClipDistance) ||
-                                           (builtInId == BuiltInCullDistance));
-                        }
-                        else
-                        {
-                            isVertexIdx = (isGsInput || isTcsInput ||
-                                           ((isTcsOutput || isTesInput) && (inOutMeta.PerPatch == false)));
-                        }
-                    }
+                            // NOTE: For tessellation shader and geometry shader, the outermost array index might be
+                            // used for vertex indexing. Thus, it should be counted out when collect input/output usage
+                            // info.
+                            const bool isGsInput   = ((shaderStage == ShaderStageGeometry) &&
+                                                      (addrSpace == SPIRAS_Input));
+                            const bool isTcsInput  = ((shaderStage == ShaderStageTessControl) &&
+                                                      (addrSpace == SPIRAS_Input));
+                            const bool isTcsOutput = ((shaderStage == ShaderStageTessControl) &&
+                                                      (addrSpace == SPIRAS_Output));
+                            const bool isTesInput  = ((shaderStage == ShaderStageTessEval) &&
+                                                      (addrSpace == SPIRAS_Input));
 
-                    if (isVertexIdx)
-                    {
-                        // The outermost array index is for vertex indexing
-                        pGlobalTy = pGlobalTy->getArrayElementType();
-                        pMeta = cast<Constant>(pMeta->getOperand(2));
+                            bool isVertexIdx = false;
+
+                            if (isGsInput || isTcsInput || isTcsOutput || isTesInput)
+                            {
+                                ShaderInOutMetadata inOutMeta = {};
+                                inOutMeta.U64All = cast<ConstantInt>(pMeta->getOperand(1))->getZExtValue();
+
+                                if (inOutMeta.IsBuiltIn)
+                                {
+                                    const BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
+                                    isVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
+                                                   (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
+                                                   (builtInId == BuiltInPointSize)    ||
+                                                   (builtInId == BuiltInClipDistance) ||
+                                                   (builtInId == BuiltInCullDistance));
+                                }
+                                else
+                                {
+                                    isVertexIdx = (isGsInput || isTcsInput ||
+                                                   ((isTcsOutput || isTesInput) && (inOutMeta.PerPatch == false)));
+                                }
+                            }
+
+                            if (isVertexIdx)
+                            {
+                                // The outermost array index is for vertex indexing
+                                pInOutTy = pInOutTy->getArrayElementType();
+                                pMeta = cast<Constant>(pMeta->getOperand(2));
+                            }
+                        }
+
+                        CollectInOutUsage(shaderStage, pInOutTy, pMeta, static_cast<SPIRAddressSpace>(addrSpace));
                     }
                 }
-
-                CollectInOutUsage(pGlobalTy, pMeta, static_cast<SPIRAddressSpace>(addrSpace));
                 break;
             }
         case SPIRAS_Uniform:
@@ -260,7 +310,14 @@ bool SpirvLowerResourceCollect::runOnModule(
                                                                           DescriptorType::ShaderStorageBlock;
                 bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
 
-                CollectDescriptorUsage(descSet, binding, &bindingInfo);
+                for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+                {
+                    auto shaderStage = ShaderStage(stage);
+                    if ((shaderUseMask >> shaderStage) & 1)
+                    {
+                        CollectDescriptorUsage(shaderStage, descSet, binding, &bindingInfo);
+                    }
+                }
                 break;
             }
         case SPIRAS_PushConst:
@@ -268,7 +325,14 @@ bool SpirvLowerResourceCollect::runOnModule(
                 // Push constant
                 MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
                 auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                m_pResUsage->pushConstSizeInBytes = pushConstSize;
+                for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+                {
+                    auto shaderStage = ShaderStage(stage);
+                    if ((shaderUseMask >> shaderStage) & 1)
+                    {
+                        m_pContext->GetShaderResourceUsage(shaderStage)->pushConstSizeInBytes = pushConstSize;
+                    }
+                }
                 break;
             }
         default:
@@ -306,7 +370,7 @@ bool SpirvLowerResourceCollect::runOnModule(
         viewIndexMeta.push_back(ConstantAsMetadata::get(pViewIndexMetaValue));
         auto pViewIndexMetaNode = MDNode::get(*m_pContext, viewIndexMeta);
         pViewIndex->addMetadata(gSPIRVMD::InOut, *pViewIndexMetaNode);
-        CollectInOutUsage(m_pContext->Int32Ty(), pViewIndexMetaValue, SPIRAS_Input);
+        CollectInOutUsage(ShaderStageFragment, m_pContext->Int32Ty(), pViewIndexMetaValue, SPIRAS_Input);
     }
 
     return true;
@@ -348,9 +412,11 @@ const Type* SpirvLowerResourceCollect::GetFlattenArrayElementType(
 
 // =====================================================================================================================
 // Collects the usage of execution modes from entry-point metadata.
-void SpirvLowerResourceCollect::CollectExecutionModeUsage()
+void SpirvLowerResourceCollect::CollectExecutionModeUsage(
+    ShaderStage shaderStage)  // API shader stage
 {
-    const auto execModel = static_cast<ExecutionModel>(m_shaderStage);
+    auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto execModel = static_cast<ExecutionModel>(shaderStage);
     std::string execModeMetaName = gSPIRVMD::ExecutionMode + std::string(".") + getName(execModel);
 
     ShaderExecModeMetadata execModeMeta = {};
@@ -388,196 +454,196 @@ void SpirvLowerResourceCollect::CollectExecutionModeUsage()
 
 #if VKI_KHR_SHADER_FLOAT_CONTROLS
                 auto fpControlFlags = execModeMeta.common.FpControlFlags;
-                m_pResUsage->builtInUsage.common.denormPerserve           = fpControlFlags.DenormPerserve;
-                m_pResUsage->builtInUsage.common.denormFlushToZero        = fpControlFlags.DenormFlushToZero;
-                m_pResUsage->builtInUsage.common.signedZeroInfNanPreserve = fpControlFlags.SignedZeroInfNanPreserve;
-                m_pResUsage->builtInUsage.common.roundingModeRTE          = fpControlFlags.RoundingModeRTE;
-                m_pResUsage->builtInUsage.common.roundingModeRTZ          = fpControlFlags.RoundingModeRTZ;
+                pResUsage->builtInUsage.common.denormPerserve           = fpControlFlags.DenormPerserve;
+                pResUsage->builtInUsage.common.denormFlushToZero        = fpControlFlags.DenormFlushToZero;
+                pResUsage->builtInUsage.common.signedZeroInfNanPreserve = fpControlFlags.SignedZeroInfNanPreserve;
+                pResUsage->builtInUsage.common.roundingModeRTE          = fpControlFlags.RoundingModeRTE;
+                pResUsage->builtInUsage.common.roundingModeRTZ          = fpControlFlags.RoundingModeRTZ;
 #endif
 
-                if (m_shaderStage == ShaderStageTessControl)
+                if (shaderStage == ShaderStageTessControl)
                 {
                     LLPC_ASSERT(execModeMeta.ts.OutputVertices <= MaxTessPatchVertices);
-                    m_pResUsage->builtInUsage.tcs.outputVertices = execModeMeta.ts.OutputVertices;
+                    pResUsage->builtInUsage.tcs.outputVertices = execModeMeta.ts.OutputVertices;
 
                     // NOTE: These execution modes belong to tessellation evaluation shader. But SPIR-V allows
                     // them to appear in tessellation control shader.
-                    m_pResUsage->builtInUsage.tcs.vertexSpacing = SpacingUnknown;
+                    pResUsage->builtInUsage.tcs.vertexSpacing = SpacingUnknown;
                     if (execModeMeta.ts.SpacingEqual)
                     {
-                        m_pResUsage->builtInUsage.tcs.vertexSpacing = SpacingEqual;
+                        pResUsage->builtInUsage.tcs.vertexSpacing = SpacingEqual;
                     }
                     else if (execModeMeta.ts.SpacingFractionalEven)
                     {
-                        m_pResUsage->builtInUsage.tcs.vertexSpacing = SpacingFractionalEven;
+                        pResUsage->builtInUsage.tcs.vertexSpacing = SpacingFractionalEven;
                     }
                     else if (execModeMeta.ts.SpacingFractionalOdd)
                     {
-                        m_pResUsage->builtInUsage.tcs.vertexSpacing = SpacingFractionalOdd;
+                        pResUsage->builtInUsage.tcs.vertexSpacing = SpacingFractionalOdd;
                     }
 
-                    m_pResUsage->builtInUsage.tcs.vertexOrder = VertexOrderUnknown;
+                    pResUsage->builtInUsage.tcs.vertexOrder = VertexOrderUnknown;
                     if (execModeMeta.ts.VertexOrderCw)
                     {
-                        m_pResUsage->builtInUsage.tcs.vertexOrder = VertexOrderCw;
+                        pResUsage->builtInUsage.tcs.vertexOrder = VertexOrderCw;
                     }
                     else if (execModeMeta.ts.VertexOrderCcw)
                     {
-                        m_pResUsage->builtInUsage.tcs.vertexOrder = VertexOrderCcw;
+                        pResUsage->builtInUsage.tcs.vertexOrder = VertexOrderCcw;
                     }
 
-                    m_pResUsage->builtInUsage.tcs.primitiveMode = SPIRVPrimitiveModeKind::Unknown;
+                    pResUsage->builtInUsage.tcs.primitiveMode = SPIRVPrimitiveModeKind::Unknown;
                     if (execModeMeta.ts.Triangles)
                     {
-                        m_pResUsage->builtInUsage.tcs.primitiveMode = Triangles;
+                        pResUsage->builtInUsage.tcs.primitiveMode = Triangles;
                     }
                     else if (execModeMeta.ts.Quads)
                     {
-                        m_pResUsage->builtInUsage.tcs.primitiveMode = Quads;
+                        pResUsage->builtInUsage.tcs.primitiveMode = Quads;
                     }
                     else if (execModeMeta.ts.Isolines)
                     {
-                        m_pResUsage->builtInUsage.tcs.primitiveMode = Isolines;
+                        pResUsage->builtInUsage.tcs.primitiveMode = Isolines;
                     }
 
-                    m_pResUsage->builtInUsage.tcs.pointMode = false;
+                    pResUsage->builtInUsage.tcs.pointMode = false;
                     if (execModeMeta.ts.PointMode)
                     {
-                        m_pResUsage->builtInUsage.tcs.pointMode = true;
+                        pResUsage->builtInUsage.tcs.pointMode = true;
                     }
                 }
-                else if (m_shaderStage == ShaderStageTessEval)
+                else if (shaderStage == ShaderStageTessEval)
                 {
-                    m_pResUsage->builtInUsage.tes.vertexSpacing = SpacingUnknown;
+                    pResUsage->builtInUsage.tes.vertexSpacing = SpacingUnknown;
                     if (execModeMeta.ts.SpacingEqual)
                     {
-                        m_pResUsage->builtInUsage.tes.vertexSpacing = SpacingEqual;
+                        pResUsage->builtInUsage.tes.vertexSpacing = SpacingEqual;
                     }
                     else if (execModeMeta.ts.SpacingFractionalEven)
                     {
-                        m_pResUsage->builtInUsage.tes.vertexSpacing = SpacingFractionalEven;
+                        pResUsage->builtInUsage.tes.vertexSpacing = SpacingFractionalEven;
                     }
                     else if (execModeMeta.ts.SpacingFractionalOdd)
                     {
-                        m_pResUsage->builtInUsage.tes.vertexSpacing = SpacingFractionalOdd;
+                        pResUsage->builtInUsage.tes.vertexSpacing = SpacingFractionalOdd;
                     }
 
-                    m_pResUsage->builtInUsage.tes.vertexOrder = VertexOrderUnknown;
+                    pResUsage->builtInUsage.tes.vertexOrder = VertexOrderUnknown;
                     if (execModeMeta.ts.VertexOrderCw)
                     {
-                        m_pResUsage->builtInUsage.tes.vertexOrder = VertexOrderCw;
+                        pResUsage->builtInUsage.tes.vertexOrder = VertexOrderCw;
                     }
                     else if (execModeMeta.ts.VertexOrderCcw)
                     {
-                        m_pResUsage->builtInUsage.tes.vertexOrder = VertexOrderCcw;
+                        pResUsage->builtInUsage.tes.vertexOrder = VertexOrderCcw;
                     }
 
-                    m_pResUsage->builtInUsage.tes.primitiveMode = SPIRVPrimitiveModeKind::Unknown;
+                    pResUsage->builtInUsage.tes.primitiveMode = SPIRVPrimitiveModeKind::Unknown;
                     if (execModeMeta.ts.Triangles)
                     {
-                        m_pResUsage->builtInUsage.tes.primitiveMode = Triangles;
+                        pResUsage->builtInUsage.tes.primitiveMode = Triangles;
                     }
                     else if (execModeMeta.ts.Quads)
                     {
-                        m_pResUsage->builtInUsage.tes.primitiveMode = Quads;
+                        pResUsage->builtInUsage.tes.primitiveMode = Quads;
                     }
                     else if (execModeMeta.ts.Isolines)
                     {
-                        m_pResUsage->builtInUsage.tes.primitiveMode = Isolines;
+                        pResUsage->builtInUsage.tes.primitiveMode = Isolines;
                     }
 
-                    m_pResUsage->builtInUsage.tes.pointMode = false;
+                    pResUsage->builtInUsage.tes.pointMode = false;
                     if (execModeMeta.ts.PointMode)
                     {
-                        m_pResUsage->builtInUsage.tes.pointMode = true;
+                        pResUsage->builtInUsage.tes.pointMode = true;
                     }
 
                     // NOTE: This execution mode belongs to tessellation control shader. But SPIR-V allows
                     // it to appear in tessellation evaluation shader.
                     LLPC_ASSERT(execModeMeta.ts.OutputVertices <= MaxTessPatchVertices);
-                    m_pResUsage->builtInUsage.tes.outputVertices = execModeMeta.ts.OutputVertices;
+                    pResUsage->builtInUsage.tes.outputVertices = execModeMeta.ts.OutputVertices;
                 }
-                else if (m_shaderStage == ShaderStageGeometry)
+                else if (shaderStage == ShaderStageGeometry)
                 {
-                    m_pResUsage->builtInUsage.gs.invocations = 1;
+                    pResUsage->builtInUsage.gs.invocations = 1;
                     if (execModeMeta.gs.Invocations > 0)
                     {
                         LLPC_ASSERT(execModeMeta.gs.Invocations <= MaxGeometryInvocations);
-                        m_pResUsage->builtInUsage.gs.invocations = execModeMeta.gs.Invocations;
+                        pResUsage->builtInUsage.gs.invocations = execModeMeta.gs.Invocations;
                     }
 
                     LLPC_ASSERT(execModeMeta.gs.OutputVertices <= MaxGeometryOutputVertices);
-                    m_pResUsage->builtInUsage.gs.outputVertices = execModeMeta.gs.OutputVertices;
+                    pResUsage->builtInUsage.gs.outputVertices = execModeMeta.gs.OutputVertices;
 
                     if (execModeMeta.gs.InputPoints)
                     {
-                        m_pResUsage->builtInUsage.gs.inputPrimitive = InputPoints;
+                        pResUsage->builtInUsage.gs.inputPrimitive = InputPoints;
                     }
                     else if (execModeMeta.gs.InputLines)
                     {
-                        m_pResUsage->builtInUsage.gs.inputPrimitive = InputLines;
+                        pResUsage->builtInUsage.gs.inputPrimitive = InputLines;
                     }
                     else if (execModeMeta.gs.InputLinesAdjacency)
                     {
-                        m_pResUsage->builtInUsage.gs.inputPrimitive = InputLinesAdjacency;
+                        pResUsage->builtInUsage.gs.inputPrimitive = InputLinesAdjacency;
                     }
                     else if (execModeMeta.gs.Triangles)
                     {
-                        m_pResUsage->builtInUsage.gs.inputPrimitive = InputTriangles;
+                        pResUsage->builtInUsage.gs.inputPrimitive = InputTriangles;
                     }
                     else if (execModeMeta.gs.InputTrianglesAdjacency)
                     {
-                        m_pResUsage->builtInUsage.gs.inputPrimitive = InputTrianglesAdjacency;
+                        pResUsage->builtInUsage.gs.inputPrimitive = InputTrianglesAdjacency;
                     }
 
                     if (execModeMeta.gs.OutputPoints)
                     {
-                        m_pResUsage->builtInUsage.gs.outputPrimitive = OutputPoints;
+                        pResUsage->builtInUsage.gs.outputPrimitive = OutputPoints;
                     }
                     else if (execModeMeta.gs.OutputLineStrip)
                     {
-                        m_pResUsage->builtInUsage.gs.outputPrimitive = OutputLineStrip;
+                        pResUsage->builtInUsage.gs.outputPrimitive = OutputLineStrip;
                     }
                     else if (execModeMeta.gs.OutputTriangleStrip)
                     {
-                        m_pResUsage->builtInUsage.gs.outputPrimitive = OutputTriangleStrip;
+                        pResUsage->builtInUsage.gs.outputPrimitive = OutputTriangleStrip;
                     }
                 }
-                else if (m_shaderStage == ShaderStageFragment)
+                else if (shaderStage == ShaderStageFragment)
                 {
-                    m_pResUsage->builtInUsage.fs.originUpperLeft    = execModeMeta.fs.OriginUpperLeft;
-                    m_pResUsage->builtInUsage.fs.pixelCenterInteger = execModeMeta.fs.PixelCenterInteger;
-                    m_pResUsage->builtInUsage.fs.earlyFragmentTests = execModeMeta.fs.EarlyFragmentTests;
+                    pResUsage->builtInUsage.fs.originUpperLeft    = execModeMeta.fs.OriginUpperLeft;
+                    pResUsage->builtInUsage.fs.pixelCenterInteger = execModeMeta.fs.PixelCenterInteger;
+                    pResUsage->builtInUsage.fs.earlyFragmentTests = execModeMeta.fs.EarlyFragmentTests;
 
-                    m_pResUsage->builtInUsage.fs.depthMode = DepthReplacing;
+                    pResUsage->builtInUsage.fs.depthMode = DepthReplacing;
                     if (execModeMeta.fs.DepthReplacing)
                     {
-                        m_pResUsage->builtInUsage.fs.depthMode = DepthReplacing;
+                        pResUsage->builtInUsage.fs.depthMode = DepthReplacing;
                     }
                     else if (execModeMeta.fs.DepthGreater)
                     {
-                        m_pResUsage->builtInUsage.fs.depthMode = DepthGreater;
+                        pResUsage->builtInUsage.fs.depthMode = DepthGreater;
                     }
                     else if (execModeMeta.fs.DepthLess)
                     {
-                        m_pResUsage->builtInUsage.fs.depthMode = DepthLess;
+                        pResUsage->builtInUsage.fs.depthMode = DepthLess;
                     }
                     else if (execModeMeta.fs.DepthUnchanged)
                     {
-                        m_pResUsage->builtInUsage.fs.depthMode = DepthUnchanged;
+                        pResUsage->builtInUsage.fs.depthMode = DepthUnchanged;
                     }
                 }
-                else if (m_shaderStage == ShaderStageCompute)
+                else if (shaderStage == ShaderStageCompute)
                 {
                     LLPC_ASSERT((execModeMeta.cs.LocalSizeX <= MaxComputeWorkgroupSize) &&
                                 (execModeMeta.cs.LocalSizeY <= MaxComputeWorkgroupSize) &&
                                 (execModeMeta.cs.LocalSizeZ <= MaxComputeWorkgroupSize));
 
-                    m_pResUsage->builtInUsage.cs.workgroupSizeX =
+                    pResUsage->builtInUsage.cs.workgroupSizeX =
                         (execModeMeta.cs.LocalSizeX > 0) ? execModeMeta.cs.LocalSizeX : 1;
-                    m_pResUsage->builtInUsage.cs.workgroupSizeY =
+                    pResUsage->builtInUsage.cs.workgroupSizeY =
                         (execModeMeta.cs.LocalSizeY > 0) ? execModeMeta.cs.LocalSizeY : 1;
-                    m_pResUsage->builtInUsage.cs.workgroupSizeZ =
+                    pResUsage->builtInUsage.cs.workgroupSizeZ =
                         (execModeMeta.cs.LocalSizeZ > 0) ? execModeMeta.cs.LocalSizeZ : 1;
                 }
 
@@ -590,17 +656,20 @@ void SpirvLowerResourceCollect::CollectExecutionModeUsage()
 // =====================================================================================================================
 // Collects the usage info of descriptor sets and their bindings.
 void SpirvLowerResourceCollect::CollectDescriptorUsage(
+    ShaderStage              shaderStage,   // API shader stage
     uint32_t                 descSet,       // ID of descriptor set
     uint32_t                 binding,       // ID of descriptor binding
     const DescriptorBinding* pBindingInfo)  // [in] Descriptor binding info
 {
+    auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+
     // The set ID is somewhat larger than expected
-    if ((descSet + 1) > m_pResUsage->descSets.size())
+    if ((descSet + 1) > pResUsage->descSets.size())
     {
-        m_pResUsage->descSets.resize(descSet + 1);
+        pResUsage->descSets.resize(descSet + 1);
     }
 
-    auto pDescSet = &m_pResUsage->descSets[descSet];
+    auto pDescSet = &pResUsage->descSets[descSet];
     static const DescriptorBinding DummyBinding = {};
     while ((binding + 1) > pDescSet->size())
     {
@@ -614,12 +683,14 @@ void SpirvLowerResourceCollect::CollectDescriptorUsage(
 // =====================================================================================================================
 // Collects the usage info of inputs and outputs.
 void SpirvLowerResourceCollect::CollectInOutUsage(
+    ShaderStage      shaderStage,   // API shader stage
     const Type*      pInOutTy,      // [in] Type of this input/output
     Constant*        pInOutMeta,    // [in] Metadata of this input/output
     SPIRAddressSpace addrSpace)     // Address space
 {
     LLPC_ASSERT((addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output));
 
+    auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     ShaderInOutMetadata inOutMeta = {};
     uint32_t locCount = 0;
 
@@ -634,7 +705,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             // Built-in arrayed input/output
             const uint32_t builtInId = inOutMeta.Value;
 
-            if (m_shaderStage == ShaderStageVertex)
+            if (shaderStage == ShaderStageVertex)
             {
                 switch (builtInId)
                 {
@@ -642,14 +713,14 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         const uint32_t elemCount = pInOutTy->getArrayNumElements();
                         LLPC_ASSERT(elemCount <= MaxClipCullDistanceCount);
-                        m_pResUsage->builtInUsage.vs.clipDistance = elemCount;
+                        pResUsage->builtInUsage.vs.clipDistance = elemCount;
                         break;
                     }
                 case BuiltInCullDistance:
                     {
                         const uint32_t elemCount = pInOutTy->getArrayNumElements();
                         LLPC_ASSERT(elemCount <= MaxClipCullDistanceCount);
-                        m_pResUsage->builtInUsage.vs.cullDistance = elemCount;
+                        pResUsage->builtInUsage.vs.cullDistance = elemCount;
                         break;
                     }
                 default:
@@ -659,7 +730,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     }
                 }
             }
-            else if (m_shaderStage == ShaderStageTessControl)
+            else if (shaderStage == ShaderStageTessControl)
             {
                 switch (builtInId)
                 {
@@ -670,12 +741,12 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.tcs.clipDistanceIn = elemCount;
+                            pResUsage->builtInUsage.tcs.clipDistanceIn = elemCount;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.tcs.clipDistance = elemCount;
+                            pResUsage->builtInUsage.tcs.clipDistance = elemCount;
                         }
                         break;
                     }
@@ -686,23 +757,23 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.tcs.cullDistanceIn = elemCount;
+                            pResUsage->builtInUsage.tcs.cullDistanceIn = elemCount;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.tcs.cullDistance = elemCount;
+                            pResUsage->builtInUsage.tcs.cullDistance = elemCount;
                         }
                         break;
                     }
                 case BuiltInTessLevelOuter:
                     {
-                        m_pResUsage->builtInUsage.tcs.tessLevelOuter = true;
+                        pResUsage->builtInUsage.tcs.tessLevelOuter = true;
                         break;
                     }
                 case BuiltInTessLevelInner:
                     {
-                        m_pResUsage->builtInUsage.tcs.tessLevelInner = true;
+                        pResUsage->builtInUsage.tcs.tessLevelInner = true;
                         break;
                     }
                 case BuiltInPerVertex:
@@ -717,7 +788,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     }
                 }
             }
-            else if (m_shaderStage == ShaderStageTessEval)
+            else if (shaderStage == ShaderStageTessEval)
             {
                 switch (builtInId)
                 {
@@ -728,12 +799,12 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.tes.clipDistanceIn = elemCount;
+                            pResUsage->builtInUsage.tes.clipDistanceIn = elemCount;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.tes.clipDistance = elemCount;
+                            pResUsage->builtInUsage.tes.clipDistance = elemCount;
                         }
                         break;
                     }
@@ -744,23 +815,23 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.tes.cullDistanceIn = elemCount;
+                            pResUsage->builtInUsage.tes.cullDistanceIn = elemCount;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.tes.cullDistance = elemCount;
+                            pResUsage->builtInUsage.tes.cullDistance = elemCount;
                         }
                         break;
                     }
                 case BuiltInTessLevelOuter:
                     {
-                        m_pResUsage->builtInUsage.tes.tessLevelOuter = true;
+                        pResUsage->builtInUsage.tes.tessLevelOuter = true;
                         break;
                     }
                 case BuiltInTessLevelInner:
                     {
-                        m_pResUsage->builtInUsage.tes.tessLevelInner = true;
+                        pResUsage->builtInUsage.tes.tessLevelInner = true;
                         break;
                     }
                 case BuiltInPerVertex:
@@ -783,7 +854,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     }
                 }
             }
-            else if (m_shaderStage == ShaderStageGeometry)
+            else if (shaderStage == ShaderStageGeometry)
             {
                 switch (builtInId)
                 {
@@ -794,13 +865,12 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.gs.clipDistanceIn = elemCount;
+                            pResUsage->builtInUsage.gs.clipDistanceIn = elemCount;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.gs.clipDistance = elemCount;
-                            CollectGsOutputInfo(InvalidValue, BuiltInClipDistance, inOutMeta);
+                            pResUsage->builtInUsage.gs.clipDistance = elemCount;
                         }
                         break;
                     }
@@ -811,13 +881,12 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.gs.cullDistanceIn = elemCount;
+                            pResUsage->builtInUsage.gs.cullDistanceIn = elemCount;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.gs.cullDistance = elemCount;
-                            CollectGsOutputInfo(InvalidValue, BuiltInCullDistance, inOutMeta);
+                            pResUsage->builtInUsage.gs.cullDistance = elemCount;
                         }
                         break;
                     }
@@ -840,8 +909,13 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                         break;
                     }
                 }
+
+                if (addrSpace == SPIRAS_Output)
+                {
+                     CollectGsOutputInfo(pInOutTy, InvalidValue, inOutMeta);
+                }
             }
-            else if (m_shaderStage == ShaderStageFragment)
+            else if (shaderStage == ShaderStageFragment)
             {
                 switch (builtInId)
                 {
@@ -849,36 +923,36 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         const uint32_t elemCount = pInOutTy->getArrayNumElements();
                         LLPC_ASSERT(elemCount <= MaxClipCullDistanceCount);
-                        m_pResUsage->builtInUsage.fs.clipDistance = elemCount;
+                        pResUsage->builtInUsage.fs.clipDistance = elemCount;
 
                         // NOTE: gl_ClipDistance[] is emulated via general inputs. Those qualifiers therefore have to
                         // be marked as used.
-                        m_pResUsage->builtInUsage.fs.noperspective = true;
-                        m_pResUsage->builtInUsage.fs.center = true;
+                        pResUsage->builtInUsage.fs.noperspective = true;
+                        pResUsage->builtInUsage.fs.center = true;
                         break;
                     }
                 case BuiltInCullDistance:
                     {
                         const uint32_t elemCount = pInOutTy->getArrayNumElements();
                         LLPC_ASSERT(elemCount <= MaxClipCullDistanceCount);
-                        m_pResUsage->builtInUsage.fs.cullDistance = elemCount;
+                        pResUsage->builtInUsage.fs.cullDistance = elemCount;
 
                         // NOTE: gl_CullDistance[] is emulated via general inputs. Those qualifiers therefore have to
                         // be marked as used.
-                        m_pResUsage->builtInUsage.fs.noperspective = true;
-                        m_pResUsage->builtInUsage.fs.center = true;
+                        pResUsage->builtInUsage.fs.noperspective = true;
+                        pResUsage->builtInUsage.fs.center = true;
                         break;
                     }
                 case BuiltInSampleMask:
                     {
                         if (addrSpace == SPIRAS_Input)
                         {
-                            m_pResUsage->builtInUsage.fs.sampleMaskIn = true;
+                            pResUsage->builtInUsage.fs.sampleMaskIn = true;
                         }
                         else
                         {
                             LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                            m_pResUsage->builtInUsage.fs.sampleMask = true;
+                            pResUsage->builtInUsage.fs.sampleMask = true;
                         }
 
                         break;
@@ -907,17 +981,17 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             {
                 if (inOutMeta.PerPatch)
                 {
-                    LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
+                    LLPC_ASSERT(shaderStage == ShaderStageTessEval);
                     for (uint32_t i = 0; i < locCount; ++i)
                     {
-                        m_pResUsage->inOutUsage.perPatchInputLocMap[startLoc + i] = InvalidValue;
+                        pResUsage->inOutUsage.perPatchInputLocMap[startLoc + i] = InvalidValue;
                     }
                 }
                 else
                 {
                     for (uint32_t i = 0; i < locCount; ++i)
                     {
-                        m_pResUsage->inOutUsage.inputLocMap[startLoc + i] = InvalidValue;
+                        pResUsage->inOutUsage.inputLocMap[startLoc + i] = InvalidValue;
                     }
                 }
             }
@@ -927,71 +1001,71 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                 if (inOutMeta.PerPatch)
                 {
-                    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                    LLPC_ASSERT(shaderStage == ShaderStageTessControl);
                     for (uint32_t i = 0; i < locCount; ++i)
                     {
-                        m_pResUsage->inOutUsage.perPatchOutputLocMap[startLoc + i] = InvalidValue;
+                        pResUsage->inOutUsage.perPatchOutputLocMap[startLoc + i] = InvalidValue;
                     }
                 }
                 else
                 {
-                    if (m_shaderStage == ShaderStageGeometry)
+                    if (shaderStage == ShaderStageGeometry)
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            CollectGsOutputInfo(startLoc + i, InvalidValue, inOutMeta);
+                            CollectGsOutputInfo(pBaseTy, startLoc + i, inOutMeta);
                         }
                     }
                     else
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            m_pResUsage->inOutUsage.outputLocMap[startLoc + i] = InvalidValue;
+                            pResUsage->inOutUsage.outputLocMap[startLoc + i] = InvalidValue;
                         }
                     }
                 }
             }
 
             // Special stage-specific processing
-            if (m_shaderStage == ShaderStageVertex)
+            if (shaderStage == ShaderStageVertex)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
                     CollectVertexInputUsage(pBaseTy, (inOutMeta.Signedness != 0), startLoc, locCount);
                 }
             }
-            else if (m_shaderStage == ShaderStageFragment)
+            else if (shaderStage == ShaderStageFragment)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
                     // Collect interpolation info
                     if (inOutMeta.InterpMode == InterpModeSmooth)
                     {
-                        m_pResUsage->builtInUsage.fs.smooth = true;
+                        pResUsage->builtInUsage.fs.smooth = true;
                     }
                     else if (inOutMeta.InterpMode == InterpModeFlat)
                     {
-                        m_pResUsage->builtInUsage.fs.flat = true;
+                        pResUsage->builtInUsage.fs.flat = true;
                     }
                     else
                     {
                         LLPC_ASSERT(inOutMeta.InterpMode == InterpModeNoPersp);
-                        m_pResUsage->builtInUsage.fs.noperspective = true;
+                        pResUsage->builtInUsage.fs.noperspective = true;
                     }
 
                     if (inOutMeta.InterpLoc == InterpLocCenter)
                     {
-                        m_pResUsage->builtInUsage.fs.center = true;
+                        pResUsage->builtInUsage.fs.center = true;
                     }
                     else if (inOutMeta.InterpLoc == InterpLocCentroid)
                     {
-                        m_pResUsage->builtInUsage.fs.centroid = true;
+                        pResUsage->builtInUsage.fs.centroid = true;
                     }
                     else
                     {
                         LLPC_ASSERT(inOutMeta.InterpLoc == InterpLocSample);
-                        m_pResUsage->builtInUsage.fs.sample = true;
-                        m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
+                        pResUsage->builtInUsage.fs.sample = true;
+                        pResUsage->builtInUsage.fs.runAtSampleRate = true;
                     }
                 }
             }
@@ -1005,7 +1079,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         {
             auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
             auto pMemberMeta = cast<Constant>(pInOutMeta->getOperand(memberIdx));
-            CollectInOutUsage(pMemberTy, pMemberMeta, addrSpace); // Collect usages for structure member
+            CollectInOutUsage(shaderStage, pMemberTy, pMemberMeta, addrSpace); // Collect usages for structure member
         }
     }
     else
@@ -1019,20 +1093,20 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         if (inOutMeta.IsXfb)
         {
             LLPC_ASSERT(inOutMeta.XfbBuffer < MaxTransformFeedbackBuffers);
-            m_pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer] = inOutMeta.XfbStride;
+            pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer] = inOutMeta.XfbStride;
 
             if (inOutMeta.XfbStride <= inOutMeta.XfbOffset)
             {
                 uint32_t elemCount = pInOutTy->isVectorTy() ? pInOutTy->getVectorNumElements() : 1;
                 uint32_t inOutTySize = elemCount * pInOutTy->getScalarSizeInBits() / 8;
-                m_pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer]
+                pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer]
                     = RoundUpToMultiple(uint32_t(inOutMeta.XfbOffset) + inOutTySize, 4u);
             }
 
-            m_pResUsage->inOutUsage.enableXfb = (m_pResUsage->inOutUsage.enableXfb || (inOutMeta.XfbStride > 0));
+            pResUsage->inOutUsage.enableXfb = (pResUsage->inOutUsage.enableXfb || (inOutMeta.XfbStride > 0));
 
             LLPC_ASSERT(inOutMeta.StreamId < MaxGsStreams);
-            m_pResUsage->inOutUsage.streamXfbBuffers[inOutMeta.StreamId] = 1 << (inOutMeta.XfbBuffer);
+            pResUsage->inOutUsage.streamXfbBuffers[inOutMeta.StreamId] = 1 << (inOutMeta.XfbBuffer);
         }
 
         if (inOutMeta.IsBuiltIn)
@@ -1040,444 +1114,443 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             // Built-in input/output
             const uint32_t builtInId = inOutMeta.Value;
 
-            if (m_shaderStage == ShaderStageVertex)
+            if (shaderStage == ShaderStageVertex)
             {
                 switch (builtInId)
                 {
                 case BuiltInVertexIndex:
-                    m_pResUsage->builtInUsage.vs.vertexIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseVertex = true;
+                    pResUsage->builtInUsage.vs.vertexIndex = true;
+                    pResUsage->builtInUsage.vs.baseVertex = true;
                     break;
                 case BuiltInInstanceIndex:
-                    m_pResUsage->builtInUsage.vs.instanceIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseInstance = true;
+                    pResUsage->builtInUsage.vs.instanceIndex = true;
+                    pResUsage->builtInUsage.vs.baseInstance = true;
                     break;
                 case BuiltInBaseVertex:
-                    m_pResUsage->builtInUsage.vs.baseVertex = true;
+                    pResUsage->builtInUsage.vs.baseVertex = true;
                     break;
                 case BuiltInBaseInstance:
-                    m_pResUsage->builtInUsage.vs.baseInstance = true;
+                    pResUsage->builtInUsage.vs.baseInstance = true;
                     break;
                 case BuiltInDrawIndex:
-                    m_pResUsage->builtInUsage.vs.drawIndex = true;
+                    pResUsage->builtInUsage.vs.drawIndex = true;
                     break;
                 case BuiltInPosition:
-                    m_pResUsage->builtInUsage.vs.position = true;
+                    pResUsage->builtInUsage.vs.position = true;
                     break;
                 case BuiltInPointSize:
-                    m_pResUsage->builtInUsage.vs.pointSize = true;
+                    pResUsage->builtInUsage.vs.pointSize = true;
                     break;
                 case BuiltInViewportIndex:
-                    m_pResUsage->builtInUsage.vs.viewportIndex = true;
+                    pResUsage->builtInUsage.vs.viewportIndex = true;
                     break;
                 case BuiltInLayer:
-                    m_pResUsage->builtInUsage.vs.layer = true;
+                    pResUsage->builtInUsage.vs.layer = true;
                     break;
                 case BuiltInViewIndex:
-                    m_pResUsage->builtInUsage.vs.viewIndex = true;
+                    pResUsage->builtInUsage.vs.viewIndex = true;
                     break;
                 case BuiltInSubgroupSize:
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupLocalInvocationId:
-                    m_pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
                     break;
                 case BuiltInSubgroupEqMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupEqMask = true;
+                    pResUsage->builtInUsage.common.subgroupEqMask = true;
                     break;
                 case BuiltInSubgroupGeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGeMask = true;
+                    pResUsage->builtInUsage.common.subgroupGeMask = true;
                     break;
                 case BuiltInSubgroupGtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGtMask = true;
+                    pResUsage->builtInUsage.common.subgroupGtMask = true;
                     break;
                 case BuiltInSubgroupLeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLeMask = true;
+                    pResUsage->builtInUsage.common.subgroupLeMask = true;
                     break;
                 case BuiltInSubgroupLtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLtMask = true;
+                    pResUsage->builtInUsage.common.subgroupLtMask = true;
                     break;
                 case BuiltInDeviceIndex:
-                    m_pResUsage->builtInUsage.common.deviceIndex = true;
+                    pResUsage->builtInUsage.common.deviceIndex = true;
                     break;
                 default:
                     LLPC_NEVER_CALLED();
                     break;
                 }
             }
-            else if (m_shaderStage == ShaderStageTessControl)
+            else if (shaderStage == ShaderStageTessControl)
             {
                 switch (builtInId)
                 {
                 case BuiltInPosition:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.tcs.positionIn = true;
+                        pResUsage->builtInUsage.tcs.positionIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.tcs.position = true;
+                        pResUsage->builtInUsage.tcs.position = true;
                     }
                     break;
                 case BuiltInPointSize:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.tcs.pointSizeIn = true;
+                        pResUsage->builtInUsage.tcs.pointSizeIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.tcs.pointSize = true;
+                        pResUsage->builtInUsage.tcs.pointSize = true;
                     }
                     break;
                 case BuiltInPatchVertices:
-                    m_pResUsage->builtInUsage.tcs.patchVertices = true;
+                    pResUsage->builtInUsage.tcs.patchVertices = true;
                     break;
                 case BuiltInInvocationId:
-                    m_pResUsage->builtInUsage.tcs.invocationId = true;
+                    pResUsage->builtInUsage.tcs.invocationId = true;
                     break;
                 case BuiltInPrimitiveId:
-                    m_pResUsage->builtInUsage.tcs.primitiveId = true;
+                    pResUsage->builtInUsage.tcs.primitiveId = true;
                     break;
                 case BuiltInSubgroupSize:
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupLocalInvocationId:
-                    m_pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
                     break;
                 case BuiltInSubgroupEqMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupEqMask = true;
+                    pResUsage->builtInUsage.common.subgroupEqMask = true;
                     break;
                 case BuiltInSubgroupGeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGeMask = true;
+                    pResUsage->builtInUsage.common.subgroupGeMask = true;
                     break;
                 case BuiltInSubgroupGtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGtMask = true;
+                    pResUsage->builtInUsage.common.subgroupGtMask = true;
                     break;
                 case BuiltInSubgroupLeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLeMask = true;
+                    pResUsage->builtInUsage.common.subgroupLeMask = true;
                     break;
                 case BuiltInSubgroupLtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLtMask = true;
+                    pResUsage->builtInUsage.common.subgroupLtMask = true;
                     break;
                 case BuiltInDeviceIndex:
-                    m_pResUsage->builtInUsage.common.deviceIndex = true;
+                    pResUsage->builtInUsage.common.deviceIndex = true;
                     break;
                 default:
                     LLPC_NEVER_CALLED();
                     break;
                 }
             }
-            else if (m_shaderStage == ShaderStageTessEval)
+            else if (shaderStage == ShaderStageTessEval)
             {
                 switch (builtInId)
                 {
                 case BuiltInPosition:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.tes.positionIn = true;
+                        pResUsage->builtInUsage.tes.positionIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.tes.position = true;
+                        pResUsage->builtInUsage.tes.position = true;
                     }
                     break;
                 case BuiltInPointSize:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.tes.pointSizeIn = true;
+                        pResUsage->builtInUsage.tes.pointSizeIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.tes.pointSize = true;
+                        pResUsage->builtInUsage.tes.pointSize = true;
                     }
                     break;
                 case BuiltInPatchVertices:
-                    m_pResUsage->builtInUsage.tes.patchVertices = true;
+                    pResUsage->builtInUsage.tes.patchVertices = true;
                     break;
                 case BuiltInPrimitiveId:
-                    m_pResUsage->builtInUsage.tes.primitiveId = true;
+                    pResUsage->builtInUsage.tes.primitiveId = true;
                     break;
                 case BuiltInTessCoord:
-                    m_pResUsage->builtInUsage.tes.tessCoord = true;
+                    pResUsage->builtInUsage.tes.tessCoord = true;
                     break;
                 case BuiltInViewportIndex:
-                    m_pResUsage->builtInUsage.tes.viewportIndex = true;
+                    pResUsage->builtInUsage.tes.viewportIndex = true;
                     break;
                 case BuiltInLayer:
-                    m_pResUsage->builtInUsage.tes.layer = true;
+                    pResUsage->builtInUsage.tes.layer = true;
                     break;
                 case BuiltInViewIndex:
-                    m_pResUsage->builtInUsage.tes.viewIndex = true;
+                    pResUsage->builtInUsage.tes.viewIndex = true;
                     break;
                 case BuiltInSubgroupSize:
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupLocalInvocationId:
-                    m_pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
                     break;
                 case BuiltInSubgroupEqMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupEqMask = true;
+                    pResUsage->builtInUsage.common.subgroupEqMask = true;
                     break;
                 case BuiltInSubgroupGeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGeMask = true;
+                    pResUsage->builtInUsage.common.subgroupGeMask = true;
                     break;
                 case BuiltInSubgroupGtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGtMask = true;
+                    pResUsage->builtInUsage.common.subgroupGtMask = true;
                     break;
                 case BuiltInSubgroupLeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLeMask = true;
+                    pResUsage->builtInUsage.common.subgroupLeMask = true;
                     break;
                 case BuiltInSubgroupLtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLtMask = true;
+                    pResUsage->builtInUsage.common.subgroupLtMask = true;
                     break;
                 case BuiltInDeviceIndex:
-                    m_pResUsage->builtInUsage.common.deviceIndex = true;
+                    pResUsage->builtInUsage.common.deviceIndex = true;
                     break;
                 default:
                     LLPC_NEVER_CALLED();
                     break;
                 }
             }
-            else if (m_shaderStage == ShaderStageGeometry)
+            else if (shaderStage == ShaderStageGeometry)
             {
                 switch (builtInId)
                 {
                 case BuiltInPosition:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.gs.positionIn = true;
+                        pResUsage->builtInUsage.gs.positionIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.gs.position = true;
-                        CollectGsOutputInfo(InvalidValue, BuiltInPosition, inOutMeta);
+                        pResUsage->builtInUsage.gs.position = true;
                     }
                     break;
                 case BuiltInPointSize:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.gs.pointSizeIn = true;
+                        pResUsage->builtInUsage.gs.pointSizeIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.gs.pointSize = true;
-                        CollectGsOutputInfo(InvalidValue, BuiltInPointSize, inOutMeta);
+                        pResUsage->builtInUsage.gs.pointSize = true;
                     }
                     break;
                 case BuiltInInvocationId:
-                    m_pResUsage->builtInUsage.gs.invocationId = true;
+                    pResUsage->builtInUsage.gs.invocationId = true;
                     break;
                 case BuiltInViewportIndex:
-                    m_pResUsage->builtInUsage.gs.viewportIndex = true;
-                    CollectGsOutputInfo(InvalidValue, BuiltInViewportIndex, inOutMeta);
+                    pResUsage->builtInUsage.gs.viewportIndex = true;
                     break;
                 case BuiltInLayer:
-                    m_pResUsage->builtInUsage.gs.layer = true;
-                    CollectGsOutputInfo(InvalidValue, BuiltInLayer, inOutMeta);
+                    pResUsage->builtInUsage.gs.layer = true;
                     break;
                 case BuiltInViewIndex:
-                    m_pResUsage->builtInUsage.gs.viewIndex = true;
-                    CollectGsOutputInfo(InvalidValue, BuiltInViewIndex, inOutMeta);
+                    pResUsage->builtInUsage.gs.viewIndex = true;
                     break;
                 case BuiltInPrimitiveId:
                     if (addrSpace == SPIRAS_Input)
                     {
-                        m_pResUsage->builtInUsage.gs.primitiveIdIn = true;
+                        pResUsage->builtInUsage.gs.primitiveIdIn = true;
                     }
                     else
                     {
                         LLPC_ASSERT(addrSpace == SPIRAS_Output);
-                        m_pResUsage->builtInUsage.gs.primitiveId = true;
-                        CollectGsOutputInfo(InvalidValue, BuiltInPrimitiveId, inOutMeta);
+                        pResUsage->builtInUsage.gs.primitiveId = true;
                     }
                     break;
                 case BuiltInSubgroupSize:
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupLocalInvocationId:
-                    m_pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
                     break;
                 case BuiltInSubgroupEqMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupEqMask = true;
+                    pResUsage->builtInUsage.common.subgroupEqMask = true;
                     break;
                 case BuiltInSubgroupGeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGeMask = true;
+                    pResUsage->builtInUsage.common.subgroupGeMask = true;
                     break;
                 case BuiltInSubgroupGtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGtMask = true;
+                    pResUsage->builtInUsage.common.subgroupGtMask = true;
                     break;
                 case BuiltInSubgroupLeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLeMask = true;
+                    pResUsage->builtInUsage.common.subgroupLeMask = true;
                     break;
                 case BuiltInSubgroupLtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLtMask = true;
+                    pResUsage->builtInUsage.common.subgroupLtMask = true;
                     break;
                 case BuiltInDeviceIndex:
-                    m_pResUsage->builtInUsage.common.deviceIndex = true;
+                    pResUsage->builtInUsage.common.deviceIndex = true;
                     break;
                 default:
                     LLPC_NEVER_CALLED();
                     break;
                 }
+
+                if (addrSpace == SPIRAS_Output)
+                {
+                    CollectGsOutputInfo(pInOutTy, InvalidValue, inOutMeta);
+                }
             }
-            else if (m_shaderStage == ShaderStageFragment)
+            else if (shaderStage == ShaderStageFragment)
             {
                 switch (builtInId)
                 {
                 case BuiltInFragCoord:
-                    m_pResUsage->builtInUsage.fs.fragCoord = true;
+                    pResUsage->builtInUsage.fs.fragCoord = true;
                     break;
                 case BuiltInFrontFacing:
-                    m_pResUsage->builtInUsage.fs.frontFacing = true;
+                    pResUsage->builtInUsage.fs.frontFacing = true;
                     break;
                 case BuiltInPointCoord:
-                    m_pResUsage->builtInUsage.fs.pointCoord = true;
+                    pResUsage->builtInUsage.fs.pointCoord = true;
 
                     // NOTE: gl_PointCoord is emulated via a general input. Those qualifiers therefore have to
                     // be marked as used.
-                    m_pResUsage->builtInUsage.fs.smooth = true;
-                    m_pResUsage->builtInUsage.fs.center = true;
+                    pResUsage->builtInUsage.fs.smooth = true;
+                    pResUsage->builtInUsage.fs.center = true;
                     break;
                 case BuiltInPrimitiveId:
-                    m_pResUsage->builtInUsage.fs.primitiveId = true;
+                    pResUsage->builtInUsage.fs.primitiveId = true;
                     break;
                 case BuiltInSampleId:
-                    m_pResUsage->builtInUsage.fs.sampleId = true;
-                    m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
+                    pResUsage->builtInUsage.fs.sampleId = true;
+                    pResUsage->builtInUsage.fs.runAtSampleRate = true;
                     break;
                 case BuiltInSamplePosition:
-                    m_pResUsage->builtInUsage.fs.samplePosition = true;
+                    pResUsage->builtInUsage.fs.samplePosition = true;
                     // NOTE: gl_SamplePostion is derived from gl_SampleID
-                    m_pResUsage->builtInUsage.fs.sampleId = true;
-                    m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
+                    pResUsage->builtInUsage.fs.sampleId = true;
+                    pResUsage->builtInUsage.fs.runAtSampleRate = true;
                     break;
                 case BuiltInLayer:
-                    m_pResUsage->builtInUsage.fs.layer = true;
+                    pResUsage->builtInUsage.fs.layer = true;
                     break;
                 case BuiltInViewportIndex:
-                    m_pResUsage->builtInUsage.fs.viewportIndex = true;
+                    pResUsage->builtInUsage.fs.viewportIndex = true;
                     break;
                 case BuiltInHelperInvocation:
-                    m_pResUsage->builtInUsage.fs.helperInvocation = true;
+                    pResUsage->builtInUsage.fs.helperInvocation = true;
                     break;
                 case BuiltInFragDepth:
-                    m_pResUsage->builtInUsage.fs.fragDepth = true;
+                    pResUsage->builtInUsage.fs.fragDepth = true;
                     break;
                 case BuiltInFragStencilRefEXT:
-                    m_pResUsage->builtInUsage.fs.fragStencilRef = true;
+                    pResUsage->builtInUsage.fs.fragStencilRef = true;
                     break;
                 case BuiltInViewIndex:
-                    m_pResUsage->builtInUsage.fs.viewIndex = true;
+                    pResUsage->builtInUsage.fs.viewIndex = true;
                     break;
                 case BuiltInBaryCoordNoPerspAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordNoPersp = true;
+                    pResUsage->builtInUsage.fs.baryCoordNoPersp = true;
                     break;
                 case BuiltInBaryCoordNoPerspCentroidAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordNoPerspCentroid = true;
+                    pResUsage->builtInUsage.fs.baryCoordNoPerspCentroid = true;
                     break;
                 case BuiltInBaryCoordNoPerspSampleAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordNoPerspSample = true;
+                    pResUsage->builtInUsage.fs.baryCoordNoPerspSample = true;
                     break;
                 case BuiltInBaryCoordSmoothAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordSmooth = true;
+                    pResUsage->builtInUsage.fs.baryCoordSmooth = true;
                     break;
                 case BuiltInBaryCoordSmoothCentroidAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordSmoothCentroid = true;
+                    pResUsage->builtInUsage.fs.baryCoordSmoothCentroid = true;
                     break;
                 case BuiltInBaryCoordSmoothSampleAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordSmoothSample = true;
+                    pResUsage->builtInUsage.fs.baryCoordSmoothSample = true;
                     break;
                 case BuiltInBaryCoordPullModelAMD:
-                    m_pResUsage->builtInUsage.fs.baryCoordPullModel = true;
+                    pResUsage->builtInUsage.fs.baryCoordPullModel = true;
                     break;
                 case BuiltInSubgroupSize:
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupLocalInvocationId:
-                    m_pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
                     break;
                 case BuiltInSubgroupEqMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupEqMask = true;
+                    pResUsage->builtInUsage.common.subgroupEqMask = true;
                     break;
                 case BuiltInSubgroupGeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGeMask = true;
+                    pResUsage->builtInUsage.common.subgroupGeMask = true;
                     break;
                 case BuiltInSubgroupGtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGtMask = true;
+                    pResUsage->builtInUsage.common.subgroupGtMask = true;
                     break;
                 case BuiltInSubgroupLeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLeMask = true;
+                    pResUsage->builtInUsage.common.subgroupLeMask = true;
                     break;
                 case BuiltInSubgroupLtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLtMask = true;
+                    pResUsage->builtInUsage.common.subgroupLtMask = true;
                     break;
                 case BuiltInDeviceIndex:
-                    m_pResUsage->builtInUsage.common.deviceIndex = true;
+                    pResUsage->builtInUsage.common.deviceIndex = true;
                     break;
                 default:
                     LLPC_NEVER_CALLED();
                     break;
                 }
             }
-            else if (m_shaderStage == ShaderStageCompute)
+            else if (shaderStage == ShaderStageCompute)
             {
                 switch (builtInId)
                 {
                 case BuiltInLocalInvocationId:
-                    m_pResUsage->builtInUsage.cs.localInvocationId = true;
+                    pResUsage->builtInUsage.cs.localInvocationId = true;
                     break;
                 case BuiltInWorkgroupId:
-                    m_pResUsage->builtInUsage.cs.workgroupId = true;
+                    pResUsage->builtInUsage.cs.workgroupId = true;
                     break;
                 case BuiltInNumWorkgroups:
-                    m_pResUsage->builtInUsage.cs.numWorkgroups = true;
+                    pResUsage->builtInUsage.cs.numWorkgroups = true;
                     break;
                 case BuiltInGlobalInvocationId:
-                    m_pResUsage->builtInUsage.cs.workgroupId = true;
-                    m_pResUsage->builtInUsage.cs.localInvocationId = true;
+                    pResUsage->builtInUsage.cs.workgroupId = true;
+                    pResUsage->builtInUsage.cs.localInvocationId = true;
                     break;
                 case BuiltInLocalInvocationIndex:
-                    m_pResUsage->builtInUsage.cs.workgroupId = true;
-                    m_pResUsage->builtInUsage.cs.localInvocationId = true;
+                    pResUsage->builtInUsage.cs.workgroupId = true;
+                    pResUsage->builtInUsage.cs.localInvocationId = true;
                     break;
                 case BuiltInNumSubgroups:
-                    m_pResUsage->builtInUsage.cs.numSubgroups = true;
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.cs.numSubgroups = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupId:
-                    m_pResUsage->builtInUsage.cs.workgroupId = true;
-                    m_pResUsage->builtInUsage.cs.localInvocationId = true;
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.cs.workgroupId = true;
+                    pResUsage->builtInUsage.cs.localInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupSize:
-                    m_pResUsage->builtInUsage.common.subgroupSize = true;
+                    pResUsage->builtInUsage.common.subgroupSize = true;
                     break;
                 case BuiltInSubgroupLocalInvocationId:
-                    m_pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
+                    pResUsage->builtInUsage.common.subgroupLocalInvocationId = true;
                     break;
                 case BuiltInSubgroupEqMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupEqMask = true;
+                    pResUsage->builtInUsage.common.subgroupEqMask = true;
                     break;
                 case BuiltInSubgroupGeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGeMask = true;
+                    pResUsage->builtInUsage.common.subgroupGeMask = true;
                     break;
                 case BuiltInSubgroupGtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupGtMask = true;
+                    pResUsage->builtInUsage.common.subgroupGtMask = true;
                     break;
                 case BuiltInSubgroupLeMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLeMask = true;
+                    pResUsage->builtInUsage.common.subgroupLeMask = true;
                     break;
                 case BuiltInSubgroupLtMaskKHR:
-                    m_pResUsage->builtInUsage.common.subgroupLtMask = true;
+                    pResUsage->builtInUsage.common.subgroupLtMask = true;
                     break;
                 case BuiltInDeviceIndex:
-                    m_pResUsage->builtInUsage.common.deviceIndex = true;
+                    pResUsage->builtInUsage.common.deviceIndex = true;
                     break;
                 default:
                     LLPC_NEVER_CALLED();
@@ -1502,17 +1575,17 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             {
                 if (inOutMeta.PerPatch)
                 {
-                    LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
+                    LLPC_ASSERT(shaderStage == ShaderStageTessEval);
                     for (uint32_t i = 0; i < locCount; ++i)
                     {
-                        m_pResUsage->inOutUsage.perPatchInputLocMap[startLoc + i] = InvalidValue;
+                        pResUsage->inOutUsage.perPatchInputLocMap[startLoc + i] = InvalidValue;
                     }
                 }
                 else
                 {
                     for (uint32_t i = 0; i < locCount; ++i)
                     {
-                        m_pResUsage->inOutUsage.inputLocMap[startLoc + i] = InvalidValue;
+                        pResUsage->inOutUsage.inputLocMap[startLoc + i] = InvalidValue;
                     }
                 }
             }
@@ -1522,79 +1595,79 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                 if (inOutMeta.PerPatch)
                 {
-                    LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
+                    LLPC_ASSERT(shaderStage == ShaderStageTessControl);
                     for (uint32_t i = 0; i < locCount; ++i)
                     {
-                        m_pResUsage->inOutUsage.perPatchOutputLocMap[startLoc + i] = InvalidValue;
+                        pResUsage->inOutUsage.perPatchOutputLocMap[startLoc + i] = InvalidValue;
                     }
                 }
                 else
                 {
-                    if (m_shaderStage == ShaderStageGeometry)
+                    if (shaderStage == ShaderStageGeometry)
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            CollectGsOutputInfo(startLoc + i, InvalidValue, inOutMeta);
+                            CollectGsOutputInfo(pBaseTy, startLoc + i, inOutMeta);
                         }
                     }
                     else
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            m_pResUsage->inOutUsage.outputLocMap[startLoc + i] = InvalidValue;
+                            pResUsage->inOutUsage.outputLocMap[startLoc + i] = InvalidValue;
                         }
                     }
                 }
             }
 
             // Special stage-specific processing
-            if (m_shaderStage == ShaderStageVertex)
+            if (shaderStage == ShaderStageVertex)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
                     CollectVertexInputUsage(pBaseTy, (inOutMeta.Signedness != 0), startLoc, locCount);
                 }
             }
-            else if (m_shaderStage == ShaderStageFragment)
+            else if (shaderStage == ShaderStageFragment)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
                     // Collect interpolation info
                     if (inOutMeta.InterpMode == InterpModeSmooth)
                     {
-                        m_pResUsage->builtInUsage.fs.smooth = true;
+                        pResUsage->builtInUsage.fs.smooth = true;
                     }
                     else if (inOutMeta.InterpMode == InterpModeFlat)
                     {
-                        m_pResUsage->builtInUsage.fs.flat = true;
+                        pResUsage->builtInUsage.fs.flat = true;
                     }
                     else if (inOutMeta.InterpMode == InterpModeNoPersp)
                     {
-                        m_pResUsage->builtInUsage.fs.noperspective = true;
+                        pResUsage->builtInUsage.fs.noperspective = true;
                     }
                     else
                     {
                         LLPC_ASSERT(inOutMeta.InterpMode == InterpModeCustom);
-                        m_pResUsage->builtInUsage.fs.custom = true;
+                        pResUsage->builtInUsage.fs.custom = true;
                     }
 
                     if (inOutMeta.InterpLoc == InterpLocCenter)
                     {
-                        m_pResUsage->builtInUsage.fs.center = true;
+                        pResUsage->builtInUsage.fs.center = true;
                     }
                     else if (inOutMeta.InterpLoc == InterpLocCentroid)
                     {
-                        m_pResUsage->builtInUsage.fs.centroid = true;
+                        pResUsage->builtInUsage.fs.centroid = true;
                     }
                     else if (inOutMeta.InterpLoc == InterpLocSample)
                     {
-                        m_pResUsage->builtInUsage.fs.sample = true;
-                        m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
+                        pResUsage->builtInUsage.fs.sample = true;
+                        pResUsage->builtInUsage.fs.runAtSampleRate = true;
                     }
                     else
                     {
                         LLPC_ASSERT(inOutMeta.InterpLoc == InterpLocCustom);
-                        m_pResUsage->builtInUsage.fs.custom = true;
+                        pResUsage->builtInUsage.fs.custom = true;
                     }
                 }
                 else
@@ -1641,7 +1714,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                         LLPC_NEVER_CALLED();
                     }
 
-                    m_pResUsage->inOutUsage.fs.outputTypes[startLoc] = basicTy;
+                    pResUsage->inOutUsage.fs.outputTypes[startLoc] = basicTy;
 
                     if (m_pContext->NeedAutoLayoutDesc())
                     {
@@ -1652,7 +1725,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                         LLPC_ASSERT(compIdx + compCount <= 4);
 
                         const uint32_t channelMask = (((1 << compCount) - 1) << compIdx);
-                        m_pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << 4 * startLoc);
+                        pResUsage->inOutUsage.fs.cbShaderMask |= (channelMask << 4 * startLoc);
                     }
                 }
             }
@@ -1668,6 +1741,7 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
     uint32_t    startLoc,   // Start location
     uint32_t    locCount)   // Count of locations
 {
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
     auto bitWidth = pVertexTy->getScalarSizeInBits();
     auto pCompTy  = pVertexTy->isVectorTy() ? pVertexTy->getVectorElementType() : pVertexTy;
 
@@ -1712,7 +1786,7 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
         LLPC_NEVER_CALLED();
     }
 
-    auto& vsInputTypes = m_pResUsage->inOutUsage.vs.inputTypes;
+    auto& vsInputTypes = pResUsage->inOutUsage.vs.inputTypes;
     while ((startLoc + locCount) > vsInputTypes.size())
     {
         vsInputTypes.push_back(BasicType::Unknown);
@@ -1727,29 +1801,140 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
 // =====================================================================================================================
 // Collects output info for geometry shader.
 void SpirvLowerResourceCollect::CollectGsOutputInfo(
-    uint32_t                   location,    // Location of output
-    uint32_t                   builtIn,     // ID of the built-in output
-    const ShaderInOutMetadata& inOutMeta)   // [out] Metadata of the built-in output
+    const Type*                pOutputTy,   // [in] Type of this output
+    uint32_t                   location,    // Location of this output
+    const ShaderInOutMetadata& outputMeta)  // [in] Metadata of this output
 {
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+
+    Type* pBaseTy = const_cast<Type*>(pOutputTy);
+    if (pBaseTy->isArrayTy())
+    {
+        pBaseTy = pBaseTy->getArrayElementType();
+    }
+    LLPC_ASSERT(pBaseTy->isSingleValueType());
+
     XfbOutInfo xfbOutInfo = {};
-    xfbOutInfo.xfbBuffer = inOutMeta.XfbBuffer;
-    xfbOutInfo.xfbOffset = inOutMeta.XfbOffset;
+    xfbOutInfo.xfbBuffer = outputMeta.XfbBuffer;
+    xfbOutInfo.xfbOffset = outputMeta.XfbOffset;
+    xfbOutInfo.is16bit   = (pBaseTy->getScalarSizeInBits() == 16);
 
     GsOutLocInfo outLocInfo = {};
-    bool isBuiltIn = (location == InvalidValue);
-    outLocInfo.streamId = inOutMeta.StreamId;
-    outLocInfo.isBuiltIn = isBuiltIn;
-    outLocInfo.location = (isBuiltIn ? builtIn:location);
-    m_pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    outLocInfo.location     = (outputMeta.IsBuiltIn ? outputMeta.Value : location);
+    outLocInfo.isBuiltIn    = outputMeta.IsBuiltIn;
+    outLocInfo.streamId     = outputMeta.StreamId;
 
-    if (isBuiltIn)
+    pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+
+    if (outputMeta.IsBuiltIn)
     {
-        // Collect raster stream Id for the export GL builtIn value
-        m_pResUsage->inOutUsage.gs.rasterStream = inOutMeta.StreamId;
+        // Collect raster stream ID for the export of built-ins
+        pResUsage->inOutUsage.gs.rasterStream = outputMeta.StreamId;
     }
     else
     {
-        m_pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = InvalidValue;
+        pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = InvalidValue;
+    }
+}
+
+// =====================================================================================================================
+// Calculate a mask of which shader stages reference the specified global
+uint32_t SpirvLowerResourceCollect::GetGlobalShaderUse(
+    GlobalValue* pGlobal)   // [in] Global variable
+{
+    uint32_t shaderUseMask = 0;
+
+    // Calculate which functions reference the specified global. We need to iteratively follow constant exprs.
+    std::set<Constant*> seenConstExprs;
+    SmallVector<Constant*, 8> constants;
+    constants.push_back(pGlobal);
+
+    for (uint32_t i = 0; i < constants.size(); ++i)
+    {
+        auto pConstant = constants[i];
+        for (auto pUser : pConstant->users())
+        {
+            auto pConstExprUser = dyn_cast<ConstantExpr>(pUser);
+            if (pConstExprUser != nullptr)
+            {
+                if (seenConstExprs.insert(pConstExprUser).second)
+                {
+                    constants.push_back(pConstExprUser);
+                }
+            }
+            else
+            {
+                shaderUseMask |= m_funcShaderUseMap[cast<Instruction>(pUser)->getParent()->getParent()];
+            }
+        }
+    }
+
+    LLVM_DEBUG(dbgs() << "Global " << pGlobal->getName() << " shader use: " << shaderUseMask << "\n");
+
+    return shaderUseMask;
+}
+
+// =====================================================================================================================
+// For each function, create a mask of which shader(s) it is used in
+//
+// This allows us to cope with the situation where a subfunction is used by more than one shader stage.
+void SpirvLowerResourceCollect::SetFunctionShaderUse()
+{
+    m_funcShaderUseMap.clear();
+
+    auto pCallGraph = &getAnalysis<CallGraphWrapperPass>().getCallGraph();
+
+    std::map<CallGraphNode*, uint32_t> callGraphNodeShaderUseMap;
+    std::queue<CallGraphNode*> callGraphNodes;
+    std::set<CallGraphNode*> callGraphNodeList;
+
+    // Add the shader entrypoints to the worklist, and initialize their masks.
+    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    {
+        auto shaderStage = ShaderStage(stage);
+        auto pEntryPoint = m_pPipelineShaders->GetEntryPoint(shaderStage);
+        if (pEntryPoint != nullptr)
+        {
+            auto pCallGraphNode = (*pCallGraph)[m_pPipelineShaders->GetEntryPoint(shaderStage)];
+            callGraphNodeShaderUseMap[pCallGraphNode] = 1U << shaderStage;
+            callGraphNodes.push(pCallGraphNode);
+            callGraphNodeList.insert(pCallGraphNode);
+        }
+    }
+
+    // Iterate until the queue is empty.
+    while (callGraphNodes.empty() == false)
+    {
+        auto pCallGraphNode = callGraphNodes.front();
+        callGraphNodes.pop();
+        callGraphNodeList.erase(pCallGraphNode);
+        // Visit other functions that this function calls.
+        auto calleeShaderUseMask = callGraphNodeShaderUseMap[pCallGraphNode];
+        for (auto calleeNodeIt : *pCallGraphNode)
+        {
+            CallGraphNode* pCalleeNode = calleeNodeIt.second;
+            auto& calleeMask = callGraphNodeShaderUseMap[pCalleeNode];
+            if ((calleeMask & calleeShaderUseMask) != calleeShaderUseMask)
+            {
+                // Propagate more shader use into callee node, and add it to the worklist if not already there.
+                calleeMask |= calleeShaderUseMask;
+                if (callGraphNodeList.insert(pCalleeNode).second)
+                {
+                    callGraphNodes.push(pCalleeNode);
+                }
+            }
+        }
+    }
+
+    // Set up funcShaderUse from callGraphNodeShaderUseMap.
+    for (auto shaderUseMapIt : callGraphNodeShaderUseMap)
+    {
+        auto pFunc = shaderUseMapIt.first->getFunction();
+        if ((pFunc != nullptr) && (pFunc->empty() == false))
+        {
+            LLVM_DEBUG(dbgs() << "Function: " << pFunc->getName() << ", shader use: " << shaderUseMapIt.second << "\n");
+            m_funcShaderUseMap[pFunc] = shaderUseMapIt.second;
+        }
     }
 }
 
@@ -1757,5 +1942,5 @@ void SpirvLowerResourceCollect::CollectGsOutputInfo(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for resource collecting.
-INITIALIZE_PASS(SpirvLowerResourceCollect, "Spirv-lower-resource-collect",
+INITIALIZE_PASS(SpirvLowerResourceCollect, DEBUG_TYPE,
                 "Lower SPIR-V resource collecting", false, false)

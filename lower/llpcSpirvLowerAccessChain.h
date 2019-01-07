@@ -49,9 +49,6 @@ public:
     virtual bool runOnModule(llvm::Module& module);
     virtual void visitGetElementPtrInst(llvm::GetElementPtrInst& getElemPtrInst);
 
-    // Pass creator, creates the pass of SPIR-V lowering opertions for access chain
-    static llvm::ModulePass* Create() { return new SpirvLowerAccessChain(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

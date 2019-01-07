@@ -33,6 +33,7 @@
 #include "llvm/IR/InstVisitor.h"
 
 #include <unordered_set>
+#include "llpcPipelineShaders.h"
 #include "llpcSpirvLower.h"
 
 namespace Llpc
@@ -47,11 +48,14 @@ class SpirvLowerImageOp:
 public:
     SpirvLowerImageOp();
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitCallInst(llvm::CallInst& callInst);
+    void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+    }
 
-    // Pass creator, creates the pass of SPIR-V lowering opertions for image operations
-    static llvm::ModulePass* Create() { return new SpirvLowerImageOp(); }
+    virtual bool runOnModule(llvm::Module& module) override;
+    virtual void visitCallInst(llvm::CallInst& callInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -59,6 +63,8 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerImageOp);
+
+    void ProcessShader();
 
     void ExtractBindingInfo(llvm::LoadInst*     pLoadInst,
                             llvm::ConstantInt** ppDescSet,

@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include <fstream>
+#include <sstream>
 #include <stdarg.h>
 #include <sys/stat.h>
 
@@ -161,6 +162,16 @@ void VKAPI_CALL IPipelineDumper::DumpPipelineBinary(
     const BinaryData*        pPipelineBin) // [in] Pipeline binary (ELF)
 {
     PipelineDumper::DumpPipelineBinary(reinterpret_cast<PipelineDumpFile*>(pDumpFile), gfxIp, pPipelineBin);
+}
+
+// =====================================================================================================================
+// Dump extra info to pipeline file.
+void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(
+    void*                     pDumpFile,   // [in] The handle of pipeline dump file
+    const char*               pStr)        // [in] Extra string info to dump
+{
+    std::string str(pStr);
+    PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pDumpFile), &str);
 }
 
 // =====================================================================================================================
@@ -1026,8 +1037,11 @@ void OutputText(
 
         // Output text
         const char* pText = reinterpret_cast<const char*>(pData + startPos);
-        out << pText << lastChar;
-
+        out << pText;
+        if (lastChar != 0)
+        {
+            out << static_cast<char>(lastChar);
+        }
         // Restore last character
         const_cast<uint8_t*>(pData)[endPos - 1] = lastChar;
     }
@@ -1407,6 +1421,13 @@ OStream& operator<<(
                 ++symIdx;
                 startPos = endPos;
             }
+        }
+        else if (strncmp(pSection->pName, AmdGpuMetadataName, sizeof(AmdGpuMetadataName) - 1) == 0)
+        {
+            // Output text based sections
+            out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
+
+            OutputText(pSection->pData, 0, static_cast<uint32_t>(pSection->secHead.sh_size), out);
         }
         else
         {

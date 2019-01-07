@@ -59,6 +59,14 @@ extern TimeProfileResult g_timeProfileResult;
 char PassExternalLibLink::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the LLVM pass for linking external library of LLVM IR
+ModulePass* CreatePassExternalLibLink(
+    bool nativeOnly)    // Whether to only link native functions
+{
+    return new PassExternalLibLink(nativeOnly);
+}
+
+// =====================================================================================================================
 PassExternalLibLink::PassExternalLibLink(
     bool nativeOnly) // Whether to only link native functions
     :
@@ -179,5 +187,5 @@ bool PassExternalLibLink::runOnModule(
 
 // =====================================================================================================================
 // Initializes the LLVM pass for linking external libraries.
-INITIALIZE_PASS(PassExternalLibLink, "Pass-external-lib-link",
+INITIALIZE_PASS(PassExternalLibLink, DEBUG_TYPE,
                 "LLVM pass for linking external libraries", false, false)

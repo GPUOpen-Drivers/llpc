@@ -34,11 +34,10 @@
 
 #include <unordered_set>
 #include "llpcPatch.h"
+#include "llpcPipelineShaders.h"
 
 namespace Llpc
 {
-
-class PipelineShaders;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
@@ -57,9 +56,6 @@ public:
 
     virtual bool runOnModule(llvm::Module& module) override;
     virtual void visitCallInst(llvm::CallInst& callInst);
-
-    // Pass creator, creates the pass of LLVM patching opertions for resource collecting
-    static llvm::ModulePass* Create() { return new PatchResourceCollect(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 

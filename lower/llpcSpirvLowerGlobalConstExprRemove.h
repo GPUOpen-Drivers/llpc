@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,51 +24,37 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerDynIndex.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerDynIndex.
+ * @file  llpcSpirvLowerGlobalConstExprRemove.h
+ * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerGlobalConstExprRemove
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/InstVisitor.h"
-
-#include <unordered_set>
 #include "llpcSpirvLower.h"
 
 namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for dynamic index in access chain.
-class SpirvLowerDynIndex:
-    public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerDynIndex>
+// Pass to remove constant expressions that directly or indirectly involve global variables that are lowered in
+// SpirvLowerGlobal
+//
+// Global variable, inlcude general global variable, input and output is a special constant variable, so if
+// it is referenced by constant expression, we need translate constant expression to normal instruction first,
+// Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
+class SpirvLowerGlobalConstExprRemove : public SpirvLower
 {
 public:
-    SpirvLowerDynIndex();
+    static char ID;
+    SpirvLowerGlobalConstExprRemove() : SpirvLower(ID)
+    {
+        initializeSpirvLowerGlobalConstExprRemovePass(*llvm::PassRegistry::getPassRegistry());
+    }
 
-    virtual bool runOnModule(llvm::Module& module);
-    virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
+    bool runOnModule(llvm::Module& module) override;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerDynIndex);
-
-    bool NeedExpandDynamicIndex(llvm::GetElementPtrInst* pGetElemPtr,
-                                uint32_t*                pOperandIndex,
-                                uint32_t*                pDynIndexBound) const;
-    void ExpandLoadInst(llvm::LoadInst*                          pLoadInst,
-                        llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                        llvm::Value*                             pDynIndex);
-    void ExpandStoreInst(llvm::StoreInst*                         pStoreInst,
-                         llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
-                         llvm::Value*                             pDynIndex);
-
-    std::unordered_set<llvm::Instruction*> m_getElemPtrInsts;
-    std::unordered_set<llvm::Instruction*> m_loadInsts;
+    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerGlobalConstExprRemove);
 };
 
 } // Llpc

@@ -83,9 +83,6 @@ public:
     void moveAfter(llvm::Instruction& move, llvm::Instruction& after) const;
     void insertAfter(llvm::Instruction& insert, llvm::Instruction& after) const;
 
-    // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-    static llvm::FunctionPass* Create() { return new PatchPeepholeOpt(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass

@@ -53,15 +53,15 @@ void initializePatchAddrSpaceMutatePass(PassRegistry&);
 void initializePatchAutoLayoutDescPass(PassRegistry&);
 void initializePatchBufferOpPass(PassRegistry&);
 void initializePatchCopyShaderPass(PassRegistry&);
-void initializePatchDeadFuncRemovePass(PassRegistry&);
 void initializePatchDescriptorLoadPass(PassRegistry&);
 void initializePatchEntryPointMutatePass(PassRegistry&);
-void initializePatchExternalLibLinkPass(PassRegistry&);
 void initializePatchGroupOpPass(PassRegistry&);
 void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
-void initializePatchOptPass(PassRegistry&);
+void initializePatchIncludeLlvmIrPass(PassRegistry&);
+void initializePatchLoopUnrollInfoRectifyPass(PassRegistry&);
 void initializePatchNullFragShaderPass(PassRegistry&);
+void initializePatchPeepholeOptPass(PassRegistry&);
 void initializePatchPreparePipelineAbiPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);
 void initializePatchResourceCollectPass(PassRegistry&);
@@ -71,10 +71,43 @@ void initializePatchResourceCollectPass(PassRegistry&);
 namespace Llpc
 {
 
+// Initialize passes for patching
+inline static void InitializePatchPasses(
+    llvm::PassRegistry& passRegistry)   // Pass registry
+{
+  initializePatchAddrSpaceMutatePass(passRegistry);
+  initializePatchAutoLayoutDescPass(passRegistry);
+  initializePatchBufferOpPass(passRegistry);
+  initializePatchCopyShaderPass(passRegistry);
+  initializePatchDescriptorLoadPass(passRegistry);
+  initializePatchEntryPointMutatePass(passRegistry);
+  initializePatchGroupOpPass(passRegistry);
+  initializePatchImageOpPass(passRegistry);
+  initializePatchInOutImportExportPass(passRegistry);
+  initializePatchLoopUnrollInfoRectifyPass(passRegistry);
+  initializePatchNullFragShaderPass(passRegistry);
+  initializePatchPeepholeOptPass(passRegistry);
+  initializePatchPreparePipelineAbiPass(passRegistry);
+  initializePatchPushConstOpPass(passRegistry);
+  initializePatchResourceCollectPass(passRegistry);
+}
+
+llvm::ModulePass* CreatePatchAddrSpaceMutate();
 llvm::ModulePass* CreatePatchAutoLayoutDesc();
+llvm::ModulePass* CreatePatchDescriptorLoad();
+llvm::ModulePass* CreatePatchBufferOp();
 llvm::ModulePass* CreatePatchCopyShader();
+llvm::ModulePass* CreatePatchEntryPointMutate();
+llvm::ModulePass* CreatePatchGroupOp();
+llvm::ModulePass* CreatePatchImageOp();
+llvm::ModulePass* CreatePatchInOutImportExport();
+llvm::ModulePass* CreatePatchIncludeLlvmIr();
+llvm::FunctionPass* CreatePatchLoopUnrollInfoRectify();
 llvm::ModulePass* CreatePatchNullFragShader();
+llvm::FunctionPass* CreatePatchPeepholeOpt();
 llvm::ModulePass* CreatePatchPreparePipelineAbi();
+llvm::ModulePass* CreatePatchPushConstOp();
+llvm::ModulePass* CreatePatchResourceCollect();
 
 class Context;
 

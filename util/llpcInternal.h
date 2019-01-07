@@ -39,7 +39,7 @@
 #include "llpc.h"
 #include "llpcUtil.h"
 
-namespace llvm { class Module; }
+namespace llvm { class CallInst; }
 namespace Llpc { class Context; }
 
 // Internally defined SPIR-V semantics (internal-use)
@@ -66,8 +66,32 @@ static const ExecutionModel ExecutionModelCopyShader = static_cast<ExecutionMode
 
 } // spv
 
+namespace llvm
+{
+
+class PassRegistry;
+void initializePassDeadFuncRemovePass(PassRegistry&);
+void initializePassExternalLibLinkPass(PassRegistry&);
+void initializePassLoopInfoCollectPass(PassRegistry&);
+void initializePipelineShadersPass(PassRegistry&);
+
+} // llvm
+
 namespace Llpc
 {
+
+llvm::ModulePass* CreatePassDeadFuncRemove();
+llvm::ModulePass* CreatePassExternalLibLink(bool nativeOnly);
+
+// Initialize helper passes
+inline static void InitializeUtilPasses(
+    llvm::PassRegistry& passRegistry)   // Pass registry
+{
+    initializePassDeadFuncRemovePass(passRegistry);
+    initializePassExternalLibLinkPass(passRegistry);
+    initializePassLoopInfoCollectPass(passRegistry);
+    initializePipelineShadersPass(passRegistry);
+}
 
 namespace LlpcName
 {
@@ -84,6 +108,7 @@ namespace LlpcName
     const static char InputInterpEval[]               = "llpc.input.interpolate.evalij.";
     const static char BufferCallPrefix[]              = "llpc.buffer.";
     const static char BufferAtomic[]                  = "llpc.buffer.atomic.";
+    const static char BufferAtomicDesc[]              = "llpc.buffer.atomic.desc.";
     const static char BufferLoad[]                    = "llpc.buffer.load.";
     const static char BufferLoadDesc[]                = "llpc.buffer.load.desc.";
     const static char BufferLoadScalarAlignedDesc[]   = "llpc.buffer.load.scalar.aligned.desc.";
@@ -109,7 +134,6 @@ namespace LlpcName
     const static char DescriptorLoadInlineBuffer[]    = "llpc.descriptor.load.inlinebuffer";
     const static char DescriptorLoadTexelBuffer[]     = "llpc.descriptor.load.texelbuffer";
     const static char DescriptorLoadSpillTable[]      = "llpc.descriptor.load.spilltable";
-    const static char DescriptorLoadInternalBuffer[]  = "llpc.descriptor.load.internalbuffer";
 
     const static char ImageCallPrefix[]               = "llpc.image";
 
@@ -171,21 +195,21 @@ llvm::Function* GetEntryPoint(llvm::Module* pModule);
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
-llvm::Value* EmitCall(llvm::Module*                             pModule,
-                      llvm::StringRef                           funcName,
-                      llvm::Type*                               pRetTy,
-                      llvm::ArrayRef<llvm::Value *>             args,
-                      llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
-                      llvm::Instruction*                        pInsertPos);
+llvm::CallInst* EmitCall(llvm::Module*                             pModule,
+                         llvm::StringRef                           funcName,
+                         llvm::Type*                               pRetTy,
+                         llvm::ArrayRef<llvm::Value *>             args,
+                         llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
+                         llvm::Instruction*                        pInsertPos);
 
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
-llvm::Value* EmitCall(llvm::Module*                             pModule,
-                      llvm::StringRef                           funcName,
-                      llvm::Type*                               pRetTy,
-                      llvm::ArrayRef<llvm::Value *>             args,
-                      llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
-                      llvm::BasicBlock*                         pInsertAtEnd);
+llvm::CallInst* EmitCall(llvm::Module*                             pModule,
+                         llvm::StringRef                           funcName,
+                         llvm::Type*                               pRetTy,
+                         llvm::ArrayRef<llvm::Value *>             args,
+                         llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
+                         llvm::BasicBlock*                         pInsertAtEnd);
 
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
 void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);

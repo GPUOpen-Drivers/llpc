@@ -56,9 +56,6 @@ public:
 
     virtual bool runOnModule(llvm::Module& module) override;
 
-    // Pass creator, creates the pass of LLVM patching opertions for entry-point mutation
-    static llvm::ModulePass* Create() { return new PatchEntryPointMutate(); }
-
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
@@ -70,21 +67,7 @@ private:
 
     llvm::FunctionType* GenerateEntryPointType(uint64_t* pInRegMask) const;
 
-    llvm::Value* InitPointerWithValue(llvm::Value*       pPtr,
-                                      llvm::Value*       pLowValue,
-                                      llvm::Value*       pHighValue,
-                                      llvm::Type*        pCastTy,
-                                      llvm::Instruction* pInsertPos) const;
-
     bool IsResourceMappingNodeActive(const ResourceMappingNode* pNode, bool isRootNode) const;
-
-    llvm::Value* SetRingBufferDataFormat(llvm::Value* pBufDesc,
-                                         uint32_t dataFormat,
-                                         llvm::Instruction* pInsertPos) const;
-
-    llvm::Value* LoadStreamOutBufferDescriptor(uint32_t           xfbBuffer,
-                                               llvm::Value*       pStreamOutTablePtr,
-                                               llvm::Instruction* pInsertPos) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

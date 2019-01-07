@@ -24,21 +24,18 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerInstMetaRemove.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerInstMetaRemove.
+ * @file  llpcPatchIncludeLlvmIr.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::PatchIncludeLlvmIr.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-inst-meta-remove"
+#define DEBUG_TYPE "llpc-patch-include-llvm-ir"
 
-#include "llvm/IR/Instructions.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/Constants.h"
 
-#include "SPIRVInternal.h"
-#include "llpcSpirvLowerInstMetaRemove.h"
+#include "llpcContext.h"
+#include "llpcPatchIncludeLlvmIr.h"
 
 using namespace llvm;
-using namespace SPIRV;
 using namespace Llpc;
 
 namespace Llpc
@@ -46,64 +43,58 @@ namespace Llpc
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerInstMetaRemove::ID = 0;
+char PatchIncludeLlvmIr::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering opertions for removing the instruction metadata
-ModulePass* CreateSpirvLowerInstMetaRemove()
+// Pass creator, creates the pass of LLVM patching operations of including llvm-ir as a separate section in the ELF.
+ModulePass* CreatePatchIncludeLlvmIr()
 {
-    return new SpirvLowerInstMetaRemove();
+    return new PatchIncludeLlvmIr();
 }
 
 // =====================================================================================================================
-SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove()
+PatchIncludeLlvmIr::PatchIncludeLlvmIr()
     :
-    SpirvLower(ID),
-    m_changed(false)
+    Patch(ID)
 {
-    initializeSpirvLowerInstMetaRemovePass(*PassRegistry::getPassRegistry());
+    initializePatchIncludeLlvmIrPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-bool SpirvLowerInstMetaRemove::runOnModule(
+// Executes this patching pass on the specified LLVM module.
+//
+// This pass includes llvm-ir as a separate section in the ELF binary by inserting a new global variable with explicit
+// section.
+bool PatchIncludeLlvmIr::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Inst-Meta-Remove\n");
+    Patch::Init(&module);
 
-    SpirvLower::Init(&module);
-    m_changed = false;
+    std::string moduleStr;
+    raw_string_ostream llvmIr(moduleStr);
+    llvmIr << *m_pModule;
+    llvmIr.flush();
 
-    visit(m_pModule);
+    auto pGlobalTy = ArrayType::get(m_pContext->Int8Ty(), moduleStr.size());
+    auto pInitializer = ConstantDataArray::getString(m_pModule->getContext(), moduleStr, false);
+    auto pGlobal = new GlobalVariable(*m_pModule,
+                                      pGlobalTy,
+                                      true,
+                                      GlobalValue::ExternalLinkage,
+                                      pInitializer,
+                                      "llvm_ir",
+                                      nullptr,
+                                      GlobalValue::NotThreadLocal,
+                                      false);
+    LLPC_ASSERT(pGlobal != nullptr);
+    pGlobal->setSection(".AMDGPU.metadata.llvm_ir");
 
-    return m_changed;
-}
-
-// =====================================================================================================================
-// Visits "call" instruction.
-void SpirvLowerInstMetaRemove::visitCallInst(
-    CallInst& callInst) // [in] "Call" instruction
-{
-    auto pCallee = callInst.getCalledFunction();
-    if (pCallee == nullptr)
-    {
-        return;
-    }
-
-    auto mangledName = pCallee->getName();
-    LLPC_ASSERT(strlen(gSPIRVMD::NonUniform) == 16);
-    const std::string NonUniformPrefix = std::string("_Z16") + std::string(gSPIRVMD::NonUniform);
-    if (mangledName.startswith(NonUniformPrefix))
-    {
-        callInst.dropAllReferences();
-        callInst.eraseFromParent();
-        m_changed = true;
-    }
+    return true;
 }
 
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for removing instruction metadata.
-INITIALIZE_PASS(SpirvLowerInstMetaRemove, DEBUG_TYPE,
-                "Lower SPIR-V instruction metadata by removing those targeted", false, false)
+// Initializes the pass of LLVM patching operations of including llvm-ir as a separate section in the ELF binary.
+INITIALIZE_PASS(PatchIncludeLlvmIr, DEBUG_TYPE,
+                "Include llvm-ir as a separate section in the ELF binary", false, false)

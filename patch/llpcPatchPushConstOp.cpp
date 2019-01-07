@@ -50,6 +50,13 @@ namespace Llpc
 char PatchPushConstOp::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching operations for push constant operations
+ModulePass* CreatePatchPushConstOp()
+{
+    return new PatchPushConstOp();
+}
+
+// =====================================================================================================================
 PatchPushConstOp::PatchPushConstOp()
     :
     Patch(ID)
@@ -185,5 +192,5 @@ void PatchPushConstOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for push constant operations.
-INITIALIZE_PASS(PatchPushConstOp, "Patch-push-const",
+INITIALIZE_PASS(PatchPushConstOp, DEBUG_TYPE,
                 "Patch LLVM for push constant operations", false, false)

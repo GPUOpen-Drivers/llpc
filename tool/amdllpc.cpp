@@ -812,7 +812,7 @@ static Result BuildShaderModules(
             {
                 LLPC_ERRS("Fails to build "
                           << GetShaderStageName(static_cast<ShaderStage>(stage))
-                          << " shader module: " << "\n");
+                          << " shader module:\n");
                 break;
             }
         }
@@ -1138,10 +1138,14 @@ static Result ProcessPipeline(
                 }
                 else
                 {
+                    LLPC_OUTS("===============================================================================\n");
+                    LLPC_OUTS("// Pipeline file info for " << inFile << " \n\n");
+
                     if ((pLog != nullptr) && (strlen(pLog) > 0))
                     {
                         LLPC_OUTS("Pipeline file parse warning:\n" << pLog << "\n");
                     }
+
                     compileInfo.compPipelineInfo = pPipelineState->compPipelineInfo;
                     compileInfo.gfxPipelineInfo = pPipelineState->gfxPipelineInfo;
                     if (IgnoreColorAttachmentFormats)
@@ -1180,7 +1184,7 @@ static Result ProcessPipeline(
                                 LLPC_ASSERT(pSpvText != nullptr);
                                 memset(pSpvText, 0, textSize);
                                 LLPC_OUTS("\nSPIR-V disassembly for " <<
-                                          GetShaderStageName(static_cast<ShaderStage>(stage)) << "\n");
+                                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader module:\n");
                                 spvDisassembleSpirv(binSize, compileInfo.spirvBin[stage].pCode, textSize, pSpvText);
                                 LLPC_OUTS(pSpvText << "\n");
                                 delete[] pSpvText;
@@ -1320,10 +1324,10 @@ int32_t main(
     }
 #endif
 
-    if (StringRef(InFiles[0]).endswith(".pipe"))
+    if (IsPipelineInfoFile(InFiles[0]) || IsLlvmIrFile(InFiles[0]))
     {
-        // The first input file is a pipeline file. Assume they all are, and compile each one separately
-        // but in the same context.
+        // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
+        // separately but in the same context.
         for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
         {
             result = ProcessPipeline(pCompiler, InFiles[i]);

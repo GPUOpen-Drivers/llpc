@@ -47,6 +47,13 @@ namespace Llpc
 char PatchGroupOp::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of LLVM patching opertions for group operations.
+ModulePass* CreatePatchGroupOp()
+{
+    return new PatchGroupOp();
+}
+
+// =====================================================================================================================
 PatchGroupOp::PatchGroupOp()
     :
     Patch(ID)
@@ -123,5 +130,5 @@ void PatchGroupOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM path operations for group operations.
-INITIALIZE_PASS(PatchGroupOp, "Patch-group-op", "Patch LLVM for group operations", false, false)
+INITIALIZE_PASS(PatchGroupOp, DEBUG_TYPE, "Patch LLVM for group operations", false, false)
 

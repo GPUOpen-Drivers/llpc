@@ -110,14 +110,17 @@ union DescriptorPair
 };
 
 // Represents GS output location info (including location, built-in ID, and vertex stream ID)
-
+//
+// NOTE: Be careful to add new fields in this structure. It will be used as 32-bit hash map key in doing
+// location map for GS. The change of 32-bit value has impacts on ordering of entries. Thus, the mapping
+// result is changed accordingly.
 union GsOutLocInfo
 {
     struct
     {
-        uint32_t location :  16;  // Location of the output
-        uint32_t isBuiltIn : 1;   // Whether location is builtIn id
-        uint32_t streamId :  2;   // Output vertex stream ID
+        uint32_t location  : 16;    // Location of the output
+        uint32_t isBuiltIn : 1;     // Whether location is actually built-in ID
+        uint32_t streamId  : 2;     // Output vertex stream ID
     };
     uint32_t  u32All;
 };
@@ -127,8 +130,9 @@ union XfbOutInfo
 {
     struct
     {
-        uint32_t xfbBuffer : 2;  // Transform feedback buffer
-        uint32_t xfbOffset : 30; // Transform feedback offset
+        uint32_t xfbBuffer : 2;     // Transform feedback buffer
+        uint32_t xfbOffset : 16;    // Transform feedback offset
+        uint32_t is16bit   : 1;     // Whether it is 16-bit data for transform feedback
     };
     uint32_t u32All;
 };
@@ -402,8 +406,6 @@ struct ResourceUsage
 
         uint32_t    expCount;   // Export count (number of "exp" instructions) for generic outputs
 
-        llvm::Value*    pEsGsRingBufDesc;   // ES -> GS ring buffer descriptor (common, used by VS, TES, and GS)
-
         struct
         {
             std::vector<BasicType>    inputTypes;       // Array of basic types of vertex inputs (vertex input location
@@ -446,19 +448,7 @@ struct ResourceUsage
                 uint32_t tessFactorStride;              // Size of tess factor stride (in DWORD)
 
             } calcFactor;
-
-            llvm::Value* pTessFactorBufDesc;  // Descriptor for tessellation factor (TF) buffer
-            llvm::Value* pPrimitiveId;        // PrimitiveId for the tessellation shader
-            llvm::Value* pInvocationId;       // InvocationId for the tessellation shader
-            llvm::Value* pRelativeId;         // Relative PatchId for the tessellation shader
-            llvm::Value* pOffChipLdsDesc;     // Descriptor for off-chip LDS buffer
         } tcs;
-
-        struct
-        {
-            llvm::Value* pTessCoord;          // Tessellated coordinate
-            llvm::Value* pOffChipLdsDesc;     // Descriptor for off-chip LDS buffer
-        } tes;
 
         struct
         {
@@ -476,11 +466,6 @@ struct ResourceUsage
 
             // ID of the vertex stream sent to rasterizor
             uint32_t rasterStream;
-
-            llvm::Value* pEsGsOffsets;          // ES -> GS offsets (GS in)
-            llvm::Value* gsVsOutRingBufDesc[MaxGsStreams];    // GS -> VS ring buffer descriptor (GS out)
-            llvm::Value* pGsVsInRingBufDesc;                  // GS -> VS ring buffer descriptor (VS in)
-            llvm::Value* pEmitCounterPtr[MaxGsStreams];       // Pointer to emit counter
 
             struct
             {
@@ -537,38 +522,27 @@ struct InterfaceData
     static const uint32_t CsStartUserData     = 2;
     static const uint32_t UserDataUnmapped = InvalidValue;
 
-    llvm::Value*                descTablePtrs[MaxDescTableCount]; // Descriptor table pointers
-    llvm::Value*                shadowDescTablePtrs[MaxDescTableCount]; // Shadow descriptor table pointers
-    llvm::Value*                dynDescs[MaxDynDescCount];        // Dynamic descriptors
-    llvm::Value*                pInternalTablePtr;                // Global internal table pointer
-    llvm::Value*                pInternalPerShaderTablePtr;       // Internal per shader table pointer
-
-    llvm::Value*                pNumWorkgroups;                   // NumWorkgroups
     uint32_t                    userDataCount;                    // User data count
     uint32_t                    userDataMap[MaxUserDataCount];    // User data map (from SGPR No. to API logical ID)
 
     struct
     {
-        llvm::Value*            pTablePtr;                        // Spilled push constant pointer
         uint32_t                resNodeIdx;                       // Resource node index for push constant
     } pushConst;
 
     struct
     {
-        llvm::Value*            pTablePtr;                        // Spill table pointer
         uint32_t                sizeInDwords;                     // Spill table size in dwords
         uint32_t                offsetInDwords;                   // Start offset of Spill table
     } spillTable;
 
     struct
     {
-        llvm::Value*            pTablePtr;                      // Vertex buffer table pointer
         uint32_t                resNodeIdx;                     // Resource node index for vertex buffer table
     } vbTable;
 
     struct
     {
-        llvm::Value*           bufDescs[MaxTransformFeedbackBuffers];  // Stream-out buffer descriptors
         uint32_t               resNodeIdx;                             // Resource node index for stream-out table
     } streamOutTable;
 
@@ -717,7 +691,8 @@ struct InterfaceData
 
         uint32_t resNodeValues[MaxDescTableCount];  // Resource node values
         uint32_t spillTable;                        // Spill table
-
+        bool     initialized;                       // Whether entryArgIdxs has been initialized
+                                                    //   by PatchEntryPointMutate
     } entryArgIdxs;
 };
 

@@ -41,7 +41,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 16;
+static const uint32_t  Version = 17;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
@@ -461,6 +461,13 @@ public:
     static void VKAPI_CALL DumpPipelineBinary(void*                    pDumpFile,
                                               GfxIpVersion             gfxIp,
                                               const BinaryData*        pPipelineBin);
+
+    /// Dump extra info to pipeline file.
+    ///
+    /// @param [in]  pDumpFile        The handle of pipeline dump file
+    /// @param [in]  pStr             Extra string info to dump
+    static void VKAPI_CALL DumpPipelineExtraInfo(void*                  pDumpFile,
+                                                 const char*            pStr);
 
     /// Gets shader module hash code.
     ///

@@ -51,6 +51,13 @@ namespace Llpc
 char SpirvLowerDynIndex::ID = 0;
 
 // =====================================================================================================================
+// Pass creator, creates the pass of SPIR-V lowering operations for dynamic index in access chain
+ModulePass* CreateSpirvLowerDynIndex()
+{
+    return new SpirvLowerDynIndex();
+}
+
+// =====================================================================================================================
 SpirvLowerDynIndex::SpirvLowerDynIndex()
     :
     SpirvLower(ID)
@@ -331,5 +338,5 @@ void SpirvLowerDynIndex::ExpandStoreInst(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering opertions for dynamic index in access chain.
-INITIALIZE_PASS(SpirvLowerDynIndex, "Spirv-lower-dyn-index",
+INITIALIZE_PASS(SpirvLowerDynIndex, DEBUG_TYPE,
                 "Lower SPIR-V dynamic index in access chain", false, false)

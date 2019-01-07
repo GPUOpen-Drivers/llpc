@@ -38,6 +38,8 @@
 namespace Llpc
 {
 
+class PipelineShaders;
+
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for buffer operations (load and store).
 class SpirvLowerBufferOp:
@@ -47,13 +49,15 @@ class SpirvLowerBufferOp:
 public:
     SpirvLowerBufferOp();
 
-    virtual bool runOnModule(llvm::Module& module);
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+    }
+
+    virtual bool runOnModule(llvm::Module& module) override;
     virtual void visitCallInst(llvm::CallInst& callInst);
     virtual void visitLoadInst(llvm::LoadInst& loadInst);
     virtual void visitStoreInst(llvm::StoreInst& storeInst);
-
-    // Pass creator, creates the pass of SPIR-V lowering opertions for buffer operations
-    static llvm::ModulePass* Create() { return new SpirvLowerBufferOp(); }
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -61,6 +65,8 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerBufferOp);
+
+    void ProcessShader();
 
     bool NeedScalarAlignment(const llvm::Type* const            pValueTy,
                              const llvm::Type*                  pBlockTy,
@@ -121,6 +127,14 @@ private:
                                      llvm::Value*                     pBlockMemberOffset,
                                      llvm::Constant*                  pBlockMemberMeta,
                                      llvm::Instruction*               pInsertPos);
+
+    llvm::Value* AddBufferAtomicDescInst(std::string                      atomicOpName,
+                                         llvm::Type*                      pDataTy,
+                                         const std::vector<llvm::Value*>& data,
+                                         llvm::Value*                     pDesc,
+                                         llvm::Value*                     pBlockMemberOffset,
+                                         llvm::Constant*                  pBlockMemberMeta,
+                                         llvm::Instruction*               pInsertPos);
 
     llvm::Value* TransposeMatrix(llvm::Value* pMatrix, llvm::Instruction* pInsertPos);
 

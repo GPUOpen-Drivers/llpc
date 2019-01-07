@@ -41,11 +41,14 @@ class PassManager final :
     public llvm::legacy::PassManager
 {
 public:
+    PassManager();
+
     void add(llvm::Pass* pPass) override;
     void stop();
 
 private:
-    bool              m_stopped = false;    // Whether we have already stopped adding new passes.
+    bool              m_stopped = false;        // Whether we have already stopped adding new passes.
+    llvm::AnalysisID  m_dumpCfgAfter = nullptr; // -dump-cfg-after pass id
 };
 
 } // Llpc
