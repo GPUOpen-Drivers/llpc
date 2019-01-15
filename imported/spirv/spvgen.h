@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2015-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2015-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -30,8 +30,11 @@
  */
 #pragma once
 
-#define SPVGEN_VERSION  0x10000
-#define SPVGEN_REVISION 4
+#define SPVGEN_VERSION  0x20000
+#define SPVGEN_REVISION 5
+
+#define SPVGEN_MAJOR_VERSION(version)  (version >> 16)
+#define SPVGEN_MINOR_VERSION(version)  (version & 0xFFFF)
 
 #ifndef SH_IMPORT_EXPORT
     #ifdef _WIN32
@@ -49,33 +52,48 @@
 
 #include "vfx.h"
 
-enum SpvGenVersion
+enum SpvGenVersion : uint32_t
 {
     SpvGenVersionGlslang,
     SpvGenVersionSpirv,
     SpvGenVersionStd450,
     SpvGenVersionExtAmd,
+    SpvGenVersionSpvGen,
+    SpvGenVersionVfx,
     SpvGenVersionCount,
 };
 
 // Command-line options
-enum TOptions {
-    EOptionNone = 0,
-    EOptionVulkanRules = (1 << 0),
-    EOptionDefaultDesktop = (1 << 1),
-    EOptionReadHlsl = (1 << 2),
-    EOptionHlslOffsets = (1 << 3),
-    EOptionHlslIoMapping = (1 << 4),
-    EOptionDebug = (1 << 5),
-    EOptionAutoMapBindings = (1 << 6),
-    EOptionFlattenUniformArrays = (1 << 7),
-    EOptionAutoMapLocations = (1 << 8),
-    EOptionOptimizeDisable = (1 << 9),
-    EOptionOptimizeSize = (1 << 10),
-    EOptionInvertY = (1 << 11),
+enum SpvGenOptions : uint32_t
+{
+    SpvGenOptionNone                 = 0,
+    SpvGenOptionVulkanRules          = (1 << 0),
+    SpvGenOptionDefaultDesktop       = (1 << 1),
+    SpvGenOptionReadHlsl             = (1 << 2),
+    SpvGenOptionHlslOffsets          = (1 << 3),
+    SpvGenOptionHlslIoMapping        = (1 << 4),
+    SpvGenOptionDebug                = (1 << 5),
+    SpvGenOptionAutoMapBindings      = (1 << 6),
+    SpvGenOptionFlattenUniformArrays = (1 << 7),
+    SpvGenOptionAutoMapLocations     = (1 << 8),
+    SpvGenOptionOptimizeDisable      = (1 << 9),
+    SpvGenOptionOptimizeSize         = (1 << 10),
+    SpvGenOptionInvertY              = (1 << 11),
+    SpvGenOptionSuppressInfolog      = (1 << 12)
 };
 
-#define VkStageCount 6
+enum SpvGenStage : uint32_t
+{
+    SpvGenStageVertex,
+    SpvGenStageTessControl,
+    SpvGenStageTessEvaluation,
+    SpvGenStageGeometry,
+    SpvGenStageFragment,
+    SpvGenStageCompute,
+    SpvGenStageCount,
+    SpvGenStageInvalid = ~0u,
+    SpvGenNativeStageCount = SpvGenStageCompute + 1,
+};
 
 #ifdef SH_EXPORTING
 
@@ -88,15 +106,26 @@ bool SH_IMPORT_EXPORT spvCompileAndLinkProgramFromFile(
     void**          pProgram,
     const char**    ppLog);
 
+bool SH_IMPORT_EXPORT spvCompileAndLinkProgramFromFileEx(
+    int             fileNum,
+    const char*     fileList[],
+    const char*     entryPoints[],
+    void**          pProgram,
+    const char**    ppLog,
+    int             options);
+
 bool SH_IMPORT_EXPORT spvCompileAndLinkProgram(
-    int                sourceStringCount[VkStageCount],
-    const char* const* sourceList[VkStageCount],
+    int                sourceStringCount[SpvGenNativeStageCount],
+    const char* const* sourceList[SpvGenNativeStageCount],
     void**             pProgram,
     const char**       ppLog);
 
-bool SH_IMPORT_EXPORT spvCompileAndLinkProgramWithOptions(
-    int                sourceStringCount[VkStageCount],
-    const char* const* sourceList[VkStageCount],
+bool SH_IMPORT_EXPORT spvCompileAndLinkProgramEx(
+    int                stageCount,
+    const SpvGenStage* stageList,
+    const int*         sourceStringCount,
+    const char* const* sourceList[],
+    const char*        entryPoints[],
     void**             pProgram,
     const char**       ppLog,
     int                options);
@@ -108,6 +137,10 @@ int SH_IMPORT_EXPORT spvGetSpirvBinaryFromProgram(
     void*                hProgram,
     int                  stage,
     const unsigned int** ppData);
+
+SpvGenStage SH_IMPORT_EXPORT spvGetStageTypeFromName(
+    const char* pName,
+    bool*       pIsHlsl);
 
 int SH_IMPORT_EXPORT spvAssembleSpirv(
     const char*   pSpvText,
@@ -178,16 +211,6 @@ static inline bool InitSpvGen()
 
 #else
 
-typedef enum {
-    EShLangVertex,
-    EShLangTessControl,
-    EShLangTessEvaluation,
-    EShLangGeometry,
-    EShLangFragment,
-    EShLangCompute,
-    EShLangCount,
-} EShLanguage;
-
 // =====================================================================================================================
 // SPIR-V generator entrypoints declaration
 typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvCompileAndLinkProgramFromFile)(
@@ -196,15 +219,26 @@ typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvCompileAndLinkProgramFromFile)(
     void**          pProgram,
     const char**    ppLog);
 
+typedef bool SH_IMPORT_EXPORT(SPVAPI* PFN_spvCompileAndLinkProgramFromFileEx)(
+    int             fileNum,
+    const char*     fileList[],
+    const char*     entryPoints[],
+    void**          pProgram,
+    const char**    ppLog,
+    int             options);
+
 typedef bool SH_IMPORT_EXPORT (SPVAPI* PFN_spvCompileAndLinkProgram)(
-    int                sourceStringCount[VkStageCount],
-    const char* const* sourceList[VkStageCount],
+    int                sourceStringCount[SpvGenNativeStageCount],
+    const char* const* sourceList[SpvGenNativeStageCount],
     void**             pProgram,
     const char**       ppLog);
 
-typedef bool SH_IMPORT_EXPORT(SPVAPI* PFN_spvCompileAndLinkProgramWithOptions)(
-    int                sourceStringCount[VkStageCount],
-    const char* const* sourceList[VkStageCount],
+typedef bool SH_IMPORT_EXPORT(SPVAPI* PFN_spvCompileAndLinkProgramEx)(
+    int                stageCount,
+    const SpvGenStage* stageList,
+    const int*         sourceStringCount,
+    const char* const* sourceList[],
+    const char*        entryPoints[],
     void**             pProgram,
     const char**       ppLog,
     int                options);
@@ -215,6 +249,10 @@ typedef int SH_IMPORT_EXPORT (SPVAPI* PFN_spvGetSpirvBinaryFromProgram)(
     void*                hProgram,
     int                  stage,
     const unsigned int** ppData);
+
+typedef SpvGenStage SH_IMPORT_EXPORT(SPVAPI* PFN_spvGetStageTypeFromName)(
+    const char* pName,
+    bool*       pIsHlsl);
 
 typedef int SH_IMPORT_EXPORT (SPVAPI* PFN_spvAssembleSpirv)(
     const char*     pSpvText,
@@ -280,10 +318,12 @@ typedef void SH_IMPORT_EXPORT (SPVAPI* PFN_vfxPrintDoc)(
   extern PFN_##func g_pfn##func
 
 DECL_EXPORT_FUNC(spvCompileAndLinkProgramFromFile);
+DECL_EXPORT_FUNC(spvCompileAndLinkProgramFromFileEx);
 DECL_EXPORT_FUNC(spvCompileAndLinkProgram);
-DECL_EXPORT_FUNC(spvCompileAndLinkProgramWithOptions);
+DECL_EXPORT_FUNC(spvCompileAndLinkProgramEx);
 DECL_EXPORT_FUNC(spvDestroyProgram);
 DECL_EXPORT_FUNC(spvGetSpirvBinaryFromProgram);
+DECL_EXPORT_FUNC(spvGetStageTypeFromName);
 DECL_EXPORT_FUNC(spvAssembleSpirv);
 DECL_EXPORT_FUNC(spvDisassembleSpirv);
 DECL_EXPORT_FUNC(spvValidateSpirv);
@@ -306,10 +346,12 @@ bool InitSpvGen();
   PFN_##func g_pfn##func = nullptr
 
 DEFI_EXPORT_FUNC(spvCompileAndLinkProgramFromFile);
+DEFI_EXPORT_FUNC(spvCompileAndLinkProgramFromFileEx);
 DEFI_EXPORT_FUNC(spvCompileAndLinkProgram);
-DEFI_EXPORT_FUNC(spvCompileAndLinkProgramWithOptions);
+DEFI_EXPORT_FUNC(spvCompileAndLinkProgramEx);
 DEFI_EXPORT_FUNC(spvDestroyProgram);
 DEFI_EXPORT_FUNC(spvGetSpirvBinaryFromProgram);
+DEFI_EXPORT_FUNC(spvGetStageTypeFromName);
 DEFI_EXPORT_FUNC(spvAssembleSpirv);
 DEFI_EXPORT_FUNC(spvDisassembleSpirv);
 DEFI_EXPORT_FUNC(spvValidateSpirv);
@@ -372,7 +414,7 @@ static const char* SpvGeneratorName = "spvgen.so";
 // This can be called multiple times in the same application.
 bool InitSpvGen()
 {
-    if (g_pfnspvCompileAndLinkProgramFromFile != nullptr)
+    if (g_pfnspvGetVersion != nullptr)
     {
         // Already loaded.
         return true;
@@ -388,33 +430,49 @@ bool InitSpvGen()
     if (hModule != NULL)
     {
         INITFUNC(spvCompileAndLinkProgramFromFile);
+        INITFUNC(spvCompileAndLinkProgramFromFileEx);
         INITFUNC(spvCompileAndLinkProgram);
-        INITFUNC(spvCompileAndLinkProgramWithOptions);
+        INITFUNC(spvCompileAndLinkProgramEx);
         INITFUNC(spvDestroyProgram);
         INITFUNC(spvGetSpirvBinaryFromProgram);
+        INITFUNC(spvGetStageTypeFromName);
         INITFUNC(spvAssembleSpirv);
         INITFUNC(spvDisassembleSpirv);
         INITFUNC(spvValidateSpirv);
         INITFUNC(spvOptimizeSpirv);
         INITFUNC(spvFreeBuffer);
-        INIT_OPT_FUNC(spvGetVersion);
+        INITFUNC(spvGetVersion);
         INITFUNC(vfxParseFile);
         INITFUNC(vfxCloseDoc);
         INITFUNC(vfxGetRenderDoc);
         INITFUNC(vfxGetPipelineDoc);
-        INIT_OPT_FUNC(vfxPrintDoc);
+        INITFUNC(vfxPrintDoc);
     }
     else
     {
         success = false;
     }
+
+    if (success)
+    {
+        unsigned int version = 0;
+        unsigned int revsion = 0;
+        success = g_pfnspvGetVersion(SpvGenVersionSpvGen, &version, &revsion);
+        if (SPVGEN_MAJOR_VERSION(version) != SPVGEN_MAJOR_VERSION(SPVGEN_VERSION))
+        {
+            success = false;
+        }
+    }
+
     if (success == false)
     {
         DEINITFUNC(spvCompileAndLinkProgramFromFile);
+        DEINITFUNC(spvCompileAndLinkProgramFromFileEx);
         DEINITFUNC(spvCompileAndLinkProgram);
-        DEINITFUNC(spvCompileAndLinkProgramWithOptions);
+        DEINITFUNC(spvCompileAndLinkProgramEx);
         DEINITFUNC(spvDestroyProgram);
         DEINITFUNC(spvGetSpirvBinaryFromProgram);
+        DEINITFUNC(spvGetStageTypeFromName);
         DEINITFUNC(spvAssembleSpirv);
         DEINITFUNC(spvDisassembleSpirv);
         DEINITFUNC(spvValidateSpirv);
@@ -435,10 +493,12 @@ bool InitSpvGen()
 #ifndef SH_EXPORTING
 
 #define spvCompileAndLinkProgramFromFile    g_pfnspvCompileAndLinkProgramFromFile
+#define spvCompileAndLinkProgramFromFileEx  g_pfnspvCompileAndLinkProgramFromFileEx
 #define spvCompileAndLinkProgram            g_pfnspvCompileAndLinkProgram
-#define spvCompileAndLinkProgramWithOptions g_pfnspvCompileAndLinkProgramWithOptions
+#define spvCompileAndLinkProgramEx          g_pfnspvCompileAndLinkProgramEx
 #define spvDestroyProgram                   g_pfnspvDestroyProgram
 #define spvGetSpirvBinaryFromProgram        g_pfnspvGetSpirvBinaryFromProgram
+#define spvGetStageTypeFromName             g_pfnspvGetStageTypeFromName
 #define spvAssembleSpirv                    g_pfnspvAssembleSpirv
 #define spvDisassembleSpirv                 g_pfnspvDisassembleSpirv
 #define spvValidateSpirv                    g_pfnspvValidateSpirv

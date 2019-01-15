@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -72,6 +72,8 @@ StrToMemberAddr SectionResourceMappingNode::m_addrTable[SectionResourceMappingNo
 StrToMemberAddr SectionShaderInfo::m_addrTable[SectionShaderInfo::MemberCount];
 StrToMemberAddr SectionVersion::m_addrTable[SectionVersion::MemberCount];
 StrToMemberAddr SectionCompileLog::m_addrTable[SectionCompileLog::MemberCount];
+StrToMemberAddr SectionPipelineOption::m_addrTable[SectionPipelineOption::MemberCount];
+StrToMemberAddr SectionShaderOption::m_addrTable[SectionShaderOption::MemberCount];
 
 // =====================================================================================================================
 // Dummy class used to initialize all static variables
@@ -111,6 +113,9 @@ public:
         SectionDescriptorRangeValueItem::InitialAddrTable();
         SectionResourceMappingNode::InitialAddrTable();
         SectionShaderInfo::InitialAddrTable();
+        SectionPipelineOption::InitialAddrTable();
+        SectionShaderOption::InitialAddrTable();
+
     };
 };
 
@@ -187,6 +192,20 @@ void Section::InitSectionInfo()
     INIT_SECTION_INFO("GsSpvasmFile", SectionTypeGeometryShader, SpirvAsmFile)
     INIT_SECTION_INFO("FsSpvasmFile", SectionTypeFragmentShader, SpirvAsmFile)
     INIT_SECTION_INFO("CsSpvasmFile", SectionTypeComputeShader, SpirvAsmFile)
+
+    INIT_SECTION_INFO("VsHlsl", SectionTypeVertexShader, Hlsl)
+    INIT_SECTION_INFO("TcsHlsl", SectionTypeTessControlShader, Hlsl)
+    INIT_SECTION_INFO("TesHlsl", SectionTypeTessEvalShader, Hlsl)
+    INIT_SECTION_INFO("GsHlsl", SectionTypeGeometryShader, Hlsl)
+    INIT_SECTION_INFO("FsHlsl", SectionTypeFragmentShader, Hlsl)
+    INIT_SECTION_INFO("CsHlsl", SectionTypeComputeShader, Hlsl)
+
+    INIT_SECTION_INFO("VsHlslFile", SectionTypeVertexShader, HlslFile)
+    INIT_SECTION_INFO("TcsHlslFile", SectionTypeTessControlShader, HlslFile)
+    INIT_SECTION_INFO("TesHlslFile", SectionTypeTessEvalShader, HlslFile)
+    INIT_SECTION_INFO("GsHlslFile", SectionTypeGeometryShader, HlslFile)
+    INIT_SECTION_INFO("FsHlslFile", SectionTypeFragmentShader, HlslFile)
+    INIT_SECTION_INFO("CsHlslFile", SectionTypeComputeShader, HlslFile)
 
     INIT_SECTION_INFO("Version", SectionTypeVersion, 0)
     INIT_SECTION_INFO("CompileLog", SectionTypeCompileLog, 0)
@@ -321,11 +340,17 @@ void Section::PrintSelf(
                         {
                         case MemberTypeEnum:
                         case MemberTypeInt:
+                        {
+                            printf("%s = %d\n",
+                                m_pMemberTable[i].pMemberName,
+                                *(((int32_t*)(GetMemberAddr(i))) + arrayIndex));
+                            break;
+                        }
                         case MemberTypeBool:
                         {
                             printf("%s = %d\n",
                                    m_pMemberTable[i].pMemberName,
-                                   *(((int32_t*)(GetMemberAddr(i))) + arrayIndex));
+                                   *(((bool*)(GetMemberAddr(i))) + arrayIndex));
                             break;
                         }
                         case MemberTypeFloat:
@@ -679,6 +704,8 @@ bool Section::GetPtrOfSubSection(
     CASE_SUBSECTION(MemberTypeResourceMappingNode, SectionResourceMappingNode)
     CASE_SUBSECTION(MemberTypeSpecInfo, SectionSpecInfo)
     CASE_SUBSECTION(MemberTypeDescriptorRangeValue, SectionDescriptorRangeValueItem)
+    CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
+    CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
         break;
     default:
         VFX_NEVER_CALLED();
@@ -748,14 +775,15 @@ bool SectionShader::ReadFile(
 // =====================================================================================================================
 // Compiles GLSL source text file (input) to SPIR-V binary file (output).
 bool SectionShader::CompileGlsl(
-   std::string* pErrorMsg)   // [out] Error message
+    const Section* pShaderInfo, // [in] Shader info section
+    std::string*   pErrorMsg)   // [out] Error message
 {
-    int32_t           sourceStringCount[ShaderStageCount] = {};
-    const char*const* sourceList[ShaderStageCount]        = {};
+    int32_t           sourceStringCount = 1;
+    const char*const* sourceList[1]        = {};
 
     bool        result    = true;
     const char* pGlslText = shaderSource.c_str();
-    uint32_t    stage     = m_sectionType - SectionTypeVertexShader;
+    SpvGenStage stage     = static_cast<SpvGenStage>(m_sectionType - SectionTypeVertexShader);
     void*       pProgram  = nullptr;
     const char* pLog      = nullptr;
 
@@ -765,19 +793,30 @@ bool SectionShader::CompileGlsl(
         return false;
     }
 
-    sourceStringCount[stage] = 1;
-    sourceList[stage] = &pGlslText;
-    int compileOption = EOptionDefaultDesktop | EOptionVulkanRules | EOptionDebug;
-    bool compileResult = spvCompileAndLinkProgramWithOptions(sourceStringCount,
-                                                             sourceList,
-                                                             &pProgram,
-                                                             &pLog,
-                                                             compileOption);
+    sourceList[0] = &pGlslText;
+    int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+    if ((m_shaderType == Hlsl) || (m_shaderType == HlslFile))
+    {
+        compileOption |= SpvGenOptionReadHlsl;
+    }
+    const char* pEntryPoint = nullptr;
+    if (pShaderInfo != nullptr)
+    {
+        pEntryPoint = reinterpret_cast<const SectionShaderInfo*>(pShaderInfo)->GetEntryPoint();
+    }
+    bool compileResult = spvCompileAndLinkProgramEx(1,
+                                                   &stage,
+                                                   &sourceStringCount,
+                                                   sourceList,
+                                                   &pEntryPoint,
+                                                   &pProgram,
+                                                   &pLog,
+                                                   compileOption);
 
     if (compileResult)
     {
         const uint32_t* pSpvBin = nullptr;
-        uint32_t binSize = spvGetSpirvBinaryFromProgram(pProgram, stage, &pSpvBin);
+        uint32_t binSize = spvGetSpirvBinaryFromProgram(pProgram, 0, &pSpvBin);
         m_spvBin.resize(binSize);
         memcpy(&m_spvBin[0], pSpvBin, binSize);
     }
@@ -852,22 +891,25 @@ bool SectionShader::IsShaderSourceSection()
 // Loads external shader code, and translate shader code to SPIRV binary
 bool SectionShader::CompileShader(
     const std::string&  docFilename,      // [in] File name of parent document
+    const Section*      pShaderInfo,      // [in] Shader info sections
     std::string*        pErrorMsg)        // [out] Error message
 {
     bool result = false;
     switch (m_shaderType)
     {
     case Glsl:
+    case Hlsl:
         {
-            result = CompileGlsl(pErrorMsg);
+            result = CompileGlsl(pShaderInfo, pErrorMsg);
             break;
         }
     case GlslFile:
+    case HlslFile:
         {
             result = ReadFile(docFilename, false, pErrorMsg);
             if (result)
             {
-                CompileGlsl(pErrorMsg);
+                CompileGlsl(pShaderInfo, pErrorMsg);
             }
             break;
         }

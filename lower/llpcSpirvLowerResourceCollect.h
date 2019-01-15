@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -83,7 +83,8 @@ private:
                            llvm::Constant*    pInOutMeta,
                            SPIRAddressSpace   addrSpace);
     void CollectVertexInputUsage(const llvm::Type* pVertexTy, bool signedness, uint32_t startLoc, uint32_t locCount);
-    void CollectGsOutputInfo(const Type* pOutputTy, uint32_t location, const ShaderInOutMetadata& outputMeta);
+    void CollectGsOutputInfo(const Type* pOutputTy, uint32_t location, uint32_t locOffset, const ShaderInOutMetadata& outputMeta);
+    void CollectXfbOutputInfo(ShaderStage  shaderStage, const llvm::Type* pOutputTy, const ShaderInOutMetadata& inOutMeta);
 
     uint32_t GetGlobalShaderUse(GlobalValue* pGlobal);
     void SetFunctionShaderUse();

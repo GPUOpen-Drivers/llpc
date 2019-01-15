@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -132,6 +132,7 @@ union XfbOutInfo
     {
         uint32_t xfbBuffer : 2;     // Transform feedback buffer
         uint32_t xfbOffset : 16;    // Transform feedback offset
+        uint32_t locOffset : 13;    // Location offset
         uint32_t is16bit   : 1;     // Whether it is 16-bit data for transform feedback
     };
     uint32_t u32All;

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -557,13 +557,13 @@ void PipelineDumper::DumpPipelineShaderInfo(
     }
 
     // Output pipeline shader options
-    dumpFile << "trapPresent = " << pShaderInfo->options.trapPresent << "\n";
-    dumpFile << "debugMode = " << pShaderInfo->options.debugMode << "\n";
-    dumpFile << "enablePerformanceData = " << pShaderInfo->options.enablePerformanceData << "\n";
-    dumpFile << "allowReZ = " << pShaderInfo->options.allowReZ << "\n";
-    dumpFile << "vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
-    dumpFile << "sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
-    dumpFile << "maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
+    dumpFile << "options.trapPresent = " << pShaderInfo->options.trapPresent << "\n";
+    dumpFile << "options.debugMode = " << pShaderInfo->options.debugMode << "\n";
+    dumpFile << "options.enablePerformanceData = " << pShaderInfo->options.enablePerformanceData << "\n";
+    dumpFile << "options.allowReZ = " << pShaderInfo->options.allowReZ << "\n";
+    dumpFile << "options.vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
+    dumpFile << "options.sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
+    dumpFile << "options.maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
     dumpFile << "\n";
 }
 
@@ -633,9 +633,19 @@ void PipelineDumper::DumpComputeStateInfo(
 
     // Output pipeline states
     dumpFile << "deviceIndex = " << pPipelineInfo->deviceIndex << "\n";
-    dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
-    dumpFile << "autoLayoutDesc = " << pPipelineInfo->options.autoLayoutDesc << "\n";
-    dumpFile << "scalarBlockLayout = " << pPipelineInfo->options.scalarBlockLayout << "\n";
+    DumpPipelineOptions(&pPipelineInfo->options, dumpFile);
+}
+
+// =====================================================================================================================
+// Dumps pipeline options to file.
+void PipelineDumper::DumpPipelineOptions(
+    const PipelineOptions*   pOptions,  // [in] Pipeline options
+    std::ostream&            dumpFile)  // [out] dump file
+{
+    dumpFile << "options.includeDisassembly = " << pOptions->includeDisassembly << "\n";
+    dumpFile << "options.autoLayoutDesc = " << pOptions->autoLayoutDesc << "\n";
+    dumpFile << "options.scalarBlockLayout = " << pOptions->scalarBlockLayout << "\n";
+    dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
 }
 
 // =====================================================================================================================
@@ -679,11 +689,6 @@ void PipelineDumper::DumpGraphicsStateInfo(
     dumpFile << "cullMode = " << static_cast<VkCullModeFlagBits>(pPipelineInfo->rsState.cullMode) << "\n";
     dumpFile << "frontFace = " << pPipelineInfo->rsState.frontFace << "\n";
     dumpFile << "depthBiasEnable = " << pPipelineInfo->rsState.depthBiasEnable << "\n";
-
-    dumpFile << "includeDisassembly = " << pPipelineInfo->options.includeDisassembly << "\n";
-    dumpFile << "autoLayoutDesc = " << pPipelineInfo->options.autoLayoutDesc << "\n";
-    dumpFile << "scalarBlockLayout = " << pPipelineInfo->options.scalarBlockLayout << "\n";
-
     dumpFile << "alphaToCoverageEnable = " << pPipelineInfo->cbState.alphaToCoverageEnable << "\n";
     dumpFile << "dualSourceBlendEnable = " << pPipelineInfo->cbState.dualSourceBlendEnable << "\n";
 
@@ -698,6 +703,8 @@ void PipelineDumper::DumpGraphicsStateInfo(
             dumpFile << "colorBuffer[" << i << "].blendSrcAlphaToColor = " << pCbTarget->blendSrcAlphaToColor << "\n";
         }
     }
+
+    DumpPipelineOptions(&pPipelineInfo->options, dumpFile);
     dumpFile << "\n\n";
 
     // Output vertex input state
@@ -847,6 +854,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     hasher.Update(pPipeline->options.includeDisassembly);
     hasher.Update(pPipeline->options.autoLayoutDesc);
     hasher.Update(pPipeline->options.scalarBlockLayout);
+    hasher.Update(pPipeline->options.includeIr);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -868,6 +876,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     hasher.Update(pPipeline->options.includeDisassembly);
     hasher.Update(pPipeline->options.autoLayoutDesc);
     hasher.Update(pPipeline->options.scalarBlockLayout);
+    hasher.Update(pPipeline->options.includeIr);
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);

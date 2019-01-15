@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -700,6 +700,11 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         // Input/output is array type
         inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
+        if (inOutMeta.IsXfb)
+        {
+            CollectXfbOutputInfo(shaderStage, pInOutTy->getArrayElementType(), inOutMeta);
+        }
+
         if (inOutMeta.IsBuiltIn)
         {
             // Built-in arrayed input/output
@@ -912,7 +917,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                 if (addrSpace == SPIRAS_Output)
                 {
-                     CollectGsOutputInfo(pInOutTy, InvalidValue, inOutMeta);
+                     CollectGsOutputInfo(pInOutTy, InvalidValue, 0, inOutMeta);
                 }
             }
             else if (shaderStage == ShaderStageFragment)
@@ -1013,7 +1018,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            CollectGsOutputInfo(pBaseTy, startLoc + i, inOutMeta);
+                            CollectGsOutputInfo(pBaseTy, startLoc + i, i, inOutMeta);
                         }
                     }
                     else
@@ -1092,21 +1097,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         // Transform feedback input/output
         if (inOutMeta.IsXfb)
         {
-            LLPC_ASSERT(inOutMeta.XfbBuffer < MaxTransformFeedbackBuffers);
-            pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer] = inOutMeta.XfbStride;
-
-            if (inOutMeta.XfbStride <= inOutMeta.XfbOffset)
-            {
-                uint32_t elemCount = pInOutTy->isVectorTy() ? pInOutTy->getVectorNumElements() : 1;
-                uint32_t inOutTySize = elemCount * pInOutTy->getScalarSizeInBits() / 8;
-                pResUsage->inOutUsage.xfbStrides[inOutMeta.XfbBuffer]
-                    = RoundUpToMultiple(uint32_t(inOutMeta.XfbOffset) + inOutTySize, 4u);
-            }
-
-            pResUsage->inOutUsage.enableXfb = (pResUsage->inOutUsage.enableXfb || (inOutMeta.XfbStride > 0));
-
-            LLPC_ASSERT(inOutMeta.StreamId < MaxGsStreams);
-            pResUsage->inOutUsage.streamXfbBuffers[inOutMeta.StreamId] = 1 << (inOutMeta.XfbBuffer);
+            CollectXfbOutputInfo(shaderStage, pInOutTy, inOutMeta);
         }
 
         if (inOutMeta.IsBuiltIn)
@@ -1396,7 +1387,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                 if (addrSpace == SPIRAS_Output)
                 {
-                    CollectGsOutputInfo(pInOutTy, InvalidValue, inOutMeta);
+                    CollectGsOutputInfo(pInOutTy, InvalidValue, 0, inOutMeta);
                 }
             }
             else if (shaderStage == ShaderStageFragment)
@@ -1607,7 +1598,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            CollectGsOutputInfo(pBaseTy, startLoc + i, inOutMeta);
+                            CollectGsOutputInfo(pBaseTy, startLoc + i, i, inOutMeta);
                         }
                     }
                     else
@@ -1803,6 +1794,7 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
 void SpirvLowerResourceCollect::CollectGsOutputInfo(
     const Type*                pOutputTy,   // [in] Type of this output
     uint32_t                   location,    // Location of this output
+    uint32_t                   locOffset,   // Location offset
     const ShaderInOutMetadata& outputMeta)  // [in] Metadata of this output
 {
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
@@ -1818,13 +1810,17 @@ void SpirvLowerResourceCollect::CollectGsOutputInfo(
     xfbOutInfo.xfbBuffer = outputMeta.XfbBuffer;
     xfbOutInfo.xfbOffset = outputMeta.XfbOffset;
     xfbOutInfo.is16bit   = (pBaseTy->getScalarSizeInBits() == 16);
+    xfbOutInfo.locOffset = locOffset;
 
     GsOutLocInfo outLocInfo = {};
     outLocInfo.location     = (outputMeta.IsBuiltIn ? outputMeta.Value : location);
     outLocInfo.isBuiltIn    = outputMeta.IsBuiltIn;
     outLocInfo.streamId     = outputMeta.StreamId;
 
-    pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    if (outputMeta.IsXfb)
+    {
+        pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    }
 
     if (outputMeta.IsBuiltIn)
     {
@@ -1835,6 +1831,31 @@ void SpirvLowerResourceCollect::CollectGsOutputInfo(
     {
         pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = InvalidValue;
     }
+}
+
+// =====================================================================================================================
+// Collect the transform feedback info from output metadata
+void SpirvLowerResourceCollect::CollectXfbOutputInfo(
+    ShaderStage                 shaderStage, // API shader stage
+    const Type*                 pOutputTy,    // [in] Type of this output
+    const ShaderInOutMetadata & outputMeta)   // [in] Metadata of this output
+{
+    auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    LLPC_ASSERT(outputMeta.XfbBuffer < MaxTransformFeedbackBuffers);
+    pResUsage->inOutUsage.xfbStrides[outputMeta.XfbBuffer] = outputMeta.XfbStride;
+
+    if (outputMeta.XfbStride <= outputMeta.XfbOffset)
+    {
+        uint32_t elemCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
+        uint32_t inOutTySize = elemCount * pOutputTy->getScalarSizeInBits() / 8;
+        pResUsage->inOutUsage.xfbStrides[outputMeta.XfbBuffer]
+            = RoundUpToMultiple(uint32_t(outputMeta.XfbOffset) + inOutTySize, 4u);
+    }
+
+    pResUsage->inOutUsage.enableXfb = (pResUsage->inOutUsage.enableXfb || (outputMeta.XfbStride > 0));
+
+    LLPC_ASSERT(outputMeta.StreamId < MaxGsStreams);
+    pResUsage->inOutUsage.streamXfbBuffers[outputMeta.StreamId] = 1 << (outputMeta.XfbBuffer);
 }
 
 // =====================================================================================================================

@@ -24,84 +24,67 @@
  **********************************************************************************************************************/
 /**
 ***********************************************************************************************************************
-* @file  llpcPipelineShaders.cpp
-* @brief LLPC source file: contains implementation of class Llpc::PipelineShaders
+* @file  llpcPatchSetupTargetFeatures.cpp
+* @brief LLPC source file: contains declaration and implementation of class Llpc::PatchSetupTargetFeatures.
 ***********************************************************************************************************************
 */
-#define DEBUG_TYPE "llpc-pipeline-shaders"
-
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
-#include "llpcInternal.h"
-#include "llpcPipelineShaders.h"
+#include "llpcCodeGenManager.h"
+#include "llpcPatch.h"
+
+#define DEBUG_TYPE "llpc-patch-setup-target-features"
 
 using namespace llvm;
 using namespace Llpc;
 
-char PipelineShaders::ID = 0;
+namespace Llpc
+{
 
 // =====================================================================================================================
-// Create an instance of the pass.
-ModulePass* CreatePipelineShaders()
+// Pass to set up target features on shader entry-points
+class PatchSetupTargetFeatures : public Patch
 {
-    return new PipelineShaders();
+public:
+    static char ID;
+    PatchSetupTargetFeatures() : Patch(ID)
+    {
+        initializePatchSetupTargetFeaturesPass(*PassRegistry::getPassRegistry());
+    }
+
+    bool runOnModule(Module& module) override;
+
+private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchSetupTargetFeatures);
+};
+
+char PatchSetupTargetFeatures::ID = 0;
+
+} // Llpc
+
+// =====================================================================================================================
+// Create pass to set up target features
+ModulePass* Llpc::CreatePatchSetupTargetFeatures()
+{
+    return new PatchSetupTargetFeatures();
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
-//
-// This populates the shader array. In the pipeline module, a shader entrypoint is a non-internal function definition,
-// and it has metadata giving the SPIR-V execution model.
-bool PipelineShaders::runOnModule(
+bool PatchSetupTargetFeatures::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
-    m_entryPointMap.clear();
-    for (auto& pEntryPoint : m_entryPoints)
-    {
-        pEntryPoint = nullptr;
-    }
+    Patch::Init(&module);
 
-    for (auto& func : module)
-    {
-        if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
-        {
-            auto shaderStage = GetShaderStageFromFunction(&func);
-            m_entryPoints[shaderStage] = &func;
-            m_entryPointMap[&func] = shaderStage;
-        }
-    }
-    return false;
-}
+    CodeGenManager::SetupTargetFeatures(&module);
 
-// =====================================================================================================================
-// Get the shader for a particular API shader stage, or nullptr if none
-Function* PipelineShaders::GetEntryPoint(
-    ShaderStage shaderStage     // Shader stage
-    ) const
-{
-    LLPC_ASSERT((uint32_t)shaderStage < ShaderStageCountInternal);
-    return m_entryPoints[shaderStage];
-}
-
-// =====================================================================================================================
-// Get the ABI shader stage for a particular function, or ShaderStageInvalid if not a shader entrypoint.
-ShaderStage PipelineShaders::GetShaderStage(
-    const Function* pFunc  // [in] Function to look up
-    ) const
-{
-    auto entryMapIt = m_entryPointMap.find(pFunc);
-    if (entryMapIt == m_entryPointMap.end())
-    {
-        return ShaderStageInvalid;
-    }
-    return entryMapIt->second;
+    return true; // Modified the module.
 }
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(PipelineShaders, DEBUG_TYPE, "LLVM pass for getting pipeline shaders", false, true)
+INITIALIZE_PASS(PatchSetupTargetFeatures, DEBUG_TYPE, "Patch LLVM to set up target features", false, false)
 

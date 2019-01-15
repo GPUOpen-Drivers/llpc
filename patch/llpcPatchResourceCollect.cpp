@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -995,13 +995,15 @@ void PatchResourceCollect::MatchGenericInOut()
             for (auto& locMap : outLocMap)
             {
                 uint32_t loc = locMap.first;
+                bool outputXfb = false;
                 if (m_shaderStage == ShaderStageGeometry)
                 {
                     uint32_t outLocInfo = locMap.first;
                     loc = reinterpret_cast<GsOutLocInfo*>(&outLocInfo)->location;
+                    outputXfb = inOutUsage.gs.xfbOutsInfo.find(outLocInfo) != inOutUsage.gs.xfbOutsInfo.end();
                 }
 
-                if (nextInLocMap.find(loc) == nextInLocMap.end())
+                if ((nextInLocMap.find(loc) == nextInLocMap.end()) && (outputXfb == false))
                 {
                     if (m_hasDynIndexedOutput || (m_importedOutputLocs.find(loc) != m_importedOutputLocs.end()))
                     {

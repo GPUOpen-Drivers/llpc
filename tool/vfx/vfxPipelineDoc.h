@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -52,6 +52,8 @@ public:
         return m_MaxSectionCount[type];
     }
 
+    virtual bool Validate();
+
     virtual bool CheckVersion(uint32_t ver);
     VfxPipelineStatePtr GetDocument();
 
@@ -59,6 +61,8 @@ private:
     static uint32_t m_MaxSectionCount[SectionTypeNameNum];    // Contants max section count for each section type
     VfxPipelineState m_pipelineState;                         // Contants the render state
     VkPipelineVertexInputStateCreateInfo m_vertexInputState;
+    std::vector<Vfx::ShaderSource> m_shaderSources;
+    std::vector<PipelineShaderInfo> m_shaderInfos;
 };
 
 }

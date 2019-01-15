@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -62,6 +62,7 @@ public:
 
     virtual uint32_t GetMaxSectionCount(SectionType type) = 0;
     virtual bool CheckVersion(uint32_t ver) { return true; }
+    virtual bool Validate() { return true; }
 
     static Document* CreateDocument(VfxDocType type);
 
@@ -74,6 +75,7 @@ public:
 
 protected:
     std::vector<Section*>  m_sections[SectionTypeNameNum]; // Contains sections
+    std::vector<Section*>  m_sectionList;
     std::string            m_errorMsg;                     // Error message
 
 private:

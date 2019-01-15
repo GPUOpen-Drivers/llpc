@@ -243,10 +243,13 @@ public:
       auto DF = getDIFile(SpDbg.getFunctionFileStr(SF));
       auto FN = F->getName();
       auto LN = SpDbg.getFunctionLineNo(SF);
+      auto SPFlags = DISubprogram::SPFlagDefinition;
+      if (Function::isInternalLinkage(F->getLinkage()))
+        SPFlags |= DISubprogram::SPFlagLocalToUnit;
       return Builder.createFunction(
           DF, FN, FN, DF, LN,
           Builder.createSubroutineType(Builder.getOrCreateTypeArray(None)),
-          Function::isInternalLinkage(F->getLinkage()), true, LN);
+          LN, DINode::FlagZero, SPFlags);
     });
   }
 
@@ -4332,10 +4335,12 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
 
       SPIRVWord XfbBuffer = SPIRVID_INVALID;
       if (BV->hasDecorate(DecorationXfbBuffer, 0, &XfbBuffer)) {
+        InOutDec.IsXfb = true;
         InOutDec.XfbBuffer = XfbBuffer;
       }
       SPIRVWord XfbStride = SPIRVID_INVALID;
       if (BV->hasDecorate(DecorationXfbStride, 0, &XfbStride)) {
+        InOutDec.IsXfb = true;
         InOutDec.XfbStride = XfbStride;
       }
 
@@ -4343,7 +4348,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       if (BV->hasDecorate(DecorationOffset, 0, &XfbOffset)) {
         // NOTE: Transform feedback is triggered only if "xfb_offset"
         // is specified.
-        InOutDec.IsXfb = true;
         InOutDec.XfbOffset = XfbOffset;
       }
 
@@ -4838,8 +4842,9 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
         MemberDec.PerPatch = true;
 
       SPIRVWord XfbOffset = SPIRVID_INVALID;
-      if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset))
+      if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset)) {
         MemberDec.XfbOffset = XfbOffset;
+      }
 
       SPIRVWord MemberStreamId = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -131,6 +131,40 @@ static cl::opt<std::string> EntryTarget("entry-target",
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
 
+namespace llvm
+{
+
+namespace cl
+{
+
+extern opt<bool> EnablePipelineDump;
+extern opt<std::string> PipelineDumpDir;
+
+// -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
+static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
+                                              desc("Filter which types of pipeline dump are disabled\n"
+                                                   "0x00 - Always enable pipeline logging\n"
+                                                   "0x01 - Disable logging for CS pipelines\n"
+                                                   "0x02 - Disable logging for NGG pipelines\n"
+                                                   "0x04 - Disable logging for GS pipelines\n"
+                                                   "0x08 - Disable logging for TS pipelines\n"
+                                                   "0x10 - Disable logging for VS-PS pipelines"),
+                                              init(0));
+
+//// -filter-pipeline-dump-by-hash: only dump the pipeline whose computed hash is equal to the specified (if non-zero).
+static opt<uint64_t> FilterPipelineDumpByHash("filter-pipeline-dump-by-hash",
+                                              desc("Only dump the pipeline whose computed hash is equal to the specified (if non-zero)"),
+                                              init(0));
+
+//-dump-duplicate-pipelines: dump duplicated pipeline, attaching a numeric suffix
+static opt<bool> DumpDuplicatePipelines("dump-duplicate-pipelines",
+    desc("If TRUE, duplicate pipelines will be dumped to a file with a numeric suffix attached"),
+    init(false));
+
+} // cl
+
+} // llvm
+
 #ifdef WIN_OS
 // -assert-to-msgbox: pop message box when an assert is hit, only valid in Windows
 static cl::opt<bool>        AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
@@ -142,12 +176,6 @@ namespace LlpcExt
 
 const char SpirvBin[]       = ".spv";
 const char SpirvText[]      = ".spvas";
-const char GlslTextVs[]     = ".vert";
-const char GlslTextTcs[]    = ".tesc";
-const char GlslTextTes[]    = ".tese";
-const char GlslTextGs[]     = ".geom";
-const char GlslTextFs[]     = ".frag";
-const char GlslTextCs[]     = ".comp";
 const char PipelineInfo[]   = ".pipe";
 const char LlvmIr[]         = ".ll";
 
@@ -175,15 +203,14 @@ struct CompileInfo
 // =====================================================================================================================
 // Translates GLSL source language to corresponding shader stage.
 static ShaderStage SourceLangToShaderStage(
-    EShLanguage sourceLang) // GLSL source language
+    SpvGenStage sourceLang) // GLSL source language
 {
-    static_assert(EShLangVertex         == 0, "Unexpected value!");
-    static_assert(EShLangTessControl    == 1, "Unexpected value!");
-    static_assert(EShLangTessEvaluation == 2, "Unexpected value!");
-    static_assert(EShLangGeometry       == 3, "Unexpected value!");
-    static_assert(EShLangFragment       == 4, "Unexpected value!");
-    static_assert(EShLangCompute        == 5, "Unexpected value!");
-    static_assert(EShLangCount          == 6, "Unexpected value!");
+    static_assert(SpvGenStageVertex         == 0, "Unexpected value!");
+    static_assert(SpvGenStageTessControl    == 1, "Unexpected value!");
+    static_assert(SpvGenStageTessEvaluation == 2, "Unexpected value!");
+    static_assert(SpvGenStageGeometry       == 3, "Unexpected value!");
+    static_assert(SpvGenStageFragment       == 4, "Unexpected value!");
+    static_assert(SpvGenStageCompute        == 5, "Unexpected value!");
 
     return static_cast<ShaderStage>(sourceLang);
 }
@@ -393,37 +420,6 @@ void* VKAPI_CALL AllocateBuffer(
 }
 
 // =====================================================================================================================
-// Checks whether the specified file name represents a GLSL source text file (.vert, .tesc, .tese, .geom, .frag, or
-// .comp).
-static bool IsGlslTextFile(
-    const std::string& fileName)    // [in] File name to check
-{
-    bool isGlslText = false;
-
-    std::string extName;
-    size_t extPos = fileName.find_last_of(".");
-    if (extPos != std::string::npos)
-    {
-        extName = fileName.substr(extPos, fileName.size() - extPos);
-    }
-
-    if (extName.empty() == false)
-    {
-        if ((extName == LlpcExt::GlslTextVs)  ||
-            (extName == LlpcExt::GlslTextTcs) ||
-            (extName == LlpcExt::GlslTextTes) ||
-            (extName == LlpcExt::GlslTextGs)  ||
-            (extName == LlpcExt::GlslTextFs)  ||
-            (extName == LlpcExt::GlslTextCs))
-        {
-            isGlslText = true;
-        }
-    }
-
-    return isGlslText;
-}
-
-// =====================================================================================================================
 // Checks whether the specified file name represents a SPRI-V assembly text file (.spvas).
 static bool IsSpirvTextFile(
     const std::string& fileName)
@@ -512,49 +508,6 @@ static bool IsLlvmIrFile(
 }
 
 // =====================================================================================================================
-// Gets GLSL source language from file extension.
-static EShLanguage GetGlslSourceLang(
-    const std::string& fileName)    // [in] Name of GLSL source text file
-{
-    EShLanguage sourceLang = EShLangCount;
-
-    std::string extName;
-
-    size_t extPos = fileName.find_last_of(".");
-    if (extPos != std::string::npos)
-    {
-        extName = fileName.substr(extPos, fileName.size() - extPos);
-    }
-
-    if (extName == LlpcExt::GlslTextVs)
-    {
-        sourceLang = EShLangVertex;
-    }
-    else if (extName == LlpcExt::GlslTextTcs)
-    {
-        sourceLang = EShLangTessControl;
-    }
-    else if (extName == LlpcExt::GlslTextTes)
-    {
-        sourceLang = EShLangTessEvaluation;
-    }
-    else if (extName == LlpcExt::GlslTextGs)
-    {
-        sourceLang = EShLangGeometry;
-    }
-    else if (extName == LlpcExt::GlslTextFs)
-    {
-        sourceLang = EShLangFragment;
-    }
-    else if (extName == LlpcExt::GlslTextCs)
-    {
-        sourceLang = EShLangCompute;
-    }
-
-    return sourceLang;
-}
-
-// =====================================================================================================================
 // Gets SPIR-V binary codes from the specified binary file.
 static Result GetSpirvBinaryFromFile(
     const std::string& spvBinFile,  // [in] SPIR-V binary file
@@ -603,8 +556,14 @@ static Result CompileGlsl(
     }
 
     Result result = Result::Success;
+    bool isHlsl = false;
 
-    EShLanguage lang = GetGlslSourceLang(inFile);
+    SpvGenStage lang = spvGetStageTypeFromName(inFile.c_str(), &isHlsl);
+    if (lang == SpvGenStageInvalid)
+    {
+        LLPC_ERRS("File " << inFile << ": Bad file extension; try -help\n");
+        return Result::ErrorInvalidShader;
+    }
     *pStage = SourceLangToShaderStage(lang);
 
     FILE* pInFile = fopen(inFile.c_str(), "r");
@@ -644,26 +603,28 @@ static Result CompileGlsl(
         LLPC_OUTS(pGlslText);
         LLPC_OUTS("\n\n");
 
-        int32_t sourceStringCount[EShLangCount] = {};
-        const char*const* sourceList[EShLangCount] = {};
-        sourceStringCount[lang] = 1;
-        sourceList[lang] = &pGlslText;
+        int32_t sourceStringCount = 1;
+        const char*const* sourceList[1] = {};
+        sourceList[0] = &pGlslText;
 
         void* pProgram = nullptr;
         const char* pLog = nullptr;
-        int compileOption = EOptionDefaultDesktop | EOptionVulkanRules | EOptionDebug;
-        bool compileResult = spvCompileAndLinkProgramWithOptions(sourceStringCount,
-                                                                 sourceList,
-                                                                 &pProgram,
-                                                                 &pLog,
-                                                                 compileOption);
+        int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+        bool compileResult = spvCompileAndLinkProgramEx(1,
+                                                        &lang,
+                                                        &sourceStringCount,
+                                                        sourceList,
+                                                        nullptr,
+                                                        &pProgram,
+                                                        &pLog,
+                                                        compileOption);
 
         LLPC_OUTS("// GLSL program compile/link log\n");
 
         if (compileResult)
         {
             const uint32_t* pSpvBin = nullptr;
-            uint32_t binSize = spvGetSpirvBinaryFromProgram(pProgram, lang, &pSpvBin);
+            uint32_t binSize = spvGetSpirvBinaryFromProgram(pProgram, 0, &pSpvBin);
             fwrite(pSpvBin, 1, binSize, pOutFile);
 
             textSize = binSize * 10 + 1024;
@@ -872,9 +833,32 @@ static Result BuildPipeline(
             pPipelineInfo->iaState.patchControlPoints = 3;
         }
 
-        result = pCompiler->BuildGraphicsPipeline(pPipelineInfo, pPipelineOut);
+        void* pPipelineDumpHandle = nullptr;
+        if (llvm::cl::EnablePipelineDump)
+        {
+            PipelineDumpOptions dumpOptions = {};
+            dumpOptions.pDumpDir                 = llvm::cl::PipelineDumpDir.c_str();
+            dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
+            dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
+            dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
+            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(
+                &dumpOptions, nullptr, pPipelineInfo);
+        }
+
+        result = pCompiler->BuildGraphicsPipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+
         if (result == Result::Success)
         {
+            if (llvm::cl::EnablePipelineDump)
+            {
+                Llpc::BinaryData pipelineBinary = {};
+                pipelineBinary.codeSize = pPipelineOut->pipelineBin.codeSize;
+                pipelineBinary.pCode = pPipelineOut->pipelineBin.pCode;
+                Llpc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
+
+                Llpc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
+            }
+
             result = DecodePipelineBinary(&pPipelineOut->pipelineBin, pCompileInfo, true);
         }
     }
@@ -898,9 +882,32 @@ static Result BuildPipeline(
         pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
         pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
 
-        result = pCompiler->BuildComputePipeline(pPipelineInfo, pPipelineOut);
+        void* pPipelineDumpHandle = nullptr;
+        if (llvm::cl::EnablePipelineDump)
+        {
+            PipelineDumpOptions dumpOptions = {};
+            dumpOptions.pDumpDir                 = llvm::cl::PipelineDumpDir.c_str();
+            dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
+            dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
+            dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
+            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(
+                &dumpOptions, pPipelineInfo, nullptr);
+        }
+
+        result = pCompiler->BuildComputePipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+
         if (result == Result::Success)
         {
+            if (llvm::cl::EnablePipelineDump)
+            {
+                Llpc::BinaryData pipelineBinary = {};
+                pipelineBinary.codeSize = pPipelineOut->pipelineBin.codeSize;
+                pipelineBinary.pCode = pPipelineOut->pipelineBin.pCode;
+                Llpc::IPipelineDumper::DumpPipelineBinary(pPipelineDumpHandle, ParsedGfxIp, &pipelineBinary);
+
+                Llpc::IPipelineDumper::EndPipelineDump(pPipelineDumpHandle);
+            }
+
             result = DecodePipelineBinary(&pPipelineOut->pipelineBin, pCompileInfo, false);
         }
     }
@@ -1025,18 +1032,7 @@ static Result ProcessPipeline(
         const std::string& inFile = inFiles[i];
         std::string spvBinFile;
 
-        if (IsGlslTextFile(inFile))
-        {
-            // GLSL source text
-            ShaderStage stage = ShaderStageInvalid;
-            result = CompileGlsl(inFile, &stage, spvBinFile);
-            if (result == Result::Success)
-            {
-                compileInfo.stageMask |= ShaderStageToMask(stage);
-                result = GetSpirvBinaryFromFile(spvBinFile, &compileInfo.spirvBin[stage]);
-            }
-        }
-        else if (IsSpirvTextFile(inFile) || IsSpirvBinaryFile(inFile))
+        if (IsSpirvTextFile(inFile) || IsSpirvBinaryFile(inFile))
         {
             // SPIR-V assembly text or SPIR-V binary
             if (IsSpirvTextFile(inFile))
@@ -1252,10 +1248,15 @@ static Result ProcessPipeline(
         }
         else
         {
-            LLPC_ERRS("File " << inFile << ": Bad file extension; try -help\n");
-            result = Result::ErrorInvalidShader;
+            // GLSL source text
+            ShaderStage stage = ShaderStageInvalid;
+            result = CompileGlsl(inFile, &stage, spvBinFile);
+            if (result == Result::Success)
+            {
+                compileInfo.stageMask |= ShaderStageToMask(stage);
+                result = GetSpirvBinaryFromFile(spvBinFile, &compileInfo.spirvBin[stage]);
+            }
         }
-
     }
 
     //

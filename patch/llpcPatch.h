@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -58,13 +58,14 @@ void initializePatchEntryPointMutatePass(PassRegistry&);
 void initializePatchGroupOpPass(PassRegistry&);
 void initializePatchImageOpPass(PassRegistry&);
 void initializePatchInOutImportExportPass(PassRegistry&);
-void initializePatchIncludeLlvmIrPass(PassRegistry&);
+void initializePatchLlvmIrInclusionPass(PassRegistry&);
 void initializePatchLoopUnrollInfoRectifyPass(PassRegistry&);
 void initializePatchNullFragShaderPass(PassRegistry&);
 void initializePatchPeepholeOptPass(PassRegistry&);
 void initializePatchPreparePipelineAbiPass(PassRegistry&);
 void initializePatchPushConstOpPass(PassRegistry&);
 void initializePatchResourceCollectPass(PassRegistry&);
+void initializePatchSetupTargetFeaturesPass(PassRegistry&);
 
 } // llvm
 
@@ -90,24 +91,26 @@ inline static void InitializePatchPasses(
   initializePatchPreparePipelineAbiPass(passRegistry);
   initializePatchPushConstOpPass(passRegistry);
   initializePatchResourceCollectPass(passRegistry);
+  initializePatchSetupTargetFeaturesPass(passRegistry);
 }
 
 llvm::ModulePass* CreatePatchAddrSpaceMutate();
 llvm::ModulePass* CreatePatchAutoLayoutDesc();
-llvm::ModulePass* CreatePatchDescriptorLoad();
 llvm::ModulePass* CreatePatchBufferOp();
 llvm::ModulePass* CreatePatchCopyShader();
+llvm::ModulePass* CreatePatchDescriptorLoad();
 llvm::ModulePass* CreatePatchEntryPointMutate();
 llvm::ModulePass* CreatePatchGroupOp();
 llvm::ModulePass* CreatePatchImageOp();
 llvm::ModulePass* CreatePatchInOutImportExport();
-llvm::ModulePass* CreatePatchIncludeLlvmIr();
+llvm::ModulePass* CreatePatchLlvmIrInclusion();
 llvm::FunctionPass* CreatePatchLoopUnrollInfoRectify();
 llvm::ModulePass* CreatePatchNullFragShader();
 llvm::FunctionPass* CreatePatchPeepholeOpt();
 llvm::ModulePass* CreatePatchPreparePipelineAbi();
 llvm::ModulePass* CreatePatchPushConstOp();
 llvm::ModulePass* CreatePatchResourceCollect();
+llvm::ModulePass* CreatePatchSetupTargetFeatures();
 
 class Context;
 

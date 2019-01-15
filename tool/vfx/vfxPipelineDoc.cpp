@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,10 @@
 ***********************************************************************************************************************
 */
 #include "vfxPipelineDoc.h"
+#if VFX_INSIDE_SPVGEN
+#define SH_EXPORTING
+#endif
+#include "spvgen.h"
 
 namespace Vfx
 {
@@ -89,6 +93,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
     if (m_sections[SectionTypeGraphicsState].size() > 0)
     {
         GraphicsPipelineState graphicState;
+        m_pipelineState.pipelineType = VfxPipelineTypeGraphics;
         reinterpret_cast<SectionGraphicsState*>(m_sections[SectionTypeGraphicsState][0])->GetSubState(graphicState);
         auto pGfxPipelineInfo = &m_pipelineState.gfxPipelineInfo;
         pGfxPipelineInfo->iaState.topology                = graphicState.topology;
@@ -120,9 +125,7 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
                 graphicState.colorBuffer[i].blendSrcAlphaToColor ? true : false;
         }
 
-        pGfxPipelineInfo->options.includeDisassembly      = graphicState.includeDisassembly ? true : false;
-        pGfxPipelineInfo->options.autoLayoutDesc          = graphicState.autoLayoutDesc ? true : false;
-        pGfxPipelineInfo->options.scalarBlockLayout       = graphicState.scalarBlockLayout ? true : false;
+        pGfxPipelineInfo->options = graphicState.options;
 
     }
 
@@ -130,12 +133,11 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
     if (m_sections[SectionTypeComputeState].size() > 0)
     {
         ComputePipelineState computeState;
+        m_pipelineState.pipelineType = VfxPipelineTypeCompute;
         reinterpret_cast<SectionComputeState*>(m_sections[SectionTypeComputeState][0])->GetSubState(computeState);
         auto pComputePipelineInfo = &m_pipelineState.compPipelineInfo;
-        pComputePipelineInfo->deviceIndex                = computeState.deviceIndex;
-        pComputePipelineInfo->options.includeDisassembly = computeState.includeDisassembly ? true : false;
-        pComputePipelineInfo->options.autoLayoutDesc     = computeState.autoLayoutDesc ? true : false;
-        pComputePipelineInfo->options.scalarBlockLayout  = computeState.scalarBlockLayout ? true : false;
+        pComputePipelineInfo->deviceIndex = computeState.deviceIndex;
+        pComputePipelineInfo->options     = computeState.options;
     }
 
     // Section "VertexInputState"
@@ -146,34 +148,115 @@ VfxPipelineStatePtr PipelineDocument::GetDocument()
         m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
     }
 
-    PipelineShaderInfo* shaderInfo[ShaderStageCount] =
+    if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
+        m_pipelineState.pipelineType == VfxPipelineTypeCompute)
     {
-        &m_pipelineState.gfxPipelineInfo.vs,
-        &m_pipelineState.gfxPipelineInfo.tcs,
-        &m_pipelineState.gfxPipelineInfo.tes,
-        &m_pipelineState.gfxPipelineInfo.gs,
-        &m_pipelineState.gfxPipelineInfo.fs,
-        &m_pipelineState.compPipelineInfo.cs,
-    };
-
-    for (uint32_t i = 0; i < ShaderStageCount; ++i)
-    {
-        // shader section
-        if (m_sections[SectionTypeVertexShader + i].size() > 0)
+        PipelineShaderInfo* shaderInfo[NativeShaderStageCount] =
         {
-            reinterpret_cast<SectionShader*>(m_sections[SectionTypeVertexShader + i][0])->
-                GetSubState(m_pipelineState.stages[i]);
-        }
+            &m_pipelineState.gfxPipelineInfo.vs,
+            &m_pipelineState.gfxPipelineInfo.tcs,
+            &m_pipelineState.gfxPipelineInfo.tes,
+            &m_pipelineState.gfxPipelineInfo.gs,
+            &m_pipelineState.gfxPipelineInfo.fs,
+            &m_pipelineState.compPipelineInfo.cs,
+        };
 
-        // shader info Section "XXInfo"
-        if (m_sections[SectionTypeVertexShaderInfo + i].size() > 0)
+        m_shaderSources.resize(NativeShaderStageCount);
+        m_pipelineState.numStages = NativeShaderStageCount;
+        m_pipelineState.stages = &m_shaderSources[0];
+        for (uint32_t i = 0; i < NativeShaderStageCount; ++i)
         {
-            reinterpret_cast<SectionShaderInfo*>(m_sections[SectionTypeVertexShaderInfo + i][0])->
-                GetSubState(*(shaderInfo[i]));
+            // shader section
+            if (m_sections[SectionTypeVertexShader + i].size() > 0)
+            {
+                reinterpret_cast<SectionShader*>(m_sections[SectionTypeVertexShader + i][0])->
+                    GetSubState(m_pipelineState.stages[i]);
+            }
+
+            // shader info Section "XXInfo"
+            if (m_sections[SectionTypeVertexShaderInfo + i].size() > 0)
+            {
+                reinterpret_cast<SectionShaderInfo*>(m_sections[SectionTypeVertexShaderInfo + i][0])->
+                    GetSubState(*(shaderInfo[i]));
+            }
         }
     }
 
     return &m_pipelineState;
+}
+
+// =====================================================================================================================
+// Validates whether sections in this document are valid.
+bool PipelineDocument::Validate()
+{
+    uint32_t stageMask = 0;
+    for (size_t i = 0; i < m_sectionList.size(); ++i)
+    {
+        auto sectionType = m_sectionList[i]->GetSectionType();
+        if ((sectionType >= SectionTypeVertexShader) &&
+            (sectionType < (SectionTypeVertexShader + ShaderStageCount)))
+        {
+            auto stage = sectionType - SectionTypeVertexShader;
+            stageMask |= (1 << stage);
+            if (i == m_sectionList.size())
+            {
+                PARSE_ERROR(m_errorMsg, m_sectionList[i]->GetLineNum(), "Fails to find related shader info section!\n");
+                return false;
+            }
+            else
+            {
+                auto nextSectionType = m_sectionList[i + 1]->GetSectionType();
+                if (nextSectionType != (SectionTypeVertexShaderInfo + stage))
+                {
+                    PARSE_ERROR(m_errorMsg,
+                                m_sectionList[i + 1]->GetLineNum(),
+                                "Unexpected section type. Shader source and shader info must be in pair!\n");
+                    return false;
+                }
+            }
+        }
+    }
+    const uint32_t GraphicsStageMask = (
+        (1 << SpvGenStageVertex) |
+        (1 << SpvGenStageTessControl) |
+        (1 << SpvGenStageTessEvaluation) |
+        (1 << SpvGenStageGeometry) |
+        (1 << SpvGenStageFragment)
+        );
+    const uint32_t ComputeStageMask = (1 << SpvGenStageCompute);
+
+    if (((stageMask & GraphicsStageMask) && (stageMask & ComputeStageMask))
+        )
+    {
+        PARSE_ERROR(m_errorMsg,
+            0,
+            "Stage Conflict! Different pipeline stage can't in same pipeline file.\n");
+        return false;
+    }
+
+    if (stageMask & GraphicsStageMask)
+    {
+        if (m_sections[SectionTypeComputeState].size() != 0)
+        {
+            PARSE_ERROR(m_errorMsg,
+                m_sections[SectionTypeComputeState][0]->GetLineNum(),
+                "Section ComputePipelineState conflict with graphic shader stages\n");
+            return false;
+        }
+    }
+
+    if (stageMask & ComputeStageMask)
+    {
+        if (m_sections[SectionTypeGraphicsState].size() != 0)
+        {
+            PARSE_ERROR(m_errorMsg,
+                m_sections[SectionTypeGraphicsState][0]->GetLineNum(),
+                "Section GraphicsPipelineState conflict with compute shader stages\n");
+            return false;
+        }
+    }
+
+    return true;
 }
 
 }

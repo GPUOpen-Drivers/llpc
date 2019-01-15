@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -78,28 +78,10 @@ namespace cl
 {
 
 // -pipeline-dump-dir: directory where pipeline info are dumped
-static opt<std::string> PipelineDumpDir("pipeline-dump-dir",
-                                        desc("Directory where pipeline shader info are dumped"),
-                                        value_desc("dir"),
-                                        init("."));
-
-static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
-                                              desc("Filter which types of pipeline dump are disabled\n"
-                                                   "0x00 - Do not disable logging based on pipeline type\n"
-                                                   "0x01 - Disable logging for CS pipelines\n"
-                                                   "0x02 - Disable logging for NGG pipelines\n"
-                                                   "0x04 - Disable logging for GS pipelines\n"
-                                                   "0x08 - Disable logging for TS pipelines\n"
-                                                   "0x10 - Disable logging for VS-PS pipelines"),
-                                              init(0));
-
-static opt<uint64_t> FilterPipelineDumpByHash("filter-pipeline-dump-by-hash",
-                                              desc("Only dump the pipeline with this compiler hash if non-zero"),
-                                              init(0));
-
-static opt<bool> DumpDuplicatePipelines("dump-duplicate-pipelines",
-    desc("If TRUE, duplicate pipelines will be dumped to a file with a numeric suffix attached"),
-    init(false));
+opt<std::string> PipelineDumpDir("pipeline-dump-dir",
+                                 desc("Directory where pipeline shader info are dumped"),
+                                 value_desc("dir"),
+                                 init("."));
 
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
@@ -574,7 +556,7 @@ Result Compiler::BuildPipelineInternal(
         {
             passMgr.add(createPrintModulePass(outs(),
                         "===============================================================================\n"
-                        "// LLPC SPIRV-to-LLVM translation results\n\n"));
+                        "// LLPC SPIRV-to-LLVM translation results\n"));
         }
 
         result = CodeGenManager::Run(pPipelineModule, passMgr);
@@ -606,14 +588,6 @@ Result Compiler::BuildPipelineInternal(
 
         // Patching.
         Patch::AddPasses(pContext, passMgr);
-
-        // Dump the module just before codegen.
-        if (EnableOuts())
-        {
-            passMgr.add(createPrintModulePass(outs(),
-                        "===============================================================================\n"
-                        "// LLPC final pipeline module info\n\n"));
-        }
     }
 
     // Run the "whole pipeline" passes, excluding the target backend.
@@ -622,7 +596,11 @@ Result Compiler::BuildPipelineInternal(
         TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
 
         result = CodeGenManager::Run(pPipelineModule, passMgr);
-        if (result != Result::Success)
+        if (result == Result::Success)
+        {
+            CodeGenManager::SetupTargetFeatures(pPipelineModule);
+        }
+        else
         {
             LLPC_ERRS("Fails to run whole pipeline passes\n");
         }
@@ -676,8 +654,9 @@ Result Compiler::BuildGraphicsPipelineInternal(
 // =====================================================================================================================
 // Build graphics pipeline from the specified info.
 Result Compiler::BuildGraphicsPipeline(
-    const GraphicsPipelineBuildInfo* pPipelineInfo, // [in] Info to build this graphics pipeline
-    GraphicsPipelineBuildOut*        pPipelineOut)  // [out] Output of building this graphics pipeline
+    const GraphicsPipelineBuildInfo* pPipelineInfo,     // [in] Info to build this graphics pipeline
+    GraphicsPipelineBuildOut*        pPipelineOut,      // [out] Output of building this graphics pipeline
+    void*                            pPipelineDumpFile) // [in] Handle of pipeline dump file
 {
     Result           result  = Result::Success;
     CacheEntryHandle hEntry  = nullptr;
@@ -780,16 +759,8 @@ Result Compiler::BuildGraphicsPipeline(
         LLPC_OUTS("\n");
     }
 
-    PipelineDumpFile* pPipelineDumperFile = nullptr;
-
-    if ((result == Result::Success) && cl::EnablePipelineDump)
+    if ((result == Result::Success) && (pPipelineDumpFile != nullptr))
     {
-        PipelineDumpOptions dumpOptions = {};
-        dumpOptions.pDumpDir                 = cl::PipelineDumpDir.c_str();
-        dumpOptions.filterPipelineDumpByType = cl::FilterPipelineDumpByType;
-        dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
-        dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
-        pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, nullptr, pPipelineInfo, &pipelineHash);
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
         for (auto& option : m_options)
@@ -797,7 +768,7 @@ Result Compiler::BuildGraphicsPipeline(
             strStream << option << " ";
         }
         std::string extraInfo = strStream.str();
-        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
+        PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -937,24 +908,18 @@ Result Compiler::BuildGraphicsPipeline(
         pPipelineOut->pipelineBin.pCode = pCode;
     }
 
-    if (pPipelineDumperFile != nullptr)
+    if (pPipelineDumpFile != nullptr)
     {
         if (result == Result::Success)
         {
-            PipelineDumper::DumpPipelineBinary(pPipelineDumperFile,
-                                               m_gfxIp,
-                                               &pPipelineOut->pipelineBin);
-
             if (needRecompile)
             {
                 std::stringstream strStream;
                 strStream << "Dynamic loop unroll enabled: loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n";
                 std::string extraInfo = strStream.str();
-                PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
+                PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
             }
         }
-
-        PipelineDumper::EndPipelineDump(pPipelineDumperFile);
     }
 
     // Free shader replacement allocations and restore original shader module
@@ -1009,8 +974,9 @@ Result Compiler::BuildComputePipelineInternal(
 // =====================================================================================================================
 // Build compute pipeline from the specified info.
 Result Compiler::BuildComputePipeline(
-    const ComputePipelineBuildInfo* pPipelineInfo,  // [in] Info to build this compute pipeline
-    ComputePipelineBuildOut*        pPipelineOut)   // [out] Output of building this compute pipeline
+    const ComputePipelineBuildInfo* pPipelineInfo,     // [in] Info to build this compute pipeline
+    ComputePipelineBuildOut*        pPipelineOut,      // [out] Output of building this compute pipeline
+    void*                           pPipelineDumpFile) // [in] Handle of pipeline dump file
 {
     CacheEntryHandle hEntry    = nullptr;
     const void*      pElf      = nullptr;
@@ -1086,15 +1052,8 @@ Result Compiler::BuildComputePipeline(
         LLPC_OUTS("\n");
     }
 
-    PipelineDumpFile* pPipelineDumperFile = nullptr;
-    if ((result == Result::Success) && cl::EnablePipelineDump)
+    if ((result == Result::Success) && (pPipelineDumpFile != nullptr))
     {
-        PipelineDumpOptions dumpOptions = {};
-        dumpOptions.pDumpDir                 = cl::PipelineDumpDir.c_str();
-        dumpOptions.filterPipelineDumpByType = cl::FilterPipelineDumpByType;
-        dumpOptions.filterPipelineDumpByHash = cl::FilterPipelineDumpByHash;
-        dumpOptions.dumpDuplicatePipelines   = cl::DumpDuplicatePipelines;
-        pPipelineDumperFile = PipelineDumper::BeginPipelineDump(&dumpOptions, pPipelineInfo, nullptr, &pipelineHash);
         std::stringstream strStream;
         strStream << ";Compiler Options: ";
         for (auto& option : m_options)
@@ -1102,7 +1061,7 @@ Result Compiler::BuildComputePipeline(
             strStream << option << " ";
         }
         std::string extraInfo = strStream.str();
-        PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
+        PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
     }
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -1245,24 +1204,18 @@ Result Compiler::BuildComputePipeline(
         pPipelineOut->pipelineBin.pCode = pCode;
     }
 
-    if (pPipelineDumperFile != nullptr)
+    if (pPipelineDumpFile != nullptr)
     {
         if (result == Result::Success)
         {
-            PipelineDumper::DumpPipelineBinary(pPipelineDumperFile,
-                                               m_gfxIp,
-                                               &pPipelineOut->pipelineBin);
-
             if (needRecompile)
             {
                 std::stringstream strStream;
                 strStream << "Dynamic loop unroll enabled: loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n";
                 std::string extraInfo = strStream.str();
-                PipelineDumper::DumpPipelineExtraInfo(pPipelineDumperFile, &extraInfo);
+                PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
             }
         }
-
-        PipelineDumper::EndPipelineDump(pPipelineDumperFile);
     }
 
     // Free shader replacement allocations and restore original shader module

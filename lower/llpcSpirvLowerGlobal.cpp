@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -1694,9 +1694,16 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
         if (outputMeta.IsXfb)
         {
+            // NOTE: If the relative location offset is not specified, initialize it to 0.
+            if (pLocOffset == nullptr)
+            {
+                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+            }
+
             instName = LlpcName::OutputExportXfb;
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbBuffer));
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbOffset));
+            args.push_back(pLocOffset);
             args.push_back(pOutputValue);
             AddTypeMangling(nullptr, args, instName);
             EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);

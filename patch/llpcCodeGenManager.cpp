@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -103,7 +103,7 @@ class LlpcDiagnosticHandler: public llvm::DiagnosticHandler
             else if (EnableOuts())
             {
                 DiagnosticPrinterRawOStream printStream(outs());
-                printStream << "\n=====  LLVM DIAGNOSIS START  =====\n\n";
+                printStream << "\n\n=====  LLVM DIAGNOSIS START  =====\n\n";
                 diagInfo.print(printStream);
                 printStream << "\n\n=====  LLVM DIAGNOSIS END  =====\n\n";
                 outs().flush();
@@ -123,9 +123,9 @@ Result CodeGenManager::CreateTargetMachine(
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
     if ((pContext->GetTargetMachine() != nullptr) &&
         (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
-        (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc)
-        && (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout)
-        )
+        (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc) &&
+        (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout) &&
+        (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr))
     {
         return Result::Success;
     }
@@ -219,6 +219,14 @@ Result CodeGenManager::AddTargetPasses(
     raw_pwrite_stream&    outStream)  // [out] Output stream
 {
     Result result = Result::Success;
+
+    // Dump the module just before codegen.
+    if (EnableOuts())
+    {
+        passMgr.add(createPrintModulePass(outs(),
+                    "===============================================================================\n"
+                    "// LLPC final pipeline module info\n"));
+    }
 
     if (cl::EmitLlvm)
     {

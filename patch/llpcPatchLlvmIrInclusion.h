@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPatchIncludeLlvmIr.h
- * @brief LLPC header file: contains declaration of class Llpc::IncludeLlvmIr.
+ * @file  llpcPatchLlvmIrInclusion.h
+ * @brief LLPC header file: contains declaration of class Llpc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -36,11 +36,11 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patch operations of including llvm-ir as a separate section in the ELF binary.
-class PatchIncludeLlvmIr: public Patch
+// Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
+class PatchLlvmIrInclusion: public Patch
 {
 public:
-    PatchIncludeLlvmIr();
+    PatchLlvmIrInclusion();
 
     bool runOnModule(llvm::Module& module) override;
 
@@ -54,7 +54,7 @@ public:
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchIncludeLlvmIr);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchLlvmIrInclusion);
 };
 
 } // Llpc

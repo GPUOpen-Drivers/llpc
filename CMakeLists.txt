@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -137,6 +137,7 @@ message(STATUS "LLVM link options:" ${LLVM_LINK_FLAGS})
 
 target_compile_definitions(llpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(llpc PRIVATE _SPIRV_LLVM_API)
+target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
 
 if(XGL_LLVM_UPSTREAM)
     target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
@@ -231,13 +232,14 @@ target_sources(llpc PRIVATE
     patch/llpcPatchGroupOp.cpp
     patch/llpcPatchImageOp.cpp
     patch/llpcPatchInOutImportExport.cpp
-    patch/llpcPatchIncludeLlvmIr.cpp
+    patch/llpcPatchLlvmIrInclusion.cpp
     patch/llpcPatchLoopUnrollInfoRectify.cpp
     patch/llpcPatchNullFragShader.cpp
     patch/llpcPatchPeepholeOpt.cpp
     patch/llpcPatchPreparePipelineAbi.cpp
     patch/llpcPatchPushConstOp.cpp
     patch/llpcPatchResourceCollect.cpp
+    patch/llpcPatchSetupTargetFeatures.cpp
     patch/llpcSystemValues.cpp
     patch/llpcVertexFetch.cpp
 )

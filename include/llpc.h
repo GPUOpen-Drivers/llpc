@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 17;
+static const uint32_t  Version = 18;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
@@ -200,6 +200,7 @@ struct PipelineOptions
     bool autoLayoutDesc;      ///< If set, the LLPC standalone compiler is compiling individual shader(s)
                               ///  without pipeline info, so LLPC needs to do auto descriptor layout.
     bool scalarBlockLayout;   ///< If set, allows scalar block layout of types.
+    bool includeIr;           ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
@@ -552,7 +553,8 @@ public:
     ///
     /// @returns Result::Success if successful. Other return codes indicate failure.
     virtual Result BuildGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipelineInfo,
-                                         GraphicsPipelineBuildOut*        pPipelineOut) = 0;
+                                         GraphicsPipelineBuildOut*        pPipelineOut,
+                                         void*                            pPipelineDumpFile = nullptr) = 0;
 
     /// Build compute pipeline from the specified info.
     ///
@@ -561,7 +563,8 @@ public:
     ///
     /// @returns Result::Success if successful. Other return codes indicate failure.
     virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pPipelineInfo,
-                                        ComputePipelineBuildOut*        pPipelineOut) = 0;
+                                        ComputePipelineBuildOut*        pPipelineOut,
+                                        void*                           pPipelineDumpFile = nullptr) = 0;
 
     /// Creates a shader cache object with the requested properties.
     ///

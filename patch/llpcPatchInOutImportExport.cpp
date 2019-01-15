@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -708,6 +708,7 @@ void PatchInOutImportExport::visitCallInst(
             LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
 
             uint32_t xfbOffset = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+            uint32_t locOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
 
             // NOTE: Transform feedback output will be done in last vertex-processing shader stage.
             switch (m_shaderStage)
@@ -717,7 +718,7 @@ void PatchInOutImportExport::visitCallInst(
                     // No TS/GS pipeline, VS is the last stage
                     if ((m_hasGs == false) && (m_hasTs == false))
                     {
-                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, locOffset, &callInst);
                     }
                     break;
                 }
@@ -726,7 +727,7 @@ void PatchInOutImportExport::visitCallInst(
                     // TS-only pipeline, TES is the last stage
                     if (m_hasGs == false)
                     {
-                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, locOffset, &callInst);
                     }
                     break;
                 }
@@ -738,7 +739,7 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageCopyShader:
                 {
                     // TS-GS or GS-only pipeline, copy shader is the last stage
-                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, &callInst);
+                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset,locOffset, &callInst);
                     break;
                 }
             default:
@@ -4356,6 +4357,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     Value*        pOutput,            // [in] Output value
     uint32_t      xfbBuffer,          // Transform feedback buffer ID
     uint32_t      xfbOffset,          // Transform feedback offset
+    uint32_t      locOffset,         //  Relative location offset, passed from aggregate type
     Instruction*  pInsertPos)         // [in] Where to insert the store instruction
 {
     LLPC_ASSERT((m_shaderStage == ShaderStageVertex) ||
@@ -4370,6 +4372,8 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     auto pOutputTy = pOutput->getType();
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
+    uint32_t typeSize = bitWidth / 8 * compCount;
+    xfbOffset = xfbOffset + typeSize * locOffset;
 
     if (bitWidth == 64)
     {

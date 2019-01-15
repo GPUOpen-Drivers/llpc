@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -37,10 +37,11 @@
 #include <map>
 #include <assert.h>
 
-#ifndef VFX_DISABLE_PIPLINE_DOC
-    #include "llpc.h"
-    using namespace Llpc;
-#endif
+#define VFX_VERSION 0x10000
+#define VFX_REVISION 1
+
+#include "llpc.h"
+using namespace Llpc;
 
 extern int Snprintf(char* pOutput, size_t bufSize, const char* pFormat, ...);
 
@@ -49,7 +50,8 @@ namespace Vfx
 
 // =====================================================================================================================
 // Common definition of VfxParser
-static const uint32_t ShaderStageCount = 6;             // Number of shader stages in Vulkan
+static const uint32_t ShaderStageCount = 6;            // Number of shader stages in Vulkan
+static const uint32_t NativeShaderStageCount = 6;       // Number of native shader stages in Vulkan
 static const uint32_t MaxSectionCount = 16;             // Max section count
 static const uint32_t MaxBindingCount = 16;             // Max binding count
 static const uint32_t MaxResultCount = 16;              // Max result count
@@ -334,6 +336,7 @@ typedef struct IUFValue_
 // Represents the shader binary data
 struct ShaderSource
 {
+    VkShaderStageFlagBits stage;      // Shader stage
     uint32_t              dataSize;   // Size of the shader binary data
     uint8_t*              pData;      // Shader binary data
 };
@@ -571,9 +574,7 @@ struct GraphicsPipelineState
     uint32_t    dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
     uint32_t    switchWinding;                // reverse the TCS declared output primitive vertex order
     uint32_t    enableMultiView;              // Whether to enable multi-view support
-    uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
-    uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
-    uint32_t    scalarBlockLayout;            // Whether to use scalar block layout
+    Llpc::PipelineOptions options;            // Pipeline options
 
     ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
 };
@@ -582,10 +583,8 @@ struct GraphicsPipelineState
 // Represents ComputePipelineState section.
 struct ComputePipelineState
 {
-    uint32_t    deviceIndex;                  // Device index for device group
-    uint32_t    includeDisassembly;           // Whenther to include the disassembly code in the pipeline ELF
-    uint32_t    autoLayoutDesc;               // Whether to auto-layout descriptors, because we have incomplete info
-    uint32_t    scalarBlockLayout;            // Whether to use scalar block layout
+    uint32_t              deviceIndex;        // Device index for device group
+    Llpc::PipelineOptions options;            // Pipeline options
 };
 
 };
@@ -607,17 +606,22 @@ struct VfxRenderState
     Vfx::ShaderSource stages[Vfx::ShaderStageCount];            // Shader source sections
 };
 
-#ifndef DISABLE_PIPLINE_DOC
+enum VfxPipelineType
+{
+    VfxPipelineTypeGraphics,
+    VfxPipelineTypeCompute,
+};
 // =====================================================================================================================
 // Represents the content of PipelineDoucment.
 struct VfxPipelineState
 {
-    uint32_t                  version;                          // Pipeline state version
-    GraphicsPipelineBuildInfo gfxPipelineInfo;                  // LLPC graphics pipeline build info
-    ComputePipelineBuildInfo  compPipelineInfo;                 // LLPC compute pipeline build info
-    Vfx::ShaderSource         stages[ShaderStageCount];         // Shader source sections
+    uint32_t                    version;                          // Pipeline state version
+    VfxPipelineType             pipelineType;                     // Pipeline type
+    GraphicsPipelineBuildInfo   gfxPipelineInfo;                  // LLPC graphics pipeline build info
+    ComputePipelineBuildInfo    compPipelineInfo;                 // LLPC compute pipeline build info
+    uint32_t                    numStages;                        // Number of shader source sections
+    Vfx::ShaderSource*          stages;                           // Shader source sections
 };
-#endif
 
 // =====================================================================================================================
 // Types used in VFX library public entry points.
@@ -653,11 +657,9 @@ void vfxGetRenderDoc(
     void*              pDoc,
     VfxRenderStatePtr* pRenderState);
 
-#ifndef DISABLE_PIPLINE_DOC
 void vfxGetPipelineDoc(
     void*                pDoc,
     VfxPipelineStatePtr* pPipelineState);
-#endif
 
 void vfxPrintDoc(
     void*                pDoc);

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,16 +24,16 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPatchIncludeLlvmIr.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PatchIncludeLlvmIr.
+ * @file  llpcPatchLlvmIrInclusion.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::PatchLlvmIrInclusion.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-patch-include-llvm-ir"
+#define DEBUG_TYPE "llpc-patch-llvm-ir-inclusion"
 
 #include "llvm/IR/Constants.h"
 
 #include "llpcContext.h"
-#include "llpcPatchIncludeLlvmIr.h"
+#include "llpcPatchLlvmIrInclusion.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -43,29 +43,29 @@ namespace Llpc
 
 // =====================================================================================================================
 // Initializes static members.
-char PatchIncludeLlvmIr::ID = 0;
+char PatchLlvmIrInclusion::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of LLVM patching operations of including llvm-ir as a separate section in the ELF.
-ModulePass* CreatePatchIncludeLlvmIr()
+// Pass creator, creates the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF.
+ModulePass* CreatePatchLlvmIrInclusion()
 {
-    return new PatchIncludeLlvmIr();
+    return new PatchLlvmIrInclusion();
 }
 
 // =====================================================================================================================
-PatchIncludeLlvmIr::PatchIncludeLlvmIr()
+PatchLlvmIrInclusion::PatchLlvmIrInclusion()
     :
     Patch(ID)
 {
-    initializePatchIncludeLlvmIrPass(*PassRegistry::getPassRegistry());
+    initializePatchLlvmIrInclusionPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this patching pass on the specified LLVM module.
 //
-// This pass includes llvm-ir as a separate section in the ELF binary by inserting a new global variable with explicit
+// This pass includes LLVM IR as a separate section in the ELF binary by inserting a new global variable with explicit
 // section.
-bool PatchIncludeLlvmIr::runOnModule(
+bool PatchLlvmIrInclusion::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
     Patch::Init(&module);
@@ -82,12 +82,12 @@ bool PatchIncludeLlvmIr::runOnModule(
                                       true,
                                       GlobalValue::ExternalLinkage,
                                       pInitializer,
-                                      "llvm_ir",
+                                      "llvmir",
                                       nullptr,
                                       GlobalValue::NotThreadLocal,
                                       false);
     LLPC_ASSERT(pGlobal != nullptr);
-    pGlobal->setSection(".AMDGPU.metadata.llvm_ir");
+    pGlobal->setSection(".AMDGPU.metadata.llvmir");
 
     return true;
 }
@@ -95,6 +95,6 @@ bool PatchIncludeLlvmIr::runOnModule(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the pass of LLVM patching operations of including llvm-ir as a separate section in the ELF binary.
-INITIALIZE_PASS(PatchIncludeLlvmIr, DEBUG_TYPE,
-                "Include llvm-ir as a separate section in the ELF binary", false, false)
+// Initializes the pass of LLVM patching operations of including LLVM IR as a separate section in the ELF binary.
+INITIALIZE_PASS(PatchLlvmIrInclusion, DEBUG_TYPE,
+                "Include LLVM IR as a separate section in the ELF binary", false, false)

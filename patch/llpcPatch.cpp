@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -44,6 +44,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
@@ -70,8 +71,8 @@ static opt<bool> AutoLayoutDesc("auto-layout-desc",
 // -disable-patch-opt: disable optimization for LLVM patching
 opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
 
-// -include-llvm-ir: include llvm-ir as a separate section in the ELF binary
-opt<bool> IncludeLlvmIr("include-llvm-ir", desc("Include llvm-ir as a separate section in the ELF binary"), init(false));
+// -include-llvm-ir: include LLVM IR as a separate section in the ELF binary
+opt<bool> IncludeLlvmIr("include-llvm-ir", desc("Include LLVM IR as a separate section in the ELF binary"), init(false));
 
 } // cl
 
@@ -150,10 +151,13 @@ void Patch::AddPasses(
     // Prepare pipeline ABI.
     passMgr.add(CreatePatchPreparePipelineAbi());
 
-    // Include llvm-ir as a separate section in the ELF binary
-    if (cl::IncludeLlvmIr)
+    // Set up target features in shader entry-points.
+    passMgr.add(CreatePatchSetupTargetFeatures());
+
+    // Include LLVM IR as a separate section in the ELF binary
+    if (cl::IncludeLlvmIr || pContext->GetPipelineContext()->GetPipelineOptions()->includeIr)
     {
-        passMgr.add(CreatePatchIncludeLlvmIr());
+        passMgr.add(CreatePatchLlvmIrInclusion());
     }
 
     // Dump the result
@@ -161,7 +165,7 @@ void Patch::AddPasses(
     {
         passMgr.add(createPrintModulePass(outs(),
                     "===============================================================================\n"
-                    "// LLPC pipeline patching results\n\n"));
+                    "// LLPC pipeline patching results\n"));
     }
 }
 

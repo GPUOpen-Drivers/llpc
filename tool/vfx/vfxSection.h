@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -110,6 +110,8 @@ enum MemberType : uint32_t
     MemberTypeResourceMappingNode,           // VFX member type: SectionResourceMappingNode
     MemberTypeSpecInfo,                      // VFX member type: SectionSpecInfo
     MemberTypeDescriptorRangeValue,          // VFX member type: SectionDescriptorRangeValueItem
+    MemberTypePipelineOption,                // VFX member type: SectionPipelineOption
+    MemberTypeShaderOption,                  // VFX member type: SectionShaderOption
 };
 
 // =====================================================================================================================
@@ -117,8 +119,10 @@ enum MemberType : uint32_t
 enum ShaderType
 {
     Glsl,            // GLSL source
+    Hlsl,            // HLSL source
     SpirvAsm,        // SPIRV assemble code
     GlslFile,        // GLSL source in extenal file
+    HlslFile,        // HLSL source in external file
     SpirvFile,       // SPIRV binary code in external file
     SpirvAsmFile,    // SPIRV assemble code in external file
 };
@@ -279,6 +283,8 @@ public:
     void PrintSelf(uint32_t level);
 
     void SetLineNum(uint32_t lineNum) { m_lineNum = lineNum; }
+
+    uint32_t GetLineNum() const { return m_lineNum; }
 private:
     Section() {};
 
@@ -305,7 +311,7 @@ bool Section::GetPtrOf(
     std::string* pErrorMsg)         // [out] Error message
 {
     bool        result      = true;
-    void*      pMemberAddr  = reinterpret_cast<void*>(VfxInvalidValue);
+    void*      pMemberAddr  = reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue));
     MemberType memberType   = MemberTypeInt;
     uint32_t   arrayMaxSize = 0;
 
@@ -335,7 +341,7 @@ bool Section::GetPtrOf(
         }
     }
 
-    if ((result == true) && (pMemberAddr == reinterpret_cast<void*>(VfxInvalidValue)))
+    if ((result == true) && (pMemberAddr == reinterpret_cast<void*>(static_cast<size_t>(VfxInvalidValue))))
     {
         PARSE_WARNING(*pErrorMsg, lineNum, "Invalid member name: %s", memberName);
         result = false;
@@ -1020,11 +1026,11 @@ public:
 
     virtual void AddLine(const char* pLine) { shaderSource += pLine; };
 
-    bool CompileShader(const std::string& docFilename, std::string* pErrorMsg);
+    bool CompileShader(const std::string& docFilename, const Section* pShaderInfo, std::string* pErrorMsg);
 
 private:
     bool ReadFile(const std::string& docFilename, bool isBinary, std::string* pErrorMsg);
-    bool CompileGlsl(std::string* pErrorMsg);
+    bool CompileGlsl(const Section* pShaderInfo, std::string* pErrorMsg);
     bool AssembleSpirv(std::string* pErrorMsg);
 
     static const uint32_t  MemberCount = 1;
@@ -1093,6 +1099,74 @@ private:
 };
 
 // =====================================================================================================================
+// Represents the sub section pipeline option
+class SectionPipelineOption : public Section
+{
+public:
+    typedef Llpc::PipelineOptions SubState;
+
+    SectionPipelineOption() :
+        Section(m_addrTable, MemberCount, SectionTypeUnset, "options")
+    {
+        memset(&m_state, 0, sizeof(m_state));
+    }
+
+    static void InitialAddrTable()
+    {
+        StrToMemberAddr* pTableItem = m_addrTable;
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, autoLayoutDesc, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
+        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+    }
+
+    void GetSubState(SubState& state) { state = m_state; };
+
+private:
+    static const uint32_t  MemberCount = 4;
+    static StrToMemberAddr m_addrTable[MemberCount];
+
+    SubState               m_state;
+};
+
+// =====================================================================================================================
+// Represents the sub section shader option
+class SectionShaderOption : public Section
+{
+public:
+    typedef Llpc::PipelineShaderOptions SubState;
+
+    SectionShaderOption() :
+        Section(m_addrTable, MemberCount, SectionTypeUnset, "options")
+    {
+        memset(&m_state, 0, sizeof(m_state));
+    }
+
+    static void InitialAddrTable()
+    {
+        StrToMemberAddr* pTableItem = m_addrTable;
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, trapPresent, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, debugMode, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enablePerformanceData, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowReZ, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
+
+        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+    }
+
+    void GetSubState(SubState& state) { state = m_state; };
+
+private:
+    static const uint32_t  MemberCount = 7;
+    static StrToMemberAddr m_addrTable[MemberCount];
+
+    SubState               m_state;
+};
+
+// =====================================================================================================================
 // Represents the section graphics state
 class SectionGraphicsState : public Section
 {
@@ -1126,10 +1200,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dualSourceBlendEnable,   MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding,           MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView,         MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, includeDisassembly,      MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, autoLayoutDesc,          MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, scalarBlockLayout,       MemberTypeInt, false);
-
+        INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, options, MemberTypePipelineOption, true);
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState,
                                        colorBuffer,
                                        MemberTypeColorBufferItem,
@@ -1144,15 +1215,17 @@ public:
         {
             colorBuffer[i].GetSubState(m_state.colorBuffer[i]);
         }
+        options.GetSubState(m_state.options);
         state = m_state;
     };
 
 private:
-    static const uint32_t  MemberCount = 22;
+    static const uint32_t  MemberCount = 20;
     static StrToMemberAddr m_addrTable[MemberCount];
-
     SubState               m_state;
     SectionColorBuffer     colorBuffer[MaxColorTargets]; // Color buffer
+    SectionPipelineOption  options;
+
 };
 
 // =====================================================================================================================
@@ -1171,23 +1244,23 @@ public:
     static void InitialAddrTable()
     {
         StrToMemberAddr* pTableItem = m_addrTable;
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex,             MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, includeDisassembly,      MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, autoLayoutDesc,          MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
+        INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, options, MemberTypePipelineOption, true);
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state)
     {
+        options.GetSubState(m_state.options);
         state = m_state;
     };
 
 private:
-    static const uint32_t  MemberCount = 3;
-
+    static const uint32_t  MemberCount = 2;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
+    SectionPipelineOption  options;
 };
 
 // =====================================================================================================================
@@ -1334,7 +1407,7 @@ public:
         if (m_vkDivisors.size() > 0)
         {
             state.pNext = &m_vkDivisorState;
-            m_vkDivisorState.vertexBindingDivisorCount = m_vkDivisors.size();
+            m_vkDivisorState.vertexBindingDivisorCount = static_cast<uint32_t>(m_vkDivisors.size());
             m_vkDivisorState.pVertexBindingDivisors = &m_vkDivisors[0];
         }
     };
@@ -1576,15 +1649,9 @@ public:
         StrToMemberAddr* pTableItem = m_addrTable;
         INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, entryPoint,  MemberTypeString, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, specConst,   MemberTypeSpecInfo, true);
+        INIT_MEMBER_NAME_TO_ADDR(SectionShaderInfo, options, MemberTypeShaderOption, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, descriptorRangeValue, MemberTypeDescriptorRangeValue, true);
         INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionShaderInfo, userDataNode, MemberTypeResourceMappingNode, true);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, trapPresent, options.trapPresent, MemberTypeBool ,false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, debugMode, options.debugMode, MemberTypeBool, false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, enablePerformanceData, options.enablePerformanceData, MemberTypeBool, false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, allowReZ, options.allowReZ, MemberTypeBool, false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, vgprLimit, options.vgprLimit, MemberTypeInt, false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, sgprLimit, options.sgprLimit, MemberTypeInt, false);
-        INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionShaderInfo, maxThreadGroupsPerComputeUnit, options.maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
@@ -1596,6 +1663,8 @@ public:
 
         specConst.GetSubState(m_specializationInfo);
         state.pSpecializationInfo = &m_specializationInfo;
+
+        options.GetSubState(state.options);
 
         if (descriptorRangeValue.size() > 0)
         {
@@ -1620,18 +1689,20 @@ public:
         }
     };
 
+    const char* GetEntryPoint() const { return entryPoint.empty() ? nullptr : entryPoint.c_str(); }
 private:
-    static const uint32_t  MemberCount = 11;
-    static StrToMemberAddr m_addrTable[MemberCount];
-    SubState        m_state;
-    SectionSpecInfo specConst;                                            // Specialization constant info
-    std::string entryPoint;                                               // Entry point name
+    static const uint32_t                        MemberCount = 5;
+    static StrToMemberAddr                       m_addrTable[MemberCount];
+    SubState                                     m_state;
+    SectionSpecInfo                              specConst;               // Specialization constant info
+    SectionShaderOption                          options;                 // Pipeline shader options
+    std::string                                  entryPoint;              // Entry point name
     std::vector<SectionDescriptorRangeValueItem> descriptorRangeValue;    // Contains descriptor range vuale
-    std::vector<SectionResourceMappingNode> userDataNode;                 // Contains user data node
+    std::vector<SectionResourceMappingNode>      userDataNode;            // Contains user data node
 
-    VkSpecializationInfo              m_specializationInfo;
-    std::vector<DescriptorRangeValue> m_descriptorRangeValues;
-    std::vector<ResourceMappingNode>  m_userDataNodes;
+    VkSpecializationInfo                         m_specializationInfo;
+    std::vector<DescriptorRangeValue>            m_descriptorRangeValues;
+    std::vector<ResourceMappingNode>             m_userDataNodes;
 };
 
 }

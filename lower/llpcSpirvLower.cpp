@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -164,7 +164,7 @@ void SpirvLower::AddPasses(
     {
         passMgr.add(createPrintModulePass(outs(),
                     "===============================================================================\n"
-                    "// LLPC pipeline SPIR-V lowering results\n\n"));
+                    "// LLPC pipeline SPIR-V lowering results\n"));
     }
 }
 

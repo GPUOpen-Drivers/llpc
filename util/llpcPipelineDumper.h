@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -102,9 +102,10 @@ private:
                                         std::ostream&              dumpFile);
     static void DumpComputeStateInfo(const ComputePipelineBuildInfo* pPipelineInfo,
                                      std::ostream&                   dumpFile);
-     static void DumpGraphicsStateInfo(const GraphicsPipelineBuildInfo* pPipelineInfo,
+    static void DumpGraphicsStateInfo(const GraphicsPipelineBuildInfo* pPipelineInfo,
                                       std::ostream&                    dumpFile);
-
+    static void DumpPipelineOptions(const PipelineOptions*   pOptions,
+                                    std::ostream&            dumpFile);
     static void UpdateHashForPipelineShaderInfo(ShaderStage               stage,
                                                 const PipelineShaderInfo* pShaderInfo,
                                                 bool                      isCacheHash,

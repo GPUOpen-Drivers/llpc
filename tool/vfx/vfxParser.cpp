@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -126,6 +126,7 @@ Section* Document::GetFreeSection(
     {
         pSection = Section::CreateSection(pSectionName);
         m_sections[type].push_back(pSection);
+        m_sectionList.push_back(pSection);
     }
     return pSection;
 }
@@ -148,14 +149,14 @@ void Document::PrintSelf()
 bool Document::CompileShader()
 {
     bool ret = true;
-    for (uint32_t i = 0; i < ShaderStageCount; ++i)
+    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
     {
-        Section* pSection = m_sections[SectionTypeVertexShader + i].size() > 0 ?
-                            m_sections[SectionTypeVertexShader + i][0] :
-                            nullptr;
-        if (pSection)
+        for (size_t i = 0; i < m_sections[SectionTypeVertexShader + stage].size(); ++i)
         {
-            bool stageRet = reinterpret_cast<SectionShader*>(pSection)->CompileShader(m_fileName, &m_errorMsg);
+            auto pShaderSection = m_sections[SectionTypeVertexShader + stage][i];
+            VFX_ASSERT(m_sections[SectionTypeVertexShaderInfo + stage].size() > i);
+            auto pShaderInfoSection = m_sections[SectionTypeVertexShaderInfo + stage][i];
+            bool stageRet = reinterpret_cast<SectionShader*>(pShaderSection)->CompileShader(m_fileName, pShaderInfoSection, &m_errorMsg);
             ret = ret && stageRet;
         }
     }
@@ -428,12 +429,12 @@ bool VfxParser::ParseKeyValue(
     uint32_t arrayIndex = 0;
     char memberName[MaxKeyBufSize];
     result = ParseKey(pKey,
-                               lineNum,
-                               pSectionObject,
-                               &pAccessedSectionObject,
-                               memberName,
-                               MaxKeyBufSize,
-                               &arrayIndex);
+                      lineNum,
+                      pSectionObject,
+                      &pAccessedSectionObject,
+                      memberName,
+                      MaxKeyBufSize,
+                      &arrayIndex);
 
     if (result == true)
     {
@@ -674,6 +675,11 @@ bool VfxParser::Parse(
         }
 
         fclose(pConfigFile);
+
+        if (result)
+        {
+            result = m_pVfxDoc->Validate();
+        }
 
         if (result)
         {
