@@ -514,7 +514,8 @@ struct StreamOutData
 // NOTE: All fields must be initialized in InitShaderInterfaceData().
 struct InterfaceData
 {
-    static const uint32_t MaxDescTableCount  = 16;
+    static const uint32_t MaxDescTableCount  = 64; // Must greater than (vk::MaxDynamicDescriptors +
+                                                   // vk::MaxDescriptorSets + special descriptors)
     static const uint32_t MaxUserDataCount   = 32; // Max count of allowed user data (consider GFX IP version info)
     static const uint32_t MaxSpillTableSize  = 512;
     static const uint32_t MaxDynDescCount    = 32;

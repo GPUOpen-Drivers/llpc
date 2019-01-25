@@ -320,8 +320,6 @@ static Result Init(
         {
             pEnvString = getenv("LOCALAPPDATA");
         }
-
-        LLPC_ASSERT(pEnvString != nullptr);
 #else
         char shaderCacheFileRootDir[MaxFilePathLen];
 

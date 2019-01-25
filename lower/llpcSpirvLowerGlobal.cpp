@@ -364,9 +364,11 @@ void SpirvLowerGlobal::visitLoadInst(
         {
             bool isVertexIdx = false;
 
-            LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
+            LLPC_ASSERT(pInOutMeta->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+
+            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
 
             if (inOutMeta.IsBuiltIn)
             {
@@ -388,7 +390,7 @@ void SpirvLowerGlobal::visitLoadInst(
                 pVertexIdx = indexOperands[1];
                 ++operandIdx;
 
-                pInOutMeta = cast<Constant>(pInOutMeta->getOperand(2));
+                pInOutMeta = cast<Constant>(pInOutMeta->getOperand(1));
             }
         }
 
@@ -423,9 +425,10 @@ void SpirvLowerGlobal::visitLoadInst(
         if (pInOutTy->isArrayTy())
         {
             // Arrayed input/output
-            LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
+            LLPC_ASSERT(pInOutMeta->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
 
             // If the input/output is arrayed, the outermost dimension might for vertex indexing
             if (inOutMeta.IsBuiltIn)
@@ -448,7 +451,7 @@ void SpirvLowerGlobal::visitLoadInst(
             LLPC_ASSERT(pInOutTy->isArrayTy());
 
             auto pElemTy = pInOutTy->getArrayElementType();
-            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(2));
+            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
 
             const uint32_t elemCount = pInOutTy->getArrayNumElements();
             for (uint32_t i = 0; i < elemCount; ++i)
@@ -529,9 +532,10 @@ void SpirvLowerGlobal::visitStoreInst(
         {
             bool isVertexIdx = false;
 
-            LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
+            LLPC_ASSERT(pOutputMeta->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -553,7 +557,7 @@ void SpirvLowerGlobal::visitStoreInst(
                 pVertexIdx = indexOperands[1];
                 ++operandIdx;
 
-                pOutputMeta = cast<Constant>(pOutputMeta->getOperand(2));
+                pOutputMeta = cast<Constant>(pOutputMeta->getOperand(1));
             }
         }
 
@@ -584,9 +588,10 @@ void SpirvLowerGlobal::visitStoreInst(
         // If the input/output is arrayed, the outermost dimension might for vertex indexing
         if (pOutputy->isArrayTy())
         {
-            LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
+            LLPC_ASSERT(pOutputMeta->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -606,7 +611,7 @@ void SpirvLowerGlobal::visitStoreInst(
         if (hasVertexIdx)
         {
             LLPC_ASSERT(pOutputy->isArrayTy());
-            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(2));
+            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
 
             const uint32_t elemCount = pOutputy->getArrayNumElements();
             for (uint32_t i = 0; i < elemCount; ++i)
@@ -1058,9 +1063,10 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         // Array type
         LLPC_ASSERT(pElemIdx == nullptr);
 
-        LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
+        LLPC_ASSERT(pInOutMeta->getNumOperands() == 4);
         uint32_t stride = cast<ConstantInt>(pInOutMeta->getOperand(0))->getZExtValue();
-        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
 
         if (inOutMeta.IsBuiltIn)
         {
@@ -1083,7 +1089,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                             (m_shaderStage == ShaderStageTessControl) ||
                             (m_shaderStage == ShaderStageTessEval));
 
-                auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(2));
+                auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
                 auto pElemTy   = pInOutTy->getArrayElementType();
 
                 const uint64_t elemCount = pInOutTy->getArrayNumElements();
@@ -1150,7 +1156,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         }
         else
         {
-            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(2));
+            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
             auto pElemTy   = pInOutTy->getArrayElementType();
 
             const uint64_t elemCount = pInOutTy->getArrayNumElements();
@@ -1243,8 +1249,9 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     else
     {
         std::vector<Value*> args;
-
-        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta)->getZExtValue();
+        Constant* pInOutMetaConst = cast<Constant>(pInOutMeta);
+        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
 
         LLPC_ASSERT(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
@@ -1558,9 +1565,11 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         // Array type
         LLPC_ASSERT(pElemIdx == nullptr);
 
-        LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
+        LLPC_ASSERT(pOutputMeta->getNumOperands() == 4);
         uint32_t stride = cast<ConstantInt>(pOutputMeta->getOperand(0))->getZExtValue();
-        outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
+
+        outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
+        outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1629,7 +1638,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
             }
 
-            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(2));
+            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
 
             const uint64_t elemCount = pOutputTy->getArrayNumElements();
             for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
@@ -1678,8 +1687,9 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     {
         // Normal scalar or vector type
         std::vector<Value*> args;
-
-        outputMeta.U64All = cast<ConstantInt>(pOutputMeta)->getZExtValue();
+        Constant* pInOutMetaConst = cast<Constant>(pOutputMeta);
+        outputMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
+        outputMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1888,11 +1898,13 @@ Value* SpirvLowerGlobal::LoadInOutMember(
         if (pInOutTy->isArrayTy())
         {
             // Array type
-            LLPC_ASSERT(pInOutMeta->getNumOperands() == 3);
+            LLPC_ASSERT(pInOutMeta->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
 
-            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(2));
+            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
+
+            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
             auto pElemTy   = pInOutTy->getArrayElementType();
 
             if (inOutMeta.IsBuiltIn)
@@ -2013,11 +2025,13 @@ void SpirvLowerGlobal::StoreOutputMember(
     {
         if (pOutputTy->isArrayTy())
         {
-            LLPC_ASSERT(pOutputMeta->getNumOperands() == 3);
+            LLPC_ASSERT(pOutputMeta->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All = cast<ConstantInt>(pOutputMeta->getOperand(1))->getZExtValue();
 
-            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(2));
+            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
+
+            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
             auto pElemTy   = pOutputTy->getArrayElementType();
 
             if (outputMeta.IsBuiltIn)

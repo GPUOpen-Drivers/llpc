@@ -265,7 +265,9 @@ bool SpirvLowerResourceCollect::runOnModule(
                             if (isGsInput || isTcsInput || isTcsOutput || isTesInput)
                             {
                                 ShaderInOutMetadata inOutMeta = {};
-                                inOutMeta.U64All = cast<ConstantInt>(pMeta->getOperand(1))->getZExtValue();
+
+                                inOutMeta.U64All[0] = cast<ConstantInt>(pMeta->getOperand(2))->getZExtValue();
+                                inOutMeta.U64All[1] = cast<ConstantInt>(pMeta->getOperand(3))->getZExtValue();
 
                                 if (inOutMeta.IsBuiltIn)
                                 {
@@ -287,7 +289,7 @@ bool SpirvLowerResourceCollect::runOnModule(
                             {
                                 // The outermost array index is for vertex indexing
                                 pInOutTy = pInOutTy->getArrayElementType();
-                                pMeta = cast<Constant>(pMeta->getOperand(2));
+                                pMeta = cast<Constant>(pMeta->getOperand(1));
                             }
                         }
 
@@ -360,13 +362,19 @@ bool SpirvLowerResourceCollect::runOnModule(
         std::vector<Metadata*> viewIndexMeta;
 
         ShaderInOutMetadata viewIndexMetaValue = {};
-        viewIndexMetaValue.U64All = 0;
+        viewIndexMetaValue.U64All[0] = 0;
+        viewIndexMetaValue.U64All[1] = 0;
         viewIndexMetaValue.IsBuiltIn = true;
         viewIndexMetaValue.Value = BuiltInViewIndex;
         viewIndexMetaValue.InterpMode = InterpModeSmooth;
         viewIndexMetaValue.InterpLoc = InterpLocCenter;
 
-        auto pViewIndexMetaValue = ConstantInt::get(m_pContext->Int32Ty(), viewIndexMetaValue.U64All);
+        std::vector<Type *> MDTys = { m_pContext->Int64Ty(), m_pContext->Int64Ty() };
+        auto pMDTy = StructType::get(*m_pContext, MDTys);
+        std::vector<Constant *> MDValues = { ConstantInt::get(m_pContext->Int64Ty(), viewIndexMetaValue.U64All[0]) ,
+                                             ConstantInt::get(m_pContext->Int64Ty(), viewIndexMetaValue.U64All[1]) };
+
+        auto pViewIndexMetaValue = ConstantStruct::get(static_cast<StructType *>(pMDTy), MDValues);
         viewIndexMeta.push_back(ConstantAsMetadata::get(pViewIndexMetaValue));
         auto pViewIndexMetaNode = MDNode::get(*m_pContext, viewIndexMeta);
         pViewIndex->addMetadata(gSPIRVMD::InOut, *pViewIndexMetaNode);
@@ -698,7 +706,8 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
     if (pInOutTy->isArrayTy())
     {
         // Input/output is array type
-        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta->getOperand(1))->getZExtValue();
+        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
 
         if (inOutMeta.IsXfb)
         {
@@ -978,7 +987,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             const uint32_t startLoc = inOutMeta.Value;
 
             pBaseTy = GetFlattenArrayElementType(pInOutTy);
-            locCount = (pInOutTy->getPrimitiveSizeInBits() > SizeOfVec4) ? 2 : 1;
+            locCount = (pInOutTy->getPrimitiveSizeInBits() > (SizeOfVec4 * 8)) ? 2 : 1;
             locCount *= (stride * cast<ArrayType>(pInOutTy)->getNumElements());
 
             // Prepare for location mapping
@@ -1092,7 +1101,9 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
         // Input/output is scalar or vector type
         LLPC_ASSERT(pInOutTy->isSingleValueType());
 
-        inOutMeta.U64All = cast<ConstantInt>(pInOutMeta)->getZExtValue();
+        Constant* pInOutMetaConst = cast<Constant>(pInOutMeta);
+        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
 
         // Transform feedback input/output
         if (inOutMeta.IsXfb)

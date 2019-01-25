@@ -4730,8 +4730,17 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       InOutDec.Value.Loc += (Width <= 32 * 4) ? 1 : 2;
     }
 
-    MDTy = Type::getInt64Ty(*Context);
-    return ConstantInt::get(MDTy, InOutMD.U64All);
+    auto Int64Ty = Type::getInt64Ty(*Context);
+    std::vector<Type *> MDTys;
+    MDTys.push_back(Int64Ty);     // Content of "ShaderInOutMetadata.U64All[0]"
+    MDTys.push_back(Int64Ty);     // Content of "ShaderInOutMetadata.U64All[1]"
+    MDTy = StructType::get(*Context, MDTys);
+
+    std::vector<Constant *> MDValues;
+    MDValues.push_back(ConstantInt::get(Int64Ty, InOutMD.U64All[0]));
+    MDValues.push_back(ConstantInt::get(Int64Ty, InOutMD.U64All[1]));
+
+    return ConstantStruct::get(static_cast<StructType *>(MDTy), MDValues);
 
   } else if (BT->isTypeArray() || BT->isTypeMatrix()) {
     // Handle array or matrix type
@@ -4760,8 +4769,9 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     // Built metadata for the array/matrix
     std::vector<Type *> MDTys;
     MDTys.push_back(Int32Ty);     // Stride
-    MDTys.push_back(Int64Ty);     // Content of "ShaderInOutMetadata"
     MDTys.push_back(ElemMDTy);    // Element MD type
+    MDTys.push_back(Int64Ty);     // Content of "ShaderInOutMetadata.U64All[0]"
+    MDTys.push_back(Int64Ty);     // Content of "ShaderInOutMetadata.U64All[1]"
     MDTy = StructType::get(*Context, MDTys);
 
     ShaderInOutMetadata InOutMD = {};
@@ -4788,8 +4798,10 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 
     std::vector<Constant *> MDValues;
     MDValues.push_back(ConstantInt::get(Int32Ty, Stride));
-    MDValues.push_back(ConstantInt::get(Int64Ty, InOutMD.U64All));
     MDValues.push_back(ElemMD);
+    MDValues.push_back(ConstantInt::get(Int64Ty, InOutMD.U64All[0]));
+    MDValues.push_back(ConstantInt::get(Int64Ty, InOutMD.U64All[1]));
+
     return ConstantStruct::get(static_cast<StructType *>(MDTy), MDValues);
 
   } else if (BT->isTypeStruct()) {

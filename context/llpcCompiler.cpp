@@ -1585,7 +1585,9 @@ void Compiler::InitGpuProperty()
     //TODO: Setup gsPrimBufferDepth from hardware config option, will be done in another change.
     m_gpuProperty.gsPrimBufferDepth = 0x100;
 
-    m_gpuProperty.maxUserDataCount = (m_gfxIp.major >= 9) ? 32 : 16;
+    // NOTE: It is a workaround for LLVM back-end.
+    // We can't set maxUserDataCount to 32 via current interface.
+    m_gpuProperty.maxUserDataCount = (m_gfxIp.major >= 9) ? 31 : 16;
 
     m_gpuProperty.gsOnChipMaxLdsSize = 16384;
 

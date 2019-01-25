@@ -1431,7 +1431,11 @@ OStream& operator<<(
                 startPos = endPos;
             }
         }
-        else if (strncmp(pSection->pName, AmdGpuMetadataName, sizeof(AmdGpuMetadataName) - 1) == 0)
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 464
+        else if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0)
+#else
+        else if (strncmp(pSection->pName, ".AMDGPU.comment.", sizeof(".AMDGPU.comment.") - 1) == 0)
+#endif
         {
             // Output text based sections
             out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";

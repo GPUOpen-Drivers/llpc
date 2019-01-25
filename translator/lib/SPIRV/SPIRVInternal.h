@@ -1214,8 +1214,9 @@ union ShaderInOutMetadata {
     uint64_t XfbBuffer          : 2;  // Transform feedback buffer ID
     uint64_t XfbOffset          : 15; // Transform feedback offset
     uint64_t XfbStride          : 16; // Transform feedback stride
+    uint64_t reserved           : 64;
   };
-  uint64_t U64All;
+  uint64_t U64All[2];
 };
 
 /// Info structure for all decorations applied to shader inputs and outputs.

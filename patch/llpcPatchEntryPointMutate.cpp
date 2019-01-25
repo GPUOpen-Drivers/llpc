@@ -638,6 +638,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         if (actualAvailUserDataCount + pNode->sizeInDwords <= availUserDataCount)
         {
             // User data isn't spilled
+            LLPC_ASSERT(i < InterfaceData::MaxDescTableCount);
             pIntfData->entryArgIdxs.resNodeValues[i] = argIdx;
             *pInRegMask |= (1ull << (argIdx++));
             actualAvailUserDataCount += pNode->sizeInDwords;
