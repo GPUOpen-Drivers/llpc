@@ -425,24 +425,66 @@ void SpirvLowerImageOp::visitCallInst(
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All));
             }
 
+            bool isCoherent = false;
+            bool isVolatile = false;
+
+            if (pMemoryQualifier != nullptr)
+            {
+                ShaderImageMemoryMetadata imageMemoryMeta = {};
+                imageMemoryMeta.U32All = pMemoryQualifier->getZExtValue();
+                isCoherent = imageMemoryMeta.Coherent;
+                isVolatile = imageMemoryMeta.Volatile;
+            }
+
+            size_t searchPos = mangledName.find(gSPIRVName::ImageCallMakeTexelVisible);
+            if (searchPos != std::string::npos)
+            {
+                mangledName.erase(searchPos, strlen(gSPIRVName::ImageCallMakeTexelVisible));
+                const uint64_t scope = cast<ConstantInt>(args.back())->getZExtValue();
+                args.pop_back();
+
+                // Memory model coherency is defined per call
+                isCoherent |= (scope != ScopeInvocation);
+            }
+
+            searchPos = mangledName.find(gSPIRVName::ImageCallMakeTexelAvailable);
+            if (searchPos != std::string::npos)
+            {
+                mangledName.erase(searchPos, strlen(gSPIRVName::ImageCallMakeTexelAvailable));
+                const uint64_t scope = cast<ConstantInt>(args.back())->getZExtValue();
+                args.pop_back();
+
+                // Memory model coherency is defined per call
+                isCoherent |= (scope != ScopeInvocation);
+            }
+
+            searchPos = mangledName.find(gSPIRVName::ImageCallNonPrivateTexel);
+            if (searchPos != std::string::npos)
+            {
+                mangledName.erase(searchPos, strlen(gSPIRVName::ImageCallMakeTexelAvailable));
+            }
+
+            searchPos = mangledName.find(gSPIRVName::ImageCallVolatileTexel);
+            if (searchPos != std::string::npos)
+            {
+                mangledName.erase(searchPos, strlen(gSPIRVName::ImageCallVolatileTexel));
+
+                // Memory model volatility is defined per call
+                isVolatile = true;
+            }
+
             // Process image memory metadata
             if ((imageCallMeta.OpKind == ImageOpRead) || (imageCallMeta.OpKind == ImageOpWrite))
             {
-                LLPC_ASSERT(pMemoryQualifier != nullptr); // Must be present
-                ShaderImageMemoryMetadata imageMemoryMeta = {};
-                imageMemoryMeta.U32All = pMemoryQualifier->getZExtValue();
                 args.pop_back();
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), imageMemoryMeta.Coherent ? true : false)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), imageMemoryMeta.Volatile ? true : false)); // slc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isCoherent ? true : false)); // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isVolatile ? true : false)); // slc
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All)); //imageCallMeta
             }
             else if (isImageAtomicOp(imageCallMeta.OpKind))
             {
-                LLPC_ASSERT(pMemoryQualifier != nullptr); // Must be present
-                ShaderImageMemoryMetadata imageMemoryMeta = {};
-                imageMemoryMeta.U32All = pMemoryQualifier->getZExtValue();
                 args.pop_back();
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), imageMemoryMeta.Volatile ? true : false)); // slc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isVolatile ? true : false)); // slc
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All)); //imageCallMeta
             }
 

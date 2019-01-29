@@ -926,7 +926,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                 if (addrSpace == SPIRAS_Output)
                 {
-                     CollectGsOutputInfo(pInOutTy, InvalidValue, 0, inOutMeta);
+                     CollectGsOutputInfo(pInOutTy, InvalidValue, inOutMeta);
                 }
             }
             else if (shaderStage == ShaderStageFragment)
@@ -987,8 +987,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             const uint32_t startLoc = inOutMeta.Value;
 
             pBaseTy = GetFlattenArrayElementType(pInOutTy);
-            locCount = (pInOutTy->getPrimitiveSizeInBits() > (SizeOfVec4 * 8)) ? 2 : 1;
-            locCount *= (stride * cast<ArrayType>(pInOutTy)->getNumElements());
+            locCount = stride * cast<ArrayType>(pInOutTy)->getNumElements();
 
             // Prepare for location mapping
             if (addrSpace == SPIRAS_Input)
@@ -1027,7 +1026,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            CollectGsOutputInfo(pBaseTy, startLoc + i, i, inOutMeta);
+                            CollectGsOutputInfo(pBaseTy, startLoc + i, inOutMeta);
                         }
                     }
                     else
@@ -1398,7 +1397,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
 
                 if (addrSpace == SPIRAS_Output)
                 {
-                    CollectGsOutputInfo(pInOutTy, InvalidValue, 0, inOutMeta);
+                    CollectGsOutputInfo(pInOutTy, InvalidValue, inOutMeta);
                 }
             }
             else if (shaderStage == ShaderStageFragment)
@@ -1609,7 +1608,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     {
                         for (uint32_t i = 0; i < locCount; ++i)
                         {
-                            CollectGsOutputInfo(pBaseTy, startLoc + i, i, inOutMeta);
+                            CollectGsOutputInfo(pBaseTy, startLoc + i, inOutMeta);
                         }
                     }
                     else
@@ -1688,7 +1687,11 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                     if (pCompTy->isIntegerTy())
                     {
                         // Integer type
-                        if (bitWidth == 16)
+                        if (bitWidth == 8)
+                        {
+                            basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
+                        }
+                        else if (bitWidth == 16)
                         {
                             basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
                         }
@@ -1752,7 +1755,11 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
     if (pCompTy->isIntegerTy())
     {
         // Integer type
-        if (bitWidth == 16)
+        if (bitWidth == 8)
+        {
+            basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
+        }
+        else if (bitWidth == 16)
         {
             basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
         }
@@ -1805,33 +1812,14 @@ void SpirvLowerResourceCollect::CollectVertexInputUsage(
 void SpirvLowerResourceCollect::CollectGsOutputInfo(
     const Type*                pOutputTy,   // [in] Type of this output
     uint32_t                   location,    // Location of this output
-    uint32_t                   locOffset,   // Location offset
     const ShaderInOutMetadata& outputMeta)  // [in] Metadata of this output
 {
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
-
-    Type* pBaseTy = const_cast<Type*>(pOutputTy);
-    if (pBaseTy->isArrayTy())
-    {
-        pBaseTy = pBaseTy->getArrayElementType();
-    }
-    LLPC_ASSERT(pBaseTy->isSingleValueType());
-
-    XfbOutInfo xfbOutInfo = {};
-    xfbOutInfo.xfbBuffer = outputMeta.XfbBuffer;
-    xfbOutInfo.xfbOffset = outputMeta.XfbOffset;
-    xfbOutInfo.is16bit   = (pBaseTy->getScalarSizeInBits() == 16);
-    xfbOutInfo.locOffset = locOffset;
 
     GsOutLocInfo outLocInfo = {};
     outLocInfo.location     = (outputMeta.IsBuiltIn ? outputMeta.Value : location);
     outLocInfo.isBuiltIn    = outputMeta.IsBuiltIn;
     outLocInfo.streamId     = outputMeta.StreamId;
-
-    if (outputMeta.IsXfb)
-    {
-        pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
-    }
 
     if (outputMeta.IsBuiltIn)
     {
@@ -1842,12 +1830,22 @@ void SpirvLowerResourceCollect::CollectGsOutputInfo(
     {
         pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = InvalidValue;
     }
+
+    if (outputMeta.IsXfb)
+    {
+        XfbOutInfo xfbOutInfo = {};
+        xfbOutInfo.xfbBuffer = outputMeta.XfbBuffer;
+        xfbOutInfo.xfbOffset = outputMeta.XfbOffset;
+        xfbOutInfo.is16bit = (pOutputTy->getScalarSizeInBits() == 16);
+        xfbOutInfo.xfbLocOffset = 0;
+        pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
+    }
 }
 
 // =====================================================================================================================
 // Collect the transform feedback info from output metadata
 void SpirvLowerResourceCollect::CollectXfbOutputInfo(
-    ShaderStage                 shaderStage, // API shader stage
+    ShaderStage                 shaderStage,  // API shader stage
     const Type*                 pOutputTy,    // [in] Type of this output
     const ShaderInOutMetadata & outputMeta)   // [in] Metadata of this output
 {

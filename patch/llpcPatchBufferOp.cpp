@@ -136,12 +136,13 @@ void PatchBufferOp::visitCallInst(
         }
         else if (mangledName.startswith(LlpcName::BufferLoad))
         {
-            bool bufferReadOnly = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
+            const bool readOnly = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
+
             if (isInlineConst)
             {
                 ReplaceCallee(&callInst, LlpcName::BufferLoad, LlpcName::InlineConstLoadUniform);
             }
-            else if (bufferReadOnly)
+            else if (readOnly)
             {
                 ReplaceCallee(&callInst, LlpcName::BufferLoad, LlpcName::BufferLoadUniform);
             }

@@ -23,9 +23,10 @@
  #
  #######################################################################################################################
 
-BASIC_TYPES = ["half", "float", "double", "i1","i16", "i32", "int", "i64"]
-TYPE_PREFIX_TO_BASIC = {"f":"float", "d":"double", "u":"i32", "i":"i32", "b":"i1", "f16":"half", "u16":"i16", "i16":"i16", "i64":"i64", "u64":"i64"}
-TYPES_MANGLE = {"half":"Dh", "float":"f", "double":"d", "i1":"b","i16":"s", "i32":"i", "i64":"l"}
+BASIC_TYPES = ["half", "float", "double", "i1", "i8", "i16", "i32", "int", "i64"]
+TYPE_PREFIX_TO_BASIC = {"f":"float", "d":"double", "u":"i32", "i":"i32", "b":"i1", \
+                        "f16":"half", "u8":"i8", "i8":"i8", "u16":"i16", "i16":"i16", "i64":"i64", "u64":"i64"}
+TYPES_MANGLE = {"half":"Dh", "float":"f", "double":"d", "i1":"b", "i8":"c", "i16":"s", "i32":"i", "i64":"l"}
 LINE_END = "\n"
 LINE_TAB = "    "
 

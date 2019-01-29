@@ -309,9 +309,9 @@ void PatchResourceCollect::visitCallInst(
                     }
                     else
                     {
-                        // NOTE: For 16-bit/32-bit vector/scalar, one location is sufficient regardless of vector component
+                        // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
                         // addressing.
-                        LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+                        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
                         m_activeInputLocs.insert(loc);
                     }
                 }
@@ -417,9 +417,9 @@ void PatchResourceCollect::visitCallInst(
             }
             else
             {
-                // NOTE: For 16-bit/32-bit vector/scalar, one location is sufficient regardless of vector component
+                // NOTE: For non 64-bit vector/scalar, one location is sufficient regardless of vector component
                 // addressing.
-                LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+                LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
                 m_importedOutputLocs.insert(loc);
             }
         }

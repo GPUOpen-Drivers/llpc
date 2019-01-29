@@ -367,6 +367,10 @@ namespace gSPIRVName {
   const static char ImageCallQueryNonLodPrefix[]          = ".querynonlod";
   const static char ImageCallQueryLodPrefix[]             = ".querylod";
   const static char ImageCallDimAwareSuffix[]             = ".dimaware";
+  const static char ImageCallMakeTexelAvailable[]         = ".maketexelavailable";
+  const static char ImageCallMakeTexelVisible[]           = ".maketexelvisible";
+  const static char ImageCallNonPrivateTexel[]            = ".nonprivatetexel";
+  const static char ImageCallVolatileTexel[]              = ".volatiletexel";
 }
 
 namespace kSPIRVPostfix {
@@ -580,8 +584,8 @@ union SPIRVImageOpInfo {
     uint32_t         OperAtomicComparator : 3;  // Index of atomic comparator
                                                 // operand (valid for
                                                 // CompareExchange)
-
-    uint32_t         Unused   : 12;
+    uint32_t         OperScope            : 3;  // Index of the scope (valid for atomics)
+    uint32_t         Unused               : 9;
   };
   uint32_t           U32All;
 };
@@ -590,62 +594,62 @@ static const uint32_t InvalidOperIdx = 0x7;
 
 template<> inline void
 SPIRVMap<Op, SPIRVImageOpInfo>::init() {
-  //       Image OpCode                           OpCode Kind                 Mask              ref             Proj    Sparse  AtomicData      AtomicComparator
-  //---------------------------------------------------------------------------------------------------------------------------------------------------------------
-  add(OpImageSampleImplicitLod,               { ImageOpSample,                  2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleExplicitLod,               { ImageOpSample,                  2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleDrefImplicitLod,           { ImageOpSample,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleDrefExplicitLod,           { ImageOpSample,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleProjImplicitLod,           { ImageOpSample,                  2,              InvalidOperIdx, true,   false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleProjExplicitLod,           { ImageOpSample,                  2,              InvalidOperIdx, true,   false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleProjDrefImplicitLod,       { ImageOpSample,                  3,              3,              true,   false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleProjDrefExplicitLod,       { ImageOpSample,                  3,              3,              true,   false,  InvalidOperIdx, InvalidOperIdx });
+  //       Image OpCode                           OpCode Kind                 Mask              ref             Proj    Sparse  AtomicData      AtomicComparator    Scope
+  //---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  add(OpImageSampleImplicitLod,               { ImageOpSample,                  2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleExplicitLod,               { ImageOpSample,                  2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleDrefImplicitLod,           { ImageOpSample,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleDrefExplicitLod,           { ImageOpSample,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleProjImplicitLod,           { ImageOpSample,                  2,              InvalidOperIdx, true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleProjExplicitLod,           { ImageOpSample,                  2,              InvalidOperIdx, true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleProjDrefImplicitLod,       { ImageOpSample,                  3,              3,              true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleProjDrefExplicitLod,       { ImageOpSample,                  3,              3,              true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  add(OpImageSampleAnisoLodAMD,               { ImageOpSample,                  2,              InvalidOperIdx, false,   false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleDrefAnisoLodAMD,           { ImageOpSample,                  3,              3,              false,   false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageGatherAnisoLodAMD,               { ImageOpGather,                  3,              InvalidOperIdx, false,   false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageDrefGatherAnisoLodAMD,           { ImageOpGather,                  3,              3,              false,   false,  InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleAnisoLodAMD,               { ImageOpSample,                  2,              InvalidOperIdx, false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSampleDrefAnisoLodAMD,           { ImageOpSample,                  3,              3,              false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageGatherAnisoLodAMD,               { ImageOpGather,                  3,              InvalidOperIdx, false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageDrefGatherAnisoLodAMD,           { ImageOpGather,                  3,              3,              false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
 #endif
-  add(OpImageFetch,                           { ImageOpFetch,                   2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageGather,                          { ImageOpGather,                  3,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageDrefGather,                      { ImageOpGather,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageRead,                            { ImageOpRead,                    2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageWrite,                           { ImageOpWrite,                   3,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
+  add(OpImageFetch,                           { ImageOpFetch,                   2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageGather,                          { ImageOpGather,                  3,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageDrefGather,                      { ImageOpGather,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageRead,                            { ImageOpRead,                    2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageWrite,                           { ImageOpWrite,                   3,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
 
-  add(OpImageSparseSampleImplicitLod,         { ImageOpSample,                  2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleExplicitLod,         { ImageOpSample,                  2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleDrefImplicitLod,     { ImageOpSample,                  3,              3,              false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleDrefExplicitLod,     { ImageOpSample,                  3,              3,              false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleProjImplicitLod,     { ImageOpSample,                  2,              InvalidOperIdx, true,   true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleProjExplicitLod,     { ImageOpSample,                  2,              InvalidOperIdx, true,   true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleProjDrefImplicitLod, { ImageOpSample,                  3,              3,              true,   true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseSampleProjDrefExplicitLod, { ImageOpSample,                  3,              3,              true,   true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseFetch,                     { ImageOpFetch,                   2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseGather,                    { ImageOpGather,                  3,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseDrefGather,                { ImageOpGather,                  3,              3,              false,  true,   InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSparseRead,                      { ImageOpRead,                    2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleImplicitLod,         { ImageOpSample,                  2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleExplicitLod,         { ImageOpSample,                  2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleDrefImplicitLod,     { ImageOpSample,                  3,              3,              false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleDrefExplicitLod,     { ImageOpSample,                  3,              3,              false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleProjImplicitLod,     { ImageOpSample,                  2,              InvalidOperIdx, true,   true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleProjExplicitLod,     { ImageOpSample,                  2,              InvalidOperIdx, true,   true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleProjDrefImplicitLod, { ImageOpSample,                  3,              3,              true,   true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseSampleProjDrefExplicitLod, { ImageOpSample,                  3,              3,              true,   true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseFetch,                     { ImageOpFetch,                   2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseGather,                    { ImageOpGather,                  3,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseDrefGather,                { ImageOpGather,                  3,              3,              false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageSparseRead,                      { ImageOpRead,                    2,              InvalidOperIdx, false,  true,   InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
 
-  add(OpImageQuerySizeLod,                    { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageQuerySize,                       { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageQueryLod,                        { ImageOpQueryLod,                InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageQueryLevels,                     { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpImageQuerySamples,                    { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
+  add(OpImageQuerySizeLod,                    { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageQuerySize,                       { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageQueryLod,                        { ImageOpQueryLod,                InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageQueryLevels,                     { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
+  add(OpImageQuerySamples,                    { ImageOpQueryNonLod,             InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
 
-  add(OpAtomicLoad,                           { ImageOpAtomicLoad,              InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpAtomicStore,                          { ImageOpAtomicStore,             InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicExchange,                       { ImageOpAtomicExchange,          InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicCompareExchange,                { ImageOpAtomicCompareExchange,   InvalidOperIdx, InvalidOperIdx, false,  false,  4,              5              });
-  add(OpAtomicIIncrement,                     { ImageOpAtomicIIncrement,        InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpAtomicIDecrement,                     { ImageOpAtomicIDecrement,        InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx });
-  add(OpAtomicIAdd,                           { ImageOpAtomicIAdd,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicISub,                           { ImageOpAtomicISub,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicSMin,                           { ImageOpAtomicSMin,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicUMin,                           { ImageOpAtomicUMin,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicSMax,                           { ImageOpAtomicSMax,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicUMax,                           { ImageOpAtomicUMax,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicAnd,                            { ImageOpAtomicAnd,               InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicOr,                             { ImageOpAtomicOr,                InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
-  add(OpAtomicXor,                            { ImageOpAtomicXor,               InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx });
+  add(OpAtomicLoad,                           { ImageOpAtomicLoad,              InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, 1 });
+  add(OpAtomicStore,                          { ImageOpAtomicStore,             InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicExchange,                       { ImageOpAtomicExchange,          InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicCompareExchange,                { ImageOpAtomicCompareExchange,   InvalidOperIdx, InvalidOperIdx, false,  false,  4,              5,              1 });
+  add(OpAtomicIIncrement,                     { ImageOpAtomicIIncrement,        InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, 1 });
+  add(OpAtomicIDecrement,                     { ImageOpAtomicIDecrement,        InvalidOperIdx, InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, 1 });
+  add(OpAtomicIAdd,                           { ImageOpAtomicIAdd,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicISub,                           { ImageOpAtomicISub,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicSMin,                           { ImageOpAtomicSMin,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicUMin,                           { ImageOpAtomicUMin,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicSMax,                           { ImageOpAtomicSMax,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicUMax,                           { ImageOpAtomicUMax,              InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicAnd,                            { ImageOpAtomicAnd,               InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicOr,                             { ImageOpAtomicOr,                InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
+  add(OpAtomicXor,                            { ImageOpAtomicXor,               InvalidOperIdx, InvalidOperIdx, false,  false,  3,              InvalidOperIdx, 1 });
 }
 typedef SPIRVMap<Op, SPIRVImageOpInfo> SPIRVImageOpInfoMap;
 
@@ -1214,7 +1218,8 @@ union ShaderInOutMetadata {
     uint64_t XfbBuffer          : 2;  // Transform feedback buffer ID
     uint64_t XfbOffset          : 15; // Transform feedback offset
     uint64_t XfbStride          : 16; // Transform feedback stride
-    uint64_t reserved           : 64;
+    uint64_t XfbLoc             : 14; // Transform feedback location
+    uint64_t XfbLocStride       : 15; // Transform location stride
   };
   uint64_t U64All[2];
 };
@@ -1245,10 +1250,13 @@ struct ShaderInOutDecorate {
       SPIRVInterpLocKind    Loc;    // Interpolation location
   } Interp;
 
-  uint32_t       StreamId;          // ID of output stream (geometry shader)
-  uint32_t       XfbBuffer;         // Transform feedback buffer ID
-  uint32_t       XfbOffset;         // Transform feedback offset
-  uint32_t       XfbStride;         // Transform feedback stride
+  uint32_t       StreamId;           // ID of output stream (geometry shader)
+  uint32_t       XfbBuffer;          // Transform feedback buffer ID
+  uint32_t       XfbOffset;          // Transform feedback offset
+  uint32_t       XfbStride;          // Transform feedback stride
+  uint32_t       XfbLoc;             // Transform feedback location
+  uint32_t       XfbLocStride;       // Transform feedback location stride
+  bool           contains64BitType;  // Whether contains 64-bit type
 };
 
 /// Metadata for shader block.

@@ -74,6 +74,8 @@ enum class BasicType : uint32_t
     Float16,              // 16-bit floating-point
     Int16,                // 16-bit signed integer
     Uint16,               // 16-bit unsigned integer
+    Int8,                 // 8-bit signed integer
+    Uint8,                // 8-bit unsigned integer
 };
 
 // Represents the info of a descriptor binding
@@ -130,10 +132,10 @@ union XfbOutInfo
 {
     struct
     {
-        uint32_t xfbBuffer : 2;     // Transform feedback buffer
-        uint32_t xfbOffset : 16;    // Transform feedback offset
-        uint32_t locOffset : 13;    // Location offset
-        uint32_t is16bit   : 1;     // Whether it is 16-bit data for transform feedback
+        uint32_t xfbBuffer    : 2;   // Transform feedback buffer
+        uint32_t xfbOffset    : 16;  // Transform feedback offset
+        uint32_t xfbLocOffset : 13;  // Location offset
+        uint32_t is16bit      : 1;   // Whether it is 16-bit data for transform feedback
     };
     uint32_t u32All;
 };

@@ -624,6 +624,7 @@ void SpirvLowerGlobal::visitStoreInst(
                 AddCallInstForOutputExport(pElemValue,
                                            pElemMeta,
                                            nullptr,
+                                           InvalidValue,
                                            nullptr,
                                            pVertexIdx,
                                            InvalidValue,
@@ -632,7 +633,14 @@ void SpirvLowerGlobal::visitStoreInst(
         }
         else
         {
-            AddCallInstForOutputExport(pStoreValue, pOutputMeta, nullptr, nullptr, nullptr, InvalidValue, &storeInst);
+            AddCallInstForOutputExport(pStoreValue,
+                                       pOutputMeta,
+                                       nullptr,
+                                       InvalidValue,
+                                       nullptr,
+                                       nullptr,
+                                       InvalidValue,
+                                       &storeInst);
         }
 
         m_storeInsts.insert(&storeInst);
@@ -907,7 +915,7 @@ void SpirvLowerGlobal::LowerOutput()
             (m_shaderStage == ShaderStageFragment))
         {
             Value* pOutputValue = new LoadInst(pProxy, "", pRetInst);
-            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, nullptr, nullptr, InvalidValue, pRetInst);
+            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, nullptr, nullptr, InvalidValue, pRetInst);
         }
         else if (m_shaderStage == ShaderStageGeometry)
         {
@@ -926,7 +934,7 @@ void SpirvLowerGlobal::LowerOutput()
                 }
 
                 Value* pOutputValue = new LoadInst(pProxy, "", pEmitCall);
-                AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, nullptr, nullptr, emitStreamId, pEmitCall);
+                AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, nullptr, nullptr, emitStreamId, pEmitCall);
             }
         }
     }
@@ -1472,31 +1480,31 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         }
 
         //
-        // VS:  @llpc.input.import.generic.%Type%.i32.i32(i32 location, i32 elemIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
+        // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
         //
-        // TCS: @llpc.input.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32.i32.i32(i32 builtInId, i32 elemIdx, i32 vertexIdx)
+        // TCS: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
         //
-        //      @llpc.output.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.output.import.builtin.%BuiltIn%.%Type%.i32.i32.i32(i32 builtInId, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.output.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.output.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
         //
         //
-        // TES: @llpc.input.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32.i32.i32(i32 builtInId, i32 elemIdx, i32 vertexIdx)
+        // TES: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
 
-        // GS:  @llpc.input.import.generic.%Type%.i32.i32.i32(i32 location, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32.i32(i32 builtInId, i32 vertexIdx)
+        // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 vertexIdx)
         //
-        // FS:  @llpc.input.import.generic.%Type%.i32.i32.i32.i32(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
+        // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
         //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
         //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
         //
-        // CS:  @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
+        // CS:  @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
         //
         //
-        // Common: @llpc.input.import.builtin.%BuiltIn%.%Type%.i32(i32 builtInId)
+        // Common: @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
         //
         if (inOutMeta.IsBuiltIn)
         {
@@ -1548,6 +1556,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     Value*       pOutputValue, // [in] Value exported to output
     Constant*    pOutputMeta,  // [in] Metadata of this output
     Value*       pLocOffset,   // [in] Relative location offset, passed from aggregate type
+    uint32_t     xfbLocOffset, // Transform feedback location offset (for array type)
     Value*       pElemIdx,     // [in] Element index used for element indexing, valid for tessellation control shader
                                // (usually, it is vector component index, for built-in input/output, it could be
                                // element index of scalar array)
@@ -1604,8 +1613,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 {
                     // When vertex indexing is not specified, we set it to don't-care value
                     pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                    }
-                    args.push_back(pVertexIdx);
+                }
+                args.push_back(pVertexIdx);
             }
             else
             {
@@ -1648,16 +1657,28 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 idxs.push_back(elemIdx);
                 Value* pElem = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
 
-                // elemLocOffset = locOffset + stride * elemIdx
-                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(m_pContext->Int32Ty(), stride),
-                                                                  ConstantInt::get(m_pContext->Int32Ty(), elemIdx),
-                                                                  "",
-                                                                  pInsertPos);
-                pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
+                Value* pElemLocOffset = nullptr;
+                ConstantInt* pLocOffsetConst = dyn_cast<ConstantInt>(pLocOffset);
+
+                if (pLocOffsetConst != nullptr)
+                {
+                    uint32_t xfbLocOffset = pLocOffsetConst->getZExtValue();
+                    pElemLocOffset = ConstantInt::get(m_pContext->Int32Ty(), xfbLocOffset + stride * elemIdx);
+                }
+                else
+                {
+                    // elemLocOffset = locOffset + stride * elemIdx
+                    pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(m_pContext->Int32Ty(), stride),
+                                                               ConstantInt::get(m_pContext->Int32Ty(), elemIdx),
+                                                               "",
+                                                               pInsertPos);
+                    pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
+                }
 
                 AddCallInstForOutputExport(pElem,
                                            pElemMeta,
                                            pElemLocOffset,
+                                           xfbLocOffset + outputMeta.XfbLocStride * elemIdx,
                                            nullptr,
                                            pVertexIdx,
                                            emitStreamId,
@@ -1680,7 +1701,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             idxs.push_back(memberIdx);
             Value* pMember = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
 
-            AddCallInstForOutputExport(pMember, pMemberMeta, pLocOffset, nullptr, pVertexIdx, emitStreamId, pInsertPos);
+            AddCallInstForOutputExport(pMember, pMemberMeta, pLocOffset, xfbLocOffset, nullptr, pVertexIdx, emitStreamId, pInsertPos);
         }
     }
     else
@@ -1704,19 +1725,31 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
         if (outputMeta.IsXfb)
         {
-            // NOTE: If the relative location offset is not specified, initialize it to 0.
-            if (pLocOffset == nullptr)
+            uint32_t locOffset = 0;
+            if (pLocOffset != nullptr)
             {
-                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                locOffset = (dyn_cast<ConstantInt>(pLocOffset))->getZExtValue();
             }
 
+            LLPC_ASSERT(xfbLocOffset != InvalidValue);
+            auto pXfbLocOffset = ConstantInt::get(m_pContext->Int32Ty(), xfbLocOffset + outputMeta.XfbLoc);
+
+            // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbLocOffset, %Type% outputValue)
             instName = LlpcName::OutputExportXfb;
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbBuffer));
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbOffset));
-            args.push_back(pLocOffset);
+            args.push_back(pXfbLocOffset);
             args.push_back(pOutputValue);
             AddTypeMangling(nullptr, args, instName);
             EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+
+            if ((m_shaderStage == ShaderStageGeometry) && (outputMeta.IsBuiltIn == false))
+            {
+                CollectGsXfbOutputInfo(pOutputValue->getType(),
+                                       locOffset,
+                                       xfbLocOffset + outputMeta.XfbLoc,
+                                       outputMeta);
+            }
         }
 
         args.clear();
@@ -1800,7 +1833,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             // Element indexing is not valid for other shader stages
             LLPC_ASSERT(pElemIdx == nullptr);
 
-            if ((outputMeta.IsBuiltIn == false) && (m_shaderStage != ShaderStageCompute))
+            if (m_shaderStage != ShaderStageCompute)
             {
                 LLPC_ASSERT(pOutputTy->isSingleValueType());
 
@@ -2043,6 +2076,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                 return AddCallInstForOutputExport(pStoreValue,
                                                   pElemMeta,
                                                   nullptr,
+                                                  InvalidValue,
                                                   pElemIdx,
                                                   pVertexIdx,
                                                   InvalidValue,
@@ -2101,6 +2135,7 @@ void SpirvLowerGlobal::StoreOutputMember(
             return AddCallInstForOutputExport(pStoreValue,
                                               pOutputMeta,
                                               pLocOffset,
+                                              InvalidValue,
                                               pCompIdx,
                                               pVertexIdx,
                                               InvalidValue,
@@ -2115,6 +2150,7 @@ void SpirvLowerGlobal::StoreOutputMember(
         return AddCallInstForOutputExport(pStoreValue,
                                           pOutputMeta,
                                           pLocOffset,
+                                          InvalidValue,
                                           nullptr,
                                           pVertexIdx,
                                           InvalidValue,
@@ -2122,6 +2158,37 @@ void SpirvLowerGlobal::StoreOutputMember(
     }
 
     LLPC_NEVER_CALLED();
+}
+
+// =====================================================================================================================
+// Collects transform output info for geometry shader.
+void SpirvLowerGlobal::CollectGsXfbOutputInfo(
+    const llvm::Type *          pOutputTy,     // [in] Type of this output
+    uint32_t                    locOffset,     // Relative location array offset, passed from aggregate type
+    uint32_t                    xfbLocOffset,  // Transform feedback location offset (for array type)
+    const ShaderInOutMetadata & outputMeta)    // [in] Metadata of this output
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+    LLPC_ASSERT(outputMeta.IsXfb == true);
+    LLPC_ASSERT(outputMeta.IsBuiltIn == false);
+
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+
+    uint32_t location = outputMeta.Value + outputMeta.Index + locOffset;
+
+    GsOutLocInfo outLocInfo = {};
+    outLocInfo.location = location;
+    outLocInfo.isBuiltIn = false;
+    outLocInfo.streamId = outputMeta.StreamId;
+
+    XfbOutInfo xfbOutInfo = {};
+
+    xfbOutInfo.xfbBuffer = outputMeta.XfbBuffer;
+    xfbOutInfo.xfbOffset = outputMeta.XfbOffset;
+    xfbOutInfo.is16bit = (pOutputTy->getScalarSizeInBits() == 16);
+    xfbOutInfo.xfbLocOffset = xfbLocOffset;
+
+    pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
 }
 
 } // Llpc

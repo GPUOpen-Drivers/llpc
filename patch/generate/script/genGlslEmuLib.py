@@ -110,6 +110,8 @@ genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCode
                            OUTPUT_DIR, "float16")
 genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeF64.txt"),
                            OUTPUT_DIR, "float64")
+genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI8.txt"),
+                           OUTPUT_DIR, "int8")
 genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI16.txt"),
                            OUTPUT_DIR, "int16")
 genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI64.txt"),

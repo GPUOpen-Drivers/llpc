@@ -451,7 +451,7 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
           if (SrcCompTy->isTypeInt(16))
             // Uint8 <- uint16
             DestVal.Uint8Val = static_cast<uint8_t>(SrcVal[0].Uint16Val);
-          if (SrcCompTy->isTypeInt(32))
+          else if (SrcCompTy->isTypeInt(32))
             // Uint8 <- uint32
             DestVal.Uint8Val = static_cast<uint16_t>(SrcVal[0].UintVal);
           else if (SrcCompTy->isTypeInt(64))
@@ -488,7 +488,7 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
           if (SrcCompTy->isTypeInt(8))
             // Uint64 <- uint8
             DestVal.Uint64Val = static_cast<uint64_t>(SrcVal[0].Uint8Val);
-          if (SrcCompTy->isTypeInt(16))
+          else if (SrcCompTy->isTypeInt(16))
             // Uint64 <- uint16
             DestVal.Uint64Val = static_cast<uint64_t>(SrcVal[0].Uint16Val);
           else if (SrcCompTy->isTypeInt(32))
@@ -621,7 +621,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSNegate: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // -Int8
+          DestVal.Int8Val = (0 - SrcVal[0].Int8Val);
+        else if (DestCompTy->isTypeInt(16))
           // -Int16
           DestVal.Int16Val = (0 - SrcVal[0].Int16Val);
         else if (DestCompTy->isTypeInt(32))
@@ -635,8 +638,11 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpNot: {
-        if (DestCompTy->isTypeInt(16))
-          // ~Uint
+        if (DestCompTy->isTypeInt(8))
+          // ~Uint8
+          DestVal.Uint8Val = ~SrcVal[0].Uint8Val;
+        else if (DestCompTy->isTypeInt(16))
+          // ~Uint16
           DestVal.Uint16Val = ~SrcVal[0].Uint16Val;
         else if (DestCompTy->isTypeInt(32))
           // ~Uint
@@ -649,7 +655,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpIAdd: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Int8 + int8
+          DestVal.Int8Val = SrcVal[0].Int8Val + SrcVal[1].Int8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Int16 + int16
           DestVal.Int16Val = SrcVal[0].Int16Val + SrcVal[1].Int16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -663,7 +672,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpISub: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Int8 - int8
+          DestVal.Int8Val = SrcVal[0].Int8Val - SrcVal[1].Int8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Int16 - int16
           DestVal.Int16Val = SrcVal[0].Int16Val - SrcVal[1].Int16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -677,7 +689,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpIMul: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Int8 * int8
+          DestVal.Int8Val = SrcVal[0].Int8Val * SrcVal[1].Int8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Int16 * int16
           DestVal.Int16Val = SrcVal[0].Int16Val * SrcVal[1].Int16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -691,7 +706,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpUDiv: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 / Uint8
+          DestVal.Uint8Val = SrcVal[0].Uint8Val / SrcVal[1].Uint8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 / uint16
           DestVal.Uint16Val = SrcVal[0].Uint16Val / SrcVal[1].Uint16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -705,7 +723,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSDiv: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Int8 / Int8
+          DestVal.Int8Val = SrcVal[0].Int8Val / SrcVal[1].Int8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Int16 / int16
           DestVal.Int16Val = SrcVal[0].Int16Val / SrcVal[1].Int16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -719,7 +740,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpUMod: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 % Uint8
+          DestVal.Uint8Val = SrcVal[0].Uint8Val % SrcVal[1].Uint8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 % uint16
           DestVal.Uint16Val = SrcVal[0].Uint16Val % SrcVal[1].Uint16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -733,7 +757,13 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSMod: {
-        if (DestCompTy->isTypeInt(16)) {
+        if (DestCompTy->isTypeInt(8)) {
+          // Mod(int8, int8)
+          float Quo =
+            static_cast<float>(SrcVal[0].Int8Val) / SrcVal[1].Int8Val;
+          DestVal.Int8Val = SrcVal[0].Int8Val -
+            SrcVal[1].Int8Val * static_cast<int8_t>(std::floor(Quo));
+        } else if (DestCompTy->isTypeInt(16)) {
           // Mod(int16, int16)
           float Quo =
             static_cast<float>(SrcVal[0].Int16Val) / SrcVal[1].Int16Val;
@@ -756,7 +786,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSRem: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Int8 % int8
+          DestVal.Int8Val = SrcVal[0].Int8Val % SrcVal[1].Int8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Int16 % int16
           DestVal.Int16Val = SrcVal[0].Int16Val % SrcVal[1].Int16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -772,7 +805,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       case OpShiftRightLogical: {
         // NOTE: "Shift number" is consumed as an 32-bit unsigned integer
         // regardless of its actual type.
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 >> uint
+          DestVal.Uint8Val = SrcVal[0].Uint8Val >> SrcVal[1].UintVal;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 >> uint
           DestVal.Uint16Val = SrcVal[0].Uint16Val >> SrcVal[1].UintVal;
         else if (DestCompTy->isTypeInt(32))
@@ -788,7 +824,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       case OpShiftRightArithmetic: {
         // NOTE: "Shift number" is consumed as an 32-bit unsigned integer
         // regardless of its actual type.
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Int8 >> uint
+          DestVal.Int8Val = SrcVal[0].Int8Val >> SrcVal[1].UintVal;
+        else if (DestCompTy->isTypeInt(16))
           // Int16 >> uint
           DestVal.Int16Val = SrcVal[0].Int16Val >> SrcVal[1].UintVal;
         else if (DestCompTy->isTypeInt(32))
@@ -804,7 +843,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
       case OpShiftLeftLogical: {
         // NOTE: "Shift number" is consumed as an 32-bit unsigned integer
         // regardless of its actual type.
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 << uint
+          DestVal.Uint8Val = SrcVal[0].Uint8Val << SrcVal[1].UintVal;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 << uint
           DestVal.Uint16Val = SrcVal[0].Uint16Val << SrcVal[1].UintVal;
         else if (DestCompTy->isTypeInt(32))
@@ -818,7 +860,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpBitwiseOr: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 | uint8
+          DestVal.Uint8Val = SrcVal[0].Uint8Val | SrcVal[1].Uint8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 | uint16
           DestVal.Uint16Val = SrcVal[0].Uint16Val | SrcVal[1].Uint16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -832,7 +877,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpBitwiseXor: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 ^ uint8
+          DestVal.Uint8Val = SrcVal[0].Uint8Val ^ SrcVal[1].Uint8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 ^ uint16
           DestVal.Uint16Val = SrcVal[0].Uint16Val ^ SrcVal[1].Uint16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -846,7 +894,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpBitwiseAnd: {
-        if (DestCompTy->isTypeInt(16))
+        if (DestCompTy->isTypeInt(8))
+          // Uint8 & uint8
+          DestVal.Uint8Val = SrcVal[0].Uint8Val & SrcVal[1].Uint8Val;
+        else if (DestCompTy->isTypeInt(16))
           // Uint16 & uint16
           DestVal.Uint16Val = SrcVal[0].Uint16Val & SrcVal[1].Uint16Val;
         else if (DestCompTy->isTypeInt(32))
@@ -884,7 +935,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         DestVal = SrcVal[0].BoolVal ? SrcVal[1] : SrcVal[2];
         break;
       case OpIEqual: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Uint8 == uint8
+          DestVal.BoolVal = (SrcVal[0].Uint8Val == SrcVal[1].Uint8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Uint16 == uint16
           DestVal.BoolVal = (SrcVal[0].Uint16Val == SrcVal[1].Uint16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -898,7 +952,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpINotEqual: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Uint8 != uint8
+          DestVal.BoolVal = (SrcVal[0].Uint8Val != SrcVal[1].Uint8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Uint16 != uint16
           DestVal.BoolVal = (SrcVal[0].Uint16Val != SrcVal[1].Uint16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -912,7 +969,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpULessThan: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Uint8 < uint8
+          DestVal.BoolVal = (SrcVal[0].Uint8Val < SrcVal[1].Uint8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Uint16 < uint16
           DestVal.BoolVal = (SrcVal[0].Uint16Val < SrcVal[1].Uint16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -926,7 +986,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSLessThan: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Int8 < int8
+          DestVal.BoolVal = (SrcVal[0].Int8Val < SrcVal[1].Int8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Int16 < int16
           DestVal.BoolVal = (SrcVal[0].Int16Val < SrcVal[1].Int16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -940,7 +1003,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpUGreaterThan: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Uint8 > uint8
+          DestVal.BoolVal = (SrcVal[0].Uint8Val > SrcVal[1].Uint8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Uint16 > uint16
           DestVal.BoolVal = (SrcVal[0].Uint16Val > SrcVal[1].Uint16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -954,7 +1020,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSGreaterThan: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Int8 > Int8
+          DestVal.BoolVal = (SrcVal[0].Int8Val > SrcVal[1].Int8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Int16 > int16
           DestVal.BoolVal = (SrcVal[0].Int16Val > SrcVal[1].Int16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -968,7 +1037,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpULessThanEqual: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Uint8 <= uint8
+          DestVal.BoolVal = (SrcVal[0].Uint8Val <= SrcVal[1].Uint8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Uint16 <= uint16
           DestVal.BoolVal = (SrcVal[0].Uint16Val <= SrcVal[1].Uint16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -982,7 +1054,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSLessThanEqual: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Int8 <= int8
+          DestVal.BoolVal = (SrcVal[0].Int8Val <= SrcVal[1].Int8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Int16 <= int16
           DestVal.BoolVal = (SrcVal[0].Int16Val <= SrcVal[1].Int16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -996,7 +1071,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpUGreaterThanEqual: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Uint8 >= uint8
+          DestVal.BoolVal = (SrcVal[0].Uint8Val >= SrcVal[1].Uint8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Uint16 >= uint16
           DestVal.BoolVal = (SrcVal[0].Uint16Val >= SrcVal[1].Uint16Val);
         else if (SrcCompTy->isTypeInt(32))
@@ -1010,7 +1088,10 @@ SPIRVValue * createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst,
         break;
       }
       case OpSGreaterThanEqual: {
-        if (SrcCompTy->isTypeInt(16))
+        if (SrcCompTy->isTypeInt(8))
+          // Int8 >= int8
+          DestVal.BoolVal = (SrcVal[0].Int8Val >= SrcVal[1].Int8Val);
+        else if (SrcCompTy->isTypeInt(16))
           // Int16 >= int16
           DestVal.BoolVal = (SrcVal[0].Int16Val >= SrcVal[1].Int16Val);
         else if (SrcCompTy->isTypeInt(32))

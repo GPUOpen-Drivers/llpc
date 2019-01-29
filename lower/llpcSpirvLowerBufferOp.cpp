@@ -457,6 +457,50 @@ void SpirvLowerBufferOp::visitCallInst(
                     data.push_back(callInst.getOperand(3));
                 }
 
+                const uint32_t scopeOperandIdx = 1;
+
+                const uint64_t scope = cast<ConstantInt>(callInst.getOperand(scopeOperandIdx))->getZExtValue();
+
+                AtomicOrdering ordering = AtomicOrdering::NotAtomic;
+
+                if (scope != spv::ScopeInvocation)
+                {
+                    const uint64_t semantics = cast<ConstantInt>(callInst.getOperand(scopeOperandIdx + 1))->getZExtValue();
+
+                    if (semantics & MemorySemanticsSequentiallyConsistentMask)
+                    {
+                        ordering = AtomicOrdering::SequentiallyConsistent;
+                    }
+                    else if (semantics & MemorySemanticsAcquireReleaseMask)
+                    {
+                        ordering = AtomicOrdering::AcquireRelease;
+                    }
+                    else if (semantics & MemorySemanticsAcquireMask)
+                    {
+                        ordering = AtomicOrdering::Acquire;
+                    }
+                    else if (semantics & MemorySemanticsReleaseMask)
+                    {
+                        ordering = AtomicOrdering::Release;
+                    }
+
+                    if (semantics & (MemorySemanticsMakeAvailableKHRMask | MemorySemanticsMakeVisibleKHRMask))
+                    {
+                        ordering = AtomicOrdering::SequentiallyConsistent;
+                    }
+                }
+
+                switch (ordering)
+                {
+                    case AtomicOrdering::Release:
+                    case AtomicOrdering::AcquireRelease:
+                    case AtomicOrdering::SequentiallyConsistent:
+                        new FenceInst(*m_pContext, AtomicOrdering::Release, SyncScope::System, &callInst);
+                        break;
+                    default:
+                        break;
+                }
+
                 Value* pAtomicValue = AddBufferAtomicInst(atomicOpName,
                                                           pDataTy,
                                                           data,
@@ -466,6 +510,18 @@ void SpirvLowerBufferOp::visitCallInst(
                                                           pMemberOffset,
                                                           pResultMeta,
                                                           &callInst);
+
+                switch (ordering)
+                {
+                    case AtomicOrdering::Acquire:
+                    case AtomicOrdering::AcquireRelease:
+                    case AtomicOrdering::SequentiallyConsistent:
+                        new FenceInst(*m_pContext, AtomicOrdering::Acquire, SyncScope::System, &callInst);
+                        break;
+                    default:
+                        break;
+                }
+
                 if (atomicOpName != "store")
                 {
                     LLPC_ASSERT(pAtomicValue != nullptr);
@@ -531,8 +587,13 @@ void SpirvLowerBufferOp::visitCallInst(
         Value* pDesc = ExtractValueInst::Create(pStruct, { 0 }, "", &callInst);
         Value* pOffset = ExtractValueInst::Create(pStruct, { 1 }, "", &callInst);
 
+        const bool isCoherent = cast<ConstantInt>(callInst.getArgOperand(1))->isOne();
+        const bool isVolatile = cast<ConstantInt>(callInst.getArgOperand(2))->isOne();
+
         // Load variable from buffer block
         auto pLoadValue = AddBufferLoadDescInst(callInst.getType(),
+                                                isCoherent,
+                                                isVolatile,
                                                 pDesc,
                                                 pOffset,
                                                 pResultMeta,
@@ -553,8 +614,13 @@ void SpirvLowerBufferOp::visitCallInst(
         Value* pOffset = ExtractValueInst::Create(pStruct, { 1 }, "", &callInst);
         Value* pStoreValue = callInst.getOperand(0);
 
+        const bool isCoherent = cast<ConstantInt>(callInst.getArgOperand(2))->isOne();
+        const bool isVolatile = cast<ConstantInt>(callInst.getArgOperand(3))->isOne();
+
         // Store variable to buffer block
         AddBufferStoreDescInst(pStoreValue,
+                               isCoherent,
+                               isVolatile,
                                pDesc,
                                pOffset,
                                pResultMeta,
@@ -688,6 +754,8 @@ void SpirvLowerBufferOp::visitLoadInst(
                                                  binding,
                                                  isPushConst,
                                                  isScalarAligned,
+                                                 loadInst.isAtomic(),
+                                                 loadInst.isVolatile(),
                                                  pBlockOffset,
                                                  pMemberOffset,
                                                  pResultMeta,
@@ -707,7 +775,12 @@ void SpirvLowerBufferOp::visitLoadInst(
             std::vector<Value*> indexOperands;
             indexOperands.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
 
-            Value* pLoadDest = LoadEntireBlock(pBlock, pBlockTy, indexOperands, &loadInst);
+            Value* pLoadDest = LoadEntireBlock(pBlock,
+                                               loadInst.isAtomic(),
+                                               loadInst.isVolatile(),
+                                               pBlockTy,
+                                               indexOperands,
+                                               &loadInst);
             m_loadInsts.insert(&loadInst);
             loadInst.replaceAllUsesWith(pLoadDest);
         }
@@ -804,6 +877,8 @@ void SpirvLowerBufferOp::visitStoreInst(
                                descSet,
                                binding,
                                isScalarAligned,
+                               storeInst.isAtomic(),
+                               storeInst.isVolatile(),
                                pBlockOffset,
                                pMemberOffset,
                                pResultMeta,
@@ -820,7 +895,12 @@ void SpirvLowerBufferOp::visitStoreInst(
             std::vector<Value*> indexOperands;
             indexOperands.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
 
-            StoreEntireBlock(pBlock, pStoreSrc, indexOperands, &storeInst);
+            StoreEntireBlock(pBlock,
+                             storeInst.isAtomic(),
+                             storeInst.isVolatile(),
+                             pStoreSrc,
+                             indexOperands,
+                             &storeInst);
             m_storeInsts.insert(&storeInst);
         }
 
@@ -1135,6 +1215,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
     uint32_t     binding,            // Descriptor binding of buffer block
     bool         isPushConst,        // Whether the block is actually a push constant
     bool         isScalarAligned,    // Whether scalar alignment has to be used for the load.
+    bool         isCoherent,         // Whether the buffer load is coherent.
+    bool         isVolatile,         // Whether the buffer load is volatile.
     Value*       pBlockOffset,       // [in] Block offset
     Value*       pBlockMemberOffset, // [in] Block member offset
     Constant*    pBlockMemberMeta,   // [in] Block member metadata
@@ -1258,12 +1340,11 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
 
             if (isPushConst == false)
             {
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(),
-                                                blockMeta.NonWritable ? true : false)); // readonly
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.NonWritable)); // readonly
             }
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform)); // nonUniform
 
             std::string suffix = GetTypeNameForScalarOrVector(pActualLoadTy);
 
@@ -1339,6 +1420,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                                            binding,
                                            isPushConst,
                                            isScalarAligned,
+                                           isCoherent,
+                                           isVolatile,
                                            pBlockOffset,
                                            pElemOffset,
                                            pElemMeta,
@@ -1398,6 +1481,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                                              binding,
                                              isPushConst,
                                              isScalarAligned,
+                                             isCoherent,
+                                             isVolatile,
                                              pBlockOffset,
                                              pMemberOffset,
                                              pMemberMeta,
@@ -1417,6 +1502,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
 // Inserts instructions to load variable from buffer block (with descriptor).
 Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
     Type*        pLoadTy,            // [in] Type of value loaded from buffer block
+    bool         isCoherent,         // Whether the buffer load is coherent.
+    bool         isVolatile,         // Whether the buffer load is volatile.
     Value*       pDesc,              // [in] Descriptor of buffer block
     Value*       pBlockMemberOffset, // [in] Block member offset
     Constant*    pBlockMemberMeta,   // [in] Element meta Data
@@ -1454,8 +1541,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(),
                     blockMeta.NonWritable ? true : false)); // readonly
 
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
 
                 Value* pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
@@ -1522,8 +1609,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(),
                 blockMeta.NonWritable ? true : false)); // readonly
 
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
 
             std::string suffix = GetTypeNameForScalarOrVector(pActualLoadTy);
 
@@ -1595,6 +1682,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
 
             // Load array element
             auto pElem = AddBufferLoadDescInst(pElemTy,
+                                               isCoherent,
+                                               isVolatile,
                                                pDesc,
                                                pElemOffset,
                                                pElemMeta,
@@ -1650,6 +1739,8 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
 
             // Load structure member
             auto pMember = AddBufferLoadDescInst(pMemberTy,
+                                                isCoherent,
+                                                isVolatile,
                                                 pDesc,
                                                 pMemberOffset,
                                                 pMemberMeta,
@@ -1671,7 +1762,9 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
     Value*       pStoreValue,        // [in] Value stored to buffer block
     uint32_t     descSet,            // Descriptor set of buffer block
     uint32_t     binding,            // Descriptor binding of buffer block
-    bool         isScalarAligned,    // Is the store scalar aligned
+    bool         isScalarAligned,    // Whether the buffer store scalar aligned
+    bool         isCoherent,         // Whether the buffer store coherent
+    bool         isVolatile,         // Whether the buffer store volatile
     Value*       pBlockOffset,       // [in] Block offset
     Value*       pBlockMemberOffset, // [in] Block member offset
     Constant*    pBlockMemberMeta,   // [in] Metadata of buffer block
@@ -1716,9 +1809,9 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
                 args.push_back(pBlockOffset);
                 args.push_back(pBlockMemberOffset);
                 args.push_back(pCompValue);
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform)); // nonUniform
                 EmitCall(m_pModule, LlpcName::BufferStore + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
                 // Update the block member offset for the next component
@@ -1771,9 +1864,9 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             args.push_back(pBlockOffset);
             args.push_back(pBlockMemberOffset);
             args.push_back(pStoreValue);
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+            args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform)); // nonUniform
 
             std::string suffix = GetTypeNameForScalarOrVector(pActualStoreTy);
             const char* pInstName = isScalarAligned ?
@@ -1848,6 +1941,8 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
                                descSet,
                                binding,
                                isScalarAligned,
+                               isCoherent,
+                               isVolatile,
                                pBlockOffset,
                                pElemOffset,
                                pElemMeta,
@@ -1900,6 +1995,8 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
                                descSet,
                                binding,
                                isScalarAligned,
+                               isCoherent,
+                               isVolatile,
                                pBlockOffset,
                                pMemberOffset,
                                pMemberMeta,
@@ -2084,6 +2181,8 @@ Value* SpirvLowerBufferOp::TransposeMatrix(
 // Loads variable from entire buffer block.
 Value* SpirvLowerBufferOp::LoadEntireBlock(
     GlobalVariable*      pBlock,        // [in] Buffer block
+    bool                 isCoherent,    // Whether the buffer load is coherent
+    bool                 isVolatile,    // Whether the buffer load is volatile
     Type*                pLoadTy,       // [in] Type of value loaded from buffer block
     std::vector<Value*>& indexOperands, // [in] Index operands (used for block array dimension)
     Instruction*         pInsertPos)    // [in] Where to insert instructions
@@ -2100,7 +2199,7 @@ Value* SpirvLowerBufferOp::LoadEntireBlock(
         {
             // Handle array elements recursively
             indexOperands.push_back(ConstantInt::get(m_pContext->Int32Ty(), elemIdx));
-            auto pElem = LoadEntireBlock(pBlock, pElemTy, indexOperands, pInsertPos);
+            auto pElem = LoadEntireBlock(pBlock, isCoherent, isVolatile, pElemTy, indexOperands, pInsertPos);
             indexOperands.pop_back();
 
             std::vector<uint32_t> idxs;
@@ -2167,6 +2266,8 @@ Value* SpirvLowerBufferOp::LoadEntireBlock(
                                        binding,
                                        isPushConst,
                                        isScalarAligned,
+                                       isCoherent,
+                                       isVolatile,
                                        pBlockOffset,
                                        pMemberOffset,
                                        pResultMeta,
@@ -2180,6 +2281,8 @@ Value* SpirvLowerBufferOp::LoadEntireBlock(
 // Stores variable to entire buffer block.
 void SpirvLowerBufferOp::StoreEntireBlock(
     GlobalVariable*      pBlock,        // [in] Buffer block
+    bool                 isCoherent,    // Whether the buffer store is coherent
+    bool                 isVolatile,    // Whether the buffer store is volatile
     Value*               pStoreValue,   // [in] Value stored to buffer block
     std::vector<Value*>& indexOperands, // [in] Index operands (used for block array dimension)
     Instruction*         pInsertPos)    // [in] Where to insert instructions
@@ -2199,7 +2302,7 @@ void SpirvLowerBufferOp::StoreEntireBlock(
             auto pElem = ExtractValueInst::Create(pStoreValue, idxs, "", pInsertPos);
 
             indexOperands.push_back(ConstantInt::get(m_pContext->Int32Ty(), elemIdx));
-            StoreEntireBlock(pBlock, pElem, indexOperands, pInsertPos);
+            StoreEntireBlock(pBlock, isCoherent, isVolatile, pElem, indexOperands, pInsertPos);
             indexOperands.pop_back();
         }
     }
@@ -2249,6 +2352,8 @@ void SpirvLowerBufferOp::StoreEntireBlock(
                            descSet,
                            binding,
                            isScalarAligned,
+                           isCoherent,
+                           isVolatile,
                            pBlockOffset,
                            pMemberOffset,
                            pResultMeta,
@@ -2260,6 +2365,8 @@ void SpirvLowerBufferOp::StoreEntireBlock(
 // Inserts instructions to store variable to buffer block (with descriptor).
 void SpirvLowerBufferOp::AddBufferStoreDescInst(
     Value*       pStoreValue,        // [in] Value stored to buffer block
+    bool         isCoherent,         // Whether the buffer store coherent
+    bool         isVolatile,         // Whether the buffer store volatile
     Value*       pDesc,              // [in] Descriptor set of buffer block
     Value*       pBlockMemberOffset, // [in] Block member offset
     Constant*    pBlockMemberMeta,   // [in] Metadata of buffer block
@@ -2432,6 +2539,8 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
 
             // Store array element
             AddBufferStoreDescInst(pElem,
+                                   isCoherent,
+                                   isVolatile,
                                    pDesc,
                                    pElemOffset,
                                    pElemMeta,
@@ -2481,6 +2590,8 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
 
             // Store structure member
             AddBufferStoreDescInst(pMember,
+                                   isCoherent,
+                                   isVolatile,
                                    pDesc,
                                    pMemberOffset,
                                    pMemberMeta,

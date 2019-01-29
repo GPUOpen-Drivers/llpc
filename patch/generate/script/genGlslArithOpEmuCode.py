@@ -34,6 +34,8 @@ GEN_TYPE_TO_SCALAR = \
     "genDType"   : "double",    \
     "genIType"   : "i32",       \
     "genUType"   : "i32",       \
+    "genI8Type"  : "i8",        \
+    "genU8Type"  : "i8",        \
     "genF16Type" : "half",      \
     "genI16Type" : "i16",       \
     "genU16Type" : "i16",       \
@@ -55,6 +57,8 @@ GEN_TYPE_TO_VECTOR = \
     "genDType"   : "dvec",      \
     "genIType"   : "ivec",      \
     "genUType"   : "uvec",      \
+    "genI8Type"  : "i8vec",     \
+    "genU8Type"  : "u8vec",     \
     "genF16Type" : "f16vec",    \
     "genI16Type" : "i16vec",    \
     "genU16Type" : "u16vec",    \

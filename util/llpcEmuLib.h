@@ -75,7 +75,8 @@ class EmuLib
     Context* pContext;                                    // The LLPC context
     std::vector<EmuLibArchive> m_archives;                // Bitcode archives that make up this EmuLib
     std::vector<std::unique_ptr<llvm::Module>> m_modules; // Modules that have been parsed out of archives
-
+    std::map<llvm::StringRef, size_t> m_symbolIndices;    // All available symbols in this EmuLib and the indices
+                                                          // in m_archives
 public:
     EmuLib(Context* pContext) : pContext(pContext) {}
     void AddArchive(llvm::MemoryBufferRef buffer);

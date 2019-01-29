@@ -931,6 +931,14 @@ VertexFetch::VertexFetch(
     std::vector<Constant*> defaults;
     auto pZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
 
+    // Int8 (0, 0, 0, 1)
+    defaults.clear();
+    defaults.push_back(pZero);
+    defaults.push_back(pZero);
+    defaults.push_back(pZero);
+    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
+    m_fetchDefaults.pInt8 = ConstantVector::get(defaults);
+
     // Int16 (0, 0, 0, 1)
     defaults.clear();
     defaults.push_back(pZero);
@@ -1052,6 +1060,7 @@ Value* VertexFetch::Run(
 
     const VertexFormatInfo* pFormatInfo = GetVertexFormatInfo(pAttrib->format);
 
+    const bool is8bitFetch = (pInputTy->getScalarSizeInBits() == 8);
     const bool is16bitFetch = (pInputTy->getScalarSizeInBits() == 16);
 
     // Do the first vertex fetch operation
@@ -1265,14 +1274,18 @@ Value* VertexFetch::Run(
     // Finalize vertex fetch
     Type* pBasicTy = pInputTy->isVectorTy() ? pInputTy->getVectorElementType() : pInputTy;
     const uint32_t bitWidth = pBasicTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Get default fetch values
     Constant* pDefaults = nullptr;
 
     if (pBasicTy->isIntegerTy())
     {
-        if (bitWidth == 16)
+        if (bitWidth == 8)
+        {
+            pDefaults = m_fetchDefaults.pInt8;
+        }
+        else if (bitWidth == 16)
         {
             pDefaults = m_fetchDefaults.pInt16;
         }
@@ -1384,10 +1397,22 @@ Value* VertexFetch::Run(
         }
     }
 
-    // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
-    // convert them to <n x i16> and the 16 high bits is truncated.
-    if (is16bitFetch)
+    if (is8bitFetch)
     {
+        // NOTE: The vertex fetch results are represented as <n x i32> now. For 8-bit vertex fetch, we have to
+        // convert them to <n x i8> and the 24 high bits is truncated.
+        LLPC_ASSERT(pInputTy->isIntOrIntVectorTy()); // Must be integer type
+
+        Type* pVertexTy = pVertex->getType();
+        pVertexTy = pVertexTy->isVectorTy() ?
+                        VectorType::get(m_pContext->Int8Ty(), pVertexTy->getVectorNumElements()) :
+                        m_pContext->Int8Ty();
+        pVertex = new TruncInst(pVertex, pVertexTy, "", pInsertPos);
+    }
+    else if (is16bitFetch)
+    {
+        // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
+        // convert them to <n x i16> and the 16 high bits is truncated.
         Type* pVertexTy = pVertex->getType();
         pVertexTy = pVertexTy->isVectorTy() ?
                         VectorType::get(m_pContext->Int16Ty(), pVertexTy->getVectorNumElements()) :

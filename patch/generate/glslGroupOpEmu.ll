@@ -930,8 +930,11 @@ define spir_func i32 @_Z28GroupNonUniformBallotFindMSBiDv4_i(i32 %scope, <4 x i3
 ; GLSL: int/uint subgroupShuffle(int/uint, uint)
 define spir_func i32 @_Z22GroupNonUniformShuffleiii(i32 %scope, i32 %value, i32 %id)
 {
-    %1 = call i32 @llvm.amdgcn.readlane(i32 %value, i32 %id)
-    ret i32 %1
+    %1 = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 %id)
+    %2 = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %1, i32 %id)
+    %3 = call i32 @llvm.amdgcn.readlane(i32 %value, i32 %2)
+    %4 = call i32 @llvm.amdgcn.waterfall.end.i32(i32 %1, i32 %3)
+    ret i32 %4
 }
 
 ; GLSL: ivec2/uvec2 subgroupShuffle(ivec2/uvec2, uint)
@@ -2863,6 +2866,9 @@ define spir_func i32 @_Z8MbcntAMDl(i64 %mask)
 
 declare i32 @llvm.amdgcn.wwm.i32(i32) #1
 declare i64 @llvm.amdgcn.wwm.i64(i64) #1
+declare i32 @llvm.amdgcn.waterfall.begin.i32(i32) #0
+declare i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32, i32) #0
+declare i32 @llvm.amdgcn.waterfall.end.i32(i32, i32) #0
 declare i32 @llvm.amdgcn.readlane(i32, i32) #2
 declare i32 @llvm.amdgcn.readfirstlane(i32) #2
 declare i32 @llvm.amdgcn.writelane(i32, i32, i32) #2

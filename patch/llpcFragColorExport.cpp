@@ -1208,7 +1208,9 @@ Value* FragColorExport::Run(
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
     BasicType outputType = pResUsage->inOutUsage.fs.outputTypes[origLoc];
-    const bool signedness = ((outputType == BasicType::Int16) || (outputType == BasicType::Int));
+    const bool signedness = ((outputType == BasicType::Int8) ||
+                             (outputType == BasicType::Int16) ||
+                             (outputType == BasicType::Int));
 
     auto pCompTy = pOutputTy->isVectorTy() ? pOutputTy->getVectorElementType() : pOutputTy;
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
@@ -1310,7 +1312,35 @@ Value* FragColorExport::Run(
         {
             comprExp = true;
 
-            if (bitWidth == 16)
+            if (bitWidth == 8)
+            {
+                needPack = true;
+
+                // Cast i8 to float16
+                LLPC_ASSERT(pCompTy->isIntegerTy());
+                for (uint32_t i = 0; i < compCount; ++i)
+                {
+                    if (signedness)
+                    {
+                        // %comp = sext i8 %comp to i16
+                        comps[i] = new SExtInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
+                    }
+                    else
+                    {
+                        // %comp = zext i8 %comp to i16
+                        comps[i] = new ZExtInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
+                    }
+
+                    // %comp = bitcast i16 %comp to half
+                    comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
+                }
+
+                for (uint32_t i = compCount; i < 4; ++i)
+                {
+                    comps[i] = pUndefFloat16;
+                }
+            }
+            else if (bitWidth == 16)
             {
                 needPack = true;
 
@@ -2002,7 +2032,24 @@ Value* FragColorExport::ConvertToFloat(
     LLPC_ASSERT(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
 
     const uint32_t bitWidth = pValueTy->getScalarSizeInBits();
-    if (bitWidth == 16)
+    if (bitWidth == 8)
+    {
+        LLPC_ASSERT(pValueTy->isIntegerTy());
+        if (signedness)
+        {
+            // %value = sext i8 %value to i32
+            pValue = new SExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+        }
+        else
+        {
+            // %value = zext i8 %value to i32
+            pValue = new ZExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+        }
+
+        // %value = bitcast i32 %value to float
+        pValue = new BitCastInst(pValue, m_pContext->FloatTy(), "", pInsertPos);
+    }
+    else if (bitWidth == 16)
     {
         if (pValueTy->isFloatingPointTy())
         {
@@ -2052,7 +2099,22 @@ Value* FragColorExport::ConvertToInt(
     LLPC_ASSERT(pValueTy->isFloatingPointTy() || pValueTy->isIntegerTy()); // Should be floating-point/integer scalar
 
     const uint32_t bitWidth = pValueTy->getScalarSizeInBits();
-    if (bitWidth == 16)
+    if (bitWidth == 8)
+    {
+        LLPC_ASSERT(pValueTy->isIntegerTy());
+
+        if (signedness)
+        {
+            // %value = sext i8 %value to i32
+            pValue = new SExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+        }
+        else
+        {
+            // %value = zext i8 %value to i32
+            pValue = new ZExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+        }
+    }
+    else if (bitWidth == 16)
     {
         if (pValueTy->isFloatingPointTy())
         {

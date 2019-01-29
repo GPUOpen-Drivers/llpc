@@ -30,6 +30,8 @@ add_library(llpc STATIC "")
 add_dependencies(llpc LLVMCore)
 
 ### Cached Project Options #############################################################################################
+option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
+option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 # None
 
 ### Compiler Options ###################################################################################################
@@ -121,6 +123,16 @@ elseif(WIN32)
     else()
         message(FATAL_ERROR "Using unknown compiler")
     endif()
+endif()
+
+if (LLPC_BUILD_VEGA20)
+    target_compile_definitions(llpc PRIVATE LLPC_BUILD_VEGA20)
+    target_compile_definitions(llpc PRIVATE CHIP_HDR_VEGA20)
+endif()
+
+if (LLPC_BUILD_RAVEN2)
+    target_compile_definitions(llpc PRIVATE LLPC_BUILD_RAVEN2)
+    target_compile_definitions(llpc PRIVATE CHIP_HDR_RAVEN2)
 endif()
 
 ### Defines/Includes/Sources ###########################################################################################
@@ -320,6 +332,10 @@ endif()
 
 set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmu.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuI8.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuI16.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuI64.ll
+    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF16.ll
     ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
@@ -343,6 +359,10 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/wa/treat1dImagesAs2d/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI8.txt
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI16.txt
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI64.txt
+    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF16.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslGroupOpEmuCode.py

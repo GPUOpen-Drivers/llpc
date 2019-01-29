@@ -492,8 +492,8 @@ void PatchInOutImportExport::visitCallInst(
                     pLocOffset = callInst.getOperand(1);
                     if (isa<ConstantInt>(pLocOffset))
                     {
-                        auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                        value += locOffset;
+                        auto xfbLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                        value += xfbLocOffset;
                         pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
                     }
                 }
@@ -658,8 +658,8 @@ void PatchInOutImportExport::visitCallInst(
             Value* pLocOffset = callInst.getOperand(1);
             if (isa<ConstantInt>(pLocOffset))
             {
-                auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                value += locOffset;
+                auto xfbLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                value += xfbLocOffset;
                 pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
             }
 
@@ -708,7 +708,7 @@ void PatchInOutImportExport::visitCallInst(
             LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
 
             uint32_t xfbOffset = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-            uint32_t locOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
+            uint32_t xfbLocOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
 
             // NOTE: Transform feedback output will be done in last vertex-processing shader stage.
             switch (m_shaderStage)
@@ -718,7 +718,7 @@ void PatchInOutImportExport::visitCallInst(
                     // No TS/GS pipeline, VS is the last stage
                     if ((m_hasGs == false) && (m_hasTs == false))
                     {
-                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, locOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbLocOffset, &callInst);
                     }
                     break;
                 }
@@ -727,7 +727,7 @@ void PatchInOutImportExport::visitCallInst(
                     // TS-only pipeline, TES is the last stage
                     if (m_hasGs == false)
                     {
-                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, locOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbLocOffset, &callInst);
                     }
                     break;
                 }
@@ -739,7 +739,7 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageCopyShader:
                 {
                     // TS-GS or GS-only pipeline, copy shader is the last stage
-                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset,locOffset, &callInst);
+                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset,xfbLocOffset, &callInst);
                     break;
                 }
             default:
@@ -816,8 +816,8 @@ void PatchInOutImportExport::visitCallInst(
                 pLocOffset = callInst.getOperand(1);
                 if (isa<ConstantInt>(pLocOffset))
                 {
-                    auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                    value += locOffset;
+                    auto xfbLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                    value += xfbLocOffset;
                     pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
                 }
 
@@ -1673,7 +1673,7 @@ Value* PatchInOutImportExport::PatchVsGenericInputImport(
 {
     Value* pInput = UndefValue::get(pInputTy);
 
-    // Do vertex fetch operations (returns <n x i32>)
+    // Do vertex fetch operations
     LLPC_ASSERT(m_pVertexFetch != nullptr);
     auto pVertex = m_pVertexFetch->Run(pInputTy, location, compIdx, pInsertPos);
 
@@ -1749,7 +1749,7 @@ Value* PatchInOutImportExport::PatchGsGenericInputImport(
     }
     else
     {
-        LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
     }
 
     Value* pInput = LoadValueFromEsGsRing(pInputTy, location, compIdx, pVertexIdx, pInsertPos);
@@ -1873,12 +1873,18 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
     const uint32_t compCout = pInputTy->isVectorTy() ? pInputTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     const uint32_t numChannels = ((bitWidth == 64) ? 2 : 1) * compCout;
 
     Type* pInterpTy = nullptr;
-    if (bitWidth == 16)
+    if (bitWidth == 8)
+    {
+        LLPC_ASSERT(pInputTy->isIntOrIntVectorTy());
+        pInterpTy =
+            (numChannels > 1) ? VectorType::get(m_pContext->Int8Ty(), numChannels) : m_pContext->Int8Ty();
+    }
+    else if (bitWidth == 16)
     {
         pInterpTy =
             (numChannels > 1) ? VectorType::get(m_pContext->Float16Ty(), numChannels) : m_pContext->Float16Ty();
@@ -2017,7 +2023,12 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                                   attribs,
                                   pInsertPos);
 
-            if (bitWidth == 16)
+            if (bitWidth == 8)
+            {
+                pCompValue = new BitCastInst(pCompValue, m_pContext->Int32Ty(), "", pInsertPos);
+                pCompValue = new TruncInst(pCompValue, m_pContext->Int8Ty(), "", pInsertPos);
+            }
+            else if (bitWidth == 16)
             {
                 pCompValue = new BitCastInst(pCompValue, m_pContext->Int32Ty(), "", pInsertPos);
                 pCompValue = new TruncInst(pCompValue, m_pContext->Int16Ty(), "", pInsertPos);
@@ -2103,7 +2114,7 @@ void PatchInOutImportExport::PatchVsGenericOutputExport(
             }
             else
             {
-                LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+                LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
             }
 
             StoreValueToEsGsRing(pOutput, location, compIdx, pInsertPos);
@@ -2158,7 +2169,7 @@ void PatchInOutImportExport::PatchTesGenericOutputExport(
         }
         else
         {
-            LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+            LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
         }
 
         StoreValueToEsGsRing(pOutput, location, compIdx, pInsertPos);
@@ -2200,13 +2211,17 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     }
     else
     {
-        LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
     }
 
     const uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
-    // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend WORD to DWORD and
-    // store DWORD to GS-VS ring. So for 16-bit data type, the actual byte size is based on number of DWORDs.
-    const uint32_t byteSize = ((bitWidth == 16) ? 2 : 1) * (pOutputTy->getScalarSizeInBits() / 8) * compCount;
+    // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to DWORD and
+    // store DWORD to GS-VS ring. So for 8-bit/16-bit data type, the actual byte size is based on number of DWORDs.
+    uint32_t byteSize = (pOutputTy->getScalarSizeInBits() / 8) * compCount;
+    if ((bitWidth == 8) || (bitWidth == 16))
+    {
+        byteSize *= (32 / bitWidth);
+    }
 
     LLPC_ASSERT(compIdx <= 4);
     auto& genericOutByteSizes =
@@ -2244,7 +2259,7 @@ void PatchInOutImportExport::PatchFsGenericOutputExport(
     Type* pOutputTy = pOutput->getType();
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32));
     LLPC_UNUSED(bitWidth);
 
     auto pCompTy = pOutputTy->isVectorTy() ? pOutputTy->getVectorElementType() : pOutputTy;
@@ -4357,7 +4372,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     Value*        pOutput,            // [in] Output value
     uint32_t      xfbBuffer,          // Transform feedback buffer ID
     uint32_t      xfbOffset,          // Transform feedback offset
-    uint32_t      locOffset,         //  Relative location offset, passed from aggregate type
+    uint32_t      xfbLocOffset,         //  Relative location offset, passed from aggregate type
     Instruction*  pInsertPos)         // [in] Where to insert the store instruction
 {
     LLPC_ASSERT((m_shaderStage == ShaderStageVertex) ||
@@ -4372,8 +4387,8 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     auto pOutputTy = pOutput->getType();
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-    uint32_t typeSize = bitWidth / 8 * compCount;
-    xfbOffset = xfbOffset + typeSize * locOffset;
+
+    xfbOffset = xfbOffset + 4 * xfbLocOffset;
 
     if (bitWidth == 64)
     {
@@ -4743,7 +4758,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
 {
     const uint64_t bitWidth = pLoadTy->getScalarSizeInBits();
     LLPC_ASSERT((pLoadTy->isFPOrFPVectorTy() || pLoadTy->isIntOrIntVectorTy()) &&
-                ((bitWidth == 16) || (bitWidth == 32)));
+                ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
     // Get vertex offset
     Value* pLoadValue = nullptr;
@@ -4781,7 +4796,11 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
             Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
             pLoadValue = new LoadInst(pLoadPtr, "", false, m_pLds->getAlignment(), pInsertPos);
 
-            if (bitWidth == 16)
+            if (bitWidth == 8)
+            {
+                pLoadValue = new TruncInst(pLoadValue, m_pContext->Int8Ty(), "", pInsertPos);
+            }
+            else if (bitWidth == 16)
             {
                 pLoadValue = new TruncInst(pLoadValue, m_pContext->Int16Ty(), "", pInsertPos);
             }
@@ -4810,7 +4829,14 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
                                   NoAttrib,
                                   pInsertPos);
 
-            if (bitWidth == 16)
+            if (bitWidth == 8)
+            {
+                LLPC_ASSERT(pLoadTy->isIntegerTy());
+
+                pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
+                pLoadValue = new TruncInst(pLoadValue, m_pContext->Int8Ty(), "", pInsertPos);
+            }
+            else if (bitWidth == 16)
             {
                 pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
                 pLoadValue = new TruncInst(pLoadValue, m_pContext->Int16Ty(), "", pInsertPos);
@@ -4847,13 +4873,13 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
 
     const uint32_t bitWidth = pStoreTy->getScalarSizeInBits();
     LLPC_ASSERT((pStoreTy->isFloatingPointTy() || pStoreTy->isIntegerTy()) &&
-                ((bitWidth == 16) || (bitWidth == 32)));
+                ((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32)));
 
-    if (bitWidth == 16)
+    if ((bitWidth == 8) || (bitWidth == 16))
     {
-        // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend WORD to DWORD.
-        // This is because copy shader does not know the actual data type. It only generates output export calls based
-        // on number of DWORDs.
+        // NOTE: Currently, to simplify the design of load/store data from GS-VS ring, we always extend BYTE/WORD to
+        // DWORD. This is because copy shader does not know the actual data type. It only generates output export calls
+        // based on number of DWORDs.
         if (pStoreTy->isFloatingPointTy())
         {
             pStoreValue = new BitCastInst(pStoreValue, m_pContext->Int16Ty(), "", pInsertPos);
@@ -5104,7 +5130,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     // Read DWORDs from LDS
     const uint32_t compCount = pReadTy->isVectorTy() ? pReadTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pReadTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
     const uint32_t numChannels = compCount * ((bitWidth == 64) ? 2 : 1);
 
     std::vector<Value*> loadValues(numChannels);
@@ -5154,7 +5180,11 @@ Value* PatchInOutImportExport::ReadValueFromLds(
                 LLPC_NOT_IMPLEMENTED();
             }
 
-            if (bitWidth == 16)
+            if (bitWidth == 8)
+            {
+                loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int8Ty(), "", pInsertPos);
+            }
+            else if (bitWidth == 16)
             {
                 loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int16Ty(), "", pInsertPos);
             }
@@ -5171,7 +5201,11 @@ Value* PatchInOutImportExport::ReadValueFromLds(
             Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
             loadValues[i] = new LoadInst(pLoadPtr, "", false, m_pLds->getAlignment(), pInsertPos);
 
-            if (bitWidth == 16)
+            if (bitWidth == 8)
+            {
+                loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int8Ty(), "", pInsertPos);
+            }
+            else if (bitWidth == 16)
             {
                 loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int16Ty(), "", pInsertPos);
             }
@@ -5181,20 +5215,22 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         }
     }
 
-    // Construct <n x i16> or <n x i32> vector from load values (DWORDs)
+    // Construct <n x i8>, <n x i16>, or <n x i32> vector from load values (DWORDs)
     Value* pCastValue = nullptr;
     if (numChannels > 1)
     {
-        auto pCastTy = VectorType::get((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int32Ty(), numChannels);
+        auto pIntTy = (bitWidth == 32) ? m_pContext->Int32Ty() :
+                                         ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
+        auto pCastTy = VectorType::get(pIntTy, numChannels);
         pCastValue = UndefValue::get(pCastTy);
 
         for (uint32_t i = 0; i < numChannels; ++i)
         {
             pCastValue = InsertElementInst::Create(pCastValue,
-                                                    loadValues[i],
-                                                    ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                    "",
-                                                    pInsertPos);
+                                                   loadValues[i],
+                                                   ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                   "",
+                                                   pInsertPos);
         }
     }
     else
@@ -5220,16 +5256,16 @@ void PatchInOutImportExport::WriteValueToLds(
 
     const uint32_t compCout = pWriteTy->isVectorTy() ? pWriteTy->getVectorNumElements() : 1;
     const uint32_t bitWidth = pWriteTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
     const uint32_t numChannels = compCout * ((bitWidth == 64) ? 2 : 1);
 
     // Cast write value to <n x i32> vector
-    Type* pCastTy = (numChannels > 1) ?
-                        VectorType::get((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int32Ty(), numChannels) :
-                        ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int32Ty());
+    auto pIntTy = (bitWidth == 32) ? m_pContext->Int32Ty() :
+                                     ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
+    Type* pCastTy = (numChannels > 1) ? VectorType::get(pIntTy, numChannels) : pIntTy;
     Value* pCastValue = new BitCastInst(pWriteValue, pCastTy, "", pInsertPos);
 
-    // Extract store values (DWORDs) from <n x i16> or <n x i32> vector
+    // Extract store values (DWORDs) from <n x i8>, <n x i16> or <n x i32> vector
     std::vector<Value*> storeValues(numChannels);
     if (numChannels > 1)
     {
@@ -5240,7 +5276,7 @@ void PatchInOutImportExport::WriteValueToLds(
                                                         "",
                                                         pInsertPos);
 
-            if (bitWidth == 16)
+            if ((bitWidth == 8) || (bitWidth == 16))
             {
                 storeValues[i] = new ZExtInst(storeValues[i], m_pContext->Int32Ty(), "", pInsertPos);
             }
@@ -5250,7 +5286,7 @@ void PatchInOutImportExport::WriteValueToLds(
     {
         storeValues[0] = pCastValue;
 
-        if (bitWidth == 16)
+        if ((bitWidth == 8) || (bitWidth == 16))
         {
             storeValues[0] = new ZExtInst(storeValues[0], m_pContext->Int32Ty(), "", pInsertPos);
         }
@@ -5732,7 +5768,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForVsOutput(
     Value* pAttribOffset = ConstantInt::get(m_pContext->Int32Ty(), location * 4);
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     if (bitWidth == 64)
     {
@@ -5789,7 +5825,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
     if (pCompIdx != nullptr)
     {
         const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
-        LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
         if (bitWidth == 64)
         {
@@ -5857,7 +5893,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     if (pCompIdx != nullptr)
     {
         const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
-        LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
         if (bitWidth == 64)
         {
@@ -5948,7 +5984,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     if (pCompIdx != nullptr)
     {
         const uint32_t bitWidth = pInputTy->getScalarSizeInBits();
-        LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+        LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
         if (bitWidth == 64)
         {
@@ -6087,7 +6123,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
     const uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     const uint32_t bitWidth  = pOutputTy->getScalarSizeInBits();
-    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
+    LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
 
     // Convert the output value to floating-point export value
     Value* pExport = nullptr;
@@ -6097,7 +6133,18 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
     if (pOutputTy != pExportTy)
     {
-        if (bitWidth == 16)
+        if (bitWidth == 8)
+        {
+            // NOTE: For 16-bit output export, we have to cast the 8-bit value to 32-bit floating-point value.
+            LLPC_ASSERT(pOutputTy->isIntOrIntVectorTy());
+            pExport = new ZExtInst(pOutput,
+                                   pOutputTy->isVectorTy() ?
+                                       VectorType::get(m_pContext->Int32Ty(), compCount) : m_pContext->Int32Ty(),
+                                   "",
+                                   pInsertPos);
+            pExport = new BitCastInst(pExport, pExportTy, "", pInsertPos);
+        }
+        else if (bitWidth == 16)
         {
             // NOTE: For 16-bit output export, we have to cast the 16-bit value to 32-bit floating-point value.
             if (pOutputTy->isFPOrFPVectorTy())

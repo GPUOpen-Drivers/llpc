@@ -88,6 +88,8 @@ const char* PipelineContext::GetGpuNameString() const
         { { 9, 0, 2 }, "gfx902"   },  // [9.0.2] gfx902
         { { 9, 0, 3 }, "gfx903"   },  // [9.0.3] gfx903
         { { 9, 0, 4 }, "gfx904"   },  // [9.0.4] gfx904, vega12
+        { { 9, 0, 6 }, "gfx906"   },  // [9.0.6] gfx906, vega20
+        { { 9, 0, 9 }, "gfx909"   },  // [9.0.9] gfx909, raven2
     };
 
     const GpuNameStringMap* pNameMap = nullptr;
@@ -199,6 +201,8 @@ void PipelineContext::AutoLayoutDescriptor(
         static_assert(static_cast<uint32_t>(BasicType::Float16) == 7, "Unexpected value!");
         static_assert(static_cast<uint32_t>(BasicType::Int16)   == 8, "Unexpected value!");
         static_assert(static_cast<uint32_t>(BasicType::Uint16)  == 9, "Unexpected value!");
+        static_assert(static_cast<uint32_t>(BasicType::Int8)    == 10, "Unexpected value!");
+        static_assert(static_cast<uint32_t>(BasicType::Uint8)   == 11, "Unexpected value!");
 
         static const VkFormat DummyVertexFormat[] =
         {
@@ -212,6 +216,8 @@ void PipelineContext::AutoLayoutDescriptor(
             VK_FORMAT_R16G16B16A16_SFLOAT,  // BasicType::Float16
             VK_FORMAT_R16G16B16A16_SINT,    // BasicType::Int16
             VK_FORMAT_R16G16B16A16_UINT,    // BasicType::Uint16
+            VK_FORMAT_R8G8B8A8_SINT,        // BasicType::Int8
+            VK_FORMAT_R8G8B8A8_UINT,        // BasicType::Uint8
         };
 
         for (size_t loc = 0; loc < vsInputTypeCount; ++loc)
@@ -371,6 +377,8 @@ void PipelineContext::AutoLayoutDescriptor(
         static_assert(static_cast<uint32_t>(BasicType::Float16) == 7, "Unexpected value!");
         static_assert(static_cast<uint32_t>(BasicType::Int16)   == 8, "Unexpected value!");
         static_assert(static_cast<uint32_t>(BasicType::Uint16)  == 9, "Unexpected value!");
+        static_assert(static_cast<uint32_t>(BasicType::Int8)    == 10, "Unexpected value!");
+        static_assert(static_cast<uint32_t>(BasicType::Uint8)   == 11, "Unexpected value!");
 
         static const VkFormat DummyFragColorFormat[][4] =
         {
@@ -443,6 +451,20 @@ void PipelineContext::AutoLayoutDescriptor(
                 VK_FORMAT_R16G16_UINT,
                 VK_FORMAT_R16G16B16_UINT,
                 VK_FORMAT_R16G16B16A16_UINT,
+            },
+            // BasicType::Int8
+            {
+                VK_FORMAT_R8_SINT,
+                VK_FORMAT_R8G8_SINT,
+                VK_FORMAT_R8G8B8_SINT,
+                VK_FORMAT_R8G8B8A8_SINT,
+            },
+            // BasicType::Uint8
+            {
+                VK_FORMAT_R8_UINT,
+                VK_FORMAT_R8G8_UINT,
+                VK_FORMAT_R8G8B8_UINT,
+                VK_FORMAT_R8G8B8A8_UINT,
             },
         };
 

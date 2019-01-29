@@ -59,7 +59,7 @@ define <2 x i8> @llpc.buffer.load.v2i8(
     ret <2 x i8> %3
 }
 
-; GLSL: uniform load float16/int16/uint16 (word)
+; GLSL: uniform load float16/int16/uint16/i8vec2/u8vec2 (word)
 define <2 x i8> @llpc.buffer.load.uniform.v2i8(
     i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {

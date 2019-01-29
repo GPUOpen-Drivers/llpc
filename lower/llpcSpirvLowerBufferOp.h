@@ -92,12 +92,16 @@ private:
                                    uint32_t           binding,
                                    bool               isPushConst,
                                    bool               isScalarAligned,
+                                   bool               isCoherent,
+                                   bool               isVolatile,
                                    llvm::Value*       pBlockOffset,
                                    llvm::Value*       pBlockMemberOffset,
                                    llvm::Constant*    pBlockMemberMeta,
                                    llvm::Instruction* pInsertPos);
 
     llvm::Value* AddBufferLoadDescInst(llvm::Type*        pLoadTy,
+                                       bool               isCoherent,
+                                       bool               isVolatile,
                                        llvm::Value*       pDesc,
                                        llvm::Value*       pBlockMemberOffset,
                                        llvm::Constant*    pBlockMemberMeta,
@@ -107,12 +111,16 @@ private:
                             uint32_t            descSet,
                             uint32_t            binding,
                             bool                isScalarAligned,
+                            bool                isCoherent,
+                            bool                isVolatile,
                             llvm::Value*        pBlockOffset,
                             llvm::Value*        pBlockMemberOffset,
                             llvm::Constant*     pBlockMemberMeta,
                             llvm::Instruction*  pInsertPos);
 
     void AddBufferStoreDescInst(llvm::Value*        pStoreValue,
+                                bool                isCoherent,
+                                bool                isVolatile,
                                 llvm::Value*        pDesc,
                                 llvm::Value*        pBlockMemberOffset,
                                 llvm::Constant*     pBlockMemberMeta,
@@ -139,11 +147,15 @@ private:
     llvm::Value* TransposeMatrix(llvm::Value* pMatrix, llvm::Instruction* pInsertPos);
 
     llvm::Value* LoadEntireBlock(llvm::GlobalVariable*      pBlock,
+                                 bool                       isCoherent,
+                                 bool                       isVolatile,
                                  llvm::Type*                pLoadTy,
                                  std::vector<llvm::Value*>& indexOperands,
                                  llvm::Instruction*         pInsertPos);
 
     void StoreEntireBlock(llvm::GlobalVariable*      pBlock,
+                          bool                       isCoherent,
+                          bool                       isVolatile,
                           llvm::Value*               pStoreValue,
                           std::vector<llvm::Value*>& indexOperands,
                           llvm::Instruction*         pInsertPos);

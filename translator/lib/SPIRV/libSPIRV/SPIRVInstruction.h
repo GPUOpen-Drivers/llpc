@@ -392,9 +392,21 @@ public:
     assert((MemoryAccess.size() == 1 || MemoryAccess.size() == 2) &&
            "Invalid memory access operand size");
     TheMemoryAccessMask = MemoryAccess[0];
+
+    unsigned Idx = 1;
+
     if (MemoryAccess[0] & MemoryAccessAlignedMask) {
-      assert(MemoryAccess.size() == 2 && "Alignment operand is missing");
-      Alignment = MemoryAccess[1];
+      assert(MemoryAccess.size() > Idx && "Alignment operand is missing");
+      Alignment = MemoryAccess[Idx++];
+    }
+    if (MemoryAccess[0] & MemoryAccessMakePointerAvailableKHRMask) {
+      assert(MemoryAccess.size() > Idx && "Scope operand is missing");
+      MakeAvailableScope = MemoryAccess[Idx++];
+    }
+
+    if (MemoryAccess[0] & MemoryAccessMakePointerVisibleKHRMask) {
+      assert(MemoryAccess.size() > Idx && "Scope operand is missing");
+      MakeVisisbleScope = MemoryAccess[Idx++];
     }
   }
   SPIRVWord isVolatile() const {
@@ -406,9 +418,19 @@ public:
   SPIRVWord getMemoryAccessMask() const { return TheMemoryAccessMask; }
   SPIRVWord getAlignment() const { return Alignment; }
 
+  SPIRVId getMakeAvailableScope() const {
+    return MakeAvailableScope;
+  }
+
+  SPIRVId getMakeVisisbleScope() const {
+    return MakeVisisbleScope;
+  }
+
 protected:
   SPIRVWord TheMemoryAccessMask;
   SPIRVWord Alignment;
+  SPIRVId MakeAvailableScope = SPIRVID_INVALID;
+  SPIRVId MakeVisisbleScope = SPIRVID_INVALID;
 };
 
 class SPIRVVariable : public SPIRVInstruction {

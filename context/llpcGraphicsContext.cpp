@@ -517,7 +517,8 @@ bool GraphicsContext::CheckGsOnChipValidity()
         {
             uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift);
 
-            uint32_t gsPrimsPerSubgroup = m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup;
+            // gsPrimsPerSubgroup shouldn't be bigger than wave size.
+            uint32_t gsPrimsPerSubgroup = std::min(m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup, m_pGpuProperty->waveSize);
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
             const uint32_t esGsRingItemSize = (4 * std::max(1u, pEsResUsage->inOutUsage.outputMapLocCount)) | 1;

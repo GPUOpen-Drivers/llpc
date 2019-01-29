@@ -130,6 +130,7 @@ private:
     // Default values for vertex fetch (<4 x i32> or <8 x i32>)
     struct
     {
+        llvm::Constant*   pInt8;      // < 0, 0, 0, 1 >
         llvm::Constant*   pInt16;     // < 0, 0, 0, 1 >
         llvm::Constant*   pInt;       // < 0, 0, 0, 1 >
         llvm::Constant*   pInt64;     // < 0, 0, 0, 0, 0, 0, 0, 1 >

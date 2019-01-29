@@ -50,6 +50,18 @@ void EmuLib::AddArchive(
     MemoryBufferRef buffer) // Buffer required to create the archive
 {
     m_archives.push_back(EmuLibArchive(cantFail(Archive::create(buffer), "Failed to parse archive")));
+
+    // Update symbol index in the symbol index map
+    auto& archive = m_archives.back();
+    auto index = m_archives.size() - 1;
+    for (auto& symbol : archive.archive->symbols())
+    {
+        auto symbolIndexIt = m_symbolIndices.find(symbol.getName());
+        if (symbolIndexIt == m_symbolIndices.end())
+        {
+            m_symbolIndices[symbol.getName()] = index;
+        }
+    }
 }
 
 // =====================================================================================================================
@@ -60,10 +72,11 @@ Function* EmuLib::GetFunction(
     StringRef funcName, // Function name to find
     bool nativeOnly)    // Whether to only find a native function
 {
-    // Search each archive in turn.
-    for (auto& archive : m_archives)
+    auto symbolIndexIt = m_symbolIndices.find(funcName);
+    if (symbolIndexIt != m_symbolIndices.end())
     {
-        // See if the function is already loaded from this archive.
+        auto& archive = m_archives[symbolIndexIt->second];
+
         auto funcMapIt = archive.functions.find(funcName);
         if (funcMapIt != archive.functions.end())
         {
@@ -74,20 +87,15 @@ Function* EmuLib::GetFunction(
             }
             return funcMapIt->second.pFunction;
         }
-
         // Find the function in the symbol table of the archive.
         auto pChild = cantFail(archive.archive->findSym(funcName), "Failed in archive symbol search");
-        if (!pChild)
-        {
-            // Not found. Go on to next archive.
-            continue;
-        }
-
+        LLPC_ASSERT(pChild.hasValue());
         // Found the symbol. Get the bitcode for its module.
         StringRef child = cantFail(pChild->getBuffer(), "Failed in archive module extraction");
+
         // Parse the bitcode archive member into a Module.
         auto libModule = cantFail(parseBitcodeFile(
-              MemoryBufferRef(child, ""), *pContext), "Failed to parse archive bitcode");
+            MemoryBufferRef(child, ""), *pContext), "Failed to parse archive bitcode");
 
         // Find and mark the non-native library functions. A library function is non-native if:
         //   it references llvm.amdgcn.*

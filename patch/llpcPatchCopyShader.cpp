@@ -780,7 +780,7 @@ void PatchCopyShader::ExportGenericOutput(
             instName = LlpcName::OutputExportXfb;
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbBuffer));
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbOffset));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->locOffset));
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbLocOffset));
             args.push_back(pOutputValue);
             AddTypeMangling(nullptr, args, instName);
             EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);

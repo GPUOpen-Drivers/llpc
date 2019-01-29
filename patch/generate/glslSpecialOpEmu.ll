@@ -240,25 +240,6 @@ define spir_func void @_Z7barrierj(i32 %semantics) #0
 }
 
 ; =====================================================================================================================
-; >>>  Shader Memory Control Functions
-; =====================================================================================================================
-
-; GLSL: void memoryBarrier()
-;       void memoryBarrierBuffer()
-;       void memoryBarrierShared()
-;       void memoryBarrierImage()
-;       void groupMemoryBarrier()
-define spir_func void @_Z9mem_fencej(i32 %semantics) #0
-{
-    ; TODO: We should choose correct waitcnt() and barrier() according to the specified memory semantics,
-    ; Currently, the semantics is ignored and we sync all.
-    ; 3952 = 0xF70, [3:0] = vm_cnt, [6:4] = exp_cnt, [11:8] = lgkm_cnt
-    call void @llvm.amdgcn.s.waitcnt(i32 3952)
-    call void @llvm.amdgcn.s.barrier()
-    ret void
-}
-
-; =====================================================================================================================
 ; >>>  Interpolation Functions
 ; =====================================================================================================================
 

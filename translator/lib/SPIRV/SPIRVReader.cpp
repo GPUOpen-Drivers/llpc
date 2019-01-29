@@ -302,7 +302,7 @@ public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
     const SPIRVSpecConstMap &TheSpecConstMap)
     :M(LLVMModule), BM(TheSPIRVModule), IsKernel(true),
-    EnableVarPtr(false), EntryTarget(nullptr),
+    EnableVarPtr(false), EnableXfb(false), EntryTarget(nullptr),
     SpecConstMap(TheSpecConstMap), DbgTran(BM, M) {
     assert(M);
     Context = &M->getContext();
@@ -329,6 +329,7 @@ public:
   bool transDecoration(SPIRVValue *, Value *);
   bool transShaderDecoration(SPIRVValue *, Value *);
   bool transAlign(SPIRVValue *, Value *);
+  void checkContains64BitType(SPIRVType *BT, ShaderInOutDecorate &InOutDec);
   Constant *buildShaderInOutMetadata(SPIRVType *BT, ShaderInOutDecorate &InOutDec, Type *&MetaTy);
   Constant *buildShaderBlockMetadata(SPIRVType* BT, ShaderBlockDecorate &BlockDec, Type *&MDTy);
   uint32_t calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize, uint32_t MatrixStride, bool IsRowMajor);
@@ -442,6 +443,7 @@ private:
   SPIRVModule *BM;
   bool IsKernel;
   bool EnableVarPtr;
+  bool EnableXfb;
   bool EnableGatherLodNz;
   ShaderFloatControlFlags FpControlFlags;
   SPIRVFunction* EntryTarget;
@@ -556,7 +558,7 @@ private:
   CallInst *transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
                             SPIRVWord MemSema, SPIRVWord MemScope);
 
-  CallInst *transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
+  Instruction *transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
                              SPIRVWord MemScope);
   void truncConstantIndex(std::vector<Value*> &Indices, BasicBlock *BB);
 
@@ -1858,7 +1860,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpStore: {
     SPIRVStore *BS = static_cast<SPIRVStore*>(BV);
-    Instruction *SI = nullptr;
     auto Src = transValue(BS->getSrc(), F, BB);
     Src = widenBoolValue(Src, BB);
     auto Dst = transValue(BS->getDst(), F, BB);
@@ -1874,6 +1875,24 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         StorageClass == StorageClassFunction)
       IsVolatile = false;
 
+    bool IsCoherent = false;
+
+    if (BS->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask) {
+      const auto ScopeConstant = static_cast<SPIRVConstant*>(BM->getValue(
+        BS->getMakeVisisbleScope()));
+      const auto Scope = ScopeConstant->getZExtIntValue();
+      if (Scope != ScopeInvocation)
+        IsCoherent = true;
+    }
+
+    if (BS->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask) {
+      const auto ScopeConstant = static_cast<SPIRVConstant*>(BM->getValue(
+        BS->getMakeAvailableScope()));
+      const auto Scope = ScopeConstant->getZExtIntValue();
+      if (Scope != ScopeInvocation)
+        IsCoherent = true;
+    }
+
     // NOTE: If the store destination is a structure generated from AccessChain,
     // use special buffer store call to store the result of AccessChain.
     // Otherwise, use normal store instruction.
@@ -1883,19 +1902,26 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       auto MD = Inst->getMetadata(gSPIRVMD::Block);
       std::string  MangledFuncName = "";
       mangleGlslBuiltin(gSPIRVMD::BufferStore, { Src->getType() }, MangledFuncName);
+      auto BoolTy = Type::getInt1Ty(*Context);
       auto NewF = getOrCreateFunction(M, Type::getVoidTy(*Context),
-        { Src->getType(), Dst->getType() }, MangledFuncName);
+        { Src->getType(), Dst->getType(), BoolTy, BoolTy }, MangledFuncName);
       NewF->setCallingConv(CallingConv::SPIR_FUNC);
-      auto V = CallInst::Create(NewF, { Src, Dst }, "", BB);
+      auto V = CallInst::Create(NewF, { Src, Dst,
+        ConstantInt::get(BoolTy, IsCoherent),
+        ConstantInt::get(BoolTy, IsVolatile) }, "", BB);
       V->setMetadata(gSPIRVMD::Block, MD);
       return mapValue(BV, V);
     }
     else {
-      SI = new StoreInst(Src, Dst, IsVolatile,
+      StoreInst *SI = new StoreInst(Src, Dst, IsVolatile,
         BS->SPIRVMemoryAccess::getAlignment(), BB);
-
       if (BS->SPIRVMemoryAccess::isNonTemporal())
         transNonTemporalMetadata(SI);
+      if (IsCoherent) {
+        SI->setAtomic(AtomicOrdering::Release);
+        SI->setAlignment(M->getDataLayout().getABITypeAlignment(
+          Src->getType()));
+      }
       return mapValue(BV, SI);
     }
   }
@@ -1915,6 +1941,24 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       IsVolatile = false;
     auto LoadSrc = transValue(BL->getSrc(), F, BB);
 
+    bool IsCoherent = false;
+
+    if (BL->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask) {
+      const auto ScopeConstant = static_cast<SPIRVConstant*>(BM->getValue(
+        BL->getMakeVisisbleScope()));
+      const auto Scope = ScopeConstant->getZExtIntValue();
+      if (Scope != ScopeInvocation)
+        IsCoherent = true;
+    }
+
+    if (BL->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask) {
+      const auto ScopeConstant = static_cast<SPIRVConstant*>(BM->getValue(
+        BL->getMakeAvailableScope()));
+      const auto Scope = ScopeConstant->getZExtIntValue();
+      if (Scope != ScopeInvocation)
+        IsCoherent = true;
+    }
+
     // NOTE: If the load source is a structure generated from AccessChain,
     // use special buffer load call to load the result of AccessChain,
     // Otherwise, use normal load instruction.
@@ -1926,11 +1970,13 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       auto MangledTy = { ElemTy };
       std::string MangledFuncName = "";
       mangleGlslBuiltin(gSPIRVMD::BufferLoad, MangledTy, MangledFuncName);
+      auto BoolTy = Type::getInt1Ty(*Context);
       auto NewF = getOrCreateFunction(M, ElemTy,
-        { LoadSrc->getType()}, MangledFuncName);
-
+        { LoadSrc->getType(), BoolTy, BoolTy }, MangledFuncName);
       NewF->setCallingConv(CallingConv::SPIR_FUNC);
-      auto V = CallInst::Create(NewF, { LoadSrc }, "", BB);
+      auto V = CallInst::Create(NewF, { LoadSrc,
+        ConstantInt::get(BoolTy, IsCoherent),
+        ConstantInt::get(BoolTy, IsVolatile) }, "", BB);
       V->setMetadata(gSPIRVMD::Block, MD);
       return mapValue(BV, V);
     } else {
@@ -1939,6 +1985,11 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         BL->SPIRVMemoryAccess::getAlignment(), BB);
       if (BL->SPIRVMemoryAccess::isNonTemporal())
         transNonTemporalMetadata(LI);
+      if (IsCoherent) {
+        LI->setAtomic(AtomicOrdering::Acquire);
+        LI->setAlignment(M->getDataLayout().getABITypeAlignment(
+          LI->getType()));
+      }
       return mapValue(BV,
         narrowBoolValue(LI, BL->getSrc()->getType()->getPointerElementType(), BB));
     }
@@ -3276,6 +3327,8 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
   std::vector<Type *> ArgTys;
   std::stringstream SS;
 
+  AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
+
   if (Info.OpKind != ImageOpQueryNonLod) {
     // Generate name strings for image calls:
     //    Format: prefix.image[sparse].op.[f32|i32|u32].dim[.proj][.dref][.lodnz][.bias][.lod][.grad]
@@ -3301,8 +3354,8 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
 
     // Collect operands
     if (isImageAtomicOp(Info.OpKind)) {
-        // NOTE: For atomic operations, extract image related info
-        // from "ImageTexelPointer".
+      // NOTE: For atomic operations, extract image related info
+      // from "ImageTexelPointer".
       SPIRVValue *ImagePointerOp =
         static_cast<SPIRVInstTemplateBase *>(BI)->getOperand(0);
       assert(ImagePointerOp->getOpCode() == OpImageTexelPointer);
@@ -3330,6 +3383,33 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
         Ops.push_back(static_cast<SPIRVInstTemplateBase *>(BI)->getOperand(
           Info.OperAtomicComparator));
 
+      if (Info.OperScope != InvalidOperIdx) {
+        auto BA = static_cast<SPIRVInstTemplateBase *>(BI);
+
+        auto Scope = static_cast<SPIRVConstant *>(BA->getOperand(Info.OperScope));
+
+        if (Scope->getZExtIntValue() != ScopeInvocation) {
+          auto SemanticsConstant = static_cast<SPIRVConstant *>(BA->getOperand(
+            Info.OperScope + 1));
+          auto Semantics = SemanticsConstant->getZExtIntValue();
+
+          if (Semantics & MemorySemanticsSequentiallyConsistentMask)
+            Ordering = AtomicOrdering::SequentiallyConsistent;
+          else if (Semantics & MemorySemanticsAcquireReleaseMask)
+            Ordering = AtomicOrdering::AcquireRelease;
+          else if (Semantics & MemorySemanticsAcquireMask)
+            Ordering = AtomicOrdering::Acquire;
+          else if (Semantics & MemorySemanticsReleaseMask)
+            Ordering = AtomicOrdering::Release;
+
+          if (Ordering != AtomicOrdering::NotAtomic) {
+            // Upgrade the ordering if we need to make it avaiable or visible
+            if (Semantics & (MemorySemanticsMakeAvailableKHRMask |
+              MemorySemanticsMakeVisibleKHRMask))
+              Ordering = AtomicOrdering::SequentiallyConsistent;
+          }
+        }
+      }
     } else {
       // For other image operations, remove image operand mask and keep other operands
       for (size_t I = 0, E = BI->getOperands().size(); I != E; ++I) {
@@ -3454,6 +3534,24 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     // MinLod operand
     if (Mask & ImageOperandsMinLodMask)
       SS << gSPIRVName::ImageCallModMinLod;
+
+    // MakeTexelAvailableKHR operand
+    if (Mask & ImageOperandsMakeTexelAvailableKHRMask)
+      SS << gSPIRVName::ImageCallMakeTexelAvailable;
+
+    // MakeTexelVisibleKHR operand
+    if (Mask & ImageOperandsMakeTexelVisibleKHRMask)
+      SS << gSPIRVName::ImageCallMakeTexelVisible;
+
+    // NonPrivateTexelKHR operand (only add if texel available/visible was not specified)
+    if (!(Mask & (ImageOperandsMakeTexelAvailableKHRMask |
+      ImageOperandsMakeTexelVisibleKHRMask)) &&
+      (Mask & ImageOperandsNonPrivateTexelKHRMask))
+      SS << gSPIRVName::ImageCallNonPrivateTexel;
+
+    // VolatileTexelKHR operand
+    if (Mask & ImageOperandsVolatileTexelKHRMask)
+      SS << gSPIRVName::ImageCallVolatileTexel;
 
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
     if (isAnisoLodOpCode(OC))
@@ -3636,9 +3734,31 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     assert(F->getFunctionType() == FT);
   }
 
+  switch (Ordering)
+  {
+    case AtomicOrdering::Release:
+    case AtomicOrdering::AcquireRelease:
+    case AtomicOrdering::SequentiallyConsistent:
+      new FenceInst(*Context, AtomicOrdering::Release, SyncScope::System, BB);
+      break;
+    default:
+      break;
+  }
+
   CallInst *Call = CallInst::Create(F, Args, "", BB);
   setName(Call, BI);
   setAttrByCalledFunc(Call);
+
+  switch (Ordering)
+  {
+    case AtomicOrdering::Acquire:
+    case AtomicOrdering::AcquireRelease:
+    case AtomicOrdering::SequentiallyConsistent:
+      new FenceInst(*Context, AtomicOrdering::Acquire, SyncScope::System, BB);
+      break;
+    default:
+      break;
+  }
 
   // For image read, handle such case in which return value is not vec4
   // NOTE: Such case is valid and can come from hand written or HLSL generated
@@ -3821,7 +3941,8 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
       CapabilityVariablePointersStorageBuffer) != BM->getCapability().end();
   EnableVarPtr = EnableVarPtr || (BM->getCapability().find(
       CapabilityVariablePointers) != BM->getCapability().end());
-
+  EnableXfb = BM->getCapability().find(
+      CapabilityTransformFeedback) != BM->getCapability().end();
   EnableGatherLodNz = BM->hasCapability(CapabilityImageGatherBiasLodAMD) &&
       (EntryExecModel == ExecutionModelFragment);
 
@@ -4264,6 +4385,27 @@ bool SPIRVToLLVM::transAlign(SPIRVValue *BV, Value *V) {
   return true;
 }
 
+void SPIRVToLLVM::checkContains64BitType(SPIRVType *BT,
+                                         ShaderInOutDecorate &InOutDec) {
+  if (BT->isTypeScalar()) {
+    InOutDec.contains64BitType = (BT->getBitWidth() == 64);
+    return;
+  }
+  else if (BT->isTypeVector() && (InOutDec.contains64BitType == false))
+   return checkContains64BitType(BT->getVectorComponentType(), InOutDec);
+  else if (BT->isTypeMatrix() && (InOutDec.contains64BitType == false))
+   return checkContains64BitType(BT->getMatrixColumnType(), InOutDec);
+  else if (BT->isTypeArray() && (InOutDec.contains64BitType == false))
+   return checkContains64BitType(BT->getArrayElementType(), InOutDec);
+  else if (BT->isTypeStruct() && (InOutDec.contains64BitType == false)) {
+    auto MemberCount = BT->getStructMemberCount();
+    for (auto MemberIdx = 0; MemberIdx < MemberCount; ++MemberIdx){
+      auto  MemberTy = BT->getStructMemberType(MemberIdx);
+      return checkContains64BitType(MemberTy, InOutDec);
+    }
+  }
+}
+
 bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
   auto GV = dyn_cast<GlobalVariable>(V);
   if (GV) {
@@ -4284,6 +4426,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       InOutDec.XfbBuffer = 0;
       InOutDec.XfbStride = 0;
       InOutDec.XfbOffset = 0;
+      InOutDec.contains64BitType = false;
 
       SPIRVWord Loc = SPIRVID_INVALID;
       if (BV->hasDecorate(DecorationLocation, 0, &Loc)) {
@@ -4353,6 +4496,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
 
       Type* MDTy = nullptr;
       SPIRVType* BT = BV->getType()->getPointerElementType();
+      if (EnableXfb)
+        checkContains64BitType(BT, InOutDec);
       auto MD = buildShaderInOutMetadata(BT, InOutDec, MDTy);
 
       // Setup input/output metadata
@@ -4393,10 +4538,12 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       // Determine block type based on corresponding decorations
       SPIRVBlockTypeKind BlockType = BlockTypeUnknown;
 
+      bool IsUniformBlock = false;
+
       if (BV->getType()->getPointerStorageClass() == StorageClassStorageBuffer)
         BlockType = BlockTypeShaderStorage;
       else {
-        bool IsUniformBlock = BlockTy->hasDecorate(DecorationBlock);
+        IsUniformBlock = BlockTy->hasDecorate(DecorationBlock);
         bool IsStorageBlock = BlockTy->hasDecorate(DecorationBufferBlock);
           if (IsUniformBlock)
             BlockType = BlockTypeUniform;
@@ -4417,6 +4564,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
 
       // Build block metadata
       ShaderBlockDecorate BlockDec = {};
+      BlockDec.NonWritable = IsUniformBlock;
       Type *BlockMDTy = nullptr;
       auto BlockMD = buildShaderBlockMetadata(BlockTy, BlockDec, BlockMDTy);
 
@@ -4711,6 +4859,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.XfbBuffer = InOutDec.XfbBuffer;
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
+    InOutMD.XfbLocStride = InOutDec.XfbLocStride;
+    InOutMD.XfbLoc = InOutDec.XfbLoc;
 
     // Check signedness for generic input/output
     if (!InOutDec.IsBuiltIn) {
@@ -4728,6 +4878,9 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       assert(Width <= 64 * 4);
 
       InOutDec.Value.Loc += (Width <= 32 * 4) ? 1 : 2;
+      uint32_t Alignment = InOutDec.contains64BitType ? 64 : 32;
+      uint32_t BaseStride = Alignment/ 32;
+      InOutDec.XfbLoc += (((Width + Alignment - 1) / Alignment) * BaseStride);
     }
 
     auto Int64Ty = Type::getInt64Ty(*Context);
@@ -4751,6 +4904,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     auto ElemTy = BT->isTypeArray() ? BT->getArrayElementType() :
                                       BT->getMatrixColumnType();
     uint32_t StartLoc = InOutDec.Value.Loc;
+    uint32_t StartXfbLoc = InOutDec.XfbLoc;
     Type *ElemMDTy = nullptr;
     auto ElemDec = InOutDec; // Inherit from parent
     auto ElemMD = buildShaderInOutMetadata(ElemTy, ElemDec, ElemMDTy);
@@ -4759,12 +4913,15 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       InOutDec.PerPatch = true; // Set "per-patch" flag
 
     uint32_t Stride = ElemDec.Value.Loc - StartLoc;
+    uint32_t XfbLocStride = ElemDec.XfbLoc - StartXfbLoc;
     uint32_t NumElems = BT->isTypeArray() ? BT->getArrayLength() :
                                             BT->getMatrixColumnCount();
 
     // Update next location value
-    if (!InOutDec.IsBuiltIn)
+    if (!InOutDec.IsBuiltIn) {
       InOutDec.Value.Loc = StartLoc + (Stride * NumElems);
+      InOutDec.XfbLoc = StartXfbLoc + (XfbLocStride * NumElems);
+    }
 
     // Built metadata for the array/matrix
     std::vector<Type *> MDTys;
@@ -4795,6 +4952,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.XfbBuffer = InOutDec.XfbBuffer;
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
+    InOutMD.XfbLocStride = XfbLocStride;
+    InOutMD.XfbLoc = StartXfbLoc;
 
     std::vector<Constant *> MDValues;
     MDValues.push_back(ConstantInt::get(Int32Ty, Stride));
@@ -4810,6 +4969,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     std::vector<Constant *> MemberMDValues;
 
     // Build metadata for each structure member
+    uint32_t XfbLoc = InOutDec.XfbLoc;
     auto NumMembers = BT->getStructMemberCount();
     for (auto MemberIdx = 0; MemberIdx < NumMembers; ++MemberIdx) {
       auto MemberDec = InOutDec;
@@ -4855,8 +5015,12 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 
       SPIRVWord XfbOffset = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset)) {
+        // For the structure member, if it has DecorationOffset,
+        // Then xfbLoc does not contribute offset calculation
         MemberDec.XfbOffset = XfbOffset;
-      }
+        MemberDec.XfbLoc = 0;
+      } else
+        MemberDec.XfbLoc = XfbLoc;
 
       SPIRVWord MemberStreamId = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(
@@ -4868,6 +5032,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       auto  MemberMD   =
         buildShaderInOutMetadata(MemberTy, MemberDec, MemberMDTy);
 
+      XfbLoc = MemberDec.XfbLoc;
       if (MemberDec.IsBuiltIn)
         InOutDec.IsBuiltIn = true; // Set "builtin" flag
       else
@@ -4880,6 +5045,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       MemberMDValues.push_back(MemberMD);
     }
 
+    InOutDec.XfbLoc = XfbLoc;
     // Build  metadata for the structure
     MDTy = StructType::get(*Context, MemberMDTys);
     return ConstantStruct::get(static_cast<StructType *>(MDTy), MemberMDValues);
@@ -4893,7 +5059,6 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
                                                  ShaderBlockDecorate &BlockDec,
                                                  Type *&MDTy) {
-  const bool IsUniformBlock = BT->hasDecorate(DecorationBlock);
   if (BT->isTypeVector() || BT->isTypeScalar()) {
     // Handle scalar or vector type
     ShaderBlockMetadata BlockMD = {};
@@ -4904,7 +5069,7 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
     BlockMD.Restrict     = BlockDec.Restrict;
     BlockMD.Coherent     = BlockDec.Coherent;
     BlockMD.Volatile     = BlockDec.Volatile;
-    BlockMD.NonWritable  = BlockDec.NonWritable || IsUniformBlock;
+    BlockMD.NonWritable  = BlockDec.NonWritable;
     BlockMD.NonReadable  = BlockDec.NonReadable;
 
     MDTy = Type::getInt64Ty(*Context);
@@ -4962,7 +5127,7 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
     BlockMD.Restrict      = BlockDec.Restrict;
     BlockMD.Coherent      = BlockDec.Coherent;
     BlockMD.Volatile      = BlockDec.Volatile;
-    BlockMD.NonWritable   = BlockDec.NonWritable || IsUniformBlock;
+    BlockMD.NonWritable   = BlockDec.NonWritable;
     BlockMD.NonReadable   = BlockDec.NonReadable;
 
     std::vector<Constant *> MDValues;
@@ -5010,7 +5175,6 @@ Constant * SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *BT,
         MemberDec.NonWritable = true;
       if (BT->hasMemberDecorate(MemberIdx, DecorationNonReadable))
         MemberDec.NonReadable = true;
-      MemberDec.NonWritable = MemberDec.NonWritable || IsUniformBlock;
 
       // Build metadata for structure member
       auto MemberTy = BT->getStructMemberType(MemberIdx);
@@ -5242,6 +5406,32 @@ CallInst *SPIRVToLLVM::transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
   Constant *MemFenceFlags =
       ConstantInt::get(Int32Ty, rmapBitMask<OCLMemFenceMap>(MemSema));
 
+  if (!IsKernel) {
+    AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
+
+    if (MemSema & MemorySemanticsSequentiallyConsistentMask)
+      Ordering = AtomicOrdering::SequentiallyConsistent;
+    else if (MemSema & MemorySemanticsAcquireReleaseMask)
+      Ordering = AtomicOrdering::AcquireRelease;
+    else if (MemSema & MemorySemanticsAcquireMask)
+      Ordering = AtomicOrdering::Acquire;
+    else if (MemSema & MemorySemanticsReleaseMask)
+      Ordering = AtomicOrdering::Release;
+
+    if (Ordering != AtomicOrdering::NotAtomic) {
+      // Upgrade the ordering if we need to make it avaiable or visible
+      if (MemSema & (MemorySemanticsMakeAvailableKHRMask |
+        MemorySemanticsMakeVisibleKHRMask))
+        Ordering = AtomicOrdering::SequentiallyConsistent;
+
+      const bool SystemScope = (MemScope <= ScopeDevice) ||
+        (MemScope == ScopeQueueFamilyKHR);
+
+      new FenceInst(*Context, Ordering, SystemScope ?
+          SyncScope::System : SyncScope::SingleThread, BB);
+    }
+  }
+
   FuncName = (ExecScope == ScopeWorkgroup) ? kOCLBuiltinName::WorkGroupBarrier
                                            : kOCLBuiltinName::SubGroupBarrier;
 
@@ -5273,7 +5463,7 @@ CallInst *SPIRVToLLVM::transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
   return CallInst::Create(Func, Arg, "", BB);
 }
 
-CallInst *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
+Instruction *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
                                         SPIRVWord MemScope) {
   SPIRVWord Ver = 0;
   BM->getSourceLanguage(&Ver);
@@ -5288,7 +5478,31 @@ CallInst *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
   Constant *MemFenceFlags =
       ConstantInt::get(Int32Ty, rmapBitMask<OCLMemFenceMap>(MemSema));
 
-  if ((Ver > 0 && Ver <= kOCLVer::CL12) || !IsKernel) {
+  if (!IsKernel) {
+    AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
+
+    if (MemSema & MemorySemanticsSequentiallyConsistentMask)
+      Ordering = AtomicOrdering::SequentiallyConsistent;
+    else if (MemSema & MemorySemanticsAcquireReleaseMask)
+      Ordering = AtomicOrdering::AcquireRelease;
+    else if (MemSema & MemorySemanticsAcquireMask)
+      Ordering = AtomicOrdering::Acquire;
+    else if (MemSema & MemorySemanticsReleaseMask)
+      Ordering = AtomicOrdering::Release;
+
+    if (Ordering != AtomicOrdering::NotAtomic) {
+      // Upgrade the ordering if we need to make it avaiable or visible
+      if (MemSema & (MemorySemanticsMakeAvailableKHRMask |
+        MemorySemanticsMakeVisibleKHRMask))
+        Ordering = AtomicOrdering::SequentiallyConsistent;
+    }
+
+    const bool SystemScope = (MemScope <= ScopeDevice) ||
+      (MemScope == ScopeQueueFamilyKHR);
+
+    return new FenceInst(*Context, Ordering, SystemScope ?
+        SyncScope::System : SyncScope::SingleThread, BB);
+  } else if ((Ver > 0 && Ver <= kOCLVer::CL12)) {
     FuncName = kOCLBuiltinName::MemFence;
     ArgTy.push_back(Int32Ty);
     Arg.push_back(MemFenceFlags);
@@ -5328,7 +5542,7 @@ Instruction *SPIRVToLLVM::transOCLBarrierFence(SPIRVInstruction *MB,
     return static_cast<SPIRVConstant *>(Value)->getZExtIntValue();
   };
 
-  CallInst *Call = nullptr;
+  Instruction *Barrier = nullptr;
 
   if (MB->getOpCode() == OpMemoryBarrier) {
     auto MemB = static_cast<SPIRVMemoryBarrier *>(MB);
@@ -5336,7 +5550,7 @@ Instruction *SPIRVToLLVM::transOCLBarrierFence(SPIRVInstruction *MB,
     SPIRVWord MemScope = GetIntVal(MemB->getOpValue(0));
     SPIRVWord MemSema = GetIntVal(MemB->getOpValue(1));
 
-    Call = transOCLMemFence(BB, MemSema, MemScope);
+    Barrier = transOCLMemFence(BB, MemSema, MemScope);
   } else if (MB->getOpCode() == OpControlBarrier) {
     auto CtlB = static_cast<SPIRVControlBarrier *>(MB);
 
@@ -5344,17 +5558,20 @@ Instruction *SPIRVToLLVM::transOCLBarrierFence(SPIRVInstruction *MB,
     SPIRVWord MemSema = GetIntVal(CtlB->getMemSemantic());
     SPIRVWord MemScope = GetIntVal(CtlB->getMemScope());
 
-    Call = transOCLBarrier(BB, ExecScope, MemSema, MemScope);
+    Barrier = transOCLBarrier(BB, ExecScope, MemSema, MemScope);
   } else {
     llvm_unreachable("Invalid instruction");
   }
 
-  setName(Call, MB);
-  setAttrByCalledFunc(Call);
-  SPIRVDBG(spvdbgs() << "[transBarrier] " << *MB << " -> ";
-           dbgs() << *Call << '\n';)
+  setName(Barrier, MB);
 
-  return Call;
+  if (CallInst *Call = dyn_cast<CallInst>(Barrier))
+    setAttrByCalledFunc(Call);
+
+  SPIRVDBG(spvdbgs() << "[transBarrier] " << *MB << " -> ";
+           dbgs() << *Barrier << '\n';)
+
+  return Barrier;
 }
 
 // SPIR-V only contains language version. Use OpenCL language version as

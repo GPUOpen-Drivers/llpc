@@ -96,6 +96,7 @@ private:
     void AddCallInstForOutputExport(llvm::Value*       pOutputValue,
                                     llvm::Constant*    pOutputMeta,
                                     llvm::Value*       pLocOffset,
+                                    uint32_t           xfbLocOffset,
                                     llvm::Value*       pElemIdx,
                                     llvm::Value*       pVertexIdx,
                                     uint32_t           emitStreamId,
@@ -120,6 +121,11 @@ private:
                            llvm::Value*                     pLocOffset,
                            llvm::Value*                     pVertexIdx,
                            llvm::Instruction*               pInsertPos);
+
+    void CollectGsXfbOutputInfo(const llvm::Type*          pOutputTy,
+                                uint32_t                   locOffset,
+                                uint32_t                   xfbLocOffset,
+                                const ShaderInOutMetadata& outputMeta);
 
     // -----------------------------------------------------------------------------------------------------------------
 
