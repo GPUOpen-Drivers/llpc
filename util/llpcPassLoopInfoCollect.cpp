@@ -87,39 +87,16 @@ bool PassLoopInfoCollect::NeedDynamicLoopUnroll(
 // =====================================================================================================================
 // Executes the get loop info pass on the specified LLVM module
 //
-// If any function that is the fragment shader or can be called by it, and it contains a loop deemed here to be a
+// This pass runs only on the fragment shader module. If it contains a loop deemed here to be a
 // "complex loop", then we set *m_pNeedDynamicLoopUnroll to true.
 bool PassLoopInfoCollect::runOnModule(
     llvm::Module& module)                       // [in] LLVM module to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Pass-Loop-Info-Collect\n");
 
-    // Find the fragment shader and all functions that can be called from it (ignoring function pointers).
-    Function* pEntryPoint = getAnalysis<PipelineShaders>().GetEntryPoint(ShaderStageFragment);
-    SetVector<CallGraphNode*> callGraphNodes;
-
-    if (pEntryPoint != nullptr)
+    for (auto &func : module)
     {
-        auto& callGraph = getAnalysis<CallGraphWrapperPass>().getCallGraph();
-        callGraphNodes.insert(callGraph[pEntryPoint]);
-        for (uint32_t i = 0; i < callGraphNodes.size(); ++i)
-        {
-            auto pCallGraphNode = callGraphNodes[i];
-            for (auto childNodeIt : *pCallGraphNode)
-            {
-                auto pChildNode = childNodeIt.second;
-                if (pChildNode->getFunction()->empty() == false)
-                {
-                    callGraphNodes.insert(pChildNode);
-                }
-            }
-        }
-    }
-
-    for (auto pCallGraphNode : callGraphNodes)
-    {
-        auto *pFunc = pCallGraphNode->getFunction();
-        auto& loopInfo = getAnalysis<LoopInfoWrapperPass>(*pFunc).getLoopInfo();
+        auto& loopInfo = getAnalysis<LoopInfoWrapperPass>(func).getLoopInfo();
 
         for (auto loop : loopInfo)
         {

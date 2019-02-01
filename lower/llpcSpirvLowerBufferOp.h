@@ -38,8 +38,6 @@
 namespace Llpc
 {
 
-class PipelineShaders;
-
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for buffer operations (load and store).
 class SpirvLowerBufferOp:
@@ -49,12 +47,7 @@ class SpirvLowerBufferOp:
 public:
     SpirvLowerBufferOp();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineShaders>();
-    }
-
-    virtual bool runOnModule(llvm::Module& module) override;
+    virtual bool runOnModule(llvm::Module& module);
     virtual void visitCallInst(llvm::CallInst& callInst);
     virtual void visitLoadInst(llvm::LoadInst& loadInst);
     virtual void visitStoreInst(llvm::StoreInst& storeInst);
@@ -65,8 +58,6 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerBufferOp);
-
-    void ProcessShader();
 
     bool NeedScalarAlignment(const llvm::Type* const            pValueTy,
                              const llvm::Type*                  pBlockTy,

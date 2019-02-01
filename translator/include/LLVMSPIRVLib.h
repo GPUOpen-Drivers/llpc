@@ -113,6 +113,10 @@ bool IsSPIRVText(std::string &Img);
 
 } // End namespace SPIRV
 
+namespace Llpc {
+class Builder;
+} // End namespace Llpc
+
 namespace llvm {
 
 class raw_pwrite_stream;
@@ -122,12 +126,12 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
-bool readSpirv(llvm::LLVMContext &C,
+bool readSpirv(Llpc::Builder *Builder,
                std::istream &IS,
                spv::ExecutionModel EntryExecModel,
                const char *EntryName,
                const SPIRV::SPIRVSpecConstMap &SpecConstMap,
-               llvm::Module *&M,
+               llvm::Module *M,
                std::string &ErrMsg);
 
 /// \brief Regularize LLVM module by removing entities not representable by

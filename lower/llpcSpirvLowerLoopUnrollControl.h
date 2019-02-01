@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "llpcPipelineShaders.h"
 #include "llpcSpirvLower.h"
 
 namespace Llpc
@@ -38,19 +37,13 @@ namespace Llpc
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for loop unroll control
-class SpirvLowerLoopUnrollControl: public llvm::FunctionPass
+class SpirvLowerLoopUnrollControl: public SpirvLower
 {
 public:
     SpirvLowerLoopUnrollControl();
     SpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
 
-    void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineShaders>();
-        analysisUsage.addPreserved<PipelineShaders>();
-    }
-
-    virtual bool runOnFunction(llvm::Function& func) override;
+    virtual bool runOnModule(llvm::Module& module);
 
     // -----------------------------------------------------------------------------------------------------------------
 

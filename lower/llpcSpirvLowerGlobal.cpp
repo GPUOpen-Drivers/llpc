@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerGlobal.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-global"
-
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/PassSupport.h"
@@ -39,8 +37,9 @@
 #include <unordered_set>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
-#include "llpcPipelineShaders.h"
 #include "llpcSpirvLowerGlobal.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-global"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -63,9 +62,11 @@ ModulePass* CreateSpirvLowerGlobal()
 // =====================================================================================================================
 SpirvLowerGlobal::SpirvLowerGlobal()
     :
-    SpirvLower(ID)
+    SpirvLower(ID),
+    m_pRetBlock(nullptr),
+    m_lowerInputInPlace(false),
+    m_lowerOutputInPlace(false)
 {
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializeSpirvLowerGlobalPass(*PassRegistry::getPassRegistry());
 }
 
@@ -78,70 +79,27 @@ bool SpirvLowerGlobal::runOnModule(
 
     SpirvLower::Init(&module);
 
-    // Process one function (shader entrypoint) at a time. (We cannot make this a function pass because it creates
-    // new external function declarations.)
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
-    {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
-        if (m_pEntryPoint != nullptr)
-        {
-            m_shaderStage = ShaderStage(shaderStage);
-            ProcessShader();
-        }
-    }
-
-    return true;
-}
-
-// =====================================================================================================================
-// Process a single shader
-void SpirvLowerGlobal::ProcessShader()
-{
-    m_pRetBlock = nullptr;
-    m_lowerInputInPlace = false;
-    m_lowerOutputInPlace = false;
-
-    m_globalVarProxyMap.clear();
-    m_inputProxyMap.clear();
-    m_outputProxyMap.clear();
-    m_retInsts.clear();
-    m_emitCalls.clear();
-    m_loadInsts.clear();
-    m_storeInsts.clear();
-    m_interpCalls.clear();
-
     // Map globals to proxy variables
     for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
     {
-        // Check if the global variable is used in the current function.
-        bool isGlobalUsed = false;
-        for (auto pUser : pGlobal->users())
+        if (pGlobal->getType()->getAddressSpace() == SPIRAS_Private)
         {
-            auto pInstUser = dyn_cast<Instruction>(pUser);
-            if ((pInstUser != nullptr) && (pInstUser->getParent()->getParent() == m_pEntryPoint))
-            {
-                isGlobalUsed = true;
-                break;
-            }
+            MapGlobalVariableToProxy(&*pGlobal);
         }
-
-        if (isGlobalUsed)
+        else if (pGlobal->getType()->getAddressSpace() == SPIRAS_Input)
         {
-            if (pGlobal->getType()->getAddressSpace() == SPIRAS_Private)
-            {
-                MapGlobalVariableToProxy(&*pGlobal);
-            }
-            else if (pGlobal->getType()->getAddressSpace() == SPIRAS_Input)
-            {
-                MapInputToProxy(&*pGlobal);
-            }
-            else if (pGlobal->getType()->getAddressSpace() == SPIRAS_Output)
-            {
-                MapOutputToProxy(&*pGlobal);
-            }
+            MapInputToProxy(&*pGlobal);
+        }
+        else if (pGlobal->getType()->getAddressSpace() == SPIRAS_Output)
+        {
+            MapOutputToProxy(&*pGlobal);
         }
     }
+
+    // NOTE: Global variable, inlcude general global variable, input and output is a special constant variable, so if
+    // it is referenced by constant expression, we need translate constant expression to normal instruction first,
+    // Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
+    RemoveConstantExpr();
 
     // Do lowering operations
     LowerGlobalVar();
@@ -172,6 +130,8 @@ void SpirvLowerGlobal::ProcessShader()
             LowerOutput();
         }
     }
+
+    return true;
 }
 
 // =====================================================================================================================
@@ -749,6 +709,100 @@ void SpirvLowerGlobal::MapOutputToProxy(
 }
 
 // =====================================================================================================================
+// Removes those constant expressions that reference global variables.
+void SpirvLowerGlobal::RemoveConstantExpr()
+{
+    std::unordered_map<ConstantExpr*, Instruction*> constantExprMap;
+    // Collect contant expressions and translate them to regular instructions
+    for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
+    {
+        auto addSpace = pGlobal->getType()->getAddressSpace();
+
+        // Remove constant expressions for these global variables
+        auto isGlobalVar = ((addSpace == SPIRAS_Private) || (addSpace == SPIRAS_Input) ||
+            (addSpace == SPIRAS_Output));
+
+        if (isGlobalVar == false)
+        {
+            continue;
+        }
+
+        auto pGlobalVar = cast<GlobalVariable>(pGlobal);
+
+        std::vector<Instruction*> insts;
+        for (auto pUser : pGlobalVar->users())
+        {
+            auto pConstExpr = dyn_cast<ConstantExpr>(pUser);
+            if (pConstExpr != nullptr)
+            {
+                // Map this constant expression to normal instruction if it has not been visited
+                if (constantExprMap.find(pConstExpr) == constantExprMap.end())
+                {
+                    if (pConstExpr->user_empty() == false)
+                    {
+                        auto pInst = pConstExpr->getAsInstruction();
+                        insts.push_back(pInst);
+                        constantExprMap[pConstExpr] = pInst;
+                    }
+                    else
+                    {
+                        pConstExpr->removeDeadConstantUsers();
+                        pConstExpr->dropAllReferences();
+                    }
+                }
+            }
+        }
+    }
+
+    if (constantExprMap.empty() == false)
+    {
+        // Replace constant expressions with the mapped normal instructions
+
+        // NOTE: Make sure extracted instructions from constant expressions to be inserted to
+        // a function only once. This is forced by LLVM.
+        std::unordered_set<Instruction*> insertedInsts;
+
+        // NOTE: It seems user list of constant expression is incorrect. Here, we traverse all instructions
+        // in the entry-point and do replacement.
+        for (auto pBlock = m_pEntryPoint->begin(), pBlockEnd = m_pEntryPoint->end(); pBlock != pBlockEnd; ++pBlock)
+        {
+            for (auto pInst = pBlock->begin(), pInstEnd = pBlock->end(); pInst != pInstEnd; ++pInst)
+            {
+                for (auto pOperand = pInst->op_begin(), pOperandEnd = pInst->op_end();
+                    pOperand != pOperandEnd;
+                    ++pOperand)
+                {
+                    if (isa<ConstantExpr>(pOperand))
+                    {
+                        auto pConstExpr = cast<ConstantExpr>(pOperand);
+                        if (constantExprMap.find(pConstExpr) != constantExprMap.end())
+                        {
+                            // Instruction not inserted
+                            if (insertedInsts.find(constantExprMap[pConstExpr]) == insertedInsts.end())
+                            {
+                                constantExprMap[pConstExpr]->insertBefore(&*pInst);
+                                insertedInsts.insert(constantExprMap[pConstExpr]);
+                            }
+
+                            pInst->replaceUsesOfWith(pConstExpr, constantExprMap[pConstExpr]);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Remove constant expressions
+    for (auto& constExprMap : constantExprMap)
+    {
+        auto pConstExpr = constExprMap.first;
+        pConstExpr->removeDeadConstantUsers();
+        pConstExpr->dropAllReferences();
+    }
+}
+
+// =====================================================================================================================
 // Does lowering opertions for SPIR-V global variables, replaces global variables with proxy variables.
 void SpirvLowerGlobal::LowerGlobalVar()
 {
@@ -758,33 +812,15 @@ void SpirvLowerGlobal::LowerGlobalVar()
         return;
     }
 
-    // Replace global variable with proxy variable in the current function.
+    // Replace global variable with proxy variable
     for (auto globalVarMap : m_globalVarProxyMap)
     {
         auto pGlobalVar = cast<GlobalVariable>(globalVarMap.first);
         auto pProxy = globalVarMap.second;
-        ReplaceUsesInFunc(pGlobalVar, pProxy);
-    }
-}
-
-// =====================================================================================================================
-// Replace uses of a global variable with an instruction, for uses in the current function
-void SpirvLowerGlobal::ReplaceUsesInFunc(
-    GlobalVariable* pGlobalVar,   // [in/out] Global variable whose uses we need to replace
-    Value* pProxy)                // [in/out] Value to replace uses with
-{
-    SmallVector<Use*, 4> usesInFunc;
-    for (auto& use : pGlobalVar->uses())
-    {
-        auto pInstUser = dyn_cast<Instruction>(use.getUser());
-        if ((pInstUser != nullptr) && (pInstUser->getParent()->getParent() == m_pEntryPoint))
-        {
-            usesInFunc.push_back(&use);
-        }
-    }
-    for (auto pUse : usesInFunc)
-    {
-        *pUse = pProxy;
+        pGlobalVar->mutateType(pProxy->getType()); // To clear address space for pointer to make replacement valid
+        pGlobalVar->replaceAllUsesWith(pProxy);
+        pGlobalVar->dropAllReferences();
+        pGlobalVar->eraseFromParent();
     }
 }
 
@@ -809,7 +845,7 @@ void SpirvLowerGlobal::LowerInput()
         // Invoke handling of interpolation calls
         m_instVisitFlags.u32All = 0;
         m_instVisitFlags.checkInterpCall = true;
-        visit(m_pEntryPoint);
+        visit(m_pModule);
 
         // Remove interpolation calls, they must have been replaced with LLPC intrinsics
         std::unordered_set<GetElementPtrInst*> getElemInsts;
@@ -859,7 +895,9 @@ void SpirvLowerGlobal::LowerInput()
         }
 
         auto pProxy = inputMap.second;
-        ReplaceUsesInFunc(pInput, pProxy);
+        pInput->mutateType(pProxy->getType()); // To clear address space for pointer to make replacement valid
+        pInput->replaceAllUsesWith(pProxy);
+        pInput->eraseFromParent();
     }
 }
 
@@ -880,7 +918,7 @@ void SpirvLowerGlobal::LowerOutput()
     {
         m_instVisitFlags.checkReturn = true;
     }
-    visit(m_pEntryPoint);
+    visit(m_pModule);
 
     auto pRetInst = ReturnInst::Create(*m_pContext, m_pRetBlock);
 
@@ -962,7 +1000,9 @@ void SpirvLowerGlobal::LowerOutput()
         }
 
         auto pProxy = outputMap.second;
-        ReplaceUsesInFunc(pOutput, pProxy);
+        pOutput->mutateType(pProxy->getType()); // To clear address space for pointer to make replacement valid
+        pOutput->replaceAllUsesWith(pProxy);
+        pOutput->eraseFromParent();
     }
 }
 
@@ -980,7 +1020,7 @@ void SpirvLowerGlobal::LowerInOutInPlace()
     {
         m_instVisitFlags.checkStore = true;
     }
-    visit(m_pEntryPoint);
+    visit(m_pModule);
 
     std::unordered_set<GetElementPtrInst*> getElemInsts;
 
@@ -1037,6 +1077,28 @@ void SpirvLowerGlobal::LowerInOutInPlace()
 
     m_storeInsts.clear();
     getElemInsts.clear();
+
+    // Remove inputs if they are lowered in-place
+    if (m_lowerInputInPlace)
+    {
+        for (auto inputMap : m_inputProxyMap)
+        {
+            auto pInput = cast<GlobalVariable>(inputMap.first);
+            LLPC_ASSERT(pInput->use_empty());
+            pInput->eraseFromParent();
+        }
+    }
+
+    // Remove outputs if they are lowered in-place
+    if (m_lowerOutputInPlace)
+    {
+        for (auto outputMap : m_outputProxyMap)
+        {
+            auto pOutput = cast<GlobalVariable>(outputMap.first);
+            LLPC_ASSERT(pOutput->use_empty());
+            pOutput->eraseFromParent();
+        }
+    }
 }
 
 // =====================================================================================================================

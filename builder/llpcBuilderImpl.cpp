@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,42 +24,19 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPatchAddrSpaceMutate.h
- * @brief LLPC header file: contains declaration of class Llpc::PatchAddrSpaceMutate.
+ * @file  llpcBuilderImpl.cpp
+ * @brief LLPC source file: implementation of Llpc::BuilderImpl
  ***********************************************************************************************************************
  */
-#pragma once
+#include "llpcBuilderImpl.h"
+#include "llpcContext.h"
 
-#include "llpcPatch.h"
-
-namespace Llpc
-{
+using namespace Llpc;
+using namespace llvm;
 
 // =====================================================================================================================
-// Represents the pass of LLVM patch operations of mutating address spaces from SPIRAS to AMDGPU.
-class PatchAddrSpaceMutate: public Patch
+// Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
+Context &BuilderImplBase::getContext() const
 {
-public:
-    PatchAddrSpaceMutate();
-
-    virtual bool runOnModule(llvm::Module& module);
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
-
-private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PatchAddrSpaceMutate);
-
-    void ProcessFunction(llvm::Function* pFunc);
-    llvm::Type* MapType(llvm::Type* pOldType);
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    llvm::SmallVector<unsigned, 9> m_addrSpaceMap; // Address space mapping (from SPIRAS to AMDGPU)
-    std::map<llvm::Type*, llvm::Type*> m_typeMap; // Type mapping (from SPIRAS to AMDGPU)
-    std::map<llvm::GlobalValue*, llvm::GlobalValue*> m_globalMap; // Global mapping, for any global whose type needed
-                                                                  // to be changed
-};
-
-} // Llpc
+    return *static_cast<Llpc::Context*>(&Builder::getContext());
+}

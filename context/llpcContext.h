@@ -71,6 +71,12 @@ public:
         return m_pPipelineContext;
     }
 
+    // Sets Llpc builder
+    void SetBuilder(Builder* pBuilder) { m_pBuilder = pBuilder; }
+
+    // Gets Llpc builder
+    Builder* GetBuilder() const { return m_pBuilder; }
+
     // Sets the target machine.
     void SetTargetMachine(llvm::TargetMachine* pTargetMachine, const PipelineOptions* pPipelineOptions)
     {
@@ -271,6 +277,7 @@ private:
     PipelineContext*              m_pPipelineContext;  // Pipeline-specific context
     EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
+    Builder*                      m_pBuilder = nullptr; // LLPC builder object
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine

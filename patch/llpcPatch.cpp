@@ -46,6 +46,7 @@
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
+#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
@@ -85,8 +86,23 @@ namespace Llpc
 // Add whole-pipeline patch passes to pass manager
 void Patch::AddPasses(
     Context*              pContext, // [in] LLPC context
-    legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
+    legacy::PassManager&  passMgr,  // [in/out] Pass manager to add passes to
+    llvm::Timer*          pPatchTimer,  // [in] Timer to time patch passes with, nullptr if not timing
+    llvm::Timer*          pOptTimer)    // [in] Timer to time LLVM optimization passes with, nullptr if not timing
 {
+    // Start timer for patching passes.
+    if (pPatchTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pPatchTimer, true));
+    }
+
+    // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
+    auto pBuilderReplayer = pContext->GetBuilder()->CreateBuilderReplayer();
+    if (pBuilderReplayer != nullptr)
+    {
+        passMgr.add(pBuilderReplayer);
+    }
+
     // Build null fragment shader if necessary
     passMgr.add(CreatePatchNullFragShader());
 
@@ -101,9 +117,6 @@ void Patch::AddPasses(
 
     // Generate copy shader if necessary.
     passMgr.add(CreatePatchCopyShader());
-
-    // Lower SPIRAS address spaces to AMDGPU address spaces
-    passMgr.add(CreatePatchAddrSpaceMutate());
 
     // Patch entry-point mutation (should be done before external library link)
     passMgr.add(CreatePatchEntryPointMutate());
@@ -138,6 +151,13 @@ void Patch::AddPasses(
     passMgr.add(createFunctionInliningPass(InlineThreshold));
     passMgr.add(CreatePassDeadFuncRemove());
 
+    // Stop timer for patching passes and start timer for optimization passes.
+    if (pPatchTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pPatchTimer, false));
+        passMgr.add(CreateStartStopTimer(pOptTimer, true));
+    }
+
     // Add some optimization passes
 
     // Need to run a first promote mem 2 reg to remove alloca's whose only args are lifetimes
@@ -146,6 +166,13 @@ void Patch::AddPasses(
     if (cl::DisablePatchOpt == false)
     {
         AddOptimizationPasses(pContext, passMgr);
+    }
+
+    // Stop timer for optimization passes and restart timer for patching passes.
+    if (pPatchTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pOptTimer, false));
+        passMgr.add(CreateStartStopTimer(pPatchTimer, true));
     }
 
     // Prepare pipeline ABI.
@@ -158,6 +185,12 @@ void Patch::AddPasses(
     if (cl::IncludeLlvmIr || pContext->GetPipelineContext()->GetPipelineOptions()->includeIr)
     {
         passMgr.add(CreatePatchLlvmIrInclusion());
+    }
+
+    // Stop timer for patching passes.
+    if (pPatchTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pPatchTimer, false));
     }
 
     // Dump the result

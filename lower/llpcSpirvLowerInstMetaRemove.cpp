@@ -28,14 +28,14 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerInstMetaRemove.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-inst-meta-remove"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "SPIRVInternal.h"
 #include "llpcSpirvLowerInstMetaRemove.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-inst-meta-remove"
 
 using namespace llvm;
 using namespace SPIRV;

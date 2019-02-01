@@ -177,15 +177,15 @@ typedef SPIRVMap<Op, Op, IntBoolOpMapId> IntBoolOpMap;
   "-v512:512:512-v1024:1024:1024"
 
 enum SPIRAddressSpace {
-  SPIRAS_Private,
-  SPIRAS_Global,
-  SPIRAS_Constant,
-  SPIRAS_Local,
-  SPIRAS_Generic,
-  SPIRAS_Input,
-  SPIRAS_Output,
-  SPIRAS_Uniform,
-  SPIRAS_PushConst,
+  SPIRAS_Generic   = 0,  // AMDGPUAS::FLAT_ADDRESS
+  SPIRAS_Global    = 1,  // AMDGPUAS::GLOBAL_ADDRESS
+  SPIRAS_Local     = 3,  // AMDGPUAS::LOCAL_ADDRESS
+  SPIRAS_Constant  = 4,  // AMDGPUAS::CONSTANT_ADDRESS
+  SPIRAS_Private   = 5,  // AMDGPUAS::PRIVATE_ADDRESS
+  SPIRAS_Input     = 64,
+  SPIRAS_Output    = 65,
+  SPIRAS_Uniform   = 66,
+  SPIRAS_PushConst = 67,
   SPIRAS_Count,
 };
 

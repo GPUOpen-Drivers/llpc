@@ -65,7 +65,7 @@ static const uint32_t VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex bufer set id
 static const uint32_t VfxIndexBufferSetId  = 0xFFFFFFFD; // Index buffer set id
 static const uint32_t VfxDynamicArrayId    = 0xFFFFFFFC; // Dynamic array id
 static const size_t MaxKeyBufSize   = 256;  // Buffer size to parse a key-value pair key in VFX file.
-static const size_t MaxLineBufSize  = 512;  // Buffer size to parse a line in VFX file.
+static const size_t MaxLineBufSize  = 65536;  // Buffer size to parse a line in VFX file.
 
 #define VFX_ASSERT(...) assert(__VA_ARGS__);
 #define VFX_NEW new
@@ -336,7 +336,7 @@ typedef struct IUFValue_
 // Represents the shader binary data
 struct ShaderSource
 {
-    VkShaderStageFlagBits stage;      // Shader stage
+    Llpc::ShaderStage     stage;      // Shader stage
     uint32_t              dataSize;   // Size of the shader binary data
     uint8_t*              pData;      // Shader binary data
 };

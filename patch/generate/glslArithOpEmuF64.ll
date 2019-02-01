@@ -23,8 +23,7 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024"
-target triple = "spir64-unknown-unknown"
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5"
 
 ; =====================================================================================================================
 ; >>>  Operators
@@ -91,18 +90,18 @@ define double @llpc.mod.f64(double %x, double %y) #0
 
 ; GLSL: double modf(double, out double)
 define spir_func double @_Z4modfdPd(
-    double %x, double* %i) #0
+    double %x, double addrspace(5)* %i) #0
 {
     %1 = call double @llvm.trunc.f64(double %x)
     %2 = fsub double %x, %1
 
-    store double %1, double* %i
+    store double %1, double addrspace(5)* %i
     ret double %2
 }
 
 ; GLSL: dvec2 modf(dvec2, out dvec2)
 define spir_func <2 x double> @_Z4modfDv2_dPDv2_d(
-    <2 x double> %x, <2 x double>* %i) #0
+    <2 x double> %x, <2 x double> addrspace(5)* %i) #0
 {
     %x0 = extractelement <2 x double> %x, i32 0
     %x1 = extractelement <2 x double> %x, i32 1
@@ -119,13 +118,13 @@ define spir_func <2 x double> @_Z4modfDv2_dPDv2_d(
     %7 = insertelement <2 x double> undef, double %2, i32 0
     %8 = insertelement <2 x double> %7, double %4, i32 1
 
-    store <2 x double> %6, <2 x double>* %i
+    store <2 x double> %6, <2 x double> addrspace(5)* %i
     ret <2 x double> %8
 }
 
 ; GLSL: dvec3 modf(dvec3, out dvec3)
 define spir_func <3 x double> @_Z4modfDv3_dPDv3_d(
-    <3 x double> %x, <3 x double>* %i) #0
+    <3 x double> %x, <3 x double> addrspace(5)* %i) #0
 {
     %x0 = extractelement <3 x double> %x, i32 0
     %x1 = extractelement <3 x double> %x, i32 1
@@ -148,13 +147,13 @@ define spir_func <3 x double> @_Z4modfDv3_dPDv3_d(
     %11 = insertelement <3 x double> %10, double %4, i32 1
     %12 = insertelement <3 x double> %11, double %6, i32 2
 
-    store <3 x double> %9, <3 x double>* %i
+    store <3 x double> %9, <3 x double> addrspace(5)* %i
     ret <3 x double> %12
 }
 
 ; GLSL: dvec4 modf(dvec4, out dvec4)
 define spir_func <4 x double> @_Z4modfDv4_dPDv4_d(
-    <4 x double> %x, <4 x double>* %i) #0
+    <4 x double> %x, <4 x double> addrspace(5)* %i) #0
 {
     %x0 = extractelement <4 x double> %x, i32 0
     %x1 = extractelement <4 x double> %x, i32 1
@@ -183,7 +182,7 @@ define spir_func <4 x double> @_Z4modfDv4_dPDv4_d(
     %15 = insertelement <4 x double> %14, double %6, i32 2
     %16 = insertelement <4 x double> %15, double %8, i32 3
 
-    store <4 x double> %12, <4 x double>* %i
+    store <4 x double> %12, <4 x double> addrspace(5)* %i
     ret <4 x double> %16
 }
 
@@ -375,8 +374,8 @@ define <2 x i32> @_Z16unpackDouble2x32d(double %v) #0
     %il = trunc i64 %itg64 to i32
     %im0 = lshr i64 %itg64, 32
     %im = trunc i64 %im0 to i32
-    %vec2ptr = alloca <2 x i32>
-    %vec2 = load <2 x i32>, <2 x i32>* %vec2ptr
+    %vec2ptr = alloca <2 x i32>, addrspace(5)
+    %vec2 = load <2 x i32>, <2 x i32> addrspace(5)* %vec2ptr
 
     %vec20 = insertelement <2 x i32> %vec2, i32 %il, i32 0
     %vec21 = insertelement <2 x i32> %vec20, i32 %im, i32 1
@@ -567,8 +566,8 @@ define spir_func <3 x double> @_Z5crossDv3_dDv3_d(<3 x double> %x, <3 x double> 
     %2 = fsub double %l1, %r1
     %3 = fsub double %l2, %r2
 
-    %4 = alloca <3 x double>
-    %5 = load <3 x double>, <3 x double>* %4
+    %4 = alloca <3 x double>, addrspace(5)
+    %5 = load <3 x double>, <3 x double> addrspace(5)* %4
     %6 = insertelement <3 x double> %5, double %1, i32 0
     %7 = insertelement <3 x double> %6, double %2, i32 1
     %8 = insertelement <3 x double> %7, double %3, i32 2
@@ -595,8 +594,8 @@ define spir_func <2 x double> @_Z9normalizeDv2_d(<2 x double> %x) #0
     %1 = fmul double %x.x, %rsq
     %2 = fmul double %x.y, %rsq
 
-    %3 = alloca <2 x double>
-    %4 = load <2 x double>, <2 x double>* %3
+    %3 = alloca <2 x double>, addrspace(5)
+    %4 = load <2 x double>, <2 x double> addrspace(5)* %3
     %5 = insertelement <2 x double> %4, double %1, i32 0
     %6 = insertelement <2 x double> %5, double %2, i32 1
 
@@ -617,8 +616,8 @@ define spir_func <3 x double> @_Z9normalizeDv3_d(<3 x double> %x) #0
     %2 = fmul double %x.y, %rsq
     %3 = fmul double %x.z, %rsq
 
-    %4 = alloca <3 x double>
-    %5 = load <3 x double>, <3 x double>* %4
+    %4 = alloca <3 x double>, addrspace(5)
+    %5 = load <3 x double>, <3 x double> addrspace(5)* %4
     %6 = insertelement <3 x double> %5, double %1, i32 0
     %7 = insertelement <3 x double> %6, double %2, i32 1
     %8 = insertelement <3 x double> %7, double %3, i32 2
@@ -642,8 +641,8 @@ define spir_func <4 x double> @_Z9normalizeDv4_d(<4 x double> %x) #0
     %3 = fmul double %x.z, %rsq
     %4 = fmul double %x.w, %rsq
 
-    %5 = alloca <4 x double>
-    %6 = load <4 x double>, <4 x double>* %5
+    %5 = alloca <4 x double>, addrspace(5)
+    %6 = load <4 x double>, <4 x double> addrspace(5)* %5
     %7 = insertelement <4 x double> %6, double %1, i32 0
     %8 = insertelement <4 x double> %7, double %2, i32 1
     %9 = insertelement <4 x double> %8, double %3, i32 2
@@ -684,8 +683,8 @@ define spir_func <2 x double> @_Z11faceForwardDv2_dDv2_dDv2_d(<2 x double> %N, <
     %1 = select i1 %con ,double %N.x, double %NN.x
     %2 = select i1 %con ,double %N.y, double %NN.y
 
-    %3 = alloca <2 x double>
-    %4 = load <2 x double>, <2 x double>* %3
+    %3 = alloca <2 x double>, addrspace(5)
+    %4 = load <2 x double>, <2 x double> addrspace(5)* %3
     %5 = insertelement <2 x double> %4, double %1, i32 0
     %6 = insertelement <2 x double> %5, double %2, i32 1
 
@@ -712,8 +711,8 @@ define spir_func <3 x double> @_Z11faceForwardDv3_dDv3_dDv3_d(<3 x double> %N, <
     %2 = select i1 %con ,double %N.y, double %NN.y
     %3 = select i1 %con ,double %N.z, double %NN.z
 
-    %4 = alloca <3 x double>
-    %5 = load <3 x double>, <3 x double>* %4
+    %4 = alloca <3 x double>, addrspace(5)
+    %5 = load <3 x double>, <3 x double> addrspace(5)* %4
     %6 = insertelement <3 x double> %5, double %1, i32 0
     %7 = insertelement <3 x double> %6, double %2, i32 1
     %8 = insertelement <3 x double> %7, double %3, i32 2
@@ -744,8 +743,8 @@ define spir_func <4 x double> @_Z11faceForwardDv4_dDv4_dDv4_d(<4 x double> %N, <
     %3 = select i1 %con ,double %N.z,  double %NN.z
     %4 = select i1 %con ,double %N.w,  double %NN.w
 
-    %5 = alloca <4 x double>
-    %6 = load <4 x double>, <4 x double>* %5
+    %5 = alloca <4 x double>, addrspace(5)
+    %6 = load <4 x double>, <4 x double> addrspace(5)* %5
     %7 = insertelement <4 x double> %6, double %1, i32 0
     %8 = insertelement <4 x double> %7, double %2, i32 1
     %9 = insertelement <4 x double> %8, double %3, i32 2
@@ -773,8 +772,8 @@ define spir_func <2 x double> @_Z7reflectDv2_dDv2_d(<2 x double> %I, <2 x double
     %dotin = call double @_Z3dotDv2_dDv2_d(<2 x double> %I, <2 x double> %N)
     %dot = fmul double %dotin, 2.0
 
-    %1 = alloca <2 x double>
-    %2 = load <2 x double>, <2 x double>* %1
+    %1 = alloca <2 x double>, addrspace(5)
+    %2 = load <2 x double>, <2 x double> addrspace(5)* %1
     %3 = insertelement <2 x double> %2, double %dot, i32 0
     %dotv = insertelement <2 x double> %3, double %dot, i32 1
 
@@ -791,8 +790,8 @@ define spir_func <3 x double> @_Z7reflectDv3_dDv3_d(<3 x double> %I, <3 x double
     %dotin = call double @_Z3dotDv3_dDv3_d(<3 x double> %I, <3 x double> %N)
     %dot = fmul double %dotin, 2.0
 
-    %1 = alloca <3 x double>
-    %2 = load <3 x double>, <3 x double>* %1
+    %1 = alloca <3 x double>, addrspace(5)
+    %2 = load <3 x double>, <3 x double> addrspace(5)* %1
     %3 = insertelement <3 x double> %2, double %dot, i32 0
     %4 = insertelement <3 x double> %3, double %dot, i32 1
     %dotv = insertelement <3 x double> %4, double %dot, i32 2
@@ -810,8 +809,8 @@ define spir_func <4 x double> @_Z7reflectDv4_dDv4_d(<4 x double> %I, <4 x double
     %dotin = call double @_Z3dotDv4_dDv4_d(<4 x double> %I, <4 x double> %N)
     %dot = fmul double %dotin, 2.0
 
-    %1 = alloca <4 x double>
-    %2 = load <4 x double>, <4 x double>* %1
+    %1 = alloca <4 x double>, addrspace(5)
+    %2 = load <4 x double>, <4 x double> addrspace(5)* %1
     %3 = insertelement <4 x double> %2, double %dot, i32 0
     %4 = insertelement <4 x double> %3, double %dot, i32 1
     %5 = insertelement <4 x double> %4, double %dot, i32 2
@@ -881,8 +880,8 @@ define spir_func <2 x double> @_Z7refractDv2_dDv2_dd(<2 x double> %I, <2 x doubl
     %1 = select i1 %con, double 0.0, double %S0
     %2 = select i1 %con, double 0.0, double %S1
 
-    %3 = alloca <2 x double>
-    %4 = load <2 x double>, <2 x double>* %3
+    %3 = alloca <2 x double>, addrspace(5)
+    %4 = load <2 x double>, <2 x double> addrspace(5)* %3
     %5 = insertelement <2 x double> %4, double %1, i32 0
     %6 = insertelement <2 x double> %5, double %2, i32 1
 
@@ -929,8 +928,8 @@ define spir_func <3 x double> @_Z7refractDv3_dDv3_dd(<3 x double> %I, <3 x doubl
     %2 = select i1 %con, double 0.0, double %S1
     %3 = select i1 %con, double 0.0, double %S2
 
-    %4 = alloca <3 x double>
-    %5 = load <3 x double>, <3 x double>* %4
+    %4 = alloca <3 x double>, addrspace(5)
+    %5 = load <3 x double>, <3 x double> addrspace(5)* %4
     %6 = insertelement <3 x double> %5, double %1, i32 0
     %7 = insertelement <3 x double> %6, double %2, i32 1
     %8 = insertelement <3 x double> %7, double %3, i32 2
@@ -984,8 +983,8 @@ define spir_func <4 x double> @_Z7refractDv4_dDv4_dd(<4 x double> %I, <4 x doubl
     %3 = select i1 %con, double 0.0, double %S2
     %4 = select i1 %con, double 0.0, double %S3
 
-    %5 = alloca <4 x double>
-    %6 = load <4 x double>, <4 x double>* %5
+    %5 = alloca <4 x double>, addrspace(5)
+    %6 = load <4 x double>, <4 x double> addrspace(5)* %5
     %7 = insertelement <4 x double> %6, double %1, i32 0
     %8 = insertelement <4 x double> %7, double %2, i32 1
     %9 = insertelement <4 x double> %8, double %3, i32 2

@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerBufferOp.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-buffer-op"
-
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
@@ -38,8 +36,9 @@
 #include <stack>
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
-#include "llpcPipelineShaders.h"
 #include "llpcSpirvLowerBufferOp.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-buffer-op"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -65,7 +64,6 @@ SpirvLowerBufferOp::SpirvLowerBufferOp()
     SpirvLower(ID),
     m_restoreMeta(false)
 {
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializeSpirvLowerBufferOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -78,32 +76,13 @@ bool SpirvLowerBufferOp::runOnModule(
 
     SpirvLower::Init(&module);
 
-    // Process each shader stage in turn.
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
-    {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
-        if (m_pEntryPoint != nullptr)
-        {
-            m_shaderStage = ShaderStage(shaderStage);
-            ProcessShader();
-        }
-    }
-
-    return true;
-}
-
-// =====================================================================================================================
-// Process a single shader
-void SpirvLowerBufferOp::ProcessShader()
-{
-    // Visit function to restore per-instruction metadata
+    // Visit module to restore per-instruction metadata
     m_restoreMeta = true;
-    visit(m_pEntryPoint);
+    visit(m_pModule);
     m_restoreMeta = false;
 
     // Invoke handling of "load" and "store" instruction
-    visit(m_pEntryPoint);
+    visit(m_pModule);
 
     std::unordered_set<GetElementPtrInst*> getElemInsts;
 
@@ -178,6 +157,8 @@ void SpirvLowerBufferOp::ProcessShader()
     }
     m_callInsts.clear();
     getElemInsts.clear();
+
+    return true;
 }
 
 // =====================================================================================================================

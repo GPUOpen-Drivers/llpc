@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerAlgebraTransform.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"
-
 #include "hex_float.h"
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -43,8 +41,9 @@
 
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
-#include "llpcPipelineShaders.h"
 #include "llpcSpirvLowerAlgebraTransform.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-algebra-transform"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -87,26 +86,6 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     SpirvLower::Init(&module);
     m_changed = false;
 
-    // Process one function (shader entrypoint) at a time. (We cannot make this a function pass because it creates
-    // new external function declarations.)
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
-    {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
-        if (m_pEntryPoint != nullptr)
-        {
-            m_shaderStage = ShaderStage(shaderStage);
-            ProcessShader();
-        }
-    }
-
-    return m_changed;
-}
-
-// =====================================================================================================================
-// Process a single shader
-void SpirvLowerAlgebraTransform::ProcessShader()
-{
 #if VKI_KHR_SHADER_FLOAT_CONTROLS
     auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
     if (m_enableConstFolding && (pFpControlFlags->denormFlushToZero != 0))
@@ -225,8 +204,10 @@ void SpirvLowerAlgebraTransform::ProcessShader()
 
     if (m_enableFloatOpt)
     {
-        visit(m_pEntryPoint);
+        visit(m_pModule);
     }
+
+    return m_changed;
 }
 
 // =====================================================================================================================

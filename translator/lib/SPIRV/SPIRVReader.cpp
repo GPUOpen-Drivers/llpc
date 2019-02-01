@@ -48,6 +48,8 @@
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
 
+#include "llpcBuilder.h"
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/BinaryFormat/Dwarf.h"
@@ -77,7 +79,6 @@
 #include <map>
 #include <set>
 #include <sstream>
-#include <string>
 
 #define DEBUG_TYPE "spirv"
 
@@ -300,13 +301,15 @@ private:
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
-    const SPIRVSpecConstMap &TheSpecConstMap)
-    :M(LLVMModule), BM(TheSPIRVModule), IsKernel(true),
+    const SPIRVSpecConstMap &TheSpecConstMap, Llpc::Builder *Builder)
+    :M(LLVMModule), Builder(Builder), BM(TheSPIRVModule), IsKernel(true),
     EnableVarPtr(false), EnableXfb(false), EntryTarget(nullptr),
     SpecConstMap(TheSpecConstMap), DbgTran(BM, M) {
     assert(M);
     Context = &M->getContext();
   }
+
+  DebugLoc getDebugLoc(SPIRVInstruction *BI, Function *F);
 
   std::string getOCLBuiltinName(SPIRVInstruction *BI);
   std::string getOCLConvertBuiltinName(SPIRVInstruction *BI);
@@ -329,7 +332,7 @@ public:
   bool transDecoration(SPIRVValue *, Value *);
   bool transShaderDecoration(SPIRVValue *, Value *);
   bool transAlign(SPIRVValue *, Value *);
-  void checkContains64BitType(SPIRVType *BT, ShaderInOutDecorate &InOutDec);
+  bool checkContains64BitType(SPIRVType *BT);
   Constant *buildShaderInOutMetadata(SPIRVType *BT, ShaderInOutDecorate &InOutDec, Type *&MetaTy);
   Constant *buildShaderBlockMetadata(SPIRVType* BT, ShaderBlockDecorate &BlockDec, Type *&MDTy);
   uint32_t calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize, uint32_t MatrixStride, bool IsRowMajor);
@@ -440,6 +443,7 @@ private:
   Module *M;
   BuiltinVarMap BuiltinGVMap;
   LLVMContext *Context;
+  Llpc::Builder *Builder;
   SPIRVModule *BM;
   bool IsKernel;
   bool EnableVarPtr;
@@ -1510,6 +1514,16 @@ Value *SPIRVToLLVM::oclTransConstantPipeStorage(
                             GlobalValue::NotThreadLocal, SPIRAS_Global);
 }
 
+/// Construct a DebugLoc for the given SPIRVInstruction.
+DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *BI, Function *F) {
+  if (!BI->hasLine())
+    return DebugLoc();
+  auto Line = BI->getLine();
+  return DebugLoc::get(
+      Line->getLine(), Line->getColumn(),
+      DbgTran.getDISubprogram(BI->getParent()->getParent(), F));
+}
+
 /// For instructions, this function assumes they are created in order
 /// and appended to the given basic block. An instruction may use a
 /// instruction from another BB which has not been translated. Such
@@ -1818,8 +1832,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                                transValue(RV->getReturnValue(), F, BB), BB));
   }
   case OpKill: {
-    auto Kill = mapValue(BV, transSPIRVBuiltinFromInst(
-      static_cast<SPIRVInstruction *>(BV), BB));
+    Builder->SetInsertPoint(BB);
+    Builder->SetCurrentDebugLocation(
+        getDebugLoc(static_cast<SPIRVInstruction *>(BV), BB->getParent()));
+    auto Kill = Builder->CreateKill();
 
     // NOTE: In SPIR-V, "OpKill" is considered as a valid instruction to
     // terminate blocks. But in LLVM, we have to insert a dummy "return"
@@ -4044,8 +4060,6 @@ bool SPIRVToLLVM::transAddressingModel() {
     M->setDataLayout(SPIR_DATALAYOUT32);
     break;
   case AddressingModelLogical:
-    M->setTargetTriple(SPIR_TARGETTRIPLE64);
-    M->setDataLayout(SPIR_DATALAYOUT64);
     break;
   default:
     SPIRVCKRT(0, InvalidAddressingModel,
@@ -4385,24 +4399,26 @@ bool SPIRVToLLVM::transAlign(SPIRVValue *BV, Value *V) {
   return true;
 }
 
-void SPIRVToLLVM::checkContains64BitType(SPIRVType *BT,
-                                         ShaderInOutDecorate &InOutDec) {
-  if (BT->isTypeScalar()) {
-    InOutDec.contains64BitType = (BT->getBitWidth() == 64);
-    return;
-  }
-  else if (BT->isTypeVector() && (InOutDec.contains64BitType == false))
-   return checkContains64BitType(BT->getVectorComponentType(), InOutDec);
-  else if (BT->isTypeMatrix() && (InOutDec.contains64BitType == false))
-   return checkContains64BitType(BT->getMatrixColumnType(), InOutDec);
-  else if (BT->isTypeArray() && (InOutDec.contains64BitType == false))
-   return checkContains64BitType(BT->getArrayElementType(), InOutDec);
-  else if (BT->isTypeStruct() && (InOutDec.contains64BitType == false)) {
+bool SPIRVToLLVM::checkContains64BitType(SPIRVType *BT) {
+  if (BT->isTypeScalar())
+    return (BT->getBitWidth() == 64);
+  else if (BT->isTypeVector())
+   return checkContains64BitType(BT->getVectorComponentType());
+  else if (BT->isTypeMatrix())
+   return checkContains64BitType(BT->getMatrixColumnType());
+  else if (BT->isTypeArray())
+   return checkContains64BitType(BT->getArrayElementType());
+  else if (BT->isTypeStruct()) {
+    bool Contains64BitType = false;
     auto MemberCount = BT->getStructMemberCount();
     for (auto MemberIdx = 0; MemberIdx < MemberCount; ++MemberIdx){
       auto  MemberTy = BT->getStructMemberType(MemberIdx);
-      return checkContains64BitType(MemberTy, InOutDec);
+      Contains64BitType = Contains64BitType || checkContains64BitType(MemberTy);
     }
+    return Contains64BitType;
+  } else {
+    llvm_unreachable("Invalid type");
+    return false;
   }
 }
 
@@ -4496,8 +4512,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
 
       Type* MDTy = nullptr;
       SPIRVType* BT = BV->getType()->getPointerElementType();
-      if (EnableXfb)
-        checkContains64BitType(BT, InOutDec);
       auto MD = buildShaderInOutMetadata(BT, InOutDec, MDTy);
 
       // Setup input/output metadata
@@ -4878,8 +4892,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       assert(Width <= 64 * 4);
 
       InOutDec.Value.Loc += (Width <= 32 * 4) ? 1 : 2;
-      uint32_t Alignment = InOutDec.contains64BitType ? 64 : 32;
-      uint32_t BaseStride = Alignment/ 32;
+      uint32_t Alignment = 32;
+      uint32_t BaseStride = 4; // Strides in (BYTES)
       InOutDec.XfbLoc += (((Width + Alignment - 1) / Alignment) * BaseStride);
     }
 
@@ -4905,8 +4919,14 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
                                       BT->getMatrixColumnType();
     uint32_t StartLoc = InOutDec.Value.Loc;
     uint32_t StartXfbLoc = InOutDec.XfbLoc;
+
+    // Align StartXfbLoc to 64-bit (8 bytes)
+    bool AlignTo64Bit = checkContains64BitType(ElemTy);
+    if (AlignTo64Bit)
+      StartXfbLoc = roundUpToMultiple(StartXfbLoc, 8u);
     Type *ElemMDTy = nullptr;
     auto ElemDec = InOutDec; // Inherit from parent
+    ElemDec.XfbLoc = StartXfbLoc;
     auto ElemMD = buildShaderInOutMetadata(ElemTy, ElemDec, ElemMDTy);
 
     if (ElemDec.PerPatch)
@@ -4914,6 +4934,11 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 
     uint32_t Stride = ElemDec.Value.Loc - StartLoc;
     uint32_t XfbLocStride = ElemDec.XfbLoc - StartXfbLoc;
+
+    // Align XfbLocStride to 64-bit (8 bytes)
+    if (AlignTo64Bit)
+      XfbLocStride = roundUpToMultiple(XfbLocStride, 8u);
+
     uint32_t NumElems = BT->isTypeArray() ? BT->getArrayLength() :
                                             BT->getMatrixColumnCount();
 
@@ -4970,7 +4995,20 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 
     // Build metadata for each structure member
     uint32_t XfbLoc = InOutDec.XfbLoc;
+    uint32_t StructXfbLoc = 0;
     auto NumMembers = BT->getStructMemberCount();
+
+    // Get Block starting transform feedback offset,
+    SPIRVWord BlockXfbOffset = SPIRVID_INVALID;
+    SPIRVWord XfbOffset = SPIRVID_INVALID;
+
+    // Do iteration to find the minimum member transform feedback offset as
+    // starting block transform feedback offset
+    for (auto MemberIdx = 0; MemberIdx < NumMembers; ++MemberIdx)
+      if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset))
+        if (XfbOffset < BlockXfbOffset)
+          BlockXfbOffset = XfbOffset;
+
     for (auto MemberIdx = 0; MemberIdx < NumMembers; ++MemberIdx) {
       auto MemberDec = InOutDec;
 
@@ -5013,26 +5051,36 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       if (BT->hasMemberDecorate(MemberIdx, DecorationPatch))
         MemberDec.PerPatch = true;
 
-      SPIRVWord XfbOffset = SPIRVID_INVALID;
+      auto  MemberTy = BT->getStructMemberType(MemberIdx);
+      bool AlignTo64Bit = checkContains64BitType(MemberTy);
       if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset)) {
         // For the structure member, if it has DecorationOffset,
-        // Then xfbLoc does not contribute offset calculation
-        MemberDec.XfbOffset = XfbOffset;
-        MemberDec.XfbLoc = 0;
-      } else
-        MemberDec.XfbLoc = XfbLoc;
-
+        // Then use DecorationOffset as starting xfbloc
+        MemberDec.XfbLoc = XfbOffset - BlockXfbOffset;
+        MemberDec.XfbOffset = BlockXfbOffset;
+      } else {
+        if (AlignTo64Bit)
+          // Align next XfbLoc to 64-bit (8 bytes)
+          MemberDec.XfbLoc = roundUpToMultiple(XfbLoc, 8u);
+        else
+          MemberDec.XfbLoc = XfbLoc;
+      }
+      XfbLoc = MemberDec.XfbLoc;
       SPIRVWord MemberStreamId = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(
             MemberIdx, DecorationStream, 0, &MemberStreamId))
         MemberDec.StreamId = MemberStreamId;
-
-      auto  MemberTy = BT->getStructMemberType(MemberIdx);
       Type *MemberMDTy = nullptr;
       auto  MemberMD   =
         buildShaderInOutMetadata(MemberTy, MemberDec, MemberMDTy);
 
       XfbLoc = MemberDec.XfbLoc;
+      // Align next XfbLoc to 64-bit (8 bytes)
+      if (AlignTo64Bit)
+        XfbLoc = roundUpToMultiple(XfbLoc, 8u);
+
+      StructXfbLoc = std::max(StructXfbLoc, XfbLoc);
+
       if (MemberDec.IsBuiltIn)
         InOutDec.IsBuiltIn = true; // Set "builtin" flag
       else
@@ -5045,7 +5093,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       MemberMDValues.push_back(MemberMD);
     }
 
-    InOutDec.XfbLoc = XfbLoc;
+    InOutDec.XfbLoc = StructXfbLoc;
     // Build  metadata for the structure
     MDTy = StructType::get(*Context, MemberMDTys);
     return ConstantStruct::get(static_cast<StructType *>(MDTy), MemberMDValues);
@@ -5807,16 +5855,15 @@ Value *SPIRVToLLVM::narrowBoolValue(Value *V, SPIRVType *BT, BasicBlock *BB) {
 
 } // namespace SPIRV
 
-bool llvm::readSpirv(LLVMContext &C, std::istream &IS,
+bool llvm::readSpirv(Llpc::Builder *Builder, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
-                     const SPIRVSpecConstMap &SpecConstMap, Module *&M,
+                     const SPIRVSpecConstMap &SpecConstMap, Module *M,
                      std::string &ErrMsg) {
-  M = new Module("", C);
   std::unique_ptr<SPIRVModule> BM(SPIRVModule::createSPIRVModule());
 
   IS >> *BM;
 
-  SPIRVToLLVM BTL(M, BM.get(), SpecConstMap);
+  SPIRVToLLVM BTL(M, BM.get(), SpecConstMap, Builder);
   bool Succeed = true;
   if (!BTL.translate(EntryExecModel, EntryName)) {
     BM->getError(ErrMsg);
@@ -5828,10 +5875,7 @@ bool llvm::readSpirv(LLVMContext &C, std::istream &IS,
 
   if (DbgSaveTmpLLVM)
     dumpLLVM(M, DbgTmpLLVMFileName);
-  if (!Succeed) {
-    delete M;
-    M = nullptr;
-  }
+
   return Succeed;
 }
 

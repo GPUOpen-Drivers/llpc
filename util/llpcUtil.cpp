@@ -58,10 +58,8 @@ const char* GetShaderStageName(
     {
         pName = "copy";
     }
-    else
+    else if (shaderStage < ShaderStageCount)
     {
-        LLPC_ASSERT(shaderStage < ShaderStageCount);
-
         static const char* ShaderStageNames[] =
         {
             "vertex",
@@ -73,6 +71,10 @@ const char* GetShaderStageName(
         };
 
         pName = ShaderStageNames[static_cast<uint32_t>(shaderStage)];
+    }
+    else
+    {
+        pName = "bad";
     }
 
     return pName;
@@ -90,10 +92,8 @@ const char* GetShaderStageAbbreviation(
     {
         pAbbr = upper ? "COPY" : "Copy";
     }
-    else
+    else if (shaderStage < ShaderStageCount)
     {
-        LLPC_ASSERT(shaderStage < ShaderStageCount);
-
         if (upper)
         {
             static const char* ShaderStageAbbrs[] =
@@ -122,6 +122,10 @@ const char* GetShaderStageAbbreviation(
 
             pAbbr = ShaderStageAbbrs[static_cast<uint32_t>(shaderStage)];
         }
+    }
+    else
+    {
+        pAbbr = "Bad";
     }
 
     return pAbbr;

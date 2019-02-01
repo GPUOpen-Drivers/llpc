@@ -59,6 +59,11 @@ PipelineContext::PipelineContext(
 }
 
 // =====================================================================================================================
+PipelineContext::~PipelineContext()
+{
+}
+
+// =====================================================================================================================
 // Gets the name string of GPU target according to graphics IP version info.
 const char* PipelineContext::GetGpuNameString() const
 {

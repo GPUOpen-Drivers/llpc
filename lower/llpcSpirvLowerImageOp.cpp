@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerImageOp.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-image-op"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -37,6 +35,8 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerImageOp.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-image-op"
 
 using namespace llvm;
 using namespace Llpc;
@@ -61,7 +61,6 @@ SpirvLowerImageOp::SpirvLowerImageOp()
     SpirvLower(ID),
     m_restoreMeta(false)
 {
-    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializeSpirvLowerImageOpPass(*PassRegistry::getPassRegistry());
 }
 
@@ -74,32 +73,13 @@ bool SpirvLowerImageOp::runOnModule(
 
     SpirvLower::Init(&module);
 
-    // Process each shader stage in turn.
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
-    {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
-        if (m_pEntryPoint != nullptr)
-        {
-            m_shaderStage = ShaderStage(shaderStage);
-            ProcessShader();
-        }
-    }
-
-    return true;
-}
-
-// =====================================================================================================================
-// Process one shader stage
-void SpirvLowerImageOp::ProcessShader()
-{
     // Visit module to restore per-instruction metadata
     m_restoreMeta = true;
-    visit(m_pEntryPoint);
+    visit(m_pModule);
     m_restoreMeta = false;
 
     // Invoke handling of "call" instruction
-    visit(m_pEntryPoint);
+    visit(m_pModule);
 
     for (auto pCallInst: m_imageCalls)
     {
@@ -130,6 +110,8 @@ void SpirvLowerImageOp::ProcessShader()
         }
     }
     m_imageLoadOperands.clear();
+
+    return true;
 }
 
 // =====================================================================================================================

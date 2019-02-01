@@ -40,12 +40,12 @@ namespace Llpc
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for push constant.
 class SpirvLowerPushConst:
-    public llvm::FunctionPass
+    public SpirvLower
 {
 public:
     SpirvLowerPushConst();
 
-    virtual bool runOnFunction(llvm::Function& func) override;
+    virtual bool runOnModule(llvm::Module& module) override;
 
     // Gets loop analysis usage
     virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override;
@@ -59,7 +59,6 @@ private:
 
     void HandleLoop(llvm::Loop* pLoop, Instruction* pInsertPos);
 
-    bool                            m_changed;           // Whether the pass has made any modifications
     // Push constant load map, from <component count, load offset> to load call
     std::map<uint32_t, CallInst*>   m_pushConstLoadMap;
 };

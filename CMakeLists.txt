@@ -167,6 +167,7 @@ target_include_directories(llpc
     PUBLIC
         ${PROJECT_SOURCE_DIR}/include
     PRIVATE
+        ${PROJECT_SOURCE_DIR}/builder
         ${PROJECT_SOURCE_DIR}/context
         ${PROJECT_SOURCE_DIR}/imported/chip/gfx6
         ${PROJECT_SOURCE_DIR}/imported/chip/gfx9
@@ -195,6 +196,15 @@ if(WIN32)
     target_compile_definitions(llpc PRIVATE VKI_SDK_1_1=1)
 endif()
 
+# llpc/builder
+target_sources(llpc PRIVATE
+    builder/llpcBuilder.cpp
+    builder/llpcBuilderImpl.cpp
+    builder/llpcBuilderImplMisc.cpp
+    builder/llpcBuilderRecorder.cpp
+    builder/llpcBuilderReplayer.cpp
+)
+
 # llpc/context
 target_sources(llpc PRIVATE
     context/llpcCompiler.cpp
@@ -216,7 +226,6 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
-    lower/llpcSpirvLowerGlobalConstExprRemove.cpp
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
@@ -235,7 +244,6 @@ target_sources(llpc PRIVATE
     patch/llpcCodeGenManager.cpp
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
-    patch/llpcPatchAddrSpaceMutate.cpp
     patch/llpcPatchAutoLayoutDesc.cpp
     patch/llpcPatchBufferOp.cpp
     patch/llpcPatchCopyShader.cpp
@@ -309,6 +317,7 @@ target_sources(llpc PRIVATE
     util/llpcPassManager.cpp
     util/llpcPipelineDumper.cpp
     util/llpcPipelineShaders.cpp
+    util/llpcStartStopTimer.cpp
     util/llpcUtil.cpp
 )
 

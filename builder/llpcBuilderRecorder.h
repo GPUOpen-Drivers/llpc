@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,53 +24,62 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerTranslator.h
- * @brief LLPC header file: contains declaration of Llpc::SpirvLowerTranslator
+ * @file  llpcBuilderRecorder.h
+ * @brief LLPC header file: declaration of Llpc::BuilderRecorder
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llpcSpirvLower.h"
+#include "llpcBuilder.h"
 
 namespace Llpc
 {
 
+// Prefix of all recorded calls.
+static const char* BuilderCallPrefix = "llpc.call.";
+
 // =====================================================================================================================
-// Pass to translate the SPIR-V modules and generate an IR module for the whole pipeline
-class SpirvLowerTranslator : public SpirvLower
+// Builder recorder, to record all Builder calls as intrinsics
+// Each call to a Builder method causes the insertion of a call to llpc.call.* with a sequence number, so the
+// Builder calls can be replayed in order later on.
+class BuilderRecorder : public Builder
 {
 public:
-    static char ID;
-    SpirvLowerTranslator() : SpirvLower(ID)
+    // llpc.call.* opcodes
+    enum Opcode : uint32_t
     {
-        initializeSpirvLowerTranslatorPass(*llvm::PassRegistry::getPassRegistry());
-    }
+        // NOP
+        Nop = 0,
 
-    SpirvLowerTranslator(
-        ShaderStage                 stage,        // Shader stage
-        const PipelineShaderInfo*   pShaderInfo)  // [in] Shader info for this shader
-        : SpirvLower(ID), m_shaderStage(stage), m_pShaderInfo(pShaderInfo)
-    {
-        initializeSpirvLowerTranslatorPass(*llvm::PassRegistry::getPassRegistry());
-    }
+        // Misc.
+        MiscKill,
+    };
 
-    bool runOnModule(llvm::Module& module) override;
+    // Given an opcode, get the call name (without the "llpc.call." prefix)
+    static llvm::StringRef GetCallName(Opcode opcode);
+
+    BuilderRecorder(llvm::LLVMContext& context, bool wantReplay) : Builder(context), m_wantReplay(wantReplay) {}
+    ~BuilderRecorder() {}
+
+    // Builder methods implemented in BuilderImplMisc
+    llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override;
+
+    // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
+    llvm::ModulePass* CreateBuilderReplayer() override;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerTranslator);
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderRecorder)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderRecorder)
 
-    llvm::Module* TranslateSpirvToLlvm(const BinaryData*           pSpirvBin,
-                                       ShaderStage                 shaderStage,
-                                       const char*                 pEntryTarget,
-                                       const VkSpecializationInfo* pSpecializationInfo
-                                      ) const;
-    Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut) const;
-    void CleanOptimizedSpirv(BinaryData* pSpirvBin) const;
+    // Record one Builder call
+    llvm::Instruction* Record(Opcode                        opcode,
+                              llvm::Type*                   pReturnTy,
+                              llvm::ArrayRef<llvm::Value*>  args,
+                              const llvm::Twine&            instName);
 
     // -----------------------------------------------------------------------------------------------------------------
-
-    ShaderStage               m_shaderStage;    // Shader stage
-    const PipelineShaderInfo* m_pShaderInfo;    // Input shader info
+    bool      m_wantReplay;     // true to make CreateBuilderReplayer return a replayer pass
+    uint32_t  m_seqNum = 0;     // Sequence number of next builder call
 };
 
 } // Llpc

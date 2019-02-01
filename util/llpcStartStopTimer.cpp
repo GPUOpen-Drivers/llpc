@@ -24,58 +24,76 @@
  **********************************************************************************************************************/
 /**
 ***********************************************************************************************************************
-* @file  llpcSpirvLowerTranslator.cpp
-* @brief LLPC source file: contains implementation of Llpc::SpirvLowerTranslator
+* @file  llpcStartStopTimer.cpp
+* @brief LLPC source file: pass to start or stop a timer
 ***********************************************************************************************************************
 */
-#include "llpcCompiler.h"
-#include "llpcContext.h"
-#include "llpcSpirvLowerTranslator.h"
+#include "llpcInternal.h"
 
-#define DEBUG_TYPE "llpc-spirv-lower-translator"
+#include "llvm/Support/Timer.h"
+#include "llvm/Pass.h"
+
+#define DEBUG_TYPE "llpc-start-stop-timer"
 
 using namespace llvm;
 using namespace Llpc;
 
-char SpirvLowerTranslator::ID = 0;
+namespace
+{
 
 // =====================================================================================================================
-// Creates the pass of translating SPIR-V to LLVM IR.
-ModulePass* Llpc::CreateSpirvLowerTranslator(
-    ShaderStage                 stage,        // Shader stage
-    const PipelineShaderInfo*   pShaderInfo)  // [in] Shader info for this shader
+// Pass to start or stop a timer
+class StartStopTimer : public ModulePass
 {
-    return new SpirvLowerTranslator(stage, pShaderInfo);
+public:
+    static char ID;
+    StartStopTimer() : ModulePass(ID) {}
+    StartStopTimer(Timer* pTimer, bool starting) : ModulePass(ID), m_pTimer(pTimer), m_starting(starting)
+    {
+        initializeStartStopTimerPass(*llvm::PassRegistry::getPassRegistry());
+    }
+
+    bool runOnModule(Module& module) override;
+
+private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(StartStopTimer);
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    Timer*  m_pTimer;   // The timer to start or stop when the pass is run
+    bool    m_starting; // True to start the timer, false to stop it
+};
+
+char StartStopTimer::ID = 0;
+
+} // Llpc
+
+// =====================================================================================================================
+// Create a start/stop timer pass
+ModulePass* Llpc::CreateStartStopTimer(
+    Timer*  pTimer,   // The timer to start or stop when the pass is run
+    bool    starting) // True to start the timer, false to stop it
+{
+    return new StartStopTimer(pTimer, starting);
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
-bool SpirvLowerTranslator::runOnModule(
-    llvm::Module& module)  // [in,out] LLVM module to be run on (empty on entry)
+bool StartStopTimer::runOnModule(
+    Module& module)  // [in,out] LLVM module to be run on
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Translator\n");
-
-    SpirvLower::Init(&module);
-
-#ifdef LLPC_ENABLE_SPIRV_OPT
-    InitSpvGen();
-#endif
-
-    m_pContext = static_cast<Context*>(&module.getContext());
-
-    // Translate SPIR-V binary to machine-independent LLVM module
-    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(m_pShaderInfo->pModuleData);
-    LLPC_ASSERT(pModuleData->binType == BinaryType::Spirv);
-
-    Compiler::TranslateSpirvToLlvm(&pModuleData->binCode,
-                                   m_shaderStage,
-                                   m_pShaderInfo->pEntryTarget,
-                                   m_pShaderInfo->pSpecializationInfo,
-                                   &module);
-    return true;
+    if (m_starting)
+    {
+        m_pTimer->startTimer();
+    }
+    else
+    {
+        m_pTimer->stopTimer();
+    }
+    return false;
 }
 
 // =====================================================================================================================
 // Initializes the pass
-INITIALIZE_PASS(SpirvLowerTranslator, DEBUG_TYPE, "LLPC translate SPIR-V binary to LLVM IR", false, false)
+INITIALIZE_PASS(StartStopTimer, DEBUG_TYPE, "Start or stop timer", false, false)
 

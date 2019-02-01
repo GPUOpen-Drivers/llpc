@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerDynIndex.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-dyn-index"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
@@ -38,6 +36,8 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerDynIndex.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-dyn-index"
 
 using namespace llvm;
 using namespace SPIRV;

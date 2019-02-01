@@ -229,6 +229,12 @@ public:
     static Section* CreateSection(const char* pSectionName);
     static SectionType GetSectionType(const char* pSectionName);
     static void InitSectionInfo();
+    static bool ReadFile(const std::string&    docFilename,
+                         const std::string&    fileName,
+                         bool                  isBinary,
+                         std::vector<uint8_t>* pBinaryData,
+                         std::string*          pTextData,
+                         std::string*          pErrorMsg);
 
     virtual bool IsShaderSourceSection() { return false;}
 
@@ -285,6 +291,7 @@ public:
     void SetLineNum(uint32_t lineNum) { m_lineNum = lineNum; }
 
     uint32_t GetLineNum() const { return m_lineNum; }
+
 private:
     Section() {};
 
@@ -1018,18 +1025,12 @@ public:
 
     virtual bool IsShaderSourceSection();
 
-    void GetSubState(SubState& state)
-    {
-        state.dataSize = static_cast<uint32_t>(m_spvBin.size());
-        state.pData = state.dataSize > 0 ? &m_spvBin[0] : nullptr;
-    }
-
     virtual void AddLine(const char* pLine) { shaderSource += pLine; };
 
     bool CompileShader(const std::string& docFilename, const Section* pShaderInfo, std::string* pErrorMsg);
 
+    void GetSubState(SubState& state);
 private:
-    bool ReadFile(const std::string& docFilename, bool isBinary, std::string* pErrorMsg);
     bool CompileGlsl(const Section* pShaderInfo, std::string* pErrorMsg);
     bool AssembleSpirv(std::string* pErrorMsg);
 

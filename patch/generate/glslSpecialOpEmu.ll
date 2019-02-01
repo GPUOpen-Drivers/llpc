@@ -27,17 +27,6 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; =====================================================================================================================
-; >>> Jump Statement
-; =====================================================================================================================
-
-; GLSL: void kill()
-define spir_func void @_Z4Killv() #0
-{
-    call void @llvm.amdgcn.kill(i1 false)
-    ret void
-}
-
-; =====================================================================================================================
 ; >>>  Derivative Functions
 ; =====================================================================================================================
 
@@ -379,7 +368,6 @@ define spir_func i64 @_Z7TimeAMDv()
     ret i64 %2
 }
 
-declare void @llvm.amdgcn.kill(i1) #0
 declare float @llvm.fabs.f32(float) #0
 declare i32 @llvm.amdgcn.ds.swizzle(i32, i32) #2
 declare void @llvm.amdgcn.s.waitcnt(i32) #0

@@ -32,6 +32,7 @@
 
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -39,11 +40,13 @@
 #include "llvm/Support/MutexGuard.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/Timer.h"
 
 #include "LLVMSPIRVLib.h"
 #include "spirvExt.h"
 #include "SPIRVInternal.h"
 
+#include "llpcBuilder.h"
 #include "llpcCodeGenManager.h"
 #include "llpcCompiler.h"
 #include "llpcComputeContext.h"
@@ -86,11 +89,6 @@ opt<std::string> PipelineDumpDir("pipeline-dump-dir",
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
 
-// -enable-time-profiler: enable time profiler for various compilation phases
-static opt<bool> EnableTimeProfiler("enable-time-profiler",
-                                    desc("Enable time profiler for various compilation phases"),
-                                    init(false));
-
 // -shader-cache-file-dir: root directory to store shader cache
 opt<std::string> ShaderCacheFileDir("shader-cache-file-dir",
                                     desc("Root directory to store shader cache"),
@@ -111,35 +109,11 @@ static opt<std::string> ExecutableName("executable-name",
                                        value_desc("filename"),
                                        init("amdllpc"));
 
-// -shader-replace-mode: shader replacement mode
-// 0 - Disable
-// 1 - Replacement based on shader hash
-// 2 - Replacement based on both shader hash and pipeline hash
-static opt<uint32_t> ShaderReplaceMode("shader-replace-mode",
-                                       desc("Shader replacement mode, "
-                                            "0 - disable, "
-                                            "1 - replacement based on shader hash, "
-                                            "2 - replacement based on both shader hash and pipeline hash"),
-                                       init(0));
-
-// -shader-replace-dir: directory to store the files used in shader replacement
-static opt<std::string> ShaderReplaceDir("shader-replace-dir",
-                                         desc("Directory to store the files used in shader replacement"),
-                                         value_desc("dir"),
-                                         init("."));
-
-// -shader-replace-pipeline-hashes: a collection of pipeline hashes, specifying shader replacement is operated on which pipelines
-static opt<std::string> ShaderReplacePipelineHashes("shader-replace-pipeline-hashes",
-                                                    desc("A collection of pipeline hashes, specifying shader "
-                                                         "replacement is operated on which pipelines"),
-                                                    value_desc("hashes with comma as separator"),
-                                                    init(""));
-
 // -enable-spirv-opt: enable optimization for SPIR-V binary
 opt<bool> EnableSpirvOpt("enable-spirv-opt", desc("Enable optimization for SPIR-V binary"), init(false));
 
 // -enable-shadow-desc: enable shadow desriptor table
-opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", desc("Enable shadow descriptor table"), init(false));
+opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", desc("Enable shadow descriptor table"), init(true));
 
 // -shadow-desc-table-ptr-high: high part of VA for shadow descriptor table pointer
 opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
@@ -169,9 +143,6 @@ namespace Llpc
 
 llvm::sys::Mutex      Compiler::m_contextPoolMutex;
 std::vector<Context*> Compiler::m_contextPool;
-
-// Time profiling result
-TimeProfileResult g_timeProfileResult = {};
 
 // Enumerates modes used in shader replacement
 enum ShaderReplaceMode
@@ -314,6 +285,7 @@ Compiler::Compiler(
         auto& passRegistry = *PassRegistry::getPassRegistry();
         InitializeUtilPasses(passRegistry);
         InitializeLowerPasses(passRegistry);
+        InitializeBuilderPasses(passRegistry);
         InitializePatchPasses(passRegistry);
 
         // LLVM fatal error handler only can be installed once.
@@ -519,6 +491,28 @@ Result Compiler::BuildPipelineInternal(
 {
     Result          result    = Result::Success;
 
+    if ((forceLoopUnrollCount != 0) || (cl::EnableDynamicLoopUnroll == false))
+    {
+        pDynamicLoopUnroll = nullptr;
+    }
+
+    // Create the timer group and timers for -time-passes.
+    std::string hash;
+    raw_string_ostream ostream(hash);
+    ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
+    ostream.flush();
+    Timer wholeTimer("total", (Twine("LLPC Total ") + hash).str());
+    if (TimePassesIsEnabled)
+    {
+        wholeTimer.startTimer();
+    }
+    TimerGroup timerGroup("llpc", (Twine("LLPC Phases ") + hash).str());
+    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroup);
+    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroup);
+    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroup);
+    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroup);
+    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroup);
+
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext);
 
@@ -538,31 +532,69 @@ Result Compiler::BuildPipelineInternal(
         }
     }
 
-    // If not IR input, create an empty module.
+    // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules
+    // into a single pipeline module.
     if (pPipelineModule == nullptr)
     {
-        pPipelineModule = new Module("llpcPipeline", *pContext);
-    }
+        Module* modules[ShaderStageCountInternal] = {};
 
-    // Unfortunately we have to have SPIR-V translation in its own pass manager, otherwise MachineModuleInfo
-    // gets confused by having an empty module at the start when the immutable passes get run.
-    if (IsLlvmBc == false)
-    {
-        PassManager passMgr;
-        passMgr.add(CreateSpirvLowerTranslator(shaderInfo));
-
-        // Dump the result
-        if (EnableOuts())
+        for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
         {
-            passMgr.add(createPrintModulePass(outs(),
-                        "===============================================================================\n"
-                        "// LLPC SPIRV-to-LLVM translation results\n"));
+            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+            if ((pShaderInfo == nullptr) || (pShaderInfo->pModuleData == nullptr))
+            {
+                continue;
+            }
+
+            PassManager passMgr;
+
+            // Create the empty module and set its target machine.
+            Module* pModule = new Module((Twine("llpc") + GetShaderStageName(ShaderStage(stage))).str(), *pContext);
+            modules[stage] = pModule;
+            pContext->SetModuleTargetMachine(pModule);
+
+            // Start timer for translate.
+            if (TimePassesIsEnabled)
+            {
+                passMgr.add(CreateStartStopTimer(&translateTimer, true));
+            }
+
+            // SPIR-V translation, then dump the result.
+            passMgr.add(CreateSpirvLowerTranslator(ShaderStage(stage), pShaderInfo));
+            if (EnableOuts())
+            {
+                passMgr.add(createPrintModulePass(outs(), "\n"
+                            "===============================================================================\n"
+                            "// LLPC SPIRV-to-LLVM translation results\n"));
+            }
+
+            // Stop timer for translate.
+            if (TimePassesIsEnabled)
+            {
+                passMgr.add(CreateStartStopTimer(&translateTimer, false));
+            }
+
+            // Per-shader SPIR-V lowering passes.
+            SpirvLower::AddPasses(ShaderStage(stage),
+                                  passMgr,
+                                  TimePassesIsEnabled ? &lowerTimer : nullptr,
+                                  forceLoopUnrollCount,
+                                  pDynamicLoopUnroll);
+
+            // Run the passes.
+            result = CodeGenManager::Run(pModule, passMgr);
+            if (result != Result::Success)
+            {
+                LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+            }
         }
 
-        result = CodeGenManager::Run(pPipelineModule, passMgr);
-        if (result != Result::Success)
+        // Link the shader modules into a single pipeline module.
+        pPipelineModule = LinkShaderModules(pContext, modules);
+        if (pPipelineModule == nullptr)
         {
-            LLPC_ERRS("Failed to translate SPIR-V\n");
+            LLPC_ERRS("Failed to link shader modules into pipeline module\n");
+            result = Result::ErrorInvalidShader;
         }
     }
 
@@ -579,22 +611,23 @@ Result Compiler::BuildPipelineInternal(
 
     if (result == Result::Success)
     {
-        // SPIR-V lowering.
-        if ((forceLoopUnrollCount != 0) || (cl::EnableDynamicLoopUnroll == false))
+        if (EnableOuts())
         {
-            pDynamicLoopUnroll = nullptr;
+            passMgr.add(createPrintModulePass(outs(), "\n"
+                        "===============================================================================\n"
+                        "// LLPC pipeline linking results\n"));
         }
-        SpirvLower::AddPasses(pContext, passMgr, forceLoopUnrollCount, pDynamicLoopUnroll);
 
         // Patching.
-        Patch::AddPasses(pContext, passMgr);
+        Patch::AddPasses(pContext,
+                         passMgr,
+                         TimePassesIsEnabled ? &patchTimer : nullptr,
+                         TimePassesIsEnabled ? &optTimer : nullptr);
     }
 
     // Run the "whole pipeline" passes, excluding the target backend.
     if (result == Result::Success)
     {
-        TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
-
         result = CodeGenManager::Run(pPipelineModule, passMgr);
         if (result == Result::Success)
         {
@@ -611,20 +644,33 @@ Result Compiler::BuildPipelineInternal(
 
     if (result == Result::Success)
     {
+        if (TimePassesIsEnabled)
+        {
+            codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, true));
+        }
+
         // Code generation.
         result = CodeGenManager::AddTargetPasses(pContext, codeGenPassMgr, elfStream);
+
+        if (TimePassesIsEnabled)
+        {
+            codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, false));
+        }
     }
 
     // Run the target backend codegen passes.
     if (result == Result::Success)
     {
-        TimeProfiler timeProfiler(&g_timeProfileResult.codeGenTime);
-
         result = CodeGenManager::Run(pPipelineModule, codeGenPassMgr);
         if (result != Result::Success)
         {
             LLPC_ERRS("Fails to generate GPU ISA codes\n");
         }
+    }
+
+    if (TimePassesIsEnabled)
+    {
+        wholeTimer.stopTimer();
     }
 
     delete pPipelineModule;
@@ -644,9 +690,12 @@ Result Compiler::BuildGraphicsPipelineInternal(
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pGraphicsContext);
+    pContext->SetBuilder(Builder::Create(*pContext));
 
     Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf, pDynamicLoopUnroll);
 
+    delete pContext->GetBuilder();
+    pContext->SetBuilder(nullptr);
     ReleaseContext(pContext);
     return result;
 }
@@ -681,64 +730,6 @@ Result Compiler::BuildGraphicsPipeline(
     MetroHash::Hash pipelineHash = {};
     cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true);
     pipelineHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
-
-    // Do shader replacement if it's enabled
-    bool ShaderReplaced = false;
-    const ShaderModuleData* restoreModuleData[ShaderStageGfxCount] = {};
-    if (cl::ShaderReplaceMode != ShaderReplaceDisable)
-    {
-        char pipelineHashString[64];
-        int32_t length = snprintf(pipelineHashString, 64, "0x%016" PRIX64, MetroHash::Compact64(&pipelineHash));
-        LLPC_UNUSED(length);
-
-        bool hashMatch = true;
-        if (cl::ShaderReplaceMode == ShaderReplaceShaderPipelineHash)
-        {
-            std::string pipelineReplacementHashes = cl::ShaderReplacePipelineHashes;
-            hashMatch = (pipelineReplacementHashes.find(pipelineHashString) != std::string::npos);
-
-            if (hashMatch)
-            {
-                LLPC_OUTS("// Shader replacement for graphics pipeline: " << pipelineHashString << "\n");
-            }
-        }
-
-        if (hashMatch)
-        {
-            for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
-            {
-                const ShaderModuleData* pOrigModuleData =
-                    reinterpret_cast<const ShaderModuleData*>(shaderInfo[stage]->pModuleData);
-                if (pOrigModuleData != nullptr)
-                {
-                    ShaderModuleData* pModuleData = nullptr;
-                    if (ReplaceShader(pOrigModuleData, &pModuleData) == Result::Success)
-                    {
-
-                        ShaderReplaced = true;
-                        restoreModuleData[stage] = pOrigModuleData;
-                        const_cast<PipelineShaderInfo*>(shaderInfo[stage])->pModuleData = pModuleData;
-
-                        char shaderHash[64] = {};
-                        auto pHash = reinterpret_cast<const MetroHash::Hash*>(&restoreModuleData[stage]->hash[0]);
-                        int32_t length = snprintf(shaderHash,
-                                                  64,
-                                                  "0x%016" PRIX64,
-                                                  MetroHash::Compact64(pHash));
-                        LLPC_UNUSED(length);
-                        LLPC_OUTS("// Shader replacement for shader: " << shaderHash
-                                  << ", in pipeline: " << pipelineHashString << "\n");
-                    }
-                }
-            }
-
-            if (ShaderReplaced)
-            {
-                // Update pipeline hash after shader replacement
-                cacheHash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, true);
-            }
-        }
-    }
 
     if ((result == Result::Success) && EnableOuts())
     {
@@ -782,23 +773,16 @@ Result Compiler::BuildGraphicsPipeline(
 
     if (result == Result::Success)
     {
-        if (ShaderReplaced)
+        cacheEntryState = pShaderCache->FindShader(cacheHash, true, &hEntry);
+        if (cacheEntryState == ShaderEntryState::Ready)
         {
-            cacheEntryState = ShaderEntryState::Compiling;
-        }
-        else
-        {
-            cacheEntryState = pShaderCache->FindShader(cacheHash, true, &hEntry);
-            if (cacheEntryState == ShaderEntryState::Ready)
+            result = pShaderCache->RetrieveShader(hEntry, &pElf, &elfSize);
+            // Re-try if shader cache return error unknown
+            if (result == Result::ErrorUnknown)
             {
-                result = pShaderCache->RetrieveShader(hEntry, &pElf, &elfSize);
-                // Re-try if shader cache return error unknown
-                if (result == Result::ErrorUnknown)
-                {
-                    result = Result::Success;
-                    hEntry = nullptr;
-                    cacheEntryState = ShaderEntryState::Compiling;
-                }
+                result = Result::Success;
+                hEntry = nullptr;
+                cacheEntryState = ShaderEntryState::Compiling;
             }
         }
     }
@@ -874,7 +858,7 @@ Result Compiler::BuildGraphicsPipeline(
             pElf = candidateElfs[candidateIdx].data();
         }
 
-        if ((ShaderReplaced == false) && (hEntry != nullptr))
+        if (hEntry != nullptr)
         {
             if (result == Result::Success)
             {
@@ -922,24 +906,6 @@ Result Compiler::BuildGraphicsPipeline(
         }
     }
 
-    // Free shader replacement allocations and restore original shader module
-    if (cl::ShaderReplaceMode != ShaderReplaceDisable)
-    {
-        for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
-        {
-            if (restoreModuleData[stage] != nullptr)
-            {
-                delete reinterpret_cast<const char*>(shaderInfo[stage]->pModuleData);
-                const_cast<PipelineShaderInfo*>(shaderInfo[stage])->pModuleData = restoreModuleData[stage];
-            }
-        }
-    }
-
-    if (cl::EnableTimeProfiler)
-    {
-        DumpTimeProfilingResult(&pipelineHash);
-    }
-
     return result;
 }
 
@@ -954,6 +920,7 @@ Result Compiler::BuildComputePipelineInternal(
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pComputeContext);
+    pContext->SetBuilder(Builder::Create(*pContext));
 
     const PipelineShaderInfo* shaderInfo[ShaderStageCount] =
     {
@@ -967,6 +934,8 @@ Result Compiler::BuildComputePipelineInternal(
 
     Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf, pDynamicLoopUnroll);
 
+    delete pContext->GetBuilder();
+    pContext->SetBuilder(nullptr);
     ReleaseContext(pContext);
     return result;
 }
@@ -988,57 +957,6 @@ Result Compiler::BuildComputePipeline(
     MetroHash::Hash pipelineHash = {};
     cacheHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, true);
     pipelineHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
-
-    // Do shader replacement if it's enabled
-    bool ShaderReplaced = false;
-    const ShaderModuleData* pRestoreModuleData = nullptr;
-    if (cl::ShaderReplaceMode != ShaderReplaceDisable)
-    {
-        char pipelineHashString[64];
-        int32_t length = snprintf(pipelineHashString, 64, "0x%016" PRIX64, MetroHash::Compact64(&pipelineHash));
-        LLPC_UNUSED(length);
-
-        bool hashMatch = true;
-        if (cl::ShaderReplaceMode == ShaderReplaceShaderPipelineHash)
-        {
-            std::string pipelineReplacementHashes = cl::ShaderReplacePipelineHashes;
-            hashMatch = (pipelineReplacementHashes.find(pipelineHashString) != std::string::npos);
-
-            if (hashMatch)
-            {
-                LLPC_OUTS("// Shader replacement for compute pipeline: " << pipelineHashString << "\n");
-            }
-        }
-
-        if (hashMatch)
-        {
-            const ShaderModuleData* pOrigModuleData =
-                reinterpret_cast<const ShaderModuleData*>(pPipelineInfo->cs.pModuleData);
-            if (pOrigModuleData != nullptr)
-            {
-                ShaderModuleData* pModuleData = nullptr;
-                if (ReplaceShader(pOrigModuleData, &pModuleData) == Result::Success)
-                {
-                    ShaderReplaced = true;
-                    pRestoreModuleData = pOrigModuleData;
-                    const_cast<PipelineShaderInfo*>(&pPipelineInfo->cs)->pModuleData = pModuleData;
-
-                    char shaderHash[64];
-                    auto pHash = reinterpret_cast<const MetroHash::Hash*>(&pRestoreModuleData->hash[0]);
-                    int32_t length = snprintf(shaderHash, 64, "0x%016" PRIX64, MetroHash::Compact64(pHash));
-                    LLPC_UNUSED(length);
-                    LLPC_OUTS("// Shader replacement for shader: " << shaderHash
-                               << ", in pipeline: " << pipelineHashString << "\n");
-                }
-            }
-
-            if (ShaderReplaced)
-            {
-                // Update pipeline hash after shader replacement
-                cacheHash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, true);
-            }
-        }
-    }
 
     if ((result == Result::Success) && EnableOuts())
     {
@@ -1075,23 +993,16 @@ Result Compiler::BuildComputePipeline(
 
     if (result == Result::Success)
     {
-        if (ShaderReplaced)
+        cacheEntryState = pShaderCache->FindShader(cacheHash, true, &hEntry);
+        if (cacheEntryState == ShaderEntryState::Ready)
         {
-            cacheEntryState = ShaderEntryState::Compiling;
-        }
-        else
-        {
-            cacheEntryState = pShaderCache->FindShader(cacheHash, true, &hEntry);
-            if (cacheEntryState == ShaderEntryState::Ready)
+            result = pShaderCache->RetrieveShader(hEntry, &pElf, &elfSize);
+            // Re-try if shader cache return error unknown
+            if (result == Result::ErrorUnknown)
             {
-                result = pShaderCache->RetrieveShader(hEntry, &pElf, &elfSize);
-                // Re-try if shader cache return error unknown
-                if (result == Result::ErrorUnknown)
-                {
-                    result = Result::Success;
-                    hEntry = nullptr;
-                    cacheEntryState = ShaderEntryState::Compiling;
-                }
+                result = Result::Success;
+                hEntry = nullptr;
+                cacheEntryState = ShaderEntryState::Compiling;
             }
         }
     }
@@ -1170,7 +1081,7 @@ Result Compiler::BuildComputePipeline(
             pElf = candidateElfs[candidateIdx].data();
         }
 
-        if ((ShaderReplaced == false) && (hEntry != nullptr))
+        if (hEntry != nullptr)
         {
             if (result == Result::Success)
             {
@@ -1190,18 +1101,24 @@ Result Compiler::BuildComputePipeline(
         if (pPipelineInfo->pfnOutputAlloc != nullptr)
         {
             pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfSize);
+            if (pAllocBuf != nullptr)
+            {
+                uint8_t* pCode = static_cast<uint8_t*>(pAllocBuf);
+                memcpy(pCode, pElf, elfSize);
+
+                pPipelineOut->pipelineBin.codeSize = elfSize;
+                pPipelineOut->pipelineBin.pCode = pCode;
+            }
+            else
+            {
+                result = Result::ErrorOutOfMemory;
+            }
         }
         else
         {
             // Allocator is not specified
             result = Result::ErrorInvalidPointer;
         }
-
-        uint8_t* pCode = static_cast<uint8_t*>(pAllocBuf);
-        memcpy(pCode, pElf, elfSize);
-
-        pPipelineOut->pipelineBin.codeSize = elfSize;
-        pPipelineOut->pipelineBin.pCode = pCode;
     }
 
     if (pPipelineDumpFile != nullptr)
@@ -1218,81 +1135,17 @@ Result Compiler::BuildComputePipeline(
         }
     }
 
-    // Free shader replacement allocations and restore original shader module
-    if (cl::ShaderReplaceMode != ShaderReplaceDisable)
-    {
-        if (pRestoreModuleData != nullptr)
-        {
-            delete reinterpret_cast<const char*>(pPipelineInfo->cs.pModuleData);
-            const_cast<PipelineShaderInfo*>(&pPipelineInfo->cs)->pModuleData = pRestoreModuleData;
-        }
-    }
-
-    if (cl::EnableTimeProfiler)
-    {
-        DumpTimeProfilingResult(&pipelineHash);
-    }
-
-    return result;
-}
-
-// =====================================================================================================================
-// Does shader replacement if it is feasible (files used by replacement exist as expected).
-Result Compiler::ReplaceShader(
-    const ShaderModuleData*     pOrigModuleData,    // [in] Original shader module
-    ShaderModuleData**          ppModuleData        // [out] Resuling shader module after shader replacement
-    ) const
-{
-    auto pModuleHash = reinterpret_cast<const MetroHash::Hash*>(&pOrigModuleData->hash[0]);
-    uint64_t shaderHash = MetroHash::Compact64(pModuleHash);
-
-    char fileName[64];
-    int32_t length = snprintf(fileName, 64, "Shader_0x%016" PRIX64 "_replace.spv", shaderHash);
-    LLPC_UNUSED(length);
-    std::string replaceFileName = cl::ShaderReplaceDir;
-    replaceFileName += "/";
-    replaceFileName += fileName;
-
-    Result result = File::Exists(replaceFileName.c_str()) ? Result::Success : Result::ErrorUnavailable;
-    if (result == Result::Success)
-    {
-        File shaderFile;
-        result = shaderFile.Open(replaceFileName.c_str(), FileAccessRead | FileAccessBinary);
-        if (result == Result::Success)
-        {
-            size_t binSize = File::GetFileSize(replaceFileName.c_str());
-
-            void *pAllocBuf = new char[binSize + sizeof(ShaderModuleData)];
-            ShaderModuleData *pModuleData = reinterpret_cast<ShaderModuleData*>(pAllocBuf);
-            pAllocBuf = VoidPtrInc(pAllocBuf, sizeof(ShaderModuleData));
-
-            void* pShaderBin = pAllocBuf;
-            shaderFile.Read(pShaderBin, binSize, nullptr);
-
-            pModuleData->binType = pOrigModuleData->binType;
-            pModuleData->binCode.codeSize = binSize;
-            pModuleData->binCode.pCode = pShaderBin;
-            MetroHash::Hash hash = {};
-            MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderBin), binSize, hash.bytes);
-            memcpy(&pModuleData->hash, &hash, sizeof(hash));
-
-            *ppModuleData = pModuleData;
-
-            shaderFile.Close();
-        }
-    }
-
     return result;
 }
 
 // =====================================================================================================================
 // Translates SPIR-V binary to machine-independent LLVM module.
-Module* Compiler::TranslateSpirvToLlvm(
+void Compiler::TranslateSpirvToLlvm(
     const BinaryData*           pSpirvBin,           // [in] SPIR-V binary
     ShaderStage                 shaderStage,         // Shader stage
     const char*                 pEntryTarget,        // [in] SPIR-V entry point
     const VkSpecializationInfo* pSpecializationInfo, // [in] Specialization info
-    LLVMContext*                pContext)            // [in] LLPC pipeline context
+    Module*                     pModule)             // [in/out] Module to translate into, initially empty
 {
     BinaryData  optSpirvBin = {};
 
@@ -1319,8 +1172,10 @@ Module* Compiler::TranslateSpirvToLlvm(
         }
     }
 
-    Module* pModule = nullptr;
-    if (readSpirv(*pContext,
+    Context* pContext = static_cast<Context*>(&pModule->getContext());
+    pContext->SetModuleTargetMachine(pModule);
+
+    if (readSpirv(pContext->GetBuilder(),
                   spirvStream,
                   static_cast<spv::ExecutionModel>(shaderStage),
                   pEntryTarget,
@@ -1334,11 +1189,6 @@ Module* Compiler::TranslateSpirvToLlvm(
     }
 
     CleanOptimizedSpirv(&optSpirvBin);
-
-    if (pModule == nullptr)
-    {
-        return nullptr;
-    }
 
     // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we mark it as follows:
     //   * remove the dllexport;
@@ -1367,8 +1217,6 @@ Module* Compiler::TranslateSpirvToLlvm(
             func.setLinkage(GlobalValue::InternalLinkage);
         }
     }
-
-    return pModule;
 }
 
 // =====================================================================================================================
@@ -1430,6 +1278,54 @@ void Compiler::CleanOptimizedSpirv(
 }
 
 // =====================================================================================================================
+// Create pipeline module and link shader modules into it. Frees shader modules.
+Module* Compiler::LinkShaderModules(
+    Context*          pContext, // [in] Context
+    ArrayRef<Module*> modules)  // Shader modules
+{
+    // Create an empty module then link each shader module into it.
+    bool result = true;
+    Module* pPipelineModule = new Module("llpcPipeline", *pContext);
+    pContext->SetModuleTargetMachine(pPipelineModule);
+    Linker linker(*pPipelineModule);
+
+    for (int32_t stage = 0; (stage < ShaderStageCountInternal); ++stage)
+    {
+        Module* pShaderModule = modules[stage];
+        if (pShaderModule == nullptr)
+        {
+            continue;
+        }
+
+        // Ensure the name of the shader entrypoint of this shader does not clash with any other, by qualifying
+        // the name with the shader stage.
+        for (auto& func : *pShaderModule)
+        {
+            if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
+            {
+                func.setName(Twine(LlpcName::EntryPointPrefix) +
+                             GetShaderStageAbbreviation(ShaderStage(stage), true) +
+                             "." +
+                             func.getName());
+            }
+        }
+
+        // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
+        // linked into pipeline module.
+        if (linker.linkInModule(std::unique_ptr<Module>(pShaderModule)))
+        {
+            result = false;
+        }
+    }
+    if (result == false)
+    {
+        delete pPipelineModule;
+        pPipelineModule = nullptr;
+    }
+    return pPipelineModule;
+}
+
+// =====================================================================================================================
 // Builds hash code from compilation-options
 MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     uint32_t          optionCount,    // Count of compilation-option strings
@@ -1441,12 +1337,8 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     {
         cl::PipelineDumpDir.ArgStr,
         cl::EnablePipelineDump.ArgStr,
-        cl::EnableTimeProfiler.ArgStr,
         cl::ShaderCacheFileDir.ArgStr,
         cl::ShaderCacheMode.ArgStr,
-        cl::ShaderReplaceMode.ArgStr,
-        cl::ShaderReplaceDir.ArgStr,
-        cl::ShaderReplacePipelineHashes.ArgStr,
         cl::EnableOuts.ArgStr,
         cl::EnableErrs.ArgStr,
         cl::LogFileDbgs.ArgStr,
@@ -1768,31 +1660,6 @@ void Compiler::ReleaseContext(
 {
     MutexGuard lock(m_contextPoolMutex);
     pContext->SetInUse(false);
-}
-
-// =====================================================================================================================
-// Dumps the result of time profile.
-void Compiler::DumpTimeProfilingResult(
-    const MetroHash::Hash* pHash)   // [in] Pipeline hash
-{
-    int64_t freq = {};
-    freq = GetPerfFrequency();
-
-    char shaderHash[64] = {};
-    snprintf(shaderHash, 64, "0x%016" PRIX64, MetroHash::Compact64(pHash));
-
-    // NOTE: To get correct profile result, we have to disable general info output, so we have to output time profile
-    // result to LLPC_ERRS
-    LLPC_ERRS("Time Profiling Results(General): "
-              << "Hash = " << shaderHash << ", "
-              << "Translate = " << float(g_timeProfileResult.translateTime) / freq << ", "
-              << "SPIR-V Lower = " << float(g_timeProfileResult.lowerTime) / freq << ", "
-              << "LLVM Patch = " << float(g_timeProfileResult.patchTime) / freq << ", "
-              << "Code Generation = " << float(g_timeProfileResult.codeGenTime) / freq << "\n");
-
-    LLPC_ERRS("Time Profiling Results(Special): "
-              << "SPIR-V Lower (Optimization) = " << float(g_timeProfileResult.lowerOptTime) / freq << ", "
-              << "LLVM Patch (Lib Link) = " << float(g_timeProfileResult.patchLinkTime) / freq << "\n");
 }
 
 // =====================================================================================================================

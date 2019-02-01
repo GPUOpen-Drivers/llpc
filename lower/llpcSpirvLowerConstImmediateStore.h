@@ -37,12 +37,12 @@ namespace Llpc
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations for constant immediate store
-class SpirvLowerConstImmediateStore: public llvm::FunctionPass
+class SpirvLowerConstImmediateStore: public SpirvLower
 {
 public:
     SpirvLowerConstImmediateStore();
 
-    virtual bool runOnFunction(llvm::Function& func) override;
+    virtual bool runOnModule(llvm::Module& module);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -51,6 +51,7 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerConstImmediateStore);
 
+    void ProcessAllocaInsts(llvm::Function* pFunc);
     llvm::StoreInst* FindSingleStore(llvm::AllocaInst* pAlloca);
     void ConvertAllocaToReadOnlyGlobal(llvm::StoreInst* pStoreInst);
 };

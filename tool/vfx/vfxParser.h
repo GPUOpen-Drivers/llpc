@@ -77,8 +77,6 @@ protected:
     std::vector<Section*>  m_sections[SectionTypeNameNum]; // Contains sections
     std::vector<Section*>  m_sectionList;
     std::string            m_errorMsg;                     // Error message
-
-private:
     std::string            m_fileName;                     // Name of source file
 };
 

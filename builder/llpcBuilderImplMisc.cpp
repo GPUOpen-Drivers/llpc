@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,58 +24,35 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcPassLoopInfoCollect.h
- * @brief LLPC header file: contains declaration of class Llpc::PassLoopInfoCollect.
+ * @file  llpcBuilderImplMisc.cpp
+ * @brief LLPC source file: implementation of miscellaneous Builder methods
  ***********************************************************************************************************************
  */
-#pragma once
+#include "llpcBuilderImpl.h"
+#include "llpcContext.h"
 
-#include "llvm/Analysis/CallGraph.h"
-#include "llvm/Analysis/LoopPass.h"
-#include "llpc.h"
-#include "llpcPipelineShaders.h"
+#include "llvm/IR/Intrinsics.h"
 
-namespace llvm
-{
+#define DEBUG_TYPE "llpc-builder-impl-misc"
 
-class PassRegistry;
-void initializePassLoopInfoCollectPass(PassRegistry&);
-
-} // llvm
-
-namespace Llpc
-{
+using namespace Llpc;
+using namespace llvm;
 
 // =====================================================================================================================
-// Represents the LLVM pass for determining whether dynamic loop unroll is needed
-class PassLoopInfoCollect : public llvm::ModulePass
+// Create a "kill". Only allowed in a fragment shader.
+Instruction* BuilderImplMisc::CreateKill(
+    const Twine& name) // [in] Name to give instruction(s)
 {
-public:
-    PassLoopInfoCollect() : ModulePass(ID) {}
-    PassLoopInfoCollect(bool* pNeedDynamicLoopUnroll);
+    // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
+    // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
+    // section of code containing the kill.
+    auto pFsResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
+    pFsResUsage->builtInUsage.fs.discard = true;
 
-    // Gets loop analysis usage
-    virtual void getAnalysisUsage(llvm::AnalysisUsage &analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineShaders>();
-        analysisUsage.addRequired<llvm::LoopInfoWrapperPass>();
-        analysisUsage.setPreservesAll();
-    }
+    return CreateIntrinsic(Intrinsic::amdgcn_kill,
+                           ArrayRef<Type *>(),
+                           Constant::getNullValue(Type::getInt1Ty(getContext())),
+                           nullptr,
+                           name);
+}
 
-    virtual bool runOnModule(llvm::Module& module) override;
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    static char ID;   // ID of this pass
-
-private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(PassLoopInfoCollect);
-
-    bool NeedDynamicLoopUnroll(const llvm::Loop* pLoop);
-
-    // -----------------------------------------------------------------------------------------------------------------
-
-    bool*                           m_pNeedDynamicLoopUnroll;   // Pointer to flag that this pass writes to say whether
-};
-
-} // Llpc

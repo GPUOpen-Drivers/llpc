@@ -407,6 +407,11 @@ getOrInsert(MapTy &Map, typename MapTy::key_type Key, FuncTy Func) {
   return NF;
 }
 
+template<typename T>
+inline T roundUpToMultiple(T Op, T Alignment) {
+  return (((Op + (Alignment - 1)) / Alignment) * Alignment);
+}
+
 } // namespace SPIRV
 
 #endif // SPIRV_LIBSPIRV_SPIRVUTIL_H

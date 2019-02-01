@@ -38,8 +38,6 @@
 namespace Llpc
 {
 
-class PipelineShaders;
-
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for algebraic transformation.
 class SpirvLowerAlgebraTransform:
@@ -52,8 +50,6 @@ public:
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const
     {
         analysisUsage.addRequired<llvm::TargetLibraryInfoWrapperPass>();
-        analysisUsage.addRequired<PipelineShaders>();
-        analysisUsage.addPreserved<PipelineShaders>();
     }
 
     virtual bool runOnModule(llvm::Module& module);
@@ -66,7 +62,6 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerAlgebraTransform);
 
-    void ProcessShader();
     bool IsOperandNoContract(llvm::Value* pOperand);
 
     bool m_enableConstFolding; // Whether enable constant folding in this pass

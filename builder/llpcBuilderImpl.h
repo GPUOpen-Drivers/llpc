@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,37 +24,60 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerGlobalConstExprRemove.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerGlobalConstExprRemove
+ * @file  llpcBuilderImpl.h
+ * @brief LLPC header file: declaration of Llpc::Builder implementation classes
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llpcSpirvLower.h"
+#include "llpcBuilder.h"
 
 namespace Llpc
 {
 
+class Context;
+
 // =====================================================================================================================
-// Pass to remove constant expressions that directly or indirectly involve global variables that are lowered in
-// SpirvLowerGlobal
-//
-// Global variable, inlcude general global variable, input and output is a special constant variable, so if
-// it is referenced by constant expression, we need translate constant expression to normal instruction first,
-// Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
-class SpirvLowerGlobalConstExprRemove : public SpirvLower
+// Builder implementation base class
+class BuilderImplBase : virtual public Builder
 {
 public:
-    static char ID;
-    SpirvLowerGlobalConstExprRemove() : SpirvLower(ID)
-    {
-        initializeSpirvLowerGlobalConstExprRemovePass(*llvm::PassRegistry::getPassRegistry());
-    }
+    BuilderImplBase(llvm::LLVMContext& context) : Builder(context) {}
 
-    bool runOnModule(llvm::Module& module) override;
+    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
+    Llpc::Context &getContext() const;
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerGlobalConstExprRemove);
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
+};
+
+// =====================================================================================================================
+// Builder implementation subclass for misc. operations
+class BuilderImplMisc : public BuilderImplBase
+{
+public:
+    BuilderImplMisc(llvm::LLVMContext& context) : Builder(context), BuilderImplBase(context) {}
+
+    // Create a "kill". Only allowed in a fragment shader.
+    llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override;
+
+private:
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMisc)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplMisc)
+};
+
+// =====================================================================================================================
+// The Builder implementation, encompassing all the individual builder implementation subclasses
+class BuilderImpl : public BuilderImplMisc
+{
+public:
+    BuilderImpl(llvm::LLVMContext& context) : Builder(context), BuilderImplMisc(context) {}
+    ~BuilderImpl() {}
+
+private:
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImpl)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImpl)
 };
 
 } // Llpc

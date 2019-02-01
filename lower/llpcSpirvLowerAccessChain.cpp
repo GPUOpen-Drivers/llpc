@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerAccessChain.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-access-chain"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -37,6 +35,8 @@
 #include <stack>
 #include "SPIRVInternal.h"
 #include "llpcSpirvLowerAccessChain.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-access-chain"
 
 using namespace llvm;
 using namespace SPIRV;

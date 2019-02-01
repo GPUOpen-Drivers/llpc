@@ -16693,7 +16693,13 @@ union GCEA_PERFCOUNTER_RSLT_CNTL {
 union GC_CAC_ACC_BCI0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16716,7 +16722,13 @@ union GC_CAC_ACC_BCI1 {
 union GC_CAC_ACC_CB0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16726,7 +16738,13 @@ union GC_CAC_ACC_CB0 {
 union GC_CAC_ACC_CB1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16736,7 +16754,13 @@ union GC_CAC_ACC_CB1 {
 union GC_CAC_ACC_CB2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16746,7 +16770,13 @@ union GC_CAC_ACC_CB2 {
 union GC_CAC_ACC_CB3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16808,7 +16838,13 @@ union GC_CAC_ACC_CBR3 {
 union GC_CAC_ACC_CP0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16818,7 +16854,13 @@ union GC_CAC_ACC_CP0 {
 union GC_CAC_ACC_CP1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16828,7 +16870,13 @@ union GC_CAC_ACC_CP1 {
 union GC_CAC_ACC_CP2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16838,7 +16886,13 @@ union GC_CAC_ACC_CP2 {
 union GC_CAC_ACC_CU0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16848,7 +16902,13 @@ union GC_CAC_ACC_CU0 {
 union GC_CAC_ACC_CU1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -16858,7 +16918,13 @@ union GC_CAC_ACC_CU1 {
 union GC_CAC_ACC_CU2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17037,7 +17103,13 @@ union GC_CAC_ACC_CU15 {
 union GC_CAC_ACC_DB0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17047,7 +17119,13 @@ union GC_CAC_ACC_DB0 {
 union GC_CAC_ACC_DB1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17057,7 +17135,13 @@ union GC_CAC_ACC_DB1 {
 union GC_CAC_ACC_DB2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17067,7 +17151,13 @@ union GC_CAC_ACC_DB2 {
 union GC_CAC_ACC_DB3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17129,7 +17219,13 @@ union GC_CAC_ACC_DBR3 {
 union GC_CAC_ACC_EA0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17139,7 +17235,13 @@ union GC_CAC_ACC_EA0 {
 union GC_CAC_ACC_EA1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17149,7 +17251,13 @@ union GC_CAC_ACC_EA1 {
 union GC_CAC_ACC_EA2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17159,7 +17267,13 @@ union GC_CAC_ACC_EA2 {
 union GC_CAC_ACC_EA3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17169,7 +17283,13 @@ union GC_CAC_ACC_EA3 {
 union GC_CAC_ACC_EA4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17179,7 +17299,13 @@ union GC_CAC_ACC_EA4 {
 union GC_CAC_ACC_EA5 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17189,7 +17315,13 @@ union GC_CAC_ACC_EA5 {
 union GC_CAC_ACC_GDS0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17199,7 +17331,13 @@ union GC_CAC_ACC_GDS0 {
 union GC_CAC_ACC_GDS1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17209,7 +17347,13 @@ union GC_CAC_ACC_GDS1 {
 union GC_CAC_ACC_GDS2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17219,7 +17363,13 @@ union GC_CAC_ACC_GDS2 {
 union GC_CAC_ACC_GDS3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17229,7 +17379,13 @@ union GC_CAC_ACC_GDS3 {
 union GC_CAC_ACC_IA0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17239,7 +17395,13 @@ union GC_CAC_ACC_IA0 {
 union GC_CAC_ACC_LDS0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17249,7 +17411,13 @@ union GC_CAC_ACC_LDS0 {
 union GC_CAC_ACC_LDS1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17259,7 +17427,13 @@ union GC_CAC_ACC_LDS1 {
 union GC_CAC_ACC_LDS2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17269,7 +17443,13 @@ union GC_CAC_ACC_LDS2 {
 union GC_CAC_ACC_LDS3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17279,7 +17459,13 @@ union GC_CAC_ACC_LDS3 {
 union GC_CAC_ACC_PA0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17289,7 +17475,13 @@ union GC_CAC_ACC_PA0 {
 union GC_CAC_ACC_PA1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17299,7 +17491,13 @@ union GC_CAC_ACC_PA1 {
 union GC_CAC_ACC_PC0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17309,7 +17507,10 @@ union GC_CAC_ACC_PC0 {
 union GC_CAC_ACC_PG0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17319,7 +17520,13 @@ union GC_CAC_ACC_PG0 {
 union GC_CAC_ACC_RMI0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17329,7 +17536,13 @@ union GC_CAC_ACC_RMI0 {
 union GC_CAC_ACC_SC0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17339,7 +17552,13 @@ union GC_CAC_ACC_SC0 {
 union GC_CAC_ACC_SPI0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17349,7 +17568,13 @@ union GC_CAC_ACC_SPI0 {
 union GC_CAC_ACC_SPI1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17359,7 +17584,13 @@ union GC_CAC_ACC_SPI1 {
 union GC_CAC_ACC_SPI2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17369,7 +17600,13 @@ union GC_CAC_ACC_SPI2 {
 union GC_CAC_ACC_SPI3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17379,7 +17616,13 @@ union GC_CAC_ACC_SPI3 {
 union GC_CAC_ACC_SPI4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17389,7 +17632,13 @@ union GC_CAC_ACC_SPI4 {
 union GC_CAC_ACC_SPI5 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17399,7 +17648,13 @@ union GC_CAC_ACC_SPI5 {
 union GC_CAC_ACC_SQ0_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17408,13 +17663,21 @@ union GC_CAC_ACC_SQ0_LOWER {
 
 union GC_CAC_ACC_SQ0_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17424,7 +17687,13 @@ union GC_CAC_ACC_SQ0_UPPER {
 union GC_CAC_ACC_SQ1_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17433,13 +17702,21 @@ union GC_CAC_ACC_SQ1_LOWER {
 
 union GC_CAC_ACC_SQ1_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17449,7 +17726,13 @@ union GC_CAC_ACC_SQ1_UPPER {
 union GC_CAC_ACC_SQ2_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17458,13 +17741,21 @@ union GC_CAC_ACC_SQ2_LOWER {
 
 union GC_CAC_ACC_SQ2_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17474,7 +17765,13 @@ union GC_CAC_ACC_SQ2_UPPER {
 union GC_CAC_ACC_SQ3_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17483,13 +17780,21 @@ union GC_CAC_ACC_SQ3_LOWER {
 
 union GC_CAC_ACC_SQ3_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17499,7 +17804,13 @@ union GC_CAC_ACC_SQ3_UPPER {
 union GC_CAC_ACC_SQ4_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17508,13 +17819,21 @@ union GC_CAC_ACC_SQ4_LOWER {
 
 union GC_CAC_ACC_SQ4_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17524,7 +17843,13 @@ union GC_CAC_ACC_SQ4_UPPER {
 union GC_CAC_ACC_SQ5_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17533,13 +17858,21 @@ union GC_CAC_ACC_SQ5_LOWER {
 
 union GC_CAC_ACC_SQ5_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17549,7 +17882,13 @@ union GC_CAC_ACC_SQ5_UPPER {
 union GC_CAC_ACC_SQ6_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17558,13 +17897,21 @@ union GC_CAC_ACC_SQ6_LOWER {
 
 union GC_CAC_ACC_SQ6_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17574,7 +17921,13 @@ union GC_CAC_ACC_SQ6_UPPER {
 union GC_CAC_ACC_SQ7_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17583,13 +17936,21 @@ union GC_CAC_ACC_SQ7_LOWER {
 
 union GC_CAC_ACC_SQ7_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17599,7 +17960,13 @@ union GC_CAC_ACC_SQ7_UPPER {
 union GC_CAC_ACC_SQ8_LOWER {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17608,13 +17975,21 @@ union GC_CAC_ACC_SQ8_LOWER {
 
 union GC_CAC_ACC_SQ8_UPPER {
     struct {
-        unsigned int ACCUMULATOR_39_32                                            :  8;
-        unsigned int                                                              : 24;
-    } gfx09;
-    struct {
         unsigned int                                                              :  8;
         unsigned int UNUSED_0                                                     : 24;
     } gfx09_0;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_39_32                                            :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17624,7 +17999,13 @@ union GC_CAC_ACC_SQ8_UPPER {
 union GC_CAC_ACC_SX0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17634,7 +18015,13 @@ union GC_CAC_ACC_SX0 {
 union GC_CAC_ACC_SXRB0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17644,7 +18031,13 @@ union GC_CAC_ACC_SXRB0 {
 union GC_CAC_ACC_SXRB1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17654,7 +18047,13 @@ union GC_CAC_ACC_SXRB1 {
 union GC_CAC_ACC_TA0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17664,7 +18063,13 @@ union GC_CAC_ACC_TA0 {
 union GC_CAC_ACC_TCC0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17674,7 +18079,13 @@ union GC_CAC_ACC_TCC0 {
 union GC_CAC_ACC_TCC1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17684,7 +18095,13 @@ union GC_CAC_ACC_TCC1 {
 union GC_CAC_ACC_TCC2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17694,7 +18111,13 @@ union GC_CAC_ACC_TCC2 {
 union GC_CAC_ACC_TCC3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17704,7 +18127,13 @@ union GC_CAC_ACC_TCC3 {
 union GC_CAC_ACC_TCC4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17714,7 +18143,13 @@ union GC_CAC_ACC_TCC4 {
 union GC_CAC_ACC_TCP0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17724,7 +18159,13 @@ union GC_CAC_ACC_TCP0 {
 union GC_CAC_ACC_TCP1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17734,7 +18175,13 @@ union GC_CAC_ACC_TCP1 {
 union GC_CAC_ACC_TCP2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17744,7 +18191,13 @@ union GC_CAC_ACC_TCP2 {
 union GC_CAC_ACC_TCP3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17754,7 +18207,13 @@ union GC_CAC_ACC_TCP3 {
 union GC_CAC_ACC_TCP4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17764,7 +18223,13 @@ union GC_CAC_ACC_TCP4 {
 union GC_CAC_ACC_TD0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17774,7 +18239,13 @@ union GC_CAC_ACC_TD0 {
 union GC_CAC_ACC_TD1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17784,7 +18255,13 @@ union GC_CAC_ACC_TD1 {
 union GC_CAC_ACC_TD2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17794,7 +18271,13 @@ union GC_CAC_ACC_TD2 {
 union GC_CAC_ACC_TD3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17804,7 +18287,13 @@ union GC_CAC_ACC_TD3 {
 union GC_CAC_ACC_TD4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17814,7 +18303,13 @@ union GC_CAC_ACC_TD4 {
 union GC_CAC_ACC_TD5 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17824,7 +18319,13 @@ union GC_CAC_ACC_TD5 {
 union GC_CAC_ACC_UTCL2_ATCL20 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17834,7 +18335,13 @@ union GC_CAC_ACC_UTCL2_ATCL20 {
 union GC_CAC_ACC_UTCL2_ATCL21 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17844,7 +18351,13 @@ union GC_CAC_ACC_UTCL2_ATCL21 {
 union GC_CAC_ACC_UTCL2_ATCL22 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17854,7 +18367,13 @@ union GC_CAC_ACC_UTCL2_ATCL22 {
 union GC_CAC_ACC_UTCL2_ATCL23 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17864,7 +18383,13 @@ union GC_CAC_ACC_UTCL2_ATCL23 {
 union GC_CAC_ACC_UTCL2_ATCL24 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17874,7 +18399,13 @@ union GC_CAC_ACC_UTCL2_ATCL24 {
 union GC_CAC_ACC_UTCL2_ROUTER0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17884,7 +18415,13 @@ union GC_CAC_ACC_UTCL2_ROUTER0 {
 union GC_CAC_ACC_UTCL2_ROUTER1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17894,7 +18431,13 @@ union GC_CAC_ACC_UTCL2_ROUTER1 {
 union GC_CAC_ACC_UTCL2_ROUTER2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17904,7 +18447,13 @@ union GC_CAC_ACC_UTCL2_ROUTER2 {
 union GC_CAC_ACC_UTCL2_ROUTER3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17914,7 +18463,13 @@ union GC_CAC_ACC_UTCL2_ROUTER3 {
 union GC_CAC_ACC_UTCL2_ROUTER4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17924,7 +18479,13 @@ union GC_CAC_ACC_UTCL2_ROUTER4 {
 union GC_CAC_ACC_UTCL2_ROUTER5 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17934,7 +18495,13 @@ union GC_CAC_ACC_UTCL2_ROUTER5 {
 union GC_CAC_ACC_UTCL2_ROUTER6 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17944,7 +18511,13 @@ union GC_CAC_ACC_UTCL2_ROUTER6 {
 union GC_CAC_ACC_UTCL2_ROUTER7 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17954,7 +18527,13 @@ union GC_CAC_ACC_UTCL2_ROUTER7 {
 union GC_CAC_ACC_UTCL2_ROUTER8 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17964,7 +18543,13 @@ union GC_CAC_ACC_UTCL2_ROUTER8 {
 union GC_CAC_ACC_UTCL2_ROUTER9 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17974,7 +18559,13 @@ union GC_CAC_ACC_UTCL2_ROUTER9 {
 union GC_CAC_ACC_UTCL2_VML20 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17984,7 +18575,13 @@ union GC_CAC_ACC_UTCL2_VML20 {
 union GC_CAC_ACC_UTCL2_VML21 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -17994,7 +18591,13 @@ union GC_CAC_ACC_UTCL2_VML21 {
 union GC_CAC_ACC_UTCL2_VML22 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18004,7 +18607,13 @@ union GC_CAC_ACC_UTCL2_VML22 {
 union GC_CAC_ACC_UTCL2_VML23 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18014,7 +18623,13 @@ union GC_CAC_ACC_UTCL2_VML23 {
 union GC_CAC_ACC_UTCL2_VML24 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18024,7 +18639,13 @@ union GC_CAC_ACC_UTCL2_VML24 {
 union GC_CAC_ACC_UTCL2_WALKER0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18034,7 +18655,13 @@ union GC_CAC_ACC_UTCL2_WALKER0 {
 union GC_CAC_ACC_UTCL2_WALKER1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18044,7 +18671,13 @@ union GC_CAC_ACC_UTCL2_WALKER1 {
 union GC_CAC_ACC_UTCL2_WALKER2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18054,7 +18687,13 @@ union GC_CAC_ACC_UTCL2_WALKER2 {
 union GC_CAC_ACC_UTCL2_WALKER3 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18064,7 +18703,13 @@ union GC_CAC_ACC_UTCL2_WALKER3 {
 union GC_CAC_ACC_UTCL2_WALKER4 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18074,7 +18719,13 @@ union GC_CAC_ACC_UTCL2_WALKER4 {
 union GC_CAC_ACC_VGT0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18084,7 +18735,13 @@ union GC_CAC_ACC_VGT0 {
 union GC_CAC_ACC_VGT1 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18094,7 +18751,13 @@ union GC_CAC_ACC_VGT1 {
 union GC_CAC_ACC_VGT2 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18104,7 +18767,13 @@ union GC_CAC_ACC_VGT2 {
 union GC_CAC_ACC_WD0 {
     struct {
         unsigned int ACCUMULATOR_31_0                                             : 32;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } rv2x;
+    struct {
+        unsigned int ACCUMULATOR_31_0                                             : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18147,21 +18816,31 @@ union GC_CAC_CGTT_CLK_CTRL {
 
 union GC_CAC_CNTL {
     struct {
-        unsigned int                                                              :  1;
-        unsigned int CAC_THRESHOLD                                                : 16;
-        unsigned int CAC_BLOCK_ID                                                 :  6;
-        unsigned int CAC_SIGNAL_ID                                                :  8;
-        unsigned int                                                              :  1;
-    } gfx09;
-    struct {
         unsigned int CAC_ENABLE                                                   :  1;
         unsigned int                                                              : 30;
         unsigned int UNUSED_0                                                     :  1;
     } gfx09_0;
     struct {
+        unsigned int                                                              :  1;
+        unsigned int CAC_THRESHOLD                                                : 16;
+        unsigned int CAC_BLOCK_ID                                                 :  6;
+        unsigned int CAC_SIGNAL_ID                                                :  8;
+        unsigned int                                                              :  1;
+    } rv1x;
+    struct {
         unsigned int CAC_ENABLE                                                   :  1;
-        unsigned int                                                              : 31;
+        unsigned int CAC_THRESHOLD                                                : 16;
+        unsigned int CAC_BLOCK_ID                                                 :  6;
+        unsigned int CAC_SIGNAL_ID                                                :  8;
+        unsigned int                                                              :  1;
     } rv2x;
+    struct {
+        unsigned int                                                              :  1;
+        unsigned int CAC_THRESHOLD                                                : 16;
+        unsigned int CAC_BLOCK_ID                                                 :  6;
+        unsigned int CAC_SIGNAL_ID                                                :  8;
+        unsigned int                                                              :  1;
+    } vega;
     struct {
         unsigned int CAC_FORCE_DISABLE                                            :  1;
         unsigned int                                                              : 31;
@@ -18271,7 +18950,17 @@ union GC_CAC_OVRD_CB {
         unsigned int OVRRD_SELECT                                                 :  4;
         unsigned int OVRRD_VALUE                                                  :  4;
         unsigned int                                                              : 24;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18300,7 +18989,17 @@ union GC_CAC_OVRD_CP {
         unsigned int OVRRD_SELECT                                                 :  3;
         unsigned int OVRRD_VALUE                                                  :  3;
         unsigned int                                                              : 26;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  3;
+        unsigned int OVRRD_VALUE                                                  :  3;
+        unsigned int                                                              : 26;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  3;
+        unsigned int OVRRD_VALUE                                                  :  3;
+        unsigned int                                                              : 26;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18312,7 +19011,17 @@ union GC_CAC_OVRD_CU {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18324,7 +19033,17 @@ union GC_CAC_OVRD_DB {
         unsigned int OVRRD_SELECT                                                 :  4;
         unsigned int OVRRD_VALUE                                                  :  4;
         unsigned int                                                              : 24;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18353,7 +19072,17 @@ union GC_CAC_OVRD_EA {
         unsigned int OVRRD_SELECT                                                 :  6;
         unsigned int OVRRD_VALUE                                                  :  6;
         unsigned int                                                              : 20;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  6;
+        unsigned int OVRRD_VALUE                                                  :  6;
+        unsigned int                                                              : 20;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  6;
+        unsigned int OVRRD_VALUE                                                  :  6;
+        unsigned int                                                              : 20;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18365,7 +19094,17 @@ union GC_CAC_OVRD_GDS {
         unsigned int OVRRD_SELECT                                                 :  4;
         unsigned int OVRRD_VALUE                                                  :  4;
         unsigned int                                                              : 24;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18377,7 +19116,17 @@ union GC_CAC_OVRD_IA {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18389,7 +19138,17 @@ union GC_CAC_OVRD_LDS {
         unsigned int OVRRD_SELECT                                                 :  4;
         unsigned int OVRRD_VALUE                                                  :  4;
         unsigned int                                                              : 24;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  4;
+        unsigned int OVRRD_VALUE                                                  :  4;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18401,7 +19160,17 @@ union GC_CAC_OVRD_PA {
         unsigned int OVRRD_SELECT                                                 :  2;
         unsigned int OVRRD_VALUE                                                  :  2;
         unsigned int                                                              : 28;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  2;
+        unsigned int OVRRD_VALUE                                                  :  2;
+        unsigned int                                                              : 28;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  2;
+        unsigned int OVRRD_VALUE                                                  :  2;
+        unsigned int                                                              : 28;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18413,7 +19182,17 @@ union GC_CAC_OVRD_PC {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18424,7 +19203,11 @@ union GC_CAC_OVRD_PG {
     struct {
         unsigned int OVRRD_SELECT                                                 : 16;
         unsigned int OVRRD_VALUE                                                  : 16;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 : 16;
+        unsigned int OVRRD_VALUE                                                  : 16;
+    } rv2x;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18436,7 +19219,17 @@ union GC_CAC_OVRD_RMI {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18448,7 +19241,17 @@ union GC_CAC_OVRD_SC {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18460,7 +19263,17 @@ union GC_CAC_OVRD_SPI {
         unsigned int OVRRD_SELECT                                                 :  6;
         unsigned int OVRRD_VALUE                                                  :  6;
         unsigned int                                                              : 20;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  6;
+        unsigned int OVRRD_VALUE                                                  :  6;
+        unsigned int                                                              : 20;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  6;
+        unsigned int OVRRD_VALUE                                                  :  6;
+        unsigned int                                                              : 20;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18472,7 +19285,17 @@ union GC_CAC_OVRD_SQ {
         unsigned int OVRRD_SELECT                                                 :  9;
         unsigned int OVRRD_VALUE                                                  :  9;
         unsigned int                                                              : 14;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  9;
+        unsigned int OVRRD_VALUE                                                  :  9;
+        unsigned int                                                              : 14;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  9;
+        unsigned int OVRRD_VALUE                                                  :  9;
+        unsigned int                                                              : 14;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18484,7 +19307,17 @@ union GC_CAC_OVRD_SX {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18496,7 +19329,17 @@ union GC_CAC_OVRD_SXRB {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18508,7 +19351,17 @@ union GC_CAC_OVRD_TA {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18520,7 +19373,17 @@ union GC_CAC_OVRD_TCC {
         unsigned int OVRRD_SELECT                                                 :  5;
         unsigned int OVRRD_VALUE                                                  :  5;
         unsigned int                                                              : 22;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18532,7 +19395,17 @@ union GC_CAC_OVRD_TCP {
         unsigned int OVRRD_SELECT                                                 :  5;
         unsigned int OVRRD_VALUE                                                  :  5;
         unsigned int                                                              : 22;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18544,7 +19417,17 @@ union GC_CAC_OVRD_TD {
         unsigned int OVRRD_SELECT                                                 :  6;
         unsigned int OVRRD_VALUE                                                  :  6;
         unsigned int                                                              : 20;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  6;
+        unsigned int OVRRD_VALUE                                                  :  6;
+        unsigned int                                                              : 20;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  6;
+        unsigned int OVRRD_VALUE                                                  :  6;
+        unsigned int                                                              : 20;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18556,7 +19439,17 @@ union GC_CAC_OVRD_UTCL2_ATCL2 {
         unsigned int OVRRD_SELECT                                                 :  5;
         unsigned int OVRRD_VALUE                                                  :  5;
         unsigned int                                                              : 22;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18568,7 +19461,17 @@ union GC_CAC_OVRD_UTCL2_ROUTER {
         unsigned int OVRRD_SELECT                                                 : 10;
         unsigned int OVRRD_VALUE                                                  : 10;
         unsigned int                                                              : 12;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 : 10;
+        unsigned int OVRRD_VALUE                                                  : 10;
+        unsigned int                                                              : 12;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 : 10;
+        unsigned int OVRRD_VALUE                                                  : 10;
+        unsigned int                                                              : 12;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18580,7 +19483,17 @@ union GC_CAC_OVRD_UTCL2_VML2 {
         unsigned int OVRRD_SELECT                                                 :  5;
         unsigned int OVRRD_VALUE                                                  :  5;
         unsigned int                                                              : 22;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18592,7 +19505,17 @@ union GC_CAC_OVRD_UTCL2_WALKER {
         unsigned int OVRRD_SELECT                                                 :  5;
         unsigned int OVRRD_VALUE                                                  :  5;
         unsigned int                                                              : 22;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  5;
+        unsigned int OVRRD_VALUE                                                  :  5;
+        unsigned int                                                              : 22;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18604,7 +19527,17 @@ union GC_CAC_OVRD_VGT {
         unsigned int OVRRD_SELECT                                                 :  3;
         unsigned int OVRRD_VALUE                                                  :  3;
         unsigned int                                                              : 26;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  3;
+        unsigned int OVRRD_VALUE                                                  :  3;
+        unsigned int                                                              : 26;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  3;
+        unsigned int OVRRD_VALUE                                                  :  3;
+        unsigned int                                                              : 26;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18616,7 +19549,17 @@ union GC_CAC_OVRD_WD {
         unsigned int OVRRD_SELECT                                                 :  1;
         unsigned int OVRRD_VALUE                                                  :  1;
         unsigned int                                                              : 30;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } rv2x;
+    struct {
+        unsigned int OVRRD_SELECT                                                 :  1;
+        unsigned int OVRRD_VALUE                                                  :  1;
+        unsigned int                                                              : 30;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18626,7 +19569,13 @@ union GC_CAC_OVRD_WD {
 union GC_CAC_OVR_SEL {
     struct {
         unsigned int CAC_OVR_SEL                                                  : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int CAC_OVR_SEL                                                  : 32;
+    } rv2x;
+    struct {
+        unsigned int CAC_OVR_SEL                                                  : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18636,7 +19585,13 @@ union GC_CAC_OVR_SEL {
 union GC_CAC_OVR_VAL {
     struct {
         unsigned int CAC_OVR_VAL                                                  : 32;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int CAC_OVR_VAL                                                  : 32;
+    } rv2x;
+    struct {
+        unsigned int CAC_OVR_VAL                                                  : 32;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18681,14 +19636,14 @@ union GC_CAC_SOFT_CTRL {
 union GC_CAC_WEIGHT_BCI_0 {
     struct {
         unsigned int WEIGHT_BCI_SIG0                                              : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
-        unsigned int                                                              : 16;
         unsigned int WEIGHT_BCI_SIG1                                              : 16;
     } rv1x;
     struct {
+        unsigned int WEIGHT_BCI_SIG0                                              : 16;
         unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_BCI_SIG0                                              : 16;
         unsigned int WEIGHT_BCI_SIG1                                              : 16;
     } vega;
 
@@ -18731,7 +19686,15 @@ union GC_CAC_WEIGHT_CB_0 {
     struct {
         unsigned int WEIGHT_CB_SIG0                                               : 16;
         unsigned int WEIGHT_CB_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_CB_SIG0                                               : 16;
+        unsigned int WEIGHT_CB_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_CB_SIG0                                               : 16;
+        unsigned int WEIGHT_CB_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18742,7 +19705,15 @@ union GC_CAC_WEIGHT_CB_1 {
     struct {
         unsigned int WEIGHT_CB_SIG2                                               : 16;
         unsigned int WEIGHT_CB_SIG3                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_CB_SIG2                                               : 16;
+        unsigned int WEIGHT_CB_SIG3                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_CB_SIG2                                               : 16;
+        unsigned int WEIGHT_CB_SIG3                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18753,7 +19724,15 @@ union GC_CAC_WEIGHT_CP_0 {
     struct {
         unsigned int WEIGHT_CP_SIG0                                               : 16;
         unsigned int WEIGHT_CP_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_CP_SIG0                                               : 16;
+        unsigned int WEIGHT_CP_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_CP_SIG0                                               : 16;
+        unsigned int WEIGHT_CP_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18762,13 +19741,21 @@ union GC_CAC_WEIGHT_CP_0 {
 
 union GC_CAC_WEIGHT_CP_1 {
     struct {
-        unsigned int WEIGHT_CP_SIG2                                               : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_CP_SIG2                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_CP_SIG2                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_CP_SIG2                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18777,17 +19764,21 @@ union GC_CAC_WEIGHT_CP_1 {
 
 union GC_CAC_WEIGHT_CU_0 {
     struct {
-        unsigned int WEIGHT_CU_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int WEIGHT_CU_SIG1                                               : 16;
     } gfx09_0;
     struct {
+        unsigned int WEIGHT_CU_SIG0                                               : 16;
         unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_CU_SIG0                                               : 16;
         unsigned int WEIGHT_CU_SIG1                                               : 16;
     } rv2x;
+    struct {
+        unsigned int WEIGHT_CU_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18909,7 +19900,15 @@ union GC_CAC_WEIGHT_DB_0 {
     struct {
         unsigned int WEIGHT_DB_SIG0                                               : 16;
         unsigned int WEIGHT_DB_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_DB_SIG0                                               : 16;
+        unsigned int WEIGHT_DB_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_DB_SIG0                                               : 16;
+        unsigned int WEIGHT_DB_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18920,7 +19919,15 @@ union GC_CAC_WEIGHT_DB_1 {
     struct {
         unsigned int WEIGHT_DB_SIG2                                               : 16;
         unsigned int WEIGHT_DB_SIG3                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_DB_SIG2                                               : 16;
+        unsigned int WEIGHT_DB_SIG3                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_DB_SIG2                                               : 16;
+        unsigned int WEIGHT_DB_SIG3                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18931,7 +19938,15 @@ union GC_CAC_WEIGHT_EA_0 {
     struct {
         unsigned int WEIGHT_EA_SIG0                                               : 16;
         unsigned int WEIGHT_EA_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_EA_SIG0                                               : 16;
+        unsigned int WEIGHT_EA_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_EA_SIG0                                               : 16;
+        unsigned int WEIGHT_EA_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18942,7 +19957,15 @@ union GC_CAC_WEIGHT_EA_1 {
     struct {
         unsigned int WEIGHT_EA_SIG2                                               : 16;
         unsigned int WEIGHT_EA_SIG3                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_EA_SIG2                                               : 16;
+        unsigned int WEIGHT_EA_SIG3                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_EA_SIG2                                               : 16;
+        unsigned int WEIGHT_EA_SIG3                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18953,7 +19976,15 @@ union GC_CAC_WEIGHT_EA_2 {
     struct {
         unsigned int WEIGHT_EA_SIG4                                               : 16;
         unsigned int WEIGHT_EA_SIG5                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_EA_SIG4                                               : 16;
+        unsigned int WEIGHT_EA_SIG5                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_EA_SIG4                                               : 16;
+        unsigned int WEIGHT_EA_SIG5                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18962,13 +19993,21 @@ union GC_CAC_WEIGHT_EA_2 {
 
 union GC_CAC_WEIGHT_IA_0 {
     struct {
-        unsigned int WEIGHT_IA_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } bits, bitfields;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_IA_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_IA_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_IA_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18979,7 +20018,15 @@ union GC_CAC_WEIGHT_LDS_0 {
     struct {
         unsigned int WEIGHT_LDS_SIG0                                              : 16;
         unsigned int WEIGHT_LDS_SIG1                                              : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_LDS_SIG0                                              : 16;
+        unsigned int WEIGHT_LDS_SIG1                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_LDS_SIG0                                              : 16;
+        unsigned int WEIGHT_LDS_SIG1                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -18990,7 +20037,15 @@ union GC_CAC_WEIGHT_LDS_1 {
     struct {
         unsigned int WEIGHT_LDS_SIG2                                              : 16;
         unsigned int WEIGHT_LDS_SIG3                                              : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_LDS_SIG2                                              : 16;
+        unsigned int WEIGHT_LDS_SIG3                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_LDS_SIG2                                              : 16;
+        unsigned int WEIGHT_LDS_SIG3                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19001,7 +20056,15 @@ union GC_CAC_WEIGHT_PA_0 {
     struct {
         unsigned int WEIGHT_PA_SIG0                                               : 16;
         unsigned int WEIGHT_PA_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_PA_SIG0                                               : 16;
+        unsigned int WEIGHT_PA_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_PA_SIG0                                               : 16;
+        unsigned int WEIGHT_PA_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19010,13 +20073,21 @@ union GC_CAC_WEIGHT_PA_0 {
 
 union GC_CAC_WEIGHT_PC_0 {
     struct {
-        unsigned int WEIGHT_PC_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_PC_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_PC_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_PC_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19026,12 +20097,12 @@ union GC_CAC_WEIGHT_PC_0 {
 union GC_CAC_WEIGHT_PG_0 {
     struct {
         unsigned int WEIGHT_PG_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } bits, bitfields;
-    struct {
-        unsigned int                                                              : 16;
         unsigned int unused                                                       : 16;
     } rv1x;
+    struct {
+        unsigned int WEIGHT_PG_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19040,13 +20111,21 @@ union GC_CAC_WEIGHT_PG_0 {
 
 union GC_CAC_WEIGHT_RMI_0 {
     struct {
-        unsigned int WEIGHT_RMI_SIG0                                              : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED                                                       : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_RMI_SIG0                                              : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_RMI_SIG0                                              : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_RMI_SIG0                                              : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19055,13 +20134,21 @@ union GC_CAC_WEIGHT_RMI_0 {
 
 union GC_CAC_WEIGHT_SC_0 {
     struct {
-        unsigned int WEIGHT_SC_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_SC_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SC_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SC_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19072,7 +20159,15 @@ union GC_CAC_WEIGHT_SPI_0 {
     struct {
         unsigned int WEIGHT_SPI_SIG0                                              : 16;
         unsigned int WEIGHT_SPI_SIG1                                              : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SPI_SIG0                                              : 16;
+        unsigned int WEIGHT_SPI_SIG1                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SPI_SIG0                                              : 16;
+        unsigned int WEIGHT_SPI_SIG1                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19083,7 +20178,15 @@ union GC_CAC_WEIGHT_SPI_1 {
     struct {
         unsigned int WEIGHT_SPI_SIG2                                              : 16;
         unsigned int WEIGHT_SPI_SIG3                                              : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SPI_SIG2                                              : 16;
+        unsigned int WEIGHT_SPI_SIG3                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SPI_SIG2                                              : 16;
+        unsigned int WEIGHT_SPI_SIG3                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19094,7 +20197,15 @@ union GC_CAC_WEIGHT_SPI_2 {
     struct {
         unsigned int WEIGHT_SPI_SIG4                                              : 16;
         unsigned int WEIGHT_SPI_SIG5                                              : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SPI_SIG4                                              : 16;
+        unsigned int WEIGHT_SPI_SIG5                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SPI_SIG4                                              : 16;
+        unsigned int WEIGHT_SPI_SIG5                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19105,7 +20216,15 @@ union GC_CAC_WEIGHT_SQ_0 {
     struct {
         unsigned int WEIGHT_SQ_SIG0                                               : 16;
         unsigned int WEIGHT_SQ_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG0                                               : 16;
+        unsigned int WEIGHT_SQ_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG0                                               : 16;
+        unsigned int WEIGHT_SQ_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19116,7 +20235,15 @@ union GC_CAC_WEIGHT_SQ_1 {
     struct {
         unsigned int WEIGHT_SQ_SIG2                                               : 16;
         unsigned int WEIGHT_SQ_SIG3                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG2                                               : 16;
+        unsigned int WEIGHT_SQ_SIG3                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG2                                               : 16;
+        unsigned int WEIGHT_SQ_SIG3                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19127,7 +20254,15 @@ union GC_CAC_WEIGHT_SQ_2 {
     struct {
         unsigned int WEIGHT_SQ_SIG4                                               : 16;
         unsigned int WEIGHT_SQ_SIG5                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG4                                               : 16;
+        unsigned int WEIGHT_SQ_SIG5                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG4                                               : 16;
+        unsigned int WEIGHT_SQ_SIG5                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19138,7 +20273,15 @@ union GC_CAC_WEIGHT_SQ_3 {
     struct {
         unsigned int WEIGHT_SQ_SIG6                                               : 16;
         unsigned int WEIGHT_SQ_SIG7                                               : 16;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG6                                               : 16;
+        unsigned int WEIGHT_SQ_SIG7                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG6                                               : 16;
+        unsigned int WEIGHT_SQ_SIG7                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19147,13 +20290,21 @@ union GC_CAC_WEIGHT_SQ_3 {
 
 union GC_CAC_WEIGHT_SQ_4 {
     struct {
-        unsigned int WEIGHT_SQ_SIG8                                               : 16;
-        unsigned int                                                              : 16;
-    } bits, bitfields;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_SQ_SIG8                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG8                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SQ_SIG8                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19162,17 +20313,21 @@ union GC_CAC_WEIGHT_SQ_4 {
 
 union GC_CAC_WEIGHT_SXRB_0 {
     struct {
-        unsigned int WEIGHT_SXRB_SIG0                                             : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int WEIGHT_SXRB_SIG1                                             : 16;
     } gfx09_0;
     struct {
+        unsigned int WEIGHT_SXRB_SIG0                                             : 16;
         unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SXRB_SIG0                                             : 16;
         unsigned int WEIGHT_SXRB_SIG1                                             : 16;
     } rv2x;
+    struct {
+        unsigned int WEIGHT_SXRB_SIG0                                             : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19181,13 +20336,21 @@ union GC_CAC_WEIGHT_SXRB_0 {
 
 union GC_CAC_WEIGHT_SX_0 {
     struct {
-        unsigned int WEIGHT_SX_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_SX_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_SX_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_SX_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19196,13 +20359,21 @@ union GC_CAC_WEIGHT_SX_0 {
 
 union GC_CAC_WEIGHT_TA_0 {
     struct {
-        unsigned int WEIGHT_TA_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_TA_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_TA_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_TA_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19213,7 +20384,15 @@ union GC_CAC_WEIGHT_TD_0 {
     struct {
         unsigned int WEIGHT_TD_SIG0                                               : 16;
         unsigned int WEIGHT_TD_SIG1                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_TD_SIG0                                               : 16;
+        unsigned int WEIGHT_TD_SIG1                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_TD_SIG0                                               : 16;
+        unsigned int WEIGHT_TD_SIG1                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19224,7 +20403,15 @@ union GC_CAC_WEIGHT_TD_1 {
     struct {
         unsigned int WEIGHT_TD_SIG2                                               : 16;
         unsigned int WEIGHT_TD_SIG3                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_TD_SIG2                                               : 16;
+        unsigned int WEIGHT_TD_SIG3                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_TD_SIG2                                               : 16;
+        unsigned int WEIGHT_TD_SIG3                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19235,7 +20422,15 @@ union GC_CAC_WEIGHT_TD_2 {
     struct {
         unsigned int WEIGHT_TD_SIG4                                               : 16;
         unsigned int WEIGHT_TD_SIG5                                               : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_TD_SIG4                                               : 16;
+        unsigned int WEIGHT_TD_SIG5                                               : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_TD_SIG4                                               : 16;
+        unsigned int WEIGHT_TD_SIG5                                               : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19246,7 +20441,15 @@ union GC_CAC_WEIGHT_UTCL2_ATCL2_0 {
     struct {
         unsigned int WEIGHT_UTCL2_ATCL2_SIG0                                      : 16;
         unsigned int WEIGHT_UTCL2_ATCL2_SIG1                                      : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG0                                      : 16;
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG1                                      : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG0                                      : 16;
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG1                                      : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19257,7 +20460,15 @@ union GC_CAC_WEIGHT_UTCL2_ATCL2_1 {
     struct {
         unsigned int WEIGHT_UTCL2_ATCL2_SIG2                                      : 16;
         unsigned int WEIGHT_UTCL2_ATCL2_SIG3                                      : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG2                                      : 16;
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG3                                      : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG2                                      : 16;
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG3                                      : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19266,17 +20477,21 @@ union GC_CAC_WEIGHT_UTCL2_ATCL2_1 {
 
 union GC_CAC_WEIGHT_UTCL2_ATCL2_2 {
     struct {
-        unsigned int WEIGHT_UTCL2_ATCL2_SIG4                                      : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int WEIGHT_UTCL2_ATCL2_SIG5                                      : 16;
     } gfx09_0;
     struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG4                                      : 16;
         unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG4                                      : 16;
         unsigned int WEIGHT_UTCL2_ATCL2_SIG5                                      : 16;
     } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ATCL2_SIG4                                      : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19287,7 +20502,15 @@ union GC_CAC_WEIGHT_UTCL2_ROUTER_0 {
     struct {
         unsigned int WEIGHT_UTCL2_ROUTER_SIG0                                     : 16;
         unsigned int WEIGHT_UTCL2_ROUTER_SIG1                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG0                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG1                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG0                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG1                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19298,7 +20521,15 @@ union GC_CAC_WEIGHT_UTCL2_ROUTER_1 {
     struct {
         unsigned int WEIGHT_UTCL2_ROUTER_SIG2                                     : 16;
         unsigned int WEIGHT_UTCL2_ROUTER_SIG3                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG2                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG3                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG2                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG3                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19309,7 +20540,15 @@ union GC_CAC_WEIGHT_UTCL2_ROUTER_2 {
     struct {
         unsigned int WEIGHT_UTCL2_ROUTER_SIG4                                     : 16;
         unsigned int WEIGHT_UTCL2_ROUTER_SIG5                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG4                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG5                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG4                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG5                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19320,7 +20559,15 @@ union GC_CAC_WEIGHT_UTCL2_ROUTER_3 {
     struct {
         unsigned int WEIGHT_UTCL2_ROUTER_SIG6                                     : 16;
         unsigned int WEIGHT_UTCL2_ROUTER_SIG7                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG6                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG7                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG6                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG7                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19331,7 +20578,15 @@ union GC_CAC_WEIGHT_UTCL2_ROUTER_4 {
     struct {
         unsigned int WEIGHT_UTCL2_ROUTER_SIG8                                     : 16;
         unsigned int WEIGHT_UTCL2_ROUTER_SIG9                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG8                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG9                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG8                                     : 16;
+        unsigned int WEIGHT_UTCL2_ROUTER_SIG9                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19342,7 +20597,15 @@ union GC_CAC_WEIGHT_UTCL2_VML2_0 {
     struct {
         unsigned int WEIGHT_UTCL2_VML2_SIG0                                       : 16;
         unsigned int WEIGHT_UTCL2_VML2_SIG1                                       : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG0                                       : 16;
+        unsigned int WEIGHT_UTCL2_VML2_SIG1                                       : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG0                                       : 16;
+        unsigned int WEIGHT_UTCL2_VML2_SIG1                                       : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19353,7 +20616,15 @@ union GC_CAC_WEIGHT_UTCL2_VML2_1 {
     struct {
         unsigned int WEIGHT_UTCL2_VML2_SIG2                                       : 16;
         unsigned int WEIGHT_UTCL2_VML2_SIG3                                       : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG2                                       : 16;
+        unsigned int WEIGHT_UTCL2_VML2_SIG3                                       : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG2                                       : 16;
+        unsigned int WEIGHT_UTCL2_VML2_SIG3                                       : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19362,17 +20633,21 @@ union GC_CAC_WEIGHT_UTCL2_VML2_1 {
 
 union GC_CAC_WEIGHT_UTCL2_VML2_2 {
     struct {
-        unsigned int WEIGHT_UTCL2_VML2_SIG4                                       : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int WEIGHT_UTCL2_VML2_SIG5                                       : 16;
     } gfx09_0;
     struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG4                                       : 16;
         unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG4                                       : 16;
         unsigned int WEIGHT_UTCL2_VML2_SIG5                                       : 16;
     } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_VML2_SIG4                                       : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19383,7 +20658,15 @@ union GC_CAC_WEIGHT_UTCL2_WALKER_0 {
     struct {
         unsigned int WEIGHT_UTCL2_WALKER_SIG0                                     : 16;
         unsigned int WEIGHT_UTCL2_WALKER_SIG1                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG0                                     : 16;
+        unsigned int WEIGHT_UTCL2_WALKER_SIG1                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG0                                     : 16;
+        unsigned int WEIGHT_UTCL2_WALKER_SIG1                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19394,7 +20677,15 @@ union GC_CAC_WEIGHT_UTCL2_WALKER_1 {
     struct {
         unsigned int WEIGHT_UTCL2_WALKER_SIG2                                     : 16;
         unsigned int WEIGHT_UTCL2_WALKER_SIG3                                     : 16;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG2                                     : 16;
+        unsigned int WEIGHT_UTCL2_WALKER_SIG3                                     : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG2                                     : 16;
+        unsigned int WEIGHT_UTCL2_WALKER_SIG3                                     : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19403,17 +20694,21 @@ union GC_CAC_WEIGHT_UTCL2_WALKER_1 {
 
 union GC_CAC_WEIGHT_UTCL2_WALKER_2 {
     struct {
-        unsigned int WEIGHT_UTCL2_WALKER_SIG4                                     : 16;
-        unsigned int                                                              : 16;
-    } gfx09;
-    struct {
         unsigned int                                                              : 16;
         unsigned int WEIGHT_UTCL2_WALKER_SIG5                                     : 16;
     } gfx09_0;
     struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG4                                     : 16;
         unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG4                                     : 16;
         unsigned int WEIGHT_UTCL2_WALKER_SIG5                                     : 16;
     } rv2x;
+    struct {
+        unsigned int WEIGHT_UTCL2_WALKER_SIG4                                     : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19424,7 +20719,15 @@ union GC_CAC_WEIGHT_VGT_0 {
     struct {
         unsigned int WEIGHT_VGT_SIG0                                              : 16;
         unsigned int WEIGHT_VGT_SIG1                                              : 16;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_VGT_SIG0                                              : 16;
+        unsigned int WEIGHT_VGT_SIG1                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_VGT_SIG0                                              : 16;
+        unsigned int WEIGHT_VGT_SIG1                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19433,13 +20736,21 @@ union GC_CAC_WEIGHT_VGT_0 {
 
 union GC_CAC_WEIGHT_VGT_1 {
     struct {
-        unsigned int WEIGHT_VGT_SIG2                                              : 16;
-        unsigned int                                                              : 16;
-    } bits, bitfields;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_VGT_SIG2                                              : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_VGT_SIG2                                              : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_VGT_SIG2                                              : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -19448,13 +20759,21 @@ union GC_CAC_WEIGHT_VGT_1 {
 
 union GC_CAC_WEIGHT_WD_0 {
     struct {
-        unsigned int WEIGHT_WD_SIG0                                               : 16;
-        unsigned int                                                              : 16;
-    } bits, bitfields;
-    struct {
         unsigned int                                                              : 16;
         unsigned int UNUSED_0                                                     : 16;
     } gfx09_0;
+    struct {
+        unsigned int WEIGHT_WD_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv1x;
+    struct {
+        unsigned int WEIGHT_WD_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } rv2x;
+    struct {
+        unsigned int WEIGHT_WD_SIG0                                               : 16;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -21217,13 +22536,7 @@ union IA_DEBUG_REG0 {
     struct {
         unsigned int                                                              :  2;
         unsigned int ia_busy                                                      :  1;
-        unsigned int                                                              : 25;
-        unsigned int sclk_reg_vld                                                 :  1;
-        unsigned int sclk_core_vld                                                :  1;
-        unsigned int                                                              :  2;
-    } bits, bitfields;
-    struct {
-        unsigned int                                                              :  4;
+        unsigned int                                                              :  1;
         unsigned int SPARE0                                                       :  1;
         unsigned int                                                              :  4;
         unsigned int SPARE1                                                       :  1;
@@ -21232,12 +22545,15 @@ union IA_DEBUG_REG0 {
         unsigned int                                                              :  2;
         unsigned int SPARE3                                                       :  1;
         unsigned int SPARE4                                                       :  1;
-        unsigned int                                                              :  2;
+        unsigned int sclk_reg_vld                                                 :  1;
+        unsigned int sclk_core_vld                                                :  1;
         unsigned int SPARE5                                                       :  1;
         unsigned int                                                              :  1;
     } rv1x;
     struct {
-        unsigned int                                                              :  4;
+        unsigned int                                                              :  2;
+        unsigned int ia_busy                                                      :  1;
+        unsigned int                                                              :  1;
         unsigned int RESERVED0                                                    :  1;
         unsigned int                                                              :  2;
         unsigned int tcarb_busy                                                   :  1;
@@ -21250,12 +22566,15 @@ union IA_DEBUG_REG0 {
         unsigned int                                                              :  2;
         unsigned int RESERVED3                                                    :  1;
         unsigned int RESERVED4                                                    :  1;
-        unsigned int                                                              :  2;
+        unsigned int sclk_reg_vld                                                 :  1;
+        unsigned int sclk_core_vld                                                :  1;
         unsigned int RESERVED5                                                    :  1;
         unsigned int RESERVED6                                                    :  1;
     } rv2x;
     struct {
-        unsigned int                                                              :  4;
+        unsigned int                                                              :  2;
+        unsigned int ia_busy                                                      :  1;
+        unsigned int                                                              :  1;
         unsigned int SPARE0                                                       :  1;
         unsigned int                                                              :  4;
         unsigned int SPARE1                                                       :  1;
@@ -21264,7 +22583,8 @@ union IA_DEBUG_REG0 {
         unsigned int                                                              :  2;
         unsigned int SPARE3                                                       :  1;
         unsigned int SPARE4                                                       :  1;
-        unsigned int                                                              :  2;
+        unsigned int sclk_reg_vld                                                 :  1;
+        unsigned int sclk_core_vld                                                :  1;
         unsigned int SPARE5                                                       :  1;
         unsigned int                                                              :  1;
     } vega;
@@ -21279,12 +22599,19 @@ union IA_DEBUG_REG1 {
         unsigned int                                                              : 15;
         unsigned int dma_data_fifo_full                                           :  1;
         unsigned int                                                              : 16;
-    } bits, bitfields;
+    } rv1x;
     struct {
         unsigned int                                                              :  7;
         unsigned int RESERVED0                                                    :  1;
-        unsigned int                                                              : 24;
+        unsigned int                                                              :  7;
+        unsigned int dma_data_fifo_full                                           :  1;
+        unsigned int                                                              : 16;
     } rv2x;
+    struct {
+        unsigned int                                                              : 15;
+        unsigned int dma_data_fifo_full                                           :  1;
+        unsigned int                                                              : 16;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -31565,7 +32892,11 @@ union PWR_OVERRIDE {
     struct {
         unsigned int VDDCR_CPU_OVERRIDE                                           :  1;
         unsigned int                                                              : 31;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int VDDCR_CPU_OVERRIDE                                           :  1;
+        unsigned int                                                              : 31;
+    } rv2x;
 
     unsigned int u32All;
     signed int   i32All;
@@ -36730,7 +38061,21 @@ union RPB_ATS_CNTL {
         unsigned int                                                              :  6;
         unsigned int INVAL_COM_CMD                                                :  6;
         unsigned int                                                              :  1;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int                                                              : 15;
+        unsigned int ATCTR_SWITCH_NUM                                             :  4;
+        unsigned int                                                              :  6;
+        unsigned int INVAL_COM_CMD                                                :  6;
+        unsigned int                                                              :  1;
+    } rv2x;
+    struct {
+        unsigned int                                                              : 15;
+        unsigned int ATCTR_SWITCH_NUM                                             :  4;
+        unsigned int                                                              :  6;
+        unsigned int INVAL_COM_CMD                                                :  6;
+        unsigned int                                                              :  1;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -36745,7 +38090,23 @@ union RPB_ATS_CNTL2 {
         unsigned int INVAL_COM_ROUTING_CODE                                       :  3;
         unsigned int VENDOR_ID                                                    :  2;
         unsigned int                                                              : 12;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int TRANS_CMD                                                    :  6;
+        unsigned int PAGE_REQ_CMD                                                 :  6;
+        unsigned int PAGE_ROUTING_CODE                                            :  3;
+        unsigned int INVAL_COM_ROUTING_CODE                                       :  3;
+        unsigned int VENDOR_ID                                                    :  2;
+        unsigned int                                                              : 12;
+    } rv2x;
+    struct {
+        unsigned int TRANS_CMD                                                    :  6;
+        unsigned int PAGE_REQ_CMD                                                 :  6;
+        unsigned int PAGE_ROUTING_CODE                                            :  3;
+        unsigned int INVAL_COM_ROUTING_CODE                                       :  3;
+        unsigned int VENDOR_ID                                                    :  2;
+        unsigned int                                                              : 12;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -36769,7 +38130,31 @@ union RPB_BIF_CNTL {
         unsigned int VC0_CHAINED_OVERRIDE                                         :  1;
         unsigned int PARITY_CHECK_EN                                              :  1;
         unsigned int                                                              :  1;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int                                                              : 16;
+        unsigned int ARB_MODE                                                     :  1;
+        unsigned int DRAIN_VC_NUM                                                 :  1;
+        unsigned int SWITCH_ENABLE                                                :  1;
+        unsigned int SWITCH_THRESHOLD                                             :  8;
+        unsigned int PAGE_PRI_EN                                                  :  1;
+        unsigned int TR_PRI_EN                                                    :  1;
+        unsigned int VC0_CHAINED_OVERRIDE                                         :  1;
+        unsigned int PARITY_CHECK_EN                                              :  1;
+        unsigned int                                                              :  1;
+    } rv2x;
+    struct {
+        unsigned int                                                              : 16;
+        unsigned int ARB_MODE                                                     :  1;
+        unsigned int DRAIN_VC_NUM                                                 :  1;
+        unsigned int SWITCH_ENABLE                                                :  1;
+        unsigned int SWITCH_THRESHOLD                                             :  8;
+        unsigned int PAGE_PRI_EN                                                  :  1;
+        unsigned int TR_PRI_EN                                                    :  1;
+        unsigned int VC0_CHAINED_OVERRIDE                                         :  1;
+        unsigned int PARITY_CHECK_EN                                              :  1;
+        unsigned int                                                              :  1;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -36779,9 +38164,7 @@ union RPB_BIF_CNTL {
 union RPB_BLOCKLEVEL_CONF {
     struct {
         unsigned int XPB_BLOCKLEVEL_OVERRIDE                                      :  2;
-        unsigned int                                                              : 14;
-        unsigned int IO_RD_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
-        unsigned int                                                              : 15;
+        unsigned int                                                              : 30;
     } bits, bitfields;
     struct {
         unsigned int                                                              :  2;
@@ -36793,10 +38176,38 @@ union RPB_BLOCKLEVEL_CONF {
         unsigned int ATOMIC_BLOCKLEVEL_OVERRIDE                                   :  2;
         unsigned int XPB_BLOCKLEVEL_OVERRIDE_EN                                   :  1;
         unsigned int IO_WR_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
-        unsigned int                                                              :  1;
+        unsigned int IO_RD_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
         unsigned int ATOMIC_BLOCKLEVEL_OVERRIDE_EN                                :  1;
         unsigned int                                                              : 14;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int                                                              :  2;
+        unsigned int ATC_TR_BLOCKLEVEL                                            :  2;
+        unsigned int ATC_PAGE_BLOCKLEVEL                                          :  2;
+        unsigned int ATC_INV_BLOCKLEVEL                                           :  2;
+        unsigned int IO_WR_BLOCKLEVEL_OVERRIDE                                    :  2;
+        unsigned int IO_RD_BLOCKLEVEL_OVERRIDE                                    :  2;
+        unsigned int ATOMIC_BLOCKLEVEL_OVERRIDE                                   :  2;
+        unsigned int XPB_BLOCKLEVEL_OVERRIDE_EN                                   :  1;
+        unsigned int IO_WR_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
+        unsigned int IO_RD_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
+        unsigned int ATOMIC_BLOCKLEVEL_OVERRIDE_EN                                :  1;
+        unsigned int                                                              : 14;
+    } rv2x;
+    struct {
+        unsigned int                                                              :  2;
+        unsigned int ATC_TR_BLOCKLEVEL                                            :  2;
+        unsigned int ATC_PAGE_BLOCKLEVEL                                          :  2;
+        unsigned int ATC_INV_BLOCKLEVEL                                           :  2;
+        unsigned int IO_WR_BLOCKLEVEL_OVERRIDE                                    :  2;
+        unsigned int IO_RD_BLOCKLEVEL_OVERRIDE                                    :  2;
+        unsigned int ATOMIC_BLOCKLEVEL_OVERRIDE                                   :  2;
+        unsigned int XPB_BLOCKLEVEL_OVERRIDE_EN                                   :  1;
+        unsigned int IO_WR_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
+        unsigned int IO_RD_BLOCKLEVEL_OVERRIDE_EN                                 :  1;
+        unsigned int ATOMIC_BLOCKLEVEL_OVERRIDE_EN                                :  1;
+        unsigned int                                                              : 14;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -36934,7 +38345,47 @@ union RPB_PASSPW_CONF {
         unsigned int RDRSP_PASSPW_OVERRIDE                                        :  1;
         unsigned int RDRSP_PASSPW_OVERRIDE_EN                                     :  1;
         unsigned int                                                              : 14;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int                                                              :  2;
+        unsigned int ATC_TR_PASSPW_OVERRIDE                                       :  1;
+        unsigned int ATC_PAGE_PASSPW_OVERRIDE                                     :  1;
+        unsigned int WR_PASSPW_OVERRIDE                                           :  1;
+        unsigned int RD_PASSPW_OVERRIDE                                           :  1;
+        unsigned int WR_RSPPASSPW_OVERRIDE                                        :  1;
+        unsigned int RD_RSPPASSPW_OVERRIDE                                        :  1;
+        unsigned int ATC_RSPPASSPW_OVERRIDE                                       :  1;
+        unsigned int ATOMIC_PASSPW_OVERRIDE                                       :  1;
+        unsigned int ATOMIC_RSPPASSPW_OVERRIDE                                    :  1;
+        unsigned int ATC_TR_PASSPW_OVERRIDE_EN                                    :  1;
+        unsigned int ATC_PAGE_PASSPW_OVERRIDE_EN                                  :  1;
+        unsigned int ATC_RSPPASSPW_OVERRIDE_EN                                    :  1;
+        unsigned int WRRSP_PASSPW_OVERRIDE                                        :  1;
+        unsigned int WRRSP_PASSPW_OVERRIDE_EN                                     :  1;
+        unsigned int RDRSP_PASSPW_OVERRIDE                                        :  1;
+        unsigned int RDRSP_PASSPW_OVERRIDE_EN                                     :  1;
+        unsigned int                                                              : 14;
+    } rv2x;
+    struct {
+        unsigned int                                                              :  2;
+        unsigned int ATC_TR_PASSPW_OVERRIDE                                       :  1;
+        unsigned int ATC_PAGE_PASSPW_OVERRIDE                                     :  1;
+        unsigned int WR_PASSPW_OVERRIDE                                           :  1;
+        unsigned int RD_PASSPW_OVERRIDE                                           :  1;
+        unsigned int WR_RSPPASSPW_OVERRIDE                                        :  1;
+        unsigned int RD_RSPPASSPW_OVERRIDE                                        :  1;
+        unsigned int ATC_RSPPASSPW_OVERRIDE                                       :  1;
+        unsigned int ATOMIC_PASSPW_OVERRIDE                                       :  1;
+        unsigned int ATOMIC_RSPPASSPW_OVERRIDE                                    :  1;
+        unsigned int ATC_TR_PASSPW_OVERRIDE_EN                                    :  1;
+        unsigned int ATC_PAGE_PASSPW_OVERRIDE_EN                                  :  1;
+        unsigned int ATC_RSPPASSPW_OVERRIDE_EN                                    :  1;
+        unsigned int WRRSP_PASSPW_OVERRIDE                                        :  1;
+        unsigned int WRRSP_PASSPW_OVERRIDE_EN                                     :  1;
+        unsigned int RDRSP_PASSPW_OVERRIDE                                        :  1;
+        unsigned int RDRSP_PASSPW_OVERRIDE_EN                                     :  1;
+        unsigned int                                                              : 14;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45263,10 +46714,6 @@ union SQ_CONFIG {
         unsigned int                                                              :  2;
     } bits, bitfields;
     struct {
-        unsigned int UNUSED                                                       :  7;
-        unsigned int                                                              : 25;
-    } apu09Plus;
-    struct {
         unsigned int                                                              :  7;
         unsigned int OVERRIDE_ALU_BUSY                                            :  1;
         unsigned int DEBUG_EN                                                     :  1;
@@ -45288,7 +46735,11 @@ union SQ_CONFIG {
     struct {
         unsigned int UNUSED                                                       :  7;
         unsigned int                                                              : 25;
-    } vg10_Vg12;
+    } rv2x;
+    struct {
+        unsigned int UNUSED                                                       :  7;
+        unsigned int                                                              : 25;
+    } vg10_Vg12_Rv1x;
     struct {
         unsigned int DISABLE_BARRIER_WAITCNT                                      :  1;
         unsigned int UNUSED                                                       :  6;
@@ -45304,7 +46755,15 @@ union SQ_DEBUG_CTRL_LOCAL {
     struct {
         unsigned int UNUSED                                                       :  8;
         unsigned int                                                              : 24;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int UNUSED                                                       :  8;
+        unsigned int                                                              : 24;
+    } rv2x;
+    struct {
+        unsigned int UNUSED                                                       :  8;
+        unsigned int                                                              : 24;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45328,7 +46787,19 @@ union SQ_DEBUG_STS_LOCAL {
         unsigned int                                                              :  3;
         unsigned int WAVE_LEVEL                                                   :  6;
         unsigned int                                                              : 22;
-    } gfx09;
+    } rv1x;
+    struct {
+        unsigned int BUSY                                                         :  1;
+        unsigned int                                                              :  3;
+        unsigned int WAVE_LEVEL                                                   :  6;
+        unsigned int                                                              : 22;
+    } rv2x;
+    struct {
+        unsigned int BUSY                                                         :  1;
+        unsigned int                                                              :  3;
+        unsigned int WAVE_LEVEL                                                   :  6;
+        unsigned int                                                              : 22;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45879,7 +47350,37 @@ union SQ_INTERRUPT_WORD_AUTO_CTXID {
         unsigned int SE_ID                                                        :  2;
         unsigned int ENCODING                                                     :  2;
         unsigned int                                                              :  4;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int THREAD_TRACE                                                 :  1;
+        unsigned int WLT                                                          :  1;
+        unsigned int THREAD_TRACE_BUF_FULL                                        :  1;
+        unsigned int REG_TIMESTAMP                                                :  1;
+        unsigned int CMD_TIMESTAMP                                                :  1;
+        unsigned int HOST_CMD_OVERFLOW                                            :  1;
+        unsigned int HOST_REG_OVERFLOW                                            :  1;
+        unsigned int IMMED_OVERFLOW                                               :  1;
+        unsigned int THREAD_TRACE_UTC_ERROR                                       :  1;
+        unsigned int                                                              : 15;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              :  4;
+    } rv2x;
+    struct {
+        unsigned int THREAD_TRACE                                                 :  1;
+        unsigned int WLT                                                          :  1;
+        unsigned int THREAD_TRACE_BUF_FULL                                        :  1;
+        unsigned int REG_TIMESTAMP                                                :  1;
+        unsigned int CMD_TIMESTAMP                                                :  1;
+        unsigned int HOST_CMD_OVERFLOW                                            :  1;
+        unsigned int HOST_REG_OVERFLOW                                            :  1;
+        unsigned int IMMED_OVERFLOW                                               :  1;
+        unsigned int THREAD_TRACE_UTC_ERROR                                       :  1;
+        unsigned int                                                              : 15;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              :  4;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45892,7 +47393,19 @@ union SQ_INTERRUPT_WORD_AUTO_HI {
         unsigned int SE_ID                                                        :  2;
         unsigned int ENCODING                                                     :  2;
         unsigned int                                                              : 20;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int                                                              :  8;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              : 20;
+    } rv2x;
+    struct {
+        unsigned int                                                              :  8;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              : 20;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45911,7 +47424,31 @@ union SQ_INTERRUPT_WORD_AUTO_LO {
         unsigned int IMMED_OVERFLOW                                               :  1;
         unsigned int THREAD_TRACE_UTC_ERROR                                       :  1;
         unsigned int                                                              : 23;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int THREAD_TRACE                                                 :  1;
+        unsigned int WLT                                                          :  1;
+        unsigned int THREAD_TRACE_BUF_FULL                                        :  1;
+        unsigned int REG_TIMESTAMP                                                :  1;
+        unsigned int CMD_TIMESTAMP                                                :  1;
+        unsigned int HOST_CMD_OVERFLOW                                            :  1;
+        unsigned int HOST_REG_OVERFLOW                                            :  1;
+        unsigned int IMMED_OVERFLOW                                               :  1;
+        unsigned int THREAD_TRACE_UTC_ERROR                                       :  1;
+        unsigned int                                                              : 23;
+    } rv2x;
+    struct {
+        unsigned int THREAD_TRACE                                                 :  1;
+        unsigned int WLT                                                          :  1;
+        unsigned int THREAD_TRACE_BUF_FULL                                        :  1;
+        unsigned int REG_TIMESTAMP                                                :  1;
+        unsigned int CMD_TIMESTAMP                                                :  1;
+        unsigned int HOST_CMD_OVERFLOW                                            :  1;
+        unsigned int HOST_REG_OVERFLOW                                            :  1;
+        unsigned int IMMED_OVERFLOW                                               :  1;
+        unsigned int THREAD_TRACE_UTC_ERROR                                       :  1;
+        unsigned int                                                              : 23;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45924,7 +47461,19 @@ union SQ_INTERRUPT_WORD_CMN_CTXID {
         unsigned int SE_ID                                                        :  2;
         unsigned int ENCODING                                                     :  2;
         unsigned int                                                              :  4;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int                                                              : 24;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              :  4;
+    } rv2x;
+    struct {
+        unsigned int                                                              : 24;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              :  4;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45937,7 +47486,19 @@ union SQ_INTERRUPT_WORD_CMN_HI {
         unsigned int SE_ID                                                        :  2;
         unsigned int ENCODING                                                     :  2;
         unsigned int                                                              : 20;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int                                                              :  8;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              : 20;
+    } rv2x;
+    struct {
+        unsigned int                                                              :  8;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              : 20;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45955,7 +47516,29 @@ union SQ_INTERRUPT_WORD_WAVE_CTXID {
         unsigned int SE_ID                                                        :  2;
         unsigned int ENCODING                                                     :  2;
         unsigned int                                                              :  4;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int DATA                                                         : 12;
+        unsigned int SH_ID                                                        :  1;
+        unsigned int PRIV                                                         :  1;
+        unsigned int WAVE_ID                                                      :  4;
+        unsigned int SIMD_ID                                                      :  2;
+        unsigned int CU_ID                                                        :  4;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              :  4;
+    } rv2x;
+    struct {
+        unsigned int DATA                                                         : 12;
+        unsigned int SH_ID                                                        :  1;
+        unsigned int PRIV                                                         :  1;
+        unsigned int WAVE_ID                                                      :  4;
+        unsigned int SIMD_ID                                                      :  2;
+        unsigned int CU_ID                                                        :  4;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              :  4;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45969,7 +47552,21 @@ union SQ_INTERRUPT_WORD_WAVE_HI {
         unsigned int SE_ID                                                        :  2;
         unsigned int ENCODING                                                     :  2;
         unsigned int                                                              : 20;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int CU_ID                                                        :  4;
+        unsigned int VM_ID                                                        :  4;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              : 20;
+    } rv2x;
+    struct {
+        unsigned int CU_ID                                                        :  4;
+        unsigned int VM_ID                                                        :  4;
+        unsigned int SE_ID                                                        :  2;
+        unsigned int ENCODING                                                     :  2;
+        unsigned int                                                              : 20;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -45983,7 +47580,21 @@ union SQ_INTERRUPT_WORD_WAVE_LO {
         unsigned int PRIV                                                         :  1;
         unsigned int WAVE_ID                                                      :  4;
         unsigned int SIMD_ID                                                      :  2;
-    } bits, bitfields;
+    } rv1x;
+    struct {
+        unsigned int DATA                                                         : 24;
+        unsigned int SH_ID                                                        :  1;
+        unsigned int PRIV                                                         :  1;
+        unsigned int WAVE_ID                                                      :  4;
+        unsigned int SIMD_ID                                                      :  2;
+    } rv2x;
+    struct {
+        unsigned int DATA                                                         : 24;
+        unsigned int SH_ID                                                        :  1;
+        unsigned int PRIV                                                         :  1;
+        unsigned int WAVE_ID                                                      :  4;
+        unsigned int SIMD_ID                                                      :  2;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -58719,39 +60330,34 @@ union VGT_DEBUG_REG0 {
     struct {
         unsigned int                                                              :  2;
         unsigned int vgt_busy                                                     :  1;
-        unsigned int                                                              :  9;
+        unsigned int                                                              :  3;
+        unsigned int SPARE5                                                       :  1;
+        unsigned int SPARE4                                                       :  1;
+        unsigned int                                                              :  4;
         unsigned int gs_busy                                                      :  1;
         unsigned int                                                              :  3;
         unsigned int gog_busy                                                     :  1;
-        unsigned int                                                              : 12;
-        unsigned int sclk_core_vld                                                :  1;
-        unsigned int sclk_gs_vld                                                  :  1;
-        unsigned int                                                              :  1;
-    } bits, bitfields;
-    struct {
-        unsigned int                                                              : 11;
-        unsigned int pg_busy                                                      :  1;
-        unsigned int                                                              : 20;
-    } gfx09_1x;
-    struct {
-        unsigned int                                                              :  6;
-        unsigned int SPARE5                                                       :  1;
-        unsigned int SPARE4                                                       :  1;
-        unsigned int                                                              : 12;
+        unsigned int                                                              :  3;
         unsigned int SPARE3                                                       :  1;
         unsigned int                                                              :  4;
         unsigned int SPARE2                                                       :  1;
         unsigned int                                                              :  2;
         unsigned int SPARE1                                                       :  1;
-        unsigned int                                                              :  2;
+        unsigned int sclk_core_vld                                                :  1;
+        unsigned int sclk_gs_vld                                                  :  1;
         unsigned int SPARE0                                                       :  1;
     } rv1x;
     struct {
         unsigned int                                                              :  1;
         unsigned int RESERVED0                                                    :  1;
-        unsigned int                                                              :  1;
+        unsigned int vgt_busy                                                     :  1;
         unsigned int RESERVED1                                                    :  5;
-        unsigned int                                                              : 10;
+        unsigned int                                                              :  3;
+        unsigned int pg_busy                                                      :  1;
+        unsigned int gs_busy                                                      :  1;
+        unsigned int                                                              :  3;
+        unsigned int gog_busy                                                     :  1;
+        unsigned int                                                              :  1;
         unsigned int frmt_pg_busy                                                 :  1;
         unsigned int                                                              :  1;
         unsigned int RESERVED2                                                    :  1;
@@ -58759,22 +60365,40 @@ union VGT_DEBUG_REG0 {
         unsigned int tell_clk_busy                                                :  1;
         unsigned int                                                              :  2;
         unsigned int sclk_tell_vid                                                :  1;
-        unsigned int                                                              :  2;
+        unsigned int sclk_core_vld                                                :  1;
+        unsigned int sclk_gs_vld                                                  :  1;
         unsigned int RESERVED3                                                    :  1;
     } rv2x;
     struct {
-        unsigned int                                                              :  6;
+        unsigned int                                                              :  2;
+        unsigned int vgt_busy                                                     :  1;
+        unsigned int                                                              :  3;
         unsigned int SPARE5                                                       :  1;
         unsigned int SPARE4                                                       :  1;
-        unsigned int                                                              : 12;
+        unsigned int                                                              :  4;
+        unsigned int gs_busy                                                      :  1;
+        unsigned int                                                              :  3;
+        unsigned int gog_busy                                                     :  1;
+        unsigned int                                                              :  3;
         unsigned int SPARE3                                                       :  1;
         unsigned int                                                              :  4;
         unsigned int SPARE2                                                       :  1;
         unsigned int                                                              :  2;
         unsigned int SPARE1                                                       :  1;
-        unsigned int                                                              :  2;
+        unsigned int sclk_core_vld                                                :  1;
+        unsigned int sclk_gs_vld                                                  :  1;
         unsigned int SPARE0                                                       :  1;
     } vega;
+    struct {
+        unsigned int                                                              : 11;
+        unsigned int pg_busy                                                      :  1;
+        unsigned int                                                              : 20;
+    } vg12;
+    struct {
+        unsigned int                                                              : 11;
+        unsigned int pg_busy                                                      :  1;
+        unsigned int                                                              : 20;
+    } vg20;
 
     unsigned int u32All;
     signed int   i32All;
@@ -58997,14 +60621,11 @@ union VGT_DEBUG_REG10 {
 
 union VGT_DEBUG_REG11 {
     struct {
-        unsigned int                                                              : 16;
-        unsigned int gs_issue_rtr                                                 :  1;
-        unsigned int                                                              : 15;
-    } bits, bitfields;
-    struct {
         unsigned int                                                              :  5;
         unsigned int SPARE1                                                       :  1;
-        unsigned int                                                              : 12;
+        unsigned int                                                              : 10;
+        unsigned int gs_issue_rtr                                                 :  1;
+        unsigned int                                                              :  1;
         unsigned int SPARE0                                                       :  1;
         unsigned int                                                              : 13;
     } rv1x;
@@ -59018,7 +60639,8 @@ union VGT_DEBUG_REG11 {
         unsigned int                                                              :  4;
         unsigned int VGT_SPI_gssubgrp_rtr                                         :  1;
         unsigned int RESERVED3                                                    :  1;
-        unsigned int                                                              :  2;
+        unsigned int gs_issue_rtr                                                 :  1;
+        unsigned int                                                              :  1;
         unsigned int RESERVED4                                                    :  1;
         unsigned int                                                              :  1;
         unsigned int RESERVED5                                                    :  1;
@@ -59033,7 +60655,9 @@ union VGT_DEBUG_REG11 {
     struct {
         unsigned int                                                              :  5;
         unsigned int SPARE1                                                       :  1;
-        unsigned int                                                              : 12;
+        unsigned int                                                              : 10;
+        unsigned int gs_issue_rtr                                                 :  1;
+        unsigned int                                                              :  1;
         unsigned int SPARE0                                                       :  1;
         unsigned int                                                              : 13;
     } vega;
@@ -59134,9 +60758,11 @@ union VGT_DEBUG_REG15 {
         unsigned int                                                              :  3;
         unsigned int output_fifo_full                                             :  1;
         unsigned int                                                              : 28;
-    } bits, bitfields;
+    } rv1x;
     struct {
-        unsigned int                                                              :  5;
+        unsigned int                                                              :  3;
+        unsigned int output_fifo_full                                             :  1;
+        unsigned int                                                              :  1;
         unsigned int active_sm_q_4_0                                              :  5;
         unsigned int entry_rdptr_q_4_0                                            :  5;
         unsigned int cntr_tbl_wrptr_q_4_0                                         :  5;
@@ -59144,6 +60770,11 @@ union VGT_DEBUG_REG15 {
         unsigned int                                                              :  3;
         unsigned int RESERVED1                                                    :  3;
     } rv2x;
+    struct {
+        unsigned int                                                              :  3;
+        unsigned int output_fifo_full                                             :  1;
+        unsigned int                                                              : 28;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -59154,12 +60785,17 @@ union VGT_DEBUG_REG16 {
     struct {
         unsigned int gog_busy                                                     :  1;
         unsigned int                                                              : 31;
-    } bits, bitfields;
+    } rv1x;
     struct {
-        unsigned int                                                              : 23;
+        unsigned int gog_busy                                                     :  1;
+        unsigned int                                                              : 22;
         unsigned int RESERVED0                                                    :  1;
         unsigned int                                                              :  8;
     } rv2x;
+    struct {
+        unsigned int gog_busy                                                     :  1;
+        unsigned int                                                              : 31;
+    } vega;
 
     unsigned int u32All;
     signed int   i32All;
@@ -59188,19 +60824,16 @@ union VGT_DEBUG_REG23 {
 
 union VGT_DEBUG_REG30 {
     struct {
+        unsigned int                                                              : 19;
+        unsigned int SPARE                                                        : 13;
+    } rv1x;
+    struct {
         unsigned int                                                              :  4;
         unsigned int pg_busy                                                      :  1;
         unsigned int pg_noif_busy                                                 :  1;
         unsigned int pg_spi_interface_busy                                        :  1;
         unsigned int pg_te_prim_fifo_busy                                         :  1;
-        unsigned int                                                              : 24;
-    } gfx09_1x;
-    struct {
-        unsigned int                                                              : 19;
-        unsigned int SPARE                                                        : 13;
-    } rv1x;
-    struct {
-        unsigned int                                                              : 19;
+        unsigned int                                                              : 11;
         unsigned int non_pg_perfcounter_start                                     :  1;
         unsigned int non_pg_perfcounter_stop                                      :  1;
         unsigned int                                                              :  1;
@@ -59219,6 +60852,22 @@ union VGT_DEBUG_REG30 {
         unsigned int                                                              : 19;
         unsigned int SPARE                                                        : 13;
     } vega;
+    struct {
+        unsigned int                                                              :  4;
+        unsigned int pg_busy                                                      :  1;
+        unsigned int pg_noif_busy                                                 :  1;
+        unsigned int pg_spi_interface_busy                                        :  1;
+        unsigned int pg_te_prim_fifo_busy                                         :  1;
+        unsigned int                                                              : 24;
+    } vg12;
+    struct {
+        unsigned int                                                              :  4;
+        unsigned int pg_busy                                                      :  1;
+        unsigned int pg_noif_busy                                                 :  1;
+        unsigned int pg_spi_interface_busy                                        :  1;
+        unsigned int pg_te_prim_fifo_busy                                         :  1;
+        unsigned int                                                              : 24;
+    } vg20;
 
     unsigned int u32All;
     signed int   i32All;
@@ -60782,7 +62431,7 @@ union VML2_MEM_ECC_INDEX {
     struct {
         unsigned int INDEX                                                        :  8;
         unsigned int                                                              : 24;
-    } bits, bitfields;
+    } vg20;
 
     unsigned int u32All;
     signed int   i32All;
@@ -60824,7 +62473,7 @@ union VML2_WALKER_MEM_ECC_INDEX {
     struct {
         unsigned int INDEX                                                        :  8;
         unsigned int                                                              : 24;
-    } bits, bitfields;
+    } vg20;
 
     unsigned int u32All;
     signed int   i32All;
@@ -60936,39 +62585,55 @@ union WD_DEBUG_DATA {
 
 union WD_DEBUG_REG0 {
     struct {
-        unsigned int                                                              :  2;
-        unsigned int wd_busy                                                      :  1;
-        unsigned int                                                              : 25;
-        unsigned int sclk_reg_vld                                                 :  1;
-        unsigned int sclk_input_vld                                               :  1;
-        unsigned int sclk_core_vld                                                :  1;
-        unsigned int                                                              :  1;
-    } bits, bitfields;
-    struct {
         unsigned int                                                              : 12;
         unsigned int SPARE2                                                       :  1;
         unsigned int                                                              : 19;
     } gfx09_0;
     struct {
+        unsigned int                                                              :  2;
+        unsigned int wd_busy                                                      :  1;
+        unsigned int                                                              : 13;
+        unsigned int SPARE3                                                       :  1;
+        unsigned int                                                              : 11;
+        unsigned int sclk_reg_vld                                                 :  1;
+        unsigned int sclk_input_vld                                               :  1;
+        unsigned int sclk_core_vld                                                :  1;
+        unsigned int                                                              :  1;
+    } rv1x;
+    struct {
+        unsigned int                                                              :  2;
+        unsigned int wd_busy                                                      :  1;
+        unsigned int                                                              :  9;
+        unsigned int wd_ngg_busy                                                  :  1;
+        unsigned int                                                              :  3;
+        unsigned int RESERVED0                                                    :  1;
+        unsigned int                                                              : 11;
+        unsigned int sclk_reg_vld                                                 :  1;
+        unsigned int sclk_input_vld                                               :  1;
+        unsigned int sclk_core_vld                                                :  1;
+        unsigned int                                                              :  1;
+    } rv2x;
+    struct {
+        unsigned int                                                              :  2;
+        unsigned int wd_busy                                                      :  1;
+        unsigned int                                                              : 13;
+        unsigned int SPARE3                                                       :  1;
+        unsigned int                                                              : 11;
+        unsigned int sclk_reg_vld                                                 :  1;
+        unsigned int sclk_input_vld                                               :  1;
+        unsigned int sclk_core_vld                                                :  1;
+        unsigned int                                                              :  1;
+    } vega;
+    struct {
         unsigned int                                                              : 12;
         unsigned int wd_ngg_busy                                                  :  1;
         unsigned int                                                              : 19;
-    } gfx09_1x;
+    } vg12;
     struct {
-        unsigned int                                                              : 16;
-        unsigned int SPARE3                                                       :  1;
-        unsigned int                                                              : 15;
-    } rv1x;
-    struct {
-        unsigned int                                                              : 16;
-        unsigned int RESERVED0                                                    :  1;
-        unsigned int                                                              : 15;
-    } rv2x;
-    struct {
-        unsigned int                                                              : 16;
-        unsigned int SPARE3                                                       :  1;
-        unsigned int                                                              : 15;
-    } vega;
+        unsigned int                                                              : 12;
+        unsigned int wd_ngg_busy                                                  :  1;
+        unsigned int                                                              : 19;
+    } vg20;
 
     unsigned int u32All;
     signed int   i32All;
@@ -61089,21 +62754,21 @@ union WD_DEBUG_REG7 {
         unsigned int wd_arb_se1_input_fifo_re                                     :  1;
         unsigned int wd_arb_se1_input_fifo_empty                                  :  1;
         unsigned int wd_arb_se1_input_fifo_full                                   :  1;
-        unsigned int                                                              : 14;
-        unsigned int se1_thdgrp_is_event                                          :  1;
-        unsigned int se1_thdgrp_eop                                               :  1;
-        unsigned int                                                              :  8;
-    } raven;
-    struct {
-        unsigned int                                                              :  8;
         unsigned int SPARE1                                                       :  4;
         unsigned int SPARE2                                                       :  4;
         unsigned int te11_arb_state_q                                             :  3;
         unsigned int SPARE5                                                       :  1;
-        unsigned int                                                              : 12;
+        unsigned int                                                              :  2;
+        unsigned int se1_thdgrp_is_event                                          :  1;
+        unsigned int se1_thdgrp_eop                                               :  1;
+        unsigned int                                                              :  8;
     } rv1x;
     struct {
-        unsigned int                                                              :  8;
+        unsigned int                                                              :  4;
+        unsigned int SE1VGT_WD_thdgrp_send_in                                     :  1;
+        unsigned int wd_arb_se1_input_fifo_re                                     :  1;
+        unsigned int wd_arb_se1_input_fifo_empty                                  :  1;
+        unsigned int wd_arb_se1_input_fifo_full                                   :  1;
         unsigned int SE2VGT_WD_thdgrp_send_in                                     :  1;
         unsigned int wd_arb_se2_input_fifo_re                                     :  1;
         unsigned int wd_arb_se2_input_fifo_empty                                  :  1;
@@ -61113,7 +62778,9 @@ union WD_DEBUG_REG7 {
         unsigned int wd_arb_se3_input_fifo_empty                                  :  1;
         unsigned int wd_arb_se3_input_fifo_full                                   :  1;
         unsigned int te11_arb_state_q                                             :  4;
-        unsigned int                                                              :  4;
+        unsigned int                                                              :  2;
+        unsigned int se1_thdgrp_is_event                                          :  1;
+        unsigned int se1_thdgrp_eop                                               :  1;
         unsigned int se2_thdgrp_is_event                                          :  1;
         unsigned int se2_thdgrp_eop                                               :  1;
         unsigned int se3_thdgrp_is_event                                          :  1;
@@ -61340,7 +63007,29 @@ union WD_DEBUG_REG22 {
         unsigned int null_p3                                                      :  1;
         unsigned int state_id_p3                                                  :  3;
         unsigned int wd_ngg_csbm_no_dma_busy                                      :  1;
-    } bits, bitfields;
+    } rv2x;
+    struct {
+        unsigned int wd_csbm_sm_spi_grant_ordered_id                              : 12;
+        unsigned int wd_csbm_sm_gds_data                                          :  2;
+        unsigned int wd_ngg_csbm_dma_busy                                         :  1;
+        unsigned int csbm_tcarb_tag                                               : 10;
+        unsigned int is_event_p3                                                  :  1;
+        unsigned int eop_p3                                                       :  1;
+        unsigned int null_p3                                                      :  1;
+        unsigned int state_id_p3                                                  :  3;
+        unsigned int wd_ngg_csbm_no_dma_busy                                      :  1;
+    } vg12;
+    struct {
+        unsigned int wd_csbm_sm_spi_grant_ordered_id                              : 12;
+        unsigned int wd_csbm_sm_gds_data                                          :  2;
+        unsigned int wd_ngg_csbm_dma_busy                                         :  1;
+        unsigned int csbm_tcarb_tag                                               : 10;
+        unsigned int is_event_p3                                                  :  1;
+        unsigned int eop_p3                                                       :  1;
+        unsigned int null_p3                                                      :  1;
+        unsigned int state_id_p3                                                  :  3;
+        unsigned int wd_ngg_csbm_no_dma_busy                                      :  1;
+    } vg20;
 
     unsigned int u32All;
     signed int   i32All;

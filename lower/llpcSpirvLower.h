@@ -54,7 +54,6 @@ void initializeSpirvLowerBufferOpPass(PassRegistry&);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
 void initializeSpirvLowerDynIndexPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
-void initializeSpirvLowerGlobalConstExprRemovePass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
@@ -78,7 +77,6 @@ inline static void InitializeLowerPasses(
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
   initializeSpirvLowerDynIndexPass(passRegistry);
   initializeSpirvLowerGlobalPass(passRegistry);
-  initializeSpirvLowerGlobalConstExprRemovePass(passRegistry);
   initializeSpirvLowerImageOpPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
   initializeSpirvLowerLoopUnrollControlPass(passRegistry);
@@ -93,16 +91,15 @@ llvm::ModulePass* CreateSpirvLowerAccessChain();
 llvm::ModulePass* CreateSpirvLowerAggregateLoadStore();
 llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding , bool enableFloatOpt);
 llvm::ModulePass* CreateSpirvLowerBufferOp();
-llvm::FunctionPass* CreateSpirvLowerConstImmediateStore();
+llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
 llvm::ModulePass* CreateSpirvLowerDynIndex();
 llvm::ModulePass* CreateSpirvLowerGlobal();
-llvm::ModulePass* CreateSpirvLowerGlobalConstExprRemove();
 llvm::ModulePass* CreateSpirvLowerImageOp();
 llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
-llvm::FunctionPass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
-llvm::FunctionPass* CreateSpirvLowerPushConst();
+llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
+llvm::ModulePass* CreateSpirvLowerPushConst();
 llvm::ModulePass* CreateSpirvLowerResourceCollect();
-llvm::ModulePass* CreateSpirvLowerTranslator(llvm::ArrayRef<const PipelineShaderInfo*> shaderInfo);
+llvm::ModulePass* CreateSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo* pShaderInfo);
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations, as the base class.
@@ -119,8 +116,10 @@ public:
     {
     }
 
-    static void AddPasses(Context*                    pContext,
+    // Add per-shader lowering passes to pass manager
+    static void AddPasses(ShaderStage                 stage,
                           llvm::legacy::PassManager&  passMgr,
+                          llvm::Timer*                pLowerTimer,
                           uint32_t                    forceLoopUnrollCount,
                           bool*                       pNeedDynamicLoopUnroll);
 

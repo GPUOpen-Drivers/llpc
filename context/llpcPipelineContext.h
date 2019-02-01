@@ -48,6 +48,9 @@
 
 namespace Llpc
 {
+
+class Builder;
+
 // Enumerates types of descriptor.
 enum class DescriptorType : uint32_t
 {
@@ -709,7 +712,7 @@ public:
                     const GpuProperty*     pGpuProp,
                     const WorkaroundFlags* pGpuWorkarounds,
                     MetroHash::Hash*       pHash);
-    virtual ~PipelineContext() {}
+    virtual ~PipelineContext();
 
     // Gets resource usage of the specified shader stage
     virtual ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage) = 0;

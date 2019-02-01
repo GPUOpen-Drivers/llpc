@@ -70,10 +70,13 @@ namespace llvm
 {
 
 class PassRegistry;
+class Timer;
+
 void initializePassDeadFuncRemovePass(PassRegistry&);
 void initializePassExternalLibLinkPass(PassRegistry&);
 void initializePassLoopInfoCollectPass(PassRegistry&);
 void initializePipelineShadersPass(PassRegistry&);
+void initializeStartStopTimerPass(PassRegistry&);
 
 } // llvm
 
@@ -82,6 +85,7 @@ namespace Llpc
 
 llvm::ModulePass* CreatePassDeadFuncRemove();
 llvm::ModulePass* CreatePassExternalLibLink(bool nativeOnly);
+llvm::ModulePass* CreateStartStopTimer(llvm::Timer* pTimer, bool starting);
 
 // Initialize helper passes
 inline static void InitializeUtilPasses(
@@ -164,7 +168,7 @@ static const uint32_t MaxGsStreams = 4;
 static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 
 // Threshold of inline pass
-static const int32_t InlineThreshold = (INT32_MAX / 100);
+static const int32_t InlineThreshold = (INT32_MAX >> 15);
 
 // Internal resource table's virtual descriptor sets
 static const uint32_t InternalResourceTable  = 0x10000000;
@@ -250,12 +254,6 @@ llvm::Value* ToInt32Value(Llpc::Context* pContext, llvm::Value* pValue, llvm::In
 // Checks whether the specified value is a non-uniform value.
 bool IsNonUniformValue(llvm::Value* pValue, std::unordered_set<llvm::Value*>& checkedValues);
 
-// Retrieves the frequency of the performance counter for CPU times.
-int64_t GetPerfFrequency();
-
-// Retrieves the current value of the performance counter.
-int64_t GetPerfCpuTime();
-
 // Checks whether the input data is actually a ELF binary
 bool IsElfBinary(const void* pData, size_t dataSize);
 
@@ -271,38 +269,6 @@ struct SpirvHeader
     uint32_t    genMagicNumber;     // Generator's magic number
     uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
     uint32_t    reserved;           // Reserved word
-};
-
-// =====================================================================================================================
-// Represents the result of CPU time profiling.
-struct TimeProfileResult
-{
-    int64_t translateTime;    // Translate time
-    int64_t lowerTime;        // SPIR-V Lower phase time
-    int64_t patchTime;        // LLVM patch pahse time
-    int64_t lowerOptTime;     // General optimization time of SPIR-V lower phase
-    int64_t patchLinkTime;    // Library link time of LLVM patch phase
-    int64_t codeGenTime;      // Code generation time
-};
-
-// =====================================================================================================================
-// Helper class for time profiling
-class TimeProfiler
-{
-public:
-    TimeProfiler(int64_t* pAccumTime)
-    {
-        m_pAccumTime = pAccumTime;
-        m_startTime = GetPerfCpuTime();
-    }
-
-    ~TimeProfiler()
-    {
-        *m_pAccumTime += (GetPerfCpuTime() - m_startTime);
-    }
-
-    int64_t m_startTime;     // Start time
-    int64_t* m_pAccumTime;   // Pointer to accumulated time
 };
 
 } // Llpc

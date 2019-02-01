@@ -49,7 +49,6 @@ class PassManager;
 
 } // legacy
 
-void initializePatchAddrSpaceMutatePass(PassRegistry&);
 void initializePatchAutoLayoutDescPass(PassRegistry&);
 void initializePatchBufferOpPass(PassRegistry&);
 void initializePatchCopyShaderPass(PassRegistry&);
@@ -76,7 +75,6 @@ namespace Llpc
 inline static void InitializePatchPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
-  initializePatchAddrSpaceMutatePass(passRegistry);
   initializePatchAutoLayoutDescPass(passRegistry);
   initializePatchBufferOpPass(passRegistry);
   initializePatchCopyShaderPass(passRegistry);
@@ -94,7 +92,6 @@ inline static void InitializePatchPasses(
   initializePatchSetupTargetFeaturesPass(passRegistry);
 }
 
-llvm::ModulePass* CreatePatchAddrSpaceMutate();
 llvm::ModulePass* CreatePatchAutoLayoutDesc();
 llvm::ModulePass* CreatePatchBufferOp();
 llvm::ModulePass* CreatePatchCopyShader();
@@ -131,7 +128,10 @@ public:
     virtual ~Patch() {}
 
     static Result PreRun(llvm::Module* pModule);
-    static void AddPasses(Context* pContext, llvm::legacy::PassManager&  passMgr);
+    static void AddPasses(Context*                    pContext,
+                          llvm::legacy::PassManager&  passMgr,
+                          llvm::Timer*                pPatchTimer,
+                          llvm::Timer*                pOptTimer);
 
     static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
 

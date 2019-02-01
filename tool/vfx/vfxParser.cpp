@@ -293,6 +293,7 @@ bool VfxParser::ParseSectionKeyValues()
         m_currentSectionStringBuffer.getline(pLineBuffer, MaxLineBufSize);
 
         size_t readCount = static_cast<size_t>(m_currentSectionStringBuffer.gcount());
+        VFX_ASSERT(readCount < MaxLineBufSize);
         if (readCount == 0)
         {
             break;
@@ -620,6 +621,7 @@ void VfxParser::ParseSectionShaderSource()
         m_currentSectionStringBuffer.getline(pLineBuffer, MaxLineBufSize);
 
         size_t readCount = static_cast<size_t>(m_currentSectionStringBuffer.gcount());
+        VFX_ASSERT(readCount < MaxLineBufSize);
         if (readCount == 0)
         {
             break;

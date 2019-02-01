@@ -52,8 +52,6 @@ using namespace Llpc;
 namespace Llpc
 {
 
-extern TimeProfileResult g_timeProfileResult;
-
 // =====================================================================================================================
 // Initializes static members.
 char PassExternalLibLink::ID = 0;
@@ -81,7 +79,6 @@ PassExternalLibLink::PassExternalLibLink(
 bool PassExternalLibLink::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    TimeProfiler timeProfiler(&g_timeProfileResult.patchLinkTime);
     auto pContext = static_cast<Context*>(&module.getContext());
     std::map<Module*, ValueToValueMapTy> valueMaps;
 

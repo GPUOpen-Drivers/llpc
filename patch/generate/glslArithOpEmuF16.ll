@@ -23,8 +23,7 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024"
-target triple = "spir64-unknown-unknown"
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5"
 
 ; =====================================================================================================================
 ; >>>  Operators
@@ -258,8 +257,8 @@ define spir_func half @_Z7radiansDh(half %degrees) #0
 ; GLSL: f16vec2 radians(f16vec2)
 define spir_func <2 x half> @_Z7radiansDv2_Dh(<2 x half> %degrees) #0
 {
-    %1 = alloca <2 x half>
-    %2 = load <2 x half>, <2 x half>* %1
+    %1 = alloca <2 x half>, addrspace(5)
+    %2 = load <2 x half>, <2 x half> addrspace(5)* %1
     ; 0x3F91DC0000000000: PI/180, 0.01744080
     %3 = insertelement <2 x half> %2, half 0x3F91DC0000000000, i32 0
     %4 = insertelement <2 x half> %3, half 0x3F91DC0000000000, i32 1
@@ -270,8 +269,8 @@ define spir_func <2 x half> @_Z7radiansDv2_Dh(<2 x half> %degrees) #0
 ; GLSL: f16vec3 radians(f16vec3)
 define spir_func <3 x half> @_Z7radiansDv3_Dh(<3 x half> %degrees) #0
 {
-    %1 = alloca <3 x half>
-    %2 = load <3 x half>, <3 x half>* %1
+    %1 = alloca <3 x half>, addrspace(5)
+    %2 = load <3 x half>, <3 x half> addrspace(5)* %1
     ; 0x3F91DC0000000000: PI/180, 0.01744080
     %3 = insertelement <3 x half> %2, half 0x3F91DC0000000000, i32 0
     %4 = insertelement <3 x half> %3, half 0x3F91DC0000000000, i32 1
@@ -283,8 +282,8 @@ define spir_func <3 x half> @_Z7radiansDv3_Dh(<3 x half> %degrees) #0
 ; GLSL: f16vec4 radians(f16vec4)
 define spir_func <4 x half> @_Z7radiansDv4_Dh(<4 x half> %degrees) #0
 {
-    %1 = alloca <4 x half>
-    %2 = load <4 x half>, <4 x half>* %1
+    %1 = alloca <4 x half>, addrspace(5)
+    %2 = load <4 x half>, <4 x half> addrspace(5)* %1
     ; 0x3F91DC0000000000: PI/180, 0.01744080
     %3 = insertelement <4 x half> %2, half 0x3F91DC0000000000, i32 0
     %4 = insertelement <4 x half> %3, half 0x3F91DC0000000000, i32 1
@@ -305,8 +304,8 @@ define spir_func half @_Z7degreesDh(half %radians) #0
 ; GLSL: f16vec2 degrees(f16vec2)
 define spir_func <2 x half> @_Z7degreesDv2_Dh(<2 x half> %radians) #0
 {
-    %1 = alloca <2 x half>
-    %2 = load <2 x half>, <2 x half>* %1
+    %1 = alloca <2 x half>, addrspace(5)
+    %2 = load <2 x half>, <2 x half> addrspace(5)* %1
     ; 0x404CA40000000000: 180/PI, 57.28125000
     %3 = insertelement <2 x half> %2, half 0x404CA40000000000, i32 0
     %4 = insertelement <2 x half> %3, half 0x404CA40000000000, i32 1
@@ -317,8 +316,8 @@ define spir_func <2 x half> @_Z7degreesDv2_Dh(<2 x half> %radians) #0
 ; GLSL: f16vec3 degrees(f16vec3)
 define spir_func <3 x half> @_Z7degreesDv3_Dh(<3 x half> %radians) #0
 {
-    %1 = alloca <3 x half>
-    %2 = load <3 x half>, <3 x half>* %1
+    %1 = alloca <3 x half>, addrspace(5)
+    %2 = load <3 x half>, <3 x half> addrspace(5)* %1
     ; 0x404CA5DC20000000: 180/PI, 57.28125000
     %3 = insertelement <3 x half> %2, half 0x404CA40000000000, i32 0
     %4 = insertelement <3 x half> %3, half 0x404CA40000000000, i32 1
@@ -330,8 +329,8 @@ define spir_func <3 x half> @_Z7degreesDv3_Dh(<3 x half> %radians) #0
 ; GLSL: f16vec4 degrees(f16vec4)
 define spir_func <4 x half> @_Z7degreesDv4_Dh(<4 x half> %radians) #0
 {
-    %1 = alloca <4 x half>
-    %2 = load <4 x half>, <4 x half>* %1
+    %1 = alloca <4 x half>, addrspace(5)
+    %2 = load <4 x half>, <4 x half> addrspace(5)* %1
     ; 0x404CA40000000000: 180/PI, 57.28125000
     %3 = insertelement <4 x half> %2, half 0x404CA40000000000, i32 0
     %4 = insertelement <4 x half> %3, half 0x404CA40000000000, i32 1
@@ -652,18 +651,18 @@ define half @llpc.mod.f16(half %x, half %y) #0
 
 ; GLSL: float16_t modf(float16_t, out float16_t)
 define spir_func half @_Z4modfDhPDh(
-    half %x, half* %i) #0
+    half %x, half addrspace(5)* %i) #0
 {
     %1 = call half @llvm.trunc.f16(half %x)
     %2 = fsub half %x, %1
 
-    store half %1, half* %i
+    store half %1, half addrspace(5)* %i
     ret half %2
 }
 
 ; GLSL: f16vec2 modf(f16vec2, out f16vec2)
 define spir_func <2 x half> @_Z4modfDv2_DhPDv2_Dh(
-    <2 x half> %x, <2 x half>* %i) #0
+    <2 x half> %x, <2 x half> addrspace(5)* %i) #0
 {
     %x0 = extractelement <2 x half> %x, i32 0
     %x1 = extractelement <2 x half> %x, i32 1
@@ -680,13 +679,13 @@ define spir_func <2 x half> @_Z4modfDv2_DhPDv2_Dh(
     %7 = insertelement <2 x half> undef, half %2, i32 0
     %8 = insertelement <2 x half> %7, half %4, i32 1
 
-    store <2 x half> %6, <2 x half>* %i
+    store <2 x half> %6, <2 x half> addrspace(5)* %i
     ret <2 x half> %8
 }
 
 ; GLSL: f16vec3 modf(f16vec3, out f16vec3)
 define spir_func <3 x half> @_Z4modfDv3_DhPDv3_Dh(
-    <3 x half> %x, <3 x half>* %i) #0
+    <3 x half> %x, <3 x half> addrspace(5)* %i) #0
 {
     %x0 = extractelement <3 x half> %x, i32 0
     %x1 = extractelement <3 x half> %x, i32 1
@@ -709,13 +708,13 @@ define spir_func <3 x half> @_Z4modfDv3_DhPDv3_Dh(
     %11 = insertelement <3 x half> %10, half %4, i32 1
     %12 = insertelement <3 x half> %11, half %6, i32 2
 
-    store <3 x half> %9, <3 x half>* %i
+    store <3 x half> %9, <3 x half> addrspace(5)* %i
     ret <3 x half> %12
 }
 
 ; GLSL: f16vec4 modf(f16vec4, out f16vec4)
 define spir_func <4 x half> @_Z4modfDv4_DhPDv4_Dh(
-    <4 x half> %x, <4 x half>* %i) #0
+    <4 x half> %x, <4 x half> addrspace(5)* %i) #0
 {
     %x0 = extractelement <4 x half> %x, i32 0
     %x1 = extractelement <4 x half> %x, i32 1
@@ -744,7 +743,7 @@ define spir_func <4 x half> @_Z4modfDv4_DhPDv4_Dh(
     %15 = insertelement <4 x half> %14, half %6, i32 2
     %16 = insertelement <4 x half> %15, half %8, i32 3
 
-    store <4 x half> %12, <4 x half>* %i
+    store <4 x half> %12, <4 x half> addrspace(5)* %i
     ret <4 x half> %16
 }
 
@@ -1262,8 +1261,8 @@ define spir_func <3 x half> @_Z5crossDv3_DhDv3_Dh(<3 x half> %x, <3 x half> %y) 
     %2 = fsub half %l1, %r1
     %3 = fsub half %l2, %r2
 
-    %4 = alloca <3 x half>
-    %5 = load <3 x half>, <3 x half>* %4
+    %4 = alloca <3 x half>, addrspace(5)
+    %5 = load <3 x half>, <3 x half> addrspace(5)* %4
     %6 = insertelement <3 x half> %5, half %1, i32 0
     %7 = insertelement <3 x half> %6, half %2, i32 1
     %8 = insertelement <3 x half> %7, half %3, i32 2
@@ -1291,8 +1290,8 @@ define spir_func <2 x half> @_Z9normalizeDv2_Dh(<2 x half> %x) #0
     %1 = fmul half %x.x, %rsq
     %2 = fmul half %x.y, %rsq
 
-    %3 = alloca <2 x half>
-    %4 = load <2 x half>, <2 x half>* %3
+    %3 = alloca <2 x half>, addrspace(5)
+    %4 = load <2 x half>, <2 x half> addrspace(5)* %3
     %5 = insertelement <2 x half> %4, half %1, i32 0
     %6 = insertelement <2 x half> %5, half %2, i32 1
 
@@ -1313,8 +1312,8 @@ define spir_func <3 x half> @_Z9normalizeDv3_Dh(<3 x half> %x) #0
     %2 = fmul half %x.y, %rsq
     %3 = fmul half %x.z, %rsq
 
-    %4 = alloca <3 x half>
-    %5 = load <3 x half>, <3 x half>* %4
+    %4 = alloca <3 x half>, addrspace(5)
+    %5 = load <3 x half>, <3 x half> addrspace(5)* %4
     %6 = insertelement <3 x half> %5, half %1, i32 0
     %7 = insertelement <3 x half> %6, half %2, i32 1
     %8 = insertelement <3 x half> %7, half %3, i32 2
@@ -1338,8 +1337,8 @@ define spir_func <4 x half> @_Z9normalizeDv4_Dh(<4 x half> %x) #0
     %3 = fmul half %x.z, %rsq
     %4 = fmul half %x.w, %rsq
 
-    %5 = alloca <4 x half>
-    %6 = load <4 x half>, <4 x half>* %5
+    %5 = alloca <4 x half>, addrspace(5)
+    %6 = load <4 x half>, <4 x half> addrspace(5)* %5
     %7 = insertelement <4 x half> %6, half %1, i32 0
     %8 = insertelement <4 x half> %7, half %2, i32 1
     %9 = insertelement <4 x half> %8, half %3, i32 2
@@ -1380,8 +1379,8 @@ define spir_func <2 x half> @_Z11faceForwardDv2_DhDv2_DhDv2_Dh(<2 x half> %N, <2
     %1 = select i1 %con ,half %N.x, half %NN.x
     %2 = select i1 %con ,half %N.y, half %NN.y
 
-    %3 = alloca <2 x half>
-    %4 = load <2 x half>, <2 x half>* %3
+    %3 = alloca <2 x half>, addrspace(5)
+    %4 = load <2 x half>, <2 x half> addrspace(5)* %3
     %5 = insertelement <2 x half> %4, half %1, i32 0
     %6 = insertelement <2 x half> %5, half %2, i32 1
 
@@ -1408,8 +1407,8 @@ define spir_func <3 x half> @_Z11faceForwardDv3_DhDv3_DhDv3_Dh(<3 x half> %N, <3
     %2 = select i1 %con ,half %N.y, half %NN.y
     %3 = select i1 %con ,half %N.z, half %NN.z
 
-    %4 = alloca <3 x half>
-    %5 = load <3 x half>, <3 x half>* %4
+    %4 = alloca <3 x half>, addrspace(5)
+    %5 = load <3 x half>, <3 x half> addrspace(5)* %4
     %6 = insertelement <3 x half> %5, half %1, i32 0
     %7 = insertelement <3 x half> %6, half %2, i32 1
     %8 = insertelement <3 x half> %7, half %3, i32 2
@@ -1440,8 +1439,8 @@ define spir_func <4 x half> @_Z11faceForwardDv4_DhDv4_DhDv4_Dh(<4 x half> %N, <4
     %3 = select i1 %con ,half %N.z,  half %NN.z
     %4 = select i1 %con ,half %N.w,  half %NN.w
 
-    %5 = alloca <4 x half>
-    %6 = load <4 x half>, <4 x half>* %5
+    %5 = alloca <4 x half>, addrspace(5)
+    %6 = load <4 x half>, <4 x half> addrspace(5)* %5
     %7 = insertelement <4 x half> %6, half %1, i32 0
     %8 = insertelement <4 x half> %7, half %2, i32 1
     %9 = insertelement <4 x half> %8, half %3, i32 2
@@ -1469,8 +1468,8 @@ define spir_func <2 x half> @_Z7reflectDv2_DhDv2_Dh(<2 x half> %I, <2 x half> %N
     %dotin = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %I, <2 x half> %N)
     %dot = fmul half %dotin, 2.0
 
-    %1 = alloca <2 x half>
-    %2 = load <2 x half>, <2 x half>* %1
+    %1 = alloca <2 x half>, addrspace(5)
+    %2 = load <2 x half>, <2 x half> addrspace(5)* %1
     %3 = insertelement <2 x half> %2, half %dot, i32 0
     %dotv = insertelement <2 x half> %3, half %dot, i32 1
 
@@ -1487,8 +1486,8 @@ define spir_func <3 x half> @_Z7reflectDv3_DhDv3_Dh(<3 x half> %I, <3 x half> %N
     %dotin = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %I, <3 x half> %N)
     %dot = fmul half %dotin, 2.0
 
-    %1 = alloca <3 x half>
-    %2 = load <3 x half>, <3 x half>* %1
+    %1 = alloca <3 x half>, addrspace(5)
+    %2 = load <3 x half>, <3 x half> addrspace(5)* %1
     %3 = insertelement <3 x half> %2, half %dot, i32 0
     %4 = insertelement <3 x half> %3, half %dot, i32 1
     %dotv = insertelement <3 x half> %4, half %dot, i32 2
@@ -1506,8 +1505,8 @@ define spir_func <4 x half> @_Z7reflectDv4_DhDv4_Dh(<4 x half> %I, <4 x half> %N
     %dotin = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %I, <4 x half> %N)
     %dot = fmul half %dotin, 2.0
 
-    %1 = alloca <4 x half>
-    %2 = load <4 x half>, <4 x half>* %1
+    %1 = alloca <4 x half>, addrspace(5)
+    %2 = load <4 x half>, <4 x half> addrspace(5)* %1
     %3 = insertelement <4 x half> %2, half %dot, i32 0
     %4 = insertelement <4 x half> %3, half %dot, i32 1
     %5 = insertelement <4 x half> %4, half %dot, i32 2
@@ -1577,8 +1576,8 @@ define spir_func <2 x half> @_Z7refractDv2_DhDv2_DhDh(<2 x half> %I, <2 x half> 
     %1 = select i1 %con, half 0.0, half %S0
     %2 = select i1 %con, half 0.0, half %S1
 
-    %3 = alloca <2 x half>
-    %4 = load <2 x half>, <2 x half>* %3
+    %3 = alloca <2 x half>, addrspace(5)
+    %4 = load <2 x half>, <2 x half> addrspace(5)* %3
     %5 = insertelement <2 x half> %4, half %1, i32 0
     %6 = insertelement <2 x half> %5, half %2, i32 1
 
@@ -1625,8 +1624,8 @@ define spir_func <3 x half> @_Z7refractDv3_DhDv3_DhDh(<3 x half> %I, <3 x half> 
     %2 = select i1 %con, half 0.0, half %S1
     %3 = select i1 %con, half 0.0, half %S2
 
-    %4 = alloca <3 x half>
-    %5 = load <3 x half>, <3 x half>* %4
+    %4 = alloca <3 x half>, addrspace(5)
+    %5 = load <3 x half>, <3 x half> addrspace(5)* %4
     %6 = insertelement <3 x half> %5, half %1, i32 0
     %7 = insertelement <3 x half> %6, half %2, i32 1
     %8 = insertelement <3 x half> %7, half %3, i32 2
@@ -1680,8 +1679,8 @@ define spir_func <4 x half> @_Z7refractDv4_DhDv4_DhDh(<4 x half> %I, <4 x half> 
     %3 = select i1 %con, half 0.0, half %S2
     %4 = select i1 %con, half 0.0, half %S3
 
-    %5 = alloca <4 x half>
-    %6 = load <4 x half>, <4 x half>* %5
+    %5 = alloca <4 x half>, addrspace(5)
+    %6 = load <4 x half>, <4 x half> addrspace(5)* %5
     %7 = insertelement <4 x half> %6, half %1, i32 0
     %8 = insertelement <4 x half> %7, half %2, i32 1
     %9 = insertelement <4 x half> %8, half %3, i32 2
@@ -1692,18 +1691,18 @@ define spir_func <4 x half> @_Z7refractDv4_DhDv4_DhDh(<4 x half> %I, <4 x half> 
 
 ; GLSL: float16_t frexp(float16_t, out int)
 define spir_func half @_Z5frexpDhPi(
-    half %x, i32* %i)
+    half %x, i32 addrspace(5)* %i)
 {
     %1 = call half @llvm.amdgcn.frexp.mant.f16(half %x)
     %2 = call i16 @llvm.amdgcn.frexp.exp.i16.f16(half %x)
     %3 = sext i16 %2 to i32
-    store i32 %3, i32* %i
+    store i32 %3, i32 addrspace(5)* %i
     ret half %1
 }
 
 ; GLSL: f16vec2 frexp(f16vec2, out ivec2)
 define spir_func <2 x half> @_Z5frexpDv2_DhPDv2_i
-    (<2 x half> %x, <2 x i32>* %i)
+    (<2 x half> %x, <2 x i32> addrspace(5)* %i)
 {
     %x0 = extractelement <2 x half> %x, i32 0
     %x1 = extractelement <2 x half> %x, i32 1
@@ -1721,14 +1720,14 @@ define spir_func <2 x half> @_Z5frexpDv2_DhPDv2_i
     %8 = insertelement <2 x i16> %7, i16 %4, i32 1
 
     %9 = sext <2 x i16> %8 to <2 x i32>
-    store <2 x i32> %9, <2 x i32>* %i
+    store <2 x i32> %9, <2 x i32> addrspace(5)* %i
 
     ret <2 x half> %6
 }
 
 ; GLSL: f16vec3 frexp(f16vec3, out ivec3)
 define spir_func <3 x half> @_Z5frexpDv3_DhPDv3_i
-    (<3 x half> %x, <3 x i32>* %i)
+    (<3 x half> %x, <3 x i32> addrspace(5)* %i)
 {
     %x0 = extractelement <3 x half> %x, i32 0
     %x1 = extractelement <3 x half> %x, i32 1
@@ -1751,14 +1750,14 @@ define spir_func <3 x half> @_Z5frexpDv3_DhPDv3_i
     %12 = insertelement <3 x i16> %11, i16 %6, i32 2
 
     %13 = sext <3 x i16> %12 to <3 x i32>
-    store <3 x i32> %13, <3 x i32>* %i
+    store <3 x i32> %13, <3 x i32> addrspace(5)* %i
 
     ret <3 x half> %9
 }
 
 ; GLSL: f16vec4 frexp(f16vec4, out ivec4)
 define spir_func <4 x half> @_Z5frexpDv4_DhPDv4_i
-    (<4 x half> %x, <4 x i32>* %i)
+    (<4 x half> %x, <4 x i32> addrspace(5)* %i)
 {
     %x0 = extractelement <4 x half> %x, i32 0
     %x1 = extractelement <4 x half> %x, i32 1
@@ -1786,7 +1785,7 @@ define spir_func <4 x half> @_Z5frexpDv4_DhPDv4_i
     %16 = insertelement <4 x i16> %15, i16 %8, i32 3
 
     %17 = sext <4 x i16> %16 to <4 x i32>
-    store <4 x i32> %17, <4 x i32>* %i
+    store <4 x i32> %17, <4 x i32> addrspace(5)* %i
 
     ret <4 x half> %12
 }

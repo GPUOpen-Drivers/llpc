@@ -719,10 +719,13 @@ bool Section::GetPtrOfSubSection(
 // Reads whole file content
 // NOTE: The input file name is  from class member "fileName" and read result is stored in shaderSource or m_spvBin
 // according to file type
-bool SectionShader::ReadFile(
-    const std::string&  docFilename,      // [in] File name of parent document
-    bool                isBinary,         // Whether file is SPIRV binary file
-    std::string*        pErrorMsg)        // [out] Error message
+bool Section::ReadFile(
+    const std::string&    docFilename,      // [in] File name of parent document
+    const std::string&    fileName,         // [in] File name
+    bool                  isBinary,         // Whether file is SPIRV binary file
+    std::vector<uint8_t>* pBinaryData,      // [out] Binary data
+    std::string*          pTextData,        // [out] Text data
+    std::string*          pErrorMsg)        // [out] Error message
 {
     bool result = true;
 
@@ -757,12 +760,12 @@ bool SectionShader::ReadFile(
     // Copy to destination
     if (isBinary)
     {
-        m_spvBin.resize(readSize);
-        memcpy(&m_spvBin[0], pData, readSize);
+        (*pBinaryData).resize(readSize);
+        memcpy(&(*pBinaryData)[0], pData, readSize);
     }
     else
     {
-        shaderSource = pData;
+        *pTextData = pData;
     }
 
     // Clean up
@@ -906,7 +909,7 @@ bool SectionShader::CompileShader(
     case GlslFile:
     case HlslFile:
         {
-            result = ReadFile(docFilename, false, pErrorMsg);
+            result = ReadFile(docFilename, fileName, false, &m_spvBin, &shaderSource, pErrorMsg);
             if (result)
             {
                 CompileGlsl(pShaderInfo, pErrorMsg);
@@ -920,7 +923,7 @@ bool SectionShader::CompileShader(
         }
     case SpirvAsmFile:
         {
-            result = ReadFile(docFilename, false, pErrorMsg);
+            result = ReadFile(docFilename, fileName, false, &m_spvBin, &shaderSource, pErrorMsg);
             if (result)
             {
                 AssembleSpirv(pErrorMsg);
@@ -929,7 +932,7 @@ bool SectionShader::CompileShader(
         }
     case SpirvFile:
         {
-            result = ReadFile(docFilename, true, pErrorMsg);
+            result = ReadFile(docFilename, fileName, true, &m_spvBin, &shaderSource, pErrorMsg);
             break;
         }
     default:
@@ -939,6 +942,38 @@ bool SectionShader::CompileShader(
         }
     }
     return result;
+}
+
+void SectionShader::GetSubState(SectionShader::SubState& state)
+{
+    state.dataSize = static_cast<uint32_t>(m_spvBin.size());
+    state.pData = state.dataSize > 0 ? &m_spvBin[0] : nullptr;
+
+    switch (m_sectionType)
+    {
+    case SectionTypeVertexShader:
+        state.stage = Llpc::ShaderStageVertex;
+        break;
+    case SectionTypeTessControlShader:
+        state.stage = Llpc::ShaderStageTessControl;
+        break;
+    case SectionTypeTessEvalShader:
+        state.stage = Llpc::ShaderStageTessEval;
+        break;
+    case SectionTypeGeometryShader:
+        state.stage = Llpc::ShaderStageGeometry;
+        break;
+    case SectionTypeFragmentShader:
+        state.stage = Llpc::ShaderStageFragment;
+        break;
+    case SectionTypeComputeShader:
+        state.stage = Llpc::ShaderStageCompute;
+        break;
+    default:
+        VFX_NEVER_CALLED();
+        state.stage = Llpc::ShaderStageInvalid;
+        break;
+    }
 }
 
 }

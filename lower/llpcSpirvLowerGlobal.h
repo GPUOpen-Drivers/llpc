@@ -41,8 +41,6 @@
 namespace Llpc
 {
 
-class PipelineShaders;
-
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for globals (global variables, inputs, and outputs).
 class SpirvLowerGlobal:
@@ -52,12 +50,7 @@ class SpirvLowerGlobal:
 public:
     SpirvLowerGlobal();
 
-    void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineShaders>();
-    }
-
-    virtual bool runOnModule(llvm::Module& module) override;
+    virtual bool runOnModule(llvm::Module& module);
     virtual void visitReturnInst(llvm::ReturnInst& retInst);
     virtual void visitCallInst(llvm::CallInst& callInst);
     virtual void visitLoadInst(llvm::LoadInst& loadInst);
@@ -70,15 +63,12 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerGlobal);
 
-    void ProcessShader();
-
     void MapGlobalVariableToProxy(llvm::GlobalVariable* pGlobalVar);
     void MapInputToProxy(llvm::GlobalVariable* pInput);
     void MapOutputToProxy(llvm::GlobalVariable* pInput);
     void RemoveConstantExpr();
 
     void LowerGlobalVar();
-    void ReplaceUsesInFunc(GlobalVariable* pGlobalVar, Value* pProxy);
     void LowerInput();
     void LowerOutput();
     void LowerInOutInPlace();

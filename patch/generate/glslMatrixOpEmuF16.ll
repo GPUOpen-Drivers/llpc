@@ -23,21 +23,20 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024"
-target triple = "spir64-unknown-unknown"
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5"
 
 ; GLSL: f16mat2 = outerProduct(f16vec2, f16vec2)
 define spir_func [2 x <2 x half>] @_Z12OuterProductDv2_DhDv2_Dh(
     <2 x half> %c, <2 x half> %r) #0
 {
-    %m = alloca [2 x <2 x half>]
-    %m0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <2 x half>, <2 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <2 x half>, <2 x half>* %m0, i32 0, i32 1
+    %m = alloca [2 x <2 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m0, i32 0, i32 1
 
-    %m1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <2 x half>, <2 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <2 x half>, <2 x half>* %m1, i32 0, i32 1
+    %m1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m1, i32 0, i32 1
 
     %c0 = extractelement <2 x half> %c, i32 0
     %c1 = extractelement <2 x half> %c, i32 1
@@ -46,14 +45,14 @@ define spir_func [2 x <2 x half>] @_Z12OuterProductDv2_DhDv2_Dh(
     %r1 = extractelement <2 x half> %r, i32 1
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c0, %r1
-    store half %3, half* %m10
+    store half %3, half addrspace(5)* %m10
     %4 = fmul half %c1, %r1
-    store half %4, half* %m11
-    %5 = load [2 x <2 x half>], [2 x <2 x half>]* %m
+    store half %4, half addrspace(5)* %m11
+    %5 = load [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %m
 
     ret [2 x <2 x half>] %5
 }
@@ -62,21 +61,21 @@ define spir_func [2 x <2 x half>] @_Z12OuterProductDv2_DhDv2_Dh(
 define spir_func [3 x <3 x half>] @_Z12OuterProductDv3_DhDv3_Dh(
     <3 x half> %c, <3 x half> %r) #0
 {
-    %m = alloca [3 x <3 x half>]
-    %m0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 1
-    %m02 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 2
+    %m = alloca [3 x <3 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 1
+    %m02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 2
 
-    %m1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 1
-    %m12 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 2
+    %m1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 1
+    %m12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 2
 
-    %m2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %m, i32 0, i32 2
-    %m20 = getelementptr inbounds <3 x half>, <3 x half>* %m2, i32 0, i32 0
-    %m21 = getelementptr inbounds <3 x half>, <3 x half>* %m2, i32 0, i32 1
-    %m22 = getelementptr inbounds <3 x half>, <3 x half>* %m2, i32 0, i32 2
+    %m2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %m, i32 0, i32 2
+    %m20 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m2, i32 0, i32 0
+    %m21 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m2, i32 0, i32 1
+    %m22 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m2, i32 0, i32 2
 
     %c0 = extractelement <3 x half> %c, i32 0
     %c1 = extractelement <3 x half> %c, i32 1
@@ -87,24 +86,24 @@ define spir_func [3 x <3 x half>] @_Z12OuterProductDv3_DhDv3_Dh(
     %r2 = extractelement <3 x half> %r, i32 2
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c2, %r0
-    store half %3, half* %m02
+    store half %3, half addrspace(5)* %m02
     %4 = fmul half %c0, %r1
-    store half %4, half* %m10
+    store half %4, half addrspace(5)* %m10
     %5 = fmul half %c1, %r1
-    store half %5, half* %m11
+    store half %5, half addrspace(5)* %m11
     %6 = fmul half %c2, %r1
-    store half %6, half* %m12
+    store half %6, half addrspace(5)* %m12
     %7 = fmul half %c0, %r2
-    store half %7, half* %m20
+    store half %7, half addrspace(5)* %m20
     %8 = fmul half %c1, %r2
-    store half %8, half* %m21
+    store half %8, half addrspace(5)* %m21
     %9 = fmul half %c2, %r2
-    store half %9, half* %m22
-    %10 = load [3 x <3 x half>], [3 x <3 x half>]* %m
+    store half %9, half addrspace(5)* %m22
+    %10 = load [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %m
 
     ret [3 x <3 x half>] %10
 }
@@ -113,30 +112,30 @@ define spir_func [3 x <3 x half>] @_Z12OuterProductDv3_DhDv3_Dh(
 define spir_func [4 x <4 x half>] @_Z12OuterProductDv4_DhDv4_Dh(
     <4 x half> %c, <4 x half> %r) #0
 {
-    %m = alloca [4 x <4 x half>]
-    %m0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 1
-    %m02 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 2
-    %m03 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 3
+    %m = alloca [4 x <4 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 1
+    %m02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 2
+    %m03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 3
 
-    %m1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 1
-    %m12 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 2
-    %m13 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 3
+    %m1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 1
+    %m12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 2
+    %m13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 3
 
-    %m2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %m, i32 0, i32 2
-    %m20 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 0
-    %m21 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 1
-    %m22 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 2
-    %m23 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 3
+    %m2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %m, i32 0, i32 2
+    %m20 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 0
+    %m21 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 1
+    %m22 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 2
+    %m23 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 3
 
-    %m3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %m, i32 0, i32 3
-    %m30 = getelementptr inbounds <4 x half>, <4 x half>* %m3, i32 0, i32 0
-    %m31 = getelementptr inbounds <4 x half>, <4 x half>* %m3, i32 0, i32 1
-    %m32 = getelementptr inbounds <4 x half>, <4 x half>* %m3, i32 0, i32 2
-    %m33 = getelementptr inbounds <4 x half>, <4 x half>* %m3, i32 0, i32 3
+    %m3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %m, i32 0, i32 3
+    %m30 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m3, i32 0, i32 0
+    %m31 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m3, i32 0, i32 1
+    %m32 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m3, i32 0, i32 2
+    %m33 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m3, i32 0, i32 3
 
     %c0 = extractelement <4 x half> %c, i32 0
     %c1 = extractelement <4 x half> %c, i32 1
@@ -149,38 +148,38 @@ define spir_func [4 x <4 x half>] @_Z12OuterProductDv4_DhDv4_Dh(
     %r3 = extractelement <4 x half> %r, i32 3
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c2, %r0
-    store half %3, half* %m02
+    store half %3, half addrspace(5)* %m02
     %4 = fmul half %c3, %r0
-    store half %4, half* %m03
+    store half %4, half addrspace(5)* %m03
     %5 = fmul half %c0, %r1
-    store half %5, half* %m10
+    store half %5, half addrspace(5)* %m10
     %6 = fmul half %c1, %r1
-    store half %6, half* %m11
+    store half %6, half addrspace(5)* %m11
     %7 = fmul half %c2, %r1
-    store half %7, half* %m12
+    store half %7, half addrspace(5)* %m12
     %8 = fmul half %c3, %r1
-    store half %8, half* %m13
+    store half %8, half addrspace(5)* %m13
     %9 = fmul half %c0, %r2
-    store half %9, half* %m20
+    store half %9, half addrspace(5)* %m20
     %10 = fmul half %c1, %r2
-    store half %10, half* %m21
+    store half %10, half addrspace(5)* %m21
     %11 = fmul half %c2, %r2
-    store half %11, half* %m22
+    store half %11, half addrspace(5)* %m22
     %12 = fmul half %c3, %r2
-    store half %12, half* %m23
+    store half %12, half addrspace(5)* %m23
     %13 = fmul half %c0, %r3
-    store half %13, half* %m30
+    store half %13, half addrspace(5)* %m30
     %14 = fmul half %c1, %r3
-    store half %14, half* %m31
+    store half %14, half addrspace(5)* %m31
     %15 = fmul half %c2, %r3
-    store half %15, half* %m32
+    store half %15, half addrspace(5)* %m32
     %16 = fmul half %c3, %r3
-    store half %16, half* %m33
-    %17 = load [4 x <4 x half>], [4 x <4 x half>]* %m
+    store half %16, half addrspace(5)* %m33
+    %17 = load [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %m
 
     ret [4 x <4 x half>] %17
 }
@@ -189,16 +188,16 @@ define spir_func [4 x <4 x half>] @_Z12OuterProductDv4_DhDv4_Dh(
 define spir_func [2 x <3 x half>] @_Z12OuterProductDv3_DhDv2_Dh(
     <3 x half> %c, <2 x half> %r) #0
 {
-    %m = alloca [2 x <3 x half>]
-    %m0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 1
-    %m02 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 2
+    %m = alloca [2 x <3 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 1
+    %m02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 2
 
-    %m1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 1
-    %m12 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 2
+    %m1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 1
+    %m12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 2
 
     %c0 = extractelement <3 x half> %c, i32 0
     %c1 = extractelement <3 x half> %c, i32 1
@@ -208,18 +207,18 @@ define spir_func [2 x <3 x half>] @_Z12OuterProductDv3_DhDv2_Dh(
     %r1 = extractelement <2 x half> %r, i32 1
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c2, %r0
-    store half %3, half* %m02
+    store half %3, half addrspace(5)* %m02
     %4 = fmul half %c0, %r1
-    store half %4, half* %m10
+    store half %4, half addrspace(5)* %m10
     %5 = fmul half %c1, %r1
-    store half %5, half* %m11
+    store half %5, half addrspace(5)* %m11
     %6 = fmul half %c2, %r1
-    store half %6, half* %m12
-    %7 = load [2 x <3 x half>], [2 x <3 x half>]* %m
+    store half %6, half addrspace(5)* %m12
+    %7 = load [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %m
 
     ret [2 x <3 x half>] %7
 }
@@ -228,18 +227,18 @@ define spir_func [2 x <3 x half>] @_Z12OuterProductDv3_DhDv2_Dh(
 define spir_func [3 x <2 x half>] @_Z12OuterProductDv2_DhDv3_Dh(
     <2 x half> %c, <3 x half> %r) #0
 {
-    %m = alloca [3 x <2 x half>]
-    %m0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <2 x half>, <2 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <2 x half>, <2 x half>* %m0, i32 0, i32 1
+    %m = alloca [3 x <2 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m0, i32 0, i32 1
 
-    %m1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <2 x half>, <2 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <2 x half>, <2 x half>* %m1, i32 0, i32 1
+    %m1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m1, i32 0, i32 1
 
-    %m2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %m, i32 0, i32 2
-    %m20 = getelementptr inbounds <2 x half>, <2 x half>* %m2, i32 0, i32 0
-    %m21 = getelementptr inbounds <2 x half>, <2 x half>* %m2, i32 0, i32 1
+    %m2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %m, i32 0, i32 2
+    %m20 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m2, i32 0, i32 0
+    %m21 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m2, i32 0, i32 1
 
     %c0 = extractelement <2 x half> %c, i32 0
     %c1 = extractelement <2 x half> %c, i32 1
@@ -249,18 +248,18 @@ define spir_func [3 x <2 x half>] @_Z12OuterProductDv2_DhDv3_Dh(
     %r2 = extractelement <3 x half> %r, i32 2
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c0, %r1
-    store half %3, half* %m10
+    store half %3, half addrspace(5)* %m10
     %4 = fmul half %c1, %r1
-    store half %4, half* %m11
+    store half %4, half addrspace(5)* %m11
     %5 = fmul half %c0, %r2
-    store half %5, half* %m20
+    store half %5, half addrspace(5)* %m20
     %6 = fmul half %c1, %r2
-    store half %6, half* %m21
-    %7 = load [3 x <2 x half>], [3 x <2 x half>]* %m
+    store half %6, half addrspace(5)* %m21
+    %7 = load [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %m
 
     ret [3 x <2 x half>] %7
 }
@@ -269,18 +268,18 @@ define spir_func [3 x <2 x half>] @_Z12OuterProductDv2_DhDv3_Dh(
 define spir_func [2 x <4 x half>] @_Z12OuterProductDv4_DhDv2_Dh(
     <4 x half> %c, <2 x half> %r) #0
 {
-    %m = alloca [2 x <4 x half>]
-    %m0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 1
-    %m02 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 2
-    %m03 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 3
+    %m = alloca [2 x <4 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 1
+    %m02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 2
+    %m03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 3
 
-    %m1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 1
-    %m12 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 2
-    %m13 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 3
+    %m1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 1
+    %m12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 2
+    %m13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 3
 
     %c0 = extractelement <4 x half> %c, i32 0
     %c1 = extractelement <4 x half> %c, i32 1
@@ -291,22 +290,22 @@ define spir_func [2 x <4 x half>] @_Z12OuterProductDv4_DhDv2_Dh(
     %r1 = extractelement <2 x half> %r, i32 1
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c2, %r0
-    store half %3, half* %m02
+    store half %3, half addrspace(5)* %m02
     %4 = fmul half %c3, %r0
-    store half %4, half* %m03
+    store half %4, half addrspace(5)* %m03
     %5 = fmul half %c0, %r1
-    store half %5, half* %m10
+    store half %5, half addrspace(5)* %m10
     %6 = fmul half %c1, %r1
-    store half %6, half* %m11
+    store half %6, half addrspace(5)* %m11
     %7 = fmul half %c2, %r1
-    store half %7, half* %m12
+    store half %7, half addrspace(5)* %m12
     %8 = fmul half %c3, %r1
-    store half %8, half* %m13
-    %9 = load [2 x <4 x half>], [2 x <4 x half>]* %m
+    store half %8, half addrspace(5)* %m13
+    %9 = load [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %m
 
     ret [2 x <4 x half>] %9
 }
@@ -315,22 +314,22 @@ define spir_func [2 x <4 x half>] @_Z12OuterProductDv4_DhDv2_Dh(
 define spir_func [4 x <2 x half>] @_Z12OuterProductDv2_DhDv4_Dh(
     <2 x half> %c, <4 x half> %r) #0
 {
-    %m = alloca [4 x <2 x half>]
-    %m0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <2 x half>, <2 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <2 x half>, <2 x half>* %m0, i32 0, i32 1
+    %m = alloca [4 x <2 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m0, i32 0, i32 1
 
-    %m1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <2 x half>, <2 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <2 x half>, <2 x half>* %m1, i32 0, i32 1
+    %m1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m1, i32 0, i32 1
 
-    %m2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %m, i32 0, i32 2
-    %m20 = getelementptr inbounds <2 x half>, <2 x half>* %m2, i32 0, i32 0
-    %m21 = getelementptr inbounds <2 x half>, <2 x half>* %m2, i32 0, i32 1
+    %m2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %m, i32 0, i32 2
+    %m20 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m2, i32 0, i32 0
+    %m21 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m2, i32 0, i32 1
 
-    %m3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %m, i32 0, i32 3
-    %m30 = getelementptr inbounds <2 x half>, <2 x half>* %m3, i32 0, i32 0
-    %m31 = getelementptr inbounds <2 x half>, <2 x half>* %m3, i32 0, i32 1
+    %m3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %m, i32 0, i32 3
+    %m30 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m3, i32 0, i32 0
+    %m31 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %m3, i32 0, i32 1
 
     %c0 = extractelement <2 x half> %c, i32 0
     %c1 = extractelement <2 x half> %c, i32 1
@@ -341,22 +340,22 @@ define spir_func [4 x <2 x half>] @_Z12OuterProductDv2_DhDv4_Dh(
     %r3 = extractelement <4 x half> %r, i32 3
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c0, %r1
-    store half %3, half* %m10
+    store half %3, half addrspace(5)* %m10
     %4 = fmul half %c1, %r1
-    store half %4, half* %m11
+    store half %4, half addrspace(5)* %m11
     %5 = fmul half %c0, %r2
-    store half %5, half* %m20
+    store half %5, half addrspace(5)* %m20
     %6 = fmul half %c1, %r2
-    store half %6, half* %m21
+    store half %6, half addrspace(5)* %m21
     %7 = fmul half %c0, %r3
-    store half %7, half* %m30
+    store half %7, half addrspace(5)* %m30
     %8 = fmul half %c1, %r3
-    store half %8, half* %m31
-    %9 = load [4 x <2 x half>], [4 x <2 x half>]* %m
+    store half %8, half addrspace(5)* %m31
+    %9 = load [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %m
 
     ret [4 x <2 x half>] %9
 }
@@ -365,24 +364,24 @@ define spir_func [4 x <2 x half>] @_Z12OuterProductDv2_DhDv4_Dh(
 define spir_func [3 x <4 x half>] @_Z12OuterProductDv4_DhDv3_Dh(
     <4 x half> %c, <3 x half> %r) #0
 {
-    %m = alloca [3 x <4 x half>]
-    %m0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 1
-    %m02 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 2
-    %m03 = getelementptr inbounds <4 x half>, <4 x half>* %m0, i32 0, i32 3
+    %m = alloca [3 x <4 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 1
+    %m02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 2
+    %m03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m0, i32 0, i32 3
 
-    %m1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 1
-    %m12 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 2
-    %m13 = getelementptr inbounds <4 x half>, <4 x half>* %m1, i32 0, i32 3
+    %m1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 1
+    %m12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 2
+    %m13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m1, i32 0, i32 3
 
-    %m2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %m, i32 0, i32 2
-    %m20 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 0
-    %m21 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 1
-    %m22 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 2
-    %m23 = getelementptr inbounds <4 x half>, <4 x half>* %m2, i32 0, i32 3
+    %m2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %m, i32 0, i32 2
+    %m20 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 0
+    %m21 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 1
+    %m22 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 2
+    %m23 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %m2, i32 0, i32 3
 
     %c0 = extractelement <4 x half> %c, i32 0
     %c1 = extractelement <4 x half> %c, i32 1
@@ -394,30 +393,30 @@ define spir_func [3 x <4 x half>] @_Z12OuterProductDv4_DhDv3_Dh(
     %r2 = extractelement <3 x half> %r, i32 2
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c2, %r0
-    store half %3, half* %m02
+    store half %3, half addrspace(5)* %m02
     %4 = fmul half %c3, %r0
-    store half %4, half* %m03
+    store half %4, half addrspace(5)* %m03
     %5 = fmul half %c0, %r1
-    store half %5, half* %m10
+    store half %5, half addrspace(5)* %m10
     %6 = fmul half %c1, %r1
-    store half %6, half* %m11
+    store half %6, half addrspace(5)* %m11
     %7 = fmul half %c2, %r1
-    store half %7, half* %m12
+    store half %7, half addrspace(5)* %m12
     %8 = fmul half %c3, %r1
-    store half %8, half* %m13
+    store half %8, half addrspace(5)* %m13
     %9 = fmul half %c0, %r2
-    store half %9, half* %m20
+    store half %9, half addrspace(5)* %m20
     %10 = fmul half %c1, %r2
-    store half %10, half* %m21
+    store half %10, half addrspace(5)* %m21
     %11 = fmul half %c2, %r2
-    store half %11, half* %m22
+    store half %11, half addrspace(5)* %m22
     %12 = fmul half %c3, %r2
-    store half %12, half* %m23
-    %13 = load [3 x <4 x half>], [3 x <4 x half>]* %m
+    store half %12, half addrspace(5)* %m23
+    %13 = load [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %m
 
     ret [3 x <4 x half>] %13
 }
@@ -426,26 +425,26 @@ define spir_func [3 x <4 x half>] @_Z12OuterProductDv4_DhDv3_Dh(
 define spir_func [4 x <3 x half>] @_Z12OuterProductDv3_DhDv4_Dh(
     <3 x half> %c, <4 x half> %r) #0
 {
-    %m = alloca [4 x <3 x half>]
-    %m0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %m, i32 0, i32 0
-    %m00 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 0
-    %m01 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 1
-    %m02 = getelementptr inbounds <3 x half>, <3 x half>* %m0, i32 0, i32 2
+    %m = alloca [4 x <3 x half>], addrspace(5)
+    %m0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %m, i32 0, i32 0
+    %m00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 0
+    %m01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 1
+    %m02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m0, i32 0, i32 2
 
-    %m1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %m, i32 0, i32 1
-    %m10 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 0
-    %m11 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 1
-    %m12 = getelementptr inbounds <3 x half>, <3 x half>* %m1, i32 0, i32 2
+    %m1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %m, i32 0, i32 1
+    %m10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 0
+    %m11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 1
+    %m12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m1, i32 0, i32 2
 
-    %m2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %m, i32 0, i32 2
-    %m20 = getelementptr inbounds <3 x half>, <3 x half>* %m2, i32 0, i32 0
-    %m21 = getelementptr inbounds <3 x half>, <3 x half>* %m2, i32 0, i32 1
-    %m22 = getelementptr inbounds <3 x half>, <3 x half>* %m2, i32 0, i32 2
+    %m2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %m, i32 0, i32 2
+    %m20 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m2, i32 0, i32 0
+    %m21 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m2, i32 0, i32 1
+    %m22 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m2, i32 0, i32 2
 
-    %m3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %m, i32 0, i32 3
-    %m30 = getelementptr inbounds <3 x half>, <3 x half>* %m3, i32 0, i32 0
-    %m31 = getelementptr inbounds <3 x half>, <3 x half>* %m3, i32 0, i32 1
-    %m32 = getelementptr inbounds <3 x half>, <3 x half>* %m3, i32 0, i32 2
+    %m3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %m, i32 0, i32 3
+    %m30 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m3, i32 0, i32 0
+    %m31 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m3, i32 0, i32 1
+    %m32 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %m3, i32 0, i32 2
 
     %c0 = extractelement <3 x half> %c, i32 0
     %c1 = extractelement <3 x half> %c, i32 1
@@ -457,30 +456,30 @@ define spir_func [4 x <3 x half>] @_Z12OuterProductDv3_DhDv4_Dh(
     %r3 = extractelement <4 x half> %r, i32 3
 
     %1 = fmul half %c0, %r0
-    store half %1, half* %m00
+    store half %1, half addrspace(5)* %m00
     %2 = fmul half %c1, %r0
-    store half %2, half* %m01
+    store half %2, half addrspace(5)* %m01
     %3 = fmul half %c2, %r0
-    store half %3, half* %m02
+    store half %3, half addrspace(5)* %m02
     %4 = fmul half %c0, %r1
-    store half %4, half* %m10
+    store half %4, half addrspace(5)* %m10
     %5 = fmul half %c1, %r1
-    store half %5, half* %m11
+    store half %5, half addrspace(5)* %m11
     %6 = fmul half %c2, %r1
-    store half %6, half* %m12
+    store half %6, half addrspace(5)* %m12
     %7 = fmul half %c0, %r2
-    store half %7, half* %m20
+    store half %7, half addrspace(5)* %m20
     %8 = fmul half %c1, %r2
-    store half %8, half* %m21
+    store half %8, half addrspace(5)* %m21
     %9 = fmul half %c2, %r2
-    store half %9, half* %m22
+    store half %9, half addrspace(5)* %m22
     %10 = fmul half %c0, %r3
-    store half %10, half* %m30
+    store half %10, half addrspace(5)* %m30
     %11 = fmul half %c1, %r3
-    store half %11, half* %m31
+    store half %11, half addrspace(5)* %m31
     %12 = fmul half %c2, %r3
-    store half %12, half* %m32
-    %13 = load [4 x <3 x half>], [4 x <3 x half>]* %m
+    store half %12, half addrspace(5)* %m32
+    %13 = load [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %m
 
     ret [4 x <3 x half>] %13
 }
@@ -489,14 +488,14 @@ define spir_func [4 x <3 x half>] @_Z12OuterProductDv3_DhDv4_Dh(
 define spir_func [2 x <2 x half>] @_Z9TransposeDv2_Dv2_Dh(
     [2 x <2 x half>] %m) #0
 {
-    %nm = alloca [2 x <2 x half>]
-    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 1
+    %nm = alloca [2 x <2 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 1
 
-    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 1
+    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 1
 
     %m0v = extractvalue [2 x <2 x half>] %m, 0
     %m0v0 = extractelement <2 x half> %m0v, i32 0
@@ -506,11 +505,11 @@ define spir_func [2 x <2 x half>] @_Z9TransposeDv2_Dv2_Dh(
     %m1v0 = extractelement <2 x half> %m1v, i32 0
     %m1v1 = extractelement <2 x half> %m1v, i32 1
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    %nmv = load [2 x <2 x half>], [2 x <2 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    %nmv = load [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm
     ret [2 x <2 x half>] %nmv
 }
 
@@ -518,21 +517,21 @@ define spir_func [2 x <2 x half>] @_Z9TransposeDv2_Dv2_Dh(
 define spir_func [3 x <3 x half>] @_Z9TransposeDv3_Dv3_Dh(
     [3 x <3 x half>] %m) #0
 {
-    %nm = alloca [3 x <3 x half>]
-    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 2
+    %nm = alloca [3 x <3 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 2
 
-    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 2
+    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 2
 
-    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 2
+    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 2
 
     %m0v = extractvalue [3 x <3 x half>] %m, 0
     %m0v0 = extractelement <3 x half> %m0v, i32 0
@@ -549,16 +548,16 @@ define spir_func [3 x <3 x half>] @_Z9TransposeDv3_Dv3_Dh(
     %m2v1 = extractelement <3 x half> %m2v, i32 1
     %m2v2 = extractelement <3 x half> %m2v, i32 2
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m2v0, half* %nm02
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m2v1, half* %nm12
-    store half %m0v2, half* %nm20
-    store half %m1v2, half* %nm21
-    store half %m2v2, half* %nm22
-    %nmv = load [3 x <3 x half>], [3 x <3 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m2v0, half addrspace(5)* %nm02
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m2v1, half addrspace(5)* %nm12
+    store half %m0v2, half addrspace(5)* %nm20
+    store half %m1v2, half addrspace(5)* %nm21
+    store half %m2v2, half addrspace(5)* %nm22
+    %nmv = load [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm
     ret [3 x <3 x half>] %nmv
 }
 
@@ -566,30 +565,30 @@ define spir_func [3 x <3 x half>] @_Z9TransposeDv3_Dv3_Dh(
 define spir_func [4 x <4 x half>] @_Z9TransposeDv4_Dv4_Dh(
     [4 x <4 x half>] %m) #0
 {
-    %nm = alloca [4 x <4 x half>]
-    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 2
-    %nm03 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 3
+    %nm = alloca [4 x <4 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 2
+    %nm03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 3
 
-    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 2
-    %nm13 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 3
+    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 2
+    %nm13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 3
 
-    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 2
-    %nm23 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 3
+    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 2
+    %nm23 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 3
 
-    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 3
-    %nm30 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 0
-    %nm31 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 1
-    %nm32 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 2
-    %nm33 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 3
+    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 3
+    %nm30 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 0
+    %nm31 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 1
+    %nm32 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 2
+    %nm33 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 3
 
     %m0v = extractvalue [4 x <4 x half>] %m, 0
     %m0v0 = extractelement <4 x half> %m0v, i32 0
@@ -615,23 +614,23 @@ define spir_func [4 x <4 x half>] @_Z9TransposeDv4_Dv4_Dh(
     %m3v2 = extractelement <4 x half> %m3v, i32 2
     %m3v3 = extractelement <4 x half> %m3v, i32 3
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m2v0, half* %nm02
-    store half %m3v0, half* %nm03
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m2v1, half* %nm12
-    store half %m3v1, half* %nm13
-    store half %m0v2, half* %nm20
-    store half %m1v2, half* %nm21
-    store half %m2v2, half* %nm22
-    store half %m3v2, half* %nm23
-    store half %m0v3, half* %nm30
-    store half %m1v3, half* %nm31
-    store half %m2v3, half* %nm32
-    store half %m3v3, half* %nm33
-    %nmv = load [4 x <4 x half>], [4 x <4 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m2v0, half addrspace(5)* %nm02
+    store half %m3v0, half addrspace(5)* %nm03
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m2v1, half addrspace(5)* %nm12
+    store half %m3v1, half addrspace(5)* %nm13
+    store half %m0v2, half addrspace(5)* %nm20
+    store half %m1v2, half addrspace(5)* %nm21
+    store half %m2v2, half addrspace(5)* %nm22
+    store half %m3v2, half addrspace(5)* %nm23
+    store half %m0v3, half addrspace(5)* %nm30
+    store half %m1v3, half addrspace(5)* %nm31
+    store half %m2v3, half addrspace(5)* %nm32
+    store half %m3v3, half addrspace(5)* %nm33
+    %nmv = load [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm
     ret [4 x <4 x half>] %nmv
 }
 
@@ -639,16 +638,16 @@ define spir_func [4 x <4 x half>] @_Z9TransposeDv4_Dv4_Dh(
 define spir_func [2 x <3 x half>] @_Z9TransposeDv3_Dv2_Dh(
     [3 x <2 x half>] %m) #0
 {
-    %nm = alloca [2 x <3 x half>]
-    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 2
+    %nm = alloca [2 x <3 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 2
 
-    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 2
+    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 2
 
     %m0v = extractvalue [3 x <2 x half>] %m, 0
     %m0v0 = extractelement <2 x half> %m0v, i32 0
@@ -662,13 +661,13 @@ define spir_func [2 x <3 x half>] @_Z9TransposeDv3_Dv2_Dh(
     %m2v0 = extractelement <2 x half> %m2v, i32 0
     %m2v1 = extractelement <2 x half> %m2v, i32 1
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m2v0, half* %nm02
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m2v1, half* %nm12
-    %nmv = load [2 x <3 x half>], [2 x <3 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m2v0, half addrspace(5)* %nm02
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m2v1, half addrspace(5)* %nm12
+    %nmv = load [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm
     ret [2 x <3 x half>] %nmv
 }
 
@@ -676,18 +675,18 @@ define spir_func [2 x <3 x half>] @_Z9TransposeDv3_Dv2_Dh(
 define spir_func [3 x <2 x half>] @_Z9TransposeDv2_Dv3_Dh(
     [2 x <3 x half>] %m) #0
 {
-    %nm = alloca [3 x <2 x half>]
-    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 1
+    %nm = alloca [3 x <2 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 1
 
-    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 1
+    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 1
 
-    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 1
+    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 1
 
     %m0v = extractvalue [2 x <3 x half>] %m, 0
     %m0v0 = extractelement <3 x half> %m0v, i32 0
@@ -699,13 +698,13 @@ define spir_func [3 x <2 x half>] @_Z9TransposeDv2_Dv3_Dh(
     %m1v1 = extractelement <3 x half> %m1v, i32 1
     %m1v2 = extractelement <3 x half> %m1v, i32 2
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m0v2, half* %nm20
-    store half %m1v2, half* %nm21
-    %nmv = load [3 x <2 x half>], [3 x <2 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m0v2, half addrspace(5)* %nm20
+    store half %m1v2, half addrspace(5)* %nm21
+    %nmv = load [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm
     ret [3 x <2 x half>] %nmv
 }
 
@@ -713,18 +712,18 @@ define spir_func [3 x <2 x half>] @_Z9TransposeDv2_Dv3_Dh(
 define spir_func [2 x <4 x half>] @_Z9TransposeDv4_Dv2_Dh(
     [4 x <2 x half>] %m) #0
 {
-    %nm = alloca [2 x <4 x half>]
-    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 2
-    %nm03 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 3
+    %nm = alloca [2 x <4 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 2
+    %nm03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 3
 
-    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 2
-    %nm13 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 3
+    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 2
+    %nm13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 3
 
     %m0v = extractvalue [4 x <2 x half>] %m, 0
     %m0v0 = extractelement <2 x half> %m0v, i32 0
@@ -742,15 +741,15 @@ define spir_func [2 x <4 x half>] @_Z9TransposeDv4_Dv2_Dh(
     %m3v0 = extractelement <2 x half> %m3v, i32 0
     %m3v1 = extractelement <2 x half> %m3v, i32 1
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m2v0, half* %nm02
-    store half %m3v0, half* %nm03
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m2v1, half* %nm12
-    store half %m3v1, half* %nm13
-    %nmv = load [2 x <4 x half>], [2 x <4 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m2v0, half addrspace(5)* %nm02
+    store half %m3v0, half addrspace(5)* %nm03
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m2v1, half addrspace(5)* %nm12
+    store half %m3v1, half addrspace(5)* %nm13
+    %nmv = load [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm
     ret [2 x <4 x half>] %nmv
 }
 
@@ -758,22 +757,22 @@ define spir_func [2 x <4 x half>] @_Z9TransposeDv4_Dv2_Dh(
 define spir_func [4 x <2 x half>] @_Z9TransposeDv2_Dv4_Dh(
     [2 x <4 x half>] %m) #0
 {
-    %nm = alloca [4 x <2 x half>]
-    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 1
+    %nm = alloca [4 x <2 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 1
 
-    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 1
+    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 1
 
-    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 1
+    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 1
 
-    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 3
-    %nm30 = getelementptr inbounds <2 x half>, <2 x half>* %nm3, i32 0, i32 0
-    %nm31 = getelementptr inbounds <2 x half>, <2 x half>* %nm3, i32 0, i32 1
+    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 3
+    %nm30 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm3, i32 0, i32 0
+    %nm31 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm3, i32 0, i32 1
 
     %m0v = extractvalue [2 x <4 x half>] %m, 0
     %m0v0 = extractelement <4 x half> %m0v, i32 0
@@ -787,15 +786,15 @@ define spir_func [4 x <2 x half>] @_Z9TransposeDv2_Dv4_Dh(
     %m1v2 = extractelement <4 x half> %m1v, i32 2
     %m1v3 = extractelement <4 x half> %m1v, i32 3
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m0v2, half* %nm20
-    store half %m1v2, half* %nm21
-    store half %m0v3, half* %nm30
-    store half %m1v3, half* %nm31
-    %nmv = load [4 x <2 x half>], [4 x <2 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m0v2, half addrspace(5)* %nm20
+    store half %m1v2, half addrspace(5)* %nm21
+    store half %m0v3, half addrspace(5)* %nm30
+    store half %m1v3, half addrspace(5)* %nm31
+    %nmv = load [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm
     ret [4 x <2 x half>] %nmv
 }
 
@@ -803,24 +802,24 @@ define spir_func [4 x <2 x half>] @_Z9TransposeDv2_Dv4_Dh(
 define spir_func [3 x <4 x half>] @_Z9TransposeDv4_Dv3_Dh(
     [4 x <3 x half>] %m) #0
 {
-    %nm = alloca [3 x <4 x half>]
-    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 2
-    %nm03 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 3
+    %nm = alloca [3 x <4 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 2
+    %nm03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 3
 
-    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 2
-    %nm13 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 3
+    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 2
+    %nm13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 3
 
-    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 2
-    %nm23 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 3
+    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 2
+    %nm23 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 3
 
     %m0v = extractvalue [4 x <3 x half>] %m, 0
     %m0v0 = extractelement <3 x half> %m0v, i32 0
@@ -842,19 +841,19 @@ define spir_func [3 x <4 x half>] @_Z9TransposeDv4_Dv3_Dh(
     %m3v1 = extractelement <3 x half> %m3v, i32 1
     %m3v2 = extractelement <3 x half> %m3v, i32 2
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m2v0, half* %nm02
-    store half %m3v0, half* %nm03
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m2v1, half* %nm12
-    store half %m3v1, half* %nm13
-    store half %m0v2, half* %nm20
-    store half %m1v2, half* %nm21
-    store half %m2v2, half* %nm22
-    store half %m3v2, half* %nm23
-    %nmv = load [3 x <4 x half>], [3 x <4 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m2v0, half addrspace(5)* %nm02
+    store half %m3v0, half addrspace(5)* %nm03
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m2v1, half addrspace(5)* %nm12
+    store half %m3v1, half addrspace(5)* %nm13
+    store half %m0v2, half addrspace(5)* %nm20
+    store half %m1v2, half addrspace(5)* %nm21
+    store half %m2v2, half addrspace(5)* %nm22
+    store half %m3v2, half addrspace(5)* %nm23
+    %nmv = load [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm
     ret [3 x <4 x half>] %nmv
 }
 
@@ -862,26 +861,26 @@ define spir_func [3 x <4 x half>] @_Z9TransposeDv4_Dv3_Dh(
 define spir_func [4 x <3 x half>] @_Z9TransposeDv3_Dv4_Dh(
     [3 x <4 x half>] %m) #0
 {
-    %nm = alloca [4 x <3 x half>]
-    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 2
+    %nm = alloca [4 x <3 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 2
 
-    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 2
+    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 2
 
-    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 2
+    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 2
 
-    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 3
-    %nm30 = getelementptr inbounds <3 x half>, <3 x half>* %nm3, i32 0, i32 0
-    %nm31 = getelementptr inbounds <3 x half>, <3 x half>* %nm3, i32 0, i32 1
-    %nm32 = getelementptr inbounds <3 x half>, <3 x half>* %nm3, i32 0, i32 2
+    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 3
+    %nm30 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm3, i32 0, i32 0
+    %nm31 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm3, i32 0, i32 1
+    %nm32 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm3, i32 0, i32 2
 
     %m0v = extractvalue [3 x <4 x half>] %m, 0
     %m0v0 = extractelement <4 x half> %m0v, i32 0
@@ -901,19 +900,19 @@ define spir_func [4 x <3 x half>] @_Z9TransposeDv3_Dv4_Dh(
     %m2v2 = extractelement <4 x half> %m2v, i32 2
     %m2v3 = extractelement <4 x half> %m2v, i32 3
 
-    store half %m0v0, half* %nm00
-    store half %m1v0, half* %nm01
-    store half %m2v0, half* %nm02
-    store half %m0v1, half* %nm10
-    store half %m1v1, half* %nm11
-    store half %m2v1, half* %nm12
-    store half %m0v2, half* %nm20
-    store half %m1v2, half* %nm21
-    store half %m2v2, half* %nm22
-    store half %m0v3, half* %nm30
-    store half %m1v3, half* %nm31
-    store half %m2v3, half* %nm32
-    %nmv = load [4 x <3 x half>], [4 x <3 x half>]* %nm
+    store half %m0v0, half addrspace(5)* %nm00
+    store half %m1v0, half addrspace(5)* %nm01
+    store half %m2v0, half addrspace(5)* %nm02
+    store half %m0v1, half addrspace(5)* %nm10
+    store half %m1v1, half addrspace(5)* %nm11
+    store half %m2v1, half addrspace(5)* %nm12
+    store half %m0v2, half addrspace(5)* %nm20
+    store half %m1v2, half addrspace(5)* %nm21
+    store half %m2v2, half addrspace(5)* %nm22
+    store half %m0v3, half addrspace(5)* %nm30
+    store half %m1v3, half addrspace(5)* %nm31
+    store half %m2v3, half addrspace(5)* %nm32
+    %nmv = load [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm
     ret [4 x <3 x half>] %nmv
 }
 
@@ -921,14 +920,14 @@ define spir_func [4 x <3 x half>] @_Z9TransposeDv3_Dv4_Dh(
 define spir_func [2 x <2 x half>] @_Z17MatrixTimesScalarDv2_Dv2_DhDh(
     [2 x <2 x half>] %m, half %s) #0
 {
-    %nm = alloca [2 x <2 x half>]
-    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 1
+    %nm = alloca [2 x <2 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 1
 
-    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 1
+    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 1
 
     %m0v = extractvalue [2 x <2 x half>] %m, 0
     %m0v0 = extractelement <2 x half> %m0v, i32 0
@@ -939,14 +938,14 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesScalarDv2_Dv2_DhDh(
     %m1v1 = extractelement <2 x half> %m1v, i32 1
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m1v0, %s
-    store half %3, half* %nm10
+    store half %3, half addrspace(5)* %nm10
     %4 = fmul half %m1v1, %s
-    store half %4, half* %nm11
-    %5 = load [2 x <2 x half>], [2 x <2 x half>]* %nm
+    store half %4, half addrspace(5)* %nm11
+    %5 = load [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm
 
     ret [2 x <2 x half>] %5
 }
@@ -955,21 +954,21 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesScalarDv2_Dv2_DhDh(
 define spir_func [3 x <3 x half>] @_Z17MatrixTimesScalarDv3_Dv3_DhDh(
     [3 x <3 x half>] %m, half %s) #0
 {
-    %nm = alloca [3 x <3 x half>]
-    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 2
+    %nm = alloca [3 x <3 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 2
 
-    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 2
+    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 2
 
-    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 2
+    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 2
 
     %m0v = extractvalue [3 x <3 x half>] %m, 0
     %m0v0 = extractelement <3 x half> %m0v, i32 0
@@ -987,24 +986,24 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesScalarDv3_Dv3_DhDh(
     %m2v2 = extractelement <3 x half> %m2v, i32 2
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m0v2, %s
-    store half %3, half* %nm02
+    store half %3, half addrspace(5)* %nm02
     %4 = fmul half %m1v0, %s
-    store half %4, half* %nm10
+    store half %4, half addrspace(5)* %nm10
     %5 = fmul half %m1v1, %s
-    store half %5, half* %nm11
+    store half %5, half addrspace(5)* %nm11
     %6 = fmul half %m1v2, %s
-    store half %6, half* %nm12
+    store half %6, half addrspace(5)* %nm12
     %7 = fmul half %m2v0, %s
-    store half %7, half* %nm20
+    store half %7, half addrspace(5)* %nm20
     %8 = fmul half %m2v1, %s
-    store half %8, half* %nm21
+    store half %8, half addrspace(5)* %nm21
     %9 = fmul half %m2v2, %s
-    store half %9, half* %nm22
-    %10 = load [3 x <3 x half>], [3 x <3 x half>]* %nm
+    store half %9, half addrspace(5)* %nm22
+    %10 = load [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm
 
     ret [3 x <3 x half>] %10
 }
@@ -1013,30 +1012,30 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesScalarDv3_Dv3_DhDh(
 define spir_func [4 x <4 x half>] @_Z17MatrixTimesScalarDv4_Dv4_DhDh(
     [4 x <4 x half>] %m, half %s) #0
 {
-    %nm = alloca [4 x <4 x half>]
-    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 2
-    %nm03 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 3
+    %nm = alloca [4 x <4 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 2
+    %nm03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 3
 
-    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 2
-    %nm13 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 3
+    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 2
+    %nm13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 3
 
-    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 2
-    %nm23 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 3
+    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 2
+    %nm23 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 3
 
-    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 3
-    %nm30 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 0
-    %nm31 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 1
-    %nm32 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 2
-    %nm33 = getelementptr inbounds <4 x half>, <4 x half>* %nm3, i32 0, i32 3
+    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 3
+    %nm30 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 0
+    %nm31 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 1
+    %nm32 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 2
+    %nm33 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm3, i32 0, i32 3
 
     %m0v = extractvalue [4 x <4 x half>] %m, 0
     %m0v0 = extractelement <4 x half> %m0v, i32 0
@@ -1063,38 +1062,38 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesScalarDv4_Dv4_DhDh(
     %m3v3 = extractelement <4 x half> %m3v, i32 3
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m0v2, %s
-    store half %3, half* %nm02
+    store half %3, half addrspace(5)* %nm02
     %4 = fmul half %m0v3, %s
-    store half %4, half* %nm03
+    store half %4, half addrspace(5)* %nm03
     %5 = fmul half %m1v0, %s
-    store half %5, half* %nm10
+    store half %5, half addrspace(5)* %nm10
     %6 = fmul half %m1v1, %s
-    store half %6, half* %nm11
+    store half %6, half addrspace(5)* %nm11
     %7 = fmul half %m1v2, %s
-    store half %7, half* %nm12
+    store half %7, half addrspace(5)* %nm12
     %8 = fmul half %m1v3, %s
-    store half %8, half* %nm13
+    store half %8, half addrspace(5)* %nm13
     %9 = fmul half %m2v0, %s
-    store half %9, half* %nm20
+    store half %9, half addrspace(5)* %nm20
     %10 = fmul half %m2v1, %s
-    store half %10, half* %nm21
+    store half %10, half addrspace(5)* %nm21
     %11 = fmul half %m2v2, %s
-    store half %11, half* %nm22
+    store half %11, half addrspace(5)* %nm22
     %12 = fmul half %m2v3, %s
-    store half %12, half* %nm23
+    store half %12, half addrspace(5)* %nm23
     %13 = fmul half %m3v0, %s
-    store half %13, half* %nm30
+    store half %13, half addrspace(5)* %nm30
     %14 = fmul half %m3v1, %s
-    store half %14, half* %nm31
+    store half %14, half addrspace(5)* %nm31
     %15 = fmul half %m3v2, %s
-    store half %15, half* %nm32
+    store half %15, half addrspace(5)* %nm32
     %16 = fmul half %m3v3, %s
-    store half %16, half* %nm33
-    %17 = load [4 x <4 x half>], [4 x <4 x half>]* %nm
+    store half %16, half addrspace(5)* %nm33
+    %17 = load [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm
 
     ret [4 x <4 x half>] %17
 }
@@ -1103,18 +1102,18 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesScalarDv4_Dv4_DhDh(
 define spir_func [3 x <2 x half>] @_Z17MatrixTimesScalarDv3_Dv2_DhDh(
     [3 x <2 x half>] %m, half %s) #0
 {
-    %nm = alloca [3 x <2 x half>]
-    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 1
+    %nm = alloca [3 x <2 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 1
 
-    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 1
+    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 1
 
-    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 1
+    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 1
 
     %m0v = extractvalue [3 x <2 x half>] %m, 0
     %m0v0 = extractelement <2 x half> %m0v, i32 0
@@ -1129,18 +1128,18 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesScalarDv3_Dv2_DhDh(
     %m2v1 = extractelement <2 x half> %m2v, i32 1
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m1v0, %s
-    store half %3, half* %nm10
+    store half %3, half addrspace(5)* %nm10
     %4 = fmul half %m1v1, %s
-    store half %4, half* %nm11
+    store half %4, half addrspace(5)* %nm11
     %5 = fmul half %m2v0, %s
-    store half %5, half* %nm20
+    store half %5, half addrspace(5)* %nm20
     %6 = fmul half %m2v1, %s
-    store half %6, half* %nm21
-    %7 = load [3 x <2 x half>], [3 x <2 x half>]* %nm
+    store half %6, half addrspace(5)* %nm21
+    %7 = load [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm
 
     ret [3 x <2 x half>] %7
 }
@@ -1149,16 +1148,16 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesScalarDv3_Dv2_DhDh(
 define spir_func [2 x <3 x half>] @_Z17MatrixTimesScalarDv2_Dv3_DhDh(
     [2 x <3 x half>] %m, half %s) #0
 {
-    %nm = alloca [2 x <3 x half>]
-    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 2
+    %nm = alloca [2 x <3 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 2
 
-    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 2
+    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 2
 
     %m0v = extractvalue [2 x <3 x half>] %m, 0
     %m0v0 = extractelement <3 x half> %m0v, i32 0
@@ -1171,18 +1170,18 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesScalarDv2_Dv3_DhDh(
     %m1v2 = extractelement <3 x half> %m1v, i32 2
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m0v2, %s
-    store half %3, half* %nm02
+    store half %3, half addrspace(5)* %nm02
     %4 = fmul half %m1v0, %s
-    store half %4, half* %nm10
+    store half %4, half addrspace(5)* %nm10
     %5 = fmul half %m1v1, %s
-    store half %5, half* %nm11
+    store half %5, half addrspace(5)* %nm11
     %6 = fmul half %m1v2, %s
-    store half %6, half* %nm12
-    %7 = load [2 x <3 x half>], [2 x <3 x half>]* %nm
+    store half %6, half addrspace(5)* %nm12
+    %7 = load [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm
 
     ret [2 x <3 x half>] %7
 }
@@ -1191,22 +1190,22 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesScalarDv2_Dv3_DhDh(
 define spir_func [4 x <2 x half>] @_Z17MatrixTimesScalarDv4_Dv2_DhDh(
     [4 x <2 x half>] %m, half %s) #0
 {
-    %nm = alloca [4 x <2 x half>]
-    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <2 x half>, <2 x half>* %nm0, i32 0, i32 1
+    %nm = alloca [4 x <2 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm0, i32 0, i32 1
 
-    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <2 x half>, <2 x half>* %nm1, i32 0, i32 1
+    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm1, i32 0, i32 1
 
-    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <2 x half>, <2 x half>* %nm2, i32 0, i32 1
+    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm2, i32 0, i32 1
 
-    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 3
-    %nm30 = getelementptr inbounds <2 x half>, <2 x half>* %nm3, i32 0, i32 0
-    %nm31 = getelementptr inbounds <2 x half>, <2 x half>* %nm3, i32 0, i32 1
+    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 3
+    %nm30 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm3, i32 0, i32 0
+    %nm31 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nm3, i32 0, i32 1
 
     %m0v = extractvalue [4 x <2 x half>] %m, 0
     %m0v0 = extractelement <2 x half> %m0v, i32 0
@@ -1225,22 +1224,22 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesScalarDv4_Dv2_DhDh(
     %m3v1 = extractelement <2 x half> %m3v, i32 1
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m1v0, %s
-    store half %3, half* %nm10
+    store half %3, half addrspace(5)* %nm10
     %4 = fmul half %m1v1, %s
-    store half %4, half* %nm11
+    store half %4, half addrspace(5)* %nm11
     %5 = fmul half %m2v0, %s
-    store half %5, half* %nm20
+    store half %5, half addrspace(5)* %nm20
     %6 = fmul half %m2v1, %s
-    store half %6, half* %nm21
+    store half %6, half addrspace(5)* %nm21
     %7 = fmul half %m3v0, %s
-    store half %7, half* %nm30
+    store half %7, half addrspace(5)* %nm30
     %8 = fmul half %m3v1, %s
-    store half %8, half* %nm31
-    %9 = load [4 x <2 x half>], [4 x <2 x half>]* %nm
+    store half %8, half addrspace(5)* %nm31
+    %9 = load [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm
 
     ret [4 x <2 x half>] %9
 }
@@ -1249,18 +1248,18 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesScalarDv4_Dv2_DhDh(
 define spir_func [2 x <4 x half>] @_Z17MatrixTimesScalarDv2_Dv4_DhDh(
     [2 x <4 x half>] %m, half %s) #0
 {
-    %nm = alloca [2 x <4 x half>]
-    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 2
-    %nm03 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 3
+    %nm = alloca [2 x <4 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 2
+    %nm03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 3
 
-    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 2
-    %nm13 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 3
+    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 2
+    %nm13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 3
 
     %m0v = extractvalue [2 x <4 x half>] %m, 0
     %m0v0 = extractelement <4 x half> %m0v, i32 0
@@ -1275,22 +1274,22 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesScalarDv2_Dv4_DhDh(
     %m1v3 = extractelement <4 x half> %m1v, i32 3
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m0v2, %s
-    store half %3, half* %nm02
+    store half %3, half addrspace(5)* %nm02
     %4 = fmul half %m0v3, %s
-    store half %4, half* %nm03
+    store half %4, half addrspace(5)* %nm03
     %5 = fmul half %m1v0, %s
-    store half %5, half* %nm10
+    store half %5, half addrspace(5)* %nm10
     %6 = fmul half %m1v1, %s
-    store half %6, half* %nm11
+    store half %6, half addrspace(5)* %nm11
     %7 = fmul half %m1v2, %s
-    store half %7, half* %nm12
+    store half %7, half addrspace(5)* %nm12
     %8 = fmul half %m1v3, %s
-    store half %8, half* %nm13
-    %9 = load [2 x <4 x half>], [2 x <4 x half>]* %nm
+    store half %8, half addrspace(5)* %nm13
+    %9 = load [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm
 
     ret [2 x <4 x half>] %9
 }
@@ -1299,26 +1298,26 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesScalarDv2_Dv4_DhDh(
 define spir_func [4 x <3 x half>] @_Z17MatrixTimesScalarDv4_Dv3_DhDh(
     [4 x <3 x half>] %m, half %s) #0
 {
-    %nm = alloca [4 x <3 x half>]
-    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <3 x half>, <3 x half>* %nm0, i32 0, i32 2
+    %nm = alloca [4 x <3 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm0, i32 0, i32 2
 
-    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <3 x half>, <3 x half>* %nm1, i32 0, i32 2
+    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm1, i32 0, i32 2
 
-    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <3 x half>, <3 x half>* %nm2, i32 0, i32 2
+    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm2, i32 0, i32 2
 
-    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 3
-    %nm30 = getelementptr inbounds <3 x half>, <3 x half>* %nm3, i32 0, i32 0
-    %nm31 = getelementptr inbounds <3 x half>, <3 x half>* %nm3, i32 0, i32 1
-    %nm32 = getelementptr inbounds <3 x half>, <3 x half>* %nm3, i32 0, i32 2
+    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 3
+    %nm30 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm3, i32 0, i32 0
+    %nm31 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm3, i32 0, i32 1
+    %nm32 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nm3, i32 0, i32 2
 
     %m0v = extractvalue [4 x <3 x half>] %m, 0
     %m0v0 = extractelement <3 x half> %m0v, i32 0
@@ -1341,30 +1340,30 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesScalarDv4_Dv3_DhDh(
     %m3v2 = extractelement <3 x half> %m3v, i32 2
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m0v2, %s
-    store half %3, half* %nm02
+    store half %3, half addrspace(5)* %nm02
     %4 = fmul half %m1v0, %s
-    store half %4, half* %nm10
+    store half %4, half addrspace(5)* %nm10
     %5 = fmul half %m1v1, %s
-    store half %5, half* %nm11
+    store half %5, half addrspace(5)* %nm11
     %6 = fmul half %m1v2, %s
-    store half %6, half* %nm12
+    store half %6, half addrspace(5)* %nm12
     %7 = fmul half %m2v0, %s
-    store half %7, half* %nm20
+    store half %7, half addrspace(5)* %nm20
     %8 = fmul half %m2v1, %s
-    store half %8, half* %nm21
+    store half %8, half addrspace(5)* %nm21
     %9 = fmul half %m2v2, %s
-    store half %9, half* %nm22
+    store half %9, half addrspace(5)* %nm22
     %10 = fmul half %m3v0, %s
-    store half %10, half* %nm30
+    store half %10, half addrspace(5)* %nm30
     %11 = fmul half %m3v1, %s
-    store half %11, half* %nm31
+    store half %11, half addrspace(5)* %nm31
     %12 = fmul half %m3v2, %s
-    store half %12, half* %nm32
-    %13 = load [4 x <3 x half>], [4 x <3 x half>]* %nm
+    store half %12, half addrspace(5)* %nm32
+    %13 = load [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm
 
     ret [4 x <3 x half>] %13
 }
@@ -1373,24 +1372,24 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesScalarDv4_Dv3_DhDh(
 define spir_func [3 x <4 x half>] @_Z17MatrixTimesScalarDv3_Dv4_DhDh(
     [3 x <4 x half>] %m, half %s) #0
 {
-    %nm = alloca [3 x <4 x half>]
-    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 0
-    %nm00 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 0
-    %nm01 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 1
-    %nm02 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 2
-    %nm03 = getelementptr inbounds <4 x half>, <4 x half>* %nm0, i32 0, i32 3
+    %nm = alloca [3 x <4 x half>], addrspace(5)
+    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    %nm00 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 0
+    %nm01 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 1
+    %nm02 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 2
+    %nm03 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm0, i32 0, i32 3
 
-    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 1
-    %nm10 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 0
-    %nm11 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 1
-    %nm12 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 2
-    %nm13 = getelementptr inbounds <4 x half>, <4 x half>* %nm1, i32 0, i32 3
+    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    %nm10 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 0
+    %nm11 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 1
+    %nm12 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 2
+    %nm13 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm1, i32 0, i32 3
 
-    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 2
-    %nm20 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 0
-    %nm21 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 1
-    %nm22 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 2
-    %nm23 = getelementptr inbounds <4 x half>, <4 x half>* %nm2, i32 0, i32 3
+    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    %nm20 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 0
+    %nm21 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 1
+    %nm22 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 2
+    %nm23 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nm2, i32 0, i32 3
 
     %m0v = extractvalue [3 x <4 x half>] %m, 0
     %m0v0 = extractelement <4 x half> %m0v, i32 0
@@ -1411,30 +1410,30 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesScalarDv3_Dv4_DhDh(
     %m2v3 = extractelement <4 x half> %m2v, i32 3
 
     %1 = fmul half %m0v0, %s
-    store half %1, half* %nm00
+    store half %1, half addrspace(5)* %nm00
     %2 = fmul half %m0v1, %s
-    store half %2, half* %nm01
+    store half %2, half addrspace(5)* %nm01
     %3 = fmul half %m0v2, %s
-    store half %3, half* %nm02
+    store half %3, half addrspace(5)* %nm02
     %4 = fmul half %m0v3, %s
-    store half %4, half* %nm03
+    store half %4, half addrspace(5)* %nm03
     %5 = fmul half %m1v0, %s
-    store half %5, half* %nm10
+    store half %5, half addrspace(5)* %nm10
     %6 = fmul half %m1v1, %s
-    store half %6, half* %nm11
+    store half %6, half addrspace(5)* %nm11
     %7 = fmul half %m1v2, %s
-    store half %7, half* %nm12
+    store half %7, half addrspace(5)* %nm12
     %8 = fmul half %m1v3, %s
-    store half %8, half* %nm13
+    store half %8, half addrspace(5)* %nm13
     %9 = fmul half %m2v0, %s
-    store half %9, half* %nm20
+    store half %9, half addrspace(5)* %nm20
     %10 = fmul half %m2v1, %s
-    store half %10, half* %nm21
+    store half %10, half addrspace(5)* %nm21
     %11 = fmul half %m2v2, %s
-    store half %11, half* %nm22
+    store half %11, half addrspace(5)* %nm22
     %12 = fmul half %m2v3, %s
-    store half %12, half* %nm23
-    %13 = load [3 x <4 x half>], [3 x <4 x half>]* %nm
+    store half %12, half addrspace(5)* %nm23
+    %13 = load [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm
 
     ret [3 x <4 x half>] %13
 }
@@ -1443,18 +1442,18 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesScalarDv3_Dv4_DhDh(
 define spir_func <2 x half> @_Z17VectorTimesMatrixDv2_DhDv2_Dv2_Dh(
     <2 x half> %c, [2 x <2 x half>] %m) #0
 {
-    %nv = alloca <2 x half>
-    %nvp0 = getelementptr inbounds <2 x half>, <2 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <2 x half>, <2 x half>* %nv, i32 0, i32 1
+    %nv = alloca <2 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nv, i32 0, i32 1
 
     %m0v = extractvalue [2 x <2 x half>] %m, 0
     %1 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m0v, <2 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [2 x <2 x half>] %m, 1
     %2 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m1v, <2 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
 
-    %3 = load <2 x half>, <2 x half>* %nv
+    %3 = load <2 x half>, <2 x half> addrspace(5)* %nv
 
     ret <2 x half> %3
 }
@@ -1463,22 +1462,22 @@ define spir_func <2 x half> @_Z17VectorTimesMatrixDv2_DhDv2_Dv2_Dh(
 define spir_func <3 x half> @_Z17VectorTimesMatrixDv3_DhDv3_Dv3_Dh(
     <3 x half> %c, [3 x <3 x half>] %m) #0
 {
-    %nv = alloca <3 x half>
-    %nvp0 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 1
-    %nvp2 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 2
+    %nv = alloca <3 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 1
+    %nvp2 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 2
 
     %m0v = extractvalue [3 x <3 x half>] %m, 0
     %1 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m0v, <3 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [3 x <3 x half>] %m, 1
     %2 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m1v, <3 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
     %m2v = extractvalue [3 x <3 x half>] %m, 2
     %3 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m2v, <3 x half> %c)
-    store half %3, half* %nvp2
+    store half %3, half addrspace(5)* %nvp2
 
-    %4 = load <3 x half>, <3 x half>* %nv
+    %4 = load <3 x half>, <3 x half> addrspace(5)* %nv
 
     ret <3 x half> %4
 }
@@ -1487,26 +1486,26 @@ define spir_func <3 x half> @_Z17VectorTimesMatrixDv3_DhDv3_Dv3_Dh(
 define spir_func <4 x half> @_Z17VectorTimesMatrixDv4_DhDv4_Dv4_Dh(
     <4 x half> %c, [4 x <4 x half>] %m) #0
 {
-    %nv = alloca <4 x half>
-    %nvp0 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 1
-    %nvp2 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 2
-    %nvp3 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 3
+    %nv = alloca <4 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 1
+    %nvp2 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 2
+    %nvp3 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 3
 
     %m0v = extractvalue [4 x <4 x half>] %m, 0
     %1 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m0v, <4 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [4 x <4 x half>] %m, 1
     %2 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m1v, <4 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
     %m2v = extractvalue [4 x <4 x half>] %m, 2
     %3 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m2v, <4 x half> %c)
-    store half %3, half* %nvp2
+    store half %3, half addrspace(5)* %nvp2
     %m3v = extractvalue [4 x <4 x half>] %m, 3
     %4 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m3v, <4 x half> %c)
-    store half %4, half* %nvp3
+    store half %4, half addrspace(5)* %nvp3
 
-    %5 = load <4 x half>, <4 x half>* %nv
+    %5 = load <4 x half>, <4 x half> addrspace(5)* %nv
 
     ret <4 x half> %5
 }
@@ -1515,22 +1514,22 @@ define spir_func <4 x half> @_Z17VectorTimesMatrixDv4_DhDv4_Dv4_Dh(
 define spir_func <3 x half> @_Z17VectorTimesMatrixDv2_DhDv3_Dv2_Dh(
     <2 x half> %c, [3 x <2 x half>] %m) #0
 {
-    %nv = alloca <3 x half>
-    %nvp0 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 1
-    %nvp2 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 2
+    %nv = alloca <3 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 1
+    %nvp2 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 2
 
     %m0v = extractvalue [3 x <2 x half>] %m, 0
     %1 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m0v, <2 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [3 x <2 x half>] %m, 1
     %2 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m1v, <2 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
     %m2v = extractvalue [3 x <2 x half>] %m, 2
     %3 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m2v, <2 x half> %c)
-    store half %3, half* %nvp2
+    store half %3, half addrspace(5)* %nvp2
 
-    %4 = load <3 x half>, <3 x half>* %nv
+    %4 = load <3 x half>, <3 x half> addrspace(5)* %nv
 
     ret <3 x half> %4
 }
@@ -1539,26 +1538,26 @@ define spir_func <3 x half> @_Z17VectorTimesMatrixDv2_DhDv3_Dv2_Dh(
 define spir_func <4 x half> @_Z17VectorTimesMatrixDv2_DhDv4_Dv2_Dh(
     <2 x half> %c, [4 x <2 x half>] %m) #0
 {
-    %nv = alloca <4 x half>
-    %nvp0 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 1
-    %nvp2 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 2
-    %nvp3 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 3
+    %nv = alloca <4 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 1
+    %nvp2 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 2
+    %nvp3 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 3
 
     %m0v = extractvalue [4 x <2 x half>] %m, 0
     %1 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m0v, <2 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [4 x <2 x half>] %m, 1
     %2 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m1v, <2 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
     %m2v = extractvalue [4 x <2 x half>] %m, 2
     %3 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m2v, <2 x half> %c)
-    store half %3, half* %nvp2
+    store half %3, half addrspace(5)* %nvp2
     %m3v = extractvalue [4 x <2 x half>] %m, 3
     %4 = call half @_Z3dotDv2_DhDv2_Dh(<2 x half> %m3v, <2 x half> %c)
-    store half %4, half* %nvp3
+    store half %4, half addrspace(5)* %nvp3
 
-    %5 = load <4 x half>, <4 x half>* %nv
+    %5 = load <4 x half>, <4 x half> addrspace(5)* %nv
 
     ret <4 x half> %5
 }
@@ -1567,18 +1566,18 @@ define spir_func <4 x half> @_Z17VectorTimesMatrixDv2_DhDv4_Dv2_Dh(
 define spir_func <2 x half> @_Z17VectorTimesMatrixDv3_DhDv2_Dv3_Dh(
     <3 x half> %c, [2 x <3 x half>] %m) #0
 {
-    %nv = alloca <2 x half>
-    %nvp0 = getelementptr inbounds <2 x half>, <2 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <2 x half>, <2 x half>* %nv, i32 0, i32 1
+    %nv = alloca <2 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nv, i32 0, i32 1
 
     %m0v = extractvalue [2 x <3 x half>] %m, 0
     %1 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m0v, <3 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [2 x <3 x half>] %m, 1
     %2 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m1v, <3 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
 
-    %3 = load <2 x half>, <2 x half>* %nv
+    %3 = load <2 x half>, <2 x half> addrspace(5)* %nv
 
     ret <2 x half> %3
 }
@@ -1587,26 +1586,26 @@ define spir_func <2 x half> @_Z17VectorTimesMatrixDv3_DhDv2_Dv3_Dh(
 define spir_func <4 x half> @_Z17VectorTimesMatrixDv3_DhDv4_Dv3_Dh(
     <3 x half> %c, [4 x <3 x half>] %m) #0
 {
-    %nv = alloca <4 x half>
-    %nvp0 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 1
-    %nvp2 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 2
-    %nvp3 = getelementptr inbounds <4 x half>, <4 x half>* %nv, i32 0, i32 3
+    %nv = alloca <4 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 1
+    %nvp2 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 2
+    %nvp3 = getelementptr inbounds <4 x half>, <4 x half> addrspace(5)* %nv, i32 0, i32 3
 
     %m0v = extractvalue [4 x <3 x half>] %m, 0
     %1 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m0v, <3 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [4 x <3 x half>] %m, 1
     %2 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m1v, <3 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
     %m2v = extractvalue [4 x <3 x half>] %m, 2
     %3 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m2v, <3 x half> %c)
-    store half %3, half* %nvp2
+    store half %3, half addrspace(5)* %nvp2
     %m3v = extractvalue [4 x <3 x half>] %m, 3
     %4 = call half @_Z3dotDv3_DhDv3_Dh(<3 x half> %m3v, <3 x half> %c)
-    store half %4, half* %nvp3
+    store half %4, half addrspace(5)* %nvp3
 
-    %5 = load <4 x half>, <4 x half>* %nv
+    %5 = load <4 x half>, <4 x half> addrspace(5)* %nv
 
     ret <4 x half> %5
 }
@@ -1615,18 +1614,18 @@ define spir_func <4 x half> @_Z17VectorTimesMatrixDv3_DhDv4_Dv3_Dh(
 define spir_func <2 x half> @_Z17VectorTimesMatrixDv4_DhDv2_Dv4_Dh(
     <4 x half> %c, [2 x <4 x half>] %m) #0
 {
-    %nv = alloca <2 x half>
-    %nvp0 = getelementptr inbounds <2 x half>, <2 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <2 x half>, <2 x half>* %nv, i32 0, i32 1
+    %nv = alloca <2 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <2 x half>, <2 x half> addrspace(5)* %nv, i32 0, i32 1
 
     %m0v = extractvalue [2 x <4 x half>] %m, 0
     %1 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m0v, <4 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [2 x <4 x half>] %m, 1
     %2 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m1v, <4 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
 
-    %3 = load <2 x half>, <2 x half>* %nv
+    %3 = load <2 x half>, <2 x half> addrspace(5)* %nv
 
     ret <2 x half> %3
 }
@@ -1635,22 +1634,22 @@ define spir_func <2 x half> @_Z17VectorTimesMatrixDv4_DhDv2_Dv4_Dh(
 define spir_func <3 x half> @_Z17VectorTimesMatrixDv4_DhDv3_Dv4_Dh(
     <4 x half> %c, [3 x <4 x half>] %m) #0
 {
-    %nv = alloca <3 x half>
-    %nvp0 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 0
-    %nvp1 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 1
-    %nvp2 = getelementptr inbounds <3 x half>, <3 x half>* %nv, i32 0, i32 2
+    %nv = alloca <3 x half>, addrspace(5)
+    %nvp0 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 0
+    %nvp1 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 1
+    %nvp2 = getelementptr inbounds <3 x half>, <3 x half> addrspace(5)* %nv, i32 0, i32 2
 
     %m0v = extractvalue [3 x <4 x half>] %m, 0
     %1 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m0v, <4 x half> %c)
-    store half %1, half* %nvp0
+    store half %1, half addrspace(5)* %nvp0
     %m1v = extractvalue [3 x <4 x half>] %m, 1
     %2 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m1v, <4 x half> %c)
-    store half %2, half* %nvp1
+    store half %2, half addrspace(5)* %nvp1
     %m2v = extractvalue [3 x <4 x half>] %m, 2
     %3 = call half @_Z3dotDv4_DhDv4_Dh(<4 x half> %m2v, <4 x half> %c)
-    store half %3, half* %nvp2
+    store half %3, half addrspace(5)* %nvp2
 
-    %4 = load <3 x half>, <3 x half>* %nv
+    %4 = load <3 x half>, <3 x half> addrspace(5)* %nv
 
     ret <3 x half> %4
 }
@@ -1839,7 +1838,7 @@ define spir_func <4 x half> @_Z17MatrixTimesVectorDv3_Dv4_DhDv3_Dh(
 define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv2_Dv2_Dh(
     [2 x <2 x half>] %m, [2 x <2 x half>] %rm) #0
 {
-    %nm = alloca [2 x <2 x half>]
+    %nm = alloca [2 x <2 x half>], addrspace(5)
     %m0v = extractvalue [2 x <2 x half>] %m, 0
     %m1v = extractvalue [2 x <2 x half>] %m, 1
 
@@ -1851,8 +1850,8 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv2_Dv2_Dh(
     %2 = fmul <2 x half> %m1v, %rm0v1
     %3 = fadd <2 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %3, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %3, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -1862,10 +1861,10 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv2_Dv2_Dh(
     %5 = fmul <2 x half> %m1v, %rm1v1
     %6 = fadd <2 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %6, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %6, <2 x half> addrspace(5)* %nm1
 
-    %7 = load [2 x <2 x half>], [2 x <2 x half>]* %nm
+    %7 = load [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm
 
     ret [2 x <2 x half>] %7
 }
@@ -1874,7 +1873,7 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv2_Dv2_Dh(
 define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv3_Dv2_Dh(
     [2 x <2 x half>] %m, [3 x <2 x half>] %rm) #0
 {
-    %nm = alloca [3 x <2 x half>]
+    %nm = alloca [3 x <2 x half>], addrspace(5)
     %m0v = extractvalue [2 x <2 x half>] %m, 0
     %m1v = extractvalue [2 x <2 x half>] %m, 1
 
@@ -1886,8 +1885,8 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv3_Dv2_Dh(
     %2 = fmul <2 x half> %m1v, %rm0v1
     %3 = fadd <2 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %3, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %3, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -1897,8 +1896,8 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv3_Dv2_Dh(
     %5 = fmul <2 x half> %m1v, %rm1v1
     %6 = fadd <2 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %6, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %6, <2 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <2 x half>] %rm, 2
     %rm2v0 = shufflevector <2 x half> %rm2v, <2 x half> %rm2v, <2 x i32> <i32 0, i32 0>
@@ -1908,10 +1907,10 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv3_Dv2_Dh(
     %8 = fmul <2 x half> %m1v, %rm2v1
     %9 = fadd <2 x half> %8, %7
 
-    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 2
-    store <2 x half> %9, <2 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <2 x half> %9, <2 x half> addrspace(5)* %nm2
 
-    %10 = load [3 x <2 x half>], [3 x <2 x half>]* %nm
+    %10 = load [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm
 
     ret [3 x <2 x half>] %10
 }
@@ -1920,7 +1919,7 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv3_Dv2_Dh(
 define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv4_Dv2_Dh(
     [2 x <2 x half>] %m, [4 x <2 x half>] %rm) #0
 {
-    %nm = alloca [4 x <2 x half>]
+    %nm = alloca [4 x <2 x half>], addrspace(5)
     %m0v = extractvalue [2 x <2 x half>] %m, 0
     %m1v = extractvalue [2 x <2 x half>] %m, 1
 
@@ -1932,8 +1931,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv4_Dv2_Dh(
     %2 = fmul <2 x half> %m1v, %rm0v1
     %3 = fadd <2 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %3, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %3, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -1943,8 +1942,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv4_Dv2_Dh(
     %5 = fmul <2 x half> %m1v, %rm1v1
     %6 = fadd <2 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %6, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %6, <2 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <2 x half>] %rm, 2
     %rm2v0 = shufflevector <2 x half> %rm2v, <2 x half> %rm2v, <2 x i32> <i32 0, i32 0>
@@ -1954,8 +1953,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv4_Dv2_Dh(
     %8 = fmul <2 x half> %m1v, %rm2v1
     %9 = fadd <2 x half> %8, %7
 
-    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 2
-    store <2 x half> %9, <2 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <2 x half> %9, <2 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <2 x half>] %rm, 3
     %rm3v0 = shufflevector <2 x half> %rm3v, <2 x half> %rm3v, <2 x i32> <i32 0, i32 0>
@@ -1965,10 +1964,10 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv4_Dv2_Dh(
     %11 = fmul <2 x half> %m1v, %rm3v1
     %12 = fadd <2 x half> %11, %10
 
-    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 3
-    store <2 x half> %12, <2 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <2 x half> %12, <2 x half> addrspace(5)* %nm3
 
-    %13 = load [4 x <2 x half>], [4 x <2 x half>]* %nm
+    %13 = load [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm
 
     ret [4 x <2 x half>] %13
 }
@@ -1977,7 +1976,7 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv2_Dv2_DhDv4_Dv2_Dh(
 define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv3_Dv3_Dh(
     [3 x <3 x half>] %m, [3 x <3 x half>] %rm) #0
 {
-    %nm = alloca [3 x <3 x half>]
+    %nm = alloca [3 x <3 x half>], addrspace(5)
     %m0v = extractvalue [3 x <3 x half>] %m, 0
     %m1v = extractvalue [3 x <3 x half>] %m, 1
     %m2v = extractvalue [3 x <3 x half>] %m, 2
@@ -1994,8 +1993,8 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv3_Dv3_Dh(
     %4 = fmul <3 x half> %m2v, %rm0v2
     %5 = fadd <3 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %5, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %5, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2009,8 +2008,8 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv3_Dv3_Dh(
     %9 = fmul <3 x half> %m2v, %rm1v2
     %10 = fadd <3 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %10, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %10, <3 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <3 x half>] %rm, 2
     %rm2v0 = shufflevector <3 x half> %rm2v, <3 x half> %rm2v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2024,10 +2023,10 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv3_Dv3_Dh(
     %14 = fmul <3 x half> %m2v, %rm2v2
     %15 = fadd <3 x half> %14, %13
 
-    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 2
-    store <3 x half> %15, <3 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <3 x half> %15, <3 x half> addrspace(5)* %nm2
 
-    %16 = load [3 x <3 x half>], [3 x <3 x half>]* %nm
+    %16 = load [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm
 
     ret [3 x <3 x half>] %16
 }
@@ -2036,7 +2035,7 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv3_Dv3_Dh(
 define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv2_Dv3_Dh(
     [3 x <3 x half>] %m, [2 x <3 x half>] %rm) #0
 {
-    %nm = alloca [2 x <3 x half>]
+    %nm = alloca [2 x <3 x half>], addrspace(5)
     %m0v = extractvalue [3 x <3 x half>] %m, 0
     %m1v = extractvalue [3 x <3 x half>] %m, 1
     %m2v = extractvalue [3 x <3 x half>] %m, 2
@@ -2053,8 +2052,8 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv2_Dv3_Dh(
     %4 = fmul <3 x half> %m2v, %rm0v2
     %5 = fadd <3 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %5, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %5, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2068,10 +2067,10 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv2_Dv3_Dh(
     %9 = fmul <3 x half> %m2v, %rm1v2
     %10 = fadd <3 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %10, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %10, <3 x half> addrspace(5)* %nm1
 
-    %11 = load [2 x <3 x half>], [2 x <3 x half>]* %nm
+    %11 = load [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm
 
     ret [2 x <3 x half>] %11
 }
@@ -2080,7 +2079,7 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv2_Dv3_Dh(
 define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv4_Dv3_Dh(
     [3 x <3 x half>] %m, [4 x <3 x half>] %rm) #0
 {
-    %nm = alloca [4 x <3 x half>]
+    %nm = alloca [4 x <3 x half>], addrspace(5)
     %m0v = extractvalue [3 x <3 x half>] %m, 0
     %m1v = extractvalue [3 x <3 x half>] %m, 1
     %m2v = extractvalue [3 x <3 x half>] %m, 2
@@ -2097,8 +2096,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv4_Dv3_Dh(
     %4 = fmul <3 x half> %m2v, %rm0v2
     %5 = fadd <3 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %5, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %5, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2112,8 +2111,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv4_Dv3_Dh(
     %9 = fmul <3 x half> %m2v, %rm1v2
     %10 = fadd <3 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %10, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %10, <3 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <3 x half>] %rm, 2
     %rm2v0 = shufflevector <3 x half> %rm2v, <3 x half> %rm2v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2127,8 +2126,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv4_Dv3_Dh(
     %14 = fmul <3 x half> %m2v, %rm2v2
     %15 = fadd <3 x half> %14, %13
 
-    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 2
-    store <3 x half> %15, <3 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <3 x half> %15, <3 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <3 x half>] %rm, 3
     %rm3v0 = shufflevector <3 x half> %rm3v, <3 x half> %rm3v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2142,10 +2141,10 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv4_Dv3_Dh(
     %19 = fmul <3 x half> %m2v, %rm3v2
     %20 = fadd <3 x half> %19, %18
 
-    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 3
-    store <3 x half> %20, <3 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <3 x half> %20, <3 x half> addrspace(5)* %nm3
 
-    %21 = load [4 x <3 x half>], [4 x <3 x half>]* %nm
+    %21 = load [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm
 
     ret [4 x <3 x half>] %21
 }
@@ -2154,7 +2153,7 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv3_Dv3_DhDv4_Dv3_Dh(
 define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv4_Dv4_Dh(
     [4 x <4 x half>] %m, [4 x <4 x half>] %rm) #0
 {
-    %nm = alloca [4 x <4 x half>]
+    %nm = alloca [4 x <4 x half>], addrspace(5)
     %m0v = extractvalue [4 x <4 x half>] %m, 0
     %m1v = extractvalue [4 x <4 x half>] %m, 1
     %m2v = extractvalue [4 x <4 x half>] %m, 2
@@ -2176,8 +2175,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv4_Dv4_Dh(
     %6 = fmul <4 x half> %m3v, %rm0v3
     %7 = fadd <4 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %7, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %7, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2195,8 +2194,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv4_Dv4_Dh(
     %13 = fmul <4 x half> %m3v, %rm1v3
     %14 = fadd <4 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %14, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %14, <4 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <4 x half>] %rm, 2
     %rm2v0 = shufflevector <4 x half> %rm2v, <4 x half> %rm2v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2214,8 +2213,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv4_Dv4_Dh(
     %20 = fmul <4 x half> %m3v, %rm2v3
     %21 = fadd <4 x half> %20, %19
 
-    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 2
-    store <4 x half> %21, <4 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <4 x half> %21, <4 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <4 x half>] %rm, 3
     %rm3v0 = shufflevector <4 x half> %rm3v, <4 x half> %rm3v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2233,10 +2232,10 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv4_Dv4_Dh(
     %27 = fmul <4 x half> %m3v, %rm3v3
     %28 = fadd <4 x half> %27, %26
 
-    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 3
-    store <4 x half> %28, <4 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <4 x half> %28, <4 x half> addrspace(5)* %nm3
 
-    %29 = load [4 x <4 x half>], [4 x <4 x half>]* %nm
+    %29 = load [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm
 
     ret [4 x <4 x half>] %29
 }
@@ -2245,7 +2244,7 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv4_Dv4_Dh(
 define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv2_Dv4_Dh(
     [4 x <4 x half>] %m, [2 x <4 x half>] %rm) #0
 {
-    %nm = alloca [2 x <4 x half>]
+    %nm = alloca [2 x <4 x half>], addrspace(5)
     %m0v = extractvalue [4 x <4 x half>] %m, 0
     %m1v = extractvalue [4 x <4 x half>] %m, 1
     %m2v = extractvalue [4 x <4 x half>] %m, 2
@@ -2267,8 +2266,8 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv2_Dv4_Dh(
     %6 = fmul <4 x half> %m3v, %rm0v3
     %7 = fadd <4 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %7, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %7, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2286,10 +2285,10 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv2_Dv4_Dh(
     %13 = fmul <4 x half> %m3v, %rm1v3
     %14 = fadd <4 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %14, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %14, <4 x half> addrspace(5)* %nm1
 
-    %15 = load [2 x <4 x half>], [2 x <4 x half>]* %nm
+    %15 = load [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm
 
     ret [2 x <4 x half>] %15
 }
@@ -2298,7 +2297,7 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv2_Dv4_Dh(
 define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv3_Dv4_Dh(
     [4 x <4 x half>] %m, [3 x <4 x half>] %rm) #0
 {
-    %nm = alloca [3 x <4 x half>]
+    %nm = alloca [3 x <4 x half>], addrspace(5)
     %m0v = extractvalue [4 x <4 x half>] %m, 0
     %m1v = extractvalue [4 x <4 x half>] %m, 1
     %m2v = extractvalue [4 x <4 x half>] %m, 2
@@ -2320,8 +2319,8 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv3_Dv4_Dh(
     %6 = fmul <4 x half> %m3v, %rm0v3
     %7 = fadd <4 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %7, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %7, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2339,8 +2338,8 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv3_Dv4_Dh(
     %13 = fmul <4 x half> %m3v, %rm1v3
     %14 = fadd <4 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %14, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %14, <4 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <4 x half>] %rm, 2
     %rm2v0 = shufflevector <4 x half> %rm2v, <4 x half> %rm2v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2358,10 +2357,10 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv3_Dv4_Dh(
     %20 = fmul <4 x half> %m3v, %rm2v3
     %21 = fadd <4 x half> %20, %19
 
-    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 2
-    store <4 x half> %21, <4 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <4 x half> %21, <4 x half> addrspace(5)* %nm2
 
-    %22 = load [3 x <4 x half>], [3 x <4 x half>]* %nm
+    %22 = load [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm
 
     ret [3 x <4 x half>] %22
 }
@@ -2370,7 +2369,7 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv4_Dv4_DhDv3_Dv4_Dh(
 define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv2_Dv3_Dh(
     [3 x <2 x half>] %m, [2 x <3 x half>] %rm) #0
 {
-    %nm = alloca [2 x <2 x half>]
+    %nm = alloca [2 x <2 x half>], addrspace(5)
     %m0v = extractvalue [3 x <2 x half>] %m, 0
     %m1v = extractvalue [3 x <2 x half>] %m, 1
     %m2v = extractvalue [3 x <2 x half>] %m, 2
@@ -2387,8 +2386,8 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv2_Dv3_Dh(
     %4 = fmul <2 x half> %m2v, %rm0v2
     %5 = fadd <2 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %5, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %5, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -2402,10 +2401,10 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv2_Dv3_Dh(
     %9 = fmul <2 x half> %m2v, %rm1v2
     %10 = fadd <2 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %10, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %10, <2 x half> addrspace(5)* %nm1
 
-    %11 = load [2 x <2 x half>], [2 x <2 x half>]* %nm
+    %11 = load [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm
 
     ret [2 x <2 x half>] %11
 }
@@ -2414,7 +2413,7 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv2_Dv3_Dh(
 define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv3_Dv3_Dh(
     [3 x <2 x half>] %m, [3 x <3 x half>] %rm) #0
 {
-    %nm = alloca [3 x <2 x half>]
+    %nm = alloca [3 x <2 x half>], addrspace(5)
     %m0v = extractvalue [3 x <2 x half>] %m, 0
     %m1v = extractvalue [3 x <2 x half>] %m, 1
     %m2v = extractvalue [3 x <2 x half>] %m, 2
@@ -2431,8 +2430,8 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv3_Dv3_Dh(
     %4 = fmul <2 x half> %m2v, %rm0v2
     %5 = fadd <2 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %5, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %5, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -2446,8 +2445,8 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv3_Dv3_Dh(
     %9 = fmul <2 x half> %m2v, %rm1v2
     %10 = fadd <2 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %10, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %10, <2 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <3 x half>] %rm, 2
     %rm2v0 = shufflevector <3 x half> %rm2v, <3 x half> %rm2v, <2 x i32> <i32 0, i32 0>
@@ -2461,10 +2460,10 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv3_Dv3_Dh(
     %14 = fmul <2 x half> %m2v, %rm2v2
     %15 = fadd <2 x half> %14, %13
 
-    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 2
-    store <2 x half> %15, <2 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <2 x half> %15, <2 x half> addrspace(5)* %nm2
 
-    %16 = load [3 x <2 x half>], [3 x <2 x half>]* %nm
+    %16 = load [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm
 
     ret [3 x <2 x half>] %16
 }
@@ -2473,7 +2472,7 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv3_Dv3_Dh(
 define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv4_Dv3_Dh(
     [3 x <2 x half>] %m, [4 x <3 x half>] %rm) #0
 {
-    %nm = alloca [4 x <2 x half>]
+    %nm = alloca [4 x <2 x half>], addrspace(5)
     %m0v = extractvalue [3 x <2 x half>] %m, 0
     %m1v = extractvalue [3 x <2 x half>] %m, 1
     %m2v = extractvalue [3 x <2 x half>] %m, 2
@@ -2490,8 +2489,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv4_Dv3_Dh(
     %4 = fmul <2 x half> %m2v, %rm0v2
     %5 = fadd <2 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %5, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %5, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -2505,8 +2504,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv4_Dv3_Dh(
     %9 = fmul <2 x half> %m2v, %rm1v2
     %10 = fadd <2 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %10, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %10, <2 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <3 x half>] %rm, 2
     %rm2v0 = shufflevector <3 x half> %rm2v, <3 x half> %rm2v, <2 x i32> <i32 0, i32 0>
@@ -2520,8 +2519,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv4_Dv3_Dh(
     %14 = fmul <2 x half> %m2v, %rm2v2
     %15 = fadd <2 x half> %14, %13
 
-    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 2
-    store <2 x half> %15, <2 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <2 x half> %15, <2 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <3 x half>] %rm, 3
     %rm3v0 = shufflevector <3 x half> %rm3v, <3 x half> %rm3v, <2 x i32> <i32 0, i32 0>
@@ -2535,10 +2534,10 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv4_Dv3_Dh(
     %19 = fmul <2 x half> %m2v, %rm3v2
     %20 = fadd <2 x half> %19, %18
 
-    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 3
-    store <2 x half> %20, <2 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <2 x half> %20, <2 x half> addrspace(5)* %nm3
 
-    %21 = load [4 x <2 x half>], [4 x <2 x half>]* %nm
+    %21 = load [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm
 
     ret [4 x <2 x half>] %21
 }
@@ -2547,7 +2546,7 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv3_Dv2_DhDv4_Dv3_Dh(
 define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv2_Dv2_Dh(
     [2 x <3 x half>] %m, [2 x <2 x half>] %rm) #0
 {
-    %nm = alloca [2 x <3 x half>]
+    %nm = alloca [2 x <3 x half>], addrspace(5)
     %m0v = extractvalue [2 x <3 x half>] %m, 0
     %m1v = extractvalue [2 x <3 x half>] %m, 1
 
@@ -2559,8 +2558,8 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv2_Dv2_Dh(
     %2 = fmul <3 x half> %m1v, %rm0v1
     %3 = fadd <3 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %3, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %3, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2570,10 +2569,10 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv2_Dv2_Dh(
     %5 = fmul <3 x half> %m1v, %rm1v1
     %6 = fadd <3 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %6, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %6, <3 x half> addrspace(5)* %nm1
 
-    %7 = load [2 x <3 x half>], [2 x <3 x half>]* %nm
+    %7 = load [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm
 
     ret [2 x <3 x half>] %7
 }
@@ -2582,7 +2581,7 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv2_Dv2_Dh(
 define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv3_Dv2_Dh(
     [2 x <3 x half>] %m, [3 x <2 x half>] %rm) #0
 {
-    %nm = alloca [3 x <3 x half>]
+    %nm = alloca [3 x <3 x half>], addrspace(5)
     %m0v = extractvalue [2 x <3 x half>] %m, 0
     %m1v = extractvalue [2 x <3 x half>] %m, 1
 
@@ -2594,8 +2593,8 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv3_Dv2_Dh(
     %2 = fmul <3 x half> %m1v, %rm0v1
     %3 = fadd <3 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %3, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %3, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2605,8 +2604,8 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv3_Dv2_Dh(
     %5 = fmul <3 x half> %m1v, %rm1v1
     %6 = fadd <3 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %6, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %6, <3 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <2 x half>] %rm, 2
     %rm2v0 = shufflevector <2 x half> %rm2v, <2 x half> %rm2v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2616,10 +2615,10 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv3_Dv2_Dh(
     %8 = fmul <3 x half> %m1v, %rm2v1
     %9 = fadd <3 x half> %8, %7
 
-    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 2
-    store <3 x half> %9, <3 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <3 x half> %9, <3 x half> addrspace(5)* %nm2
 
-    %10 = load [3 x <3 x half>], [3 x <3 x half>]* %nm
+    %10 = load [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm
 
     ret [3 x <3 x half>] %10
 }
@@ -2628,7 +2627,7 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv3_Dv2_Dh(
 define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv4_Dv2_Dh(
     [2 x <3 x half>] %m, [4 x <2 x half>] %rm) #0
 {
-    %nm = alloca [4 x <3 x half>]
+    %nm = alloca [4 x <3 x half>], addrspace(5)
     %m0v = extractvalue [2 x <3 x half>] %m, 0
     %m1v = extractvalue [2 x <3 x half>] %m, 1
 
@@ -2640,8 +2639,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv4_Dv2_Dh(
     %2 = fmul <3 x half> %m1v, %rm0v1
     %3 = fadd <3 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %3, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %3, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2651,8 +2650,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv4_Dv2_Dh(
     %5 = fmul <3 x half> %m1v, %rm1v1
     %6 = fadd <3 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %6, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %6, <3 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <2 x half>] %rm, 2
     %rm2v0 = shufflevector <2 x half> %rm2v, <2 x half> %rm2v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2662,8 +2661,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv4_Dv2_Dh(
     %8 = fmul <3 x half> %m1v, %rm2v1
     %9 = fadd <3 x half> %8, %7
 
-    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 2
-    store <3 x half> %9, <3 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <3 x half> %9, <3 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <2 x half>] %rm, 3
     %rm3v0 = shufflevector <2 x half> %rm3v, <2 x half> %rm3v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -2673,10 +2672,10 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv4_Dv2_Dh(
     %11 = fmul <3 x half> %m1v, %rm3v1
     %12 = fadd <3 x half> %11, %10
 
-    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 3
-    store <3 x half> %12, <3 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <3 x half> %12, <3 x half> addrspace(5)* %nm3
 
-    %13 = load [4 x <3 x half>], [4 x <3 x half>]* %nm
+    %13 = load [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm
 
     ret [4 x <3 x half>] %13
 }
@@ -2685,7 +2684,7 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv2_Dv3_DhDv4_Dv2_Dh(
 define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv2_Dv4_Dh(
     [4 x <2 x half>] %m, [2 x <4 x half>] %rm) #0
 {
-    %nm = alloca [2 x <2 x half>]
+    %nm = alloca [2 x <2 x half>], addrspace(5)
     %m0v = extractvalue [4 x <2 x half>] %m, 0
     %m1v = extractvalue [4 x <2 x half>] %m, 1
     %m2v = extractvalue [4 x <2 x half>] %m, 2
@@ -2707,8 +2706,8 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv2_Dv4_Dh(
     %6 = fmul <2 x half> %m3v, %rm0v3
     %7 = fadd <2 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %7, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %7, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -2726,10 +2725,10 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv2_Dv4_Dh(
     %13 = fmul <2 x half> %m3v, %rm1v3
     %14 = fadd <2 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %14, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %14, <2 x half> addrspace(5)* %nm1
 
-    %15 = load [2 x <2 x half>], [2 x <2 x half>]* %nm
+    %15 = load [2 x <2 x half>], [2 x <2 x half>] addrspace(5)* %nm
 
     ret [2 x <2 x half>] %15
 }
@@ -2738,7 +2737,7 @@ define spir_func [2 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv2_Dv4_Dh(
 define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv3_Dv4_Dh(
     [4 x <2 x half>] %m, [3 x <4 x half>] %rm) #0
 {
-    %nm = alloca [3 x <2 x half>]
+    %nm = alloca [3 x <2 x half>], addrspace(5)
     %m0v = extractvalue [4 x <2 x half>] %m, 0
     %m1v = extractvalue [4 x <2 x half>] %m, 1
     %m2v = extractvalue [4 x <2 x half>] %m, 2
@@ -2760,8 +2759,8 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv3_Dv4_Dh(
     %6 = fmul <2 x half> %m3v, %rm0v3
     %7 = fadd <2 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %7, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %7, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -2779,8 +2778,8 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv3_Dv4_Dh(
     %13 = fmul <2 x half> %m3v, %rm1v3
     %14 = fadd <2 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %14, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %14, <2 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <4 x half>] %rm, 2
     %rm2v0 = shufflevector <4 x half> %rm2v, <4 x half> %rm2v, <2 x i32> <i32 0, i32 0>
@@ -2798,10 +2797,10 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv3_Dv4_Dh(
     %20 = fmul <2 x half> %m3v, %rm2v3
     %21 = fadd <2 x half> %20, %19
 
-    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>]* %nm, i32 0, i32 2
-    store <2 x half> %21, <2 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <2 x half> %21, <2 x half> addrspace(5)* %nm2
 
-    %22 = load [3 x <2 x half>], [3 x <2 x half>]* %nm
+    %22 = load [3 x <2 x half>], [3 x <2 x half>] addrspace(5)* %nm
 
     ret [3 x <2 x half>] %22
 }
@@ -2810,7 +2809,7 @@ define spir_func [3 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv3_Dv4_Dh(
 define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv4_Dv4_Dh(
     [4 x <2 x half>] %m, [4 x <4 x half>] %rm) #0
 {
-    %nm = alloca [4 x <2 x half>]
+    %nm = alloca [4 x <2 x half>], addrspace(5)
     %m0v = extractvalue [4 x <2 x half>] %m, 0
     %m1v = extractvalue [4 x <2 x half>] %m, 1
     %m2v = extractvalue [4 x <2 x half>] %m, 2
@@ -2832,8 +2831,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv4_Dv4_Dh(
     %6 = fmul <2 x half> %m3v, %rm0v3
     %7 = fadd <2 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 0
-    store <2 x half> %7, <2 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <2 x half> %7, <2 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <2 x i32> <i32 0, i32 0>
@@ -2851,8 +2850,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv4_Dv4_Dh(
     %13 = fmul <2 x half> %m3v, %rm1v3
     %14 = fadd <2 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 1
-    store <2 x half> %14, <2 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <2 x half> %14, <2 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <4 x half>] %rm, 2
     %rm2v0 = shufflevector <4 x half> %rm2v, <4 x half> %rm2v, <2 x i32> <i32 0, i32 0>
@@ -2870,8 +2869,8 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv4_Dv4_Dh(
     %20 = fmul <2 x half> %m3v, %rm2v3
     %21 = fadd <2 x half> %20, %19
 
-    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 2
-    store <2 x half> %21, <2 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <2 x half> %21, <2 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <4 x half>] %rm, 3
     %rm3v0 = shufflevector <4 x half> %rm3v, <4 x half> %rm3v, <2 x i32> <i32 0, i32 0>
@@ -2889,10 +2888,10 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv4_Dv4_Dh(
     %27 = fmul <2 x half> %m3v, %rm3v3
     %28 = fadd <2 x half> %27, %26
 
-    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>]* %nm, i32 0, i32 3
-    store <2 x half> %28, <2 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <2 x half> %28, <2 x half> addrspace(5)* %nm3
 
-    %29 = load [4 x <2 x half>], [4 x <2 x half>]* %nm
+    %29 = load [4 x <2 x half>], [4 x <2 x half>] addrspace(5)* %nm
 
     ret [4 x <2 x half>] %29
 }
@@ -2901,7 +2900,7 @@ define spir_func [4 x <2 x half>] @_Z17MatrixTimesMatrixDv4_Dv2_DhDv4_Dv4_Dh(
 define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv2_Dv2_Dh(
     [2 x <4 x half>] %m, [2 x <2 x half>] %rm) #0
 {
-    %nm = alloca [2 x <4 x half>]
+    %nm = alloca [2 x <4 x half>], addrspace(5)
     %m0v = extractvalue [2 x <4 x half>] %m, 0
     %m1v = extractvalue [2 x <4 x half>] %m, 1
 
@@ -2913,8 +2912,8 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv2_Dv2_Dh(
     %2 = fmul <4 x half> %m1v, %rm0v1
     %3 = fadd <4 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %3, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %3, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2924,10 +2923,10 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv2_Dv2_Dh(
     %5 = fmul <4 x half> %m1v, %rm1v1
     %6 = fadd <4 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %6, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %6, <4 x half> addrspace(5)* %nm1
 
-    %7 = load [2 x <4 x half>], [2 x <4 x half>]* %nm
+    %7 = load [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm
 
     ret [2 x <4 x half>] %7
 }
@@ -2936,7 +2935,7 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv2_Dv2_Dh(
 define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv3_Dv2_Dh(
     [2 x <4 x half>] %m, [3 x <2 x half>] %rm) #0
 {
-    %nm = alloca [3 x <4 x half>]
+    %nm = alloca [3 x <4 x half>], addrspace(5)
     %m0v = extractvalue [2 x <4 x half>] %m, 0
     %m1v = extractvalue [2 x <4 x half>] %m, 1
 
@@ -2948,8 +2947,8 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv3_Dv2_Dh(
     %2 = fmul <4 x half> %m1v, %rm0v1
     %3 = fadd <4 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %3, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %3, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2959,8 +2958,8 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv3_Dv2_Dh(
     %5 = fmul <4 x half> %m1v, %rm1v1
     %6 = fadd <4 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %6, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %6, <4 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <2 x half>] %rm, 2
     %rm2v0 = shufflevector <2 x half> %rm2v, <2 x half> %rm2v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -2970,10 +2969,10 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv3_Dv2_Dh(
     %8 = fmul <4 x half> %m1v, %rm2v1
     %9 = fadd <4 x half> %8, %7
 
-    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 2
-    store <4 x half> %9, <4 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <4 x half> %9, <4 x half> addrspace(5)* %nm2
 
-    %10 = load [3 x <4 x half>], [3 x <4 x half>]* %nm
+    %10 = load [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm
 
     ret [3 x <4 x half>] %10
 }
@@ -2982,7 +2981,7 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv3_Dv2_Dh(
 define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv4_Dv2_Dh(
     [2 x <4 x half>] %m, [4 x <2 x half>] %rm) #0
 {
-    %nm = alloca [4 x <4 x half>]
+    %nm = alloca [4 x <4 x half>], addrspace(5)
     %m0v = extractvalue [2 x <4 x half>] %m, 0
     %m1v = extractvalue [2 x <4 x half>] %m, 1
 
@@ -2994,8 +2993,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv4_Dv2_Dh(
     %2 = fmul <4 x half> %m1v, %rm0v1
     %3 = fadd <4 x half> %2, %1
 
-    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %3, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %3, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <2 x half>] %rm, 1
     %rm1v0 = shufflevector <2 x half> %rm1v, <2 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3005,8 +3004,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv4_Dv2_Dh(
     %5 = fmul <4 x half> %m1v, %rm1v1
     %6 = fadd <4 x half> %5, %4
 
-    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %6, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %6, <4 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <2 x half>] %rm, 2
     %rm2v0 = shufflevector <2 x half> %rm2v, <2 x half> %rm2v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3016,8 +3015,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv4_Dv2_Dh(
     %8 = fmul <4 x half> %m1v, %rm2v1
     %9 = fadd <4 x half> %8, %7
 
-    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 2
-    store <4 x half> %9, <4 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <4 x half> %9, <4 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <2 x half>] %rm, 3
     %rm3v0 = shufflevector <2 x half> %rm3v, <2 x half> %rm3v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3027,10 +3026,10 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv4_Dv2_Dh(
     %11 = fmul <4 x half> %m1v, %rm3v1
     %12 = fadd <4 x half> %11, %10
 
-    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 3
-    store <4 x half> %12, <4 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <4 x half> %12, <4 x half> addrspace(5)* %nm3
 
-    %13 = load [4 x <4 x half>], [4 x <4 x half>]* %nm
+    %13 = load [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm
 
     ret [4 x <4 x half>] %13
 }
@@ -3039,7 +3038,7 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv2_Dv4_DhDv4_Dv2_Dh(
 define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv2_Dv4_Dh(
     [4 x <3 x half>] %m, [2 x <4 x half>] %rm) #0
 {
-    %nm = alloca [2 x <3 x half>]
+    %nm = alloca [2 x <3 x half>], addrspace(5)
     %m0v = extractvalue [4 x <3 x half>] %m, 0
     %m1v = extractvalue [4 x <3 x half>] %m, 1
     %m2v = extractvalue [4 x <3 x half>] %m, 2
@@ -3061,8 +3060,8 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv2_Dv4_Dh(
     %6 = fmul <3 x half> %m3v, %rm0v3
     %7 = fadd <3 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %7, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %7, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -3080,10 +3079,10 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv2_Dv4_Dh(
     %13 = fmul <3 x half> %m3v, %rm1v3
     %14 = fadd <3 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %14, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %14, <3 x half> addrspace(5)* %nm1
 
-    %15 = load [2 x <3 x half>], [2 x <3 x half>]* %nm
+    %15 = load [2 x <3 x half>], [2 x <3 x half>] addrspace(5)* %nm
 
     ret [2 x <3 x half>] %15
 }
@@ -3092,7 +3091,7 @@ define spir_func [2 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv2_Dv4_Dh(
 define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv3_Dv4_Dh(
     [4 x <3 x half>] %m, [3 x <4 x half>] %rm) #0
 {
-    %nm = alloca [3 x <3 x half>]
+    %nm = alloca [3 x <3 x half>], addrspace(5)
     %m0v = extractvalue [4 x <3 x half>] %m, 0
     %m1v = extractvalue [4 x <3 x half>] %m, 1
     %m2v = extractvalue [4 x <3 x half>] %m, 2
@@ -3114,8 +3113,8 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv3_Dv4_Dh(
     %6 = fmul <3 x half> %m3v, %rm0v3
     %7 = fadd <3 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %7, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %7, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -3133,8 +3132,8 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv3_Dv4_Dh(
     %13 = fmul <3 x half> %m3v, %rm1v3
     %14 = fadd <3 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %14, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %14, <3 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <4 x half>] %rm, 2
     %rm2v0 = shufflevector <4 x half> %rm2v, <4 x half> %rm2v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -3152,10 +3151,10 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv3_Dv4_Dh(
     %20 = fmul <3 x half> %m3v, %rm2v3
     %21 = fadd <3 x half> %20, %19
 
-    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>]* %nm, i32 0, i32 2
-    store <3 x half> %21, <3 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <3 x half> %21, <3 x half> addrspace(5)* %nm2
 
-    %22 = load [3 x <3 x half>], [3 x <3 x half>]* %nm
+    %22 = load [3 x <3 x half>], [3 x <3 x half>] addrspace(5)* %nm
 
     ret [3 x <3 x half>] %22
 }
@@ -3164,7 +3163,7 @@ define spir_func [3 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv3_Dv4_Dh(
 define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv4_Dv4_Dh(
     [4 x <3 x half>] %m, [4 x <4 x half>] %rm) #0
 {
-    %nm = alloca [4 x <3 x half>]
+    %nm = alloca [4 x <3 x half>], addrspace(5)
     %m0v = extractvalue [4 x <3 x half>] %m, 0
     %m1v = extractvalue [4 x <3 x half>] %m, 1
     %m2v = extractvalue [4 x <3 x half>] %m, 2
@@ -3186,8 +3185,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv4_Dv4_Dh(
     %6 = fmul <3 x half> %m3v, %rm0v3
     %7 = fadd <3 x half> %6, %5
 
-    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 0
-    store <3 x half> %7, <3 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <3 x half> %7, <3 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <4 x half>] %rm, 1
     %rm1v0 = shufflevector <4 x half> %rm1v, <4 x half> %rm1v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -3205,8 +3204,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv4_Dv4_Dh(
     %13 = fmul <3 x half> %m3v, %rm1v3
     %14 = fadd <3 x half> %13, %12
 
-    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 1
-    store <3 x half> %14, <3 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <3 x half> %14, <3 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <4 x half>] %rm, 2
     %rm2v0 = shufflevector <4 x half> %rm2v, <4 x half> %rm2v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -3224,8 +3223,8 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv4_Dv4_Dh(
     %20 = fmul <3 x half> %m3v, %rm2v3
     %21 = fadd <3 x half> %20, %19
 
-    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 2
-    store <3 x half> %21, <3 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <3 x half> %21, <3 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <4 x half>] %rm, 3
     %rm3v0 = shufflevector <4 x half> %rm3v, <4 x half> %rm3v, <3 x i32> <i32 0, i32 0, i32 0>
@@ -3243,10 +3242,10 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv4_Dv4_Dh(
     %27 = fmul <3 x half> %m3v, %rm3v3
     %28 = fadd <3 x half> %27, %26
 
-    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>]* %nm, i32 0, i32 3
-    store <3 x half> %28, <3 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <3 x half> %28, <3 x half> addrspace(5)* %nm3
 
-    %29 = load [4 x <3 x half>], [4 x <3 x half>]* %nm
+    %29 = load [4 x <3 x half>], [4 x <3 x half>] addrspace(5)* %nm
 
     ret [4 x <3 x half>] %29
 }
@@ -3255,7 +3254,7 @@ define spir_func [4 x <3 x half>] @_Z17MatrixTimesMatrixDv4_Dv3_DhDv4_Dv4_Dh(
 define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv2_Dv3_Dh(
     [3 x <4 x half>] %m, [2 x <3 x half>] %rm) #0
 {
-    %nm = alloca [2 x <4 x half>]
+    %nm = alloca [2 x <4 x half>], addrspace(5)
     %m0v = extractvalue [3 x <4 x half>] %m, 0
     %m1v = extractvalue [3 x <4 x half>] %m, 1
     %m2v = extractvalue [3 x <4 x half>] %m, 2
@@ -3272,8 +3271,8 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv2_Dv3_Dh(
     %4 = fmul <4 x half> %m2v, %rm0v2
     %5 = fadd <4 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %5, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %5, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [2 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3287,10 +3286,10 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv2_Dv3_Dh(
     %9 = fmul <4 x half> %m2v, %rm1v2
     %10 = fadd <4 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %10, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %10, <4 x half> addrspace(5)* %nm1
 
-    %11 = load [2 x <4 x half>], [2 x <4 x half>]* %nm
+    %11 = load [2 x <4 x half>], [2 x <4 x half>] addrspace(5)* %nm
 
     ret [2 x <4 x half>] %11
 }
@@ -3299,7 +3298,7 @@ define spir_func [2 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv2_Dv3_Dh(
 define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv3_Dv3_Dh(
     [3 x <4 x half>] %m, [3 x <3 x half>] %rm) #0
 {
-    %nm = alloca [3 x <4 x half>]
+    %nm = alloca [3 x <4 x half>], addrspace(5)
     %m0v = extractvalue [3 x <4 x half>] %m, 0
     %m1v = extractvalue [3 x <4 x half>] %m, 1
     %m2v = extractvalue [3 x <4 x half>] %m, 2
@@ -3316,8 +3315,8 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv3_Dv3_Dh(
     %4 = fmul <4 x half> %m2v, %rm0v2
     %5 = fadd <4 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %5, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %5, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [3 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3331,8 +3330,8 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv3_Dv3_Dh(
     %9 = fmul <4 x half> %m2v, %rm1v2
     %10 = fadd <4 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %10, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %10, <4 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [3 x <3 x half>] %rm, 2
     %rm2v0 = shufflevector <3 x half> %rm2v, <3 x half> %rm2v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3346,10 +3345,10 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv3_Dv3_Dh(
     %14 = fmul <4 x half> %m2v, %rm2v2
     %15 = fadd <4 x half> %14, %13
 
-    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>]* %nm, i32 0, i32 2
-    store <4 x half> %15, <4 x half>* %nm2
+    %nm2 = getelementptr inbounds [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <4 x half> %15, <4 x half> addrspace(5)* %nm2
 
-    %16 = load [3 x <4 x half>], [3 x <4 x half>]* %nm
+    %16 = load [3 x <4 x half>], [3 x <4 x half>] addrspace(5)* %nm
 
     ret [3 x <4 x half>] %16
 }
@@ -3358,7 +3357,7 @@ define spir_func [3 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv3_Dv3_Dh(
 define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv4_Dv3_Dh(
     [3 x <4 x half>] %m, [4 x <3 x half>] %rm) #0
 {
-    %nm = alloca [4 x <4 x half>]
+    %nm = alloca [4 x <4 x half>], addrspace(5)
     %m0v = extractvalue [3 x <4 x half>] %m, 0
     %m1v = extractvalue [3 x <4 x half>] %m, 1
     %m2v = extractvalue [3 x <4 x half>] %m, 2
@@ -3375,8 +3374,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv4_Dv3_Dh(
     %4 = fmul <4 x half> %m2v, %rm0v2
     %5 = fadd <4 x half> %4, %3
 
-    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 0
-    store <4 x half> %5, <4 x half>* %nm0
+    %nm0 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 0
+    store <4 x half> %5, <4 x half> addrspace(5)* %nm0
 
     %rm1v = extractvalue [4 x <3 x half>] %rm, 1
     %rm1v0 = shufflevector <3 x half> %rm1v, <3 x half> %rm1v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3390,8 +3389,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv4_Dv3_Dh(
     %9 = fmul <4 x half> %m2v, %rm1v2
     %10 = fadd <4 x half> %9, %8
 
-    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 1
-    store <4 x half> %10, <4 x half>* %nm1
+    %nm1 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 1
+    store <4 x half> %10, <4 x half> addrspace(5)* %nm1
 
     %rm2v = extractvalue [4 x <3 x half>] %rm, 2
     %rm2v0 = shufflevector <3 x half> %rm2v, <3 x half> %rm2v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3405,8 +3404,8 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv4_Dv3_Dh(
     %14 = fmul <4 x half> %m2v, %rm2v2
     %15 = fadd <4 x half> %14, %13
 
-    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 2
-    store <4 x half> %15, <4 x half>* %nm2
+    %nm2 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 2
+    store <4 x half> %15, <4 x half> addrspace(5)* %nm2
 
     %rm3v = extractvalue [4 x <3 x half>] %rm, 3
     %rm3v0 = shufflevector <3 x half> %rm3v, <3 x half> %rm3v, <4 x i32> <i32 0, i32 0, i32 0, i32 0>
@@ -3420,10 +3419,10 @@ define spir_func [4 x <4 x half>] @_Z17MatrixTimesMatrixDv3_Dv4_DhDv4_Dv3_Dh(
     %19 = fmul <4 x half> %m2v, %rm3v2
     %20 = fadd <4 x half> %19, %18
 
-    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>]* %nm, i32 0, i32 3
-    store <4 x half> %20, <4 x half>* %nm3
+    %nm3 = getelementptr inbounds [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm, i32 0, i32 3
+    store <4 x half> %20, <4 x half> addrspace(5)* %nm3
 
-    %21 = load [4 x <4 x half>], [4 x <4 x half>]* %nm
+    %21 = load [4 x <4 x half>], [4 x <4 x half>] addrspace(5)* %nm
 
     ret [4 x <4 x half>] %21
 }

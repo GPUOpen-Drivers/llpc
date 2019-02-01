@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerAggregateLoadStore.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-aggregate-load-store"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -38,6 +36,8 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerAggregateLoadStore.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-aggregate-load-store"
 
 using namespace llvm;
 using namespace SPIRV;

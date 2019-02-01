@@ -77,17 +77,24 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Add whole-pipeline lowering passes to pass manager
+// Add per-shader lowering passes to pass manager
 void SpirvLower::AddPasses(
-    Context*              pContext,               // [in] LLPC context
+    ShaderStage           stage,                  // Shader stage
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
+    llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
     uint32_t              forceLoopUnrollCount,   // 0 or force loop unroll count
     bool*                 pNeedDynamicLoopUnroll) // nullptr or where to store flag of whether dynamic loop unrolling
                                                   //  is needed
 {
+    // Start timer for lowering passes.
+    if (pLowerTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pLowerTimer, true));
+    }
+
     // Check if this module needs dynamic loop unroll. Only do this check when caller has passed
-    // in pNeedDynamicLoopUnroll.
-    if (pNeedDynamicLoopUnroll != nullptr)
+    // in pNeedDynamicLoopUnroll, and this is the fragment shader.
+    if ((stage == ShaderStageFragment) && (pNeedDynamicLoopUnroll != nullptr))
     {
         passMgr.add(new PassLoopInfoCollect(pNeedDynamicLoopUnroll));
     }
@@ -111,9 +118,6 @@ void SpirvLower::AddPasses(
 
     // Lower SPIR-V buffer operations (load and store)
     passMgr.add(CreateSpirvLowerBufferOp());
-
-    // Remove constant exprs that involve global variables that will be lowered by the next pass.
-    passMgr.add(CreateSpirvLowerGlobalConstExprRemove());
 
     // Lower SPIR-V global variables, inputs, and outputs
     passMgr.add(CreateSpirvLowerGlobal());
@@ -159,12 +163,18 @@ void SpirvLower::AddPasses(
     // Lower SPIR-V instruction metadata remove
     passMgr.add(CreateSpirvLowerInstMetaRemove());
 
+    // Stop timer for lowering passes.
+    if (pLowerTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pLowerTimer, false));
+    }
+
     // Dump the result
     if (EnableOuts())
     {
-        passMgr.add(createPrintModulePass(outs(),
+        passMgr.add(createPrintModulePass(outs(), "\n"
                     "===============================================================================\n"
-                    "// LLPC pipeline SPIR-V lowering results\n"));
+                    "// LLPC SPIR-V lowering results\n"));
     }
 }
 
@@ -177,8 +187,16 @@ void SpirvLower::Init(
 {
     m_pModule  = pModule;
     m_pContext = static_cast<Context*>(&m_pModule->getContext());
-    m_shaderStage = ShaderStageInvalid;
-    m_pEntryPoint = nullptr;
+    if (m_pModule->empty())
+    {
+        m_shaderStage = ShaderStageInvalid;
+        m_pEntryPoint = nullptr;
+    }
+    else
+    {
+        m_shaderStage = GetShaderStageFromModule(m_pModule);
+        m_pEntryPoint = GetEntryPoint(m_pModule);
+    }
 }
 
 } // Llpc

@@ -42,6 +42,7 @@ namespace Llpc
 {
 
 // Forward declaration
+class Builder;
 class ComputeContext;
 class Context;
 class GraphicsContext;
@@ -192,11 +193,11 @@ public:
 
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 
-    static llvm::Module* TranslateSpirvToLlvm(const BinaryData*            pSpirvBin,
-                                              ShaderStage                  shaderStage,
-                                              const char*                  pEntryTarget,
-                                              const VkSpecializationInfo*  pSpecializationInfo,
-                                              llvm::LLVMContext*           pContext);
+    static void TranslateSpirvToLlvm(const BinaryData*            pSpirvBin,
+                                     ShaderStage                  shaderStage,
+                                     const char*                  pEntryTarget,
+                                     const VkSpecializationInfo*  pSpecializationInfo,
+                                     llvm::Module*                pModule);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
@@ -205,8 +206,6 @@ private:
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
     Result BuildNullFs(Context* pContext, std::unique_ptr<llvm::Module>& pNullFsModule) const;
-
-    Result ReplaceShader(const ShaderModuleData* pOrigModuleData, ShaderModuleData** ppModuleData) const;
 
     void InitGpuProperty();
     void InitGpuWorkaround();
@@ -226,6 +225,8 @@ private:
 
     uint32_t ChooseLoopUnrollCountCandidate(PipelineStatistics* pPipelineStats,
                                             uint32_t            candidateCount) const;
+
+    static llvm::Module* LinkShaderModules(Context* pContext, llvm::ArrayRef<llvm::Module*> modules);
 
     // -----------------------------------------------------------------------------------------------------------------
 

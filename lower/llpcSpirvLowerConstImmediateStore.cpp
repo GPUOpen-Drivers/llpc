@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerConstImmediateStore.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-const-immediate-store"
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 
@@ -38,6 +36,8 @@
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-const-immediate-store"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -52,7 +52,7 @@ char SpirvLowerConstImmediateStore::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for constant immediate store
-FunctionPass* CreateSpirvLowerConstImmediateStore()
+ModulePass* CreateSpirvLowerConstImmediateStore()
 {
     return new SpirvLowerConstImmediateStore();
 }
@@ -60,23 +60,45 @@ FunctionPass* CreateSpirvLowerConstImmediateStore()
 // =====================================================================================================================
 SpirvLowerConstImmediateStore::SpirvLowerConstImmediateStore()
     :
-    FunctionPass(ID)
+    SpirvLower(ID)
 {
     initializeSpirvLowerConstImmediateStorePass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
-bool SpirvLowerConstImmediateStore::runOnFunction(
-    Function& func)  // [in,out] LLVM function to be run on
+bool SpirvLowerConstImmediateStore::runOnModule(
+    Module& module)  // [in,out] LLVM module to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
 
-    bool changed = false;
+    SpirvLower::Init(&module);
 
+    // Process "alloca" instructions to see if they can be optimized to a read-only global
+    // variable.
+    for (auto funcIt = module.begin(), funcItEnd = module.end(); funcIt != funcItEnd; ++funcIt)
+    {
+        if (auto pFunc = dyn_cast<Function>(&*funcIt))
+        {
+            if (pFunc->empty() == false)
+            {
+                ProcessAllocaInsts(pFunc);
+            }
+        }
+    }
+
+    return true;
+}
+
+// =====================================================================================================================
+// Processes "alloca" instructions at the beginning of the given non-empty function to see if they
+// can be optimized to a read-only global variable.
+void SpirvLowerConstImmediateStore::ProcessAllocaInsts(
+    Function* pFunc)  // [in] Function to process
+{
     // NOTE: We only visit the entry block on the basis that SPIR-V translator puts all "alloca"
     // instructions there.
-    auto pEntryBlock = &func.front();
+    auto pEntryBlock = &pFunc->front();
     for (auto instIt = pEntryBlock->begin(), instItEnd = pEntryBlock->end(); instIt != instItEnd; ++instIt)
     {
         auto pInst = &*instIt;
@@ -91,12 +113,10 @@ bool SpirvLowerConstImmediateStore::runOnFunction(
                     // Got an aggregate "alloca" with a single store to the whole type.
                     // Do the optimization.
                     ConvertAllocaToReadOnlyGlobal(pStoreInst);
-                    changed = true;
                 }
             }
         }
     }
-    return changed;
 }
 
 // =====================================================================================================================
@@ -164,7 +184,7 @@ void SpirvLowerConstImmediateStore::ConvertAllocaToReadOnlyGlobal(
     StoreInst* pStoreInst)  // [in] The single constant store into the "alloca"
 {
     auto pAlloca = cast<AllocaInst>(pStoreInst->getPointerOperand());
-    auto pGlobal = new GlobalVariable(*pStoreInst->getParent()->getParent()->getParent(),
+    auto pGlobal = new GlobalVariable(*m_pModule,
                                       pAlloca->getType()->getElementType(),
                                       true, // isConstant
                                       GlobalValue::InternalLinkage,

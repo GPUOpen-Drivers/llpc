@@ -41,7 +41,7 @@
 namespace Llpc
 {
 
-static const uint32_t  Version = 18;
+static const uint32_t  Version = 19;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
@@ -76,20 +76,19 @@ enum class Result : int32_t
 /// Enumerates LLPC shader stages.
 enum ShaderStage : uint32_t
 {
-    ShaderStageVertex = 0,                          ///< Vertex shader
-    ShaderStageTessControl,                         ///< Tessellation control shader
-    ShaderStageTessEval,                            ///< Tessellation evaluation shader
-    ShaderStageGeometry,                            ///< Geometry shader
-    ShaderStageFragment,                            ///< Fragment shader
-    ShaderStageCompute,                             ///< Compute shader
+    ShaderStageVertex = 0,                                ///< Vertex shader
+    ShaderStageTessControl,                               ///< Tessellation control shader
+    ShaderStageTessEval,                                  ///< Tessellation evaluation shader
+    ShaderStageGeometry,                                  ///< Geometry shader
+    ShaderStageFragment,                                  ///< Fragment shader
+    ShaderStageCompute,                                   ///< Compute shader
+    ShaderStageCount,                                     ///< Count of shader stages
+    ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
+    ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
+    ShaderStageGfxCount = ShaderStageFragment + 1,        ///< Count of shader stages for graphics pipeline
 
-    ShaderStageCount = ShaderStageCompute + 1,      ///< Count of shader stages
-    ShaderStageGfxCount = ShaderStageFragment + 1,  ///< Count of shader stages for graphics pipeline
-
-    ShaderStageCopyShader = ShaderStageCompute + 1, ///< Copy shader (internal-use)
-    ShaderStageCountInternal = ShaderStageCopyShader + 1, ///< Count of shader stages (internal-use)
-
-    ShaderStageInvalid  = ShaderStageCountInternal, ///< Invalid shader stage
+    ShaderStageCopyShader = ShaderStageCount,             ///< Copy shader (internal-use)
+    ShaderStageCountInternal,                             ///< Count of shader stages (internal-use)
 };
 
 /// Enumerates the function of a particular node in a shader's resource mapping graph.

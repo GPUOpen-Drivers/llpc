@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerLoopUnrollControl.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-control"
-
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/Support/Debug.h"
 
@@ -37,6 +35,8 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerLoopUnrollControl.h"
+
+#define DEBUG_TYPE "llpc-spirv-lower-loop-unroll-control"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -51,7 +51,7 @@ char SpirvLowerLoopUnrollControl::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering operations for loop unroll control
-FunctionPass* CreateSpirvLowerLoopUnrollControl(
+ModulePass* CreateSpirvLowerLoopUnrollControl(
     uint32_t forceLoopUnrollCount)    // Force loop unroll count
 {
     auto pPass = new SpirvLowerLoopUnrollControl(forceLoopUnrollCount);
@@ -61,7 +61,7 @@ FunctionPass* CreateSpirvLowerLoopUnrollControl(
 // =====================================================================================================================
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
     :
-    FunctionPass(ID),
+    SpirvLower(ID),
     m_forceLoopUnrollCount(0)
 {
     initializeSpirvLowerLoopUnrollControlPass(*PassRegistry::getPassRegistry());
@@ -71,69 +71,69 @@ SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl()
 SpirvLowerLoopUnrollControl::SpirvLowerLoopUnrollControl(
     uint32_t forceLoopUnrollCount)    // Force loop unroll count
     :
-    FunctionPass(ID),
+    SpirvLower(ID),
     m_forceLoopUnrollCount(forceLoopUnrollCount)
 {
     initializeSpirvLowerLoopUnrollControlPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM function.
-bool SpirvLowerLoopUnrollControl::runOnFunction(
-    Function& func)  // [in,out] LLVM function to be run on
+// Executes this SPIR-V lowering pass on the specified LLVM module.
+bool SpirvLowerLoopUnrollControl::runOnModule(
+    Module& module)  // [in,out] LLVM module to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Unroll-Control\n");
+
+    SpirvLower::Init(&module);
 
     if (m_forceLoopUnrollCount == 0)
     {
         return false;
     }
 
-    // This relies on this pass being run after inlining and dead function removal.
-    auto shaderStage = getAnalysis<PipelineShaders>().GetShaderStage(&func);
-    LLPC_ASSERT(shaderStage != ShaderStageInvalid);
-
-    if ((shaderStage == ShaderStageTessControl) ||
-        (shaderStage == ShaderStageTessEval) ||
-        (shaderStage == ShaderStageGeometry))
+    if ((m_shaderStage == ShaderStageTessControl) ||
+        (m_shaderStage == ShaderStageTessEval) ||
+        (m_shaderStage == ShaderStageGeometry))
     {
         // Disabled on above shader types.
         return false;
     }
 
     bool changed = false;
-    auto pContext = &func.getParent()->getContext();
-    for (auto& block : func)
+    for (auto& func : module)
     {
-        auto pTerminator = block.getTerminator();
-        MDNode* pLoopMetaNode = pTerminator->getMetadata("llvm.loop");
-        if ((pLoopMetaNode == nullptr) || (pLoopMetaNode->getNumOperands() != 1) ||
-            (pLoopMetaNode->getOperand(0) != pLoopMetaNode))
+        for (auto& block : func)
         {
-            continue;
+            auto pTerminator = block.getTerminator();
+            MDNode* pLoopMetaNode = pTerminator->getMetadata("llvm.loop");
+            if ((pLoopMetaNode == nullptr) || (pLoopMetaNode->getNumOperands() != 1) ||
+                (pLoopMetaNode->getOperand(0) != pLoopMetaNode))
+            {
+                continue;
+            }
+            // We have a loop backedge with !llvm.loop metadata containing just
+            // one operand pointing to itself, meaning that the SPIR-V did not
+            // have an unroll or don't-unroll directive.  Add the force-unroll
+            // count here.
+            auto pTemp = MDNode::getTemporary(*m_pContext, None);
+            Metadata* args[] = { pTemp.get() };
+            auto pSelf = MDNode::get(*m_pContext, args);
+            pSelf->replaceOperandWith(0, pSelf);
+
+            SmallVector<llvm::Metadata*, 2> opValues;
+            opValues.push_back(MDString::get(*m_pContext, "llvm.loop.unroll.count"));
+            opValues.push_back(ConstantAsMetadata::get(
+                  ConstantInt::get(Type::getInt32Ty(*m_pContext), m_forceLoopUnrollCount)));
+
+            SmallVector<Metadata*, 2> metadata;
+            metadata.push_back(MDNode::get(*m_pContext, pSelf));
+            metadata.push_back(MDNode::get(*m_pContext, opValues));
+
+            pLoopMetaNode = MDNode::get(*m_pContext, metadata);
+            pLoopMetaNode->replaceOperandWith(0, pLoopMetaNode);
+            pTerminator->setMetadata("llvm.loop", pLoopMetaNode);
+            changed = true;
         }
-        // We have a loop backedge with !llvm.loop metadata containing just
-        // one operand pointing to itself, meaning that the SPIR-V did not
-        // have an unroll or don't-unroll directive.  Add the force-unroll
-        // count here.
-        auto pTemp = MDNode::getTemporary(*pContext, None);
-        Metadata* args[] = { pTemp.get() };
-        auto pSelf = MDNode::get(*pContext, args);
-        pSelf->replaceOperandWith(0, pSelf);
-
-        SmallVector<llvm::Metadata*, 2> opValues;
-        opValues.push_back(MDString::get(*pContext, "llvm.loop.unroll.count"));
-        opValues.push_back(ConstantAsMetadata::get(
-              ConstantInt::get(Type::getInt32Ty(*pContext), m_forceLoopUnrollCount)));
-
-        SmallVector<Metadata*, 2> metadata;
-        metadata.push_back(MDNode::get(*pContext, pSelf));
-        metadata.push_back(MDNode::get(*pContext, opValues));
-
-        pLoopMetaNode = MDNode::get(*pContext, metadata);
-        pLoopMetaNode->replaceOperandWith(0, pLoopMetaNode);
-        pTerminator->setMetadata("llvm.loop", pLoopMetaNode);
-        changed = true;
     }
 
     return changed;
@@ -143,5 +143,5 @@ bool SpirvLowerLoopUnrollControl::runOnFunction(
 
 // =====================================================================================================================
 // Initializes the pass of SPIR-V lowering operations for loop unroll control.
-INITIALIZE_PASS(SpirvLowerLoopUnrollControl, DEBUG_TYPE,
+INITIALIZE_PASS(SpirvLowerLoopUnrollControl, "Spirv-lower-loop-unroll-control",
                 "Set metadata to control LLPC loop unrolling", false, false)

@@ -4388,7 +4388,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
 
-    xfbOffset = xfbOffset + 4 * xfbLocOffset;
+    xfbOffset = xfbOffset + xfbLocOffset;
 
     if (bitWidth == 64)
     {
@@ -4595,7 +4595,9 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     auto pThreadValid = new ICmpInst(pInsertPos, ICmpInst::ICMP_ULT, m_pThreadId, pVertexCount);
     // Setup write index for stream-out
     auto pWriteIndex = GetFunctionArgument(m_pEntryPoint, writeIndex);
-    pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pInsertPos);
+
+    if (m_shaderStage != ShaderStageCopyShader)
+        pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pInsertPos);
 
     if (m_gfxIp.major >= 9)
     {
@@ -5219,8 +5221,9 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     Value* pCastValue = nullptr;
     if (numChannels > 1)
     {
-        auto pIntTy = (bitWidth == 32) ? m_pContext->Int32Ty() :
-                                         ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
+        auto pIntTy = ((bitWidth == 32) || (bitWidth == 64)) ?
+                          m_pContext->Int32Ty() :
+                          ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
         auto pCastTy = VectorType::get(pIntTy, numChannels);
         pCastValue = UndefValue::get(pCastTy);
 
@@ -5238,7 +5241,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         pCastValue = loadValues[0];
     }
 
-    // Cast <n x i16> or <n x i32> vector to read value
+    // Cast <n x i8>, <n x i16> or <n x i32> vector to read value
     return new BitCastInst(pCastValue, pReadTy, "", pInsertPos);
 }
 
@@ -5260,8 +5263,9 @@ void PatchInOutImportExport::WriteValueToLds(
     const uint32_t numChannels = compCout * ((bitWidth == 64) ? 2 : 1);
 
     // Cast write value to <n x i32> vector
-    auto pIntTy = (bitWidth == 32) ? m_pContext->Int32Ty() :
-                                     ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
+    auto pIntTy = ((bitWidth == 32) || (bitWidth == 64)) ?
+                      m_pContext->Int32Ty() :
+                      ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
     Type* pCastTy = (numChannels > 1) ? VectorType::get(pIntTy, numChannels) : pIntTy;
     Value* pCastValue = new BitCastInst(pWriteValue, pCastTy, "", pInsertPos);
 
