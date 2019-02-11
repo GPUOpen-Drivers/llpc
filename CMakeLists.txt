@@ -517,7 +517,6 @@ if(UNIX)
             -std=c++11
             -fno-rtti
         >)
-        #message(STATUS "Configured compiler options for Clang.")
         message(WARNING "Clang is untested.")
     else()
         message(FATAL_ERROR "Using unknown compiler.")
