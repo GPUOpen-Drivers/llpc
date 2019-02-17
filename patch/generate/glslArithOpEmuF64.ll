@@ -53,13 +53,13 @@ define double @llpc.inverseSqrt.f64(double %x) #0
 ; >>>  Common Functions
 ; =====================================================================================================================
 
-; GLSL: double abs(double)
+; GLSL: double sign(double)
 define double @llpc.fsign.f64(double %x) #0
 {
     %con1 = fcmp ogt double %x, 0.0
     %ret1 = select i1 %con1, double 1.0, double %x
     %con2 = fcmp oge double %ret1, 0.0
-    %ret2 = select i1 %con2, double %ret1,double -1.0
+    %ret2 = select i1 %con2, double %ret1, double -1.0
     ret double %ret2
 }
 
