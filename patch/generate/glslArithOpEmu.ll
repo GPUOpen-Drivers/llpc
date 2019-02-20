@@ -238,8 +238,8 @@ define float @llpc.acos.f32(float %x)
 ; GLSL: float atan(float)
 define float @llpc.atan.f32(float %x)
 {
-    ; atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, x <= 1.0
-    ; x = min(1.0, x) / max(1.0, x), make x <= 1.0
+    ; atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, |x| <= 1.0
+    ; x = min(1.0, x) / max(1.0, x), make |x| <= 1.0
 
     %1 = call float @llvm.fabs.f32(float %x)
     %2 = call float @llvm.maxnum.f32(float %1, float 1.0)
@@ -295,27 +295,30 @@ define float @llpc.atan2.f32(float %y, float %x)
     ; p1 = sgn(y) * PI
     ; atanyox = atan(yox)
     ;
-    ; if (x != 0.0)
-    ;     atan(y, x) = (x < 0.0) ? p1 + atanyox : atanyox
+    ; if (y != 0.0)
+    ;     if (x != 0.0)
+    ;         atan(y, x) = (x < 0.0) ? p1 + atanyox : atanyox
+    ;     else
+    ;         atan(y, x) = p0
     ; else
-    ;     atan(y, x) = p0
+    ;     atan(y, x) = (x > 0.0) ? 0 : PI
 
     %1 = call float @llvm.fabs.f32(float %x)    ; %1 = |x|
     %2 = call float @llvm.fabs.f32(float %y)    ; %2 = |y|
-    %3 = call float @llpc.fsign.f32(float %y)   ; %3 = syn(y)
+    %3 = call float @llpc.fsign.f32(float %y)   ; %3 = sgn(y)
 
     ; 0x3FF921FB60000000: PI/2 = 1.57079637
-    %4 = fmul float %3, 0x3FF921FB60000000      ; %4 = p0 = syn(y) * PI/2
+    %4 = fmul float %3, 0x3FF921FB60000000      ; %4 = p0 = sgn(y) * PI/2
     ; 0x400921FB60000000: PI = 3.14159274
-    %5 = fmul float %3, 0x400921FB60000000      ; %5 = p1 = syn(y) * PI
+    %5 = fmul float %3, 0x400921FB60000000      ; %5 = p1 = sgn(y) * PI
 
     %6 = fcmp oeq float %1, %2                  ; %6 = (|x| == |y|)
     %7 = fcmp oeq float %x, %y                  ; %7 = (x == y)
     %8 = select i1 %7, float 1.0, float -1.0    ; %8 = (x == y) ? 1.0 : -1.0
 
-    ; NOTE: "atan" is very sensitive to the value of y_over_x, so we have to use high accuracy division.
-    %9 = call float @llvm.amdgcn.fdiv.fast(float %y, float %x)
-                                                ; %9  = y/x
+    ; NOTE: Use fast fdiv to bypass any optimization.
+    %9 = call float @llvm.amdgcn.fdiv.fast(float %y, float %x)  ; %9  = y/x                    
+
     %10 = select i1 %6, float %8, float %9      ; %10 = yox = (|x| == |y|) ? ((x == y) ? 1.0 : -1.0) : y/x
     %11 = call float @llpc.atan.f32(float %10)  ; %11 = atanyox = atan(yox)
 
@@ -324,9 +327,16 @@ define float @llpc.atan2.f32(float %y, float %x)
     %14 = select i1 %13, float %12, float %11   ; %14 = (x < 0.0) ? atanyox + p1 : atanyox
 
     %15 = fcmp one float %x, 0.0                ; %15 = (x != 0.0)
-    %16 = select i1 %15, float %14, float %4    ; %16 = atan(y, x)
+    %16 = select i1 %15, float %14, float %4    ; %16 = (x != 0.0) ? ((x < 0.0) ? atanyox + p1 : atanyox) : p0
 
-    ret float %16
+    %17 = fcmp ogt float %x, 0.0                ; %17 = (x > 0.0)
+    ; 0x4009200000000000: PI = 3.14159274
+    %18 = select i1 %17, float 0.0, float 0x4009200000000000    ; %18 = (x > 0.0) ? 0.0 : PI
+
+    %19 = fcmp one float %y, 0.0                ; %19 = (y != 0.0)
+    %20 = select i1 %19, float %16, float %18   ; %20 = atan(y, x)
+
+    ret float %20
 }
 
 ; GLSL: float sinh(float)
@@ -476,7 +486,7 @@ define i32 @llpc.sabs.i32(i32 %x) #0
     ret i32 %val
 }
 
-; GLSL: float abs(float)
+; GLSL: float sign(float)
 define float @llpc.fsign.f32(float %x) #0
 {
     %con1 = fcmp ogt float %x, 0.0
