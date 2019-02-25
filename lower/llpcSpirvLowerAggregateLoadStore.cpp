@@ -181,8 +181,6 @@ void SpirvLowerAggregateLoadStore::ExpandStoreInst(
 
         pElemPtr = GetElementPtrInst::CreateInBounds(pStorePtr, idxs,"", pInsertPos);
 
-        LLPC_ASSERT(pElemPtr->getType()->getPointerElementType() != pElemValue->getType());
-
         new StoreInst(pElemValue, pElemPtr, pInsertPos);
     }
 }

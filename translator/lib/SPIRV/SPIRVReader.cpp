@@ -311,6 +311,8 @@ public:
 
   DebugLoc getDebugLoc(SPIRVInstruction *BI, Function *F);
 
+  void updateBuilderDebugLoc(SPIRVValue *BV, Function *F);
+
   std::string getOCLBuiltinName(SPIRVInstruction *BI);
   std::string getOCLConvertBuiltinName(SPIRVInstruction *BI);
   std::string getOCLGenericCastToPtrName(SPIRVInstruction *BI);
@@ -325,6 +327,7 @@ public:
                     bool CreatePlaceHolder = true);
   Value *transValueWithoutDecoration(SPIRVValue *, Function *F, BasicBlock *,
                                      bool CreatePlaceHolder = true);
+  template<spv::Op> Value* transValueWithOpcode(SPIRVValue*, BasicBlock*);
   Value *transDeviceEvent(SPIRVValue *BV, Function *F, BasicBlock *BB);
   Value *transEnqueuedBlock(SPIRVValue *BF, SPIRVValue *BC, SPIRVValue *BCSize,
                             SPIRVValue *BCAligment, Function *F,
@@ -1524,6 +1527,55 @@ DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *BI, Function *F) {
       DbgTran.getDISubprogram(BI->getParent()->getParent(), F));
 }
 
+void SPIRVToLLVM::updateBuilderDebugLoc(SPIRVValue *BV, Function *F) {
+  if (BV->isInst()) {
+    SPIRVInstruction *BI = static_cast<SPIRVInstruction*>(BV);
+    Builder->SetCurrentDebugLocation(getDebugLoc(BI, F));
+  }
+}
+
+template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpKill>(SPIRVValue* SV, BasicBlock* BB) {
+  Value* const Kill = Builder->CreateKill();
+
+  // NOTE: In SPIR-V, "OpKill" is considered as a valid instruction to
+  // terminate blocks. But in LLVM, we have to insert a dummy "return"
+  // instruction as block terminator.
+  if (Builder->getCurrentFunctionReturnType()->isVoidTy()) {
+    // No return value
+    Builder->CreateRetVoid();
+  } else {
+    // Function returns value
+    Builder->CreateRet(UndefValue::get(Builder->getCurrentFunctionReturnType()));
+  }
+
+  return Kill;
+}
+
+#if VKI_KHR_SHADER_CLOCK
+template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(SPIRVValue* SV, BasicBlock* BB) {
+  auto BI = static_cast<SPIRVInstruction*>(SV);
+  auto Scope = static_cast<spv::Scope>(static_cast<SPIRVConstant*>(BI->getOperands()[0])->getZExtIntValue());
+  assert(Scope == spv::ScopeDevice || Scope == spv::ScopeWorkgroup);
+
+  Value* ReadClock = Builder->CreateReadClock(Scope == spv::ScopeDevice);
+
+  auto RetBTy = BI->getType();
+  if (RetBTy->isTypeVectorInt(32)) {
+    assert(BI->getType()->getVectorComponentCount() == 2); // Must be uvec2
+    ReadClock = Builder->CreateBitCast(ReadClock, transType(RetBTy)); // uint64 -> uvec2
+  } else {
+    assert(RetBTy->isTypeInt(64));
+  }
+
+  return ReadClock;
+}
+#endif
+
+template<spv::Op> Value* SPIRVToLLVM::transValueWithOpcode(SPIRVValue* SV, BasicBlock* BB) {
+  LLPC_NOT_IMPLEMENTED();
+  return nullptr;
+}
+
 /// For instructions, this function assumes they are created in order
 /// and appended to the given basic block. An instruction may use a
 /// instruction from another BB which has not been translated. Such
@@ -1830,23 +1882,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(
         BV, ReturnInst::Create(*Context,
                                transValue(RV->getReturnValue(), F, BB), BB));
-  }
-  case OpKill: {
-    Builder->SetInsertPoint(BB);
-    Builder->SetCurrentDebugLocation(
-        getDebugLoc(static_cast<SPIRVInstruction *>(BV), BB->getParent()));
-    auto Kill = Builder->CreateKill();
-
-    // NOTE: In SPIR-V, "OpKill" is considered as a valid instruction to
-    // terminate blocks. But in LLVM, we have to insert a dummy "return"
-    // instruction as block terminator.
-    if (F->getReturnType()->isVoidTy())
-      // No return
-      ReturnInst::Create(*Context, BB);
-    else
-      // Function returns value
-      ReturnInst::Create(*Context, UndefValue::get(F->getReturnType()), BB);
-    return Kill;
   }
   case OpLifetimeStart: {
     SPIRVLifetimeStart *LTStart = static_cast<SPIRVLifetimeStart *>(BV);
@@ -2673,6 +2708,19 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
     return mapValue(BV, CallInst::Create(Func, Arg, "", BB));
   }
+
+#define HANDLE_OPCODE(op) case (op): \
+  Builder->SetInsertPoint(BB); \
+  updateBuilderDebugLoc(BV, F); \
+  return mapValue(BV, transValueWithOpcode<op>(BV, BB))
+
+  HANDLE_OPCODE(OpKill);
+#if VKI_KHR_SHADER_CLOCK
+  HANDLE_OPCODE(OpReadClockKHR);
+#endif
+
+#undef HANDLE_OPCODE
+
   default: {
     auto OC = BV->getOpCode();
     if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(BV))) {

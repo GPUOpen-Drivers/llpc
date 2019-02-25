@@ -1152,8 +1152,22 @@ Result ConfigBuilder::BuildGsRegConfig(
         gsOutputPrimitiveType = LINESTRIP;
     }
 
-    // TODO: Multiple output streams are not supported.
     SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
+
+    // Set multi-stream output primitive type
+    if ((gsVertItemSize1 > 0) || (gsVertItemSize2 > 0) || (gsVertItemSize3 > 0))
+    {
+        const static auto GS_OUT_PRIM_INVALID = 3u;
+        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
+            (gsVertItemSize1 > 0) ? gsOutputPrimitiveType : GS_OUT_PRIM_INVALID);
+
+        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
+            (gsVertItemSize2 > 0) ? gsOutputPrimitiveType : GS_OUT_PRIM_INVALID);
+
+        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
+            (gsVertItemSize3 > 0) ? gsOutputPrimitiveType : GS_OUT_PRIM_INVALID);
+    }
+
     SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, inOutUsage.gs.calcFactor.gsVsRingItemSize);
 
     SET_REG(&pConfig->m_gsRegs, GS_NUM_AVAIL_SGPRS, pResUsage->numSgprsAvailable);

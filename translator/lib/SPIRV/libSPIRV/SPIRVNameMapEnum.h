@@ -535,6 +535,10 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
   add(CapabilityAnisotropicLodCompensationAMD, "AnisotropicLodCompensationAMD");
 #endif
+#if VKI_KHR_SHADER_CLOCK
+  add(CapabilityShaderClockWorkgroupKHR, "ShaderClockWorkgroupKHR");
+  add(CapabilityShaderClockDeviceKHR, "ShaderClockDeviceKHR");
+#endif
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
   add(CapabilityShaderNonUniformEXT, "ShaderNonUniformEXT");

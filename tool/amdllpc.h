@@ -24,19 +24,19 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcBuilderImpl.cpp
- * @brief LLPC source file: implementation of Llpc::BuilderImpl
+ * @file  amdllpc.h
+ * @brief LLPC header file: common header for amdllpc command-line utility
  ***********************************************************************************************************************
  */
-#include "llpcBuilderImpl.h"
-#include "llpcContext.h"
+#pragma once
 
-using namespace Llpc;
-using namespace llvm;
+#include "llpc.h"
 
-// =====================================================================================================================
-// Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-Context& BuilderImplBase::getContext() const
-{
-    return *static_cast<Llpc::Context*>(&Builder::getContext());
-}
+// Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
+// SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
+// matter because we are running a short-lived command-line utility.
+void DoAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
+                      Llpc::BinaryData                  spirvBin,
+                      Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,
+                      Llpc::PipelineShaderInfo*         pShaderInfo);
+

@@ -531,18 +531,18 @@ define float @llpc.mod.f32(float %x, float %y) #0
 
 ; GLSL: float modf(float, out float)
 define spir_func float @_Z4modffPf(
-    float %x, float* %i) #0
+    float %x, float addrspace(5)* %i) #0
 {
     %1 = call float @llvm.trunc.f32(float %x)
     %2 = fsub float %x, %1
 
-    store float %1, float* %i
+    store float %1, float addrspace(5)* %i
     ret float %2
 }
 
 ; GLSL: vec2 modf(vec2, out vec2)
 define spir_func <2 x float> @_Z4modfDv2_fPDv2_f(
-    <2 x float> %x, <2 x float>* %i) #0
+    <2 x float> %x, <2 x float> addrspace(5)* %i) #0
 {
     %x0 = extractelement <2 x float> %x, i32 0
     %x1 = extractelement <2 x float> %x, i32 1
@@ -559,13 +559,13 @@ define spir_func <2 x float> @_Z4modfDv2_fPDv2_f(
     %7 = insertelement <2 x float> undef, float %2, i32 0
     %8 = insertelement <2 x float> %7, float %4, i32 1
 
-    store <2 x float> %6, <2 x float>* %i
+    store <2 x float> %6, <2 x float> addrspace(5)* %i
     ret <2 x float> %8
 }
 
 ; GLSL: vec3 modf(vec3, out vec3)
 define spir_func <3 x float> @_Z4modfDv3_fPDv3_f(
-    <3 x float> %x, <3 x float>* %i) #0
+    <3 x float> %x, <3 x float> addrspace(5)* %i) #0
 {
     %x0 = extractelement <3 x float> %x, i32 0
     %x1 = extractelement <3 x float> %x, i32 1
@@ -588,13 +588,13 @@ define spir_func <3 x float> @_Z4modfDv3_fPDv3_f(
     %11 = insertelement <3 x float> %10, float %4, i32 1
     %12 = insertelement <3 x float> %11, float %6, i32 2
 
-    store <3 x float> %9, <3 x float>* %i
+    store <3 x float> %9, <3 x float> addrspace(5)* %i
     ret <3 x float> %12
 }
 
 ; GLSL: vec4 modf(vec4, out vec4)
 define spir_func <4 x float> @_Z4modfDv4_fPDv4_f(
-    <4 x float> %x, <4 x float>* %i) #0
+    <4 x float> %x, <4 x float> addrspace(5)* %i) #0
 {
     %x0 = extractelement <4 x float> %x, i32 0
     %x1 = extractelement <4 x float> %x, i32 1
@@ -623,7 +623,7 @@ define spir_func <4 x float> @_Z4modfDv4_fPDv4_f(
     %15 = insertelement <4 x float> %14, float %6, i32 2
     %16 = insertelement <4 x float> %15, float %8, i32 3
 
-    store <4 x float> %12, <4 x float>* %i
+    store <4 x float> %12, <4 x float> addrspace(5)* %i
     ret <4 x float> %16
 }
 

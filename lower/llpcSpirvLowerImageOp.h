@@ -55,6 +55,14 @@ public:
     static char ID;   // ID of this pass
 
 private:
+    // F-mask mode used in handling image call
+    enum FmaskMode
+    {
+        FmaskNone,  // No F-mask
+        FmaskBased, // Texel fetching based on F-mask
+        FmaskOnly   // Only return F-mask data
+    };
+
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerImageOp);
 
     void ExtractBindingInfo(llvm::LoadInst*     pLoadInst,
@@ -62,6 +70,17 @@ private:
                             llvm::ConstantInt** ppBinding,
                             llvm::Value**       ppIndex,
                             llvm::ConstantInt** ppMemoryQualifier);
+
+    FmaskMode GetFmaskMode(const ShaderImageCallMetadata&  imageCallMeta,
+                           const std::string&              callName);
+
+    void PatchImageCallForFmask(const ShaderImageCallMetadata&  imageCallMeta,
+                                FmaskMode                       fmaskMode,
+                                std::string&                    callName);
+
+    llvm::Value* GetFragCoord(llvm::Instruction* pInsertPos);
+
+    llvm::Value* GetViewIndex(llvm::Instruction* pInsertPos);
 
     // -----------------------------------------------------------------------------------------------------------------
 

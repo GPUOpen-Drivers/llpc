@@ -2458,6 +2458,9 @@ _SPIRV_OP(SubgroupReadInvocationKHR, true, 5, false)
 _SPIRV_OP(SubgroupAllKHR, true, 4, false)
 _SPIRV_OP(SubgroupAnyKHR, true, 4, false)
 _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
+#if VKI_KHR_SHADER_CLOCK
+_SPIRV_OP(ReadClockKHR, true, 4)
+#endif
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase:public SPIRVInstTemplateBase {
 protected:

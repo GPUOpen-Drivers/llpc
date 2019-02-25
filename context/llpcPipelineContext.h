@@ -772,8 +772,6 @@ public:
 
     const WorkaroundFlags* GetGpuWorkarounds() const { return m_pGpuWorkarounds; }
 
-    void AutoLayoutDescriptor(ShaderStage shaderStage);
-
     // Gets pipeline hash code
     uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_hash); }
     virtual uint64_t GetShaderHashCode(ShaderStage stage) const = 0;
@@ -782,9 +780,6 @@ public:
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
 
 protected:
-    // Gets dummy resource mapping nodes of the specified shader stage
-    virtual std::vector<ResourceMappingNode>* GetDummyResourceMapNodes(ShaderStage shaderStage) = 0;
-
     // Gets dummy vertex input create info
     virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return nullptr; }
 
@@ -812,9 +807,6 @@ protected:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(PipelineContext);
-
-    ResourceMappingNodeType GetResourceMapNodeType(DescriptorType descType);
-    uint32_t GetResourceMapNodeSize(const DescriptorBinding* pBinding);
 };
 
 } // Llpc

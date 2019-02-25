@@ -77,15 +77,46 @@ public:
     virtual llvm::ModulePass* CreateBuilderReplayer() { return nullptr; }
 
     //
+    // Methods implemented in BuilderImplDesc:
+    //
+
+    // Create a waterfall loop containing the specified instruction.
+    // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
+    virtual llvm::Instruction* CreateWaterfallLoop(
+        llvm::Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
+        llvm::ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to
+                                                      //  be uniform
+        const llvm::Twine&        instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a load of a buffer descriptor.
+    // Currently supports returning non-fat-pointer <4 x i32> descriptor when pPointeeTy is nullptr.
+    // TODO: It is intended to remove that functionality once LLPC has switched to fat pointers.
+    virtual llvm::Value* CreateLoadBufferDesc(
+        uint32_t            descSet,            // Descriptor set
+        uint32_t            binding,            // Descriptor binding
+        llvm::Value*        pBlockOffset,       // [in] Buffer block offset
+        bool                isNonUniform,       // Whether the descriptor index is non-uniform
+        llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to (null to return
+                                                //    a non-fat-pointer <4 x i32> descriptor instead)
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a load of the spill table pointer for push constants.
+    virtual llvm::Value* CreateLoadSpillTablePtr(
+        llvm::Type*         pSpillTableTy,      // [in] Type of the spill table that the returned pointer will point to
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    //
     // Methods implemented in BuilderImplMisc:
     //
 
     // Create a "kill". Only allowed in a fragment shader.
-    virtual llvm::Instruction* CreateKill(const llvm::Twine& instName = "") = 0;
+    virtual llvm::Instruction* CreateKill(
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
-    //
-    // Methods implemented in other BuilderImpl* subclasses...
-    //
+    // Create a "readclock".
+    virtual llvm::Instruction* CreateReadClock(
+        bool                realtime,           // Whether to read real-time clock counter
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
 protected:
     Builder(llvm::LLVMContext& context) : llvm::IRBuilder<>(context) {}

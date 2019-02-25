@@ -111,24 +111,12 @@ void PatchBufferOp::visitCallInst(
 
     auto mangledName = pCallee->getName();
 
-    if (mangledName.startswith(LlpcName::BufferLoadDesc) ||
-        mangledName.startswith(LlpcName::BufferStoreDesc) ||
-        mangledName.startswith(LlpcName::BufferAtomicDesc))
+    if (mangledName.startswith(LlpcName::BufferArrayLength))
     {
-        // Variable pointer does not support nonuniform descriptor
     }
     else if (mangledName.startswith(LlpcName::BufferCallPrefix))
     {
         m_changed = true;
-        uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-        uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-        auto isNonUniform = cast<ConstantInt>(callInst.getOperand(callInst.getNumArgOperands() - 1))->getZExtValue();
-        bool isInlineConst = IsInlineConst(descSet, binding);
-
-        if (isNonUniform != 0)
-        {
-            AddWaterFallInst(2, -1, &callInst);
-        }
 
         if (mangledName.startswith(LlpcName::BufferLoadScalarAligned))
         {
@@ -136,22 +124,15 @@ void PatchBufferOp::visitCallInst(
         }
         else if (mangledName.startswith(LlpcName::BufferLoad))
         {
-            const bool readOnly = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
+            const bool readOnly = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
 
-            if (isInlineConst)
-            {
-                ReplaceCallee(&callInst, LlpcName::BufferLoad, LlpcName::InlineConstLoadUniform);
-            }
-            else if (readOnly)
+            if (readOnly)
             {
                 ReplaceCallee(&callInst, LlpcName::BufferLoad, LlpcName::BufferLoadUniform);
             }
         }
         else if (mangledName.startswith(LlpcName::BufferStore))
         {
-            // NOTE: Only uniform block support inline constant now
-            LLPC_ASSERT(isInlineConst == false);
-
             auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
             if (pGpuWorkarounds->gfx6.shader8b16bLocalWriteCorruption)
             {
@@ -164,11 +145,7 @@ void PatchBufferOp::visitCallInst(
                     (mangledName.find(".v3i8") != StringRef::npos) ||
                     (mangledName.find(".v6i8") != StringRef::npos))
                 {
-                    uint32_t glcOperandIdx = 5;
-                    if (mangledName.startswith(LlpcName::BufferStoreDesc))
-                    {
-                        glcOperandIdx = 3;
-                    }
+                    uint32_t glcOperandIdx = 3;
                     callInst.setOperand(glcOperandIdx, ConstantInt::getTrue(*m_pContext));
                 }
             }
@@ -176,45 +153,7 @@ void PatchBufferOp::visitCallInst(
             // TODO: Translate buffer store operation to s_store if the offset is uniform, which is similar to buffer
             // load operation.
         }
-        else
-        {
-            // NOTE: Only uniform block support inline constant now, and we can't translate other buffer operations to
-            // scalar
-            LLPC_ASSERT(isInlineConst == false);
-        }
     }
-}
-
-// =====================================================================================================================
-// Checks whether the specified pair of descriptor set/binding represent an inline constant buffer.
-bool PatchBufferOp::IsInlineConst(
-    uint32_t descSet,     // Descriptor set
-    uint32_t binding)     // Descriptor binding
-{
-    bool isInlineConst = false;
-    bool exist = false;
-    auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
-
-    for (uint32_t i = 0; (i < pShaderInfo->userDataNodeCount) && (exist == false); ++i)
-    {
-        auto pResNode = &pShaderInfo->pUserDataNodes[i];
-        if (pResNode->type == ResourceMappingNodeType::DescriptorTableVaPtr)
-        {
-            for (uint32_t j = 0; j < pResNode->tablePtr.nodeCount; ++j)
-            {
-                auto pSubNode = &pResNode->tablePtr.pNext[j];
-                if ((pSubNode->srdRange.set == descSet) &&
-                    (pSubNode->srdRange.binding == binding))
-                {
-                    exist = true;
-                    isInlineConst = (pSubNode->type == ResourceMappingNodeType::PushConst);
-                    break;
-                }
-            }
-        }
-    }
-
-    return isInlineConst;
 }
 
 // =====================================================================================================================

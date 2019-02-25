@@ -28,12 +28,12 @@
  * @brief LLPC source file: contains implementation of LLPC standalone tool.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "amd-llpc"
-
 #ifdef WIN_OS
     // NOTE: Disable Windows-defined min()/max() because we use STL-defined std::min()/std::max() in LLPC.
     #define NOMINMAX
 #endif
+
+#include "amdllpc.h"
 
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -63,6 +63,7 @@
     #endif
 #endif
 
+#include <sstream>
 #include <stdlib.h> // getenv
 
 // NOTE: To enable VLD, please add option BUILD_WIN_VLD=1 in build option.To run amdllpc with VLD enabled,
@@ -81,6 +82,8 @@
 #include "llpcDebug.h"
 #include "llpcElf.h"
 #include "llpcInternal.h"
+
+#define DEBUG_TYPE "amd-llpc"
 
 using namespace llvm;
 using namespace Llpc;
@@ -365,10 +368,6 @@ static Result Init(
 static Result InitCompileInfo(
     CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
 {
-
-    // Assume not compiling whole pipeline.
-    pCompileInfo->gfxPipelineInfo.options.autoLayoutDesc = true;
-    pCompileInfo->compPipelineInfo.options.autoLayoutDesc = true;
 
     return Result::Success;
 }
@@ -818,6 +817,12 @@ static Result BuildPipeline(
                     pShaderInfo->pEntryTarget = EntryTarget.c_str();
                 }
                 pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+
+                // If no user data nodes (not compiling from pipeline), lay them out now.
+                if (pShaderInfo->pUserDataNodes == nullptr)
+                {
+                    DoAutoLayoutDesc(ShaderStage(stage), pCompileInfo->spirvBin[stage], pPipelineInfo, pShaderInfo);
+                }
             }
         }
 
@@ -875,6 +880,12 @@ static Result BuildPipeline(
             pShaderInfo->pEntryTarget = EntryTarget.c_str();
         }
         pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+
+        // If no user data nodes (not compiling from pipeline), lay them out now.
+        if (pShaderInfo->pUserDataNodes == nullptr)
+        {
+            DoAutoLayoutDesc(ShaderStageCompute, pCompileInfo->spirvBin[ShaderStageCompute], nullptr, pShaderInfo);
+        }
 
         pPipelineInfo->pInstance      = nullptr; // Dummy, unused
         pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;

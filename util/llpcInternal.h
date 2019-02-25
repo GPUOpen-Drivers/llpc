@@ -112,21 +112,17 @@ namespace LlpcName
     const static char InputInterpEval[]               = "llpc.input.interpolate.evalij.";
     const static char BufferCallPrefix[]              = "llpc.buffer.";
     const static char BufferAtomic[]                  = "llpc.buffer.atomic.";
-    const static char BufferAtomicDesc[]              = "llpc.buffer.atomic.desc.";
     const static char BufferLoad[]                    = "llpc.buffer.load.";
-    const static char BufferLoadDesc[]                = "llpc.buffer.load.desc.";
-    const static char BufferLoadScalarAlignedDesc[]   = "llpc.buffer.load.scalar.aligned.desc.";
     const static char BufferLoadUniform[]             = "llpc.buffer.load.uniform.";
     const static char BufferLoadScalarAligned[]       = "llpc.buffer.load.scalar.aligned.";
     const static char BufferStore[]                   = "llpc.buffer.store.";
-    const static char BufferStoreDesc[]               = "llpc.buffer.store.desc.";
     const static char BufferStoreScalarAligned[]      = "llpc.buffer.store.scalar.aligned.";
-    const static char BufferStoreScalarAlignedDesc[]  = "llpc.buffer.store.scalar.aligned.desc.";
     const static char BufferArrayLength[]             = "llpc.buffer.arraylength";
     const static char InlineConstLoadUniform[]        = "llpc.inlineconst.load.uniform.";
     const static char InlineConstLoad[]               = "llpc.inlineconst.load.";
     const static char PushConstLoad[]                 = "llpc.pushconst.load.";
     const static char TfBufferStore[]                 = "llpc.tfbuffer.store.f32";
+    const static char StreamOutBufferStore[]          = "llpc.streamoutbuffer.store";
 
     const static char DescriptorCallPrefix[]          = "llpc.descriptor.";
     const static char DescriptorLoadPrefix[]          = "llpc.descriptor.load.";
@@ -135,7 +131,6 @@ namespace LlpcName
     const static char DescriptorLoadFmask[]           = "llpc.descriptor.load.fmask";
     const static char DescriptorLoadBuffer[]          = "llpc.descriptor.load.buffer";
     const static char DescriptorLoadAddress[]         = "llpc.descriptor.load.address";
-    const static char DescriptorLoadInlineBuffer[]    = "llpc.descriptor.load.inlinebuffer";
     const static char DescriptorLoadTexelBuffer[]     = "llpc.descriptor.load.texelbuffer";
     const static char DescriptorLoadSpillTable[]      = "llpc.descriptor.load.spilltable";
 

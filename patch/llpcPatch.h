@@ -49,7 +49,6 @@ class PassManager;
 
 } // legacy
 
-void initializePatchAutoLayoutDescPass(PassRegistry&);
 void initializePatchBufferOpPass(PassRegistry&);
 void initializePatchCopyShaderPass(PassRegistry&);
 void initializePatchDescriptorLoadPass(PassRegistry&);
@@ -75,7 +74,6 @@ namespace Llpc
 inline static void InitializePatchPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
-  initializePatchAutoLayoutDescPass(passRegistry);
   initializePatchBufferOpPass(passRegistry);
   initializePatchCopyShaderPass(passRegistry);
   initializePatchDescriptorLoadPass(passRegistry);
@@ -92,7 +90,6 @@ inline static void InitializePatchPasses(
   initializePatchSetupTargetFeaturesPass(passRegistry);
 }
 
-llvm::ModulePass* CreatePatchAutoLayoutDesc();
 llvm::ModulePass* CreatePatchBufferOp();
 llvm::ModulePass* CreatePatchCopyShader();
 llvm::ModulePass* CreatePatchDescriptorLoad();
@@ -137,10 +134,6 @@ public:
 
 protected:
     void Init(llvm::Module* pModule);
-
-    void AddWaterFallInst(int32_t         nonUniformIndex1,
-                          int32_t         nonUniformIndex2,
-                          llvm::CallInst* pCallInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 

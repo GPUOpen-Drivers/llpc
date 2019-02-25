@@ -28,9 +28,8 @@ target triple = "spir64-unknown-unknown"
 
 ; GLSL: load int8/uint8 (byte)
 define i8 @llpc.buffer.load.i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = extractelement <4 x i8> %2, i32 0
@@ -39,9 +38,8 @@ define i8 @llpc.buffer.load.i8(
 
 ; GLSL: uniform load int8/uint8 (byte)
 define i8 @llpc.buffer.load.uniform.i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = extractelement <4 x i8> %2, i32 0
@@ -50,9 +48,8 @@ define i8 @llpc.buffer.load.uniform.i8(
 
 ; GLSL: load float16/int16/uint16/i8vec2/u8vec2 (word)
 define <2 x i8> @llpc.buffer.load.v2i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = shufflevector <4 x i8> %2, <4 x i8> %2, <2 x i32> <i32 0, i32 1>
@@ -61,9 +58,8 @@ define <2 x i8> @llpc.buffer.load.v2i8(
 
 ; GLSL: uniform load float16/int16/uint16/i8vec2/u8vec2 (word)
 define <2 x i8> @llpc.buffer.load.uniform.v2i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = shufflevector <4 x i8> %2, <4 x i8> %2, <2 x i32> <i32 0, i32 1>
@@ -72,9 +68,8 @@ define <2 x i8> @llpc.buffer.load.uniform.v2i8(
 
 ; GLSL: load i8vec3/u8vec3 (bytex3)
 define <3 x i8> @llpc.buffer.load.v3i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = add i32 %memberOffset, 2
@@ -86,9 +81,8 @@ define <3 x i8> @llpc.buffer.load.v3i8(
 
 ; GLSL: uniform load i8vec3/u8vec3 (bytex3)
 define <3 x i8> @llpc.buffer.load.uniform.v3i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = add i32 %memberOffset, 2
@@ -101,9 +95,8 @@ define <3 x i8> @llpc.buffer.load.uniform.v3i8(
 
 ; GLSL: load f16vec2/i16vec2/u16vec2/float/int/uint/i8vec4/u8vec4 (dword)
 define <4 x i8> @llpc.buffer.load.v4i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     ret <4 x i8> %2
@@ -111,9 +104,8 @@ define <4 x i8> @llpc.buffer.load.v4i8(
 
 ; GLSL: uniform load f16vec2/i16vec2/u16vec2/float/int/uint/i8vec4/u8vec4 (dword)
 define <4 x i8> @llpc.buffer.load.uniform.v4i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %glcx = zext i1 %glc to i32
     %1 = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = bitcast i32 %1 to <4 x i8>
@@ -122,9 +114,8 @@ define <4 x i8> @llpc.buffer.load.uniform.v4i8(
 
 ; GLSL: load f16vec3/i16vec3/u16vec3 (wordx3)
 define <6 x i8> @llpc.buffer.load.v6i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast float %1 to <4 x i8>
     %3 = add i32 %memberOffset, 4
@@ -136,9 +127,8 @@ define <6 x i8> @llpc.buffer.load.v6i8(
 
 ; GLSL: uniform load f16vec3/i16vec3/u16vec3 (wordx3)
 define <6 x i8> @llpc.buffer.load.uniform.v6i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %glcx = zext i1 %glc to i32
     %1 = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = bitcast i32 %1 to <4 x i8>
@@ -151,9 +141,8 @@ define <6 x i8> @llpc.buffer.load.uniform.v6i8(
 
 ; GLSL: load f16vec4/i16vec4/u16vec4/vec2/ivec2/uvec2/double/int64/uint64 (dwordx2)
 define <8 x i8> @llpc.buffer.load.v8i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast <2 x float> %1 to <8 x i8>
     ret <8 x i8> %2
@@ -161,9 +150,8 @@ define <8 x i8> @llpc.buffer.load.v8i8(
 
 ; GLSL: uniform load f16vec4/i16vec4/u16vec4/vec2/ivec2/uvec2/double/int64/uint64 (dwordx2)
 define <8 x i8> @llpc.buffer.load.uniform.v8i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %glcx = zext i1 %glc to i32
     %1 = call <2 x i32> @llvm.amdgcn.s.buffer.load.v2i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = bitcast <2 x i32> %1 to <8 x i8>
@@ -172,9 +160,8 @@ define <8 x i8> @llpc.buffer.load.uniform.v8i8(
 
 ; GLSL: load vec3/ivec3/uvec3 (dwordx3)
 define <12 x i8> @llpc.buffer.load.v12i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = add i32 %memberOffset, 8
     %3 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
@@ -186,9 +173,8 @@ define <12 x i8> @llpc.buffer.load.v12i8(
 
 ; GLSL: uniform load vec3/ivec3/uvec3 (dwordx3)
 define <12 x i8> @llpc.buffer.load.uniform.v12i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %glcx = zext i1 %glc to i32
     %1 = call <2 x i32> @llvm.amdgcn.s.buffer.load.v2i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = add i32 %memberOffset, 8
@@ -201,9 +187,8 @@ define <12 x i8> @llpc.buffer.load.uniform.v12i8(
 
 ; GLSL: load vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 (dwordx4)
 define <16 x i8> @llpc.buffer.load.v16i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = bitcast <4 x float> %1 to <16 x i8>
     ret <16 x i8> %2
@@ -211,9 +196,8 @@ define <16 x i8> @llpc.buffer.load.v16i8(
 
 ; GLSL: uniform load vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 (dwordx4)
 define <16 x i8> @llpc.buffer.load.uniform.v16i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %glcx = zext i1 %glc to i32
     %1 = call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = bitcast <4 x i32> %1 to <16 x i8>
@@ -222,9 +206,8 @@ define <16 x i8> @llpc.buffer.load.uniform.v16i8(
 
 ; GLSL: load dvec3/i64vec3/u64vec3 (dwordx6)
 define <24 x i8> @llpc.buffer.load.v24i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = add i32 %memberOffset, 16
     %3 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
@@ -236,10 +219,8 @@ define <24 x i8> @llpc.buffer.load.v24i8(
 
 ; GLSL: uniform load dvec3/i64vec3/u64vec3 (dwordx6)
 define <24 x i8> @llpc.buffer.load.uniform.v24i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-
     %glcx = zext i1 %glc to i32
     %1 = call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = add i32 %memberOffset, 16
@@ -252,9 +233,8 @@ define <24 x i8> @llpc.buffer.load.uniform.v24i8(
 
 ; GLSL: load dvec4/i64vec4/u64vec4 (dwordx8)
 define <32 x i8> @llpc.buffer.load.v32i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %2 = add i32 %memberOffset, 16
     %3 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
@@ -266,9 +246,8 @@ define <32 x i8> @llpc.buffer.load.v32i8(
 
 ; GLSL: uniform load dvec4/i64vec4/u64vec4 (dwordx8)
 define <32 x i8> @llpc.buffer.load.uniform.v32i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %glcx = zext i1 %glc to i32
     %1 = call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %desc, i32 %memberOffset, i32 %glcx)
     %2 = add i32 %memberOffset, 16
@@ -281,9 +260,8 @@ define <32 x i8> @llpc.buffer.load.uniform.v32i8(
 
 ; GLSL: store int8/uint8 (byte)
 define void @llpc.buffer.store.i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i8 %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i8 %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = insertelement <4 x i8> undef,  i8 %storeData, i32 0
     %2 = bitcast <4 x i8> %1 to float
     call void @llvm.amdgcn.buffer.store.byte(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
@@ -292,16 +270,13 @@ define void @llpc.buffer.store.i8(
 
 ; GLSL: store float16/int16/uint16/i8vec2/u8vec2 (word)
 define void @llpc.buffer.store.v2i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <2 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = shufflevector <2 x i8> %storeData, <2 x i8> <i8 0, i8 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
     %2 = bitcast <4 x i8> %1 to float
     call void @llvm.amdgcn.buffer.store.short(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
@@ -310,16 +285,13 @@ define void @llpc.buffer.store.v2i8(
 
 ; GLSL: store i8vec3/u8vec3 (bytex3)
 define void @llpc.buffer.store.v3i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <3 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = shufflevector <3 x i8> %storeData, <3 x i8> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
     %2 = bitcast <4 x i8> %1 to float
     call void @llvm.amdgcn.buffer.store.short(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
@@ -332,16 +304,13 @@ define void @llpc.buffer.store.v3i8(
 
 ; GLSL: store f16vec2/i16vec2/u16vec2/float/int/uint/i8vec4/u8vec4 (dword)
 define void @llpc.buffer.store.v4i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <4 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = bitcast <4 x i8> %storeData to float
     call void @llvm.amdgcn.buffer.store.f32(float %1, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     ret void
@@ -349,16 +318,13 @@ define void @llpc.buffer.store.v4i8(
 
 ; GLSL: store f16vec3/i16vec3/u16vec3 (wordx3)
 define void @llpc.buffer.store.v6i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <6 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = shufflevector <6 x i8> %storeData, <6 x i8> %storeData, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
     %2 = bitcast <4 x i8> %1 to float
     call void @llvm.amdgcn.buffer.store.f32(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
@@ -372,16 +338,13 @@ define void @llpc.buffer.store.v6i8(
 
 ; GLSL: store f16vec4/i61vec4/u16vec4/vec2/ivec2/uvec2/dvec2/int64/uint64 (dwordx2)
 define void @llpc.buffer.store.v8i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <8 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = bitcast <8 x i8> %storeData to <2 x float>
     call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %1,
                                               <4 x i32> %desc,
@@ -394,16 +357,13 @@ define void @llpc.buffer.store.v8i8(
 
 ; GLSL: store vec3/ivec3/uvec3 (dwordx3)
 define void @llpc.buffer.store.v12i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <12 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = bitcast <12 x i8> %storeData to <3 x float>
     %2 = shufflevector <3 x float> %1, <3 x float> %1, <2 x i32> <i32 0, i32 1>
     call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %2,
@@ -420,16 +380,13 @@ define void @llpc.buffer.store.v12i8(
 
 ; GLSL: store vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 (dwordx4)
 define void @llpc.buffer.store.v16i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <16 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = bitcast <16 x i8> %storeData to <4 x float>
     call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %1,
                                               <4 x i32> %desc,
@@ -442,16 +399,13 @@ define void @llpc.buffer.store.v16i8(
 
 ; GLSL: store dvec3/i64vec3/u64vec3 (dwordx6)
 define void @llpc.buffer.store.v24i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <24 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = bitcast <24 x i8> %storeData to <6 x float>
     %2 = shufflevector <6 x float> %1, <6 x float> %1, <4 x i32> <i32 0, i32 1, i32 2 , i32 3>
     call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %2,
@@ -473,275 +427,12 @@ define void @llpc.buffer.store.v24i8(
 
 ; GLSL: store dvec4/i64vec4/u64vec4 (dwordx8)
 define void @llpc.buffer.store.v32i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     <32 x i8> %storeData,
     i1 %glc,
     i1 %slc,
     i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = bitcast <32 x i8> %storeData to <8 x float>
-    %2 = shufflevector <8 x float> %1, <8 x float> %1, <4 x i32> <i32 0, i32 1, i32 2 , i32 3>
-    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %2,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %memberOffset,
-                                              i1 %glc,
-                                              i1 %slc)
-    %3 = shufflevector <8 x float> %1, <8 x float> %1, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
-    %4 = add i32 %memberOffset, 16
-    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %3,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %4,
-                                              i1 %glc,
-                                              i1 %slc)
-    ret void
-}
-
-; GLSL: load int8/uint8 with descriptor (byte)
-define i8 @llpc.buffer.load.desc.i8(
-   <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast float %1 to <4 x i8>
-    %3 = extractelement <4 x i8> %2, i32 0
-    ret i8 %3
-}
-
-; GLSL: load float16/int16/uint16/i8vec2/u8vec2 with descriptor (word)
-define <2 x i8> @llpc.buffer.load.desc.v2i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast float %1 to <4 x i8>
-    %3 = shufflevector <4 x i8> %2, <4 x i8> %2, <2 x i32> <i32 0, i32 1>
-    ret <2 x i8> %3
-}
-
-; GLSL: load i8vec3/u8vec4 with descriptor (bytex3)
-define <3 x i8> @llpc.buffer.load.desc.v3i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast float %1 to <4 x i8>
-    %3 = add i32 %memberOffset, 2
-    %4 = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %3, i1 %glc, i1 %slc)
-    %5 = bitcast float %4 to <4 x i8>
-    %6 = shufflevector <4 x i8> %2, <4 x i8> %5, <3 x i32> <i32 0, i32 1, i32 4>
-    ret <3 x i8> %6
-}
-
-; GLSL: load f16vec2/i16vec2/u16vec2/float/int/uint/i8vec4/u8vec4 with descriptor (dword)
-define <4 x i8> @llpc.buffer.load.desc.v4i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast float %1 to <4 x i8>
-    ret <4 x i8> %2
-}
-
-
-; GLSL: load f16vec3/i16vec3/u16vec3 with descriptor (wordx3)
-define <6 x i8> @llpc.buffer.load.desc.v6i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call float @llvm.amdgcn.buffer.load.f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast float %1 to <4 x i8>
-    %3 = add i32 %memberOffset, 4
-    %4 = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %3, i1 %glc, i1 %slc)
-    %5 = bitcast float %4 to <4 x i8>
-    %6 = shufflevector <4 x i8> %2, <4 x i8> %5, <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
-    ret <6 x i8> %6
-}
-
-; GLSL: load f16vec4/i16vec4/u16vec4/vec2/ivec2/uvec2/double/int64/uint64 with descriptor (dwordx2)
-define <8 x i8> @llpc.buffer.load.desc.v8i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast <2 x float> %1 to <8 x i8>
-    ret <8 x i8> %2
-}
-
-; GLSL: load vec3/ivec3/uvec3 with descriptor (dwordx3)
-define <12 x i8> @llpc.buffer.load.desc.v12i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = shufflevector <4 x float> %1, <4 x float> %1, <3 x i32> <i32 0, i32 1, i32 2>
-    %3 = bitcast <3 x float> %2 to <12 x i8>
-    ret <12 x i8> %3
-}
-
-; GLSL: load vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 with descriptor (dwordx4)
-define <16 x i8> @llpc.buffer.load.desc.v16i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = bitcast <4 x float> %1 to <16 x i8>
-    ret <16 x i8> %2
-}
-
-; GLSL: load dvec3/i64vec3/u64vec3 with descriptor (dwordx6)
-define <24 x i8> @llpc.buffer.load.desc.v24i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = add i32 %memberOffset, 16
-    %3 = call <2 x float> @llvm.amdgcn.buffer.load.v2f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
-    %4 = shufflevector <2 x float> %3, <2 x float> %3, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
-    %5 = shufflevector <4 x float> %1, <4 x float> %4, <6 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5>
-    %6 = bitcast <6 x float> %5 to <24 x i8>
-    ret <24 x i8> %6
-}
-
-; GLSL: load dvec4/i64vec4/u64vec4 with descriptor (dwordx8)
-define <32 x i8> @llpc.buffer.load.desc.v32i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
-{
-    %1 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %2 = add i32 %memberOffset, 16
-    %3 = call <4 x float> @llvm.amdgcn.buffer.load.v4f32(<4 x i32> %desc, i32 0, i32 %2, i1 %glc, i1 %slc)
-    %4 = shufflevector <4 x float> %1, <4 x float> %3,
-                       <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-    %5 = bitcast <8 x float> %4 to <32 x i8>
-    ret <32 x i8> %5
-}
-
-; GLSL: store int8/uint8 with descriptor (byte)
-define void @llpc.buffer.store.desc.i8(
-    <4 x i32> %desc, i32 %memberOffset, i8 %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = insertelement <4 x i8> undef,  i8 %storeData, i32 0
-    %2 = bitcast <4 x i8> %1 to float
-    call void @llvm.amdgcn.buffer.store.byte(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store float16/int16/uint16/i8vec2/u8vec2 with descriptor (word)
-define void @llpc.buffer.store.desc.v2i8(
-    <4 x i32> %desc, i32 %memberOffset, <2 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = shufflevector <2 x i8> %storeData, <2 x i8> <i8 0, i8 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-    %2 = bitcast <4 x i8> %1 to float
-    call void @llvm.amdgcn.buffer.store.short(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store i8vec3/u8vec3 with descriptor (bytex3)
-define void @llpc.buffer.store.desc.v3i8(
-    <4 x i32> %desc, i32 %memberOffset, <3 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = shufflevector <3 x i8> %storeData, <3 x i8> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-    %2 = bitcast <4 x i8> %1 to float
-    call void @llvm.amdgcn.buffer.store.short(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %3 = add i32 %memberOffset, 2
-    %4 = shufflevector <3 x i8> %storeData, <3 x i8> undef, <4 x i32> <i32 2, i32 3, i32 4, i32 5>
-    %5 = bitcast <4 x i8> %4 to float
-    call void @llvm.amdgcn.buffer.store.byte(float %5, <4 x i32> %desc, i32 0, i32 %3, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store f16vec2/i16vec2/u16vec2/float/int/uint/i8vec4/u8vec4 with descriptor (dword)
-define void @llpc.buffer.store.desc.v4i8(
-    <4 x i32> %desc, i32 %memberOffset, <4 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = bitcast <4 x i8> %storeData to float
-    call void @llvm.amdgcn.buffer.store.f32(float %1, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store f16vec3/i16vec3/u16vec3 with descriptor (wordx3)
-define void @llpc.buffer.store.desc.v6i8(
-    <4 x i32> %desc, i32 %memberOffset, <6 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = shufflevector <6 x i8> %storeData, <6 x i8> %storeData, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-    %2 = bitcast <4 x i8> %1 to float
-    call void @llvm.amdgcn.buffer.store.f32(float %2, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
-    %3 = add i32 %memberOffset, 4
-    %4 = shufflevector <6 x i8> %storeData, <6 x i8> %storeData, <2 x i32> <i32 4, i32 5>
-    %5 = shufflevector <2 x i8> %4, <2 x i8> <i8 0, i8 0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-    %6 = bitcast <4 x i8> %5 to float
-    call void @llvm.amdgcn.buffer.store.short(float %6, <4 x i32> %desc, i32 0, i32 %3, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store f16vec4/i61vec4/u16vec4/vec2/ivec2/uvec2/dvec2/int64/uint64 with descriptor (dwordx2)
-define void @llpc.buffer.store.desc.v8i8(
-    <4 x i32> %desc, i32 %memberOffset, <8 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = bitcast <8 x i8> %storeData to <2 x float>
-    call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %1,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %memberOffset,
-                                              i1 %glc,
-                                              i1 %slc)
-    ret void
-}
-
-; GLSL: store vec3/ivec3/uvec3 with descriptor (dwordx3)
-define void @llpc.buffer.store.desc.v12i8(
-    <4 x i32> %desc, i32 %memberOffset, <12 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = bitcast <12 x i8> %storeData to <3 x float>
-    %2 = shufflevector <3 x float> %1, <3 x float> %1, <2 x i32> <i32 0, i32 1>
-    call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %2,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %memberOffset,
-                                              i1 %glc,
-                                              i1 %slc)
-    %3 = extractelement <3 x float> %1, i32 2
-    %4 = add i32 %memberOffset, 8
-    call void @llvm.amdgcn.buffer.store.f32(float %3, <4 x i32> %desc, i32 0, i32 %4, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 with descriptor (dwordx4)
-define void @llpc.buffer.store.desc.v16i8(
-    <4 x i32> %desc, i32 %memberOffset, <16 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = bitcast <16 x i8> %storeData to <4 x float>
-    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %1,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %memberOffset,
-                                              i1 %glc,
-                                              i1 %slc)
-    ret void
-}
-
-; GLSL: store dvec3/i64vec3/u64vec3 with descriptor (dwordx6)
-define void @llpc.buffer.store.desc.v24i8(
-    <4 x i32> %desc, i32 %memberOffset, <24 x i8> %storeData, i1 %glc, i1 %slc) #0
-{
-    %1 = bitcast <24 x i8> %storeData to <6 x float>
-    %2 = shufflevector <6 x float> %1, <6 x float> %1, <4 x i32> <i32 0, i32 1, i32 2 , i32 3>
-    call void @llvm.amdgcn.buffer.store.v4f32(<4 x float> %2,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %memberOffset,
-                                              i1 %glc,
-                                              i1 %slc)
-    %3 = shufflevector <6 x float> %1, <6 x float> %1, <2 x i32> <i32 4, i32 5>
-    %4 = add i32 %memberOffset, 16
-    call void @llvm.amdgcn.buffer.store.v2f32(<2 x float> %3,
-                                              <4 x i32> %desc,
-                                              i32 0,
-                                              i32 %4,
-                                              i1 %glc,
-                                              i1 %slc)
-    ret void
-}
-
-; GLSL: store dvec4/i64vec4/u64vec4 with descriptor (dwordx8)
-define void @llpc.buffer.store.desc.v32i8(
-    <4 x i32> %desc, i32 %memberOffset, <32 x i8> %storeData, i1 %glc, i1 %slc) #0
 {
     %1 = bitcast <32 x i8> %storeData to <8 x float>
     %2 = shufflevector <8 x float> %1, <8 x float> %1, <4 x i32> <i32 0, i32 1, i32 2 , i32 3>
@@ -765,9 +456,8 @@ define void @llpc.buffer.store.desc.v32i8(
 ; GLSL: uint atomicAdd(inout uint, uint)
 ;       int  atomicAdd(inout int, int)
 define i32 @llpc.buffer.atomic.iadd.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.add(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
@@ -775,45 +465,40 @@ define i32 @llpc.buffer.atomic.iadd.i32(
 ; GLSL: uint atomicSub(inout uint, uint)
 ;        int atomicSub(inout int, int)
 define i32 @llpc.buffer.atomic.isub.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.sub(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
 
 ; GLSL: uint atomicMin(inout uint, uint)
 define i32 @llpc.buffer.atomic.umin.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.umin(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
 
 ; GLSL: int atomicMin(inout int, int)
 define i32 @llpc.buffer.atomic.smin.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.smin(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
 
 ; GLSL: uint atomicMax(inout uint, uint)
 define i32 @llpc.buffer.atomic.umax.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.umax(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
 
 ; GLSL: int atomicMax(inout int, int)
 define i32 @llpc.buffer.atomic.smax.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.smax(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
@@ -821,9 +506,8 @@ define i32 @llpc.buffer.atomic.smax.i32(
 ; GLSL: uint atomicAnd(inout uint, uint)
 ;       int  atomicAnd(inout int, int)
 define i32 @llpc.buffer.atomic.and.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.and(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
@@ -831,9 +515,8 @@ define i32 @llpc.buffer.atomic.and.i32(
 ; GLSL: uint atomicOr(inout uint, uint)
 ;       int  atomicOr(inout int, int)
 define i32 @llpc.buffer.atomic.or.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.or(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
@@ -841,9 +524,8 @@ define i32 @llpc.buffer.atomic.or.i32(
 ; GLSL: uint atomicXor(inout uint, uint)
 ;       int  atomicXor(inout int, int)
 define i32 @llpc.buffer.atomic.xor.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.xor(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
@@ -851,25 +533,22 @@ define i32 @llpc.buffer.atomic.xor.i32(
 ; GLSL: uint atomicExchange(inout uint, uint)
 ;       int  atomicExchange(inout int, int)
 define i32 @llpc.buffer.atomic.exchange.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.swap(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
     ret i32 %1
 }
 
 ; GLSL: float atomicExchange(inout float, float)
 define float @llpc.buffer.atomic.exchange.f32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, float %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, float %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = bitcast float %data to i32
-    %2 = call i32 @llpc.buffer.atomic.exchange.i32(i32 %descSet,
-                                                   i32 %binding,
-                                                   i32 %blockOffset,
+    %2 = call i32 @llpc.buffer.atomic.exchange.i32(<4 x i32> %desc,
                                                    i32 %memberOffset,
                                                    i32 %1,
                                                    i1  %slc,
-                                                   i1 %nonUniform)
+                                                   i1  %nonUniform)
     %3 = bitcast i32 %2 to float
     ret float %3
 }
@@ -877,16 +556,13 @@ define float @llpc.buffer.atomic.exchange.f32(
 ; GLSL: uint atomicCompSwap(inout uint, uint, uint)
 ;       int  atomicCompSwap(inout int, int, int)
 define i32 @llpc.buffer.atomic.compareexchange.i32(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
+    <4 x i32> %desc,
     i32 %memberOffset,
     i32 %data,
     i32 %compare,
     i1 %slc,
     i1 %nonUniform) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     %1 = call i32 @llvm.amdgcn.buffer.atomic.cmpswap(i32 %data,
                                                      i32 %compare,
                                                      <4 x i32> %desc,
@@ -899,41 +575,35 @@ define i32 @llpc.buffer.atomic.compareexchange.i32(
 ; GLSL: uint atomicIncrement(inout uint)
 ;       int  atomicIncrement(inout int)
 define i32 @llpc.buffer.atomic.iincrement.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i32 @llpc.buffer.atomic.iadd.i32(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
+    %1 = call i32 @llpc.buffer.atomic.iadd.i32(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i32 1,
                                                i1  %slc,
-                                               i1 %nonUniform)
+                                               i1  %nonUniform)
     ret i32 %1
 }
 
 ; GLSL: uint atomicDecrement(inout uint)
 ;       int  atomicDecrement(inout int)
 define i32 @llpc.buffer.atomic.idecrement.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i32 @llpc.buffer.atomic.isub.i32(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
+    %1 = call i32 @llpc.buffer.atomic.isub.i32(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i32 1,
                                                i1  %slc,
-                                               i1 %nonUniform)
+                                               i1  %nonUniform)
     ret i32 %1
 }
 
 ; GLSL: uint atomicLoad(inout uint)
 ;       int  atomicLoad(inout int)
 define i32 @llpc.buffer.atomic.load.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i32 @llpc.buffer.atomic.iadd.i32(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
+    %1 = call i32 @llpc.buffer.atomic.iadd.i32(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i32 0,
                                                i1 %slc,
@@ -943,14 +613,12 @@ define i32 @llpc.buffer.atomic.load.i32(
 
 ; GLSL: float atomicLoad(inout float)
 define float @llpc.buffer.atomic.load.f32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i32 @llpc.buffer.atomic.load.i32(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
+    %1 = call i32 @llpc.buffer.atomic.load.i32(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i1  %slc,
-                                               i1 %nonUniform)
+                                               i1  %nonUniform)
     %2 = bitcast i32 %1 to float
     ret float %2
 }
@@ -958,15 +626,13 @@ define float @llpc.buffer.atomic.load.f32(
 ; GLSL: void atomicStore(inout uint, uint)
 ;       void atomicStore(inout int, int)
 define void @llpc.buffer.atomic.store.i32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i32 @llpc.buffer.atomic.exchange.i32(i32 %descSet,
-                                                   i32 %binding,
-                                                   i32 %blockOffset,
+    %1 = call i32 @llpc.buffer.atomic.exchange.i32(<4 x i32> %desc,
                                                    i32 %memberOffset,
                                                    i32 %data,
                                                    i1  %slc,
-                                                   i1 %nonUniform)
+                                                   i1  %nonUniform)
     ; We do not care about the result returned by "exchange" operation. We just want to store the specified
     ; data to the targeted buffer.
     ret void
@@ -974,209 +640,14 @@ define void @llpc.buffer.atomic.store.i32(
 
 ; GLSL: void atomicStore(inout float, float)
 define void @llpc.buffer.atomic.store.f32(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, float %data, i1 %slc, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %memberOffset, float %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = bitcast float %data to i32
-    %2 = call i32 @llpc.buffer.atomic.exchange.i32(i32 %descSet,
-                                                   i32 %binding,
-                                                   i32 %blockOffset,
+    %2 = call i32 @llpc.buffer.atomic.exchange.i32(<4 x i32> %desc,
                                                    i32 %memberOffset,
                                                    i32 %1,
                                                    i1  %slc,
-                                                   i1 %nonUniform)
-    ; We do not care about the result returned by "exchange" operation. We just want to store the specified
-    ; data to the targeted buffer.
-    ret void
-}
-
-; GLSL: uint atomicAdd(inout uint, uint)
-;       int  atomicAdd(inout int, int)
-define i32 @llpc.buffer.atomic.desc.iadd.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.add(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicSub(inout uint, uint)
-;        int atomicSub(inout int, int)
-define i32 @llpc.buffer.atomic.desc.isub.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.sub(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicMin(inout uint, uint)
-define i32 @llpc.buffer.atomic.desc.umin.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.umin(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: int atomicMin(inout int, int)
-define i32 @llpc.buffer.atomic.desc.smin.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.smin(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicMax(inout uint, uint)
-define i32 @llpc.buffer.atomic.desc.umax.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.umax(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: int atomicMax(inout int, int)
-define i32 @llpc.buffer.atomic.desc.smax.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.smax(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicAnd(inout uint, uint)
-;       int  atomicAnd(inout int, int)
-define i32 @llpc.buffer.atomic.desc.and.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.and(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicOr(inout uint, uint)
-;       int  atomicOr(inout int, int)
-define i32 @llpc.buffer.atomic.desc.or.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.or(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicXor(inout uint, uint)
-;       int  atomicXor(inout int, int)
-define i32 @llpc.buffer.atomic.desc.xor.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.xor(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicExchange(inout uint, uint)
-;       int  atomicExchange(inout int, int)
-define i32 @llpc.buffer.atomic.desc.exchange.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.swap(i32 %data, <4 x i32> %desc, i32 0, i32 %memberOffset, i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: float atomicExchange(inout float, float)
-define float @llpc.buffer.atomic.desc.exchange.f32(
-    <4 x i32> %desc, i32 %memberOffset, float %data, i1 %slc) #0
-{
-    %1 = bitcast float %data to i32
-    %2 = call i32 @llpc.buffer.atomic.desc.exchange.i32(<4 x i32> %desc,
-                                                   i32 %memberOffset,
-                                                   i32 %1,
-                                                   i1  %slc)
-    %3 = bitcast i32 %2 to float
-    ret float %3
-}
-
-; GLSL: uint atomicCompSwap(inout uint, uint, uint)
-;       int  atomicCompSwap(inout int, int, int)
-define i32 @llpc.buffer.atomic.desc.compareexchange.i32(
-    <4 x i32> %desc,
-    i32 %memberOffset,
-    i32 %data,
-    i32 %compare,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %1 = call i32 @llvm.amdgcn.buffer.atomic.cmpswap(i32 %data,
-                                                     i32 %compare,
-                                                     <4 x i32> %desc,
-                                                     i32 0,
-                                                     i32 %memberOffset,
-                                                     i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicIncrement(inout uint)
-;       int  atomicIncrement(inout int)
-define i32 @llpc.buffer.atomic.desc.iincrement.i32(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
-{
-    %1 = call i32 @llpc.buffer.atomic.desc.iadd.i32(<4 x i32> %desc,
-                                               i32 %memberOffset,
-                                               i32 1,
-                                               i1  %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicDecrement(inout uint)
-;       int  atomicDecrement(inout int)
-define i32 @llpc.buffer.atomic.desc.idecrement.i32(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
-{
-    %1 = call i32 @llpc.buffer.atomic.desc.isub.i32(<4 x i32> %desc,
-                                               i32 %memberOffset,
-                                               i32 1,
-                                               i1  %slc)
-    ret i32 %1
-}
-
-; GLSL: uint atomicLoad(inout uint)
-;       int  atomicLoad(inout int)
-define i32 @llpc.buffer.atomic.desc.load.i32(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
-{
-    %1 = call i32 @llpc.buffer.atomic.desc.iadd.i32(<4 x i32> %desc,
-                                               i32 %memberOffset,
-                                               i32 0,
-                                               i1 %slc)
-    ret i32 %1
-}
-
-; GLSL: float atomicLoad(inout float)
-define float @llpc.buffer.atomic.desc.load.f32(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
-{
-    %1 = call i32 @llpc.buffer.atomic.desc.load.i32(<4 x i32> %desc,
-                                               i32 %memberOffset,
-                                               i1  %slc)
-    %2 = bitcast i32 %1 to float
-    ret float %2
-}
-
-; GLSL: void atomicStore(inout uint, uint)
-;       void atomicStore(inout int, int)
-define void @llpc.buffer.atomic.desc.store.i32(
-    <4 x i32> %desc, i32 %memberOffset, i32 %data, i1 %slc) #0
-{
-    %1 = call i32 @llpc.buffer.atomic.desc.exchange.i32(<4 x i32> %desc,
-                                                   i32 %memberOffset,
-                                                   i32 %data,
-                                                   i1  %slc)
-    ; We do not care about the result returned by "exchange" operation. We just want to store the specified
-    ; data to the targeted buffer.
-    ret void
-}
-
-; GLSL: void atomicStore(inout float, float)
-define void @llpc.buffer.atomic.desc.store.f32(
-    <4 x i32> %desc, i32 %memberOffset, float %data, i1 %slc) #0
-{
-    %1 = bitcast float %data to i32
-    %2 = call i32 @llpc.buffer.atomic.desc.exchange.i32(<4 x i32> %desc,
-                                                   i32 %memberOffset,
-                                                   i32 %1,
-                                                   i1  %slc)
+                                                   i1  %nonUniform)
     ; We do not care about the result returned by "exchange" operation. We just want to store the specified
     ; data to the targeted buffer.
     ret void
@@ -1184,8 +655,8 @@ define void @llpc.buffer.atomic.desc.store.f32(
 
 ; GLSL: uint64_t atomicAdd(inout uint64_t, uint64_t)
 ;       int64_t  atomicAdd(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.iadd.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.iadd.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile add i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1194,8 +665,8 @@ define i64 @llpc.buffer.atomic.desc.iadd.i64(
 
 ; GLSL: uint64_t atomicSub(inout uint64_t, uint64_t)
 ;       int64_t  atomicSub(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.isub.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.isub.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile sub i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1203,8 +674,8 @@ define i64 @llpc.buffer.atomic.desc.isub.i64(
 }
 
 ; GLSL: uint64_t atomicMin(inout uint64_t, uint64_t)
-define i64 @llpc.buffer.atomic.desc.umin.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.umin.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile umin i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1212,8 +683,8 @@ define i64 @llpc.buffer.atomic.desc.umin.i64(
 }
 
 ; GLSL: int64_t atomicMin(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.smin.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.smin.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile min i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1221,8 +692,8 @@ define i64 @llpc.buffer.atomic.desc.smin.i64(
 }
 
 ; GLSL: uint64_t atomicMax(inout uint64_t, uint64_t)
-define i64 @llpc.buffer.atomic.desc.umax.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.umax.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile umax i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1230,8 +701,8 @@ define i64 @llpc.buffer.atomic.desc.umax.i64(
 }
 
 ; GLSL: int64_t atomicMax(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.smax.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.smax.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile max i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1240,8 +711,8 @@ define i64 @llpc.buffer.atomic.desc.smax.i64(
 
 ; GLSL: uint64_t atomicAnd(inout uint64_t, uint64_t)
 ;       int64_t  atomicAnd(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.and.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.and.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile and i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1250,8 +721,8 @@ define i64 @llpc.buffer.atomic.desc.and.i64(
 
 ; GLSL: uint64_t atomicOr(inout uint64_t, uint64_t)
 ;       int64_t  atomicOr(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.or.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.or.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile or i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1260,8 +731,8 @@ define i64 @llpc.buffer.atomic.desc.or.i64(
 
 ; GLSL: uint64_t atomicXor(inout uint64_t, uint64_t)
 ;       int64_t  atomicXor(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.xor.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.xor.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile xor i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1270,8 +741,8 @@ define i64 @llpc.buffer.atomic.desc.xor.i64(
 
 ; GLSL: uint64_t atomicExchange(inout uint64_t, uint64_t)
 ;       int64_t  atomicExchange(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.exchange.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define i64 @llpc.buffer.atomic.exchange.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = atomicrmw volatile xchg i64 addrspace(1)* %1, i64 %data seq_cst
@@ -1280,12 +751,13 @@ define i64 @llpc.buffer.atomic.desc.exchange.i64(
 
 ; GLSL: uint64_t atomicCompSwap(inout uint64_t, uint64_t, uint64_t)
 ;       int64_t  atomicCompSwap(inout int64_t, int64_t, int64_t)
-define i64 @llpc.buffer.atomic.desc.compareexchange.i64(
+define i64 @llpc.buffer.atomic.compareexchange.i64(
     <4 x i32> %desc,
     i32 %memberOffset,
     i64 %data,
     i64 %compare,
-    i1 %slc) #0
+    i1 %slc,
+    i1 %nonUniform) #0
 {
     %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
     %2 = cmpxchg i64 addrspace(1)* %1, i64 %compare, i64 %data seq_cst monotonic
@@ -1295,49 +767,53 @@ define i64 @llpc.buffer.atomic.desc.compareexchange.i64(
 
 ; GLSL: uint64_t atomicIncrement(inout uint64_t)
 ;       int64_t  atomicIncrement(inout int64_t)
-define i64 @llpc.buffer.atomic.desc.iincrement.i64(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
+define i64 @llpc.buffer.atomic.iincrement.i64(
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i64 @llpc.buffer.atomic.desc.iadd.i64(<4 x i32> %desc,
+    %1 = call i64 @llpc.buffer.atomic.iadd.i64(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i64 1,
-                                               i1  %slc)
+                                               i1  %slc,
+                                               i1  %nonUniform)
     ret i64 %1
 }
 
 ; GLSL: uint64_t atomicDecrement(inout uint64_t)
 ;       int64_t  atomicDecrement(inout int64_t)
-define i64 @llpc.buffer.atomic.desc.idecrement.i64(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
+define i64 @llpc.buffer.atomic.idecrement.i64(
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i64 @llpc.buffer.atomic.desc.isub.i64(<4 x i32> %desc,
+    %1 = call i64 @llpc.buffer.atomic.isub.i64(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i64 1,
-                                               i1  %slc)
+                                               i1  %slc,
+                                               i1  %nonUniform)
     ret i64 %1
 }
 
 ; GLSL: uint64_t atomicLoad(inout uint64_t)
 ;       int64_t  atomicLoad(inout int64_t)
-define i64 @llpc.buffer.atomic.desc.load.i64(
-    <4 x i32> %desc, i32 %memberOffset, i1 %slc) #0
+define i64 @llpc.buffer.atomic.load.i64(
+    <4 x i32> %desc, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i64 @llpc.buffer.atomic.desc.iadd.i64(<4 x i32> %desc,
+    %1 = call i64 @llpc.buffer.atomic.iadd.i64(<4 x i32> %desc,
                                                i32 %memberOffset,
                                                i64 0,
-                                               i1  %slc)
+                                               i1  %slc,
+                                               i1  %nonUniform)
     ret i64 %1
 }
 
 ; GLSL: void atomicStore(inout uint64_t, uint64_t)
 ;       void atomicStore(inout int64_t, int64_t)
-define void @llpc.buffer.atomic.desc.store.i64(
-    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc) #0
+define void @llpc.buffer.atomic.store.i64(
+    <4 x i32> %desc, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
 {
-    %1 = call i64 @llpc.buffer.atomic.desc.exchange.i64(<4 x i32> %desc,
+    %1 = call i64 @llpc.buffer.atomic.exchange.i64(<4 x i32> %desc,
                                                    i32 %memberOffset,
                                                    i64 %data,
-                                                   i1  %slc)
+                                                   i1  %slc,
+                                                   i1  %nonUniform)
     ; We do not care about the result returned by "exchange" operation. We just want to store the specified
     ; data to the targeted buffer.
     ret void
@@ -1363,198 +839,10 @@ define i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOff
     ret  i64 addrspace(1)* %9
 }
 
-; GLSL: uint64_t atomicAdd(inout uint64_t, uint64_t)
-;       int64_t  atomicAdd(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.iadd.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile add i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicSub(inout uint64_t, uint64_t)
-;       int64_t  atomicSub(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.isub.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile sub i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicMin(inout uint64_t, uint64_t)
-define i64 @llpc.buffer.atomic.umin.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile umin i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: int64_t atomicMin(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.smin.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile min i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicMax(inout uint64_t, uint64_t)
-define i64 @llpc.buffer.atomic.umax.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile umax i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: int64_t atomicMax(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.smax.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile max i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicAnd(inout uint64_t, uint64_t)
-;       int64_t  atomicAnd(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.and.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile and i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicOr(inout uint64_t, uint64_t)
-;       int64_t  atomicOr(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.or.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile or i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicXor(inout uint64_t, uint64_t)
-;       int64_t  atomicXor(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.xor.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile xor i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicExchange(inout uint64_t, uint64_t)
-;       int64_t  atomicExchange(inout int64_t, int64_t)
-define i64 @llpc.buffer.atomic.exchange.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = atomicrmw volatile xchg i64 addrspace(1)* %1, i64 %data seq_cst
-    ret i64 %2
-}
-
-; GLSL: uint64_t atomicCompSwap(inout uint64_t, uint64_t, uint64_t)
-;       int64_t  atomicCompSwap(inout int64_t, int64_t, int64_t)
-define i64 @llpc.buffer.atomic.compareexchange.i64(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    i64 %data,
-    i64 %compare,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %1 = call i64 addrspace(1)* @llpc.buffer.getaddress(<4 x i32> %desc, i32 %memberOffset)
-    %2 = cmpxchg i64 addrspace(1)* %1, i64 %compare, i64 %data seq_cst monotonic
-    %3 = extractvalue { i64, i1 } %2, 0
-    ret i64 %3
-}
-
-; GLSL: uint64_t atomicIncrement(inout uint64_t)
-;       int64_t  atomicIncrement(inout int64_t)
-define i64 @llpc.buffer.atomic.iincrement.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
-{
-    %1 = call i64 @llpc.buffer.atomic.iadd.i64(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
-                                               i32 %memberOffset,
-                                               i64 1,
-                                               i1  %slc,
-                                               i1 %nonUniform)
-    ret i64 %1
-}
-
-; GLSL: uint64_t atomicDecrement(inout uint64_t)
-;       int64_t  atomicDecrement(inout int64_t)
-define i64 @llpc.buffer.atomic.idecrement.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
-{
-    %1 = call i64 @llpc.buffer.atomic.isub.i64(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
-                                               i32 %memberOffset,
-                                               i64 1,
-                                               i1  %slc,
-                                               i1 %nonUniform)
-    ret i64 %1
-}
-
-; GLSL: uint64_t atomicLoad(inout uint64_t)
-;       int64_t  atomicLoad(inout int64_t)
-define i64 @llpc.buffer.atomic.load.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %slc, i1 %nonUniform) #0
-{
-    %1 = call i64 @llpc.buffer.atomic.iadd.i64(i32 %descSet,
-                                               i32 %binding,
-                                               i32 %blockOffset,
-                                               i32 %memberOffset,
-                                               i64 0,
-                                               i1  %slc,
-                                               i1 %nonUniform)
-    ret i64 %1
-}
-
-; GLSL: void atomicStore(inout uint64_t, uint64_t)
-;       void atomicStore(inout int64_t, int64_t)
-define void @llpc.buffer.atomic.store.i64(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i64 %data, i1 %slc, i1 %nonUniform) #0
-{
-    %1 = call i64 @llpc.buffer.atomic.exchange.i64(i32 %descSet,
-                                                   i32 %binding,
-                                                   i32 %blockOffset,
-                                                   i32 %memberOffset,
-                                                   i64 %data,
-                                                   i1  %slc,
-                                                   i1 %nonUniform)
-    ; We do not care about the result returned by "exchange" operation. We just want to store the specified
-    ; data to the targeted buffer.
-    ret void
-}
-
 ; GLSL: int array.length()
 define i32 @llpc.buffer.arraylength(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %arrayOffset, i32 %arrayStride, i1 %nonUniform) #0
+    <4 x i32> %desc, i32 %arrayOffset, i32 %arrayStride) #0
 {
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
     ; The third DWORD is the field NUM_RECORDS of SQ_BUF_RSRC_WORD2. For untyped buffer, the buffer stride is
     ; always set to 1. Therefore, this field represents size of the buffer.
     %1 = extractelement <4 x i32> %desc, i32 2
@@ -1564,8 +852,8 @@ define i32 @llpc.buffer.arraylength(
 }
 
 ; GLSL: load scalar aligned i8vec2/u8vec2 with descriptor
-define <2 x i8> @llpc.buffer.load.scalar.aligned.desc.v2i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+define <2 x i8> @llpc.buffer.load.scalar.aligned.v2i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %x = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %yOffset = add i32 %memberOffset, 1
@@ -1577,22 +865,9 @@ define <2 x i8> @llpc.buffer.load.scalar.aligned.desc.v2i8(
     ret <2 x i8> %result
 }
 
-; GLSL: load scalar aligned i8vec2/u8vec2
-define <2 x i8> @llpc.buffer.load.scalar.aligned.v2i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %result = call <2 x i8> @llpc.buffer.load.scalar.aligned.desc.v2i8(<4 x i32> %desc,
-                                                                       i32 %memberOffset,
-                                                                       i1 %readonly,
-                                                                       i1 %glc,
-                                                                       i1 %slc)
-    ret <2 x i8> %result
-}
-
 ; GLSL: load scalar aligned i8vec3/u8vec3 with descriptor
-define <3 x i8> @llpc.buffer.load.scalar.aligned.desc.v3i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+define <3 x i8> @llpc.buffer.load.scalar.aligned.v3i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %x = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %yOffset = add i32 %memberOffset, 1
@@ -1607,22 +882,9 @@ define <3 x i8> @llpc.buffer.load.scalar.aligned.desc.v3i8(
     ret <3 x i8> %result
 }
 
-; GLSL: load scalar aligned i8vec3/u8vec3
-define <3 x i8> @llpc.buffer.load.scalar.aligned.v3i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %result = call <3 x i8> @llpc.buffer.load.scalar.aligned.desc.v3i8(<4 x i32> %desc,
-                                                                       i32 %memberOffset,
-                                                                       i1 %readonly,
-                                                                       i1 %glc,
-                                                                       i1 %slc)
-    ret <3 x i8> %result
-}
-
 ; GLSL: load scalar aligned i8vec4/u8vec4 with descriptor
-define <4 x i8> @llpc.buffer.load.scalar.aligned.desc.v4i8(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+define <4 x i8> @llpc.buffer.load.scalar.aligned.v4i8(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %x = call float @llvm.amdgcn.buffer.load.ubyte(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %yOffset = add i32 %memberOffset, 1
@@ -1640,22 +902,9 @@ define <4 x i8> @llpc.buffer.load.scalar.aligned.desc.v4i8(
     ret <4 x i8> %result
 }
 
-; GLSL: load scalar aligned i8vec4/u8vec4
-define <4 x i8> @llpc.buffer.load.scalar.aligned.v4i8(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %result = call <4 x i8> @llpc.buffer.load.scalar.aligned.desc.v4i8(<4 x i32> %desc,
-                                                                       i32 %memberOffset,
-                                                                       i1 %readonly,
-                                                                       i1 %glc,
-                                                                       i1 %slc)
-    ret <4 x i8> %result
-}
-
 ; GLSL: load scalar aligned i16vec2/u16vec2/f16vec2 with descriptor
-define <2 x i16> @llpc.buffer.load.scalar.aligned.desc.v2i16(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+define <2 x i16> @llpc.buffer.load.scalar.aligned.v2i16(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %x = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %yOffset = add i32 %memberOffset, 2
@@ -1667,22 +916,9 @@ define <2 x i16> @llpc.buffer.load.scalar.aligned.desc.v2i16(
     ret <2 x i16> %result
 }
 
-; GLSL: load scalar aligned i16vec2/u16vec2/f16vec2
-define <2 x i16> @llpc.buffer.load.scalar.aligned.v2i16(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %result = call <2 x i16> @llpc.buffer.load.scalar.aligned.desc.v2i16(<4 x i32> %desc,
-                                                                         i32 %memberOffset,
-                                                                         i1 %readonly,
-                                                                         i1 %glc,
-                                                                         i1 %slc)
-    ret <2 x i16> %result
-}
-
 ; GLSL: load scalar aligned i16vec3/u16vec3/f16vec3 with descriptor
-define <3 x i16> @llpc.buffer.load.scalar.aligned.desc.v3i16(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+define <3 x i16> @llpc.buffer.load.scalar.aligned.v3i16(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %x = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %yOffset = add i32 %memberOffset, 2
@@ -1697,22 +933,9 @@ define <3 x i16> @llpc.buffer.load.scalar.aligned.desc.v3i16(
     ret <3 x i16> %result
 }
 
-; GLSL: load scalar aligned i16vec3/u16vec3/f16vec3
-define <3 x i16> @llpc.buffer.load.scalar.aligned.v3i16(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %result = call <3 x i16> @llpc.buffer.load.scalar.aligned.desc.v3i16(<4 x i32> %desc,
-                                                                         i32 %memberOffset,
-                                                                         i1 %readonly,
-                                                                         i1 %glc,
-                                                                         i1 %slc)
-    ret <3 x i16> %result
-}
-
 ; GLSL: load scalar aligned i16vec4/u16vec4/f16vec4 with descriptor
-define <4 x i16> @llpc.buffer.load.scalar.aligned.desc.v4i16(
-    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc) #0
+define <4 x i16> @llpc.buffer.load.scalar.aligned.v4i16(
+    <4 x i32> %desc, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %x = call float @llvm.amdgcn.buffer.load.ushort(<4 x i32> %desc, i32 0, i32 %memberOffset, i1 %glc, i1 %slc)
     %yOffset = add i32 %memberOffset, 2
@@ -1730,22 +953,9 @@ define <4 x i16> @llpc.buffer.load.scalar.aligned.desc.v4i16(
     ret <4 x i16> %result
 }
 
-; GLSL: load scalar aligned i16vec4/u16vec4/f16vec4
-define <4 x i16> @llpc.buffer.load.scalar.aligned.v4i16(
-    i32 %descSet, i32 %binding, i32 %blockOffset, i32 %memberOffset, i1 %readonly, i1 %glc, i1 %slc, i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    %result = call <4 x i16> @llpc.buffer.load.scalar.aligned.desc.v4i16(<4 x i32> %desc,
-                                                                         i32 %memberOffset,
-                                                                         i1 %readonly,
-                                                                         i1 %glc,
-                                                                         i1 %slc)
-    ret <4 x i16> %result
-}
-
 ; GLSL: store scalar aligned i8vec2/u8vec2 with descriptor
-define void @llpc.buffer.store.scalar.aligned.desc.v2i8(
-    <4 x i32> %desc, i32 %memberOffset, <2 x i8> %storeData, i1 %glc, i1 %slc) #0
+define void @llpc.buffer.store.scalar.aligned.v2i8(
+    <4 x i32> %desc, i32 %memberOffset, <2 x i8> %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %zext = zext <2 x i8> %storeData to <2 x i32>
     %bitcast = bitcast <2 x i32> %zext to <2 x float>
@@ -1757,29 +967,9 @@ define void @llpc.buffer.store.scalar.aligned.desc.v2i8(
     ret void
 }
 
-; GLSL: store scalar aligned i8vec2/u8vec2
-define void @llpc.buffer.store.scalar.aligned.v2i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    <2 x i8> %storeData,
-    i1 %glc,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    call void @llpc.buffer.store.scalar.aligned.desc.v2i8(<4 x i32> %desc,
-                                                          i32 %memberOffset,
-                                                          <2 x i8> %storeData,
-                                                          i1 %glc,
-                                                          i1 %slc)
-    ret void
-}
-
 ; GLSL: store scalar aligned i8vec3/u8vec3 with descriptor
-define void @llpc.buffer.store.scalar.aligned.desc.v3i8(
-    <4 x i32> %desc, i32 %memberOffset, <3 x i8> %storeData, i1 %glc, i1 %slc) #0
+define void @llpc.buffer.store.scalar.aligned.v3i8(
+    <4 x i32> %desc, i32 %memberOffset, <3 x i8> %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %zext = zext <3 x i8> %storeData to <3 x i32>
     %bitcast = bitcast <3 x i32> %zext to <3 x float>
@@ -1794,29 +984,9 @@ define void @llpc.buffer.store.scalar.aligned.desc.v3i8(
     ret void
 }
 
-; GLSL: store scalar aligned i8vec3/u8vec3
-define void @llpc.buffer.store.scalar.aligned.v3i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    <3 x i8> %storeData,
-    i1 %glc,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    call void @llpc.buffer.store.scalar.aligned.desc.v3i8(<4 x i32> %desc,
-                                                          i32 %memberOffset,
-                                                          <3 x i8> %storeData,
-                                                          i1 %glc,
-                                                          i1 %slc)
-    ret void
-}
-
 ; GLSL: store scalar aligned i8vec4/u8vec4 with descriptor
-define void @llpc.buffer.store.scalar.aligned.desc.v4i8(
-    <4 x i32> %desc, i32 %memberOffset, <4 x i8> %storeData, i1 %glc, i1 %slc) #0
+define void @llpc.buffer.store.scalar.aligned.v4i8(
+    <4 x i32> %desc, i32 %memberOffset, <4 x i8> %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %zext = zext <4 x i8> %storeData to <4 x i32>
     %bitcast = bitcast <4 x i32> %zext to <4 x float>
@@ -1834,29 +1004,9 @@ define void @llpc.buffer.store.scalar.aligned.desc.v4i8(
     ret void
 }
 
-; GLSL: store scalar aligned i8vec4/u8vec4
-define void @llpc.buffer.store.scalar.aligned.v4i8(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    <4 x i8> %storeData,
-    i1 %glc,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    call void @llpc.buffer.store.scalar.aligned.desc.v4i8(<4 x i32> %desc,
-                                                          i32 %memberOffset,
-                                                          <4 x i8> %storeData,
-                                                          i1 %glc,
-                                                          i1 %slc)
-    ret void
-}
-
 ; GLSL: store scalar aligned i16vec2/u16vec2/f16vec2 with descriptor
-define void @llpc.buffer.store.scalar.aligned.desc.v2i16(
-    <4 x i32> %desc, i32 %memberOffset, <2 x i16> %storeData, i1 %glc, i1 %slc) #0
+define void @llpc.buffer.store.scalar.aligned.v2i16(
+    <4 x i32> %desc, i32 %memberOffset, <2 x i16> %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %zext = zext <2 x i16> %storeData to <2 x i32>
     %bitcast = bitcast <2 x i32> %zext to <2 x float>
@@ -1868,29 +1018,9 @@ define void @llpc.buffer.store.scalar.aligned.desc.v2i16(
     ret void
 }
 
-; GLSL: store scalar aligned i16vec2/u16vec2/f16vec2
-define void @llpc.buffer.store.scalar.aligned.v2i16(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    <2 x i16> %storeData,
-    i1 %glc,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    call void @llpc.buffer.store.scalar.aligned.desc.v2i16(<4 x i32> %desc,
-                                                           i32 %memberOffset,
-                                                           <2 x i16> %storeData,
-                                                           i1 %glc,
-                                                           i1 %slc)
-    ret void
-}
-
 ; GLSL: store scalar aligned i16vec3/u16vec3/f16vec3 with descriptor
-define void @llpc.buffer.store.scalar.aligned.desc.v3i16(
-    <4 x i32> %desc, i32 %memberOffset, <3 x i16> %storeData, i1 %glc, i1 %slc) #0
+define void @llpc.buffer.store.scalar.aligned.v3i16(
+    <4 x i32> %desc, i32 %memberOffset, <3 x i16> %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %zext = zext <3 x i16> %storeData to <3 x i32>
     %bitcast = bitcast <3 x i32> %zext to <3 x float>
@@ -1905,29 +1035,9 @@ define void @llpc.buffer.store.scalar.aligned.desc.v3i16(
     ret void
 }
 
-; GLSL: store scalar aligned i16vec3/u16vec3/f16vec3
-define void @llpc.buffer.store.scalar.aligned.v3i16(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    <3 x i16> %storeData,
-    i1 %glc,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    call void @llpc.buffer.store.scalar.aligned.desc.v3i16(<4 x i32> %desc,
-                                                           i32 %memberOffset,
-                                                           <3 x i16> %storeData,
-                                                           i1 %glc,
-                                                           i1 %slc)
-    ret void
-}
-
 ; GLSL: store scalar aligned i16vec4/u16vec4/f16vec4 with descriptor
-define void @llpc.buffer.store.scalar.aligned.desc.v4i16(
-    <4 x i32> %desc, i32 %memberOffset, <4 x i16> %storeData, i1 %glc, i1 %slc) #0
+define void @llpc.buffer.store.scalar.aligned.v4i16(
+    <4 x i32> %desc, i32 %memberOffset, <4 x i16> %storeData, i1 %glc, i1 %slc, i1 %nonUniform) #0
 {
     %zext = zext <4 x i16> %storeData to <4 x i32>
     %bitcast = bitcast <4 x i32> %zext to <4 x float>
@@ -1942,26 +1052,6 @@ define void @llpc.buffer.store.scalar.aligned.desc.v4i16(
     call void @llvm.amdgcn.buffer.store.short(float %z, <4 x i32> %desc, i32 0, i32 %zOffset, i1 %glc, i1 %slc)
     %wOffset = add i32 %memberOffset, 6
     call void @llvm.amdgcn.buffer.store.short(float %w, <4 x i32> %desc, i32 0, i32 %wOffset, i1 %glc, i1 %slc)
-    ret void
-}
-
-; GLSL: store scalar aligned i16vec4/u16vec4/f16vec4
-define void @llpc.buffer.store.scalar.aligned.v4i16(
-    i32 %descSet,
-    i32 %binding,
-    i32 %blockOffset,
-    i32 %memberOffset,
-    <4 x i16> %storeData,
-    i1 %glc,
-    i1 %slc,
-    i1 %nonUniform) #0
-{
-    %desc = call <4 x i32> @llpc.descriptor.load.buffer(i32 %descSet, i32 %binding, i32 %blockOffset, i1 %nonUniform)
-    call void @llpc.buffer.store.scalar.aligned.desc.v4i16(<4 x i32> %desc,
-                                                           i32 %memberOffset,
-                                                           <4 x i16> %storeData,
-                                                           i1 %glc,
-                                                           i1 %slc)
     ret void
 }
 

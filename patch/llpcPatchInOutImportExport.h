@@ -189,6 +189,8 @@ private:
                                      llvm::Value*       pStreamOutBufDesc,
                                      llvm::Instruction* pInsertPos);
 
+    void CreateStreamOutBufferStoreFunction(llvm::Value*  pStoreValue, uint32_t xfbStrde, std::string& funcName);
+
     void StoreValueToEsGsRing(llvm::Value*        pStoreValue,
                               uint32_t            location,
                               uint32_t            compIdx,

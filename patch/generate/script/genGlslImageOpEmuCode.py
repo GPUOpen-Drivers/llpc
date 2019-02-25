@@ -55,7 +55,6 @@ SPIRV_IMAGE_OPERAND_CONSTOFFSETS_MODIFIER   = "constoffsets"
 SPIRV_IMAGE_OPERAND_SAMPLE_MODIFIER         = "sample"
 SPIRV_IMAGE_OPERAND_MINLOD_MODIFIER         = "minlod"
 SPIRV_IMAGE_OPERAND_FMASKBASED_MODIFIER     = "fmaskbased"
-SPIRV_IMAGE_OPERAND_FMASKID_MODIFIER        = "fmaskid"
 SPIRV_IMAGE_DIM_PREFIX                      = "Dim"
 SPIRV_IMAGE_ARRAY_MODIFIER                  = "Array"
 
@@ -261,7 +260,6 @@ class FuncDef(object):
         self._hasSample         = other._hasSample
         self._hasMinLod         = other._hasMinLod
         self._isFmaskBased      = other._isFmaskBased
-        self._returnFmaskId     = other._returnFmaskId
         self._attr              = other._attr
         self._localVarCounter   = other._localVarCounter
         self._coordXYZW[0]      = other._coordXYZW[0]
@@ -310,7 +308,6 @@ class FuncDef(object):
         self._hasSample         = False
         self._hasMinLod         = False
         self._isFmaskBased      = False
-        self._returnFmaskId     = False
         self._attr              = ""
         self._localVarCounter   = 1
         self._coordXYZW         = [FuncDef.INVALID_VAR, FuncDef.INVALID_VAR, \
@@ -385,8 +382,6 @@ class FuncDef(object):
                 self._hasMinLod         = True
             elif t == SPIRV_IMAGE_OPERAND_FMASKBASED_MODIFIER:
                 self._isFmaskBased      = True
-            elif t == SPIRV_IMAGE_OPERAND_FMASKID_MODIFIER:
-                self._returnFmaskId     = True
             else:
                 shouldNeverCall(self._mangledName)
         pass
@@ -492,7 +487,7 @@ class CodeGen(FuncDef):
         else:
             shouldNeverCall()
 
-        if intrinGen._returnFmaskId or intrinGen._isFmaskBased:
+        if intrinGen._isFmaskBased:
             shouldNeverCall()
 
         retVal    = intrinGen.genIntrinsicCall(irOut)
@@ -718,18 +713,17 @@ class CodeGen(FuncDef):
                     VarNames.samplerBinding, VarNames.samplerIndex, VarNames.imageCallMeta)
             irOut.write(loadSampler)
 
-        if not self._returnFmaskId:
-            if self._dim == SpirvDim.DimBuffer:
-                loadResource = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
-                        (VarNames.resource, LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, VarNames.resourceSet, \
-                        VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
-            else:
-                loadResource = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
-                        (VarNames.resource, LLPC_DESCRIPTOR_LOAD_RESOURCE, VarNames.resourceSet, \
-                        VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
-            irOut.write(loadResource)
+        if self._dim == SpirvDim.DimBuffer:
+            loadResource = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
+                    (VarNames.resource, LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, VarNames.resourceSet, \
+                    VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
+        else:
+            loadResource = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
+                    (VarNames.resource, LLPC_DESCRIPTOR_LOAD_RESOURCE, VarNames.resourceSet, \
+                    VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
+        irOut.write(loadResource)
 
-        if self._isFmaskBased or self._returnFmaskId:
+        if self._isFmaskBased:
             loadFMask = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
                     (VarNames.fmask, LLPC_DESCRIPTOR_LOAD_FMASK, VarNames.resourceSet, \
                     VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
@@ -1214,47 +1208,24 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
         return newRetVal
 
     # Gets image return value and sparse residency code from sparse intrinsic return value
-    def genProcessSparseReturnVal(self, sparseRetVal, sparseRetType, retType, retCompType, retNumComp, irOut):
+    def genProcessSparseReturnVal(self, sparseRetVal, sparseRetType, irOut):
         assert self._supportSparse
         assert sparseRetType != self.INVALID_TYPE
-        assert retType != self.INVALID_TYPE
-        assert retNumComp != -1
 
         # Return value components are before sparse residency code component
         # Extract return value
         retVal = self.acquireLocalVar()
-        shuffleMask = "i32 0"
-        for i in range(1, retNumComp):
-            shuffleMask += ", i32 %d" % (i)
-        irShuffle = "    %s = shufflevector %s %s, %s undef, <%d x i32> <%s>\n" % (retVal,
-                                                                                   sparseRetType,
-                                                                                   sparseRetVal,
-                                                                                   sparseRetType,
-                                                                                   retNumComp,
-                                                                                   shuffleMask)
-        irOut.write(irShuffle)
-
-        # Extract residency code
-        temp = self.acquireLocalVar()
-        irExtract = "    %s = extractelement %s %s, i32 %d\n" % (temp,
-                                                                 sparseRetType,
-                                                                 sparseRetVal,
-                                                                 retNumComp)
+        irExtract = "    %s = extractvalue %s %s, 0\n" % (retVal,
+                                                          sparseRetType,
+                                                          sparseRetVal)
         irOut.write(irExtract)
 
-        if retCompType == "half":
-            temp2 = self.acquireLocalVar()
-            irBitcast = "    %s = bitcast %s %s to i16\n" % (temp2, retCompType, temp)
-            irOut.write(irBitcast)
-
-            residencyCode = self.acquireLocalVar()
-            irZExt    = "    %s = zext i16 %s to i32\n" % (residencyCode, temp2)
-            irOut.write(irZExt)
-            pass
-        else:
-            residencyCode = self.acquireLocalVar()
-            irBitcast = "    %s = bitcast %s %s to i32\n" % (residencyCode, retCompType, temp)
-            irOut.write(irBitcast)
+        # Extract residency code
+        residencyCode = self.acquireLocalVar()
+        irExtractRC = "    %s = extractvalue %s %s, 1\n" % (residencyCode,
+                                                            sparseRetType,
+                                                            sparseRetVal)
+        irOut.write(irExtractRC)
 
         return retVal, residencyCode
 
@@ -1298,11 +1269,11 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
             dataType = "i32"
         else:
             if self._sampledType == SpirvSampledType.f16:
-                sparseDataType   = "<8 x half>"
+                sparseDataType   = "{<4 x half>, i32}"
                 dataType         = "<4 x half>"
                 dataNumComp      = 4
             else:
-                sparseDataType   = "<8 x float>"
+                sparseDataType   = "{<4 x float>, i32}"
                 dataType         = "<4 x float>"
                 dataNumComp      = 4
 
@@ -1776,18 +1747,11 @@ class DimAwareImageLoadGen(CodeGen):
         assert self._dim != SpirvDim.DimBuffer
         assert self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.fetch
 
-        if self._returnFmaskId:
-            # Fetch fmask only
+        if self._isFmaskBased:
+            # Get sampleId from fmask value
             # FMask is only supported for read and fetch
-            fmaskVal    = self.genLoadFmaskDimAware(irOut)
-            retVal      = self.genReturnFmaskValue(fmaskVal, irOut)
-            return retVal
-        else:
-            if self._isFmaskBased:
-                # Get sampleId from fmask value
-                # FMask is only supported for read and fetch
-                fmaskVal        = self.genLoadFmaskDimAware(irOut)
-                self._sample    = self.genGetSampleIdFromFmaskValue(fmaskVal, irOut)
+            fmaskVal        = self.genLoadFmaskDimAware(irOut)
+            self._sample    = self.genGetSampleIdFromFmaskValue(fmaskVal, irOut)
 
         if self._dim == SpirvDim.DimCube:
             self._resource = VarNames.patchedResource
@@ -1814,7 +1778,7 @@ class DimAwareImageLoadGen(CodeGen):
 
         # For sparse intrinsic, extract return value and residency code
         if self._supportSparse:
-            retVal, residencyCode = self.genProcessSparseReturnVal(retVal, sparseRetType, retType, retCompType, retNumComp, irOut)
+            retVal, residencyCode = self.genProcessSparseReturnVal(retVal, sparseRetType, irOut)
             self.setResidencyCode(residencyCode)
 
         retVal = self.genCastReturnValToSampledType(retVal, irOut)
@@ -2259,7 +2223,7 @@ class DimAwareImageSampleGen(CodeGen):
 
             # For sparse intrinsic, extract return value and residency code
             if self._supportSparse:
-                retVals[i], residencyCode = self.genProcessSparseReturnVal(retVals[i], sparseRetType, retType, retCompType, retNumComp, irOut)
+                retVals[i], residencyCode = self.genProcessSparseReturnVal(retVals[i], sparseRetType, irOut)
                 self.setResidencyCode(residencyCode)
 
             if self._gfxLevel < GFX9 and self._opKind == SpirvImageOpKind.gather:
@@ -2560,8 +2524,7 @@ def processLine(irOut, funcConfig, gfxLevel):
     # 12. sample                                            (optional)
     # 13. minlod                                            (optional)
     # 14. fmaskbased                                        (optional)
-    # 15. fmaskid                                           (optional)
-    # 16. lodnz                                             (optional)
+    # 15. lodnz                                             (optional)
     #         Apply to gather instructions, indicates lz version of instruction should not be used.
     #         returns index of fragment which is encoded in Fmask.
     # Dimension string: All supported dimensions are packed in a dimension string, as a configuration token.
@@ -2605,9 +2568,8 @@ def processLine(irOut, funcConfig, gfxLevel):
                                                SpirvImageOpKind.write):
                 funcDef = FuncDef(mangledName, SpirvSampledType.f16)
                 funcDef.parse()
-                if not funcDef._returnFmaskId:
-                    codeGen = CodeGen(funcDef, gfxLevel)
-                    codeGen.gen(irOut)
+                codeGen = CodeGen(funcDef, gfxLevel)
+                codeGen.gen(irOut)
 
         if funcConfig.find('dref') == -1 and opKind != SpirvImageOpKind.querylod:
             # Support integer return type for non-shadowed image operations

@@ -36,13 +36,16 @@ namespace Llpc
 {
 
 // Prefix of all recorded calls.
-static const char* BuilderCallPrefix = "llpc.call.";
+static const char* const BuilderCallPrefix = "llpc.call.";
+
+// LLPC call metadata name.
+static const char* const BuilderCallMetadataName = "llpc_call_metadata";
 
 // =====================================================================================================================
 // Builder recorder, to record all Builder calls as intrinsics
-// Each call to a Builder method causes the insertion of a call to llpc.call.* with a sequence number, so the
-// Builder calls can be replayed in order later on.
-class BuilderRecorder : public Builder
+// Each call to a Builder method causes the insertion of a call to llpc.call.*, so the Builder calls can be replayed
+// later on.
+class BuilderRecorder final : public Builder
 {
 public:
     // llpc.call.* opcodes
@@ -51,8 +54,15 @@ public:
         // NOP
         Nop = 0,
 
+        // Descriptor
+        DescWaterfallLoop,
+        DescWaterfallStoreLoop,
+        DescLoadBuffer,
+        DescLoadSpillTablePtr,
+
         // Misc.
         MiscKill,
+        MiscReadClock,
     };
 
     // Given an opcode, get the call name (without the "llpc.call." prefix)
@@ -61,8 +71,30 @@ public:
     BuilderRecorder(llvm::LLVMContext& context, bool wantReplay) : Builder(context), m_wantReplay(wantReplay) {}
     ~BuilderRecorder() {}
 
+    //
+    // Builder methods implemented in BuilderImplDesc
+    //
+
+    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
+                                           llvm::ArrayRef<uint32_t> operandIdxs,
+                                           const llvm::Twine&       instName) override final;
+
+    llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
+                                      uint32_t            binding,
+                                      llvm::Value*        pBlockOffset,
+                                      bool                isNonUniform,
+                                      llvm::Type*         pPointeeTy,
+                                      const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
+                                         const llvm::Twine&  instName) override final;
+
+    //
     // Builder methods implemented in BuilderImplMisc
-    llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override;
+    //
+
+    llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override final;
+    llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
     llvm::ModulePass* CreateBuilderReplayer() override;
@@ -78,8 +110,8 @@ private:
                               const llvm::Twine&            instName);
 
     // -----------------------------------------------------------------------------------------------------------------
+
     bool      m_wantReplay;     // true to make CreateBuilderReplayer return a replayer pass
-    uint32_t  m_seqNum = 0;     // Sequence number of next builder call
 };
 
 } // Llpc

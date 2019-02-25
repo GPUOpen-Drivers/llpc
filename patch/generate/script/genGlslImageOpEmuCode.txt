@@ -36,9 +36,7 @@
 # 12. sample                                            (optional)
 # 13. minlod                                            (optional)
 # 14. fmaskbased                                        (optional)
-# 15. fmaskid                                           (optional)
-#         returns index of fragment which is encoded in Fmask.
-# 16. lodnz                                             (optional)
+# 15. lodnz                                             (optional)
 #         Apply to gather instructions, indicates lz version of instruction should not be used.
 # Dimension string: All supported dimensions are packed in a dimension string, as a configuration token.
 # Dimension string format:
@@ -128,7 +126,6 @@ llpc.image|sparse.fetch.Dim1D|2D|3D|1DArray|2DArray.lod.offset
 llpc.image|sparse.fetch.DimRect.offset
 llpc.image|sparse.fetch.Dim2D|2DArray|SubpassData.sample
 llpc.image|sparse.fetch.Dim2D|2DArray.sample.fmaskbased
-llpc.image.fetch.Dim2D|2DArray.sample.fmaskid
 
 # Gather instructions
 llpc.image|sparse.gather.Dim2D|2DArray|Cube|CubeArray|Rect
