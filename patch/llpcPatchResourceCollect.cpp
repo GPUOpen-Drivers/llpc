@@ -182,7 +182,8 @@ void PatchResourceCollect::visitCallInst(
 
     auto mangledName = pCallee->getName();
 
-    if (mangledName.startswith(LlpcName::PushConstLoad))
+    if (mangledName.startswith(LlpcName::PushConstLoad) ||
+        mangledName.startswith(LlpcName::DescriptorLoadSpillTable))
     {
         // Push constant operations
         if (isDeadCall)
@@ -194,16 +195,6 @@ void PatchResourceCollect::visitCallInst(
             m_hasPushConstOp = true;
         }
     }
-    else if (mangledName.startswith(LlpcName::BufferLoadDesc) ||
-            mangledName.startswith(LlpcName::BufferStoreDesc) ||
-            mangledName.startswith(LlpcName::BufferAtomicDesc))
-    {
-        if (isDeadCall &&
-            (mangledName.startswith(LlpcName::BufferLoadDesc) == true))
-        {
-            m_deadCalls.insert(&callInst);
-        }
-    }
     else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer))
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
@@ -211,21 +202,11 @@ void PatchResourceCollect::visitCallInst(
         DescriptorPair descPair = { descSet, binding };
         m_pResUsage->descPairs.insert(descPair.u64All);
     }
-    else if (mangledName.startswith(LlpcName::BufferCallPrefix))
+    else if (mangledName.startswith(LlpcName::BufferLoad))
     {
-        // Buffer operations
-        if (isDeadCall &&
-            (mangledName.startswith(LlpcName::BufferAtomic) == false) &&
-            (mangledName.startswith(LlpcName::BufferStore) == false))
+        if (isDeadCall)
         {
             m_deadCalls.insert(&callInst);
-        }
-        else
-        {
-            uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-            uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-            DescriptorPair descPair = { descSet, binding };
-            m_pResUsage->descPairs.insert(descPair.u64All);
         }
     }
     else if (mangledName.startswith(LlpcName::ImageCallPrefix))

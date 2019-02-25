@@ -86,11 +86,14 @@ bool PatchNullFragShader::runOnModule(
     Patch::Init(&module);
 
     const bool hasCs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageCompute)) != 0);
+    const bool hasVs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
+    const bool hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
+    const bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
     const bool hasFs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageFragment)) != 0);
-    if (m_pContext->NeedAutoLayoutDesc() || hasCs || hasFs)
+    if (hasCs || hasFs || ((hasVs == false) && (hasTes == false) && (hasGs == false)))
     {
-        // This is a non-pipeline compile, or a compute pipeline, or a graphics pipeline that already has a
-        // fragment shader. A null fragment shader is not required.
+        // This is an incomplete graphics pipeline from the amdllpc command-line tool, or a compute pipeline, or a
+        // graphics pipeline that already has a fragment shader. A null fragment shader is not required.
         return false;
     }
 

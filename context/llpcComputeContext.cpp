@@ -91,15 +91,6 @@ const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
 }
 
 // =====================================================================================================================
-// Gets dummy resource mapping nodes of the specified shader stage.
-std::vector<ResourceMappingNode>* ComputeContext::GetDummyResourceMapNodes(
-  ShaderStage shaderStage)  // Shader stage
-{
-    LLPC_ASSERT(shaderStage == ShaderStageCompute);
-    return &m_dummyResMapNodes;
-}
-
-// =====================================================================================================================
 // Gets the hash code of input shader with specified shader stage.
 uint64_t ComputeContext::GetShaderHashCode(
     ShaderStage stage       // Shader stage

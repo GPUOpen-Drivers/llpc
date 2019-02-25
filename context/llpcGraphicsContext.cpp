@@ -250,15 +250,6 @@ ShaderStage GraphicsContext::GetNextShaderStage(
 }
 
 // =====================================================================================================================
-// Gets dummy resource mapping nodes of the specified shader stage.
-std::vector<ResourceMappingNode>* GraphicsContext::GetDummyResourceMapNodes(
-  ShaderStage shaderStage)  // Shader stage
-{
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
-    return &m_dummyResMapNodes[shaderStage];
-}
-
-// =====================================================================================================================
 // Initializes shader info for null fragment shader.
 void GraphicsContext::InitShaderInfoForNullFs()
 {
@@ -518,7 +509,8 @@ bool GraphicsContext::CheckGsOnChipValidity()
             uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift);
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
-            uint32_t gsPrimsPerSubgroup = std::min(m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup, m_pGpuProperty->waveSize);
+            uint32_t gsPrimsPerSubgroup = std::min(m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup,
+                                                   GetShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
             const uint32_t esGsRingItemSize = (4 * std::max(1u, pEsResUsage->inOutUsage.outputMapLocCount)) | 1;
@@ -722,7 +714,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
     if (gsOnChip || (m_gfxIp.major >= 9))
     {
         {
-            LLPC_OUTS("GS is on-chip\n");
+            LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
         }
     }
     else

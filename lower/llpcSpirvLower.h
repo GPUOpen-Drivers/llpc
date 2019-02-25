@@ -132,6 +132,7 @@ protected:
     Context*        m_pContext;     // Associated LLPC context of the LLVM module that passes run on
     ShaderStage     m_shaderStage;  // Shader stage
     llvm::Function* m_pEntryPoint;  // Entry point of input module
+    Builder*        m_pBuilder;     // LLPC builder object
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(SpirvLower);

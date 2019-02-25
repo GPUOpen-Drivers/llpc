@@ -200,6 +200,7 @@ endif()
 target_sources(llpc PRIVATE
     builder/llpcBuilder.cpp
     builder/llpcBuilderImpl.cpp
+    builder/llpcBuilderImplDesc.cpp
     builder/llpcBuilderImplMisc.cpp
     builder/llpcBuilderRecorder.cpp
     builder/llpcBuilderReplayer.cpp
@@ -244,7 +245,6 @@ target_sources(llpc PRIVATE
     patch/llpcCodeGenManager.cpp
     patch/llpcFragColorExport.cpp
     patch/llpcPatch.cpp
-    patch/llpcPatchAutoLayoutDesc.cpp
     patch/llpcPatchBufferOp.cpp
     patch/llpcPatchCopyShader.cpp
     patch/llpcPatchDescriptorLoad.cpp
@@ -466,7 +466,10 @@ if(UNIX)
 endif()
 
 ### Create Standalone Compiler ############################################################################################
-add_executable(amdllpc tool/amdllpc.cpp)
+add_executable(amdllpc
+    tool/amdllpc.cpp
+    tool/llpcAutoLayout.cpp
+)
 add_dependencies(amdllpc llpc)
 
 target_compile_definitions(amdllpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
@@ -484,6 +487,7 @@ PRIVATE
     ${PROJECT_SOURCE_DIR}/patch/gfx6/chip
     ${PROJECT_SOURCE_DIR}/patch/gfx9/chip
     ${PROJECT_SOURCE_DIR}/patch/generate
+    ${PROJECT_SOURCE_DIR}/translator/include
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/Mangler
@@ -512,6 +516,7 @@ if(UNIX)
             -fcolor-diagnostics
             -Wall
             -Werror
+            -Wno-missing-braces
         )
         target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -std=c++11

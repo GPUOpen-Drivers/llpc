@@ -86,6 +86,9 @@ bool PatchDescriptorLoad::runOnModule(
     Patch::Init(&module);
     m_changed = false;
 
+    // TODO: Temporary code to patch up calls to llvm.amdgcn.waterfall.last.use.i32.
+    PatchWaterfallLastUseCalls();
+
     // Invoke handling of "call" instruction
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
@@ -147,7 +150,8 @@ void PatchDescriptorLoad::visitCallInst(
 
     m_changed = true;
     Type* pDescPtrTy = nullptr;
-    ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
+    ResourceMappingNodeType nodeType1 = ResourceMappingNodeType::Unknown;
+    ResourceMappingNodeType nodeType2 = ResourceMappingNodeType::Unknown;
 
     bool loadSpillTable = false;
     bool isNonUniform = false;
@@ -158,36 +162,37 @@ void PatchDescriptorLoad::visitCallInst(
     if (mangledName == LlpcName::DescriptorLoadResource)
     {
         pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
-        nodeType = ResourceMappingNodeType::DescriptorResource;
+        nodeType1 = ResourceMappingNodeType::DescriptorResource;
+        nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadSampler)
     {
         pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
-        nodeType = ResourceMappingNodeType::DescriptorSampler;
+        nodeType1 = ResourceMappingNodeType::DescriptorSampler;
+        nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadFmask)
     {
         pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
-        nodeType = ResourceMappingNodeType::DescriptorFmask;
+        nodeType1 = ResourceMappingNodeType::DescriptorFmask;
+        nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadBuffer)
     {
         pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
-        nodeType = ResourceMappingNodeType::DescriptorBuffer;
-    }
-    else if (mangledName == LlpcName::DescriptorLoadInlineBuffer)
-    {
-        pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
-        nodeType = ResourceMappingNodeType::PushConst;
+        nodeType1 = ResourceMappingNodeType::DescriptorBuffer;
+        nodeType2 = ResourceMappingNodeType::PushConst;
     }
     else if (mangledName == LlpcName::DescriptorLoadAddress)
     {
-        nodeType = ResourceMappingNodeType::PushConst;
+        nodeType1 = ResourceMappingNodeType::PushConst;
+        nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadTexelBuffer)
     {
         pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
-        nodeType = ResourceMappingNodeType::DescriptorTexelBuffer;
+        nodeType1 = ResourceMappingNodeType::DescriptorTexelBuffer;
+        nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadSpillTable)
     {
@@ -200,14 +205,19 @@ void PatchDescriptorLoad::visitCallInst(
 
     if (loadSpillTable)
     {
-        auto pSpilledPushConstTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
-        callInst.replaceAllUsesWith(pSpilledPushConstTablePtr);
+        // Do not do this if the llpc.descriptor.load.spilltable is unused, as no spill table pointer has
+        // been set up in PatchEntryPointMutate. That happens if PatchPushConst has unspilled all push constants.
+        if (callInst.use_empty() == false)
+        {
+            auto pSpilledPushConstTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
+            callInst.replaceAllUsesWith(pSpilledPushConstTablePtr);
+        }
         m_descLoadCalls.push_back(&callInst);
         m_descLoadFuncs.insert(pCallee);
     }
     else
     {
-        LLPC_ASSERT(nodeType != ResourceMappingNodeType::Unknown);
+        LLPC_ASSERT(nodeType1 != ResourceMappingNodeType::Unknown);
 
         // Calculate descriptor offset (in bytes)
         auto pDescSet = cast<ConstantInt>(callInst.getOperand(0));
@@ -215,17 +225,17 @@ void PatchDescriptorLoad::visitCallInst(
         auto pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
 
         // Check non-uniform flag
-        if (nodeType == ResourceMappingNodeType::DescriptorBuffer)
+        if (nodeType1 == ResourceMappingNodeType::DescriptorBuffer)
         {
             auto pIsNonUniform = cast<ConstantInt>(callInst.getOperand(3));
             isNonUniform = pIsNonUniform->getZExtValue() ? true : false;
         }
-        else if (nodeType != ResourceMappingNodeType::PushConst)
+        else if (nodeType1 != ResourceMappingNodeType::PushConst)
         {
             auto pImageCallMeta = cast<ConstantInt>(callInst.getOperand(3));
             ShaderImageCallMetadata imageCallMeta = {};
             imageCallMeta.U32All = static_cast<uint32_t>(pImageCallMeta->getZExtValue());
-            isNonUniform = (nodeType == ResourceMappingNodeType::DescriptorSampler) ?
+            isNonUniform = (nodeType1 == ResourceMappingNodeType::DescriptorSampler) ?
                            imageCallMeta.NonUniformSampler :
                            imageCallMeta.NonUniformResource;
             isWriteOnly = imageCallMeta.WriteOnly;
@@ -237,7 +247,9 @@ void PatchDescriptorLoad::visitCallInst(
             const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
             // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-            if ((gfxIp.major > 6) && (isNonUniform == false))
+            // Do not do this for a buffer descriptor, as it is done in BuilderImplDescriptor.
+            if ((gfxIp.major > 6) && (isNonUniform == false) &&
+                (nodeType1 != ResourceMappingNodeType::DescriptorBuffer))
             {
                 std::vector<Value*> args;
                 args.push_back(pArrayOffset);
@@ -254,12 +266,12 @@ void PatchDescriptorLoad::visitCallInst(
         uint32_t descSize   = 0;
         uint32_t dynDescIdx = InvalidValue;
         Value*   pDesc = nullptr;
-        auto  pDescRangeValue = GetDescriptorRangeValue(nodeType, pDescSet->getZExtValue(), pBinding->getZExtValue());
+        auto  pDescRangeValue = GetDescriptorRangeValue(nodeType1, pDescSet->getZExtValue(), pBinding->getZExtValue());
 
         if (pDescRangeValue != nullptr)
         {
             // Descriptor range value (immutable sampler in Vulkan)
-            LLPC_ASSERT(nodeType == ResourceMappingNodeType::DescriptorSampler);
+            LLPC_ASSERT(nodeType1 == ResourceMappingNodeType::DescriptorSampler);
 
             uint32_t descSizeInDword = pDescPtrTy->getPointerElementType()->getVectorNumElements();
 
@@ -333,12 +345,18 @@ void PatchDescriptorLoad::visitCallInst(
 
         if (pDesc == nullptr)
         {
-            CalcDescriptorOffsetAndSize(nodeType,
-                                        pDescSet->getZExtValue(),
-                                        pBinding->getZExtValue(),
-                                        &descOffset,
-                                        &descSize,
-                                        &dynDescIdx);
+            auto foundNodeType = CalcDescriptorOffsetAndSize(nodeType1,
+                                                             nodeType2,
+                                                             pDescSet->getZExtValue(),
+                                                             pBinding->getZExtValue(),
+                                                             &descOffset,
+                                                             &descSize,
+                                                             &dynDescIdx);
+            if (foundNodeType == ResourceMappingNodeType::PushConst)
+            {
+                // Handle the case of an inline const node when we were expecting a buffer descriptor.
+                nodeType1 = foundNodeType;
+            }
 
             uint32_t descSizeInDword = descSize / sizeof(uint32_t);
             if (dynDescIdx != InvalidValue)
@@ -446,7 +464,7 @@ void PatchDescriptorLoad::visitCallInst(
                     LLPC_NEVER_CALLED();
                 }
             }
-            else if (nodeType == ResourceMappingNodeType::PushConst)
+            else if (nodeType1 == ResourceMappingNodeType::PushConst)
             {
                 auto pDescTablePtr =
                     m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(pDescSet->getZExtValue());
@@ -562,7 +580,7 @@ void PatchDescriptorLoad::visitCallInst(
                 {
                     pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
                 }
-                else if ((cl::EnableShadowDescriptorTable) && (nodeType == ResourceMappingNodeType::DescriptorFmask))
+                else if ((cl::EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
                 {
                     pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetShadowDescTablePtr(descSet);
                 }
@@ -582,49 +600,6 @@ void PatchDescriptorLoad::visitCallInst(
 
         if (pDesc != nullptr)
         {
-            // Add "llvm.amdgcn.waterfall.last.use." for write-only non-uniform operations
-            if (isNonUniform)
-            {
-                // Set flag writeOnly if the non-uniform descriptor is used by instruction which don't have
-                // return type (only for buffer store operations).
-                if (checkWriteOp)
-                {
-                    for (auto pUser : callInst.users())
-                    {
-                        auto pInst = dyn_cast<CallInst>(pUser);
-                        if ((pInst != nullptr) && pInst->getType()->isVoidTy())
-                        {
-                            isWriteOnly = true;
-                        }
-                    }
-                }
-
-                if (isWriteOnly)
-                {
-                    // Insert waterfall.last.use
-                    auto pNonUniformIndex = cast<CallInst>(callInst.getOperand(2));
-                    // For non-uniform descriptor, the resource/block index must be the result of
-                    // waterfall.readfirstlane
-                    LLPC_ASSERT(pNonUniformIndex->getCalledFunction()->getName()
-                        .startswith("llvm.amdgcn.waterfall.readfirstlane."));
-
-                    auto pWaterfallBegin = pNonUniformIndex->getOperand(0);
-
-                    // NOTE: waterfall.begin is only used by waterfall.readfirstlane for write only operations.
-                    // We need insert waterfall.last.use after loading descriptor.
-                    LLPC_ASSERT(pWaterfallBegin->getNumUses() == 1);
-
-                    std::string waterfallLastUse = "llvm.amdgcn.waterfall.last.use.";
-                    waterfallLastUse += GetTypeNameForScalarOrVector(pDesc->getType());
-                    pDesc = EmitCall(m_pModule,
-                                     waterfallLastUse,
-                                     pDesc->getType(),
-                                     { pWaterfallBegin, pDesc },
-                                     NoAttrib,
-                                     &callInst);
-                }
-            }
-
             callInst.replaceAllUsesWith(pDesc);
             m_descLoadCalls.push_back(&callInst);
             m_descLoadFuncs.insert(pCallee);
@@ -658,17 +633,21 @@ const DescriptorRangeValue* PatchDescriptorLoad::GetDescriptorRangeValue(
 }
 // =====================================================================================================================
 // Calculates the offset and size for the specified descriptor.
-void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
-    ResourceMappingNodeType   nodeType,   // Type of the resource mapping node
-    uint32_t                  descSet,    // ID of descriptor set
-    uint32_t                  binding,    // ID of descriptor binding
-    uint32_t*                 pOffset,    // [out] Calculated offset of the descriptor
-    uint32_t*                 pSize,      // [out] Calculated size of the descriptor
-    uint32_t*                 pDynDescIdx // [out] Calculated index of dynamic descriptor
+//
+// Returns the type actually found, or ResourceMappingNodeType::Unknown if not found.
+ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
+    ResourceMappingNodeType   nodeType1,      // The first resource node type for calculation
+    ResourceMappingNodeType   nodeType2,      // The second resource node type for calculation (alternative)
+    uint32_t                  descSet,        // ID of descriptor set
+    uint32_t                  binding,        // ID of descriptor binding
+    uint32_t*                 pOffset,        // [out] Calculated offset of the descriptor
+    uint32_t*                 pSize,          // [out] Calculated size of the descriptor
+    uint32_t*                 pDynDescIdx     // [out] Calculated index of dynamic descriptor
     ) const
 {
     auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
     bool exist = false;
+    ResourceMappingNodeType foundNodeType = ResourceMappingNodeType::Unknown;
 
     *pDynDescIdx = InvalidValue;
     *pOffset = 0;
@@ -684,12 +663,12 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
         exist = true;
     }
 
-    if (cl::EnableShadowDescriptorTable && (nodeType == ResourceMappingNodeType::DescriptorFmask))
+    if (cl::EnableShadowDescriptorTable && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
     {
         // NOTE: When shadow descriptor table is enable, we need get F-Mask descriptor node from
-        // associated multi-sampled texture resource node. So we have to change the nodeType to
+        // associated multi-sampled texture resource node. So we have to change nodeType1 to
         // DescriptorResource during the search.
-        nodeType = ResourceMappingNodeType::DescriptorResource;
+        nodeType1 = ResourceMappingNodeType::DescriptorResource;
     }
 
     for (uint32_t i = 0; (i < pShaderInfo->userDataNodeCount) && (exist == false); ++i)
@@ -704,8 +683,9 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
         {
             if ((descSet == pSetNode->srdRange.set) &&
                 (binding == pSetNode->srdRange.binding) &&
-                ((nodeType == pSetNode->type) ||
-                 ((nodeType == ResourceMappingNodeType::DescriptorBuffer) &&
+                ((nodeType1 == pSetNode->type) ||
+                 (nodeType2 == pSetNode->type) ||
+                 ((nodeType1 == ResourceMappingNodeType::DescriptorBuffer) &&
                  (pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact))))
             {
                 *pOffset = pSetNode->offsetInDwords;
@@ -731,6 +711,7 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
 
                 *pDynDescIdx = dynDescIdx;
                 exist = true;
+                foundNodeType = pSetNode->type;
             }
             ++dynDescIdx;
         }
@@ -750,9 +731,11 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                     {
                         if ((pNode->srdRange.set == descSet) &&
                             (pNode->srdRange.binding == binding) &&
-                            (nodeType == pNode->type))
+                            ((nodeType1 == pNode->type) ||
+                             (nodeType2 == pNode->type)))
                         {
                             exist = true;
+                            foundNodeType = pNode->type;
 
                             if (pNode->type == ResourceMappingNodeType::DescriptorResource)
                             {
@@ -791,19 +774,20 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                         // bound in this way.
                         if ((pNode->srdRange.set == descSet) &&
                             (pNode->srdRange.binding == binding) &&
-                            ((nodeType == ResourceMappingNodeType::DescriptorResource) ||
-                            (nodeType == ResourceMappingNodeType::DescriptorSampler)))
+                            ((nodeType1 == ResourceMappingNodeType::DescriptorResource) ||
+                            (nodeType1 == ResourceMappingNodeType::DescriptorSampler)))
                         {
                             exist = true;
+                            foundNodeType = pNode->type;
 
-                            if (nodeType == ResourceMappingNodeType::DescriptorResource)
+                            if (nodeType1 == ResourceMappingNodeType::DescriptorResource)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize   = DescriptorSizeResource + DescriptorSizeSampler;
                             }
                             else
                             {
-                                LLPC_ASSERT(nodeType == ResourceMappingNodeType::DescriptorSampler);
+                                LLPC_ASSERT(nodeType1 == ResourceMappingNodeType::DescriptorSampler);
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t) + DescriptorSizeResource;
                                 *pSize   = DescriptorSizeResource + DescriptorSizeSampler;
                             }
@@ -824,6 +808,50 @@ void PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
     // TODO: We haven't removed the dead code, so we might load inactive descriptors sometimes.
     // Currently, disable this assert.
     //LLPC_ASSERT(exist);
+
+    return foundNodeType;
+}
+
+// =====================================================================================================================
+// Patch up calls to llvm.amdgcn.waterfall.last.use.i32.
+// Where Builder::CreateWaterfallLoop() was applied to a buffer or image operation that has its descriptor load
+// combined in, the call to llvm.amdgcn.waterfall.last.use is applied to the non-uniform index for the descriptor load.
+// That is wrong, and it needs to be changed to apply to the descriptor.
+//
+// TODO: This is temporary code, and it will be removed once both buffer ops and image ops have had descriptor
+// loads separated out.
+void PatchDescriptorLoad::PatchWaterfallLastUseCalls()
+{
+    auto pWaterfallLastUseI32 = Intrinsic::getDeclaration(m_pModule,
+                                                Intrinsic::amdgcn_waterfall_last_use,
+                                                m_pContext->Int32Ty());
+    while (pWaterfallLastUseI32->use_empty() == false)
+    {
+        // We have a call to llvm.amdgcn.waterfall.last.use.i32.
+        auto pCall = cast<CallInst>(pWaterfallLastUseI32->use_begin()->getUser());
+        // There should be a single use in a descriptor load.
+        LLPC_ASSERT(pCall->hasOneUse());
+
+        auto pDescLoadCall = cast<CallInst>(pCall->use_begin()->getUser());
+        LLPC_ASSERT(pDescLoadCall->getCalledFunction()->getName().startswith(LlpcName::DescriptorCallPrefix));
+        LLPC_ASSERT(pDescLoadCall->hasOneUse());
+        Use& descLoadCallUse = *pDescLoadCall->use_begin();
+
+        // Insert a new llvm.amdgcn.waterfall.last.use after the descriptor load.
+        auto pNewWaterfallLastUseCall = Intrinsic::getDeclaration(m_pModule,
+                                                                  Intrinsic::amdgcn_waterfall_last_use,
+                                                                  pDescLoadCall->getType());
+        auto pNewCall = CallInst::Create(pNewWaterfallLastUseCall,
+                                         { pCall->getArgOperand(0), pDescLoadCall },
+                                         "",
+                                         pDescLoadCall->getNextNode());
+        pNewCall->takeName(pCall);
+        descLoadCallUse = pNewCall;
+
+        // Remove the old waterfall call.
+        pCall->replaceAllUsesWith(pCall->getArgOperand(1));
+        pCall->eraseFromParent();
+    }
 }
 
 } // Llpc

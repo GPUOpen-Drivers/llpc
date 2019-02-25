@@ -201,11 +201,6 @@ public:
         return m_pEmptyMetaNode;
     }
 
-    void AutoLayoutDescriptor(ShaderStage shaderStage)
-    {
-        return m_pPipelineContext->AutoLayoutDescriptor(shaderStage);
-    }
-
     bool IsTessOffChip() const
     {
         return m_pPipelineContext->IsTessOffChip();
@@ -259,12 +254,6 @@ public:
     EmuLib* GetGlslEmuLib()
     {
         return &m_glslEmuLib;
-    }
-
-    // Gets whether auto layout of descriptors is required (caller is amdllpc not with a whole pipeline).
-    bool NeedAutoLayoutDesc() const
-    {
-        return GetPipelineContext()->GetPipelineOptions()->autoLayoutDesc;
     }
 
 private:

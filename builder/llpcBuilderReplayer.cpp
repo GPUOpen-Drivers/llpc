@@ -43,7 +43,7 @@ namespace
 
 // =====================================================================================================================
 // Pass to replay Builder calls recorded by BuilderRecorder
-class BuilderReplayer : public ModulePass
+class BuilderReplayer final : public ModulePass
 {
 public:
     BuilderReplayer() : ModulePass(ID) {}
@@ -57,20 +57,11 @@ public:
     bool runOnModule(Module& module) override;
 
     // -----------------------------------------------------------------------------------------------------------------
+
     static char ID;
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderReplayer);
-
-    // Represents a Builder call.
-    struct BuilderCall
-    {
-        uint32_t  seqNum;   // Sequence number of this llpc.call.* call.
-        CallInst* pCall;    // The call instruction
-
-        // Comparison, used for sorting into sequence number order.
-        bool operator<(const BuilderCall& other) const { return seqNum < other.seqNum; }
-    };
 
     // The LLPC builder that the builder calls are being replayed on.
     std::unique_ptr<Builder> m_pBuilder;
@@ -95,62 +86,167 @@ bool BuilderReplayer::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Running the pass of replaying LLPC builder calls\n");
 
-    // Gather the builder calls that were recorded.
-    std::vector<BuilderCall> builderCalls;
-    for (auto &func : module)
+    bool changed = false;
+
+    SmallVector<Function*, 8> funcsToRemove;
+
+    for (auto& func : module)
     {
-        StringRef name = func.getName();
-        if ((func.empty() != false) && name.startswith(BuilderCallPrefix))
+        // Skip non-declarations that are definitely not LLPC intrinsics.
+        if (func.isDeclaration() == false)
         {
-            // This is an llpc.call.* declaration. Add the calls that use it to the builderCalls vector.
-            for (auto pUser : func.users())
+            continue;
+        }
+
+        const MDNode* const pFuncMeta = func.getMetadata(BuilderCallMetadataName);
+
+        // Skip builder calls that do not have the correct metadata to identify the opcode.
+        if (pFuncMeta == nullptr)
+        {
+            // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
+            LLPC_ASSERT(func.getName().startswith(BuilderCallPrefix) == false);
+            continue;
+        }
+
+        const ConstantAsMetadata* const pMetaConst = dyn_cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
+        LLPC_ASSERT(pMetaConst != nullptr);
+
+        const ConstantInt* const pConst = dyn_cast<ConstantInt>(pMetaConst->getValue());
+        LLPC_ASSERT(pConst != nullptr);
+
+        // If we got here we are definitely changing the module.
+        changed = true;
+
+        SmallVector<CallInst*, 8> callsToRemove;
+
+        for (User* const pUser : func.users())
+        {
+            CallInst* const pCall = dyn_cast<CallInst>(pUser);
+
+            // Skip users that are not calls.
+            if (pCall == nullptr)
             {
-                auto pCall = cast<CallInst>(pUser);
-                uint32_t seqNum = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
-                builderCalls.push_back(BuilderCall({ seqNum, pCall }));
+                continue;
             }
+
+            m_pBuilder->SetInsertPoint(pCall);
+
+            Value* pNewValue = nullptr;
+
+            switch (BuilderRecorder::Opcode(pConst->getZExtValue()))
+            {
+            // NOP
+            case BuilderRecorder::Opcode::Nop:
+            default:
+                {
+                    LLPC_NEVER_CALLED();
+                    continue;
+                }
+
+            // Replayer implementations of BuilderImplDesc methods
+            case BuilderRecorder::Opcode::DescWaterfallLoop:
+                {
+                    SmallVector<uint32_t, 2> operandIdxs;
+                    for (Value* pOperand : pCall->arg_operands())
+                    {
+                        if (auto pConstOperand = dyn_cast<ConstantInt>(pOperand))
+                        {
+                            operandIdxs.push_back(pConstOperand->getZExtValue());
+                        }
+                    }
+                    pNewValue = m_pBuilder->CreateWaterfallLoop(cast<Instruction>(pCall->getArgOperand(0)),
+                                                                operandIdxs);
+                    break;
+                }
+
+            case BuilderRecorder::Opcode::DescWaterfallStoreLoop:
+                {
+                    SmallVector<uint32_t, 2> operandIdxs;
+                    for (Value* pOperand : pCall->arg_operands())
+                    {
+                        if (auto pConstOperand = dyn_cast<ConstantInt>(pOperand))
+                        {
+                            operandIdxs.push_back(pConstOperand->getZExtValue());
+                        }
+                    }
+
+                    // This is the special case that we want to waterfall a store op with no result.
+                    // The llpc.call.waterfall.store.loop intercepts (one of) the non-uniform descriptor
+                    // input(s) to the store. Use that interception to find the store, and remove the
+                    // interception.
+                    Use& useInNonUniformInst = *pCall->use_begin();
+                    auto pNonUniformInst = cast<Instruction>(useInNonUniformInst.getUser());
+                    useInNonUniformInst = pCall->getArgOperand(0);
+                    auto pWaterfallLoop = m_pBuilder->CreateWaterfallLoop(pNonUniformInst, operandIdxs);
+                    // Avoid using the replaceAllUsesWith after the end of this switch.
+                    pWaterfallLoop->takeName(pCall);
+                    callsToRemove.push_back(pCall);
+                    continue;
+                }
+
+            case BuilderRecorder::Opcode::DescLoadBuffer:
+                {
+                    pNewValue = m_pBuilder->CreateLoadBufferDesc(
+                          cast<ConstantInt>(pCall->getArgOperand(0))->getZExtValue(),  // descSet
+                          cast<ConstantInt>(pCall->getArgOperand(1))->getZExtValue(),  // binding
+                          pCall->getArgOperand(2),                                     // pBlockOffset
+                          cast<ConstantInt>(pCall->getArgOperand(3))->getZExtValue(),  // isNonUniform
+                          isa<PointerType>(pCall->getType()) ?
+                              pCall->getType()->getPointerElementType() :
+                              nullptr);                                                // pPointeeTy
+                    break;
+                }
+
+            case BuilderRecorder::Opcode::DescLoadSpillTablePtr:
+                {
+                    pNewValue = m_pBuilder->CreateLoadSpillTablePtr(
+                          pCall->getType()->getPointerElementType());                  // pSpillTableTy
+                    break;
+                }
+
+            // Replayer implementations of BuilderImplMisc methods
+            case BuilderRecorder::Opcode::MiscKill:
+                {
+                    pNewValue = m_pBuilder->CreateKill();
+                    break;
+                }
+            case BuilderRecorder::Opcode::MiscReadClock:
+                {
+                    LLPC_ASSERT(isa<ConstantInt>(pCall->getArgOperand(0)));
+                    bool realtime = (cast<ConstantInt>(pCall->getArgOperand(0))->getZExtValue() != 0);
+                    pNewValue = m_pBuilder->CreateReadClock(realtime);
+                    break;
+                }
+
+            }
+
+            if (auto pNewInst = dyn_cast<Instruction>(pNewValue))
+            {
+                pNewInst->takeName(pCall);
+            }
+            pCall->replaceAllUsesWith(pNewValue);
+            callsToRemove.push_back(pCall);
         }
-    }
 
-    // Sort into seqNum order.
-    std::sort(builderCalls.begin(), builderCalls.end());
-
-    // Action each one by calling a method on m_pBuilder to create the IR.
-    for (const auto& builderCall : builderCalls)
-    {
-        CallInst* pCall = builderCall.pCall;
-        StringRef callName = pCall->getCalledFunction()->getName();
-        auto opcode = BuilderRecorder::Opcode(cast<ConstantInt>(pCall->getOperand(0))->getZExtValue());
-        LLPC_ASSERT(callName.startswith(BuilderCallPrefix));
-        LLPC_ASSERT(callName.substr(strlen(BuilderCallPrefix)).startswith(BuilderRecorder::GetCallName(opcode)));
-
-        StringRef name = builderCall.pCall->getName();
-        Value* pNewValue = nullptr;
-        m_pBuilder->SetInsertPoint(builderCall.pCall);
-
-        switch (opcode)
+        for (CallInst* const pCall : callsToRemove)
         {
-        case BuilderRecorder::Opcode::Nop:
-            LLPC_NEVER_CALLED();
-            break;
-        case BuilderRecorder::Opcode::MiscKill:
-            pNewValue = m_pBuilder->CreateKill(name);
-            break;
-        default:
-            LLPC_NEVER_CALLED();
-            break;
+            pCall->eraseFromParent();
         }
 
-        // Replace the original one and erase it.
-        LLVM_DEBUG(dbgs() << "BuilderReplayer replacing " << builderCall.pCall
-                          << "\n   with " << *pNewValue << "\n");
-        builderCall.pCall->replaceAllUsesWith(pNewValue);
-        builderCall.pCall->eraseFromParent();
+        if (func.user_empty())
+        {
+            funcsToRemove.push_back(&func);
+        }
     }
-    return true;
+
+    for (Function* const pFunc : funcsToRemove)
+    {
+        pFunc->eraseFromParent();
+    }
+
+    return changed;
 }
 
 // =====================================================================================================================
 // Initializes the pass
 INITIALIZE_PASS(BuilderReplayer, DEBUG_TYPE, "Replay LLPC builder calls", false, false)
-

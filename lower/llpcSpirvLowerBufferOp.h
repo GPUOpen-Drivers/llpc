@@ -79,13 +79,12 @@ private:
                                        llvm::Constant**                 ppResultMeta);
 
     llvm::Value* AddBufferLoadInst(llvm::Type*        pLoadTy,
-                                   uint32_t           descSet,
-                                   uint32_t           binding,
+                                   llvm::Value*       pDesc,
                                    bool               isPushConst,
+                                   bool               isNonUniform,
                                    bool               isScalarAligned,
                                    bool               isCoherent,
                                    bool               isVolatile,
-                                   llvm::Value*       pBlockOffset,
                                    llvm::Value*       pBlockMemberOffset,
                                    llvm::Constant*    pBlockMemberMeta,
                                    llvm::Instruction* pInsertPos);
@@ -99,12 +98,11 @@ private:
                                        llvm::Instruction* pInsertPos);
 
     void AddBufferStoreInst(llvm::Value*        pStoreValue,
-                            uint32_t            descSet,
-                            uint32_t            binding,
+                            llvm::Value*        pDesc,
+                            bool                isNonUniform,
                             bool                isScalarAligned,
                             bool                isCoherent,
                             bool                isVolatile,
-                            llvm::Value*        pBlockOffset,
                             llvm::Value*        pBlockMemberOffset,
                             llvm::Constant*     pBlockMemberMeta,
                             llvm::Instruction*  pInsertPos);
@@ -120,20 +118,11 @@ private:
     llvm::Value* AddBufferAtomicInst(std::string                      atomicOpName,
                                      llvm::Type*                      pDataTy,
                                      const std::vector<llvm::Value*>& data,
-                                     uint32_t                         descSet,
-                                     uint32_t                         binding,
-                                     llvm::Value*                     pBlockOffset,
+                                     llvm::Value*                     pDesc,
+                                     bool                             isUniform,
                                      llvm::Value*                     pBlockMemberOffset,
                                      llvm::Constant*                  pBlockMemberMeta,
                                      llvm::Instruction*               pInsertPos);
-
-    llvm::Value* AddBufferAtomicDescInst(std::string                      atomicOpName,
-                                         llvm::Type*                      pDataTy,
-                                         const std::vector<llvm::Value*>& data,
-                                         llvm::Value*                     pDesc,
-                                         llvm::Value*                     pBlockMemberOffset,
-                                         llvm::Constant*                  pBlockMemberMeta,
-                                         llvm::Instruction*               pInsertPos);
 
     llvm::Value* TransposeMatrix(llvm::Value* pMatrix, llvm::Instruction* pInsertPos);
 

@@ -32,6 +32,7 @@
 #include "llpcContext.h"
 
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/InlineAsm.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-misc"
 
@@ -41,18 +42,39 @@ using namespace llvm;
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 Instruction* BuilderImplMisc::CreateKill(
-    const Twine& name) // [in] Name to give instruction(s)
+    const Twine& instName) // [in] Name to give instruction(s)
 {
     // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
     // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
     // section of code containing the kill.
-    auto pFsResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
-    pFsResUsage->builtInUsage.fs.discard = true;
+    auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
+    pResUsage->builtInUsage.fs.discard = true;
 
-    return CreateIntrinsic(Intrinsic::amdgcn_kill,
-                           ArrayRef<Type *>(),
-                           Constant::getNullValue(Type::getInt1Ty(getContext())),
-                           nullptr,
-                           name);
+    return CreateIntrinsic(Intrinsic::amdgcn_kill, {}, getFalse(), nullptr, instName);
 }
 
+// =====================================================================================================================
+// Create a "readclock".
+Instruction* BuilderImplMisc::CreateReadClock(
+    bool         realtime,  // Whether to read real-time clock counter
+    const Twine& instName)  // [in] Name to give instruction(s)
+{
+    CallInst* pReadClock = nullptr;
+    if (realtime)
+    {
+        pReadClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
+    }
+    else
+    {
+        pReadClock = CreateIntrinsic(Intrinsic::amdgcn_s_memtime, {}, {}, nullptr, instName);
+    }
+    pReadClock->addAttribute(AttributeList::FunctionIndex, Attribute::ReadOnly);
+
+    // NOTE: The inline ASM is to prevent optimization of backend compiler.
+    InlineAsm* pAsmFunc =
+        InlineAsm::get(FunctionType::get(getInt64Ty(), { getInt64Ty() }, false), "; %1", "=r,0", true);
+
+    pReadClock = CreateCall(pAsmFunc, { pReadClock });
+
+    return pReadClock;
+}

@@ -268,14 +268,40 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
     {
         if (m_shaderStage == ShaderStageGeometry)
         {
-            // Geometry shader, using GS-VS ring for output.
-            auto pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS);
-            m_gsVsRingBufDescs[streamId] = pDesc;
+            const auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
+            // Geometry shader, using GS-VS ring for output.
+            auto pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS + streamId);
             auto pInsertPos = pDesc->getNextNode();
 
+            uint32_t outLocStart = 0;
+            for (int i = 0; i < streamId; ++i)
+                outLocStart += pResUsage->inOutUsage.gs.outLocCount[i];
+
+            // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(uint32_t)
+            // streamOffset = (streamSize[0] + ... + streamSize[streamId - 1]) * 64 * outputVertices
+            uint32_t baseAddr = outLocStart * pResUsage->builtInUsage.gs.outputVertices
+                * sizeof(uint32_t) * 4 * 64;
+
+            // Patch GS-VS ring buffer descriptor base address for GS output
+            Value* pGsVsOutRingBufDescElem0 = ExtractElementInst::Create(pDesc,
+                                                                         ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                                         "",
+                                                                         &*pInsertPos);
+
+            pGsVsOutRingBufDescElem0 = BinaryOperator::CreateAdd(pGsVsOutRingBufDescElem0,
+                                                                 ConstantInt::get(m_pContext->Int32Ty(), baseAddr),
+                                                                 "",
+                                                                 &*pInsertPos);
+
+            pDesc = InsertElementInst::Create(pDesc,
+                                            pGsVsOutRingBufDescElem0,
+                                            ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                            "",
+                                            &*pInsertPos);
+
             // Patch GS-VS ring buffer descriptor stride for GS output
-            Value* pGsVsRingBufDescElem1 = ExtractElementInst::Create(m_gsVsRingBufDescs[streamId],
+            Value* pGsVsRingBufDescElem1 = ExtractElementInst::Create(pDesc,
                                                                       ConstantInt::get(m_pContext->Int32Ty(), 1),
                                                                       "",
                                                                       pInsertPos);
@@ -291,9 +317,8 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
                                               pInsertPos);
 
             // Calculate and set stride in SRD dword1
-            const auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
             uint32_t gsVsStride = pResUsage->builtInUsage.gs.outputVertices *
-                                  pResUsage->inOutUsage.outputMapLocCount *
+                                  pResUsage->inOutUsage.gs.outLocCount[streamId] *
                                   sizeof(uint32_t) * 4;
 
             SqBufRsrcWord1 strideSetValue = {};
@@ -304,13 +329,13 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
                                              "",
                                              pInsertPos);
 
-            m_gsVsRingBufDescs[streamId] =
-                    InsertElementInst::Create(m_gsVsRingBufDescs[streamId],
-                                              pGsVsRingBufDescElem1,
-                                              ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                              "",
-                                              pInsertPos);
+            pDesc = InsertElementInst::Create(pDesc,
+                                            pGsVsRingBufDescElem1,
+                                            ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                            "",
+                                            pInsertPos);
 
+            m_gsVsRingBufDescs[streamId] = pDesc;
             if (m_pContext->GetGfxIpVersion().major >= 8)
             {
                 // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.

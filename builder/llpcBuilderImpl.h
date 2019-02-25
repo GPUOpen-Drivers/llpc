@@ -39,13 +39,13 @@ class Context;
 
 // =====================================================================================================================
 // Builder implementation base class
-class BuilderImplBase : virtual public Builder
+class BuilderImplBase : public Builder
 {
 public:
     BuilderImplBase(llvm::LLVMContext& context) : Builder(context) {}
 
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-    Llpc::Context &getContext() const;
+    Llpc::Context& getContext() const;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
@@ -53,14 +53,46 @@ private:
 };
 
 // =====================================================================================================================
-// Builder implementation subclass for misc. operations
-class BuilderImplMisc : public BuilderImplBase
+// Builder implementation subclass for descriptors
+class BuilderImplDesc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMisc(llvm::LLVMContext& context) : Builder(context), BuilderImplBase(context) {}
+    BuilderImplDesc(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+
+    // Create a waterfall loop containing the specified instruction.
+    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
+                                           llvm::ArrayRef<uint32_t> operandIdxs,
+                                           const llvm::Twine&       instName) override final;
+
+    // Create a load of a buffer descriptor.
+    llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
+                                      uint32_t            binding,
+                                      llvm::Value*        pBlockOffset,
+                                      bool                isNonUniform,
+                                      llvm::Type*         pPointeeTy,
+                                      const llvm::Twine&  instName) override final;
+
+    // Create a load of the spill table pointer.
+    llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
+                                         const llvm::Twine&  instName) override final;
+
+private:
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplDesc)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplDesc)
+};
+
+// =====================================================================================================================
+// Builder implementation subclass for misc. operations
+class BuilderImplMisc : virtual public BuilderImplBase
+{
+public:
+    BuilderImplMisc(llvm::LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create a "kill". Only allowed in a fragment shader.
-    llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override;
+    llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override final;
+
+    // Create a "readclock".
+    llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMisc)
@@ -69,10 +101,13 @@ private:
 
 // =====================================================================================================================
 // The Builder implementation, encompassing all the individual builder implementation subclasses
-class BuilderImpl : public BuilderImplMisc
+class BuilderImpl final : public BuilderImplDesc, BuilderImplMisc
 {
 public:
-    BuilderImpl(llvm::LLVMContext& context) : Builder(context), BuilderImplMisc(context) {}
+    BuilderImpl(llvm::LLVMContext& context) : BuilderImplBase(context),
+                                              BuilderImplDesc(context),
+                                              BuilderImplMisc(context)
+    {}
     ~BuilderImpl() {}
 
 private:

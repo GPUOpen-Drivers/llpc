@@ -475,6 +475,9 @@ public:
   SPIRVEntryPoint() : ExecModel(ExecutionModelKernel) {}
   SPIRVExecutionModelKind getExecModel()const { return ExecModel; }
   std::string getName() const { return Name; }
+  std::pair<const SPIRVWord *, size_t> getInOuts() const {
+    return { InOuts.data(), InOuts.size() };
+  }
   _SPIRV_DCL_ENCDEC
 protected:
   SPIRVExecutionModelKind ExecModel;

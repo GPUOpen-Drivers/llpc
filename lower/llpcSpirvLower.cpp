@@ -128,6 +128,15 @@ void SpirvLower::AddPasses(
     // Lower SPIR-V algebraic transforms, constant folding must be done before istruction combining pass.
     passMgr.add(CreateSpirvLowerAlgebraTransform(true, false));
 
+    // Lower SPIR-V dynamic index in access chain
+    if (cl::LowerDynIndex)
+    {
+        passMgr.add(CreateSpirvLowerDynIndex());
+    }
+
+    // Lower SPIR-V load/store operations on aggregate type
+    passMgr.add(CreateSpirvLowerAggregateLoadStore());
+
     // Remove reduant load/store operations and do minimal optimization
     // It is required by SpirvLowerImageOp.
     passMgr.add(createSROAPass());
@@ -150,15 +159,6 @@ void SpirvLower::AddPasses(
 
     // Lower SPIR-V image operations (sample, fetch, gather, read/write),
     passMgr.add(CreateSpirvLowerImageOp());
-
-    // Lower SPIR-V dynamic index in access chain
-    if (cl::LowerDynIndex)
-    {
-        passMgr.add(CreateSpirvLowerDynIndex());
-    }
-
-    // Lower SPIR-V load/store operations on aggregate type
-    passMgr.add(CreateSpirvLowerAggregateLoadStore());
 
     // Lower SPIR-V instruction metadata remove
     passMgr.add(CreateSpirvLowerInstMetaRemove());
@@ -197,6 +197,7 @@ void SpirvLower::Init(
         m_shaderStage = GetShaderStageFromModule(m_pModule);
         m_pEntryPoint = GetEntryPoint(m_pModule);
     }
+    m_pBuilder = m_pContext->GetBuilder();
 }
 
 } // Llpc

@@ -129,7 +129,7 @@ void PatchPushConstOp::visitCallInst(
         LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
         auto pPushConstNode = &pShaderInfo->pUserDataNodes[pushConstNodeIdx];
 
-        auto pMemberOffsetInBytes = callInst.getOperand(0);
+        auto pMemberOffsetInBytes = callInst.getArgOperand(1);
         if (isa<Constant>(pMemberOffsetInBytes) == false)
         {
             // NOTE: Push constant only supports uniform control flow, so we can use uniform offset safely.
@@ -141,7 +141,7 @@ void PatchPushConstOp::visitCallInst(
                                                  args,
                                                  NoAttrib,
                                                  &callInst);
-            callInst.setOperand(0, pMemberOffsetInBytes);
+            callInst.setArgOperand(1, pMemberOffsetInBytes);
         }
 
         if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)

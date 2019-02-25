@@ -88,9 +88,6 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
-protected:
-    virtual std::vector<ResourceMappingNode>* GetDummyResourceMapNodes(ShaderStage shaderStage);
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ComputeContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(ComputeContext);
@@ -99,8 +96,6 @@ private:
 
     ResourceUsage   m_resUsage;   // Resource usage of compute shader
     InterfaceData   m_intfData;   // Interface data of compute shader
-
-    std::vector<ResourceMappingNode>  m_dummyResMapNodes; // Dummy resource mapping nodes
 };
 
 } // Llpc

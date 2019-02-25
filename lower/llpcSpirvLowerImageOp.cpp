@@ -33,6 +33,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerImageOp.h"
 
@@ -302,6 +303,7 @@ void SpirvLowerImageOp::visitCallInst(
             std::unordered_set<Value*> checkedValuesResource;
             imageCallMeta.NonUniformResource = IsNonUniformValue(pResourceIndex, checkedValuesResource) ? 1 : 0;
             imageCallMeta.WriteOnly = callInst.getType()->isVoidTy();
+            auto fmaskMode = GetFmaskMode(imageCallMeta, mangledName);
 
             if (imageCallMeta.OpKind != ImageOpQueryNonLod)
             {
@@ -362,27 +364,33 @@ void SpirvLowerImageOp::visitCallInst(
                     if (dim == DimSubpassData)
                     {
                         LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+
+                        Value* pFragCoord = GetFragCoord(&callInst);
+                        m_pBuilder->SetInsertPoint(&callInst);
+
                         const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
                             m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
 
                         if (enableMultiView)
                         {
-                            auto pInt32Ty = m_pContext->Int32Ty();
-                            auto pBuiltInViewIndex = ConstantInt::get(pInt32Ty, BuiltInViewIndex);
-                            auto instName = std::string(LlpcName::InputImportBuiltIn) + "ViewIndex";
-                            AddTypeMangling(pInt32Ty, pBuiltInViewIndex, instName);
-                            auto pModule = pCallee->getParent();
-                            auto pViewIndex = EmitCall(pModule,
-                                                       instName,
-                                                       pInt32Ty,
-                                                       pBuiltInViewIndex,
-                                                       NoAttrib,
-                                                       &callInst);
-                            pCoord = InsertElementInst::Create(pCoord,
-                                                               pViewIndex,
-                                                               ConstantInt::get(m_pContext->Int32Ty(), 0, true),
-                                                               "",
-                                                               &callInst);
+                            // For subpass data with multiview, the coordinate is formed of
+                            // ( fptosi(fragcoord.x), fptosi(fragcoord.y), viewindex )
+                            Value* pViewIndex = GetViewIndex(&callInst);
+
+                            // Narrow pFragCoord from <4 x float> to <3 x float>.
+                            pCoord = m_pBuilder->CreateShuffleVector(pFragCoord, pFragCoord, { 0, 1, 4 }, "");
+
+                            // Convert to int and insert view index as element 2.
+                            pCoord = m_pBuilder->CreateFPToSI(pCoord, m_pContext->Int32x3Ty(), "");
+                            pCoord = m_pBuilder->CreateInsertElement(pCoord, pViewIndex, 2, "");
+                        }
+                        else
+                        {
+                            // For subpass data without multiview, we add
+                            // ( fptosi(fragcoord.x), fptosi(fragcoord.y) ) to the provided coordinate.
+                            pFragCoord = m_pBuilder->CreateShuffleVector(pFragCoord, pFragCoord, { 0, 1 }, "");
+                            pFragCoord = m_pBuilder->CreateFPToSI(pFragCoord, m_pContext->Int32x2Ty(), "");
+                            pCoord = m_pBuilder->CreateAdd(pFragCoord, pCoord, "");
                         }
                     }
                     args.push_back(pCoord);
@@ -518,11 +526,42 @@ void SpirvLowerImageOp::visitCallInst(
                 callName += gSPIRVName::ImageCallDimAwareSuffix;
             }
 
-            // Image call replacement
-            CallInst* pImageCall =
-                cast<CallInst>(EmitCall(m_pModule, callName, callInst.getType(), args, NoAttrib, &callInst));
-            callInst.replaceAllUsesWith(pImageCall);
+            PatchImageCallForFmask(imageCallMeta, fmaskMode, callName);
 
+            // Image call replacement
+            Instruction* pImageCall =
+                cast<CallInst>(EmitCall(m_pModule, callName, callInst.getType(), args, NoAttrib, &callInst));
+
+            // Add waterfall loop if necessary.
+            SmallVector<uint32_t, 2> nonUniformOperandIdxs;
+            if (imageCallMeta.NonUniformResource)
+            {
+                if ((imageCallMeta.OpKind == ImageOpSample) ||
+                    (imageCallMeta.OpKind == ImageOpGather) ||
+                    (imageCallMeta.OpKind == ImageOpQueryLod))
+                {
+                    nonUniformOperandIdxs.push_back(5);
+                }
+                else
+                {
+                    nonUniformOperandIdxs.push_back(2);
+                }
+            }
+
+            if (imageCallMeta.NonUniformSampler)
+            {
+                nonUniformOperandIdxs.push_back(2);
+            }
+
+            if (nonUniformOperandIdxs.empty() == false)
+            {
+                pImageCall = m_pBuilder->CreateWaterfallLoop(pImageCall, nonUniformOperandIdxs);
+            }
+
+            if (pImageCall != nullptr)
+            {
+                callInst.replaceAllUsesWith(pImageCall);
+            }
             m_imageCalls.insert(&callInst);
         }
     }
@@ -637,6 +676,124 @@ void SpirvLowerImageOp::ExtractBindingInfo(
     {
         *ppMemoryQualifier = mdconst::dyn_extract<ConstantInt>(pImageMemoryMetaNode->getOperand(0));
     }
+}
+
+// =====================================================================================================================
+// Get fmask mode: FmaskNone, FmaskBased, FmaskOnly
+SpirvLowerImageOp::FmaskMode SpirvLowerImageOp::GetFmaskMode(
+    const ShaderImageCallMetadata&  imageCallMeta,    // [in] Image call metadata
+    const std::string&              callName)         // [in] Call name
+{
+    // For multi-sampled image, F-mask is only taken into account for texel fetch (not for query)
+    if ((imageCallMeta.Multisampled == false) || (imageCallMeta.OpKind == ImageOpQueryNonLod))
+    {
+        return FmaskNone;
+    }
+
+    if (callName.find(gSPIRVName::ImageCallModPatchFmaskUsage) == std::string::npos)
+    {
+        if (callName.find(gSPIRVName::ImageCallModFmaskValue) != std::string::npos)
+        {
+            return FmaskOnly;
+        }
+        return FmaskNone;
+    }
+
+    // Fmask based fetch only can work for texel fetch or load subpass data
+    if((imageCallMeta.OpKind == ImageOpFetch) ||
+       ((imageCallMeta.OpKind == ImageOpRead) &&
+        (imageCallMeta.Dim == DimSubpassData)))
+    {
+        return FmaskBased;
+    }
+    return FmaskNone;
+}
+
+// =====================================================================================================================
+// Modify the about-to-be-emitted image call name for multisampled or subpass data
+void SpirvLowerImageOp::PatchImageCallForFmask(
+    const ShaderImageCallMetadata&  imageCallMeta,    // [in] Image call metadata
+    FmaskMode                       fmaskMode,        // F-mask mode
+    std::string&                    callName)         // [in/out] Name of image call
+{
+    // For multi-sampled image, F-mask is only taken into account for texel fetch (not for query)
+    if (imageCallMeta.Multisampled && (imageCallMeta.OpKind != ImageOpQueryNonLod))
+    {
+        auto fmaskPatchPos = callName.find(gSPIRVName::ImageCallModPatchFmaskUsage);
+        if (fmaskPatchPos != std::string::npos)
+        {
+            std::string fmaskPatchString = "";
+            switch (fmaskMode)
+            {
+            case FmaskBased:
+                // F-mask based fetch only can work for texel fetch or load subpass data
+                if((imageCallMeta.OpKind == ImageOpFetch) ||
+                    ((imageCallMeta.OpKind == ImageOpRead) &&
+                    (imageCallMeta.Dim == DimSubpassData)))
+                {
+                    fmaskPatchString = gSPIRVName::ImageCallModFmaskBased;
+                }
+                break;
+            case FmaskOnly:
+                fmaskPatchString = gSPIRVName::ImageCallModFmaskId;
+                break;
+            case FmaskNone:
+                break;
+            default:
+                LLPC_NEVER_CALLED();
+                break;
+            }
+
+            callName = callName.replace(fmaskPatchPos,
+                                        strlen(gSPIRVName::ImageCallModPatchFmaskUsage),
+                                        fmaskPatchString);
+        }
+    }
+
+    if (imageCallMeta.Dim == DimSubpassData)
+    {
+        const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
+            m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
+
+        if (enableMultiView)
+        {
+            // Replace dimension SubpassData with SubpassDataArray
+            std::string dimSubpassData = SPIRVDimNameMap::map(DimSubpassData);
+            callName.replace(callName.find(dimSubpassData), dimSubpassData.length(), dimSubpassData + "Array");
+        }
+    }
+}
+
+// =====================================================================================================================
+// Emits import call to get the value of built-in gl_FragCoord
+Value* SpirvLowerImageOp::GetFragCoord(
+    Instruction* pInsertPos)    // [in] Insert code before this instruction
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+    std::string instName = LlpcName::InputImportBuiltIn;
+    instName += ".FragCoord";
+
+    std::vector<Value*> args;
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BuiltInFragCoord));
+    auto pReturnTy = m_pContext->Floatx4Ty();
+    AddTypeMangling(pReturnTy, args, instName);
+    return EmitCall(m_pModule, instName, pReturnTy, args, NoAttrib, pInsertPos);
+}
+
+// =====================================================================================================================
+// Emits import call to get the value of built-in gl_ViewIndex
+Value* SpirvLowerImageOp::GetViewIndex(
+    Instruction* pInsertPos)    // [in] Insert code before this instruction
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+    std::string instName = LlpcName::InputImportBuiltIn;
+    instName += ".ViewIndex";
+
+    std::vector<Value*> args;
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BuiltInViewIndex));
+    auto pReturnTy = m_pContext->Int32Ty();
+    AddTypeMangling(pReturnTy, args, instName);
+    return EmitCall(m_pModule, instName, pReturnTy, args, NoAttrib, pInsertPos);
 }
 
 } // Llpc

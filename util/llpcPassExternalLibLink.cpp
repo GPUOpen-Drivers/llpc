@@ -144,6 +144,7 @@ bool PassExternalLibLink::runOnModule(
                 pValueMap = &valueMapsIt->second;
             }
             // Clone the library function across to our module.
+            LLPC_ASSERT(pFunc->getType() == pLibFunc->getType());
             ++satisfiedCount;
             Function::arg_iterator funcArgIter = pFunc->arg_begin();
             for (Function::const_arg_iterator libFuncArgIter = pLibFunc->arg_begin();

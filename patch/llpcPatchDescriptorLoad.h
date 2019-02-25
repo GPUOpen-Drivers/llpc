@@ -65,16 +65,19 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchDescriptorLoad);
 
-    void CalcDescriptorOffsetAndSize(ResourceMappingNodeType   nodeType,
-                                     uint32_t                  descSet,
-                                     uint32_t                  binding,
-                                     uint32_t*                 pOffset,
-                                     uint32_t*                 pStride,
-                                     uint32_t*                 pDynDescIdx) const;
+    ResourceMappingNodeType CalcDescriptorOffsetAndSize(ResourceMappingNodeType   nodeType1,
+                                                        ResourceMappingNodeType   nodeType2,
+                                                        uint32_t                  descSet,
+                                                        uint32_t                  binding,
+                                                        uint32_t*                 pOffset,
+                                                        uint32_t*                 pStride,
+                                                        uint32_t*                 pDynDescIdx) const;
 
     const DescriptorRangeValue* GetDescriptorRangeValue(ResourceMappingNodeType   nodeType,
                                                         uint32_t                  descSet,
                                                         uint32_t                  binding) const;
+
+    void PatchWaterfallLastUseCalls();
 
     // -----------------------------------------------------------------------------------------------------------------
 

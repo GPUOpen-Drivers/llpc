@@ -623,6 +623,10 @@ inline bool isValid(spv::Capability V) {
 #if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
   case CapabilityAnisotropicLodCompensationAMD:
 #endif
+#if VKI_KHR_SHADER_CLOCK
+  case CapabilityShaderClockWorkgroupKHR:
+  case CapabilityShaderClockDeviceKHR:
+#endif
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
   case CapabilityShaderNonUniformEXT:
@@ -1008,6 +1012,9 @@ inline bool isValid(spv::Op V) {
   case OpImageSampleDrefAnisoLodAMD:
   case OpImageGatherAnisoLodAMD:
   case OpImageDrefGatherAnisoLodAMD:
+#endif
+#if VKI_KHR_SHADER_CLOCK
+  case OpReadClockKHR:
 #endif
   case OpSubgroupShuffleINTEL:
   case OpSubgroupShuffleDownINTEL:

@@ -4484,6 +4484,145 @@ void PatchInOutImportExport::PatchXfbOutputExport(
 }
 
 // =====================================================================================================================
+// Creates the LLPC intrinsic "llpc.streamoutbuffer.store.f32" to store value to to stream-out buffer.
+void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
+    Value*         pStoreValue,   // [in] Value to store
+    uint32_t       xfbStride,     // Transform feedback stride
+    std::string&   funcName)      // [out] Function name to add mangling to
+{
+    std::vector<Value*> args = { pStoreValue };
+    AddTypeMangling(nullptr, args, funcName);
+
+    // define void @llpc.streamoutbuffer.store.f32(
+    //      float %storeValue, <4 x i32> %streamOutBufDesc, i32 %writeIndex, i32 %threadId,
+    //      i32 %vertexCount, i32 %xfbOffset, i32 %streamOffset)
+    // {
+    // .entry
+    //     %1 = icmp ult i32 %threadId, %vtxCount
+    //     br i1 %1, label %.store, label %.end
+    //
+    // .store:
+    //     call void llvm.amdgcn.struct.tbuffer.store.f32(
+    //         float %storeValue, <4 x i32> %streamOutBufDesc, i32 %writeIndex,
+    //         i32 %xfbOffset, i32 %streamOffset, i32 %format, i32 %coherent)
+    //     br label %.end
+    //
+    // .end:
+    //     ret void
+    // }
+
+    std::vector<Type*> argTys;
+    argTys.push_back(pStoreValue->getType());   // %storeValue
+    argTys.push_back(m_pContext->Int32x4Ty());  // %streamOutBufDesc
+    argTys.push_back(m_pContext->Int32Ty());    // %writeIndex
+    argTys.push_back(m_pContext->Int32Ty());    // %threadId
+    argTys.push_back(m_pContext->Int32Ty());    // %vertexCount
+    argTys.push_back(m_pContext->Int32Ty());    // %xfbOffset
+    argTys.push_back(m_pContext->Int32Ty());    // %streamOffset
+
+    auto pFuncTy = FunctionType::get(m_pContext->VoidTy(), argTys, false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, funcName, m_pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::NoUnwind);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pStoredValue = argIt++;
+    Value* pStreamOutBufDesc = argIt++;
+    Value* pWriteIndex = argIt++;
+    Value* pThreadId = argIt++;
+    Value* pVertexCount = argIt++;
+    Value* pXfbOffset = argIt++;
+    Value* pStreamOffset = argIt;
+
+    // Create ".end" block
+    BasicBlock* pEndBlock = BasicBlock::Create(*m_pContext, ".end", pFunc);
+    ReturnInst::Create(*m_pContext, pEndBlock);
+
+    // Create ".store" block
+    BasicBlock* pStoreBlock = BasicBlock::Create(*m_pContext, ".store", pFunc, pEndBlock);
+
+    // Create entry block
+    BasicBlock* pEntryBlock = BasicBlock::Create(*m_pContext, "", pFunc, pStoreBlock);
+    auto pThreadValid = new ICmpInst(*pEntryBlock, ICmpInst::ICMP_ULT, pThreadId, pVertexCount);
+
+    if (m_shaderStage != ShaderStageCopyShader)
+    {
+        // Setup out-of-range value. GPU will drop stream-out buffer writing when the thread is invalid.
+        uint32_t outofRangeValue = 0xFFFFFFFF;
+        outofRangeValue /= xfbStride;
+        outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
+        Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
+        pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
+        BranchInst::Create(pStoreBlock, pEntryBlock);
+    }
+    else
+    {
+        BranchInst::Create(pStoreBlock, pEndBlock, pThreadValid, pEntryBlock);
+    }
+
+    auto pStoreTy = pStoreValue->getType();
+
+    uint32_t compCount = pStoreTy->isVectorTy() ? pStoreTy->getVectorNumElements() : 1;
+    LLPC_ASSERT(compCount <= 4);
+
+    const uint64_t bitWidth = pStoreTy->getScalarSizeInBits();
+    LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
+
+    uint32_t format = 0;
+    std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
+
+    CombineFormat formatOprd = {};
+    formatOprd.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
+    switch (compCount)
+    {
+    case 1:
+        {
+            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32 : BUF_DATA_FORMAT_16;
+            callName += (bitWidth == 32) ? "f32" : "f16";
+            break;
+        }
+    case 2:
+        {
+            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32_32 : BUF_DATA_FORMAT_16_16;
+            callName += (bitWidth == 32) ? "v2f32" : "v2f16";
+            break;
+        }
+    case 4:
+        {
+            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32_32_32_32 : BUF_DATA_FORMAT_16_16_16_16;
+            callName += (bitWidth == 32) ? "v4f32" : "v4f16";
+            break;
+        }
+    default:
+        {
+            LLPC_NEVER_CALLED();
+            break;
+        }
+    }
+
+    format = formatOprd.u32All;
+
+    // byteOffset = streamOffsets[xfbBuffer] * 4 +
+    //              (writeIndex + threadId) * bufferStride[bufferId] +
+    //              xfbOffset
+    args.clear();
+    args.push_back(pStoredValue);                                           // value
+    args.push_back(pStreamOutBufDesc);                                // desc
+    args.push_back(pWriteIndex);                                      // vindex
+    args.push_back(pXfbOffset);                                       // offset
+    args.push_back(pStreamOffset);                                    // soffset
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), format));  // format
+
+    CoherentFlag coherent = {};
+    coherent.bits.glc = true;
+    coherent.bits.slc = true;
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));           // glc, slc
+    EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pStoreBlock);
+    BranchInst::Create(pEndBlock, pStoreBlock);
+}
+
+// =====================================================================================================================
 // Store value to stream-out buffer
 void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     Value*        pStoreValue,        // [in] Value to store
@@ -4585,75 +4724,27 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
                                    NoAttrib,
                                    &*pInsertPos);
 
-    // Setup out-of-range value. GPU will drop stream-out buffer writing when the thread is invalid.
-    uint32_t outofRangeValue = 0xFFFFFFFF;
-    outofRangeValue /= xfbStride;
-    outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
-    Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
-
-    // writeIndex = (threadId < vertexCount) ? writeIndex : outOfRangeValue
-    auto pThreadValid = new ICmpInst(pInsertPos, ICmpInst::ICMP_ULT, m_pThreadId, pVertexCount);
     // Setup write index for stream-out
     auto pWriteIndex = GetFunctionArgument(m_pEntryPoint, writeIndex);
-
-    if (m_shaderStage != ShaderStageCopyShader)
-        pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pInsertPos);
 
     if (m_gfxIp.major >= 9)
     {
         pWriteIndex = BinaryOperator::CreateAdd(pWriteIndex, m_pThreadId, "", pInsertPos);
     }
 
-    uint32_t format = 0;
-    std::string callName = "llvm.amdgcn.struct.tbuffer.store.";
+    std::string funcName = LlpcName::StreamOutBufferStore;
+    CreateStreamOutBufferStoreFunction(pStoreValue, xfbStride, funcName);
 
-    CombineFormat formatOprd = {};
-    formatOprd.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
-    switch (compCount)
-    {
-    case 1:
-        {
-            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32 : BUF_DATA_FORMAT_16;
-            callName += (bitWidth == 32) ? "f32" : "f16";
-            break;
-        }
-    case 2:
-        {
-            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32_32 : BUF_DATA_FORMAT_16_16;
-            callName += (bitWidth == 32) ? "v2f32" : "v2f16";
-            break;
-        }
-    case 4:
-        {
-            formatOprd.bits.dfmt = (bitWidth == 32) ? BUF_DATA_FORMAT_32_32_32_32 : BUF_DATA_FORMAT_16_16_16_16;
-            callName += (bitWidth == 32) ? "v4f32" : "v4f16";
-            break;
-        }
-    default:
-        {
-            LLPC_NEVER_CALLED();
-            break;
-        }
-    }
-
-    format = formatOprd.u32All;
-
-    // byteOffset = streamOffsets[xfbBuffer] * 4 +
-    //              (writeIndex + threadId) * bufferStride[bufferId] +
-    //              xfbOffset
     args.clear();
     args.push_back(pStoreValue);
-    args.push_back(pStreamOutBufDesc);                                   // desc
-    args.push_back(pWriteIndex);                                         // vindex
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), xfbOffset));  // offset
-    args.push_back(pStreamOffset);                                       // soffset
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), format));     // format
+    args.push_back(pStreamOutBufDesc);
+    args.push_back(pWriteIndex);
+    args.push_back(m_pThreadId);
+    args.push_back(pVertexCount);
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), xfbOffset));
+    args.push_back(pStreamOffset);
 
-    CoherentFlag coherent = {};
-    coherent.bits.glc = true;
-    coherent.bits.slc = true;
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));           // glc, slc
-    EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+    EmitCall(m_pModule, funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 }
 
 // =====================================================================================================================

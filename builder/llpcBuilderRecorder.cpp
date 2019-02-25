@@ -30,6 +30,7 @@
  */
 #include "llpcBuilderRecorder.h"
 #include "llpcInternal.h"
+#include "llpcIntrinsDefs.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
@@ -45,8 +46,18 @@ StringRef BuilderRecorder::GetCallName(
     {
     case Opcode::Nop:
         return "nop";
+    case Opcode::DescLoadBuffer:
+        return "desc.load.buffer";
+    case Opcode::DescLoadSpillTablePtr:
+        return "desc.load.spill.table.ptr";
     case Opcode::MiscKill:
         return "misc.kill";
+    case Opcode::MiscReadClock:
+        return "misc.read.clock";
+    case Opcode::DescWaterfallLoop:
+        return "desc.waterfall.loop";
+    case Opcode::DescWaterfallStoreLoop:
+        return "desc.waterfall.store.loop";
     }
     LLPC_NEVER_CALLED();
     return "";
@@ -62,11 +73,102 @@ Builder* Builder::CreateBuilderRecorder(
 }
 
 // =====================================================================================================================
-// Recorder implementations of MiscBuilder methods
+// Create a "kill". Only allowed in a fragment shader.
 Instruction* BuilderRecorder::CreateKill(
     const Twine& instName)  // [in] Name to give final instruction
 {
-    return Record(Opcode::MiscKill, nullptr, ArrayRef<Value*>(), instName);
+    return Record(Opcode::MiscKill, nullptr, {}, instName);
+}
+
+// =====================================================================================================================
+// Create a "readclock".
+Instruction* BuilderRecorder::CreateReadClock(
+    bool         realtime,   // Whether to read real-time clock counter
+    const Twine& instName)   // [in] Name to give final instruction
+{
+    return Record(Opcode::MiscReadClock, getInt64Ty(), getInt1(realtime), instName);
+}
+
+// =====================================================================================================================
+// Create a waterfall loop containing the specified instruction.
+Instruction* BuilderRecorder::CreateWaterfallLoop(
+    Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
+    ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
+    const Twine&        instName)           // [in] Name to give instruction(s)
+{
+    LLPC_ASSERT(operandIdxs.empty() == false);
+    LLPC_ASSERT(pNonUniformInst->use_empty());
+
+    // This method is specified to ignore the insert point, and to put the waterfall loop around pNonUniformInst.
+    // For this recording implementation, put the call after pNonUniformInst, unless it is a store.
+    //auto savedInsertPoint = saveIP();
+    SetInsertPoint(pNonUniformInst->getNextNode());
+    SetCurrentDebugLocation(pNonUniformInst->getDebugLoc());
+
+    SmallVector<Value*, 3> args;
+    args.push_back(pNonUniformInst);
+    for (uint32_t operandIdx : operandIdxs)
+    {
+        args.push_back(getInt32(operandIdx));
+    }
+
+    Instruction *pWaterfallLoop = nullptr;
+    if (pNonUniformInst->getType()->isVoidTy() == false)
+    {
+        // Normal case that pNonUniformInst is not a store so has a return type.
+        pWaterfallLoop = Record(Opcode::DescWaterfallLoop, pNonUniformInst->getType(), args, instName);
+    }
+    else
+    {
+        // pNonUniformInst is a store with void return type, so we cannot pass its result through
+        // llpc.call.waterfall.loop. Instead we pass one of its non-uniform inputs through
+        // llpc.call.waterfall.store.loop. This situation needs to be specially handled in llpcBuilderReplayer.
+        SetInsertPoint(pNonUniformInst);
+        args[0] = pNonUniformInst->getOperand(operandIdxs[0]);
+        auto pWaterfallStoreLoop = Record(Opcode::DescWaterfallStoreLoop, args[0]->getType(), args, instName);
+        pNonUniformInst->setOperand(operandIdxs[0], pWaterfallStoreLoop);
+    }
+
+    // TODO: While almost nothing uses the Builder, we run the risk of the saved insertion
+    // point being invalid and this restoreIP crashing. So, for now, we just clear the insertion point.
+    //restoreIP(savedInsertPoint);
+    ClearInsertionPoint();
+
+    return pWaterfallLoop;
+}
+
+// =====================================================================================================================
+// Create a load of a buffer descriptor.
+Value* BuilderRecorder::CreateLoadBufferDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pBlockOffset,     // [in] Buffer block offset
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    Type*         pPointeeTy,       // [in] Type that the returned pointer should point to
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    Type* pDescTy = (pPointeeTy == nullptr) ?
+                        cast<Type>(VectorType::get(getInt32Ty(), 4)) :
+                        cast<Type>(PointerType::get(pPointeeTy, ADDR_SPACE_CONST));
+    return Record(Opcode::DescLoadBuffer,
+                  pDescTy,
+                  {
+                      getInt32(descSet),
+                      getInt32(binding),
+                      pBlockOffset,
+                      getInt1(isNonUniform),
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a load of the spill table pointer for push constants.
+Value* BuilderRecorder::CreateLoadSpillTablePtr(
+    Type*         pSpillTableTy,    // [in] Type of the spill table that the returned pointer will point to
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    Type* pRetTy = PointerType::get(pSpillTableTy, ADDR_SPACE_CONST);
+    return Record(Opcode::DescLoadSpillTablePtr, pRetTy, {}, instName);
 }
 
 // =====================================================================================================================
@@ -97,28 +199,26 @@ Instruction* BuilderRecorder::Record(
     std::string mangledName = (Twine(BuilderCallPrefix) + GetCallName(opcode)).str();
     AddTypeMangling(pRetTy, args, mangledName);
 
-    // Add opcode and sequence number to front of args, and step the sequence number.
-    SmallVector<Value*, 8> extendedArgs;
-    extendedArgs.push_back(getInt32(opcode));
-    extendedArgs.push_back(getInt32(m_seqNum++));
-    extendedArgs.insert(extendedArgs.end(), args.begin(), args.end());
-
     // See if the declaration already exists in the module.
-    Module* pModule = GetInsertBlock()->getParent()->getParent();
+    Module* const pModule = GetInsertBlock()->getModule();
     Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(mangledName));
     if (pFunc == nullptr)
     {
         // Does not exist. Create it.
-        std::vector<Type*> argTys;
-        for (auto arg : extendedArgs)
+        SmallVector<Type*, 8> argTys;
+        for (auto arg : args)
         {
             argTys.push_back(arg->getType());
         }
 
         auto pFuncTy = FunctionType::get(pRetTy, argTys, false);
         pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, mangledName, pModule);
+
+        MDNode* const pFuncMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
+
+        pFunc->setMetadata(BuilderCallMetadataName, pFuncMeta);
     }
 
     // Create the call.
-    return CreateCall(pFunc, extendedArgs, instName);
+    return CreateCall(pFunc, args, instName);
 }

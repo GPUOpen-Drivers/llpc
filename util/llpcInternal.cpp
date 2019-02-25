@@ -161,10 +161,21 @@ static void GetTypeNameForScalarOrVector(
     Type*         pTy,         // [in] Type to get mangle name
     raw_ostream&  nameStream)  // [in,out] Stream to write the type name into
 {
-    if (auto pArrayTy = dyn_cast<ArrayType>(pTy))
+    for (;;)
     {
-        nameStream << "a" << pArrayTy->getNumElements();
-        pTy = pArrayTy->getElementType();
+        if (auto pPointerTy = dyn_cast<PointerType>(pTy))
+        {
+            nameStream << "p" << pPointerTy->getAddressSpace();
+            pTy = pPointerTy->getElementType();
+            continue;
+        }
+        if (auto pArrayTy = dyn_cast<ArrayType>(pTy))
+        {
+            nameStream << "a" << pArrayTy->getNumElements();
+            pTy = pArrayTy->getElementType();
+            continue;
+        }
+        break;
     }
     if (auto pVectorTy = dyn_cast<VectorType>(pTy))
     {
@@ -178,6 +189,10 @@ static void GetTypeNameForScalarOrVector(
     else if (pTy->isIntegerTy())
     {
         nameStream << "i" << pTy->getScalarSizeInBits();
+    }
+    else if (pTy->isVoidTy())
+    {
+        nameStream << "V";
     }
     else
     {

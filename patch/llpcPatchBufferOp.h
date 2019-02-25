@@ -65,7 +65,6 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchBufferOp);
 
-    bool IsInlineConst(uint32_t descSet, uint32_t binding);
     void ReplaceCallee(llvm::CallInst* pCallInst, const char* pOrigNamePrefix, const char* pNewNamePrefix);
 
     // -----------------------------------------------------------------------------------------------------------------

@@ -361,6 +361,9 @@ _SPIRV_OP(ImageSampleDrefAnisoLodAMD, 5051)
 _SPIRV_OP(ImageGatherAnisoLodAMD, 5052)
 _SPIRV_OP(ImageDrefGatherAnisoLodAMD, 5053)
 #endif
+#if VKI_KHR_SHADER_CLOCK
+_SPIRV_OP(ReadClockKHR, 5055)
+#endif
 _SPIRV_OP(SubgroupShuffleINTEL, 5571)
 _SPIRV_OP(SubgroupShuffleDownINTEL, 5572)
 _SPIRV_OP(SubgroupShuffleUpINTEL, 5573)

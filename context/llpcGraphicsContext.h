@@ -96,8 +96,6 @@ public:
     void InitShaderInfoForNullFs();
 
 protected:
-    virtual std::vector<ResourceMappingNode>* GetDummyResourceMapNodes(ShaderStage shaderStage);
-
     // Gets dummy vertex input create info
     virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return &m_dummyVertexInput; }
 
@@ -126,8 +124,6 @@ private:
 
     ResourceUsage   m_resUsages[ShaderStageGfxCount];   // Resource usages of all graphics shader stages
     InterfaceData   m_intfData[ShaderStageGfxCount];    // Interface data of all graphics shader stages
-
-    std::vector<ResourceMappingNode>  m_dummyResMapNodes[ShaderStageGfxCount]; // Dummy resource mapping nodes
 
     // Dummy vertex-specific info (for vertex shader only)
     VkPipelineVertexInputStateCreateInfo           m_dummyVertexInput;    // Dummy vertex input create info
