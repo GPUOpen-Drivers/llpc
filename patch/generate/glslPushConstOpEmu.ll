@@ -27,7 +27,7 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; GLSL: load float16/int16/uint16 (word)
-define <2 x i8> @llpc.pushconst.load.v2i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <2 x i8> @llpc.pushconst.load.v2i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <2 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -36,7 +36,7 @@ define <2 x i8> @llpc.pushconst.load.v2i8([512 x i8] addrspace(4)* %spillTablePt
 }
 
 ; GLSL: load f16vec2/i16vec2/u16vec2/float/int/uint (dword)
-define <4 x i8> @llpc.pushconst.load.v4i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <4 x i8> @llpc.pushconst.load.v4i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <4 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -45,7 +45,7 @@ define <4 x i8> @llpc.pushconst.load.v4i8([512 x i8] addrspace(4)* %spillTablePt
 }
 
 ; GLSL: load f16vec3/i16vec3/u16vec3 (wordx3)
-define <6 x i8> @llpc.pushconst.load.v6i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <6 x i8> @llpc.pushconst.load.v6i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <6 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -54,7 +54,7 @@ define <6 x i8> @llpc.pushconst.load.v6i8([512 x i8] addrspace(4)* %spillTablePt
 }
 
 ; GLSL: load f16vec4/i16vec4/u16vec4/vec2/ivec2/uvec2/double/int64/uint64 (dwordx2)
-define <8 x i8> @llpc.pushconst.load.v8i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <8 x i8> @llpc.pushconst.load.v8i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <8 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -63,7 +63,7 @@ define <8 x i8> @llpc.pushconst.load.v8i8([512 x i8] addrspace(4)* %spillTablePt
 }
 
 ; GLSL: load vec3/ivec3/uvec3 (dwordx3)
-define <12 x i8> @llpc.pushconst.load.v12i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <12 x i8> @llpc.pushconst.load.v12i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <12 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -72,7 +72,7 @@ define <12 x i8> @llpc.pushconst.load.v12i8([512 x i8] addrspace(4)* %spillTable
 }
 
 ; GLSL: load vec4/ivec4/uvec4/dvec2/i64vec2/u64vec2 (dwordx4)
-define <16 x i8> @llpc.pushconst.load.v16i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <16 x i8> @llpc.pushconst.load.v16i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <16 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -81,7 +81,7 @@ define <16 x i8> @llpc.pushconst.load.v16i8([512 x i8] addrspace(4)* %spillTable
 }
 
 ; GLSL: load dvec3/i64vec3/u64vec3 (dwordx6)
-define <24 x i8> @llpc.pushconst.load.v24i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <24 x i8> @llpc.pushconst.load.v24i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <24 x i8> addrspace(4)*, !amdgpu.uniform !0
@@ -90,7 +90,7 @@ define <24 x i8> @llpc.pushconst.load.v24i8([512 x i8] addrspace(4)* %spillTable
 }
 
 ; GLSL: load dvec4/i64vec4/u64vec4 (dwordx8)
-define <32 x i8> @llpc.pushconst.load.v32i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i1 %glc, i1 %slc) #0
+define <32 x i8> @llpc.pushconst.load.v32i8([512 x i8] addrspace(4)* %spillTablePtr, i32 %memberOffset, i32 %coherent) #0
 {
     %1 = getelementptr [512 x i8], [512 x i8] addrspace(4)* %spillTablePtr, i32 0, i32 %memberOffset
     %2 = bitcast i8 addrspace(4)* %1 to <32 x i8> addrspace(4)*, !amdgpu.uniform !0

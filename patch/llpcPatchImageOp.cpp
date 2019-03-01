@@ -142,59 +142,7 @@ void PatchImageOp::visitCallInst(
                 m_imageCalls.insert(&callInst);
             }
         }
-        else if ((imageCallMeta.Dim == DimBuffer) &&
-                 ((imageCallMeta.OpKind == ImageOpFetch) ||
-                  (imageCallMeta.OpKind == ImageOpRead) ||
-                  (imageCallMeta.OpKind == ImageOpWrite) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicExchange) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicCompareExchange) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicIIncrement) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicIDecrement) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicIAdd) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicISub) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicSMin) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicUMin) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicSMax) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicUMax) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicAnd) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicOr) ||
-                  (imageCallMeta.OpKind == ImageOpAtomicXor)))
-        {
-            // TODO: This is a workaround and should be removed after backend compiler fixes it. The issue is: for
-            // GFX9, when texel offset is constant zero, backend will unset "idxen" flag and provide no VGPR as
-            // the address. This only works on pre-GFX9.
-            const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-            if (gfxIp.major == 9)
-            {
-                // Get offset from operands
-                Value* pTexelOffset = callInst.getArgOperand(3);
-                if (isa<ConstantInt>(*pTexelOffset))
-                {
-                    const uint32_t texelOffset = cast<ConstantInt>(*pTexelOffset).getZExtValue();
-                    if (texelOffset == 0)
-                    {
-                        Value* pPc = EmitCall(
-                            m_pModule, "llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), args, NoAttrib, &callInst);
-                        pPc = new BitCastInst(pPc, m_pContext->Int32x2Ty(), "", &callInst);
 
-                        Value* pPcHigh = ExtractElementInst::Create(pPc,
-                                                                    ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                                    "",
-                                                                    &callInst);
-
-                        // NOTE: Here, we construct a non-constant zero value to disable the mistaken optimization in
-                        // backend compiler. The most significant 8 bits of PC is always equal to zero. It is safe to
-                        // do this.
-                        Value* pTexelOffset = BinaryOperator::CreateLShr(pPcHigh,
-                                                                        ConstantInt::get(m_pContext->Int32Ty(), 24),
-                                                                        "",
-                                                                        &callInst);
-
-                        callInst.setArgOperand(3, pTexelOffset);
-                    }
-                }
-            }
-        }
     }
 }
 

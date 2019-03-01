@@ -546,17 +546,16 @@ Result ConfigBuilder::BuildVsRegConfig(
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_SGPRS, pContext->GetGpuProperty()->maxSgprsAvailable);
         SET_REG(&pConfig->m_vsRegs, VS_NUM_AVAIL_VGPRS, pContext->GetGpuProperty()->maxVgprsAvailable);
 
-        if (enableXfb)
-        {
-            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
-                pResUsage->inOutUsage.gs.outLocCount[0] > 0);
-            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
-                pResUsage->inOutUsage.gs.outLocCount[1] > 0);
-            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG,
-                STREAMOUT_2_EN, pResUsage->inOutUsage.gs.outLocCount[2] > 0);
-            SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
-                pResUsage->inOutUsage.gs.outLocCount[3] > 0);
-        }
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
+            (pResUsage->inOutUsage.gs.outLocCount[0] > 0) && enableXfb);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
+            pResUsage->inOutUsage.gs.outLocCount[1] > 0);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG,
+            STREAMOUT_2_EN, pResUsage->inOutUsage.gs.outLocCount[2] > 0);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
+            pResUsage->inOutUsage.gs.outLocCount[3] > 0);
+        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM,
+            pResUsage->inOutUsage.gs.rasterStream);
     }
     else
     {

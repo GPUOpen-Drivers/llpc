@@ -104,10 +104,9 @@ uint64_t ComputeContext::GetShaderHashCode(
     UpdateShaderHashForPipelineShaderInfo(ShaderStageCompute, pShaderInfo, &hasher);
     hasher.Update(m_pPipelineInfo->deviceIndex);
 
-    MetroHash::Hash hash = {};
-    hasher.Finalize(hash.bytes);
-
-    return MetroHash::Compact64(&hash);
+    uint64_t hash;
+    hasher.Finalize(reinterpret_cast<uint8_t* const>(&hash));
+    return hash;
 }
 
 // =====================================================================================================================
