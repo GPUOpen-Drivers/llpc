@@ -313,10 +313,7 @@ uint64_t GraphicsContext::GetShaderHashCode(
             }
         }
 
-        MetroHash::Hash hash = {};
-        hasher.Finalize(hash.bytes);
-
-        shaderHash = MetroHash::Compact64(&hash);
+        hasher.Finalize(reinterpret_cast<uint8_t* const>(&shaderHash));
     }
 
     return shaderHash;

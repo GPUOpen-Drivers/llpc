@@ -125,18 +125,13 @@ class VarNames:
     minlod           = "%minlod"
     atomicData       = "%atomicData"
     atomicComparator = "%atomicComparator"
-    glc              = "%glc"
-    slc              = "%slc"
+    coherent         = "%coherent"
     imageCallMeta    = "%imageCallMeta"
 
-# LLVM image load/store intrinsic flags, meaning of these flags are:
-# glc, slc, lwe
-LLVM_IMAGE_INTRINSIC_LOADSTORE_FLAGS         = "i1 0, i1 0, i1 0"
-LLVM_IMAGE_INTRINSIC_LOADSTORE_FLAGS_DYNAMIC = "i1 %s, i1 %s, i1 0" % (VarNames.glc, VarNames.slc)
 # LLVM buffer load/store intrinsic flags, meaning of these flags are:
 # glc, slc
-LLVM_BUFFER_INTRINSIC_LOADSTORE_FLAGS         = "i1 0, i1 0"
-LLVM_BUFFER_INTRINSIC_LOADSTORE_FLAGS_DYNAMIC = "i1 %s, i1 %s" % (VarNames.glc, VarNames.slc)
+LLVM_BUFFER_INTRINSIC_LOADSTORE_FLAGS         = "i32 0"
+LLVM_BUFFER_INTRINSIC_LOADSTORE_FLAGS_DYNAMIC = "i32 %coherent"
 
 # Enums and corresponding name map
 class SpirvDim:
@@ -693,11 +688,8 @@ class CodeGen(FuncDef):
         if self._opKind == SpirvImageOpKind.atomiccompexchange:
             params.append("i32 %s" % (VarNames.atomicComparator))
 
-        if self.isAtomicOp():
-            params.append("i1 %s" % (VarNames.slc))
-        elif self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.write:
-            params.append("i1 %s" % (VarNames.glc))
-            params.append("i1 %s" % (VarNames.slc))
+        if self.isAtomicOp() or self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.write:
+            params.append("i32 %s" % (VarNames.coherent))
 
         # imageCallMeta isn't used by generated code, it is for image patch pass
         params.append("i32 %imageCallMeta")
@@ -1359,24 +1351,7 @@ float %s, float %s, float %s, float %s, float %s, float %s)\n" % \
     def getGlcSlc(self, irOut):
         retVal = "0"
         if self._opKind == SpirvImageOpKind.read or self._opKind == SpirvImageOpKind.write:
-            # GLC bit and SLC bit are packed into one i32 value
-            # GLC: bit0
-            # SLC: bit1
-            glc = self.acquireLocalVar()
-            irZExt = "    %s = zext i1 %s to i32\n" % (glc, VarNames.glc)
-            irOut.write(irZExt)
-
-            slc = self.acquireLocalVar()
-            irZExt = "    %s = zext i1 %s to i32\n" % (slc, VarNames.slc)
-            irOut.write(irZExt)
-
-            slcShifted = self.acquireLocalVar()
-            irShl  = "    %s = shl i32 %s, 1\n" % (slcShifted, slc)
-            irOut.write(irShl)
-
-            retVal = self.acquireLocalVar()
-            irOr   = "    %s = or i32 %s, %s\n" % (retVal, slcShifted, glc)
-            irOut.write(irOr)
+            retVal = "%coherent"
 
         return retVal
 
@@ -1412,10 +1387,10 @@ class BufferAtomicGen(CodeGen):
                         and "i32 " + VarNames.atomicComparator + "," \
                         or  ""
         # Set slc flag
-        flags  = "i1 %slc"
+        flags  = "i32 %coherent"
 
         retVal = self.acquireLocalVar()
-        irCall = "    %s = call %s @%s(i32 %s, %s <4 x i32> %s, i32 %s, i32 0, %s)\n" % \
+        irCall = "    %s = call %s @%s(i32 %s, %s <4 x i32> %s, i32 %s, i32 0, i32 0, %s)\n" % \
                  (retVal,
                   retType,
                   funcName,
@@ -1436,7 +1411,7 @@ class BufferAtomicGen(CodeGen):
 
     # Gets buffer atomic intrinsic function name
     def getFuncName(self):
-        funcName = "llvm.amdgcn.buffer.atomic"
+        funcName = "llvm.amdgcn.struct.buffer.atomic"
 
         intrinsicNames = { \
             SpirvImageOpKind.atomicexchange      : ".swap",     \
@@ -1464,7 +1439,7 @@ class BufferAtomicGen(CodeGen):
 
         if not hasLlvmDecl(funcName):
             # Adds LLVM declaration for this function
-            funcExternalDecl = "declare %s @%s(i32, %s <4 x i32>, i32, i32, i1) %s\n" % \
+            funcExternalDecl = "declare %s @%s(i32, %s <4 x i32>, i32, i32, i32, i32) %s\n" % \
                                (self.getBackendRetType(), funcName, compareType, self._attr)
             addLlvmDecl(funcName, funcExternalDecl)
 
@@ -1650,7 +1625,7 @@ class BufferLoadGen(CodeGen):
 
         # Process buffer load
         retVal = self.acquireLocalVar()
-        irCall = "    %s = call %s @%s(<4 x i32> %s, i32 %s, i32 0, %s)\n" % \
+        irCall = "    %s = call %s @%s(<4 x i32> %s, i32 %s, i32 0, i32 0, %s)\n" % \
                  (retVal,
                   retType,
                   funcName,
@@ -1664,7 +1639,7 @@ class BufferLoadGen(CodeGen):
 
     # Gets buffer load intrinsic function name
     def getFuncName(self):
-        funcName = "llvm.amdgcn.buffer.load.format"
+        funcName = "llvm.amdgcn.struct.buffer.load.format"
 
         if self._sampledType == SpirvSampledType.f16:
             funcName += ".v4f16"
@@ -1673,7 +1648,7 @@ class BufferLoadGen(CodeGen):
 
         if not hasLlvmDecl(funcName):
             # Adds LLVM declaration for this function
-            funcExternalDecl = "declare %s @%s(<4 x i32>, i32, i32, i1, i1) %s\n" % \
+            funcExternalDecl = "declare %s @%s(<4 x i32>, i32, i32, i32, i32) %s\n" % \
                                (self.getBackendRetType(), funcName, self._attr)
             addLlvmDecl(funcName, funcExternalDecl)
 
@@ -1697,7 +1672,7 @@ class BufferStoreGen(CodeGen):
 
         # Process image buffer store
         paramTexel = self.genCastTexelToSampledType(VarNames.texel, irOut)
-        irCall = "    call void @%s(%s %s, <4 x i32> %s, i32 %s, i32 0, %s)\n" % \
+        irCall = "    call void @%s(%s %s, <4 x i32> %s, i32 %s, i32 0, i32 0, %s)\n" % \
                  (funcName,
                   self.getVDataRegType(),
                   paramTexel,
@@ -1711,9 +1686,9 @@ class BufferStoreGen(CodeGen):
     def getFuncName(self):
         funcName = "llvm.amdgcn"
         if self._opKind == SpirvImageOpKind.fetch or self._opKind == SpirvImageOpKind.read:
-            funcName += ".buffer.load.format"
+            funcName += ".struct.buffer.load.format"
         elif self._opKind == SpirvImageOpKind.write:
-            funcName += ".buffer.store.format"
+            funcName += ".struct.buffer.store.format"
         else:
             shouldNeverCall("")
 
@@ -1725,10 +1700,10 @@ class BufferStoreGen(CodeGen):
         if not hasLlvmDecl(funcName):
             # Adds LLVM declaration for this function
             if self._opKind == SpirvImageOpKind.fetch or self._opKind == SpirvImageOpKind.read:
-                funcExternalDecl = "declare %s @%s(<4 x i32>, i32, i32, i1, i1) %s\n" % \
+                funcExternalDecl = "declare %s @%s(<4 x i32>, i32, i32, i32, i32) %s\n" % \
                                    (self.getBackendRetType(), funcName, self._attr)
             elif self._opKind == SpirvImageOpKind.write:
-                funcExternalDecl = "declare %s @%s(%s, <4 x i32>, i32, i32, i1, i1) %s\n" % \
+                funcExternalDecl = "declare %s @%s(%s, <4 x i32>, i32, i32, i32, i32) %s\n" % \
                                    (self.getBackendRetType(), funcName, self.getVDataRegType(), self._attr)
             else:
                 shouldNeverCall()

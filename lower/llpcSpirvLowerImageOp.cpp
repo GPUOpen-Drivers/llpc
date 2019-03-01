@@ -467,14 +467,18 @@ void SpirvLowerImageOp::visitCallInst(
             if ((imageCallMeta.OpKind == ImageOpRead) || (imageCallMeta.OpKind == ImageOpWrite))
             {
                 args.pop_back();
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isCoherent ? true : false)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isVolatile ? true : false)); // slc
+                CoherentFlag coherentFlag = {};
+                coherentFlag.bits.glc = isCoherent;
+                coherentFlag.bits.slc = isVolatile;
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All)); //imageCallMeta
             }
             else if (isImageAtomicOp(imageCallMeta.OpKind))
             {
                 args.pop_back();
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), isVolatile ? true : false)); // slc
+                CoherentFlag coherentFlag = {};
+                coherentFlag.bits.slc = isVolatile;
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), imageCallMeta.U32All)); //imageCallMeta
             }
 

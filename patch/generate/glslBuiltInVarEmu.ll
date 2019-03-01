@@ -246,7 +246,7 @@ define <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 
     ; Load sample position descriptor (GlobalTable (268435456 = 0x10000000), SAMPLEPOS (12))
     %6 = shl i32 %5, 4
     %7 = call <4 x i32> @llpc.descriptor.load.buffer(i32 268435456, i32 12, i32 0, i1 0)
-    %8 = call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %7, i32 %6, i1 1, i1 0, i1 0, i1 0)
+    %8 = call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %7, i32 %6, i1 1, i32 0, i1 0)
     %9 = bitcast <8 x i8> %8 to <2 x float>
     ret <2 x float> %9
 }
@@ -269,7 +269,7 @@ declare i32 @llpc.input.import.builtin.NumSamples.i32.i32(i32) #0
 declare i32 @llpc.input.import.builtin.SamplePatternIdx.i32.i32(i32) #0
 declare i32 @llpc.input.import.builtin.SampleId.i32.i32(i32) #0
 declare <4 x i32> @llpc.descriptor.load.buffer(i32, i32, i32, i1)
-declare <8 x i8> @llpc.buffer.load.v8i8(<4 x i32>, i32, i1, i1, i1, i1)
+declare <8 x i8> @llpc.buffer.load.v8i8(<4 x i32>, i32, i1, i32, i1)
 declare i32 @llvm.amdgcn.mbcnt.lo(i32, i32) #1
 declare i32 @llvm.amdgcn.mbcnt.hi(i32, i32) #1
 

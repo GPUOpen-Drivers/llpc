@@ -43,25 +43,6 @@ target triple = "spir64-unknown-unknown"
 ;   2DArray.sample      v3i32
 ;======================================================================================================================
 
-define i32 @llpc.image.querynonlod.sizelod.1D.i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    ret i32 %3
-}
-
 define i32 @llpc.image.querynonlod.sizelod.1D.i32.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
@@ -79,28 +60,6 @@ define i32 @llpc.image.querynonlod.sizelod.1D.i32.dimaware(
     ret i32 %3
 }
 
-define <2 x i32> @llpc.image.querynonlod.sizelod.2D.v2i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = insertelement <2 x i32> undef, i32 %3, i32 0
-    %6 = insertelement <2 x i32> %5, i32 %4, i32 1
-    ret <2 x i32> %6
-}
-
 define <2 x i32> @llpc.image.querynonlod.sizelod.2D.v2i32.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
@@ -113,28 +72,6 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.2D.v2i32.dimaware(
                                                                      <8 x i32> %resource,
                                                                      i32 0,
                                                                      i32 0)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = insertelement <2 x i32> undef, i32 %3, i32 0
-    %6 = insertelement <2 x i32> %5, i32 %4, i32 1
-    ret <2 x i32> %6
-}
-
-define <2 x i32> @llpc.image.querynonlod.sizelod.Cube.v2i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false)
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 0
     %4 = extractelement <4 x i32> %2, i32 1
@@ -163,30 +100,6 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.Cube.v2i32.dimaware(
     ret <2 x i32> %6
 }
 
-define <3 x i32> @llpc.image.querynonlod.sizelod.3D.v3i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = extractelement <4 x i32> %2, i32 2
-    %6 = insertelement <3 x i32> undef, i32 %3, i32 0
-    %7 = insertelement <3 x i32> %6, i32 %4, i32 1
-    %8 = insertelement <3 x i32> %7, i32 %5, i32 2
-    ret <3 x i32> %8
-}
-
 define <3 x i32> @llpc.image.querynonlod.sizelod.3D.v3i32.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
@@ -199,30 +112,6 @@ define <3 x i32> @llpc.image.querynonlod.sizelod.3D.v3i32.dimaware(
                                                                      <8 x i32> %resource,
                                                                      i32 0,
                                                                      i32 0)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = extractelement <4 x i32> %2, i32 2
-    %6 = insertelement <3 x i32> undef, i32 %3, i32 0
-    %7 = insertelement <3 x i32> %6, i32 %4, i32 1
-    %8 = insertelement <3 x i32> %7, i32 %5, i32 2
-    ret <3 x i32> %8
-}
-
-define <3 x i32> @llpc.image.querynonlod.sizelod.2DArray.v3i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 true)
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 0
     %4 = extractelement <4 x i32> %2, i32 1
@@ -255,31 +144,6 @@ define <3 x i32> @llpc.image.querynonlod.sizelod.2DArray.v3i32.dimaware(
     ret <3 x i32> %8
 }
 
-define <3 x i32> @llpc.image.querynonlod.sizelod.CubeArray.v3i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 true)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = extractelement <4 x i32> %2, i32 2
-    %6 = sdiv i32 %5, 6
-    %7 = insertelement <3 x i32> undef, i32 %3, i32 0
-    %8 = insertelement <3 x i32> %7, i32 %4, i32 1
-    %9 = insertelement <3 x i32> %8, i32 %6, i32 2
-    ret <3 x i32> %9
-}
-
 define <3 x i32> @llpc.image.querynonlod.sizelod.CubeArray.v3i32.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
@@ -303,28 +167,6 @@ define <3 x i32> @llpc.image.querynonlod.sizelod.CubeArray.v3i32.dimaware(
     ret <3 x i32> %9
 }
 
-define <2 x i32> @llpc.image.querynonlod.sizelod.2D.sample.v2i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = insertelement <2 x i32> undef, i32 %3, i32 0
-    %6 = insertelement <2 x i32> %5, i32 %4, i32 1
-    ret <2 x i32> %6
-}
-
 define <2 x i32> @llpc.image.querynonlod.sizelod.2D.sample.v2i32.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
 {
@@ -343,30 +185,6 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.2D.sample.v2i32.dimaware(
     %5 = insertelement <2 x i32> undef, i32 %3, i32 0
     %6 = insertelement <2 x i32> %5, i32 %4, i32 1
     ret <2 x i32> %6
-}
-
-define <3 x i32> @llpc.image.querynonlod.sizelod.2DArray.sample.v3i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 true)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 0
-    %4 = extractelement <4 x i32> %2, i32 1
-    %5 = extractelement <4 x i32> %2, i32 2
-    %6 = insertelement <3 x i32> undef, i32 %3, i32 0
-    %7 = insertelement <3 x i32> %6, i32 %4, i32 1
-    %8 = insertelement <3 x i32> %7, i32 %5, i32 2
-    ret <3 x i32> %8
 }
 
 define <3 x i32> @llpc.image.querynonlod.sizelod.2DArray.sample.v3i32.dimaware(
@@ -421,16 +239,6 @@ define i32 @llpc.image.querynonlod.sizelod.Buffer.i32(
 ;   2DArray.sample
 ;======================================================================================================================
 
-define i32 @llpc.image.querynonlod.levels.1D(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
-}
-
 define i32 @llpc.image.querynonlod.levels.1D.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
 {
@@ -446,16 +254,6 @@ define i32 @llpc.image.querynonlod.levels.1D.dimaware(
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 3
     ret i32 %3
-}
-
-define i32 @llpc.image.querynonlod.levels.2D(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
 }
 
 define i32 @llpc.image.querynonlod.levels.2D.dimaware(
@@ -475,16 +273,6 @@ define i32 @llpc.image.querynonlod.levels.2D.dimaware(
     ret i32 %3
 }
 
-define i32 @llpc.image.querynonlod.levels.Cube(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
-}
-
 define i32 @llpc.image.querynonlod.levels.Cube.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
 {
@@ -500,16 +288,6 @@ define i32 @llpc.image.querynonlod.levels.Cube.dimaware(
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 3
     ret i32 %3
-}
-
-define i32 @llpc.image.querynonlod.levels.1DArray(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
 }
 
 define i32 @llpc.image.querynonlod.levels.1DArray.dimaware(
@@ -529,17 +307,6 @@ define i32 @llpc.image.querynonlod.levels.1DArray.dimaware(
     ret i32 %3
 }
 
-
-define i32 @llpc.image.querynonlod.levels.3D(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
-}
-
 define i32 @llpc.image.querynonlod.levels.3D.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
 {
@@ -555,16 +322,6 @@ define i32 @llpc.image.querynonlod.levels.3D.dimaware(
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 3
     ret i32 %3
-}
-
-define i32 @llpc.image.querynonlod.levels.2DArray(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
 }
 
 define i32 @llpc.image.querynonlod.levels.2DArray.dimaware(
@@ -584,17 +341,6 @@ define i32 @llpc.image.querynonlod.levels.2DArray.dimaware(
     ret i32 %3
 }
 
-
-define i32 @llpc.image.querynonlod.levels.CubeArray(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
-}
-
 define i32 @llpc.image.querynonlod.levels.CubeArray.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
 {
@@ -610,16 +356,6 @@ define i32 @llpc.image.querynonlod.levels.CubeArray.dimaware(
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 3
     ret i32 %3
-}
-
-define i32 @llpc.image.querynonlod.levels.2D.sample(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
 }
 
 define i32 @llpc.image.querynonlod.levels.2D.sample.dimaware(
@@ -639,16 +375,6 @@ define i32 @llpc.image.querynonlod.levels.2D.sample.dimaware(
     ret i32 %3
 }
 
-define i32 @llpc.image.querynonlod.levels.2DArray.sample(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %1 = call i32 @llpc.image.querynonlod.levels(i32 %resourceDescSet,
-                                                 i32 %resourceBinding,
-                                                 i32 %resourceIdx,
-                                                 i32 %imageCallMeta)
-    ret i32 %1
-}
-
 define i32 @llpc.image.querynonlod.levels.2DArray.sample.dimaware(
     i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
 {
@@ -664,53 +390,6 @@ define i32 @llpc.image.querynonlod.levels.2DArray.sample.dimaware(
     %2 = bitcast <4 x float> %1 to <4 x i32>
     %3 = extractelement <4 x i32> %2, i32 3
     ret i32 %3
-}
-
-define i32 @llpc.image.querynonlod.levels(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 undef,
-                                                                        <8 x i32> %resource,
-                                                                        i32 15,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false,
-                                                                        i1 false)
-    %2 = bitcast <4 x float> %1 to <4 x i32>
-    %3 = extractelement <4 x i32> %2, i32 3
-    ret i32 %3
-}
-
-define i32 @llpc.image.querynonlod.samples(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %imageCallMeta) #0
-{
-     %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
-    %1 = extractelement <8 x i32> %resource, i32 3
-
-    ; Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
-    %2 = call i32 @llvm.amdgcn.ubfe.i32(i32 %1, i32 16, i32 4)
-    ; Sample numer = 1 << LAST_LEVEL (LAST_LEVEL = log2(sample numer))
-    %3 = shl i32 1, %2
-
-    ; Extract TYPE(SQ_IMG_RSRC_WORD3, [31:28])
-    %4 = call i32 @llvm.amdgcn.ubfe.i32(i32 %1, i32 28, i32 4)
-
-    ; Check if resource type is 2D MSAA or 2D MSAA array, 14 = SQ_RSRC_IMG_2D_MSAA, 15 = SQ_RSRC_IMG_2D_MSAA_ARRAY
-    %5 = icmp eq i32 %4, 14
-    %6 = icmp eq i32 %4, 15
-    %7 = or i1 %5, %6
-
-    ; Return sample number if resource type is 2D MSAA or 2D MSAA array. Otherwise, return 1.
-    %8 = select i1 %7, i32 %3, i32 1
-
-    ret i32 %8
 }
 
 define i32 @llpc.image.querynonlod.samples.dimaware(

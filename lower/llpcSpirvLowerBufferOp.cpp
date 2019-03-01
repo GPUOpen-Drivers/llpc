@@ -1279,8 +1279,10 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(),
                                                     blockMeta.NonWritable ? true : false)); // readonly
                 }
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+                CoherentFlag coherentFlag = {};
+                coherentFlag.bits.glc = blockMeta.Coherent;
+                coherentFlag.bits.slc = blockMeta.Volatile;
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
                 if (isPushConst == false)
                 {
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
@@ -1365,8 +1367,11 @@ Value* SpirvLowerBufferOp::AddBufferLoadInst(
             {
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.NonWritable)); // readonly
             }
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+            CoherentFlag coherentFlag = {};
+            coherentFlag.bits.glc = blockMeta.Coherent || isCoherent;
+            coherentFlag.bits.slc = blockMeta.Volatile || isVolatile;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
+
             if (isPushConst == false)
             {
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform)); // nonUniform
@@ -1568,11 +1573,11 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
 
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(),
                     blockMeta.NonWritable ? true : false)); // readonly
-
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+                CoherentFlag coherentFlag = {};
+                coherentFlag.bits.glc = blockMeta.Coherent || isCoherent;
+                coherentFlag.bits.slc = blockMeta.Volatile || isVolatile;
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // isNonUniform
-
                 Value* pCompValue = EmitCall(m_pModule, pInstName + suffix, pCastTy, args, NoAttrib, pInsertPos);
 
                 LLPC_ASSERT(CanBitCast(pCastTy, pCompTy));
@@ -1637,9 +1642,10 @@ Value* SpirvLowerBufferOp::AddBufferLoadDescInst(
             args.push_back(pBlockMemberOffset);
             args.push_back(ConstantInt::get(m_pContext->BoolTy(),
                 blockMeta.NonWritable ? true : false)); // readonly
-
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+            CoherentFlag coherentFlag = {};
+            coherentFlag.bits.glc = blockMeta.Coherent || isCoherent;
+            coherentFlag.bits.slc = blockMeta.Volatile || isVolatile;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // isNonUniform
 
             std::string suffix = GetTypeNameForScalarOrVector(pActualLoadTy);
@@ -1834,8 +1840,10 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
                 args.push_back(pDesc);
                 args.push_back(pBlockMemberOffset);
                 args.push_back(pCompValue);
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+                CoherentFlag coherentFlag = {};
+                coherentFlag.bits.glc = blockMeta.Coherent || isCoherent;
+                coherentFlag.bits.slc = blockMeta.Volatile || isVolatile;
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform)); // nonUniform
                 auto pStoreInst = EmitCall(m_pModule,
                                            LlpcName::BufferStore + suffix,
@@ -1896,8 +1904,10 @@ void SpirvLowerBufferOp::AddBufferStoreInst(
             args.push_back(pDesc);
             args.push_back(pBlockMemberOffset);
             args.push_back(pStoreValue);
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent || isCoherent)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile || isVolatile)); // slc
+            CoherentFlag coherentFlag = {};
+            coherentFlag.bits.glc = blockMeta.Coherent || isCoherent;
+            coherentFlag.bits.slc = blockMeta.Volatile || isVolatile;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform)); // nonUniform
 
             std::string suffix = GetTypeNameForScalarOrVector(pActualStoreTy);
@@ -2068,7 +2078,9 @@ Value* SpirvLowerBufferOp::AddBufferAtomicInst(
     {
         args.push_back(pData);
     }
-    args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+    CoherentFlag coherentFlag = {};
+    coherentFlag.bits.slc = blockMeta.Volatile;
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
     args.push_back(ConstantInt::get(m_pContext->BoolTy(), isNonUniform ? true : false)); // nonUniform
 
     if (atomicOpName == "store")
@@ -2418,8 +2430,10 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
                 args.push_back(pDesc);
                 args.push_back(pBlockMemberOffset);
                 args.push_back(pCompValue);
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+                CoherentFlag coherentFlag = {};
+                coherentFlag.bits.glc = blockMeta.Coherent;
+                coherentFlag.bits.slc = blockMeta.Coherent;
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // nonUniform
 
                 EmitCall(m_pModule, LlpcName::BufferStore + suffix, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
@@ -2478,8 +2492,10 @@ void SpirvLowerBufferOp::AddBufferStoreDescInst(
             args.push_back(pDesc);
             args.push_back(pBlockMemberOffset);
             args.push_back(pStoreValue);
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Coherent ? true : false)); // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), blockMeta.Volatile ? true : false)); // slc
+            CoherentFlag coherentFlag = {};
+            coherentFlag.bits.glc = blockMeta.Coherent;
+            coherentFlag.bits.slc = blockMeta.Volatile;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherentFlag.u32All)); // coherent
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // nonUniform
 
             std::string suffix = GetTypeNameForScalarOrVector(pActualStoreTy);
