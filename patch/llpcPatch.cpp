@@ -41,6 +41,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
@@ -126,7 +127,7 @@ void Patch::AddPasses(
     passMgr.add(CreatePassDeadFuncRemove());
 
     // Function inlining and remove dead functions after it
-    passMgr.add(createFunctionInliningPass(InlineThreshold));
+    passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(CreatePassDeadFuncRemove());
 
     // Patch input import and output export operations
@@ -136,7 +137,7 @@ void Patch::AddPasses(
     passMgr.add(CreatePatchDescriptorLoad());
 
     // Prior to general optimization, do function inlining and dead function removal once again
-    passMgr.add(createFunctionInliningPass(InlineThreshold));
+    passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(CreatePassDeadFuncRemove());
 
     // Stop timer for patching passes and start timer for optimization passes.

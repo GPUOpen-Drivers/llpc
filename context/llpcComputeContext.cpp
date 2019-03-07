@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-compute-context"
 
 #include "llpcComputeContext.h"
+#include "SPIRVInternal.h"
 
 using namespace llvm;
 
@@ -119,6 +120,49 @@ uint32_t ComputeContext::GetShaderWaveSize(
     uint32_t waveSize = m_pGpuProperty->waveSize;
     return waveSize;
 
+}
+
+// =====================================================================================================================
+// Gets float control settings of the specified shader stage for the provide floating-point type.
+FloatControl ComputeContext::GetShaderFloatControl(
+    ShaderStage shaderStage,    // Shader stage
+    uint32_t    bitWidth        // Bit width of the floating-point type
+    ) const
+{
+    LLPC_ASSERT(shaderStage == ShaderStageCompute);
+
+    FloatControl floatControl = {};
+    const auto& commonUsage = m_resUsage.builtInUsage.common;
+
+    switch (bitWidth)
+    {
+    case 16:
+        floatControl.denormPerserve             = ((commonUsage.denormPerserve & SPIRVTW_16Bit) != 0);
+        floatControl.denormFlushToZero          = ((commonUsage.denormFlushToZero & SPIRVTW_16Bit) != 0);
+        floatControl.signedZeroInfNanPreserve   = ((commonUsage.signedZeroInfNanPreserve & SPIRVTW_16Bit) != 0);
+        floatControl.roundingModeRTE            = ((commonUsage.roundingModeRTE & SPIRVTW_16Bit) != 0);
+        floatControl.roundingModeRTZ            = ((commonUsage.roundingModeRTZ & SPIRVTW_16Bit) != 0);
+        break;
+    case 32:
+        floatControl.denormPerserve             = ((commonUsage.denormPerserve & SPIRVTW_32Bit) != 0);
+        floatControl.denormFlushToZero          = ((commonUsage.denormFlushToZero & SPIRVTW_32Bit) != 0);
+        floatControl.signedZeroInfNanPreserve   = ((commonUsage.signedZeroInfNanPreserve & SPIRVTW_32Bit) != 0);
+        floatControl.roundingModeRTE            = ((commonUsage.roundingModeRTE & SPIRVTW_32Bit) != 0);
+        floatControl.roundingModeRTZ            = ((commonUsage.roundingModeRTZ & SPIRVTW_32Bit) != 0);
+        break;
+    case 64:
+        floatControl.denormPerserve             = ((commonUsage.denormPerserve & SPIRVTW_64Bit) != 0);
+        floatControl.denormFlushToZero          = ((commonUsage.denormFlushToZero & SPIRVTW_64Bit) != 0);
+        floatControl.signedZeroInfNanPreserve   = ((commonUsage.signedZeroInfNanPreserve & SPIRVTW_64Bit) != 0);
+        floatControl.roundingModeRTE            = ((commonUsage.roundingModeRTE & SPIRVTW_64Bit) != 0);
+        floatControl.roundingModeRTZ            = ((commonUsage.roundingModeRTZ & SPIRVTW_64Bit) != 0);
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return floatControl;
 }
 
 } // Llpc

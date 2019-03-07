@@ -96,14 +96,17 @@ bool PassLoopInfoCollect::runOnModule(
 
     for (auto &func : module)
     {
-        auto& loopInfo = getAnalysis<LoopInfoWrapperPass>(func).getLoopInfo();
-
-        for (auto loop : loopInfo)
+        if (func.isDeclaration() == false)
         {
-            if (NeedDynamicLoopUnroll(loop))
+            auto& loopInfo = getAnalysis<LoopInfoWrapperPass>(func).getLoopInfo();
+
+            for (auto loop : loopInfo)
             {
-                *m_pNeedDynamicLoopUnroll = true;
-                break;
+                if (NeedDynamicLoopUnroll(loop))
+                {
+                    *m_pNeedDynamicLoopUnroll = true;
+                    break;
+                }
             }
         }
     }

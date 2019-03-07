@@ -360,6 +360,7 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
+    ${OP_EMU_LIB_GEN_DIR}/llvmIntrinsicEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD16.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD64.ll

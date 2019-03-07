@@ -375,8 +375,8 @@ define half @llpc.acos.f16(half %x)
 ; GLSL: float16_t atan(float16_t)
 define half @llpc.atan.f16(half %x)
 {
-    ; atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, x <= 1.0
-    ; x = min(1.0, x) / max(1.0, x), make x <= 1.0
+    ; atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, |x| <= 1.0
+    ; x = min(1.0, x) / max(1.0, x), make |x| <= 1.0
 
     %1 = call half @llvm.fabs.f16(half %x)
     %2 = call half @llvm.maxnum.f16(half %1, half 1.0)
@@ -423,7 +423,7 @@ define half @llpc.atan.f16(half %x)
     ret half %33
 }
 
-; GLSL: float16_t atan(half, float16_t)
+; GLSL: float16_t atan(float16_t, float16_t)
 define half @llpc.atan2.f16(half %y, half %x)
 {
     ; yox = (|x| == |y|) ? ((x == y) ? 1.0 : -1.0) : y/x
@@ -432,27 +432,29 @@ define half @llpc.atan2.f16(half %y, half %x)
     ; p1 = sgn(y) * PI
     ; atanyox = atan(yox)
     ;
-    ; if (x != 0.0)
-    ;     atan(y, x) = (x < 0.0) ? p1 + atanyox : atanyox
+    ; if (y != 0.0)
+    ;     if (x != 0.0)
+    ;         atan(y, x) = (x < 0.0) ? p1 + atanyox : atanyox
+    ;     else
+    ;         atan(y, x) = p0
     ; else
-    ;     atan(y, x) = p0
+    ;     atan(y, x) = (x > 0.0) ? 0 : PI
 
     %1 = call half @llvm.fabs.f16(half %x)    ; %1 = |x|
     %2 = call half @llvm.fabs.f16(half %y)    ; %2 = |y|
-    %3 = call half @llpc.fsign.f16(half %y)   ; %3 = syn(y)
+    %3 = call half @llpc.fsign.f16(half %y)   ; %3 = sgn(y)
 
     ; 0x3FF9200000000000: PI/2 = 1.57079637
-    %4 = fmul half %3, 0x3FF9200000000000     ; %4 = p0 = syn(y) * PI/2
+    %4 = fmul half %3, 0x3FF9200000000000     ; %4 = p0 = sgn(y) * PI/2
     ; 0x4009200000000000: PI = 3.14159274
-    %5 = fmul half %3, 0x4009200000000000     ; %5 = p1 = syn(y) * PI
+    %5 = fmul half %3, 0x4009200000000000     ; %5 = p1 = sgn(y) * PI
 
     %6 = fcmp oeq half %1, %2                 ; %6 = (|x| == |y|)
     %7 = fcmp oeq half %x, %y                 ; %7 = (x == y)
     %8 = select i1 %7, half 1.0, half -1.0    ; %8 = (x == y) ? 1.0 : -1.0
 
-    ; NOTE: "atan" is very sensitive to the value of y_over_x, so we have to use high accuracy division.
-    %9 = fdiv half %y, %x
-                                              ; %9  = y/x
+    %9 = fdiv half %y, %x                     ; %9  = y/x
+
     %10 = select i1 %6, half %8, half %9      ; %10 = yox = (|x| == |y|) ? ((x == y) ? 1.0 : -1.0) : y/x
     %11 = call half @llpc.atan.f16(half %10)  ; %11 = atanyox = atan(yox)
 
@@ -461,9 +463,16 @@ define half @llpc.atan2.f16(half %y, half %x)
     %14 = select i1 %13, half %12, half %11   ; %14 = (x < 0.0) ? atanyox + p1 : atanyox
 
     %15 = fcmp one half %x, 0.0               ; %15 = (x != 0.0)
-    %16 = select i1 %15, half %14, half %4    ; %16 = atan(y, x)
+    %16 = select i1 %15, half %14, half %4    ; %16 = (x != 0.0) ? ((x < 0.0) ? atanyox + p1 : atanyox) : p0
 
-    ret half %16
+    %17 = fcmp ogt half %x, 0.0               ; %17 = (x > 0.0)
+    ; 0x4009200000000000: PI = 3.14159274
+    %18 = select i1 %17, half 0.0, half 0x4009200000000000  ; %18 = (x > 0.0) ? 0.0 : PI
+
+    %19 = fcmp one half %y, 0.0               ; %19 = (y != 0.0)
+    %20 = select i1 %19, half %16, half %18   ; %20 = atan(y, x)
+
+    ret half %20
 }
 
 ; GLSL: float16_t sinh(float16_t)
@@ -614,13 +623,13 @@ define half @llpc.inverseSqrt.f16(half %x) #0
 ; >>>  Common Functions
 ; =====================================================================================================================
 
-; GLSL: float16_t abs(float16_t)
+; GLSL: float16_t sign(float16_t)
 define half @llpc.fsign.f16(half %x) #0
 {
     %con1 = fcmp ogt half %x, 0.0
     %ret1 = select i1 %con1, half 1.0, half %x
     %con2 = fcmp oge half %ret1, 0.0
-    %ret2 = select i1 %con2, half %ret1,half -1.0
+    %ret2 = select i1 %con2, half %ret1, half -1.0
     ret half %ret2
 }
 
@@ -853,119 +862,22 @@ define spir_func { <4 x half>, <4 x half> } @_Z10modfStructDv4_Dh(
     ret { <4 x half>, <4 x half> } %18
 }
 
-; GLSL: float16_t mix(float16_t, float16_t, float16_t)
-define spir_func half @_Z4fmixDhDhDh(
-    half %x, half %y, half %a) #0
-{
-    %1 = fsub half %y, %x
-    %2 = tail call half @llvm.fmuladd.f16(half %1, half %a, half %x)
-
-    ret half %2
-}
-
-; GLSL: f16vec2 mix(f16vec2, f16vec2, f16vec2)
-define spir_func <2 x half> @_Z4fmixDv2_DhDv2_DhDv2_Dh(
-    <2 x half> %x, <2 x half> %y, <2 x half> %a) #0
-{
-    %1 = fsub <2 x half> %y, %x
-    %2 = tail call <2 x half> @llvm.fmuladd.v2f16(<2 x half> %1, <2 x half> %a, <2 x half> %x)
-
-    ret <2 x half> %2
-}
-
-; GLSL: f16vec3 mix(f16vec3, f16vec3, f16vec3)
-define spir_func <3 x half> @_Z4fmixDv3_DhDv3_DhDv3_Dh(
-    <3 x half> %x, <3 x half> %y, <3 x half> %a) #0
-{
-    %1 = fsub <3 x half> %y, %x
-    %2 = tail call <3 x half> @llvm.fmuladd.v3f16(<3 x half> %1, <3 x half> %a, <3 x half> %x)
-
-    ret <3 x half> %2
-}
-
-; GLSL: f16vec4 mix(f16vec4, f16vec4, f16vec4)
-define spir_func <4 x half> @_Z4fmixDv4_DhDv4_DhDv4_Dh(
-    <4 x half> %x, <4 x half> %y, <4 x half> %a) #0
-{
-    %1 = fsub <4 x half> %y, %x
-    %2 = tail call <4 x half> @llvm.fmuladd.v4f16(<4 x half> %1, <4 x half> %a, <4 x half> %x)
-
-    ret <4 x half> %2
-}
-
-; GLSL: float16_t min(float16_t, float16_t)
-define spir_func half @_Z4fminDhDh(
-    half %x, half %y) #0
+; GLSL: float16_t nmin(float16_t, float16_t)
+define half @llpc.nmin.f16(half %x, half %y) #0
 {
     %1 = call half @llvm.minnum.f16(half %x, half %y)
-
     ret half %1
 }
 
-; GLSL: f16vec2 min(f16vec2, f16vec2)
-define spir_func <2 x half> @_Z4fminDv2_DhDv2_Dh(
-    <2 x half> %x, <2 x half> %y) #0
-{
-    %1 = call <2 x half> @llvm.minnum.v2f16(<2 x half> %x, <2 x half> %y)
-
-    ret <2 x half> %1
-}
-
-; GLSL: f16vec3 min(f16vec3, f16vec3)
-define spir_func <3 x half> @_Z4fminDv3_DhDv3_Dh(
-    <3 x half> %x, <3 x half> %y) #0
-{
-    %1 = call <3 x half> @llvm.minnum.v3f16(<3 x half> %x, <3 x half> %y)
-
-    ret <3 x half> %1
-}
-
-; GLSL: f16vec4 min(f16vec4, f16vec4)
-define spir_func <4 x half> @_Z4fminDv4_DhDv4_Dh(
-    <4 x half> %x, <4 x half> %y) #0
-{
-    %1 = call <4 x half> @llvm.minnum.v4f16(<4 x half> %x, <4 x half> %y)
-
-    ret <4 x half> %1
-}
-
-; GLSL: float16_t max(float16_t, float16_t)
-define spir_func half @_Z4fmaxDhDh(
-    half %x, half %y) #0
+; GLSL: float16_t nmax(float16_t, float16_t)
+define half @llpc.nmax.f16(half %x, half %y) #0
 {
     %1 = call half @llvm.maxnum.f16(half %x, half %y)
-
     ret half %1
-}
-
-; GLSL: f16vec2 max(f16vec2, f16vec2)
-define spir_func <2 x half> @_Z4fmaxDv2_DhDv2_Dh(
-    <2 x half> %x, <2 x half> %y) #0
-{
-    %1 = call <2 x half> @llvm.maxnum.v2f16(<2 x half> %x, <2 x half> %y)
-
-    ret <2 x half> %1
-}
-
-; GLSL: f16vec3 max(f16vec3, f16vec3)
-define spir_func <3 x half> @_Z4fmaxDv3_DhDv3_Dh(
-    <3 x half> %x, <3 x half> %y) #0
-{
-    %1 = call <3 x half> @llvm.maxnum.v3f16(<3 x half> %x, <3 x half> %y)
-
-    ret <3 x half> %1
-}
-
-; GLSL: f16vec4 max(f16vec4, f16vec4)
-define spir_func <4 x half> @_Z4fmaxDv4_DhDv4_Dh(
-    <4 x half> %x, <4 x half> %y) #0
-{
-    %1 = call <4 x half> @llvm.maxnum.v4f16(<4 x half> %x, <4 x half> %y)
-    ret <4 x half> %1
 }
 
 ; GLSL: float16_t clamp(float16_t, float16_t ,float16_t)
-define half @_Z6fclampDhDhDh(half %x, half %minVal, half %maxVal) #0
+define half @llpc.fclamp.f16(half %x, half %minVal, half %maxVal) #0
 {
     %1 = call half @llvm.maxnum.f16(half %x, half %minVal)
     %2 = call half @llvm.minnum.f16(half %1, half %maxVal)
@@ -973,34 +885,22 @@ define half @_Z6fclampDhDhDh(half %x, half %minVal, half %maxVal) #0
     ret half %2
 }
 
-; GLSL: f16vec2 clamp(f16vec2, f16vec2 ,f16vec2)
-define spir_func <2 x half> @_Z6fclampDv2_DhDv2_DhDv2_Dh(
-    <2 x half> %x, <2 x half> %minVal, <2 x half> %maxVal) #0
+; GLSL: float16_t nclamp(float16_t, float16_t ,float16_t)
+define half @llpc.nclamp.f16(half %x, half %minVal, half %maxVal) #0
 {
-    %1 = call <2 x half> @llvm.maxnum.v2f16(<2 x half> %x, <2 x half> %minVal)
-    %2 = call <2 x half> @llvm.minnum.v2f16(<2 x half> %1, <2 x half> %maxVal)
+    %1 = call half @llvm.maxnum.f16(half %x, half %minVal)
+    %2 = call half @llvm.minnum.f16(half %1, half %maxVal)
 
-    ret <2 x half> %2
+    ret half %2
 }
 
-; GLSL: f16vec3 clamp(f16vec3, f16vec3 ,f16vec3)
-define spir_func <3 x half> @_Z6fclampDv3_DhDv3_DhDv3_Dh(
-    <3 x half> %x, <3 x half> %minVal, <3 x half> %maxVal) #0
+; GLSL: float16_t mix(float16_t, float16_t, float16_t)
+define half @llpc.fmix.f16(half %x, half %y, half %a) #0
 {
-    %1 = call <3 x half> @llvm.maxnum.v3f16(<3 x half> %x, <3 x half> %minVal)
-    %2 = call <3 x half> @llvm.minnum.v3f16(<3 x half> %1, <3 x half> %maxVal)
+    %1 = fsub half %y, %x
+    %2 = tail call half @llvm.fmuladd.f16(half %1, half %a, half %x)
 
-    ret <3 x half> %2
-}
-
-; GLSL: f16vec4 clamp(f16vec4, f16vec4 ,f16vec4)
-define spir_func <4 x half> @_Z6fclampDv4_DhDv4_DhDv4_Dh(
-    <4 x half> %x, <4 x half> %minVal, <4 x half> %maxVal) #0
-{
-    %1 = call <4 x half> @llvm.maxnum.v4f16(<4 x half> %x, <4 x half> %minVal)
-    %2 = call <4 x half> @llvm.minnum.v4f16(<4 x half> %1, <4 x half> %maxVal)
-
-    ret <4 x half> %2
+    ret half %2
 }
 
 ; GLSL: float16_t step(float16_t, float16_t)

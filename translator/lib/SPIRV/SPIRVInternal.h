@@ -1323,16 +1323,15 @@ union ShaderImageMemoryMetadata {
 
 /// Flags used for floating-point control
 union ShaderFloatControlFlags {
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
   struct {
-  uint32_t DenormPerserve           : 4;
-  uint32_t DenormFlushToZero        : 4;
-  uint32_t SignedZeroInfNanPreserve : 4;
-  uint32_t RoundingModeRTE          : 4;
-  uint32_t RoundingModeRTZ          : 4;
+  uint32_t DenormPerserve           : 4;    // Preserve denormals
+  uint32_t DenormFlushToZero        : 4;    // Flush denormals to zeros
+  uint32_t SignedZeroInfNanPreserve : 4;    // Preserve signed zero, INF, NaN
+  uint32_t RoundingModeRTE          : 4;    // Rounding to even
+  uint32_t RoundingModeRTZ          : 4;    // Rounding to zero
+
   uint32_t Unused                   : 12;
   };
-#endif
   uint32_t U32All;
 };
 

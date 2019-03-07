@@ -391,14 +391,12 @@ void SpirvLowerResourceCollect::CollectExecutionModeUsage()
                 execModeMeta.U32All[3] =
                     mdconst::dyn_extract<ConstantInt>(pArgMetaNode->getOperand(4))->getZExtValue();
 
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
                 auto fpControlFlags = execModeMeta.common.FpControlFlags;
                 m_pResUsage->builtInUsage.common.denormPerserve           = fpControlFlags.DenormPerserve;
                 m_pResUsage->builtInUsage.common.denormFlushToZero        = fpControlFlags.DenormFlushToZero;
                 m_pResUsage->builtInUsage.common.signedZeroInfNanPreserve = fpControlFlags.SignedZeroInfNanPreserve;
                 m_pResUsage->builtInUsage.common.roundingModeRTE          = fpControlFlags.RoundingModeRTE;
                 m_pResUsage->builtInUsage.common.roundingModeRTZ          = fpControlFlags.RoundingModeRTZ;
-#endif
 
                 if (m_shaderStage == ShaderStageTessControl)
                 {

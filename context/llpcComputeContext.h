@@ -79,6 +79,9 @@ public:
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() { LLPC_NEVER_CALLED(); }
 
+    // Gets float control settings of the specified shader stage for the provide floating-point type.
+    virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const;
+
     // Gets the count of vertices per primitive
     virtual uint32_t GetVerticesPerPrimitive() const { LLPC_NEVER_CALLED(); return 0; }
 

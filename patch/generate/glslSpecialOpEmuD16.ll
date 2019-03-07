@@ -38,16 +38,17 @@ define half @llpc.dpdx.f16(half %p) #0
     %p.i32 = zext i16 %p.i16 to i32
     %p0.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 85, i32 15, i32 15, i1 1)
     %p0.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.dpp)
-    %p0 = bitcast i32 %p0.i32 to float
+    %p0.i16 = trunc i32 %p0.i32 to i16
+    %p0 = bitcast i16 %p0.i16 to half
 
     ; Broadcast pix0, [0,1,2,3]->[0,0,0,0], so dpp_ctrl = 0(0b00000000)
     %p1.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 0, i32 15, i32 15, i1 1)
     %p1.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.dpp)
-    %p1 = bitcast i32 %p1.i32 to float
+    %p1.i16 = trunc i32 %p1.i32 to i16
+    %p1 = bitcast i16 %p1.i16 to half
 
     ; Calculate the delta value p0 - p1
-    %dpdx.f32 = fsub float %p0, %p1
-    %dpdx = fptrunc float %dpdx.f32 to half
+    %dpdx = fsub half %p0, %p1
     ret half %dpdx
 }
 
@@ -59,15 +60,17 @@ define half @llpc.dpdy.f16(half %p) #0
     %p.i32 = zext i16 %p.i16 to i32
     %p0.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 170, i32 15, i32 15, i1 1)
     %p0.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.dpp)
-    %p0 = bitcast i32 %p0.i32 to float
+    %p0.i16 = trunc i32 %p0.i32 to i16
+    %p0 = bitcast i16 %p0.i16 to half
+
     ; Broadcast pix0, [0,1,2,3]->[0,0,0,0], so dpp_ctrl = 0(0b00000000)
     %p1.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 0, i32 15, i32 15, i1 1)
     %p1.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.dpp)
-    %p1 = bitcast i32 %p1.i32 to float
+    %p1.i16 = trunc i32 %p1.i32 to i16
+    %p1 = bitcast i16 %p1.i16 to half
 
     ; Calculate the delta value p0 - p1
-    %dpdy.f32 = fsub float %p0, %p1
-    %dpdy = fptrunc float %dpdy.f32 to half
+    %dpdy =  fsub half %p0, %p1
     ret half %dpdy
 }
 
@@ -90,15 +93,17 @@ define half @llpc.dpdxFine.f16(half %p) #0
     %p.i32 = zext i16 %p.i16 to i32
     %p0.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 245, i32 15, i32 15, i1 1)
     %p0.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.dpp)
-    %p0 = bitcast i32 %p0.i32 to float
+    %p0.i16 = trunc i32 %p0.i32 to i16
+    %p0 = bitcast i16 %p0.i16 to half
+
     ; permute quad, [0,1,2,3]->[0,0,2,2], so dpp_ctrl = 160(0b10100000)
     %p1.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 160, i32 15, i32 15, i1 1)
     %p1.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.dpp)
-    %p1 = bitcast i32 %p1.i32 to float
+    %p1.i16 = trunc i32 %p1.i32 to i16
+    %p1 = bitcast i16 %p1.i16 to half
 
     ; Calculate the delta value p0 - p1
-    %dpdx.f32 = fsub float %p0, %p1
-    %dpdx = fptrunc float %dpdx.f32 to half
+    %dpdx = fsub half %p0, %p1
     ret half %dpdx
 }
 
@@ -110,15 +115,17 @@ define half @llpc.dpdyFine.f16(half %p) #0
     %p.i32 = zext i16 %p.i16 to i32
     %p0.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 238, i32 15, i32 15, i1 1)
     %p0.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.dpp)
-    %p0 = bitcast i32 %p0.i32 to float
+    %p0.i16 = trunc i32 %p0.i32 to i16
+    %p0 = bitcast i16 %p0.i16 to half
+
     ; permute quad, [0,1,2,3]->[0,1,0,1], so dpp_ctrl = 68(0b01000100)
     %p1.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 68, i32 15, i32 15, i1 1)
     %p1.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.dpp)
-    %p1 = bitcast i32 %p1.i32 to float
+    %p1.i16 = trunc i32 %p1.i32 to i16
+    %p1 = bitcast i16 %p1.i16 to half
 
     ; Calculate the delta value
-    %dpdy.f32 = fsub float %p0, %p1
-    %dpdy = fptrunc float %dpdy.f32 to half
+    %dpdy =  fsub half %p0, %p1
     ret half %dpdy
 }
 

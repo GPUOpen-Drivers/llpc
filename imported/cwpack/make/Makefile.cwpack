@@ -1,0 +1,77 @@
+##
+ #######################################################################################################################
+ #
+ #  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ #
+ #  Permission is hereby granted, free of charge, to any person obtaining a copy
+ #  of this software and associated documentation files (the "Software"), to deal
+ #  in the Software without restriction, including without limitation the rights
+ #  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ #  copies of the Software, and to permit persons to whom the Software is
+ #  furnished to do so, subject to the following conditions:
+ #
+ #  The above copyright notice and this permission notice shall be included in all
+ #  copies or substantial portions of the Software.
+ #
+ #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ #  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ #  SOFTWARE.
+ #
+ #######################################################################################################################
+
+####
+#
+#   Makefile for building CWPack
+#
+####
+
+#-----------------------------------------------------------------------
+# Common CWPack Implementation Files
+#-----------------------------------------------------------------------
+
+vpath %.c $(CWPACK_DEPTH)/src
+
+CFILES += cwpack.c
+
+#-----------------------------------------------------------------------
+# Common CWPack Includes
+#-----------------------------------------------------------------------
+
+LCINCS   += -I$(CWPACK_DEPTH)/inc
+LCXXINCS += -I$(CWPACK_DEPTH)/inc
+
+#-----------------------------------------------------------------------
+# Common CWPack Build Options
+#-----------------------------------------------------------------------
+
+# Fix for error X "can not be used when making a shared object;
+# recompile with -fPIC"
+# -fPIC signifies Position Independent Code and is specified when
+# building *.so shared objects.
+ifeq ($(PAL_OS_BUILD), lnx64a)
+    LCXXOPTS += -fPIC
+    LCOPTS += -fPIC
+endif
+
+#-----------------------------------------------------------------------
+# Common CWPack Defines
+#-----------------------------------------------------------------------
+
+LCDEFS += -DCOMPILE_FOR_LITTLE_ENDIAN=1
+
+# WA - We currently do not propagate default calling convention build
+#      flag from LCXXOPTS to LCOPTS, partly because it breaks jemalloc.
+#      Using a define to make cwpack use the correct calling convention.
+ifeq ($(PAL_OS_BUILD), wNow)
+    ifneq ($(filter /Gr, $(LCXXOPTS)),)
+        LCDEFS += -DCWP_CALL=__fastcall
+    else
+        ifneq ($(filter /Gz, $(LCXXOPTS)),)
+            LCDEFS += -DCWP_CALL=__stdcall
+        endif
+    endif
+endif

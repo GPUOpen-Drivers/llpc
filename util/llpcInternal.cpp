@@ -293,6 +293,49 @@ ShaderStage GetShaderStageFromFunction(
 }
 
 // =====================================================================================================================
+// Gets the shader stage from the specified calling convention.
+ShaderStage GetShaderStageFromCallingConv(
+    uint32_t        stageMask,  // Shader stage mask for the pipeline
+    CallingConv::ID callConv)   // Calling convention
+{
+    ShaderStage shaderStage = ShaderStageInvalid;
+
+    bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0;
+    bool hasTs = (((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0) ||
+                  ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0));
+
+    switch (callConv)
+    {
+    case CallingConv::AMDGPU_PS:
+        shaderStage = ShaderStageFragment;
+        break;
+    case CallingConv::AMDGPU_LS:
+        shaderStage = ShaderStageVertex;
+        break;
+    case CallingConv::AMDGPU_HS:
+        shaderStage = ShaderStageTessControl;
+        break;
+    case CallingConv::AMDGPU_ES:
+        shaderStage = hasTs ? ShaderStageTessEval : ShaderStageVertex;
+        break;
+    case CallingConv::AMDGPU_GS:
+        shaderStage = ShaderStageGeometry;
+        break;
+    case CallingConv::AMDGPU_VS:
+        shaderStage = hasGs ? ShaderStageCopyShader : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
+        break;
+    case CallingConv::AMDGPU_CS:
+        shaderStage = ShaderStageCompute;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return shaderStage;
+}
+
+// =====================================================================================================================
 // Gets the argument from the specified function according to the argument index.
 Value* GetFunctionArgument(
     Function* pFunc,    // [in] LLVM function

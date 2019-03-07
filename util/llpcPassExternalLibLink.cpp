@@ -158,6 +158,7 @@ bool PassExternalLibLink::runOnModule(
             SmallVector<ReturnInst*, 8> retInsts;
             CloneFunctionInto(pFunc, pLibFunc, *pValueMap, true, retInsts);
             pFunc->setLinkage(GlobalValue::InternalLinkage);
+            pFunc->addFnAttr(Attribute::AlwaysInline);
         }
 
         if (satisfiedCount == 0)

@@ -136,10 +136,12 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     if (pLsEntryPoint != nullptr)
     {
         pLsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+        pLsEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
     LLPC_ASSERT(pHsEntryPoint != nullptr);
     pHsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    pHsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
     uint64_t inRegMask = 0;
     auto pEntryPointTy = GenerateLsHsEntryPointType(&inRegMask);
@@ -601,10 +603,12 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     if (pEsEntryPoint != nullptr)
     {
         pEsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+        pEsEntryPoint->addFnAttr(Attribute::AlwaysInline);
     }
 
     LLPC_ASSERT(pGsEntryPoint != nullptr);
     pGsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
+    pGsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
     auto pModule = pGsEntryPoint->getParent();
     const bool hasTs = (m_hasTcs || m_hasTes);

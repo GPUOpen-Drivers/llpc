@@ -1,0 +1,174 @@
+##
+ #######################################################################################################################
+ #
+ #  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ #
+ #  Permission is hereby granted, free of charge, to any person obtaining a copy
+ #  of this software and associated documentation files (the "Software"), to deal
+ #  in the Software without restriction, including without limitation the rights
+ #  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ #  copies of the Software, and to permit persons to whom the Software is
+ #  furnished to do so, subject to the following conditions:
+ #
+ #  The above copyright notice and this permission notice shall be included in all
+ #  copies or substantial portions of the Software.
+ #
+ #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ #  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ #  SOFTWARE.
+ #
+ #######################################################################################################################
+
+include $(ICD_DEPTH)/make/icddefs
+
+include $(ICD_DEPTH)/make/Makefile.$(ICD_PLATFORM).icd
+
+ifeq ($(XGL_LLVM_UPSTREAM), 1)
+    LCXXDEFS += -DXGL_LLVM_UPSTREAM
+endif
+
+ifeq ($(LLPC_ENABLE_SPIRV_OPT), 1)
+    LCXXDEFS += -DLLPC_ENABLE_SPIRV_OPT
+endif
+
+LCXXINCS += -I$(LLVM_DEPTH)/Bitcode
+LCXXINCS += -I$(LLVM_DEPTH)/include
+LCXXINCS += -I$(ICD_DEPTH)/build/$(ICD_OS_BUILD)/imported/llvm/B_$(BUILD_TYPE)/include
+
+LCXXINCS += -I$(ICD_DEPTH)/api/include/khronos
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/imported/chip/gfx6
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/imported/chip/gfx9
+ifeq ($(ICD_BUILD_LLPCONLY),1)
+    LCXXINCS += -I$(ICD_DEPTH)/api/llpc/imported/cwpack/src/util
+endif
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/imported/cwpath/inc
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/imported/spirv
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/include
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/translator/lib/SPIRV/libSPIRV
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/util
+LCXXINCS += -I$(ICD_DEPTH)/api/llpc/tool/vfx
+
+vpath %.cpp $(ICD_DEPTH)/api/llpc/tool
+
+CPPFILES +=             \
+    amdllpc.cpp         \
+    llpcAutoLayout.cpp
+
+EXE_TARGET = amdllpc
+
+ifeq ($(ICD_PLATFORM), win)
+    LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \
+                -DUNICODE                       \
+                -D_UNICODE
+endif
+
+LCXXDEFS += -DLITTLEENDIAN_CPU
+
+ifeq ($(ICD_PLATFORM), win)
+    LCXXOPTS += /wd4005 \
+                /wd4007 \
+                /wd4141 \
+                /wd4146 \
+                /wd4244 \
+                /wd4245 \
+                /wd4267 \
+                /wd4624 \
+                /wd4800 \
+                /wd4996 \
+                /wd6001 \
+                /wd6102 \
+                /wd6246 \
+                /wd6269 \
+                /wd6297 \
+                /wd6323 \
+                /wd6326 \
+                /wd28183 \
+                /wd28196
+
+# Remove DEBUG macro definition as LLVM header files redefine it for a
+# different purpose.
+GCXXDEFS := $(filter-out /DDEBUG,$(GCXXDEFS))
+endif
+
+ifneq ($(ICD_PLATFORM), win)
+# Non-windows: gcc-style options.
+LCXXOPTS +=                                \
+        -Wno-error=switch                  \
+	    -fno-strict-aliasing               \
+	    -Wno-error=sign-compare            \
+	    -Wno-error=parentheses             \
+	    -Wno-error=delete-non-virtual-dtor \
+	    -Wno-sign-compare
+    ifeq ($(USING_CLANG),)
+        LCXXOPTS += -Wno-error=maybe-uninitialized
+    else
+        LCXXOPTS += -Wno-error=conditional-uninitialized
+    endif
+
+# Remove DEBUG macro definition as LLVM header files redefine it for a
+# different purpose.
+GCXXDEFS := $(filter-out -DDEBUG,$(GCXXDEFS))
+endif
+
+# Turn on "warnings as errors" if enabled.
+ifeq ($(ICD_PLATFORM), win)
+    ifeq ($(ICD_ANALYSIS_WARNINGS_AS_ERRORS), 1)
+        LCXXOPTS += /analyze
+    else
+        LCXXOPTS += /analyze:WX-
+    endif
+endif
+
+# Replace calling convention /Gr (__fastcall) with /Gd (__cdecl) to link LLVM.
+ifeq ($(ICD_PLATFORM), win)
+    LCXXOPTS := $(filter-out /Gr, $(LCXXOPTS))
+    LCXXOPTS += /Gd
+endif
+
+LLLIBS += ../../$(BUILD_DIR)/icdapillpc$(LIB_EXT) \
+          ../../tool/vfx/$(BUILD_DIR)/icdapillpctoolvfx$(LIB_EXT) \
+	      ../../../../imported/llvm/$(BUILD_DIR)/icdimportedllvm$(LIB_EXT)
+
+ifneq ($(ICD_PLATFORM), win)
+    LLLIBS += ../../../../imported/llvm/$(BUILD_DIR)/lib/libLLVMAsmParser$(LIB_EXT) \
+              ../../../../imported/llvm/$(BUILD_DIR)/lib/libLLVMSupport$(LIB_EXT)
+else
+    LLLIBS += ../../../../imported/llvm/$(BUILD_DIR)/lib/LLVMAsmParser$(LIB_EXT)
+endif
+
+ifeq ($(BUILD_WIN_VLD), 1)
+    LCXXINCS += -I$(ICD_DEPTH)/../tools/winVisualMemDetector/include
+    LCXXDEFS += -DBUILD_WIN_VLD=1
+    ifeq ($(ICD_COMPILE_TYPE), 64a)
+        LLLIBS += $(ICD_DEPTH)/../tools/winVisualMemDetector/lib/Win64/vld.lib
+    else
+        LLLIBS += $(ICD_DEPTH)/../tools/winVisualMemDetector/lib/Win32/vld.lib
+    endif
+endif
+
+ifeq ($(PLATFORM_TYPE), win)
+    ifeq ($(BUILD_TYPE), dbg)
+        LLOPTS += -IGNORE:4099
+    else
+        LLOPTS += /LTCG
+    endif
+endif
+
+ifneq ($(ICD_PLATFORM), win)
+    # Non-windows: gcc-style options.
+    LLOPTS += -lstdc++  \
+              -lm       \
+              -lpthread \
+              -ldl
+
+    # CwPack
+    CWPACK_DEPTH = $(LLPC_DEPTH)/imported/cwpack
+    include $(CWPACK_DEPTH)/make/Makefile.cwpack
+endif
+
+include $(ICD_DEPTH)/make/icdrules
+
