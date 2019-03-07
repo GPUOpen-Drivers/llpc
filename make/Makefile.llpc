@@ -1,0 +1,417 @@
+##
+ #######################################################################################################################
+ #
+ #  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ #
+ #  Permission is hereby granted, free of charge, to any person obtaining a copy
+ #  of this software and associated documentation files (the "Software"), to deal
+ #  in the Software without restriction, including without limitation the rights
+ #  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ #  copies of the Software, and to permit persons to whom the Software is
+ #  furnished to do so, subject to the following conditions:
+ #
+ #  The above copyright notice and this permission notice shall be included in all
+ #  copies or substantial portions of the Software.
+ #
+ #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ #  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ #  SOFTWARE.
+ #
+ #######################################################################################################################
+
+ifndef LLPC_VULKAN_INCLUDE
+    LLPC_VULKAN_INCLUDE = $(VK_SDK_PATH)/Include/vulkan
+endif
+
+LCXXINCS += -I$(LLPC_VULKAN_INCLUDE)
+LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx6
+LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx9
+ifeq ($(ICD_BUILD_LLPCONLY),1)
+    LCXXINCS += -I$(LLPC_DEPTH)/imported/cwpack/src/util
+endif
+LCXXINCS += -I$(LLPC_DEPTH)/include
+LCXXINCS += -I$(LLPC_DEPTH)/patch
+LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9
+LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx6/chip
+LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9/chip
+LCXXINCS += -I$(LLPC_DEPTH)/util
+
+ifeq ($(LLPC_BUILD_VEGA20), 1)
+    LCXXDEFS += -DLLPC_BUILD_VEGA20=1 -DCHIP_HDR_VEGA20=1
+endif
+
+ifeq ($(LLPC_BUILD_RAVEN2), 1)
+    LCXXDEFS += -DLLPC_BUILD_RAVEN2=1 -DCHIP_HDR_RAVEN2=1
+endif
+
+ifeq ($(ICD_BUILD_LLPC), 1)
+    LCXXINCS += -I$(LLVM_DEPTH)/include
+    LCXXINCS += -I$(LLVM_BUILD_DIR)/include
+
+    LLVM_BIN_DIR = $(LLVM_BUILD_DIR)/bin/
+
+    ifeq ($(XGL_LLVM_UPSTREAM), 1)
+        LCXXDEFS += -DXGL_LLVM_UPSTREAM
+    endif
+
+    ifeq ($(LLPC_ENABLE_SPIRV_OPT), 1)
+        LCXXDEFS += -DLLPC_ENABLE_SPIRV_OPT
+    endif
+
+    LCXXINCS += -I$(LLPC_DEPTH)/context
+
+    LCXXINCS += -I$(LLPC_DEPTH)/builder
+    LCXXINCS += -I$(LLPC_DEPTH)/imported/spirv
+    LCXXINCS += -I$(LLPC_DEPTH)/lower
+    LCXXINCS += -I$(LLPC_DEPTH)/patch/generate
+    LCXXINCS += -I$(LLPC_DEPTH)/translator/include
+    LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV
+    LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
+    LCXXINCS += -I$(LLPC_DEPTH)/translator/lib/SPIRV/Mangler
+
+    vpath %.cpp $(LLPC_DEPTH)/builder
+    vpath %.cpp $(LLPC_DEPTH)/context
+    vpath %.cpp $(LLPC_DEPTH)/lower
+    vpath %.cpp $(LLPC_DEPTH)/patch
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6/chip
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9/chip
+    vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV
+    vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/libSPIRV
+    vpath %.cpp $(LLPC_DEPTH)/translator/lib/SPIRV/Mangler
+    vpath %.cpp $(LLPC_DEPTH)/util
+
+    # llpc/builder
+    CPPFILES +=                             \
+        llpcBuilder.cpp                     \
+        llpcBuilderImpl.cpp                 \
+        llpcBuilderImplDesc.cpp             \
+        llpcBuilderImplMisc.cpp             \
+        llpcBuilderRecorder.cpp             \
+        llpcBuilderReplayer.cpp
+
+    # llpc/context
+    CPPFILES +=                             \
+        llpcCompiler.cpp                    \
+        llpcContext.cpp                     \
+        llpcComputeContext.cpp              \
+        llpcGraphicsContext.cpp             \
+        llpcPipelineContext.cpp             \
+        llpcShaderCache.cpp                 \
+        llpcShaderCacheManager.cpp
+
+    # llpc/lower
+    CPPFILES +=                                 \
+        llpcSpirvLower.cpp                      \
+        llpcSpirvLowerAccessChain.cpp           \
+        llpcSpirvLowerAggregateLoadStore.cpp    \
+        llpcSpirvLowerAlgebraTransform.cpp      \
+        llpcSpirvLowerBufferOp.cpp              \
+        llpcSpirvLowerConstImmediateStore.cpp   \
+        llpcSpirvLowerDynIndex.cpp              \
+        llpcSpirvLowerGlobal.cpp                \
+        llpcSpirvLowerImageOp.cpp               \
+        llpcSpirvLowerInstMetaRemove.cpp        \
+        llpcSpirvLowerLoopUnrollControl.cpp     \
+        llpcSpirvLowerPushConst.cpp             \
+        llpcSpirvLowerResourceCollect.cpp       \
+        llpcSpirvLowerTranslator.cpp
+
+    # llpc/patch
+    CPPFILES +=                             \
+        llpcGfx6Chip.cpp                    \
+        llpcGfx6ConfigBuilder.cpp           \
+        llpcGfx9Chip.cpp                    \
+        llpcGfx9ConfigBuilder.cpp           \
+        llpcShaderMerger.cpp                \
+        \
+        llpcCodeGenManager.cpp              \
+        llpcFragColorExport.cpp             \
+        llpcPatch.cpp                       \
+        llpcPatchBufferOp.cpp               \
+        llpcPatchCopyShader.cpp             \
+        llpcPatchDescriptorLoad.cpp         \
+        llpcPatchEntryPointMutate.cpp       \
+        llpcPatchGroupOp.cpp                \
+        llpcPatchImageOp.cpp                \
+        llpcPatchInOutImportExport.cpp      \
+        llpcPatchLlvmIrInclusion.cpp        \
+        llpcPatchLoopUnrollInfoRectify.cpp  \
+        llpcPatchNullFragShader.cpp         \
+        llpcPatchPeepholeOpt.cpp            \
+        llpcPatchPreparePipelineAbi.cpp     \
+        llpcPatchPushConstOp.cpp            \
+        llpcPatchResourceCollect.cpp        \
+        llpcPatchSetupTargetFeatures.cpp    \
+        llpcSystemValues.cpp                \
+        llpcVertexFetch.cpp
+
+    # llpc/translator
+    CPPFILES +=                             \
+        SPIRVBasicBlock.cpp                 \
+        SPIRVDebug.cpp                      \
+        SPIRVDecorate.cpp                   \
+        SPIRVEntry.cpp                      \
+        SPIRVFunction.cpp                   \
+        SPIRVInstruction.cpp                \
+        SPIRVModule.cpp                     \
+        SPIRVStream.cpp                     \
+        SPIRVType.cpp                       \
+        SPIRVValue.cpp                      \
+        \
+        FunctionDescriptor.cpp              \
+        Mangler.cpp                         \
+        ManglingUtils.cpp                   \
+        ParameterType.cpp                   \
+        \
+        OCL20To12.cpp                       \
+        OCL20ToSPIRV.cpp                    \
+        OCL21ToSPIRV.cpp                    \
+        OCLTypeToSPIRV.cpp                  \
+        OCLUtil.cpp                         \
+        SPIRVLowerBool.cpp                  \
+        SPIRVLowerConstExpr.cpp             \
+        SPIRVLowerMemmove.cpp               \
+        SPIRVLowerOCLBlocks.cpp             \
+        SPIRVReader.cpp                     \
+        SPIRVRegularizeLLVM.cpp             \
+        SPIRVToOCL20.cpp                    \
+        SPIRVUtil.cpp                       \
+        SPIRVWriter.cpp                     \
+        SPIRVWriterPass.cpp                 \
+        TransOCLMD.cpp
+
+    # llpc/util
+    CPPFILES +=                             \
+        llpcDebug.cpp                       \
+        llpcElf.cpp                         \
+        llpcEmuLib.cpp                      \
+        llpcFile.cpp                        \
+        llpcInternal.cpp                    \
+        llpcPassDeadFuncRemove.cpp          \
+        llpcPassExternalLibLink.cpp         \
+        llpcPassLoopInfoCollect.cpp         \
+        llpcPassManager.cpp                 \
+        llpcPipelineDumper.cpp              \
+        llpcPipelineShaders.cpp             \
+        llpcStartStopTimer.cpp              \
+        llpcUtil.cpp
+
+    ifeq ($(LLPC_PLATFORM), win)
+        LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \
+                    -DNOMINMAX                      \
+                    -DUNICODE                       \
+                    -D_UNICODE
+    endif
+
+    ifeq ($(LLPC_ENABLE_EXCEPTION), 1)
+        LCXXDEFS += -DLLPC_ENABLE_EXCEPTION=1
+
+        ifneq ($(LLPC_PLATFORM), win)
+            # Non-windows: gcc-style options.
+            LCXXOPTS += -fexceptions
+        endif
+    endif
+
+    LCXXDEFS += -D_SPIRV_LLVM_API       \
+                -DLITTLEENDIAN_CPU
+
+    ifeq ($(LLPC_PLATFORM), win)
+        LCXXOPTS += /wd4267 \
+                    /wd4800 \
+                    /wd6246 \
+                    /wd4389 \
+                    /wd4141 \
+                    /wd4146 \
+                    /wd4244 \
+                    /wd4245 \
+                    /wd4250 \
+                    /wd4291 \
+                    /wd4296 \
+                    /wd4503 \
+                    /wd4624 \
+                    /wd4706 \
+                    /wd6001 \
+                    /wd6102 \
+                    /wd6239 \
+                    /wd6244 \
+                    /wd6246 \
+                    /wd6269 \
+                    /wd6294 \
+                    /wd6295 \
+                    /wd6297 \
+                    /wd6323 \
+                    /wd6326 \
+                    /wd6330 \
+                    /wd28183 \
+                    /wd28196 \
+                    /bigobj
+
+        # Remove DEBUG macro definition as LLVM header files redefine it for a
+        # different purpose.
+        GCXXDEFS := $(filter-out /DDEBUG,$(GCXXDEFS))
+    endif
+
+    ifneq ($(LLPC_PLATFORM), win)
+        # Non-windows: gcc-style options.
+        # disable link time optimization in LLPC to fix build failure of standalone compiler.
+        LCXXOPTS := $(filter-out -flto,$(LCXXOPTS))
+        LCXXOPTS := $(filter-out -fuse-linker-plugin,$(LCXXOPTS))
+        LCXXOPTS := $(filter-out -Wno-odr,$(LCXXOPTS))
+        LCOPTS   := $(filter-out -flto,$(LCOPTS))
+        LCOPTS   := $(filter-out -fuse-linker-plugin,$(LCOPTS))
+        LCOPTS   := $(filter-out -Wno-odr,$(LCOPTS))
+        # Remove DEBUG macro definition as LLVM header files redefine it for a
+        # different purpose.
+        GCXXDEFS := $(filter-out -DDEBUG,$(GCXXDEFS))
+
+        LCXXOPTS += -Wno-error=switch                  \
+                    -fno-strict-aliasing               \
+                    -Wno-error=sign-compare            \
+                    -Wno-error=parentheses             \
+                    -Wno-delete-non-virtual-dtor       \
+                    -Wno-invalid-offsetof              \
+                    -Wno-sign-compare                  \
+                    -Wno-delete-incomplete
+        ifeq ($(USING_CLANG),)
+            LCXXOPTS += -Wno-maybe-uninitialized
+        else
+            LCXXOPTS += -Wno-conditional-uninitialized
+            # Extra warning/error suppression when using clang.
+            LCXXOPTS += -Wno-missing-braces                \
+                        -Wno-parentheses-equality          \
+                        -Wno-pessimizing-move              \
+                        -Wno-inconsistent-missing-override \
+                        -Wno-dynamic-class-memaccess
+            endif
+    endif
+
+    # Replace calling convention /Gr (__fastcall) with /Gd (__cdecl) to link LLVM.
+    ifeq ($(LLPC_PLATFORM), win)
+        LCXXOPTS := $(filter-out /Gr, $(LCXXOPTS))
+        LCXXOPTS += /Gd
+    endif
+
+    # LLPC uses the __DATE__ and __TIME__ macros to generate a simple LLPC version identifier. This identifier is
+    # stored with shader cache and verified on cache file load to ensure compatibility. The following rule
+    # forces llpcShaderCache.cpp (the file that creates this identifier) to be re-compiled on every build, so that
+    # an up-to-date time/date is always used regardless of which files were touched since the last build.
+    ifeq ($(LLPC_PLATFORM), win)
+        llpcShaderCache.obj: .FORCE
+    else
+        llpcShaderCache.o: .FORCE
+    endif
+
+    # Pre-build operations, generate external LLVM library
+    ifeq ($(LLPC_PLATFORM), win)
+        PYTHON = $(DK_ROOT)/python/3.6/python.exe
+    else
+        PYTHON = python3
+    endif
+
+    GEN_GLSL_EMU_LIB_DIR = $(SRCPATH)/patch/generate
+
+    GEN_GLSL_EMU_LIB_SCRIPT = $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py
+
+    GEN_GLSL_EMU_LIB_DEPS = $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmu.ll                   \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuF16.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuF64.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI8.ll                 \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI16.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI64.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslBufferOpEmu.ll                  \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslBuiltInVarEmu.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslGroupOpEmu.ll                   \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslGroupOpEmuD16.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslGroupOpEmuD64.ll                \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslInlineConstOpEmu.ll             \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmu.ll                  \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmuF16.ll               \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmuF64.ll               \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslPushConstOpEmu.ll               \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslSharedVarOpEmu.ll               \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmu.ll                 \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmuD16.ll              \
+                            $(GEN_GLSL_EMU_LIB_DIR)/glslImageOpEmu.ll                   \
+                            $(GEN_GLSL_EMU_LIB_DIR)/llvmIntrinsicEmu.ll                 \
+                            \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslGroupOpEmu.ll              \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslGroupOpEmuD16.ll           \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslGroupOpEmuD64.ll           \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslSpecialOpEmu.ll            \
+                            \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmu.ll              \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmuF16.ll           \
+                            $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslImageOpEmu.ll              \
+                            \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCode.py     \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCode.txt    \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeF16.txt \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeF64.txt \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI8.txt  \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI16.txt \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI64.txt \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py             \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslGroupOpEmuCode.py     \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.py     \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.txt    \
+                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
+
+    # workaround
+    GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/wa/treat1dImagesAs2d/glslImageOpEmu.ll
+
+    PRE_TARGETS = $(GEN_GLSL_EMU_LIB_DIR)/g_llpcGlslEmuLib.h
+
+else
+
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx6/chip
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9
+    vpath %.cpp $(LLPC_DEPTH)/patch/gfx9/chip
+
+    # llpc/patch
+    CPPFILES +=                             \
+        llpcGfx6Chip.cpp                    \
+        llpcGfx9Chip.cpp
+
+    vpath %.cpp $(LLPC_DEPTH)/util
+    # llpc/util
+    CPPFILES +=                             \
+        llpcPipelineDumper.cpp              \
+        llpcElf.cpp                         \
+        llpcUtil.cpp
+
+    ifneq ($(LLPC_PLATFORM), win)
+        # Non-windows: gcc-style options.
+        LCXXOPTS += -fno-strict-aliasing               \
+                    -Wno-invalid-offsetof              \
+                    -Wno-sign-compare
+        ifeq ($(USING_CLANG),)
+            LCXXOPTS += -Wno-maybe-uninitialized
+        else
+            LCXXOPTS += -Wno-conditional-uninitialized
+        endif
+    endif
+
+endif
+
+# MetroHash
+METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
+include $(METROHASH_DEPTH)/make/Makefile.metrohash
+
+ifeq ($(LLPC_PLATFORM), win)
+    # CwPack
+    CWPACK_DEPTH = $(LLPC_DEPTH)/imported/cwpack
+    include $(CWPACK_DEPTH)/make/Makefile.cwpack
+endif
+
+.FORCE:
+
+$(GEN_GLSL_EMU_LIB_DIR)/g_llpcGlslEmuLib.h : $(GEN_GLSL_EMU_LIB_DEPS)
+	$(PYTHON) $(GEN_GLSL_EMU_LIB_SCRIPT) $(LLVM_BIN_DIR) $(LLVM_BIN_DIR) $(LLPC_PLATFORM)
+

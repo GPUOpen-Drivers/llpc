@@ -186,8 +186,30 @@ define spir_func <4 x double> @_Z4modfDv4_dPDv4_d(
     ret <4 x double> %16
 }
 
+; GLSL: double nmin(double, double)
+define double @llpc.nmin.f16(double %x, double %y) #0
+{
+    %1 = call double @llvm.minnum.f64(double %x, double %y)
+    ret double %1
+}
+
+; GLSL: double nmax(double, double)
+define double @llpc.nmax.f16(double %x, double %y) #0
+{
+    %1 = call double @llvm.maxnum.f64(double %x, double %y)
+    ret double %1
+}
+
 ; GLSL: double clamp(double, double ,double)
 define double @llpc.fclamp.f64(double %x, double %minVal, double %maxVal) #0
+{
+    %1 = call double @llvm.maxnum.f64(double %x, double %minVal)
+    %2 = call double @llvm.minnum.f64(double %1, double %maxVal)
+    ret double %2
+}
+
+; GLSL: double nclamp(double, double ,double)
+define double @llpc.nclamp.f64(double %x, double %minVal, double %maxVal) #0
 {
     %1 = call double @llvm.maxnum.f64(double %x, double %minVal)
     %2 = call double @llvm.minnum.f64(double %1, double %maxVal)

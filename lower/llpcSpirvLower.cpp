@@ -35,6 +35,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
 #include "llvm/Transforms/IPO/InferFunctionAttrs.h"
@@ -106,8 +107,9 @@ void SpirvLower::AddPasses(
     passMgr.add(CreatePassExternalLibLink(true)); // Native only
     passMgr.add(CreatePassDeadFuncRemove());
 
-    // Function inlining
-    passMgr.add(createFunctionInliningPass(InlineThreshold));
+    // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
+    // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
+    passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(CreatePassDeadFuncRemove());
 
     // Control loop unrolling

@@ -201,12 +201,37 @@ void CodeGenManager::SetupTargetFeatures(
     {
         if ((pFunc->empty() == false) && (pFunc->getLinkage() == GlobalValue::ExternalLinkage))
         {
+             std::string targetFeatures(globalFeatures);
+
+             ShaderStage shaderStage = GetShaderStageFromCallingConv(pContext->GetShaderStageMask(),
+                                                                     pFunc->getCallingConv());
+
+            auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
+            auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
+            auto fp64Control = pContext->GetShaderFloatControl(shaderStage, 64);
+
+            if (fp16Control.denormPerserve || fp64Control.denormPerserve)
             {
-                AttrBuilder builder;
-                builder.addAttribute("target-features", globalFeatures);
-                AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
-                pFunc->addAttributes(attribIdx, builder);
+                targetFeatures += ",+fp64-fp16-denormals";
             }
+            else if (fp16Control.denormFlushToZero || fp64Control.denormFlushToZero)
+            {
+                targetFeatures += ",-fp64-fp16-denormals";
+            }
+
+            if (fp32Control.denormPerserve)
+            {
+                targetFeatures += ",+fp32-denormals";
+            }
+            else if (fp32Control.denormFlushToZero)
+            {
+                targetFeatures += ",-fp32-denormals";
+            }
+
+            AttrBuilder builder;
+            builder.addAttribute("target-features", targetFeatures);
+            AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
+            pFunc->addAttributes(attribIdx, builder);
         }
     }
 }

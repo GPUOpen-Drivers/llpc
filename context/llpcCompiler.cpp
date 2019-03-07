@@ -708,7 +708,6 @@ Result Compiler::BuildGraphicsPipeline(
     void*                            pPipelineDumpFile) // [in] Handle of pipeline dump file
 {
     Result           result  = Result::Success;
-    CacheEntryHandle hEntry  = nullptr;
     const void*      pElf    = nullptr;
     size_t           elfSize = 0;
 
@@ -762,30 +761,12 @@ Result Compiler::BuildGraphicsPipeline(
         PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
     }
 
-    ShaderEntryState cacheEntryState = ShaderEntryState::New;
-    ShaderCache* pShaderCache = (pPipelineInfo->pShaderCache != nullptr) ?
-                                    static_cast<ShaderCache*>(pPipelineInfo->pShaderCache) :
-                                    m_shaderCache.get();
-    if (cl::ShaderCacheMode == ShaderCacheForceInternalCacheOnDisk)
-    {
-        pShaderCache = m_shaderCache.get();
-    }
+    constexpr uint32_t ShaderCacheCount = 2;
+    ShaderEntryState cacheEntryState  = ShaderEntryState::New;
+    ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
+    CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
 
-    if (result == Result::Success)
-    {
-        cacheEntryState = pShaderCache->FindShader(cacheHash, true, &hEntry);
-        if (cacheEntryState == ShaderEntryState::Ready)
-        {
-            result = pShaderCache->RetrieveShader(hEntry, &pElf, &elfSize);
-            // Re-try if shader cache return error unknown
-            if (result == Result::ErrorUnknown)
-            {
-                result = Result::Success;
-                hEntry = nullptr;
-                cacheEntryState = ShaderEntryState::Compiling;
-            }
-        }
-    }
+    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &pElf, &elfSize, pShaderCache, hEntry);
 
     constexpr uint32_t CandidateCount = 4;
     uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
@@ -858,18 +839,7 @@ Result Compiler::BuildGraphicsPipeline(
             pElf = candidateElfs[candidateIdx].data();
         }
 
-        if (hEntry != nullptr)
-        {
-            if (result == Result::Success)
-            {
-                LLPC_ASSERT(elfSize > 0);
-                pShaderCache->InsertShader(hEntry, pElf, elfSize);
-            }
-            else
-            {
-                pShaderCache->ResetShader(hEntry);
-            }
-        }
+        UpdateShaderCaches((result == Result::Success), pElf, elfSize, pShaderCache, hEntry, ShaderCacheCount);
     }
 
     if (result == Result::Success)
@@ -947,7 +917,6 @@ Result Compiler::BuildComputePipeline(
     ComputePipelineBuildOut*        pPipelineOut,      // [out] Output of building this compute pipeline
     void*                           pPipelineDumpFile) // [in] Handle of pipeline dump file
 {
-    CacheEntryHandle hEntry    = nullptr;
     const void*      pElf      = nullptr;
     size_t           elfSize   = 0;
 
@@ -982,30 +951,12 @@ Result Compiler::BuildComputePipeline(
         PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
     }
 
-    ShaderEntryState cacheEntryState = ShaderEntryState::New;
-    ShaderCache* pShaderCache = (pPipelineInfo->pShaderCache != nullptr) ?
-                                    static_cast<ShaderCache*>(pPipelineInfo->pShaderCache) :
-                                    m_shaderCache.get();
-    if (cl::ShaderCacheMode == ShaderCacheForceInternalCacheOnDisk)
-    {
-        pShaderCache = m_shaderCache.get();
-    }
+    constexpr uint32_t ShaderCacheCount = 2;
+    ShaderEntryState cacheEntryState  = ShaderEntryState::New;
+    ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
+    CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
 
-    if (result == Result::Success)
-    {
-        cacheEntryState = pShaderCache->FindShader(cacheHash, true, &hEntry);
-        if (cacheEntryState == ShaderEntryState::Ready)
-        {
-            result = pShaderCache->RetrieveShader(hEntry, &pElf, &elfSize);
-            // Re-try if shader cache return error unknown
-            if (result == Result::ErrorUnknown)
-            {
-                result = Result::Success;
-                hEntry = nullptr;
-                cacheEntryState = ShaderEntryState::Compiling;
-            }
-        }
-    }
+    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &pElf, &elfSize, pShaderCache, hEntry);
 
     constexpr uint32_t CandidateCount = 4;
     uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
@@ -1081,18 +1032,7 @@ Result Compiler::BuildComputePipeline(
             pElf = candidateElfs[candidateIdx].data();
         }
 
-        if (hEntry != nullptr)
-        {
-            if (result == Result::Success)
-            {
-                LLPC_ASSERT(elfSize > 0);
-                pShaderCache->InsertShader(hEntry, pElf, elfSize);
-            }
-            else
-            {
-                pShaderCache->ResetShader(hEntry);
-            }
-        }
+        UpdateShaderCaches((result == Result::Success), pElf, elfSize, pShaderCache, hEntry, ShaderCacheCount);
     }
 
     if (result == Result::Success)
@@ -1193,7 +1133,7 @@ void Compiler::TranslateSpirvToLlvm(
     // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we mark it as follows:
     //   * remove the dllexport;
     //   * ensure it is public.
-    // Also mark all other functions internal.
+    // Also mark all other functions internal and always_inline.
     //
     // TODO: We should rationalize this code as follows:
     //   1. Add code to the spir-v reader to add the entrypoint name as metadata;
@@ -1215,6 +1155,7 @@ void Compiler::TranslateSpirvToLlvm(
         else
         {
             func.setLinkage(GlobalValue::InternalLinkage);
+            func.addFnAttr(Attribute::AlwaysInline);
         }
     }
 }
@@ -1457,6 +1398,15 @@ Result Compiler::CreateShaderCache(
     }
 
     *ppShaderCache = pShaderCache;
+
+    if ((result == Result::Success) &&
+        ((cl::ShaderCacheMode == ShaderCacheEnableRuntime) ||
+         (cl::ShaderCacheMode == ShaderCacheEnableOnDisk)) &&
+        (pCreateInfo->initialDataSize > 0))
+    {
+        m_shaderCache->Merge(1, const_cast<const IShaderCache**>(ppShaderCache));
+    }
+
     return result;
 }
 
@@ -1971,6 +1921,104 @@ uint32_t Compiler::ChooseLoopUnrollCountCandidate(
     }
 
     return optimalCandidateIdx;
+}
+
+// =====================================================================================================================
+// Lookup in the shader caches with the given pipeline hash code.
+// It will try App's pipelince cache first if that's available.
+// Then try on the internal shader cache next if it misses.
+//
+// NOTE: Only two items in the array of shader caches; one for App's pipeline cache and one for internal cache
+ShaderEntryState Compiler::LookUpShaderCaches(
+    IShaderCache*                    pAppPipelineCache, // [in]    App's pipeline cache
+    MetroHash::Hash*                 pCacheHash,        // [in]    Hash code of the shader
+    const void**                     ppElf,             // [inout] Pointer to shader data
+    size_t*                          pElfSize,          // [inout] Pointer to the size of shader data in bytes
+    ShaderCache**                    ppShaderCache,     // [in]    Array of shader caches.
+    CacheEntryHandle*                phEntry            // [in]    Array of handles of the shader caches entry
+    )
+{
+    ShaderEntryState cacheEntryState  = ShaderEntryState::New;
+    uint32_t         shaderCacheCount = 1;
+    Result           result           = Result::Success;
+
+    if (pAppPipelineCache != nullptr)
+    {
+        ppShaderCache[0] = static_cast<ShaderCache*>(pAppPipelineCache);
+        ppShaderCache[1] = m_shaderCache.get();
+        shaderCacheCount = 2;
+    }
+    else
+    {
+        ppShaderCache[0] = m_shaderCache.get();
+        ppShaderCache[1] = nullptr;
+    }
+
+    if (cl::ShaderCacheMode == ShaderCacheForceInternalCacheOnDisk)
+    {
+        ppShaderCache[0] = m_shaderCache.get();
+        ppShaderCache[1] = nullptr;
+        shaderCacheCount = 1;
+    }
+
+    for (uint32_t i = 0; i < shaderCacheCount; i++)
+    {
+        cacheEntryState = ppShaderCache[i]->FindShader(*pCacheHash, true, &phEntry[i]);
+        if (cacheEntryState == ShaderEntryState::Ready)
+        {
+            result = ppShaderCache[i]->RetrieveShader(phEntry[i], ppElf, pElfSize);
+            // Re-try if shader cache return error unknown
+            if (result == Result::ErrorUnknown)
+            {
+                result = Result::Success;
+                phEntry[i] = nullptr;
+                cacheEntryState = ShaderEntryState::Compiling;
+            }
+            else
+            {
+                if (i == 1)
+                {
+                    // App's pipeline cache misses while internal cache hits
+                    if (phEntry[0] != nullptr)
+                    {
+                        LLPC_ASSERT(*pElfSize > 0);
+                        ppShaderCache[0]->InsertShader(phEntry[0], *ppElf, *pElfSize);
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    return cacheEntryState;
+}
+
+// =====================================================================================================================
+// Update the shader caches with the given entry handle, based on the "bInsert" flag.
+void Compiler::UpdateShaderCaches(
+    bool                             bInsert,           // [in] To insert data or reset the shader caches
+    const void*                      pElf,              // [in] Pointer to shader data
+    size_t                           elfSize,           // [in] Size of shader data in bytes
+    ShaderCache**                    ppShaderCache,     // [in] Array of shader caches; one for App's pipeline cache and one for internal cache
+    CacheEntryHandle*                phEntry,           // [in] Array of handles of the shader caches entry
+    uint32_t                         shaderCacheCount   // [in] Shader caches count
+)
+{
+    for (uint32_t i = 0; i < shaderCacheCount; i++)
+    {
+        if (phEntry[i] != nullptr)
+        {
+            if (bInsert)
+            {
+                LLPC_ASSERT(elfSize > 0);
+                ppShaderCache[i]->InsertShader(phEntry[i], pElf, elfSize);
+            }
+            else
+            {
+                ppShaderCache[i]->ResetShader(phEntry[i]);
+            }
+        }
+    }
 }
 
 } // Llpc

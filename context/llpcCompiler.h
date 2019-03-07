@@ -228,6 +228,20 @@ private:
 
     static llvm::Module* LinkShaderModules(Context* pContext, llvm::ArrayRef<llvm::Module*> modules);
 
+    ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
+                                        MetroHash::Hash*    pCacheHash,
+                                        const void**        ppElf,
+                                        size_t*             pElfSize,
+                                        ShaderCache**       ppShaderCache,
+                                        CacheEntryHandle*   phEntry);
+
+    void UpdateShaderCaches(bool                bInsert,
+                            const void*         pElf,
+                            size_t              elfSize,
+                            ShaderCache**       ppShaderCache,
+                            CacheEntryHandle*   phEntry,
+                            uint32_t            shaderCacheCount);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     std::vector<std::string>     m_options;          // Compilation options

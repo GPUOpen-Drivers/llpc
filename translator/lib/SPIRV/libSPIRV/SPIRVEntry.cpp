@@ -429,7 +429,6 @@ void SPIRVExecutionMode::decode(std::istream &I) {
   case ExecutionModeVecTypeHint:
     WordLiterals.resize(1);
     break;
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
   case ExecutionModeDenormPreserve:
   case ExecutionModeDenormFlushToZero:
   case ExecutionModeSignedZeroInfNanPreserve:
@@ -438,7 +437,6 @@ void SPIRVExecutionMode::decode(std::istream &I) {
     WordLiterals.resize(1);
     MergeEM = true;
     break;
-#endif
   default:
     // Do nothing. Keep this to avoid VS2013 warning.
     break;

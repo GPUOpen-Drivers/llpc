@@ -86,9 +86,12 @@ bool SpirvLowerAlgebraTransform::runOnModule(
     SpirvLower::Init(&module);
     m_changed = false;
 
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
-    auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
-    if (m_enableConstFolding && (pFpControlFlags->denormFlushToZero != 0))
+    auto fp16Control = m_pContext->GetShaderFloatControl(m_shaderStage, 16);
+    auto fp32Control = m_pContext->GetShaderFloatControl(m_shaderStage, 32);
+    auto fp64Control = m_pContext->GetShaderFloatControl(m_shaderStage, 64);
+
+    if (m_enableConstFolding &&
+        (fp16Control.denormFlushToZero || fp32Control.denormFlushToZero || fp64Control.denormFlushToZero))
     {
         // Do constant folding if we need flush denorm to zero.
         auto& targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
@@ -124,9 +127,9 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                 {
                     LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConst << " from: " << *pInst
                         << '\n');
-                    if ((pDestType->isHalfTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0)) ||
-                        (pDestType->isFloatTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_32Bit) != 0)) ||
-                        (pDestType->isDoubleTy() && ((pFpControlFlags->denormFlushToZero & SPIRVTW_64Bit) != 0)))
+                    if ((pDestType->isHalfTy() && fp16Control.denormFlushToZero) ||
+                        (pDestType->isFloatTy() && fp32Control.denormFlushToZero) ||
+                        (pDestType->isDoubleTy() && fp64Control.denormFlushToZero))
                     {
                         // Replace denorm value with zero
                         if (pConst->isFiniteNonZeroFP() && (pConst->isNormalFP() == false))
@@ -150,7 +153,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                     CallInst* pCallInst = cast<CallInst>(pInst);
                     // LLVM inline pass will do constant folding for _Z14unpackHalf2x16i.
                     // To support floating control correctly, we have to do it by ourselves.
-                    if (((pFpControlFlags->denormFlushToZero & SPIRVTW_16Bit) != 0) &&
+                    if (fp16Control.denormFlushToZero &&
                         (pCallInst->getCalledFunction()->getName() == "_Z14unpackHalf2x16i"))
                     {
                         auto pSrc = pCallInst->getOperand(0);
@@ -200,7 +203,6 @@ bool SpirvLowerAlgebraTransform::runOnModule(
             }
         }
     }
-#endif
 
     if (m_enableFloatOpt)
     {
@@ -213,7 +215,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
 // =====================================================================================================================
 // Visits binary operator instruction.
 void SpirvLowerAlgebraTransform::visitBinaryOperator(
-    llvm::BinaryOperator& binaryOp)  // Binary operator instructions
+    BinaryOperator& binaryOp)  // [in] Binary operator instruction
 {
     Instruction::BinaryOps opCode = binaryOp.getOpcode();
 
@@ -224,6 +226,10 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
     bool src2IsConstZero = isa<ConstantAggregateZero>(pSrc2) ||
                           (isa<ConstantFP>(pSrc2) && cast<ConstantFP>(pSrc2)->isZero());
     Value* pDest = nullptr;
+
+    auto fp16Control = m_pContext->GetShaderFloatControl(m_shaderStage, 16);
+    auto fp32Control = m_pContext->GetShaderFloatControl(m_shaderStage, 32);
+    auto fp64Control = m_pContext->GetShaderFloatControl(m_shaderStage, 64);
 
     if (opCode == Instruction::FAdd)
     {
@@ -240,13 +246,39 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             binaryOp.copyFastMathFlags(fastMathFlags);
         }
     }
+    else if (opCode == Instruction::FSub)
+    {
+        if (src1IsConstZero)
+        {
+            // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
+            // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
+            auto pDestTy = binaryOp.getType();
+            if ((pDestTy->getScalarType()->isHalfTy() && fp16Control.denormFlushToZero) ||
+                (pDestTy->getScalarType()->isFloatTy() && fp32Control.denormFlushToZero) ||
+                (pDestTy->getScalarType()->isDoubleTy() && fp64Control.denormFlushToZero))
+            {
+                // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
+                std::string instName = "llvm.canonicalize." + GetTypeNameForScalarOrVector(pDestTy);
+                auto pCanonical = EmitCall(m_pModule,
+                                           instName,
+                                           pDestTy,
+                                           { UndefValue::get(pDestTy) }, // Will be replaced later
+                                           NoAttrib,
+                                           binaryOp.getNextNode());
 
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
-    auto pFpControlFlags = &m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage.common;
+                binaryOp.replaceAllUsesWith(pCanonical);
+                pCanonical->setArgOperand(0, &binaryOp);
 
-    // NOTE: We can't skip following floating operations if we need flush denorm or preserve NAN.
-    if ((pFpControlFlags->denormFlushToZero == 0) && (pFpControlFlags->signedZeroInfNanPreserve == 0))
-#endif
+                m_changed = true;
+            }
+        }
+    }
+
+    // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
+    // will flush denormals or preserve NaN.
+    if ((fp16Control.denormFlushToZero == false) && (fp16Control.signedZeroInfNanPreserve == false) &&
+        (fp32Control.denormFlushToZero == false) && (fp32Control.signedZeroInfNanPreserve == false) &&
+        (fp64Control.denormFlushToZero == false) && (fp64Control.signedZeroInfNanPreserve == false))
     {
         switch (opCode)
         {
@@ -299,14 +331,15 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
 
         if (pDest != nullptr)
         {
-            m_changed = true;
             binaryOp.replaceAllUsesWith(pDest);
             binaryOp.dropAllReferences();
             binaryOp.eraseFromParent();
+
+            m_changed = true;
         }
     }
 
-    // Replace fdiv with function call if it isn't optimized
+    // Replace FDIV with function call if it isn't optimized
     if ((opCode == Instruction::FDiv) && (pDest == nullptr) && (pSrc1 != nullptr) && (pSrc2 != nullptr))
     {
         BuiltinFuncMangleInfo Info("fdiv");
@@ -320,6 +353,72 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         binaryOp.eraseFromParent();
 
         m_changed = true;
+    }
+}
+
+// =====================================================================================================================
+// Visits call instruction.
+void SpirvLowerAlgebraTransform::visitCallInst(
+    CallInst& callInst) // [in] Call instruction
+{
+    auto pCallee = callInst.getCalledFunction();
+    if (pCallee->isIntrinsic() && (pCallee->getIntrinsicID() == Intrinsic::fabs))
+    {
+        // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND. Check floating-point controls.
+        auto fp16Control = m_pContext->GetShaderFloatControl(m_shaderStage, 16);
+        auto fp32Control = m_pContext->GetShaderFloatControl(m_shaderStage, 32);
+        auto fp64Control = m_pContext->GetShaderFloatControl(m_shaderStage, 64);
+
+        auto pDestTy = callInst.getType();
+        if ((pDestTy->getScalarType()->isHalfTy() && fp16Control.denormFlushToZero) ||
+            (pDestTy->getScalarType()->isFloatTy() && fp32Control.denormFlushToZero) ||
+            (pDestTy->getScalarType()->isDoubleTy() && fp64Control.denormFlushToZero))
+        {
+            // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
+            std::string instName = "llvm.canonicalize." + GetTypeNameForScalarOrVector(pDestTy);
+            auto pCanonical = EmitCall(m_pModule,
+                                       instName,
+                                       pDestTy,
+                                       { UndefValue::get(pDestTy) }, // Will be replaced later
+                                       NoAttrib,
+                                       callInst.getNextNode());
+
+                callInst.replaceAllUsesWith(pCanonical);
+                pCanonical->setArgOperand(0, &callInst);
+
+            m_changed = true;
+        }
+    }
+}
+
+// =====================================================================================================================
+// Visits fptrunc instruction.
+void SpirvLowerAlgebraTransform::visitFPTruncInst(
+    FPTruncInst& fptruncInst)   // [in] Fptrunc instruction
+{
+    auto fp16Control = m_pContext->GetShaderFloatControl(m_shaderStage, 16);
+    if (fp16Control.roundingModeRTZ)
+    {
+        auto pSrc = fptruncInst.getOperand(0);
+        auto pSrcTy = pSrc->getType();
+        auto pDestTy = fptruncInst.getDestTy();
+
+        if ((pSrcTy->getScalarType()->isDoubleTy()) && (pDestTy->getScalarType()->isHalfTy()))
+        {
+            // NOTE: doubel -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
+            // it with two phases to disable such lowering if we need RTZ rounding.
+            auto pFloatTy =
+                pSrcTy->isVectorTy() ? VectorType::get(m_pContext->FloatTy(), pSrcTy->getVectorNumElements()) :
+                                       m_pContext->FloatTy();
+            auto pFloatValue = new FPTruncInst(pSrc, pFloatTy, "", &fptruncInst);
+            auto pDest = new FPTruncInst(pFloatValue, pDestTy, "", &fptruncInst);
+
+            fptruncInst.replaceAllUsesWith(pDest);
+            fptruncInst.dropAllReferences();
+            fptruncInst.eraseFromParent();
+
+            m_changed = true;
+        }
     }
 }
 

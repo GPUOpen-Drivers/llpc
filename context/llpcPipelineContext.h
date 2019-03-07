@@ -81,6 +81,16 @@ enum class BasicType : uint32_t
     Uint8,                // 8-bit unsigned integer
 };
 
+// Represents floating-point control setting.
+struct FloatControl
+{
+    bool    denormPerserve;             // Preserve denormals
+    bool    denormFlushToZero;          // Flush denormals to zero
+    bool    signedZeroInfNanPreserve;   // Preserve signed zero/INF/NaN
+    bool    roundingModeRTE;            // Rounding mode: to nearest even
+    bool    roundingModeRTZ;            // Rounding mode: to zero
+};
+
 // Represents the info of a descriptor binding
 struct DescriptorBinding
 {
@@ -357,16 +367,13 @@ struct ResourceUsage
                 uint32_t subgroupLeMask            : 1;  // Whether gl_SubGroupLeMask is used
                 uint32_t subgroupLtMask            : 1;  // Whether gl_SubGroupLtMask is used
                 uint32_t deviceIndex               : 1;  // Whether gl_DeviceIndex is used
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
                 uint32_t denormPerserve            : 4;  // Bitmask of denormPerserve flags
                 uint32_t denormFlushToZero         : 4;  // Bitmask of denormFlushToZero flags
                 uint32_t signedZeroInfNanPreserve  : 4;  // Bitmask of signedZeroInfNanPreserve flags
                 uint32_t roundingModeRTE           : 4;  // Bitmask of roundingModeRTE flags
                 uint32_t roundingModeRTZ           : 4;  // Bitmask of roundingModeRTZ flags
+
                 uint64_t unused                    : 36;
-#else
-                uint64_t unused                    : 56;
-#endif
             } common;
 
             struct
@@ -755,6 +762,9 @@ public:
 
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
+
+    // Gets float control settings of the specified shader stage for the provide floating-point type.
+    virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const = 0;
 
     // Gets the count of vertices per primitive
     virtual uint32_t GetVerticesPerPrimitive() const = 0;
