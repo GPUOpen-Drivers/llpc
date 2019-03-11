@@ -401,9 +401,32 @@ void SpirvLowerAlgebraTransform::visitCallInst(
     CallInst& callInst) // [in] Call instruction
 {
     auto pCallee = callInst.getCalledFunction();
+
+    bool forceFMul = false;
+
     if (pCallee->isIntrinsic() && (pCallee->getIntrinsicID() == Intrinsic::fabs))
     {
-        // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND. Check floating-point controls.
+        // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
+        forceFMul = true;
+    }
+    else if (m_pContext->GetGfxIpVersion().major <= 8)
+    {
+        // NOTE: For pre-GFX9, MIN, MAX, CLAMP are out of float control.
+        if (pCallee->isIntrinsic() &&
+            ((pCallee->getIntrinsicID() == Intrinsic::minnum) || (pCallee->getIntrinsicID() == Intrinsic::maxnum)))
+        {
+            forceFMul = true;
+        }
+        else if (pCallee->getName().startswith("_Z6fclamp") || pCallee->getName().startswith("_Z6nclamp"))
+        {
+            forceFMul = true;
+        }
+    }
+
+    // TODO: Check floating-point controls and insert a MUL to force denormal flush. This ought to
+    // be done in backend compiler.
+    if (forceFMul)
+    {
         auto fp16Control = m_pContext->GetShaderFloatControl(m_shaderStage, 16);
         auto fp32Control = m_pContext->GetShaderFloatControl(m_shaderStage, 32);
         auto fp64Control = m_pContext->GetShaderFloatControl(m_shaderStage, 64);
@@ -416,11 +439,11 @@ void SpirvLowerAlgebraTransform::visitCallInst(
             // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
             std::string instName = "llvm.canonicalize." + GetTypeNameForScalarOrVector(pDestTy);
             auto pCanonical = EmitCall(m_pModule,
-                                       instName,
-                                       pDestTy,
-                                       { UndefValue::get(pDestTy) }, // Will be replaced later
-                                       NoAttrib,
-                                       callInst.getNextNode());
+                                        instName,
+                                        pDestTy,
+                                        { UndefValue::get(pDestTy) }, // Will be replaced later
+                                        NoAttrib,
+                                        callInst.getNextNode());
 
                 callInst.replaceAllUsesWith(pCanonical);
                 pCanonical->setArgOperand(0, &callInst);
