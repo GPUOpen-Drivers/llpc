@@ -96,7 +96,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
         SET_REG(pConfig, VGT_GS_ONCHIP_CNTL, 0);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
@@ -107,7 +106,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -195,13 +193,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pVsIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pVsIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pVsIntfData->vbTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessEval)))
@@ -214,13 +210,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageTessEval);
         if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
 
     }
 
@@ -308,7 +302,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pVsIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pVsIntfData->vbTable.resNodeIdx != InvalidValue)
         {
@@ -320,7 +313,6 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pGsIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -409,13 +401,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pVsIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pVsIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pVsIntfData->vbTable.resNodeIdx);
         }
-#endif
     }
 
     if (stageMask & (ShaderStageToMask(ShaderStageTessEval) | ShaderStageToMask(ShaderStageGeometry)))
@@ -439,13 +429,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pGsIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
         if (pGsIntfData->streamOutTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pGsIntfData->streamOutTable.resNodeIdx);
         }
-#endif
 
     }
 
@@ -742,15 +730,10 @@ Result ConfigBuilder::BuildVsRegConfig(
         if (enableXfb)
         {
             LLPC_ASSERT(pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable != 0);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
+
             SET_DYN_REG(pConfig,
                         mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
                         0);
-#else
-            SET_DYN_REG(pConfig,
-                        mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
-                        static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
-#endif
         }
     }
 
@@ -1571,28 +1554,6 @@ Result ConfigBuilder::BuildUserDataConfig(
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::DrawIndex));
         }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 473
-        if (pIntfData1->userDataUsage.vs.vbTablePtr > 0)
-        {
-            LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.vbTablePtr] ==
-                InterfaceData::UserDataUnmapped);
-
-            SET_DYN_REG(pConfig,
-                startUserData + pIntfData1->userDataUsage.vs.vbTablePtr,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::VertexBufferTable));
-        }
-
-        if ((pIntfData1->userDataUsage.vs.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
-        {
-            LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.streamOutTablePtr] ==
-                InterfaceData::UserDataUnmapped);
-
-            SET_DYN_REG(pConfig,
-                startUserData + pIntfData1->userDataUsage.vs.streamOutTablePtr,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
-        }
-#endif
-
         if (enableMultiView)
         {
             if ((shaderStage2 == ShaderStageInvalid) || (shaderStage2 == ShaderStageTessControl))
@@ -1633,18 +1594,6 @@ Result ConfigBuilder::BuildUserDataConfig(
     }
     else if (shaderStage1 == ShaderStageTessEval)
     {
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 473
-        if ((pIntfData1->userDataUsage.tes.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
-        {
-            LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.tes.streamOutTablePtr] ==
-                InterfaceData::UserDataUnmapped);
-
-            SET_DYN_REG(pConfig,
-                startUserData + pIntfData1->userDataUsage.tes.streamOutTablePtr,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
-        }
-#endif
-
         if (enableMultiView)
         {
             if (shaderStage2 == ShaderStageInvalid)

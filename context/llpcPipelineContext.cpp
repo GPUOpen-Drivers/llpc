@@ -256,13 +256,11 @@ void PipelineContext::InitShaderInterfaceData(
     memset(&pIntfData->spillTable, 0, sizeof(pIntfData->spillTable));
     pIntfData->spillTable.offsetInDwords = InvalidValue;
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
     memset(&pIntfData->vbTable, 0, sizeof(pIntfData->vbTable));
     pIntfData->vbTable.resNodeIdx = InvalidValue;
 
     memset(&pIntfData->streamOutTable, 0, sizeof(pIntfData->streamOutTable));
     pIntfData->streamOutTable.resNodeIdx = InvalidValue;
-#endif
 
     memset(&pIntfData->userDataUsage, 0, sizeof(pIntfData->userDataUsage));
 

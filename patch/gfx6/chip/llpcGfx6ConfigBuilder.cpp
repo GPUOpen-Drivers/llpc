@@ -91,7 +91,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
@@ -102,7 +101,6 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -166,13 +164,12 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
         SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
+
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessControl)))
@@ -196,13 +193,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         SET_REG(pConfig, API_DS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_DS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageTessEval);
         if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -281,13 +276,12 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageVertex);
         SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
+
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, INDIRECT_TABLE_ENTRY, pIntfData->vbTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageGeometry)))
@@ -300,13 +294,11 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
         if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -379,7 +371,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         SET_REG(pConfig, API_VS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_VS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageVertex);
         if (pIntfData->vbTable.resNodeIdx != InvalidValue)
         {
@@ -390,7 +381,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageTessControl)))
@@ -424,13 +414,12 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         hash64 = pContext->GetShaderHashCode(ShaderStageGeometry);
         SET_REG(pConfig, API_GS_HASH_DWORD0, static_cast<uint32_t>(hash64));
         SET_REG(pConfig, API_GS_HASH_DWORD1, static_cast<uint32_t>(hash64 >> 32));
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
+
         const auto pIntfData = pContext->GetShaderInterfaceData(ShaderStageGeometry);
         if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
         {
             SET_REG(pConfig, STREAM_OUT_TABLE_ENTRY, pIntfData->streamOutTable.resNodeIdx);
         }
-#endif
     }
 
     if ((result == Result::Success) && (stageMask & ShaderStageToMask(ShaderStageFragment)))
@@ -704,15 +693,9 @@ Result ConfigBuilder::BuildVsRegConfig(
 
         if (enableXfb)
         {
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
             SET_DYN_REG(pConfig,
-                mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
-                0);
-#else
-            SET_DYN_REG(pConfig,
-                mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
-#endif
+                        mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderStreamOutTable,
+                        0);
         }
     }
 
@@ -1507,28 +1490,6 @@ Result ConfigBuilder::BuildUserDataConfig(
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::DrawIndex));
         }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 473
-        if (pIntfData->userDataUsage.vs.vbTablePtr > 0)
-        {
-            LLPC_ASSERT(pIntfData->userDataMap[pIntfData->userDataUsage.vs.vbTablePtr] ==
-                InterfaceData::UserDataUnmapped);
-
-            SET_DYN_REG(pConfig,
-                startUserData + pIntfData->userDataUsage.vs.vbTablePtr,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::VertexBufferTable));
-        }
-
-        if (pIntfData->userDataUsage.vs.streamOutTablePtr > 0)
-        {
-            LLPC_ASSERT(pIntfData->userDataMap[pIntfData->userDataUsage.vs.streamOutTablePtr] ==
-                InterfaceData::UserDataUnmapped);
-
-            SET_DYN_REG(pConfig,
-                startUserData + pIntfData->userDataUsage.vs.streamOutTablePtr,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
-        }
-#endif
-
         if (enableMultiView)
         {
             LLPC_ASSERT(pIntfData->entryArgIdxs.vs.viewIndex > 0);
@@ -1546,17 +1507,6 @@ Result ConfigBuilder::BuildUserDataConfig(
                         startUserData + pIntfData->userDataUsage.tes.viewIndex,
                         static_cast<uint32_t>(Util::Abi::UserDataMapping::ViewId));
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 473
-        if (pIntfData->userDataUsage.tes.streamOutTablePtr > 0)
-        {
-            LLPC_ASSERT(pIntfData->userDataMap[pIntfData->userDataUsage.tes.streamOutTablePtr] ==
-                InterfaceData::UserDataUnmapped);
-
-            SET_DYN_REG(pConfig,
-                startUserData + pIntfData->userDataUsage.tes.streamOutTablePtr,
-                static_cast<uint32_t>(Util::Abi::UserDataMapping::StreamOutTable));
-        }
-#endif
     }
     else if (shaderStage == ShaderStageGeometry)
     {
