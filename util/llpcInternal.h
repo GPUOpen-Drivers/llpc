@@ -162,9 +162,6 @@ static const uint32_t MaxTransformFeedbackBuffers = 4;
 static const uint32_t MaxGsStreams = 4;
 static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
 
-// Threshold of inline pass
-static const int32_t InlineThreshold = (INT32_MAX >> 15);
-
 // Internal resource table's virtual descriptor sets
 static const uint32_t InternalResourceTable  = 0x10000000;
 static const uint32_t InternalPerShaderTable = 0x10000001;
@@ -214,6 +211,7 @@ llvm::CallInst* EmitCall(llvm::Module*                             pModule,
 void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);
 
 // Gets LLVM-style name for scalar or vector type.
+void GetTypeNameForScalarOrVector(llvm::Type* pTy, llvm::raw_ostream& nameStream);
 std::string GetTypeNameForScalarOrVector(llvm::Type* pTy);
 
 // Gets the shader stage from the specified LLVM module.
@@ -221,6 +219,9 @@ ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
 
 // Gets the shader stage from the specified LLVM function.
 ShaderStage GetShaderStageFromFunction(llvm::Function* pFunc);
+
+// Gets the shader stage from the specified calling convention.
+ShaderStage GetShaderStageFromCallingConv(uint32_t stageMask, llvm::CallingConv::ID callConv);
 
 // Gets the argument from the specified function according to the argument index.
 llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx);

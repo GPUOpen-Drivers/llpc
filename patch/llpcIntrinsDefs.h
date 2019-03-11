@@ -178,6 +178,38 @@ enum BufNumFormat
     BUF_NUM_FORMAT_FLOAT                        = 7,            // Float
 };
 
+// Enumerates float round modes.
+enum FpRoundMode
+{
+    FP_ROUND_TO_NEAREST_EVEN                    = 0,            // RTE
+    FP_ROUND_TO_POSITIVE_INF                    = 1,            // RTP
+    FP_ROUND_TO_NEGATIVE_INF                    = 2,            // RTN
+    FP_ROUND_TO_ZERO                            = 3,            // RTZ
+};
+
+// Enumerates float denormal modes.
+enum FpDenormMode
+{
+    FP_DENORM_FLUSH_IN_OUT                      = 0,            // Flush input/output denormals
+    FP_DENORM_FLUSH_OUT                         = 1,            // Allow input denormals and flush output denormals
+    FP_DENORM_FLUSH_IN                          = 2,            // Flush input denormals and allow output denormals
+    FP_DENORM_FLUSH_NONE                        = 3,            // Allow input/output denormals
+};
+
+// Represents float modes for 16-bit/64-bit and 32-bit floating-point types.
+union FloatMode
+{
+    struct
+    {
+        uint32_t    fp32RoundMode       : 2;            // FP32 round mode
+        uint32_t    fp16fp64RoundMode   : 2;            // FP16/FP64 round mode
+        uint32_t    fp32DenormMode      : 2;            // FP32 denormal mode
+        uint32_t    fp16fp64DenormMode  : 2;            // FP16/FP64 denormal mode
+    } bits;
+
+    uint32_t u32All;
+};
+
 // Enumerates destination selection of data in memory buffer.
 enum BufDstSel
 {

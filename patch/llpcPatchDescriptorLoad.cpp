@@ -86,9 +86,6 @@ bool PatchDescriptorLoad::runOnModule(
     Patch::Init(&module);
     m_changed = false;
 
-    // TODO: Temporary code to patch up calls to llvm.amdgcn.waterfall.last.use.i32.
-    PatchWaterfallLastUseCalls();
-
     // Invoke handling of "call" instruction
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
@@ -154,9 +151,6 @@ void PatchDescriptorLoad::visitCallInst(
     ResourceMappingNodeType nodeType2 = ResourceMappingNodeType::Unknown;
 
     bool loadSpillTable = false;
-    bool isNonUniform = false;
-    bool isWriteOnly = false;
-    bool checkWriteOp = true;
 
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
     if (mangledName == LlpcName::DescriptorLoadResource)
@@ -223,44 +217,6 @@ void PatchDescriptorLoad::visitCallInst(
         auto pDescSet = cast<ConstantInt>(callInst.getOperand(0));
         auto pBinding = cast<ConstantInt>(callInst.getOperand(1));
         auto pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
-
-        // Check non-uniform flag
-        if (nodeType1 == ResourceMappingNodeType::DescriptorBuffer)
-        {
-            auto pIsNonUniform = cast<ConstantInt>(callInst.getOperand(3));
-            isNonUniform = pIsNonUniform->getZExtValue() ? true : false;
-        }
-        else if (nodeType1 != ResourceMappingNodeType::PushConst)
-        {
-            auto pImageCallMeta = cast<ConstantInt>(callInst.getOperand(3));
-            ShaderImageCallMetadata imageCallMeta = {};
-            imageCallMeta.U32All = static_cast<uint32_t>(pImageCallMeta->getZExtValue());
-            isNonUniform = (nodeType1 == ResourceMappingNodeType::DescriptorSampler) ?
-                           imageCallMeta.NonUniformSampler :
-                           imageCallMeta.NonUniformResource;
-            isWriteOnly = imageCallMeta.WriteOnly;
-            checkWriteOp = false;
-        }
-
-        if (isa<ConstantInt>(pArrayOffset) == false)
-        {
-            const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-
-            // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-            // Do not do this for a buffer descriptor, as it is done in BuilderImplDescriptor.
-            if ((gfxIp.major > 6) && (isNonUniform == false) &&
-                (nodeType1 != ResourceMappingNodeType::DescriptorBuffer))
-            {
-                std::vector<Value*> args;
-                args.push_back(pArrayOffset);
-                pArrayOffset = EmitCall(m_pModule,
-                                        "llvm.amdgcn.readfirstlane",
-                                        m_pContext->Int32Ty(),
-                                        args,
-                                        NoAttrib,
-                                        &callInst);
-            }
-        }
 
         uint32_t descOffset = 0;
         uint32_t descSize   = 0;
@@ -810,48 +766,6 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
     //LLPC_ASSERT(exist);
 
     return foundNodeType;
-}
-
-// =====================================================================================================================
-// Patch up calls to llvm.amdgcn.waterfall.last.use.i32.
-// Where Builder::CreateWaterfallLoop() was applied to a buffer or image operation that has its descriptor load
-// combined in, the call to llvm.amdgcn.waterfall.last.use is applied to the non-uniform index for the descriptor load.
-// That is wrong, and it needs to be changed to apply to the descriptor.
-//
-// TODO: This is temporary code, and it will be removed once both buffer ops and image ops have had descriptor
-// loads separated out.
-void PatchDescriptorLoad::PatchWaterfallLastUseCalls()
-{
-    auto pWaterfallLastUseI32 = Intrinsic::getDeclaration(m_pModule,
-                                                Intrinsic::amdgcn_waterfall_last_use,
-                                                m_pContext->Int32Ty());
-    while (pWaterfallLastUseI32->use_empty() == false)
-    {
-        // We have a call to llvm.amdgcn.waterfall.last.use.i32.
-        auto pCall = cast<CallInst>(pWaterfallLastUseI32->use_begin()->getUser());
-        // There should be a single use in a descriptor load.
-        LLPC_ASSERT(pCall->hasOneUse());
-
-        auto pDescLoadCall = cast<CallInst>(pCall->use_begin()->getUser());
-        LLPC_ASSERT(pDescLoadCall->getCalledFunction()->getName().startswith(LlpcName::DescriptorCallPrefix));
-        LLPC_ASSERT(pDescLoadCall->hasOneUse());
-        Use& descLoadCallUse = *pDescLoadCall->use_begin();
-
-        // Insert a new llvm.amdgcn.waterfall.last.use after the descriptor load.
-        auto pNewWaterfallLastUseCall = Intrinsic::getDeclaration(m_pModule,
-                                                                  Intrinsic::amdgcn_waterfall_last_use,
-                                                                  pDescLoadCall->getType());
-        auto pNewCall = CallInst::Create(pNewWaterfallLastUseCall,
-                                         { pCall->getArgOperand(0), pDescLoadCall },
-                                         "",
-                                         pDescLoadCall->getNextNode());
-        pNewCall->takeName(pCall);
-        descLoadCallUse = pNewCall;
-
-        // Remove the old waterfall call.
-        pCall->replaceAllUsesWith(pCall->getArgOperand(1));
-        pCall->eraseFromParent();
-    }
 }
 
 } // Llpc

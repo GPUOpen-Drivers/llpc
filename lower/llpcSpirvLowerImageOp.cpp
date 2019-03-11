@@ -281,6 +281,8 @@ void SpirvLowerImageOp::visitCallInst(
         }
         else
         {
+            m_pBuilder->SetInsertPoint(&callInst);
+
             mangledName = pCallee->getName();
 
             std::vector<Value*> args;
@@ -290,20 +292,47 @@ void SpirvLowerImageOp::visitCallInst(
                 (imageCallMeta.OpKind == ImageOpQueryLod))
             {
                 // Add sampler only for image sample and image gather
-                args.push_back(pSamplerDescSet);
-                args.push_back(pSamplerBinding);
-                args.push_back(pSamplerIndex);
                 std::unordered_set<Value*> checkedValuesSampler;
                 imageCallMeta.NonUniformSampler = IsNonUniformValue(pSamplerIndex, checkedValuesSampler) ? 1 : 0;
+
+                args.push_back(m_pBuilder->CreateLoadSamplerDesc(pSamplerDescSet->getZExtValue(),
+                                                               pSamplerBinding->getZExtValue(),
+                                                               pSamplerIndex,
+                                                               imageCallMeta.NonUniformSampler));
             }
 
-            args.push_back(pResourceDescSet);
-            args.push_back(pResourceBinding);
-            args.push_back(pResourceIndex);
             std::unordered_set<Value*> checkedValuesResource;
             imageCallMeta.NonUniformResource = IsNonUniformValue(pResourceIndex, checkedValuesResource) ? 1 : 0;
             imageCallMeta.WriteOnly = callInst.getType()->isVoidTy();
             auto fmaskMode = GetFmaskMode(imageCallMeta, mangledName);
+
+            uint32_t descSet = pResourceDescSet->getZExtValue();
+            uint32_t binding = pResourceBinding->getZExtValue();
+
+            if (fmaskMode != FmaskOnly)
+            {
+                if (imageCallMeta.Dim != DimBuffer)
+                {
+                    args.push_back(m_pBuilder->CreateLoadResourceDesc(descSet,
+                                                                    binding,
+                                                                    pResourceIndex,
+                                                                    imageCallMeta.NonUniformResource));
+                }
+                else
+                {
+                    args.push_back(m_pBuilder->CreateLoadTexelBufferDesc(descSet,
+                                                                       binding,
+                                                                       pResourceIndex,
+                                                                       imageCallMeta.NonUniformResource));
+                }
+            }
+            if (fmaskMode != FmaskNone)
+            {
+                args.push_back(m_pBuilder->CreateLoadFmaskDesc(descSet,
+                                                             binding,
+                                                             pResourceIndex,
+                                                             imageCallMeta.NonUniformResource));
+            }
 
             if (imageCallMeta.OpKind != ImageOpQueryNonLod)
             {
@@ -544,17 +573,17 @@ void SpirvLowerImageOp::visitCallInst(
                     (imageCallMeta.OpKind == ImageOpGather) ||
                     (imageCallMeta.OpKind == ImageOpQueryLod))
                 {
-                    nonUniformOperandIdxs.push_back(5);
+                    nonUniformOperandIdxs.push_back(1);
                 }
                 else
                 {
-                    nonUniformOperandIdxs.push_back(2);
+                    nonUniformOperandIdxs.push_back(0);
                 }
             }
 
             if (imageCallMeta.NonUniformSampler)
             {
-                nonUniformOperandIdxs.push_back(2);
+                nonUniformOperandIdxs.push_back(0);
             }
 
             if (nonUniformOperandIdxs.empty() == false)

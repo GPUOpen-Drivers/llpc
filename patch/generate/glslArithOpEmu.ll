@@ -238,8 +238,8 @@ define float @llpc.acos.f32(float %x)
 ; GLSL: float atan(float)
 define float @llpc.atan.f32(float %x)
 {
-    ; atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, x <= 1.0
-    ; x = min(1.0, x) / max(1.0, x), make x <= 1.0
+    ; atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, |x| <= 1.0
+    ; x = min(1.0, x) / max(1.0, x), make |x| <= 1.0
 
     %1 = call float @llvm.fabs.f32(float %x)
     %2 = call float @llvm.maxnum.f32(float %1, float 1.0)
@@ -295,27 +295,30 @@ define float @llpc.atan2.f32(float %y, float %x)
     ; p1 = sgn(y) * PI
     ; atanyox = atan(yox)
     ;
-    ; if (x != 0.0)
-    ;     atan(y, x) = (x < 0.0) ? p1 + atanyox : atanyox
+    ; if (y != 0.0)
+    ;     if (x != 0.0)
+    ;         atan(y, x) = (x < 0.0) ? p1 + atanyox : atanyox
+    ;     else
+    ;         atan(y, x) = p0
     ; else
-    ;     atan(y, x) = p0
+    ;     atan(y, x) = (x > 0.0) ? 0 : PI
 
     %1 = call float @llvm.fabs.f32(float %x)    ; %1 = |x|
     %2 = call float @llvm.fabs.f32(float %y)    ; %2 = |y|
-    %3 = call float @llpc.fsign.f32(float %y)   ; %3 = syn(y)
+    %3 = call float @llpc.fsign.f32(float %y)   ; %3 = sgn(y)
 
     ; 0x3FF921FB60000000: PI/2 = 1.57079637
-    %4 = fmul float %3, 0x3FF921FB60000000      ; %4 = p0 = syn(y) * PI/2
+    %4 = fmul float %3, 0x3FF921FB60000000      ; %4 = p0 = sgn(y) * PI/2
     ; 0x400921FB60000000: PI = 3.14159274
-    %5 = fmul float %3, 0x400921FB60000000      ; %5 = p1 = syn(y) * PI
+    %5 = fmul float %3, 0x400921FB60000000      ; %5 = p1 = sgn(y) * PI
 
     %6 = fcmp oeq float %1, %2                  ; %6 = (|x| == |y|)
     %7 = fcmp oeq float %x, %y                  ; %7 = (x == y)
     %8 = select i1 %7, float 1.0, float -1.0    ; %8 = (x == y) ? 1.0 : -1.0
 
-    ; NOTE: "atan" is very sensitive to the value of y_over_x, so we have to use high accuracy division.
-    %9 = call float @llvm.amdgcn.fdiv.fast(float %y, float %x)
-                                                ; %9  = y/x
+    ; NOTE: Use fast fdiv to bypass any optimization.
+    %9 = call float @llvm.amdgcn.fdiv.fast(float %y, float %x)  ; %9  = y/x                    
+
     %10 = select i1 %6, float %8, float %9      ; %10 = yox = (|x| == |y|) ? ((x == y) ? 1.0 : -1.0) : y/x
     %11 = call float @llpc.atan.f32(float %10)  ; %11 = atanyox = atan(yox)
 
@@ -324,9 +327,16 @@ define float @llpc.atan2.f32(float %y, float %x)
     %14 = select i1 %13, float %12, float %11   ; %14 = (x < 0.0) ? atanyox + p1 : atanyox
 
     %15 = fcmp one float %x, 0.0                ; %15 = (x != 0.0)
-    %16 = select i1 %15, float %14, float %4    ; %16 = atan(y, x)
+    %16 = select i1 %15, float %14, float %4    ; %16 = (x != 0.0) ? ((x < 0.0) ? atanyox + p1 : atanyox) : p0
 
-    ret float %16
+    %17 = fcmp ogt float %x, 0.0                ; %17 = (x > 0.0)
+    ; 0x4009200000000000: PI = 3.14159274
+    %18 = select i1 %17, float 0.0, float 0x4009200000000000    ; %18 = (x > 0.0) ? 0.0 : PI
+
+    %19 = fcmp one float %y, 0.0                ; %19 = (y != 0.0)
+    %20 = select i1 %19, float %16, float %18   ; %20 = atan(y, x)
+
+    ret float %20
 }
 
 ; GLSL: float sinh(float)
@@ -476,7 +486,7 @@ define i32 @llpc.sabs.i32(i32 %x) #0
     ret i32 %val
 }
 
-; GLSL: float abs(float)
+; GLSL: float sign(float)
 define float @llpc.fsign.f32(float %x) #0
 {
     %con1 = fcmp ogt float %x, 0.0
@@ -484,14 +494,6 @@ define float @llpc.fsign.f32(float %x) #0
     %con2 = fcmp oge float %ret1, 0.0
     %ret2 = select i1 %con2, float %ret1, float -1.0
     ret float %ret2
-}
-
-; GLSL: float fma(float, float, float)
-define float @llpc.fma.f32(float %x, float %y, float %z) #0
-{
-    %1 = fmul float %x, %y
-    %2 = fadd float %1, %z
-    ret float %2
 }
 
 ; GLSL: int sign(int)
@@ -628,8 +630,7 @@ define spir_func <4 x float> @_Z4modfDv4_fPDv4_f(
 }
 
 ; GLSL: float modf(float, out float)
-define spir_func { float, float } @_Z10modfStructf(
-    float %x) #0
+define spir_func { float, float } @_Z10modfStructf(float %x) #0
 {
     %1 = call float @llvm.trunc.f32(float %x)
     %2 = fsub float %x, %1
@@ -640,9 +641,8 @@ define spir_func { float, float } @_Z10modfStructf(
     ret { float, float } %4
 }
 
-; GLSL: fvec2 modf(fvec2, out fvec2)
-define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(
-    <2 x float> %x) #0
+; GLSL: vec2 modf(vec2, out vec2)
+define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(<2 x float> %x) #0
 {
     %x0 = extractelement <2 x float> %x, i32 0
     %x1 = extractelement <2 x float> %x, i32 1
@@ -665,9 +665,8 @@ define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(
     ret { <2 x float>, <2 x float> } %10
 }
 
-; GLSL: fvec3 modf(fvec3, out fvec3)
-define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(
-    <3 x float> %x) #0
+; GLSL: vec3 modf(vec3, out vec3)
+define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(<3 x float> %x) #0
 {
     %x0 = extractelement <3 x float> %x, i32 0
     %x1 = extractelement <3 x float> %x, i32 1
@@ -696,9 +695,8 @@ define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(
     ret { <3 x float>, <3 x float> } %14
 }
 
-; GLSL: fvec4 modf(fvec4, out fvec4)
-define spir_func { <4 x float>, <4 x float> } @_Z10modfStructDv4_f(
-    <4 x float> %x) #0
+; GLSL: vec4 modf(vec4, out vec4)
+define spir_func { <4 x float>, <4 x float> } @_Z10modfStructDv4_f(<4 x float> %x) #0
 {
     %x0 = extractelement <4 x float> %x, i32 0
     %x1 = extractelement <4 x float> %x, i32 1
@@ -813,9 +811,9 @@ define float @llpc.nclamp.f32(float %x, float %minVal, float %maxVal) #0
 define float @llpc.fmix.f32(float %x, float %y, float %a) #0
 {
     %1 = fsub float %y, %x
-    %2 = fmul float %1, %a
-    %3 = fadd float %2, %x
-    ret float %3
+    %2 = tail call float @llvm.fmuladd.f32(float %1, float %a, float %x)
+
+    ret float %2
 }
 
 ; GLSL: float step(float, float)
@@ -961,6 +959,13 @@ define spir_func {<4 x float>, <4 x i32>} @_Z11frexpStructDv4_f(
     %18 = insertvalue { <4 x float>, <4 x i32> } %17, <4 x i32> %16, 1
 
     ret {<4 x float>, <4 x i32>} %18
+}
+
+; GLSL: float fma(float, float, float)
+define float @llpc.fma.f32(float %a, float %b, float %c) #0
+{
+    %1 = tail call float @llvm.fmuladd.f32(float %a, float %b, float %c)
+    ret float %1
 }
 
 ; GLSL: float ldexpf(float, int)
@@ -2756,6 +2761,7 @@ declare float @llvm.amdgcn.fract.f32(float) #1
 declare float @llvm.amdgcn.fmed3.f32(float, float, float) #1
 declare float @llvm.amdgcn.ldexp.f32(float, i32) #1
 declare float @llvm.rint.f32(float) #0
+declare float @llvm.fmuladd.f32(float, float, float) #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }

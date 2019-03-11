@@ -533,7 +533,7 @@ Result ConfigBuilder::BuildVsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
@@ -806,7 +806,7 @@ Result ConfigBuilder::BuildHsRegConfig(
     const auto& calcFactor = pResUsage->inOutUsage.tcs.calcFactor;
     const auto& builtInUsage = pResUsage->builtInUsage.tcs;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true);  // Follow PAL setting
 
@@ -861,7 +861,7 @@ Result ConfigBuilder::BuildEsRegConfig(
     LLPC_ASSERT((pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
     const auto& calcFactor = pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, DX10_CLAMP, true); // Follow PAL setting
 
@@ -940,7 +940,7 @@ Result ConfigBuilder::BuildLsRegConfig(
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.vs;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, DEBUG_MODE, pShaderInfo->options.debugMode);
@@ -1030,7 +1030,7 @@ Result ConfigBuilder::BuildGsRegConfig(
     const auto& builtInUsage = pResUsage->builtInUsage.gs;
     const auto& inOutUsage   = pResUsage->inOutUsage;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true);  // Follow PAL setting
 
@@ -1194,7 +1194,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, pShaderInfo->options.debugMode);
@@ -1399,7 +1399,7 @@ Result ConfigBuilder::BuildCsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
 
-    uint32_t floatMode = SetupFloatingPointMode(pResUsage);
+    uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DX10_CLAMP, true);  // Follow PAL setting
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DEBUG_MODE, pShaderInfo->options.debugMode);
@@ -1681,50 +1681,53 @@ void ConfigBuilder::BuildApiHwShaderMapping(
 // =====================================================================================================================
 // Sets up floating point mode from the specified floating point control flags.
 uint32_t ConfigBuilder::SetupFloatingPointMode(
-    ResourceUsage* pResUsage)  // [in] Shader resource usage
+    Context*    pContext,       // [in] LLPC context
+    ShaderStage shaderStage)    // Shader stage
 {
-    uint32_t floatMode = 0xC0;
+    FloatMode floatMode = {};
+    floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
 
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
-    auto fpControlFlags = pResUsage->builtInUsage.common;
-    if (fpControlFlags.roundingModeRTE & (SPIRVTW_16Bit | SPIRVTW_64Bit))
-    {
-        floatMode &= ~0xC;
-    }
-    else if (fpControlFlags.roundingModeRTZ & (SPIRVTW_16Bit | SPIRVTW_64Bit))
-    {
-        floatMode |= 0xC;
-    }
+    auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
+    auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
+    auto fp64Control = pContext->GetShaderFloatControl(shaderStage, 64);
 
-    if (fpControlFlags.roundingModeRTE & SPIRVTW_32Bit)
+    if (fp16Control.roundingModeRTE || fp64Control.roundingModeRTE)
     {
-        floatMode &= ~0x3;
+        floatMode.bits.fp16fp64RoundMode = FP_ROUND_TO_NEAREST_EVEN;
     }
-    else if (fpControlFlags.roundingModeRTZ & SPIRVTW_32Bit)
+    else if (fp16Control.roundingModeRTZ || fp64Control.roundingModeRTZ)
     {
-        floatMode |= 0x3;
+        floatMode.bits.fp16fp64RoundMode = FP_ROUND_TO_ZERO;
     }
 
-    if (fpControlFlags.denormPerserve & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    if (fp32Control.roundingModeRTE)
     {
-        floatMode |= 0xC0;
+        floatMode.bits.fp32RoundMode = FP_ROUND_TO_NEAREST_EVEN;
     }
-    else if (fpControlFlags.denormFlushToZero & (SPIRVTW_16Bit | SPIRVTW_64Bit))
+    else if (fp32Control.roundingModeRTZ)
     {
-        floatMode &= ~0xC0;
+        floatMode.bits.fp32RoundMode = FP_ROUND_TO_ZERO;
     }
 
-    if (fpControlFlags.denormPerserve & SPIRVTW_32Bit)
+    if (fp16Control.denormPerserve || fp64Control.denormPerserve)
     {
-        floatMode |= 0x30;
+        floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
     }
-    else if (fpControlFlags.denormFlushToZero & SPIRVTW_32Bit)
+    else if (fp16Control.denormFlushToZero || fp64Control.denormFlushToZero)
     {
-        floatMode &= ~0x30;
+        floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_IN_OUT;
     }
-#endif
 
-    return floatMode;
+    if (fp32Control.denormPerserve)
+    {
+        floatMode.bits.fp32DenormMode = FP_DENORM_FLUSH_NONE;
+    }
+    else if (fp32Control.denormFlushToZero)
+    {
+        floatMode.bits.fp32DenormMode = FP_DENORM_FLUSH_IN_OUT;
+    }
+
+    return floatMode.u32All;
 }
 
 } // Gfx6

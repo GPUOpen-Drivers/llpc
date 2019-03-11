@@ -94,11 +94,47 @@ public:
     virtual llvm::Value* CreateLoadBufferDesc(
         uint32_t            descSet,            // Descriptor set
         uint32_t            binding,            // Descriptor binding
-        llvm::Value*        pBlockOffset,       // [in] Buffer block offset
+        llvm::Value*        pDescIndex,         // [in] Descriptor index
         bool                isNonUniform,       // Whether the descriptor index is non-uniform
         llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to (null to return
                                                 //    a non-fat-pointer <4 x i32> descriptor instead)
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
+    virtual llvm::Value* CreateLoadSamplerDesc(
+        uint32_t            descSet,          // Descriptor set
+        uint32_t            binding,          // Descriptor binding
+        llvm::Value*        pDescIndex,       // [in] Descriptor index
+        bool                isNonUniform,     // Whether the descriptor index is non-uniform
+        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    ) = 0;
+
+    // Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
+    virtual llvm::Value* CreateLoadResourceDesc(
+        uint32_t            descSet,          // Descriptor set
+        uint32_t            binding,          // Descriptor binding
+        llvm::Value*        pDescIndex,       // [in] Descriptor index
+        bool                isNonUniform,     // Whether the descriptor index is non-uniform
+        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    ) = 0;
+
+    // Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
+    virtual llvm::Value* CreateLoadTexelBufferDesc(
+        uint32_t            descSet,          // Descriptor set
+        uint32_t            binding,          // Descriptor binding
+        llvm::Value*        pDescIndex,       // [in] Descriptor index
+        bool                isNonUniform,     // Whether the descriptor index is non-uniform
+        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    ) = 0;
+
+    // Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
+    virtual llvm::Value* CreateLoadFmaskDesc(
+        uint32_t            descSet,          // Descriptor set
+        uint32_t            binding,          // Descriptor binding
+        llvm::Value*        pDescIndex,       // [in] Descriptor index
+        bool                isNonUniform,     // Whether the descriptor index is non-uniform
+        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    ) = 0;
 
     // Create a load of the spill table pointer for push constants.
     virtual llvm::Value* CreateLoadSpillTablePtr(

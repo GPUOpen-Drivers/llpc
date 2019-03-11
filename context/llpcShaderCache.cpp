@@ -268,6 +268,7 @@ Result ShaderCache::Merge(
                 pIndex->header = it.second->header;
 
                 m_shaderIndexMap[key] = pIndex;
+                m_totalShaders++;
             }
         }
         pSrcCache->UnlockCacheMap(true);

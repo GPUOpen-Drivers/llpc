@@ -82,6 +82,30 @@ private:
 
     llvm::Value* GetViewIndex(llvm::Instruction* pInsertPos);
 
+    llvm::Value* LoadTexelBufferDescriptor(uint32_t            descSet,
+                                           uint32_t            binding,
+                                           llvm::Value*        pBlockOffset,
+                                           bool                isNonUniform,
+                                           llvm::Instruction*  pInsertPos);
+
+    llvm::Value* LoadResourceDescriptor(uint32_t            descSet,
+                                        uint32_t            binding,
+                                        llvm::Value*        pBlockOffset,
+                                        bool                isNonUniform,
+                                        llvm::Instruction*  pInsertPos);
+
+    llvm::Value* LoadFmaskDescriptor(uint32_t            descSet,
+                                     uint32_t            binding,
+                                     llvm::Value*        pBlockOffset,
+                                     bool                isNonUniform,
+                                     llvm::Instruction*  pInsertPos);
+
+    llvm::Value* LoadSamplerDescriptor(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       llvm::Value*        pBlockOffset,
+                                       bool                isNonUniform,
+                                       llvm::Instruction*  pInsertPos);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     std::unordered_set<llvm::CallInst*>    m_imageCalls;  // List of "call" instructions to emulate SPIR-V image operations

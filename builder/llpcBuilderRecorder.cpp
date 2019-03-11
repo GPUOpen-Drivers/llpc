@@ -48,6 +48,14 @@ StringRef BuilderRecorder::GetCallName(
         return "nop";
     case Opcode::DescLoadBuffer:
         return "desc.load.buffer";
+    case Opcode::DescLoadSampler:
+        return "desc.load.sampler";
+    case Opcode::DescLoadResource:
+        return "desc.load.resource";
+    case Opcode::DescLoadTexelBuffer:
+        return "desc.load.texel.buffer";
+    case Opcode::DescLoadFmask:
+        return "desc.load.fmask";
     case Opcode::DescLoadSpillTablePtr:
         return "desc.load.spill.table.ptr";
     case Opcode::MiscKill:
@@ -142,7 +150,7 @@ Instruction* BuilderRecorder::CreateWaterfallLoop(
 Value* BuilderRecorder::CreateLoadBufferDesc(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pBlockOffset,     // [in] Buffer block offset
+    Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     Type*         pPointeeTy,       // [in] Type that the returned pointer should point to
     const Twine&  instName)         // [in] Name to give instruction(s)
@@ -155,7 +163,87 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
                   {
                       getInt32(descSet),
                       getInt32(binding),
-                      pBlockOffset,
+                      pDescIndex,
+                      getInt1(isNonUniform),
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
+Value* BuilderRecorder::CreateLoadSamplerDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::DescLoadSampler,
+                  VectorType::get(getInt32Ty(), 4),
+                  {
+                      getInt32(descSet),
+                      getInt32(binding),
+                      pDescIndex,
+                      getInt1(isNonUniform),
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
+Value* BuilderRecorder::CreateLoadResourceDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::DescLoadResource,
+                  VectorType::get(getInt32Ty(), 8),
+                  {
+                      getInt32(descSet),
+                      getInt32(binding),
+                      pDescIndex,
+                      getInt1(isNonUniform),
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
+Value* BuilderRecorder::CreateLoadTexelBufferDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::DescLoadTexelBuffer,
+                  VectorType::get(getInt32Ty(), 4),
+                  {
+                      getInt32(descSet),
+                      getInt32(binding),
+                      pDescIndex,
+                      getInt1(isNonUniform),
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
+Value* BuilderRecorder::CreateLoadFmaskDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::DescLoadFmask,
+                  VectorType::get(getInt32Ty(), 8),
+                  {
+                      getInt32(descSet),
+                      getInt32(binding),
+                      pDescIndex,
                       getInt1(isNonUniform),
                   },
                   instName);
@@ -191,27 +279,30 @@ Instruction* BuilderRecorder::Record(
     ArrayRef<Value*>        args,         // Arguments
     const Twine&            instName)     // [in] Name to give instruction
 {
-    // Create mangled name of builder call.
-    if (pRetTy == nullptr)
+    // Create mangled name of builder call. This only needs to be mangled on return type.
+    std::string mangledName;
     {
-        pRetTy = Type::getVoidTy(getContext());
+        raw_string_ostream mangledNameStream(mangledName);
+        mangledNameStream << BuilderCallPrefix;
+        mangledNameStream << GetCallName(opcode);
+        if (pRetTy != nullptr)
+        {
+            mangledNameStream << ".";
+            GetTypeNameForScalarOrVector(pRetTy, mangledNameStream);
+        }
+        else
+        {
+            pRetTy = Type::getVoidTy(getContext());
+        }
     }
-    std::string mangledName = (Twine(BuilderCallPrefix) + GetCallName(opcode)).str();
-    AddTypeMangling(pRetTy, args, mangledName);
 
     // See if the declaration already exists in the module.
     Module* const pModule = GetInsertBlock()->getModule();
     Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(mangledName));
     if (pFunc == nullptr)
     {
-        // Does not exist. Create it.
-        SmallVector<Type*, 8> argTys;
-        for (auto arg : args)
-        {
-            argTys.push_back(arg->getType());
-        }
-
-        auto pFuncTy = FunctionType::get(pRetTy, argTys, false);
+        // Does not exist. Create it as a varargs function.
+        auto pFuncTy = FunctionType::get(pRetTy, {}, true);
         pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, mangledName, pModule);
 
         MDNode* const pFuncMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
@@ -220,5 +311,7 @@ Instruction* BuilderRecorder::Record(
     }
 
     // Create the call.
-    return CreateCall(pFunc, args, instName);
+    auto pCall = CreateCall(pFunc, args, instName);
+
+    return pCall;
 }

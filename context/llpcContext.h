@@ -71,10 +71,10 @@ public:
         return m_pPipelineContext;
     }
 
-    // Sets Llpc builder
+    // Sets LLPC builder
     void SetBuilder(Builder* pBuilder) { m_pBuilder = pBuilder; }
 
-    // Gets Llpc builder
+    // Gets LLPC builder
     Builder* GetBuilder() const { return m_pBuilder; }
 
     // Sets the target machine.
@@ -224,6 +224,12 @@ public:
     void DoUserDataNodeMerge()
     {
         m_pPipelineContext->DoUserDataNodeMerge();
+    }
+
+    // Gets float control settings of the specified shader stage for the provide floating-point type.
+    FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const
+    {
+        return m_pPipelineContext->GetShaderFloatControl(shaderStage, bitWidth);
     }
 
     // Gets the count of vertices per primitive

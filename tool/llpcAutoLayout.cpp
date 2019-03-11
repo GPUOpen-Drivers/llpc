@@ -506,6 +506,7 @@ void DoAutoLayoutDesc(
                     }
                     set.back().srdRange.set = descSet;
                     set.back().srdRange.binding = binding;
+                    set.back().offsetInDwords = nextOffset;
                 }
                 break;
             }

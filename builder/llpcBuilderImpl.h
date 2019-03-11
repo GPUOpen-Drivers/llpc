@@ -67,10 +67,38 @@ public:
     // Create a load of a buffer descriptor.
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
                                       uint32_t            binding,
-                                      llvm::Value*        pBlockOffset,
+                                      llvm::Value*        pDescIndex,
                                       bool                isNonUniform,
                                       llvm::Type*         pPointeeTy,
                                       const llvm::Twine&  instName) override final;
+
+    // Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
+    llvm::Value* CreateLoadSamplerDesc(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       llvm::Value*        pDescIndex,
+                                       bool                isNonUniform,
+                                       const llvm::Twine&  instName) override final;
+
+    // Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
+    llvm::Value* CreateLoadResourceDesc(uint32_t            descSet,
+                                        uint32_t            binding,
+                                        llvm::Value*        pDescIndex,
+                                        bool                isNonUniform,
+                                        const llvm::Twine&  instName) override final;
+
+    // Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
+    llvm::Value* CreateLoadTexelBufferDesc(uint32_t            descSet,
+                                           uint32_t            binding,
+                                           llvm::Value*        pDescIndex,
+                                           bool                isNonUniform,
+                                           const llvm::Twine&  instName) override final;
+
+    // Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
+    llvm::Value* CreateLoadFmaskDesc(uint32_t            descSet,
+                                     uint32_t            binding,
+                                     llvm::Value*        pDescIndex,
+                                     bool                isNonUniform,
+                                     const llvm::Twine&  instName) override final;
 
     // Create a load of the spill table pointer.
     llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
@@ -79,6 +107,8 @@ public:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplDesc)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplDesc)
+
+    llvm::Value* ScalarizeIfUniform(llvm::Value* pValue, bool isNonUniform);
 };
 
 // =====================================================================================================================

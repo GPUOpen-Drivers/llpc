@@ -122,7 +122,7 @@ private:
                                         uint32_t           csHwShader,
                                         PipelineRegConfig* pConfig);
 
-    static uint32_t SetupFloatingPointMode(ResourceUsage* pResUsage);
+    static uint32_t SetupFloatingPointMode(Context* pContext, ShaderStage shaderStage);
 
 };
 

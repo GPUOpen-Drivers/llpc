@@ -3975,8 +3975,7 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
     return false;
 
   FpControlFlags.U32All = 0;
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
-  static_assert(SPIRVTW_8Bit == (8 >> 3),  "Unexpected value!");
+  static_assert(SPIRVTW_8Bit  == (8 >> 3),  "Unexpected value!");
   static_assert(SPIRVTW_16Bit == (16 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_32Bit == (32 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
@@ -3995,7 +3994,6 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
 
   if (auto EM = EntryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
       FpControlFlags.RoundingModeRTZ = EM->getLiterals()[0] >> 3;
-#endif
 
   // Check if the SPIR-V corresponds to OpenCL kernel
   IsKernel = (EntryExecModel == ExecutionModelKernel);
@@ -4043,12 +4041,7 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
         // time, specialization info is obtained and all specialization constants
         // get their own finalized specialization values.
         auto BI = static_cast<SPIRVSpecConstantOp *>(BV);
-        BV = createValueFromSpecConstantOp(BI,
-#if VKI_KHR_SHADER_FLOAT_CONTROLS
-            FpControlFlags.RoundingModeRTE);
-#else
-            0);
-#endif
+        BV = createValueFromSpecConstantOp(BI, FpControlFlags.RoundingModeRTE);
         BI->mapToConstant(BV);
       }
     }

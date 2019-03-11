@@ -191,7 +191,7 @@ Instruction* BuilderImplDesc::CreateWaterfallLoop(
 Value* BuilderImplDesc::CreateLoadBufferDesc(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pBlockOffset,     // [in] Buffer block offset
+    Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     Type*         pPointeeTy,       // [in] Type that the returned pointer should point to (nullptr to return a
                                     //    non-fat-pointer <4 x i32> descriptor)
@@ -199,13 +199,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
 {
     LLPC_ASSERT(pPointeeTy == nullptr && "Fat pointers not supported yet");
     Instruction* pInsertPos = &*GetInsertPoint();
-
-    if ((isa<Constant>(pBlockOffset) == false) && (isNonUniform == false) &&
-        (getContext().GetGfxIpVersion().major > 6))
-    {
-        // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-        pBlockOffset = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pBlockOffset);
-    }
+    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
 
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // look up the descSet/binding and generate the code directly. Note that we always set isNonUniform here
@@ -217,13 +211,129 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
                                      {
                                          getInt32(descSet),
                                          getInt32(binding),
-                                         pBlockOffset,
+                                         pDescIndex,
                                          getInt1(false), // isNonUniform
                                      },
                                      NoAttrib,
                                      pInsertPos);
     pBufDescLoadCall->setName(instName);
     return pBufDescLoadCall;
+}
+
+// =====================================================================================================================
+// Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
+Value* BuilderImplDesc::CreateLoadSamplerDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    Instruction* pInsertPos = &*GetInsertPoint();
+    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
+
+    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
+    // look up the descSet/binding and generate the code directly.
+    auto pSamplerDescLoadCall = EmitCall(pInsertPos->getModule(),
+                                         LlpcName::DescriptorLoadSampler,
+                                         VectorType::get(getInt32Ty(), 4),
+                                         {
+                                             getInt32(descSet),
+                                             getInt32(binding),
+                                             pDescIndex,
+                                             getInt1(false), // isNonUniform
+                                         },
+                                         NoAttrib,
+                                         pInsertPos);
+    pSamplerDescLoadCall->setName(instName);
+    return pSamplerDescLoadCall;
+}
+
+// =====================================================================================================================
+// Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
+Value* BuilderImplDesc::CreateLoadResourceDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    Instruction* pInsertPos = &*GetInsertPoint();
+    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
+
+    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
+    // look up the descSet/binding and generate the code directly.
+    auto pResDescLoadCall = EmitCall(pInsertPos->getModule(),
+                                     LlpcName::DescriptorLoadResource,
+                                     VectorType::get(getInt32Ty(), 8),
+                                     {
+                                         getInt32(descSet),
+                                         getInt32(binding),
+                                         pDescIndex,
+                                         getInt1(false), // isNonUniform
+                                     },
+                                     NoAttrib,
+                                     pInsertPos);
+    pResDescLoadCall->setName(instName);
+    return pResDescLoadCall;
+}
+
+// =====================================================================================================================
+// Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
+Value* BuilderImplDesc::CreateLoadTexelBufferDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    Instruction* pInsertPos = &*GetInsertPoint();
+    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
+
+    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
+    // look up the descSet/binding and generate the code directly.
+    auto pTexelBufDescLoadCall = EmitCall(pInsertPos->getModule(),
+                                          LlpcName::DescriptorLoadTexelBuffer,
+                                          VectorType::get(getInt32Ty(), 4),
+                                          {
+                                              getInt32(descSet),
+                                              getInt32(binding),
+                                              pDescIndex,
+                                              getInt1(false), // isNonUniform
+                                          },
+                                          NoAttrib,
+                                          pInsertPos);
+    pTexelBufDescLoadCall->setName(instName);
+    return pTexelBufDescLoadCall;
+}
+
+// =====================================================================================================================
+// Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
+Value* BuilderImplDesc::CreateLoadFmaskDesc(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    Value*        pDescIndex,       // [in] Descriptor index
+    bool          isNonUniform,     // Whether the descriptor index is non-uniform
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    Instruction* pInsertPos = &*GetInsertPoint();
+    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
+
+    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
+    // look up the descSet/binding and generate the code directly.
+    auto pFmaskDescLoadCall = EmitCall(pInsertPos->getModule(),
+                                       LlpcName::DescriptorLoadFmask,
+                                       VectorType::get(getInt32Ty(), 8),
+                                       {
+                                           getInt32(descSet),
+                                           getInt32(binding),
+                                           pDescIndex,
+                                           getInt1(false), // isNonUniform
+                                       },
+                                       NoAttrib,
+                                       pInsertPos);
+    pFmaskDescLoadCall->setName(instName);
+    return pFmaskDescLoadCall;
 }
 
 // =====================================================================================================================
@@ -244,5 +354,23 @@ Value* BuilderImplDesc::CreateLoadSpillTablePtr(
                                         pInsertPos);
     pSpillTableLoadCall->setName(instName);
     return pSpillTableLoadCall;
+}
+
+// =====================================================================================================================
+// Scalarize a value (pass it through readfirstlane) if uniform
+Value* BuilderImplDesc::ScalarizeIfUniform(
+    Value*  pValue,       // [in] 32-bit integer value to scalarize
+    bool    isNonUniform) // Whether value is marked as non-uniform
+{
+    LLPC_ASSERT(pValue->getType()->isIntegerTy(32));
+    if ((isNonUniform == false) && (isa<Constant>(pValue) == false))
+    {
+        // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
+        if (getContext().GetGfxIpVersion().major > 6)
+        {
+            pValue = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pValue);
+        }
+    }
+    return pValue;
 }
 

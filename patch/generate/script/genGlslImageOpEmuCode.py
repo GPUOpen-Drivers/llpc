@@ -60,11 +60,6 @@ SPIRV_IMAGE_ARRAY_MODIFIER                  = "Array"
 
 LLPC_IMAGE_DIM_AWARE_SUFFIX                 = "dimaware"
 
-LLPC_DESCRIPTOR_LOAD_RESOURCE               = "llpc.descriptor.load.resource"
-LLPC_DESCRIPTOR_LOAD_TEXELBUFFER            = "llpc.descriptor.load.texelbuffer"
-LLPC_DESCRIPTOR_LOAD_SAMPLER                = "llpc.descriptor.load.sampler"
-LLPC_DESCRIPTOR_LOAD_FMASK                  = "llpc.descriptor.load.fmask"
-
 LLPC_PATCH_IMAGE_READWRITEATOMIC_DESCRIPTOR_CUBE = "llpc.patch.image.readwriteatomic.descriptor.cube"
 
 # GFX level
@@ -104,12 +99,6 @@ class VarNames:
     resource         = "%resource"
     patchedResource  = "%patchedResource"
     fmask            = "%fmask"
-    samplerSet       = "%samplerDescSet"
-    samplerBinding   = "%samplerBinding"
-    samplerIndex     = "%samplerIdx"
-    resourceSet      = "%resourceDescSet"
-    resourceBinding  = "%resourceBinding"
-    resourceIndex    = "%resourceIdx"
     coord            = "%coord"
     texel            = "%texel"
     comp             = "%comp"
@@ -460,7 +449,6 @@ class CodeGen(FuncDef):
                                                 self._attr)
         irOut.write(irFuncDef)
         irOut.write('{\n')
-        self.genLoadSamplerAndResource(irOut)
         self.genCoord(irOut)
         if self._hasDref:
             self.genDref(irOut)
@@ -522,7 +510,6 @@ class CodeGen(FuncDef):
                                                     self._attr)
             irOut.write(irFuncDef)
             irOut.write('{\n')
-            self.genLoadSamplerAndResource(irOut)
             self.genCoord(irOut)
             if self._hasDref:
                 self.genDref(irOut)
@@ -615,11 +602,14 @@ class CodeGen(FuncDef):
         if self._opKind == SpirvImageOpKind.sample or \
            self._opKind == SpirvImageOpKind.gather or \
            self._opKind == SpirvImageOpKind.querylod:
-            samplerBindings = "i32 %s, i32 %s, i32 %s, " % (VarNames.samplerSet, \
-                    VarNames.samplerBinding, VarNames.samplerIndex)
+            samplerBindings = "<4 x i32> %s, " % (VarNames.sampler)
 
-        resourceBindings = "i32 %s, i32 %s, i32 %s" % (VarNames.resourceSet, VarNames.resourceBinding, \
-                VarNames.resourceIndex)
+        if self._dim == SpirvDim.DimBuffer:
+            resourceBindings = "<4 x i32> %s" % (VarNames.resource)
+        else:
+            resourceBindings = "<8 x i32> %s" % (VarNames.resource)
+        if self._isFmaskBased:
+            resourceBindings += ", <8 x i32> %s" % (VarNames.fmask)
 
         allBindings = samplerBindings + resourceBindings
         params.append(allBindings)
@@ -694,32 +684,6 @@ class CodeGen(FuncDef):
         # imageCallMeta isn't used by generated code, it is for image patch pass
         params.append("i32 %imageCallMeta")
         return " ,".join(params)
-
-    # Generates sampler and resource loading code.
-    def genLoadSamplerAndResource(self, irOut):
-        if self._opKind == SpirvImageOpKind.sample or \
-           self._opKind == SpirvImageOpKind.gather or \
-           self._opKind == SpirvImageOpKind.querylod:
-            loadSampler = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
-                    (VarNames.sampler, LLPC_DESCRIPTOR_LOAD_SAMPLER, VarNames.samplerSet, \
-                    VarNames.samplerBinding, VarNames.samplerIndex, VarNames.imageCallMeta)
-            irOut.write(loadSampler)
-
-        if self._dim == SpirvDim.DimBuffer:
-            loadResource = "    %s = call <4 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
-                    (VarNames.resource, LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, VarNames.resourceSet, \
-                    VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
-        else:
-            loadResource = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
-                    (VarNames.resource, LLPC_DESCRIPTOR_LOAD_RESOURCE, VarNames.resourceSet, \
-                    VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
-        irOut.write(loadResource)
-
-        if self._isFmaskBased:
-            loadFMask = "    %s = call <8 x i32> @%s(i32 %s, i32 %s, i32 %s, i32 %s)\n" % \
-                    (VarNames.fmask, LLPC_DESCRIPTOR_LOAD_FMASK, VarNames.resourceSet, \
-                    VarNames.resourceBinding, VarNames.resourceIndex, VarNames.imageCallMeta)
-            irOut.write(loadFMask)
 
     def processReturn(self, retVal, intrinGen, irOut):
         # Casts instrinsic return type to function return type
@@ -2649,14 +2613,6 @@ def processList(outDir, listIn, gfxLevel):
 def initLlvmDecls(gfxLevel):
     global LLVM_DECLS
     LLVM_DECLS = {}
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_SAMPLER, "declare <4 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
-            LLPC_DESCRIPTOR_LOAD_SAMPLER))
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_RESOURCE, "declare <8 x i32> @%s(i32 , i32 , i32 , i32) #0\n" % (\
-            LLPC_DESCRIPTOR_LOAD_RESOURCE))
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_TEXELBUFFER, "declare <4 x i32> @%s(i32 , i32 , i32, i32) #0\n" % (\
-            LLPC_DESCRIPTOR_LOAD_TEXELBUFFER))
-    addLlvmDecl(LLPC_DESCRIPTOR_LOAD_FMASK, "declare <8 x i32> @%s(i32 , i32 , i32, i32) #0\n" % (\
-            LLPC_DESCRIPTOR_LOAD_FMASK))
     addLlvmDecl("llvm.amdgcn.cubetc", "declare float @llvm.amdgcn.cubetc(float, float, float) #0\n")
     addLlvmDecl("llvm.amdgcn.cubesc", "declare float @llvm.amdgcn.cubesc(float, float, float) #0\n")
     addLlvmDecl("llvm.amdgcn.cubema", "declare float @llvm.amdgcn.cubema(float, float, float) #0\n")
