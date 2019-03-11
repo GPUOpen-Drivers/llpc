@@ -157,7 +157,7 @@ CallInst* EmitCall(
 
 // =====================================================================================================================
 // Gets LLVM-style name for scalar or vector type.
-static void GetTypeNameForScalarOrVector(
+void GetTypeNameForScalarOrVector(
     Type*         pTy,         // [in] Type to get mangle name
     raw_ostream&  nameStream)  // [in,out] Stream to write the type name into
 {

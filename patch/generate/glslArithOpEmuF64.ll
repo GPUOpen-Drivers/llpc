@@ -186,15 +186,117 @@ define spir_func <4 x double> @_Z4modfDv4_dPDv4_d(
     ret <4 x double> %16
 }
 
+; GLSL: double modf(double, out double)
+define spir_func { double, double } @_Z10modfStructd(double %x) #0
+{
+    %1 = call double @llvm.trunc.f64(double %x)
+    %2 = fsub double %x, %1
+
+    %3 = insertvalue { double, double } undef, double %2, 0
+    %4 = insertvalue { double, double } %3, double %1, 1
+
+    ret { double, double } %4
+}
+
+; GLSL: dvec2 modf(dvec2, out dvec2)
+define spir_func { <2 x double>, <2 x double> } @_Z10modfStructDv2_d(<2 x double> %x) #0
+{
+    %x0 = extractelement <2 x double> %x, i32 0
+    %x1 = extractelement <2 x double> %x, i32 1
+
+    %1 = call double @llvm.trunc.f64(double %x0)
+    %2 = fsub double %x0, %1
+
+    %3 = call double @llvm.trunc.f64(double %x1)
+    %4 = fsub double %x1, %3
+
+    %5 = insertelement <2 x double> undef, double %1, i32 0
+    %6 = insertelement <2 x double> %5, double %3, i32 1
+
+    %7 = insertelement <2 x double> undef, double %2, i32 0
+    %8 = insertelement <2 x double> %7, double %4, i32 1
+
+    %9 = insertvalue { <2 x double>, <2 x double> } undef, <2 x double> %8, 0
+    %10 = insertvalue { <2 x double>, <2 x double> } %9, <2 x double> %6, 1
+
+    ret { <2 x double>, <2 x double> } %10
+}
+
+; GLSL: dvec3 modf(dvec3, out dvec3)
+define spir_func { <3 x double>, <3 x double> } @_Z10modfStructDv3_d(<3 x double> %x) #0
+{
+    %x0 = extractelement <3 x double> %x, i32 0
+    %x1 = extractelement <3 x double> %x, i32 1
+    %x2 = extractelement <3 x double> %x, i32 2
+
+    %1 = call double @llvm.trunc.f64(double %x0)
+    %2 = fsub double %x0, %1
+
+    %3 = call double @llvm.trunc.f64(double %x1)
+    %4 = fsub double %x1, %3
+
+    %5 = call double @llvm.trunc.f64(double %x2)
+    %6 = fsub double %x2, %5
+
+    %7 = insertelement <3 x double> undef, double %1, i32 0
+    %8 = insertelement <3 x double> %7, double %3, i32 1
+    %9 = insertelement <3 x double> %8, double %5, i32 2
+
+    %10 = insertelement <3 x double> undef, double %2, i32 0
+    %11 = insertelement <3 x double> %10, double %4, i32 1
+    %12 = insertelement <3 x double> %11, double %6, i32 2
+
+    %13 = insertvalue { <3 x double>, <3 x double> } undef, <3 x double> %12, 0
+    %14 = insertvalue { <3 x double>, <3 x double> } %13, <3 x double> %9, 1
+
+    ret { <3 x double>, <3 x double> } %14
+}
+
+; GLSL: dvec4 modf(dvec4, out dvec4)
+define spir_func { <4 x double>, <4 x double> } @_Z10modfStructDv4_d(<4 x double> %x) #0
+{
+    %x0 = extractelement <4 x double> %x, i32 0
+    %x1 = extractelement <4 x double> %x, i32 1
+    %x2 = extractelement <4 x double> %x, i32 2
+    %x3 = extractelement <4 x double> %x, i32 3
+
+    %1 = call double @llvm.trunc.f64(double %x0)
+    %2 = fsub double %x0, %1
+
+    %3 = call double @llvm.trunc.f64(double %x1)
+    %4 = fsub double %x1, %3
+
+    %5 = call double @llvm.trunc.f64(double %x2)
+    %6 = fsub double %x2, %5
+
+    %7 = call double @llvm.trunc.f64(double %x3)
+    %8 = fsub double %x3, %7
+
+    %9 = insertelement <4 x double> undef, double %1, i32 0
+    %10 = insertelement <4 x double> %9, double %3, i32 1
+    %11 = insertelement <4 x double> %10, double %5, i32 2
+    %12 = insertelement <4 x double> %11, double %7, i32 3
+
+    %13 = insertelement <4 x double> undef, double %2, i32 0
+    %14 = insertelement <4 x double> %13, double %4, i32 1
+    %15 = insertelement <4 x double> %14, double %6, i32 2
+    %16 = insertelement <4 x double> %15, double %8, i32 3
+
+    %17 = insertvalue { <4 x double>, <4 x double> } undef, <4 x double> %16, 0
+    %18 = insertvalue { <4 x double>, <4 x double> } %17, <4 x double> %12, 1
+
+    ret { <4 x double>, <4 x double> } %18
+}
+
 ; GLSL: double nmin(double, double)
-define double @llpc.nmin.f16(double %x, double %y) #0
+define double @llpc.nmin.f64(double %x, double %y) #0
 {
     %1 = call double @llvm.minnum.f64(double %x, double %y)
     ret double %1
 }
 
 ; GLSL: double nmax(double, double)
-define double @llpc.nmax.f16(double %x, double %y) #0
+define double @llpc.nmax.f64(double %x, double %y) #0
 {
     %1 = call double @llvm.maxnum.f64(double %x, double %y)
     ret double %1
@@ -220,9 +322,9 @@ define double @llpc.nclamp.f64(double %x, double %minVal, double %maxVal) #0
 define double @llpc.fmix.f64(double %x, double %y, double %a) #0
 {
     %1 = fsub double %y, %x
-    %2 = fmul double %1, %a
-    %3 = fadd double %2, %x
-    ret double %3
+    %2 = tail call double @llvm.fmuladd.f64(double %1, double %a, double %x)
+
+    ret double %2
 }
 
 ; GLSL: double step(double, double)
@@ -1025,8 +1127,9 @@ declare double @llvm.amdgcn.frexp.mant.f64(double) #1
 declare i1 @llvm.amdgcn.class.f64(double, i32) #1
 declare i32 @llvm.amdgcn.frexp.exp.i32.f64(double %x) #1
 declare double @llvm.amdgcn.fract.f64(double) #1
-declare double @llvm.amdgcn.fmed3.f64(double %x, double %minVal, double %maxVal) #1
+declare double @llvm.amdgcn.fmed3.f64(double, double, double) #1
 declare double @llvm.rint.f64(double) #0
+declare double @llvm.fmuladd.f64(double, double, double) #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }

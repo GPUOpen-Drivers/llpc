@@ -58,6 +58,10 @@ public:
         DescWaterfallLoop,
         DescWaterfallStoreLoop,
         DescLoadBuffer,
+        DescLoadSampler,
+        DescLoadResource,
+        DescLoadTexelBuffer,
+        DescLoadFmask,
         DescLoadSpillTablePtr,
 
         // Misc.
@@ -81,10 +85,34 @@ public:
 
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
                                       uint32_t            binding,
-                                      llvm::Value*        pBlockOffset,
+                                      llvm::Value*        pDescIndex,
                                       bool                isNonUniform,
                                       llvm::Type*         pPointeeTy,
                                       const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadSamplerDesc(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       llvm::Value*        pDescIndex,
+                                       bool                isNonUniform,
+                                       const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadResourceDesc(uint32_t            descSet,
+                                        uint32_t            binding,
+                                        llvm::Value*        pDescIndex,
+                                        bool                isNonUniform,
+                                        const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadTexelBufferDesc(uint32_t            descSet,
+                                           uint32_t            binding,
+                                           llvm::Value*        pDescIndex,
+                                           bool                isNonUniform,
+                                           const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadFmaskDesc(uint32_t            descSet,
+                                     uint32_t            binding,
+                                     llvm::Value*        pDescIndex,
+                                     bool                isNonUniform,
+                                     const llvm::Twine&  instName) override final;
 
     llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
                                          const llvm::Twine&  instName) override final;
@@ -111,7 +139,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    bool      m_wantReplay;     // true to make CreateBuilderReplayer return a replayer pass
+    bool      m_wantReplay;     // true to make CreateBuilderReplayer return a replayer  pass
 };
 
 } // Llpc

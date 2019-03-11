@@ -195,7 +195,11 @@ void PatchResourceCollect::visitCallInst(
             m_hasPushConstOp = true;
         }
     }
-    else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer))
+    else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer) ||
+             mangledName.startswith(LlpcName::DescriptorLoadTexelBuffer) ||
+             mangledName.startswith(LlpcName::DescriptorLoadResource) ||
+             mangledName.startswith(LlpcName::DescriptorLoadFmask) ||
+             mangledName.startswith(LlpcName::DescriptorLoadSampler))
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
@@ -223,23 +227,6 @@ void PatchResourceCollect::visitCallInst(
         if (isDeadCall && isImageOpReadOnly(imageOp))
         {
             m_deadCalls.insert(&callInst);
-        }
-
-        uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-        uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-        DescriptorPair descPair = { descSet, binding };
-        m_pResUsage->descPairs.insert(descPair.u64All);
-
-        // NOTE: For image sampling operations, we have to add both resource descriptor and sampler descriptor info
-        // to descriptor usages, operand 0 and 1 are sampler descriptor, 3 and 4 are resource descriptor
-        if ((imageOp == ImageOpSample) ||
-            (imageOp == ImageOpGather) ||
-            (imageOp == ImageOpQueryLod))
-        {
-            uint32_t descSet = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-            uint32_t binding = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
-            DescriptorPair descPair = { descSet, binding };
-            m_pResUsage->descPairs.insert(descPair.u64All);
         }
     }
     else if (mangledName.startswith(LlpcName::InputImportGeneric))

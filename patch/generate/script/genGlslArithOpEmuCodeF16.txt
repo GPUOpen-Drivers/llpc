@@ -46,6 +46,7 @@ genF16Type step genF16Type edge genF16Type x : llpc.step.f16 #0
 genF16Type smoothStep genF16Type edge0 genF16Type edge1 genF16Type x : llpc.smoothStep.f16 #0
 genBType isinf genF16Type value : llpc.isinf.f16 #0
 genBType isnan genF16Type value : llpc.isnan.f16 #0
+genF16Type fma genF16Type a genF16Type b genF16Type c : llpc.fma.f16 #0
 genF16Type ldexp genF16Type x genIType exp : llvm.amdgcn.ldexp.f16 #1
 
 # Derivative Functions

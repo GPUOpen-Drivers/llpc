@@ -273,6 +273,45 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             }
         }
     }
+    else if (opCode == Instruction::FRem)
+    {
+        auto pDestTy = binaryOp.getType();
+        if (pDestTy->getScalarType()->isHalfTy())
+        {
+            // TODO: FREM for float16 type is not well handled by backend compiler. We lower it here:
+            // frem(x, y) = x - y * trunc(x/y)
+
+            // -trunc(x * 1/y)
+            Value* pTrunc = EmitCall(m_pModule,
+                                     "llvm.amdgcn.rcp." + GetTypeNameForScalarOrVector(pDestTy),
+                                     pDestTy,
+                                     { pSrc2 },
+                                     NoAttrib,
+                                     &binaryOp);
+            pTrunc = BinaryOperator::CreateFMul(pTrunc, pSrc1, "", &binaryOp);
+            pTrunc = EmitCall(m_pModule,
+                              "llvm.trunc." + GetTypeNameForScalarOrVector(pDestTy),
+                              pDestTy,
+                              { pTrunc },
+                              NoAttrib,
+                              &binaryOp);
+            pTrunc = BinaryOperator::CreateFNeg(pTrunc, "", &binaryOp);
+
+            // -trunc(x/y) * y + x
+            auto pFRem = EmitCall(m_pModule,
+                                  "llvm.fmuladd." + GetTypeNameForScalarOrVector(pDestTy),
+                                  pDestTy,
+                                  { pTrunc, pSrc2, pSrc1 },
+                                  NoAttrib,
+                                  &binaryOp);
+
+            binaryOp.replaceAllUsesWith(pFRem);
+            binaryOp.dropAllReferences();
+            binaryOp.eraseFromParent();
+
+            m_changed = true;
+        }
+    }
 
     // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
     // will flush denormals or preserve NaN.

@@ -31,9 +31,9 @@ target triple = "spir64-unknown-unknown"
 ; =====================================================================================================================
 
 ; GLSL: float fma(float, float, float)
-define float @llpc.fma.f32(float %x, float %y, float %z) #0
+define float @llpc.fma.f32(float %a, float %b, float %c) #0
 {
-    %1 = call float @llvm.fma.f32(float %x, float %y, float %z)
+    %1 = call float @llvm.fma.f32(float %a, float %b, float %c)
     ret float %1
 }
 

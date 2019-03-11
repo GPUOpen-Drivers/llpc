@@ -1141,8 +1141,6 @@ declare i32 @llvm.amdgcn.raw.buffer.atomic.or(i32, <4 x i32>, i32, i32, i32) #0
 declare i32 @llvm.amdgcn.raw.buffer.atomic.xor(i32, <4 x i32>, i32, i32, i32) #0
 declare i32 @llvm.amdgcn.raw.buffer.atomic.cmpswap(i32, i32, <4 x i32>, i32, i32, i32) #0
 
-declare <4 x i32> @llpc.descriptor.load.buffer(i32 , i32 , i32, i1) #0
-
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
 attributes #2 = { nounwind writeonly }

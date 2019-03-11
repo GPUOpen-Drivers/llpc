@@ -211,6 +211,7 @@ llvm::CallInst* EmitCall(llvm::Module*                             pModule,
 void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);
 
 // Gets LLVM-style name for scalar or vector type.
+void GetTypeNameForScalarOrVector(llvm::Type* pTy, llvm::raw_ostream& nameStream);
 std::string GetTypeNameForScalarOrVector(llvm::Type* pTy);
 
 // Gets the shader stage from the specified LLVM module.

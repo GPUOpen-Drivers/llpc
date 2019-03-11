@@ -79,37 +79,232 @@ define spir_func <4 x half> @_Z17convert_half4_rtzDv4_f(<4 x float> %x) #0
     ret <4 x half> %7
 }
 
+; Rounds the given bits to nearest even by discarding the last numBitsToDiscard bits.
+define i32 @llpc.round.tonearest.f32(i32 %bits, i32 %numBitsToDiscard)
+{
+.entry:
+    ; lastBits = bits & ((1 << numBitsToDiscard) - 1)
+    %lastBits.1 = shl i32 1, %numBitsToDiscard
+    %lastBits.2 = sub i32 %lastBits.1, 1
+    %lastBits = and i32 %bits, %lastBits.2
+
+    ; headBit = bits & (1 << (numBitsToDiscard - 1))
+    %headBit.1 = sub i32 %numBitsToDiscard, 1
+    %headBit.2 = shl i32 1, %headBit.1
+    %headBit = and i32 %bits, %headBit.2
+
+    ; bits = (bits >> numBitsToDiscard)
+    %bits.1 = lshr i32 %bits, %numBitsToDiscard
+
+    ; bits + 1
+    %bits.2 = add i32 %bits.1, 1
+
+    ;
+    ; if (headBit == 0)
+    ;   return bits
+    ;
+    ; else if (headBit == lastBits)
+    ;   return ((bits & 0x1) == 0x1) ? bits + 1 : bits
+    ;
+    ; else
+    ;   return bits + 1
+    ;
+
+    ; (headBits == lastBits) ?
+    %isHeadLastEqual = icmp eq i32 %headBit, %lastBits
+
+    ; ((bits & 0x1) == 0x1) ? bits + 1 : bits
+    %bits.3 = and i32 %bits.1, 1
+    %isOne = icmp eq i32 %bits.3, 1
+    %bits.4 = select i1 %isOne, i32 %bits.2, i32 %bits.1
+
+    %bits.5 = select i1 %isHeadLastEqual, i32 %bits.4, i32 %bits.2
+
+    ; (headBit == 0) ?
+    %isZeroHeadBit = icmp eq i32 %headBit, 0
+
+    %roundBits = select i1 %isZeroHeadBit, i32 %bits.1, i32 %bits.5
+
+    ret i32 %roundBits
+}
+
 ; GLSL: float16_t = float16_t(float) (rounding mode: RTE)
 define spir_func half @_Z16convert_half_rtef(float %x) #0
 {
-    %1 = fptrunc float %x to half
-    ret half %1
+.entry:
+    ; float32: sign = [31], exponent = [30:23], mantissa = [22:0]
+    ; float16: sign = [15], exponent = [14:10], mantissa = [9:0]
+
+    %bits32 = bitcast float %x to i32
+
+    ; sign = (bits32 >> 16) & 0x8000
+    %sign.1 = lshr i32 %bits32, 16
+    %sign = and i32 %sign.1, 32768
+
+    ; exp32 = (bits32 >> 23) & 0xFF
+    %exp32.1 = lshr i32 %bits32, 23
+    %exp32 = and i32 %exp32.1, 255
+
+    ; exp16 = exp32 - 127 + 15
+    %exp16 = sub i32 %exp32, 112
+
+    ; mant = bits32 & 0x7FFFFF
+    %mant = and i32 %bits32, 8388607
+
+    ; (exp32 == 0) ?
+    %isZero = icmp eq i32 %exp32, 0
+    br i1 %isZero, label %.toZero, label %.checkNaNInf
+
+.toZero:
+    ; sign
+    br label %.end
+
+.checkNaNInf:
+    ; (exp32 == 255) ?
+    %isNaNInf = icmp eq i32 %exp32, 255
+    br i1 %isNaNInf, label %.checkInf, label %.checkTooSmall
+
+.checkInf:
+    ; (mant == 0) ?
+    %isInf = icmp eq i32 %mant, 0
+    br i1 %isInf, label %.toInf, label %.toNaN
+
+.toInf:
+    ; (sign | 0x7C00)
+    %inf16 = or i32 %sign, 31744
+    br label %.end
+
+.toNaN:
+    ; mant = (mant >> 13)
+    ; (sign | 0x7C00 | mant | 0x1)
+    %mant.1 = lshr i32 %mant, 13
+    %nan16.1 = or i32 %sign, 31745
+    %nan16 = or i32 %nan16.1, %mant.1
+    br label %.end
+
+.checkTooSmall:
+    ; (exp16 < -10)
+    %isTooSmall = icmp slt i32 %exp16, -10
+    br i1 %isTooSmall, label %.toZero, label %.checkDenorm
+
+.checkDenorm:
+    ; (exp16 <= 0)
+    %isDenorm = icmp sle i32 %exp16, 0
+    br i1 %isDenorm, label %.toDenorm, label %.checkNorm
+
+.toDenorm:
+    ; mant = mant | 0x800000
+    %mant.2 = or i32 %mant, 8388608
+
+    ; numBitsToDiscard = 14 - exp16
+    %numBitsToDiscard.1 = sub i32 14, %exp16
+
+    ; mant = RoundToNearestEven(mant, 14 - exp16)
+    %mant.3 = call i32 @llpc.round.tonearest.f32(i32 %mant.2, i32 %numBitsToDiscard.1)
+
+    ; (sign | mant)
+    %denorm16 = or i32 %sign, %mant.3
+    br label %.end
+
+.checkNorm:
+    ; (exp16 <= 30)
+    %isNorm = icmp sle i32 %exp16, 30
+    br i1 %isNorm, label %.toNorm, label %.toOverflow
+
+.toNorm:
+    ; mant = RoundToNearestEven(mant, 13)
+    %mant.4 = call i32 @llpc.round.tonearest.f32(i32 %mant, i32 13)
+
+    ; exp16 = (exp16 << 10) + (mant & (1 << 10))
+    %exp16.1 = shl i32 %exp16, 10
+    %mant.5 = and i32 %mant.4, 1024
+    %exp16.2 = add i32 %exp16.1, %mant.5
+
+    ; mant &= (1 << 10) - 1
+    %mant.6 = and i32 %mant.4, 1023
+
+    ; (sign | exp16 | mant)
+    %norm16.1 = or i32 %sign, %exp16.2
+    %norm16 = or i32 %norm16.1, %mant.6
+    br label %.end
+
+.toOverflow:
+    ; (sign | (0x1F << 10))
+    %tooLarge16 = or i32 %sign, 31744
+    br label %.end
+
+.end:
+    %bits16.1 = phi i32 [ %sign, %.toZero ],
+                        [ %inf16, %.toInf ],
+                        [ %nan16, %.toNaN ],
+                        [ %denorm16, %.toDenorm ],
+                        [ %norm16, %.toNorm ],
+                        [ %tooLarge16, %.toOverflow]
+
+    %bits16 = trunc i32 %bits16.1 to i16
+    %f16 = bitcast i16 %bits16 to half
+
+    ret half %f16
 }
 
 ; GLSL: f16vec2 = f16vec2(vec2) (rounding mode: RTE)
 define spir_func <2 x half> @_Z17convert_half2_rteDv2_f(<2 x float> %x) #0
 {
-    %1 = fptrunc <2 x float> %x to <2 x half>
-    ret <2 x half> %1
+    %1 = extractelement <2 x float> %x, i32 0
+    %2 = extractelement <2 x float> %x, i32 1
+
+    %3 = call half @_Z16convert_half_rtef(float %1)
+    %4 = call half @_Z16convert_half_rtef(float %2)
+
+    %5 = insertelement <2 x half> undef, half %3, i32 0
+    %6 = insertelement <2 x half> %5, half %4, i32 1
+
+    ret <2 x half> %6
 }
 
 ; GLSL: f16vec3 = f16vec3(vec3) (rounding mode: RTE)
 define spir_func <3 x half> @_Z17convert_half3_rteDv3_f(<3 x float> %x) #0
 {
-    %1 = fptrunc <3 x float> %x to <3 x half>
-    ret <3 x half> %1
+    %1 = extractelement <3 x float> %x, i32 0
+    %2 = extractelement <3 x float> %x, i32 1
+    %3 = extractelement <3 x float> %x, i32 2
+
+    %4 = call half @_Z16convert_half_rtef(float %1)
+    %5 = call half @_Z16convert_half_rtef(float %2)
+    %6 = call half @_Z16convert_half_rtef(float %3)
+
+    %7 = insertelement <3 x half> undef, half %4, i32 0
+    %8 = insertelement <3 x half> %7, half %5, i32 1
+    %9 = insertelement <3 x half> %8, half %6, i32 2
+
+    ret <3 x half> %9
 }
 
 ; GLSL: f16vec4 = f16vec4(vec4) (rounding mode: RTE)
 define spir_func <4 x half> @_Z17convert_half4_rteDv4_f(<4 x float> %x) #0
 {
-    %1 = fptrunc <4 x float> %x to <4 x half>
-    ret <4 x half> %1
+    %1 = extractelement <4 x float> %x, i32 0
+    %2 = extractelement <4 x float> %x, i32 1
+    %3 = extractelement <4 x float> %x, i32 2
+    %4 = extractelement <4 x float> %x, i32 3
+
+    %5 = call half @_Z16convert_half_rtef(float %1)
+    %6 = call half @_Z16convert_half_rtef(float %2)
+    %7 = call half @_Z16convert_half_rtef(float %3)
+    %8 = call half @_Z16convert_half_rtef(float %4)
+
+    %9 = insertelement <4 x half> undef, half %5, i32 0
+    %10 = insertelement <4 x half> %9, half %6, i32 1
+    %11 = insertelement <4 x half> %10, half %7, i32 2
+    %12 = insertelement <4 x half> %11, half %8, i32 3
+
+    ret <4 x half> %12
 }
 
 ; GLSL: float16_t = float16_t(float) (rounding mode: RTP)
 define spir_func half @_Z16convert_half_rtpf(float %x) #0
 {
+    ; TODO: Use s.setreg() to change HW_REG_MODE.
     %1 = fptrunc float %x to half
     ret half %1
 }
@@ -757,8 +952,7 @@ define spir_func <4 x half> @_Z4modfDv4_DhPDv4_Dh(
 }
 
 ; GLSL: float16_t modf(float16_t, out float16_t)
-define spir_func { half, half } @_Z10modfStructDh(
-    half %x) #0
+define spir_func { half, half } @_Z10modfStructDh(half %x) #0
 {
     %1 = call half @llvm.trunc.f16(half %x)
     %2 = fsub half %x, %1
@@ -770,8 +964,7 @@ define spir_func { half, half } @_Z10modfStructDh(
 }
 
 ; GLSL: f16vec2 modf(f16vec2, out f16vec2)
-define spir_func { <2 x half>, <2 x half> } @_Z10modfStructDv2_Dh(
-    <2 x half> %x) #0
+define spir_func { <2 x half>, <2 x half> } @_Z10modfStructDv2_Dh(<2 x half> %x) #0
 {
     %x0 = extractelement <2 x half> %x, i32 0
     %x1 = extractelement <2 x half> %x, i32 1
@@ -795,8 +988,7 @@ define spir_func { <2 x half>, <2 x half> } @_Z10modfStructDv2_Dh(
 }
 
 ; GLSL: f16vec3 modf(f16vec3, out f16vec3)
-define spir_func { <3 x half>, <3 x half> } @_Z10modfStructDv3_Dh(
-    <3 x half> %x) #0
+define spir_func { <3 x half>, <3 x half> } @_Z10modfStructDv3_Dh(<3 x half> %x) #0
 {
     %x0 = extractelement <3 x half> %x, i32 0
     %x1 = extractelement <3 x half> %x, i32 1
@@ -826,8 +1018,7 @@ define spir_func { <3 x half>, <3 x half> } @_Z10modfStructDv3_Dh(
 }
 
 ; GLSL: f16vec4 modf(f16vec4, out f16vec4)
-define spir_func { <4 x half>, <4 x half> } @_Z10modfStructDv4_Dh(
-    <4 x half> %x) #0
+define spir_func { <4 x half>, <4 x half> } @_Z10modfStructDv4_Dh(<4 x half> %x) #0
 {
     %x0 = extractelement <4 x half> %x, i32 0
     %x1 = extractelement <4 x half> %x, i32 1
@@ -943,39 +1134,10 @@ define i1 @llpc.isnan.f16(half %x) #0
 }
 
 ; GLSL: float16_t fma(float16_t, float16_t, float16_t)
-define spir_func half @_Z3fmaDhDhDh(
-    half %a, half %b, half %c) #0
+define half @llpc.fma.f16(half %a, half %b, half %c) #0
 {
     %1 = tail call half @llvm.fmuladd.f16(half %a, half %b, half %c)
-
     ret half %1
-}
-
-; GLSL: f16vec2 fma(f16vec2, f16vec2, f16vec2)
-define spir_func <2 x half> @_Z3fmaDv2_DhDv2_DhDv2_Dh(
-    <2 x half> %a, <2 x half> %b, <2 x half> %c) #0
-{
-    %1 = tail call <2 x half> @llvm.fmuladd.v2f16(<2 x half> %a, <2 x half> %b, <2 x half> %c)
-
-    ret <2 x half>  %1
-}
-
-; GLSL: f16vec3 fma(f16vec3, f16vec3, f16vec3)
-define spir_func <3 x half> @_Z3fmaDv3_DhDv3_DhDv3_Dh(
-    <3 x half> %a, <3 x half> %b, <3 x half> %c) #0
-{
-    %1 = tail call <3 x half> @llvm.fmuladd.v3f16(<3 x half> %a, <3 x half> %b, <3 x half> %c)
-
-    ret <3 x half>  %1
-}
-
-; GLSL: f16vec4 fma(f16vec4, f16vec4, f16vec4)
-define spir_func <4 x half> @_Z3fmaDv4_DhDv4_DhDv4_Dh(
-    <4 x half> %a, <4 x half> %b, <4 x half> %c) #0
-{
-    %1 = tail call <4 x half> @llvm.fmuladd.v4f16(<4 x half> %a, <4 x half> %b, <4 x half> %c)
-
-    ret <4 x half> %1
 }
 
 ; =====================================================================================================================
@@ -1913,22 +2075,9 @@ declare half @llvm.sin.f16(half) #0
 declare half @llvm.cos.f16(half) #0
 declare float @llpc.asin.f32(float) #0
 declare float @llpc.acos.f32(float) #0
-
 declare half @llvm.minnum.f16(half, half) #0
-declare <2 x half> @llvm.minnum.v2f16(<2 x half>, <2 x half>) #0
-declare <3 x half> @llvm.minnum.v3f16(<3 x half>, <3 x half>) #0
-declare <4 x half> @llvm.minnum.v4f16(<4 x half>, <4 x half>) #0
-
 declare half @llvm.maxnum.f16(half, half) #0
-declare <2 x half> @llvm.maxnum.v2f16(<2 x half>, <2 x half>) #0
-declare <3 x half> @llvm.maxnum.v3f16(<3 x half>, <3 x half>) #0
-declare <4 x half> @llvm.maxnum.v4f16(<4 x half>, <4 x half>) #0
-
 declare half @llvm.fmuladd.f16(half, half, half) #0
-declare <2 x half> @llvm.fmuladd.v2f16(<2 x half>, <2 x half>, <2 x half>) #0
-declare <3 x half> @llvm.fmuladd.v3f16(<3 x half>, <3 x half>, <3 x half>) #0
-declare <4 x half> @llvm.fmuladd.v4f16(<4 x half>, <4 x half>, <4 x half>) #0
-
 declare i1 @llvm.amdgcn.class.f16(half, i32) #1
 declare half @llvm.amdgcn.fract.f16(half) #1
 declare half @llvm.amdgcn.fmed3.f16(half, half, half) #1
@@ -1936,6 +2085,7 @@ declare half @llvm.rint.f16(half) #0
 declare i16 @llvm.amdgcn.frexp.exp.i16.f16(half) #1
 declare half @llvm.amdgcn.frexp.mant.f16(half) #1
 declare <2 x half> @llvm.amdgcn.cvt.pkrtz(float, float) #1
+declare i32 @llvm.amdgcn.ubfe.i32(i32, i32, i32) #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }

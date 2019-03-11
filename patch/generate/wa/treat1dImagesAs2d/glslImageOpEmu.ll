@@ -44,12 +44,8 @@ target triple = "spir64-unknown-unknown"
 ;======================================================================================================================
 
 define <2 x i32> @llpc.image.querynonlod.sizelod.1DArray.v2i32(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
+    <8 x i32> %resource, i32 %lod, i32 %imageCallMeta) #0
 {
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
     ; NOTE: For 1D array on GFX9, need to use dmask 5 to get array layer as 2D array.
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 %lod,
                                                                         <8 x i32> %resource,
@@ -67,12 +63,8 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.1DArray.v2i32(
 }
 
 define <2 x i32> @llpc.image.querynonlod.sizelod.1DArray.v2i32.dimaware(
-    i32 %resourceDescSet, i32 %resourceBinding, i32 %resourceIdx, i32 %lod, i32 %imageCallMeta) #0
+    <8 x i32> %resource, i32 %lod, i32 %imageCallMeta) #0
 {
-    %resource = call <8 x i32> @llpc.descriptor.load.resource(i32 %resourceDescSet,
-                                                              i32 %resourceBinding,
-                                                              i32 %resourceIdx,
-                                                              i32 %imageCallMeta)
     ; NOTE: For 1D array on GFX9, need to use dmask 5 to get array layer as 2D array.
     %1 = call <4 x float> @llvm.amdgcn.image.getresinfo.2darray.v4f32.i32(i32 5,
                                                                           i32 %lod,
@@ -87,8 +79,6 @@ define <2 x i32> @llpc.image.querynonlod.sizelod.1DArray.v2i32.dimaware(
     ret <2 x i32> %6
 }
 
-
-declare <8 x i32> @llpc.descriptor.load.resource(i32 , i32 , i32, i32) #0
 
 declare <4 x float> @llvm.amdgcn.image.getresinfo.v4f32.i32.v8i32(i32 , <8 x i32> , i32, i1, i1, i1, i1) #1
 

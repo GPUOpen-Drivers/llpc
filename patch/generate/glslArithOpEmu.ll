@@ -496,14 +496,6 @@ define float @llpc.fsign.f32(float %x) #0
     ret float %ret2
 }
 
-; GLSL: float fma(float, float, float)
-define float @llpc.fma.f32(float %x, float %y, float %z) #0
-{
-    %1 = fmul float %x, %y
-    %2 = fadd float %1, %z
-    ret float %2
-}
-
 ; GLSL: int sign(int)
 define i32 @llpc.ssign.i32(i32 %x) #0
 {
@@ -638,8 +630,7 @@ define spir_func <4 x float> @_Z4modfDv4_fPDv4_f(
 }
 
 ; GLSL: float modf(float, out float)
-define spir_func { float, float } @_Z10modfStructf(
-    float %x) #0
+define spir_func { float, float } @_Z10modfStructf(float %x) #0
 {
     %1 = call float @llvm.trunc.f32(float %x)
     %2 = fsub float %x, %1
@@ -650,9 +641,8 @@ define spir_func { float, float } @_Z10modfStructf(
     ret { float, float } %4
 }
 
-; GLSL: fvec2 modf(fvec2, out fvec2)
-define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(
-    <2 x float> %x) #0
+; GLSL: vec2 modf(vec2, out vec2)
+define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(<2 x float> %x) #0
 {
     %x0 = extractelement <2 x float> %x, i32 0
     %x1 = extractelement <2 x float> %x, i32 1
@@ -675,9 +665,8 @@ define spir_func { <2 x float>, <2 x float> } @_Z10modfStructDv2_f(
     ret { <2 x float>, <2 x float> } %10
 }
 
-; GLSL: fvec3 modf(fvec3, out fvec3)
-define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(
-    <3 x float> %x) #0
+; GLSL: vec3 modf(vec3, out vec3)
+define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(<3 x float> %x) #0
 {
     %x0 = extractelement <3 x float> %x, i32 0
     %x1 = extractelement <3 x float> %x, i32 1
@@ -706,9 +695,8 @@ define spir_func { <3 x float>, <3 x float> } @_Z10modfStructDv3_f(
     ret { <3 x float>, <3 x float> } %14
 }
 
-; GLSL: fvec4 modf(fvec4, out fvec4)
-define spir_func { <4 x float>, <4 x float> } @_Z10modfStructDv4_f(
-    <4 x float> %x) #0
+; GLSL: vec4 modf(vec4, out vec4)
+define spir_func { <4 x float>, <4 x float> } @_Z10modfStructDv4_f(<4 x float> %x) #0
 {
     %x0 = extractelement <4 x float> %x, i32 0
     %x1 = extractelement <4 x float> %x, i32 1
@@ -823,9 +811,9 @@ define float @llpc.nclamp.f32(float %x, float %minVal, float %maxVal) #0
 define float @llpc.fmix.f32(float %x, float %y, float %a) #0
 {
     %1 = fsub float %y, %x
-    %2 = fmul float %1, %a
-    %3 = fadd float %2, %x
-    ret float %3
+    %2 = tail call float @llvm.fmuladd.f32(float %1, float %a, float %x)
+
+    ret float %2
 }
 
 ; GLSL: float step(float, float)
@@ -971,6 +959,13 @@ define spir_func {<4 x float>, <4 x i32>} @_Z11frexpStructDv4_f(
     %18 = insertvalue { <4 x float>, <4 x i32> } %17, <4 x i32> %16, 1
 
     ret {<4 x float>, <4 x i32>} %18
+}
+
+; GLSL: float fma(float, float, float)
+define float @llpc.fma.f32(float %a, float %b, float %c) #0
+{
+    %1 = tail call float @llvm.fmuladd.f32(float %a, float %b, float %c)
+    ret float %1
 }
 
 ; GLSL: float ldexpf(float, int)
@@ -2766,6 +2761,7 @@ declare float @llvm.amdgcn.fract.f32(float) #1
 declare float @llvm.amdgcn.fmed3.f32(float, float, float) #1
 declare float @llvm.amdgcn.ldexp.f32(float, i32) #1
 declare float @llvm.rint.f32(float) #0
+declare float @llvm.fmuladd.f32(float, float, float) #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readnone }
