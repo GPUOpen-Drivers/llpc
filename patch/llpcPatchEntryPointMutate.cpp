@@ -403,6 +403,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     uint32_t availUserDataCount = maxUserDataCount - userDataIdx;
     uint32_t requiredUserDataCount = 0; // Maximum required user data
     bool useFixedLayout = (m_shaderStage == ShaderStageCompute);
+    bool reserveVbTable = false;
+    bool reserveStreamOutTable = false;
 
     if (pShaderInfo->userDataNodeCount > 0)
     {
@@ -413,13 +415,19 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
              // and indirect user data should not be counted in possible spilled user data.
             if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
             {
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
                 pIntfData->vbTable.resNodeIdx = pNode->offsetInDwords + 1;
+#endif
+                reserveVbTable = true;
                 continue;
             }
 
             if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
             {
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
                 pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
+#endif
+                reserveStreamOutTable = true;
                 continue;
             }
 
@@ -462,13 +470,13 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             }
 
             // Reserve register for "IndirectUserDataVaPtr"
-            if (pIntfData->vbTable.resNodeIdx != InvalidValue)
+            if (reserveVbTable)
             {
                 availUserDataCount -= 1;
             }
 
             // Reserve for stream-out table
-            if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+            if (reserveStreamOutTable)
             {
                 availUserDataCount -= 1;
             }
@@ -493,7 +501,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             }
 
             // Reserve for stream-out table
-            if (pIntfData->streamOutTable.resNodeIdx != InvalidValue)
+            if (reserveStreamOutTable)
             {
                 availUserDataCount -= 1;
             }
@@ -590,7 +598,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     break;
                 }
             }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
             pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+#endif
             *pInRegMask |= (1ull << (argIdx++));
             ++userDataIdx;
             break;
@@ -738,7 +748,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     LLPC_ASSERT(pNode->sizeInDwords == 1);
                     pIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
                     pIntfData->entryArgIdxs.vs.vbTablePtr = argIdx;
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
                     pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+#endif
                     *pInRegMask |= (1ull << (argIdx++));
                     ++userDataIdx;
                     break;

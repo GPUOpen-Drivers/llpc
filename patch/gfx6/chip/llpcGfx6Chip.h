@@ -263,8 +263,10 @@ struct PipelineVsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_VS_HASH_DWORD1);
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
     DEF_REG(INDIRECT_TABLE_ENTRY);
     DEF_REG(STREAM_OUT_TABLE_ENTRY);
+#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -303,8 +305,10 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_DS_HASH_DWORD1);
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
     DEF_REG(INDIRECT_TABLE_ENTRY);
     DEF_REG(STREAM_OUT_TABLE_ENTRY);
+#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
@@ -342,8 +346,10 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_GS_HASH_DWORD1);
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
     DEF_REG(INDIRECT_TABLE_ENTRY);
     DEF_REG(STREAM_OUT_TABLE_ENTRY);
+#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -388,8 +394,10 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
     DEF_REG(API_GS_HASH_DWORD1);
     DEF_REG(API_PS_HASH_DWORD0);
     DEF_REG(API_PS_HASH_DWORD1);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
     DEF_REG(INDIRECT_TABLE_ENTRY);
     DEF_REG(STREAM_OUT_TABLE_ENTRY);
+#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
