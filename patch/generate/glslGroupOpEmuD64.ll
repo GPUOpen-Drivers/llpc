@@ -233,8 +233,8 @@ define spir_func i64 @llpc.subgroup.reduce.i64(i32 %binaryOp, i64 %value)
 
     %i6.1 = call i64 @llpc.readlane.i64(i64 %i5.4, i32 31)
     %i6.2 = call i64 @llpc.subgroup.arithmetic.i64(i32 %binaryOp, i64 %i6.1, i64 %i5.4)
-    %i6.3 = call i64 @llvm.amdgcn.wwm.i64(i64 %i6.2)
-    %i6.4 = call i64 @llpc.readlane.i64(i64 %i6.3, i32 63)
+    %i6.3 = call i64 @llpc.readlane.i64(i64 %i6.2, i32 63)
+    %i6.4 = call i64 @llvm.amdgcn.wwm.i64(i64 %i6.3)
 
     ret i64 %i6.4
 }
