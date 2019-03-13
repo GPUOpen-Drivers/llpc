@@ -867,7 +867,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         pIntfData->userDataUsage.spillTable = userDataIdx++;
         pIntfData->entryArgIdxs.spillTable = argIdx++;
 
-        pIntfData->spillTable.sizeInDwords = requiredUserDataCount - pIntfData->spillTable.offsetInDwords;
+        pIntfData->spillTable.sizeInDwords = requiredUserDataCount;
     }
     pIntfData->userDataCount = userDataIdx;
 
