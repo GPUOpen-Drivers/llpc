@@ -146,11 +146,10 @@ define spir_func i64 @llpc.subgroup.reduce.i64(i32 %binaryOp, i64 %value)
     %i6.1 = call i64 @llpc.mov.dpp.i64(i64 %i5.3, i32 323, i32 12, i32 15, i1 false)
     %i6.2 = call i64 @llvm.amdgcn.wwm.i64(i64 %i6.1)
     %i6.3 = call i64 @llpc.subgroup.arithmetic.i64(i32 %binaryOp, i64 %i5.3, i64 %i6.2)
-    %i6.4 = call i64 @llvm.amdgcn.wwm.i64(i64 %i6.3)
+    %i6.4 = call i64 @llpc.readlane.i64(i64 %i6.3, i32 63)
+    %i6.5 = call i64 @llvm.amdgcn.wwm.i64(i64 %i6.4)
 
-    %i7 = call i64 @llpc.readlane.i64(i64 %i6.4, i32 63)
-
-    ret i64 %i7
+    ret i64 %i6.5
 }
 
 ; GLSL: int64_t/uint64_t subgroupExclusiveXXX(int64_t/uint64_t)
