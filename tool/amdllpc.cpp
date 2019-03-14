@@ -791,17 +791,17 @@ static Result BuildPipeline(
     if (isGraphics)
     {
         // Build graphics pipeline
-        GraphicsPipelineBuildInfo* pPipelineInfo = &pCompileInfo->gfxPipelineInfo;
+        GraphicsPipelineBuildInfo* pGraphicsPipelineInfo = &pCompileInfo->gfxPipelineInfo;
         GraphicsPipelineBuildOut*  pPipelineOut  = &pCompileInfo->gfxPipelineOut;
 
         // Fill pipeline shader info
         PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
         {
-            &pPipelineInfo->vs,
-            &pPipelineInfo->tcs,
-            &pPipelineInfo->tes,
-            &pPipelineInfo->gs,
-            &pPipelineInfo->fs,
+            &pGraphicsPipelineInfo->vs,
+            &pGraphicsPipelineInfo->tcs,
+            &pGraphicsPipelineInfo->tes,
+            &pGraphicsPipelineInfo->gs,
+            &pGraphicsPipelineInfo->fs,
         };
 
         for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
@@ -817,23 +817,25 @@ static Result BuildPipeline(
                     pShaderInfo->pEntryTarget = EntryTarget.c_str();
                 }
                 pShaderInfo->pModuleData  = pShaderOut->pModuleData;
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+                pShaderInfo->entryStage = static_cast<ShaderStage>(stage);
+#endif
                 // If no user data nodes (not compiling from pipeline), lay them out now.
                 if (pShaderInfo->pUserDataNodes == nullptr)
                 {
-                    DoAutoLayoutDesc(ShaderStage(stage), pCompileInfo->spirvBin[stage], pPipelineInfo, pShaderInfo);
+                    DoAutoLayoutDesc(ShaderStage(stage), pCompileInfo->spirvBin[stage], pGraphicsPipelineInfo, pShaderInfo);
                 }
             }
         }
 
-        pPipelineInfo->pInstance      = nullptr; // Dummy, unused
-        pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
-        pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
+        pGraphicsPipelineInfo->pInstance      = nullptr; // Dummy, unused
+        pGraphicsPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
+        pGraphicsPipelineInfo->pfnOutputAlloc = AllocateBuffer;
 
         // NOTE: If number of patch control points is not specified, we set it to 3.
-        if (pPipelineInfo->iaState.patchControlPoints == 0)
+        if (pGraphicsPipelineInfo->iaState.patchControlPoints == 0)
         {
-            pPipelineInfo->iaState.patchControlPoints = 3;
+            pGraphicsPipelineInfo->iaState.patchControlPoints = 3;
         }
 
         void* pPipelineDumpHandle = nullptr;
@@ -844,11 +846,17 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
-            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(
-                &dumpOptions, nullptr, pPipelineInfo);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+            PipelineBuildInfo pipelineInfo = {};
+            pipelineInfo.pGraphicsInfo = pGraphicsPipelineInfo;
+            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
+#else
+            pPipelineDumpHandle =
+                Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, nullptr, pGraphicsPipelineInfo);
+#endif
         }
 
-        result = pCompiler->BuildGraphicsPipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+        result = pCompiler->BuildGraphicsPipeline(pGraphicsPipelineInfo, pPipelineOut, pPipelineDumpHandle);
 
         if (result == Result::Success)
         {
@@ -868,10 +876,10 @@ static Result BuildPipeline(
     else
     {
         // Build compute pipeline
-        ComputePipelineBuildInfo* pPipelineInfo = &pCompileInfo->compPipelineInfo;
+        ComputePipelineBuildInfo* pComputePipelineInfo = &pCompileInfo->compPipelineInfo;
         ComputePipelineBuildOut*  pPipelineOut  = &pCompileInfo->compPipelineOut;
 
-        PipelineShaderInfo*         pShaderInfo = &pPipelineInfo->cs;
+        PipelineShaderInfo*         pShaderInfo = &pComputePipelineInfo->cs;
         const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderOut[ShaderStageCompute];
 
         if (pShaderInfo->pEntryTarget == nullptr)
@@ -879,6 +887,9 @@ static Result BuildPipeline(
             // If entry target is not specified, use the one from command line option
             pShaderInfo->pEntryTarget = EntryTarget.c_str();
         }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+        pShaderInfo->entryStage = ShaderStageCompute;
+#endif
         pShaderInfo->pModuleData  = pShaderOut->pModuleData;
 
         // If no user data nodes (not compiling from pipeline), lay them out now.
@@ -887,9 +898,9 @@ static Result BuildPipeline(
             DoAutoLayoutDesc(ShaderStageCompute, pCompileInfo->spirvBin[ShaderStageCompute], nullptr, pShaderInfo);
         }
 
-        pPipelineInfo->pInstance      = nullptr; // Dummy, unused
-        pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
-        pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
+        pComputePipelineInfo->pInstance      = nullptr; // Dummy, unused
+        pComputePipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
+        pComputePipelineInfo->pfnOutputAlloc = AllocateBuffer;
 
         void* pPipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)
@@ -899,11 +910,16 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
-            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(
-                &dumpOptions, pPipelineInfo, nullptr);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+            PipelineBuildInfo pipelineInfo = {};
+            pipelineInfo.pComputeInfo = pComputePipelineInfo;
+            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
+#else
+            pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pComputePipelineInfo, nullptr);
+#endif
         }
 
-        result = pCompiler->BuildComputePipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+        result = pCompiler->BuildComputePipeline(pComputePipelineInfo, pPipelineOut, pPipelineDumpHandle);
 
         if (result == Result::Success)
         {

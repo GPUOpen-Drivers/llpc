@@ -129,21 +129,33 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
 // =====================================================================================================================
 // Begins to dump graphics/compute pipeline info.
 void* VKAPI_CALL IPipelineDumper::BeginPipelineDump(
-    const PipelineDumpOptions*       pDumpOptions,          // [in] Pipeline dump options
-    const ComputePipelineBuildInfo*  pComputePipelineInfo,  // [in] Info of the compute pipeline to be built
-    const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo) // [in] Info of the graphics pipeline to be built
+    const PipelineDumpOptions*         pDumpOptions,             // [in] Pipeline dump options
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+    PipelineBuildInfo                  pipelineInfo              // Info of the pipeline to be built
+#else
+    const ComputePipelineBuildInfo*    pComputePipelineInfo,     // [in] Info of the compute pipeline to be built
+    const GraphicsPipelineBuildInfo*   pGraphicsPipelineInfo     // [in] Info of the graphics pipeline to be built
+#endif
+    )
 {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 21
+    PipelineBuildInfo pipelineInfo = {};
+    pipelineInfo.pComputeInfo = pComputePipelineInfo;
+    pipelineInfo.pGraphicsInfo = pGraphicsPipelineInfo;
+#endif
+
     MetroHash::Hash hash = {};
-    if (pComputePipelineInfo != nullptr)
+    if (pipelineInfo.pComputeInfo != nullptr)
     {
-        hash = PipelineDumper::GenerateHashForComputePipeline(pComputePipelineInfo, false);
+        hash = PipelineDumper::GenerateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
     }
     else
     {
-        LLPC_ASSERT(pGraphicsPipelineInfo != nullptr);
-        hash = PipelineDumper::GenerateHashForGraphicsPipeline(pGraphicsPipelineInfo, false);
+        LLPC_ASSERT(pipelineInfo.pGraphicsInfo != nullptr);
+        hash = PipelineDumper::GenerateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false);
     }
-    return PipelineDumper::BeginPipelineDump(pDumpOptions, pComputePipelineInfo, pGraphicsPipelineInfo, &hash);
+
+    return PipelineDumper::BeginPipelineDump(pDumpOptions, pipelineInfo, &hash);
 }
 
 // =====================================================================================================================
@@ -200,7 +212,11 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(
     const size_t                      nameBufSize)   // Size of the buffer to store pipeline name
 {
     auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
-    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(nullptr, pPipelineInfo, &hash);
+    PipelineBuildInfo pipelineInfo = {};
+    pipelineInfo.pGraphicsInfo = pPipelineInfo;
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(
+        pipelineInfo,
+        &hash);
     snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
 }
 
@@ -212,7 +228,12 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(
     const size_t                    nameBufSize)   // Size of the buffer to store pipeline name
 {
     auto hash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
-    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(pPipelineInfo, nullptr, &hash);
+    PipelineBuildInfo pipelineInfo = {};
+    pipelineInfo.pComputeInfo = pPipelineInfo;
+
+    std::string pipeName = PipelineDumper::GetPipelineInfoFileName(
+        pipelineInfo,
+        &hash);
     snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
 }
 
@@ -240,30 +261,30 @@ std::string PipelineDumper::GetSpirvBinaryFileName(
 // =====================================================================================================================
 // Gets the file name of pipeline info file according to the specified pipeline build info and pipeline hash.
 std::string PipelineDumper::GetPipelineInfoFileName(
-    const ComputePipelineBuildInfo*  pComputePipelineInfo,   // [in] Info of the compute pipeline to be built
-    const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,  // [in] Info of the graphics pipeline to be built
-    const MetroHash::Hash*           pHash)                  // [in] Pipeline hash code
+    PipelineBuildInfo                  pipelineInfo,             // Info of the pipeline to be built
+    const MetroHash::Hash*             pHash)                    // [in] Pipeline hash code
 {
     uint64_t        hashCode64 = MetroHash::Compact64(pHash);
     char            fileName[64] = {};
-    if (pComputePipelineInfo != nullptr)
+    if (pipelineInfo.pComputeInfo != nullptr)
     {
         auto length = snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
         LLPC_UNUSED(length);
     }
     else
     {
-        LLPC_ASSERT(pGraphicsPipelineInfo != nullptr);
+        LLPC_ASSERT(pipelineInfo.pGraphicsInfo != nullptr);
         const char* pFileNamePrefix = nullptr;
-        if (pGraphicsPipelineInfo->tes.pModuleData != nullptr && pGraphicsPipelineInfo->gs.pModuleData != nullptr)
+        if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr &&
+            pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
         {
              pFileNamePrefix = "PipelineGsTess";
         }
-        else if (pGraphicsPipelineInfo->gs.pModuleData != nullptr)
+        else if (pipelineInfo.pGraphicsInfo->gs.pModuleData != nullptr)
         {
              pFileNamePrefix = "PipelineGs";
         }
-        else if (pGraphicsPipelineInfo->tes.pModuleData != nullptr)
+        else if (pipelineInfo.pGraphicsInfo->tes.pModuleData != nullptr)
         {
              pFileNamePrefix = "PipelineTess";
         }
@@ -282,10 +303,9 @@ std::string PipelineDumper::GetPipelineInfoFileName(
 // =====================================================================================================================
 // Begins to dump graphics/compute pipeline info.
 PipelineDumpFile* PipelineDumper::BeginPipelineDump(
-    const PipelineDumpOptions*       pDumpOptions,           // [in] Pipeline dump options
-    const ComputePipelineBuildInfo*  pComputePipelineInfo,   // [in] Info of the compute pipeline to be built
-    const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,  // [in] Info of the graphics pipeline to be built
-    const MetroHash::Hash*           pHash)                  // [in] Pipeline hash code
+    const PipelineDumpOptions*         pDumpOptions,            // [in] Pipeline dump options
+    PipelineBuildInfo                  pipelineInfo,            // Info of the pipeline to be built
+    const MetroHash::Hash*             pHash)                   // [in] Pipeline hash code
 {
     bool disableLog = false;
     std::string dumpFileName;
@@ -306,7 +326,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
     if (disableLog == false)
     {
         // Filter pipeline type
-        dumpFileName = GetPipelineInfoFileName(pComputePipelineInfo, pGraphicsPipelineInfo, pHash);
+        dumpFileName = GetPipelineInfoFileName(pipelineInfo, pHash);
         if (pDumpOptions->filterPipelineDumpByType & PipelineDumpFilterCs)
         {
             if (dumpFileName.find("Cs") != std::string::npos)
@@ -385,14 +405,14 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         CreateDirectory(pDumpOptions->pDumpDir);
 
         // Dump pipeline input info
-        if (pComputePipelineInfo)
+        if (pipelineInfo.pComputeInfo)
         {
-            DumpComputePipelineInfo(&pDumpFile->dumpFile, pComputePipelineInfo);
+            DumpComputePipelineInfo(&pDumpFile->dumpFile, pipelineInfo.pComputeInfo);
         }
 
-        if (pGraphicsPipelineInfo)
+        if (pipelineInfo.pGraphicsInfo)
         {
-            DumpGraphicsPipelineInfo(&pDumpFile->dumpFile, pGraphicsPipelineInfo);
+            DumpGraphicsPipelineInfo(&pDumpFile->dumpFile, pipelineInfo.pGraphicsInfo);
         }
     }
     return pDumpFile;
@@ -477,6 +497,13 @@ void PipelineDumper::DumpPipelineShaderInfo(
     auto pModuleHash = reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash[0]);
 
     // Output shader binary file
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+    if (stage == ShaderStageInvalid)
+    {
+        stage = pShaderInfo->stage;
+    }
+#endif
+
     dumpFile << "[" << GetShaderStageAbbreviation(stage) << "SpvFile]\n";
     dumpFile << "fileName = " << GetSpirvBinaryFileName(pModuleHash) << "\n\n";
 
