@@ -101,11 +101,10 @@ define spir_func i32 @llpc.subgroup.reduce.i32(i32 %binaryOp, i32 %value)
     %i6.1 = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %i5.3, i32 323, i32 12, i32 15, i1 false)
     %i6.2 = call i32 @llvm.amdgcn.wwm.i32(i32 %i6.1)
     %i6.3 = call i32 @llpc.subgroup.arithmetic.i32(i32 %binaryOp, i32 %i5.3, i32 %i6.2)
-    %i6.4 = call i32 @llvm.amdgcn.wwm.i32(i32 %i6.3)
+    %i6.4 = call i32 @llvm.amdgcn.readlane(i32 %i6.3, i32 63)
+    %i6.5 = call i32 @llvm.amdgcn.wwm.i32(i32 %i6.4)
 
-    %i7 = call i32 @llvm.amdgcn.readlane(i32 %i6.4, i32 63)
-
-    ret i32 %i7
+    ret i32 %i6.5
 }
 
 ; GLSL: int/uint/float subgroupExclusiveXXX(int/uint/float)
