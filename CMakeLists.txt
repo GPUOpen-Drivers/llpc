@@ -150,6 +150,9 @@ message(STATUS "LLVM link options:" ${LLVM_LINK_FLAGS})
 target_compile_definitions(llpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(llpc PRIVATE _SPIRV_LLVM_API)
 target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
+    target_compile_definitions(llpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
+endif()
 
 if(XGL_LLVM_UPSTREAM)
     target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
@@ -475,6 +478,9 @@ add_dependencies(amdllpc llpc)
 
 target_compile_definitions(amdllpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(amdllpc PRIVATE _SPIRV_LLVM_API)
+if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
+    target_compile_definitions(amdllpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
+endif()
 
 target_include_directories(amdllpc
 PUBLIC

@@ -38,10 +38,24 @@
 #undef DestroyAll
 #undef Status
 
+/// LLPC major interface version.
+#define LLPC_INTERFACE_MAJOR_VERSION 21
+
+/// LLPC minor interface version.
+#define LLPC_INTERFACE_MINOR_VERSION 0
+
+/**
+ ***********************************************************************************************************************
+ * @page VersionHistory
+ * %Version History
+ * | %Version | Change Description                                                                                     |
+ * | -------- | ------------------------------------------------------------------------------------------------------ |
+ * |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.    |
+ **/
 namespace Llpc
 {
 
-static const uint32_t  Version = 20;
+static const uint32_t  Version = LLPC_INTERFACE_MAJOR_VERSION;
 static const uint32_t  MaxColorTargets = 8;
 static const uint32_t  MaxViewports = 16;
 static const char      VkIcdName[]     = "amdvlk";
@@ -251,7 +265,9 @@ struct PipelineShaderInfo
     const void*                     pModuleData;            ///< Shader module data used for pipeline building (opaque)
     const VkSpecializationInfo*     pSpecializationInfo;    ///< Specialization constant info
     const char*                     pEntryTarget;           ///< Name of the target entry point (for multi-entry)
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+    ShaderStage                     entryStage;             ///< Shader stage of the target entry point
+#endif
     uint32_t                        descriptorRangeValueCount; ///< Count of static descriptors
     DescriptorRangeValue*           pDescriptorRangeValues;    ///< An array of static descriptors
 
@@ -355,6 +371,13 @@ struct ComputePipelineBuildOut
 {
     BinaryData          pipelineBin;        ///< Output pipeline binary data
 };
+// =====================================================================================================================
+/// Represents the unified of a pipeline create info.
+struct PipelineBuildInfo
+{
+    const ComputePipelineBuildInfo*    pComputeInfo;     // Compute pipeline create info
+    const GraphicsPipelineBuildInfo*   pGraphicsInfo;    // Graphic pipeline create info
+};
 
 typedef uint64_t ShaderHash;
 
@@ -439,14 +462,23 @@ public:
 
     /// Begins to dump graphics/compute pipeline info.
     ///
-    /// @param [in]  pDumpDir               Directory of pipeline dump
-    /// @param [in]  pComputePipelineInfo   Info of the compute pipeline to be built
-    /// @param [in]  pGraphicsPipelineInfo  Info of the graphics pipeline to be built
+    /// @param [in]  pDumpDir                 Directory of pipeline dump
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+    /// @param [in]  pipelineInfo             Info of the pipeline to be built
+#else
+    /// @param [in]  pComputePipelineInfo     Info of the compute pipeline to be built
+    /// @param [in]  pGraphicsPipelineInfo    Info of the graphics pipeline to be built
+#endif
     ///
     /// @returns The handle of pipeline dump file
     static void* VKAPI_CALL BeginPipelineDump(const PipelineDumpOptions*       pDumpOptions,
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+                                              PipelineBuildInfo               pipelineInfo
+#else
                                               const ComputePipelineBuildInfo*  pComputePipelineInfo,
-                                              const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo);
+                                              const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo
+#endif
+        );
 
     /// Ends to dump graphics/compute pipeline info.
     ///
