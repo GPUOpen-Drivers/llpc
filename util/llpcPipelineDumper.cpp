@@ -1097,11 +1097,13 @@ void OutputBinary(
     char formatBuf[256];
     for (int32_t i = 0; i < dwordCount; ++i)
     {
+        size_t length = 0;
         if (i % 8 == 0)
         {
-            out << "        ";
+            length = snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
+            out << formatBuf;
         }
-        auto length = snprintf(formatBuf, sizeof(formatBuf), "%08X", pStartPos[i]);
+        length = snprintf(formatBuf, sizeof(formatBuf), "%08X", pStartPos[i]);
         LLPC_UNUSED(length);
         out << formatBuf;
 
