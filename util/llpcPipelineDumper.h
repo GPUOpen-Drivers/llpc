@@ -66,8 +66,7 @@ public:
                                 MetroHash::Hash*                pHash);
 
     static PipelineDumpFile* BeginPipelineDump(const PipelineDumpOptions*       pDumpOptions,
-                                               const ComputePipelineBuildInfo*  pComputePipelineInfo,
-                                               const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,
+                                               PipelineBuildInfo                pipelineInfo,
                                                const MetroHash::Hash*           pHash);
 
     static void EndPipelineDump(PipelineDumpFile* pDumpFile);
@@ -82,9 +81,9 @@ public:
     static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline, bool isCacheHash);
     static MetroHash::Hash GenerateHashForComputePipeline(const ComputePipelineBuildInfo* pPipeline, bool isCacheHash);
 
-    static std::string GetPipelineInfoFileName(const ComputePipelineBuildInfo*  pComputePipelineInfo,
-                                               const GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,
+    static std::string GetPipelineInfoFileName(PipelineBuildInfo                pipelineInfo,
                                                const MetroHash::Hash*           pHash);
+
 private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
 
