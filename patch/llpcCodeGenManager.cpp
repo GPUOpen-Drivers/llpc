@@ -125,7 +125,11 @@ Result CodeGenManager::CreateTargetMachine(
         (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
         (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc) &&
         (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout) &&
-        (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr))
+        (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+        && (pPipelineOptions->robustBufferAccess == pContext->GetTargetMachinePipelineOptions()->robustBufferAccess)
+#endif
+        )
     {
         return Result::Success;
     }

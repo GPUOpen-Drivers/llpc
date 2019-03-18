@@ -39,7 +39,7 @@
 #undef Status
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 21
+#define LLPC_INTERFACE_MAJOR_VERSION 23
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -50,6 +50,8 @@
  * %Version History
  * | %Version | Change Description                                                                                     |
  * | -------- | ------------------------------------------------------------------------------------------------------ |
+ * |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.                |
+ * |     22.0 | Internal revision.                                                                                     |
  * |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.    |
  **/
 namespace Llpc

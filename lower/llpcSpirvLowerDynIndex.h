@@ -39,6 +39,15 @@ namespace Llpc
 {
 
 // =====================================================================================================================
+// The structure for store instruction which needs to be expanded.
+struct StoreExpandInfo
+{
+    StoreInst*                          pStoreInst;  ///< "Store" instruction
+    SmallVector<GetElementPtrInst*, 1>  getElemPtrs; ///< A group of "getelementptr" with constant indices
+    Value*                              pDynIndex;   ///< Dynamic index of destination.
+};
+
+// =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for dynamic index in access chain.
 class SpirvLowerDynIndex:
     public SpirvLower,
@@ -63,12 +72,16 @@ private:
     void ExpandLoadInst(llvm::LoadInst*                          pLoadInst,
                         llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
                         llvm::Value*                             pDynIndex);
+    void RecordStoreExpandInfo(llvm::StoreInst*                         pStoreInst,
+                               llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
+                               llvm::Value*                             pDynIndex);
     void ExpandStoreInst(llvm::StoreInst*                         pStoreInst,
                          llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
                          llvm::Value*                             pDynIndex);
 
     std::unordered_set<llvm::Instruction*> m_getElemPtrInsts;
     std::unordered_set<llvm::Instruction*> m_loadInsts;
+    SmallVector<StoreExpandInfo, 1>        m_storeExpandInfo;
 };
 
 } // Llpc
