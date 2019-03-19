@@ -124,9 +124,30 @@ amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 
 ## Test with SHADERDB
 You can use [shaderdb](https://github.com/GPUOpen-Drivers/xgl/tree/master/test/shadertest) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
-
+ 
+* Run the test without lit
 ```
 python testShaders.py [-h] [--shaderdb <path_to_shaderdb>] [--gfxip <major.minor.step>] <path_to_amdllpc> <path_to_spvgen>
+```
+
+* Run the test with lit
+
+By integrating with [lit](http://llvm.org/docs/CommandGuide/lit.html), the test will check the correctness of shader compilation result with the pattern specified in test files.
+
+First, enable LLVM utils build when you [build](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) Vulkan driver and amdllpc:
+```
+cd <vulkandriver_path>/drivers/xgl
+cmake -H. -Bbuilds/Release64 -DLLVM_BUILD_UTILS=ON -DLLVM_INCLUDE_UTILS=ON
+cd builds/Release64
+make -j$(nproc)
+```
+
+Then, run the test with below instructions:
+```
+cd <vulkandriver_path>/drivers/xgl/test/shadertest 
+cmake . -B../build -DLLVM_DIR=<vulkandriver_path>/drivers/xgl/builds/Release64/llvm/lib/cmake/llvm -DAMDLLPC_DIR=<vulkandriver_path>/drivers/xgl/builds/Release64/llpc
+cd ../build
+make test
 ```
 
 ## Third Party Software  
