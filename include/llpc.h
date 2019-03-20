@@ -39,7 +39,7 @@
 #undef Status
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 21
+#define LLPC_INTERFACE_MAJOR_VERSION 24
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -50,6 +50,7 @@
  * %Version History
  * | %Version | Change Description                                                                                     |
  * | -------- | ------------------------------------------------------------------------------------------------------ |
+ * |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions. 
  * |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.    |
  **/
 namespace Llpc
@@ -203,6 +204,10 @@ struct PipelineShaderOptions
     /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
     uint32_t  maxThreadGroupsPerComputeUnit;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+    /// Force loop unroll count. "0" means using default value; "1" means disabling loop unroll.
+    uint32_t  forceLoopUnrollCount;
+#endif
 };
 
 /// Represents per pipeline options.

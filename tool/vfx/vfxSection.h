@@ -1154,6 +1154,9 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
+#endif
 
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
@@ -1161,7 +1164,12 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+    static const uint32_t  MemberCount = 8;
+#else
     static const uint32_t  MemberCount = 7;
+#endif
+
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
