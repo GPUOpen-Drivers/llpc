@@ -414,6 +414,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         {
             DumpGraphicsPipelineInfo(&pDumpFile->dumpFile, pipelineInfo.pGraphicsInfo);
         }
+
     }
     return pDumpFile;
 }

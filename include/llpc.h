@@ -39,7 +39,7 @@
 #undef Status
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 21
+#define LLPC_INTERFACE_MAJOR_VERSION 22
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -50,6 +50,8 @@
  * %Version History
  * | %Version | Change Description                                                                                     |
  * | -------- | ------------------------------------------------------------------------------------------------------ |
+ * |     22.0 | Add waveBreakSize in struct PipelineShaderInfo to allow per-fragment shader control.                   |
+ * |     22.0 | Internal revision.                                                                                     |
  * |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.    |
  **/
 namespace Llpc
@@ -371,6 +373,7 @@ struct ComputePipelineBuildOut
 {
     BinaryData          pipelineBin;        ///< Output pipeline binary data
 };
+
 // =====================================================================================================================
 /// Represents the unified of a pipeline create info.
 struct PipelineBuildInfo
@@ -539,6 +542,7 @@ public:
     static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo* pPipelineInfo,
                                            char* pPipeName,
                                            const size_t nameBufSize);
+
 };
 
 // =====================================================================================================================
