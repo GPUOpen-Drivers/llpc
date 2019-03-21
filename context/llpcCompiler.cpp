@@ -1436,6 +1436,8 @@ void Compiler::InitGpuProperty()
     // TODO: Accept gsOnChipDefaultPrimsPerSubgroup from panel option
     m_gpuProperty.gsOnChipDefaultPrimsPerSubgroup   = 64;
 
+    m_gpuProperty.tessFactorBufferSizePerSe = 4096;
+
     if (m_gfxIp.major <= 6)
     {
         m_gpuProperty.ldsSizeDwordGranularityShift = 6;
@@ -1477,6 +1479,7 @@ void Compiler::InitGpuProperty()
     }
     else if (m_gfxIp.major == 9)
     {
+        m_gpuProperty.tessFactorBufferSizePerSe = 8192;
         if (m_gfxIp.stepping == 0)
         {
             m_gpuProperty.numShaderEngines = 4;

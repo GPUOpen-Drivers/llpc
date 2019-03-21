@@ -85,6 +85,7 @@ struct GpuProperty
     uint32_t tessOffChipLdsBufferSize;          // Off-chip Tess Buffer Size
     uint32_t maxSgprsAvailable;                 // Number of max available SGPRs
     uint32_t maxVgprsAvailable;                 // Number of max available VGPRs
+    uint32_t tessFactorBufferSizePerSe;         // Size of the tessellation-factor buffer per SE, in DWORDs.
 };
 
 // Contains flags for all of the hardware workarounds which affect pipeline compilation.

@@ -373,6 +373,7 @@ struct ComputePipelineBuildOut
 {
     BinaryData          pipelineBin;        ///< Output pipeline binary data
 };
+
 // =====================================================================================================================
 /// Represents the unified of a pipeline create info.
 struct PipelineBuildInfo
@@ -541,6 +542,7 @@ public:
     static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo* pPipelineInfo,
                                            char* pPipeName,
                                            const size_t nameBufSize);
+
 };
 
 // =====================================================================================================================

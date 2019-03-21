@@ -146,6 +146,9 @@ constexpr uint32_t OnChipGsMaxEsVertsPerSubgroup = 255;
 // Default value for the maximum LDS size per GS subgroup, in DWORD's.
 constexpr uint32_t DefaultLdsSizePerSubgroup = 8192;
 
+constexpr uint32_t EsVertsOffchipGsOrTess = 250;
+constexpr uint32_t GsPrimsOffchipGsOrTess = 126;
+
 // The register headers don't specify an enum for the values of VGT_GS_MODE.ONCHIP.
 enum VGT_GS_MODE_ONCHIP_TYPE : uint32_t
 {

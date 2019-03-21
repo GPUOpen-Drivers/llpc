@@ -267,6 +267,23 @@ void PatchInOutImportExport::ProcessShader()
             const uint32_t inVertexCount  = pPipelineInfo->iaState.patchControlPoints;
             const uint32_t outVertexCount = hasTcs ? tcsBuiltInUsage.outputVertices : MaxTessPatchVertices;
 
+            uint32_t tessFactorStride = 0;
+            switch (tesBuiltInUsage.primitiveMode)
+            {
+            case Triangles:
+                tessFactorStride = 4;
+                break;
+            case Quads:
+                tessFactorStride = 6;
+                break;
+            case Isolines:
+                tessFactorStride = 2;
+                break;
+            default:
+                LLPC_NEVER_CALLED();
+                break;
+            }
+
             calcFactor.inVertexStride = inLocCount * 4;
             calcFactor.outVertexStride = outLocCount * 4;
 
@@ -278,7 +295,8 @@ void PatchInOutImportExport::ProcessShader()
                                                                                calcFactor.inVertexStride,
                                                                                outVertexCount,
                                                                                calcFactor.outVertexStride,
-                                                                               patchConstCount);
+                                                                               patchConstCount,
+                                                                               tessFactorStride);
 
             const uint32_t inPatchSize = inVertexCount * calcFactor.inVertexStride;
             const uint32_t inPatchTotalSize = calcFactor.patchCountPerThreadGroup * inPatchSize;
@@ -296,23 +314,6 @@ void PatchInOutImportExport::ProcessShader()
             {
                 calcFactor.offChip.outPatchStart = 0;
                 calcFactor.offChip.patchConstStart = outPatchTotalSize;
-            }
-
-            uint32_t tessFactorStride = 0;
-            switch (tesBuiltInUsage.primitiveMode)
-            {
-            case Triangles:
-                tessFactorStride = 4;
-                break;
-            case Quads:
-                tessFactorStride = 6;
-                break;
-            case Isolines:
-                tessFactorStride = 2;
-                break;
-            default:
-                LLPC_NEVER_CALLED();
-                break;
             }
 
             calcFactor.tessFactorStride = tessFactorStride;
@@ -6136,7 +6137,8 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     uint32_t inVertexStride,    // Vertex stride of input patch in (DWORDs)
     uint32_t outVertexCount,    // Count of vertices of output patch
     uint32_t outVertexStride,   // Vertex stride of output patch in (DWORDs)
-    uint32_t patchConstCount    // Count of output patch constants
+    uint32_t patchConstCount,   // Count of output patch constants
+    uint32_t tessFactorStride   // Stride of tessellation factors (DWORDs)
     ) const
 {
     const uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
@@ -6168,6 +6170,25 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
         auto tessOffChipPatchCountPerThreadGroup =
             m_pContext->GetGpuProperty()->tessOffChipLdsBufferSize / outPatchLdsBufferSize;
         patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
+    }
+
+    // TF-Buffer-based limit for Patchers per Thread Group:
+    // ---------------------------------------------------------------------------------------------
+
+    // There is one TF Buffer per shader engine. We can do the below calculation on a per-SE basis.  It is also safe to
+    // assume that one thread-group could at most utilize all of the TF Buffer.
+    const uint32_t tfBufferSizeInBytes = sizeof(uint32_t) * m_pContext->GetGpuProperty()->tessFactorBufferSizePerSe;
+    uint32_t       tfBufferPatchCountLimit = tfBufferSizeInBytes / (tessFactorStride * sizeof(uint32_t));
+
+    patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
+
+    if (m_pContext->IsTessOffChip())
+    {
+        // For all-offchip tessellation, we need to write an additional 4-byte TCS control word to the TF buffer whenever
+        // the patch-ID is zero.
+        const uint32_t offChipTfBufferPatchCountLimit =
+            (tfBufferSizeInBytes - (patchCountPerThreadGroup * sizeof(uint32_t))) / (tessFactorStride * sizeof(uint32_t));
+        patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, offChipTfBufferPatchCountLimit);
     }
 
     // Adjust the patches-per-thread-group based on hardware workarounds.
