@@ -134,6 +134,9 @@ static cl::opt<std::string> EntryTarget("entry-target",
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
 
+static cl::opt<bool> RobustBufferAccess("robust-buffer-access",
+                                        cl::desc("Validate if the index is out of bounds"), cl::init(false));
+
 namespace llvm
 {
 
