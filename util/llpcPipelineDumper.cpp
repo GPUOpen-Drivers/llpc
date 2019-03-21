@@ -674,6 +674,9 @@ void PipelineDumper::DumpPipelineOptions(
     dumpFile << "options.autoLayoutDesc = " << pOptions->autoLayoutDesc << "\n";
     dumpFile << "options.scalarBlockLayout = " << pOptions->scalarBlockLayout << "\n";
     dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
+#endif
 }
 
 // =====================================================================================================================
@@ -883,6 +886,9 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     hasher.Update(pPipeline->options.autoLayoutDesc);
     hasher.Update(pPipeline->options.scalarBlockLayout);
     hasher.Update(pPipeline->options.includeIr);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    hasher.Update(pPipeline->options.robustBufferAccess);
+#endif
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -905,6 +911,9 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     hasher.Update(pPipeline->options.autoLayoutDesc);
     hasher.Update(pPipeline->options.scalarBlockLayout);
     hasher.Update(pPipeline->options.includeIr);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    hasher.Update(pPipeline->options.robustBufferAccess);
+#endif
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
