@@ -837,6 +837,9 @@ static Result BuildPipeline(
         {
             pGraphicsPipelineInfo->iaState.patchControlPoints = 3;
         }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+#endif
 
         void* pPipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)
@@ -901,6 +904,9 @@ static Result BuildPipeline(
         pComputePipelineInfo->pInstance      = nullptr; // Dummy, unused
         pComputePipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
         pComputePipelineInfo->pfnOutputAlloc = AllocateBuffer;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+#endif
 
         void* pPipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)

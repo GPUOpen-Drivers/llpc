@@ -85,6 +85,13 @@ bool SpirvLowerDynIndex::runOnModule(
     }
     m_loadInsts.clear();
 
+    for (uint32_t i = 0; i < m_storeExpandInfo.size(); i++)
+    {
+        StoreExpandInfo* pExpandInfo = &m_storeExpandInfo[i];
+        ExpandStoreInst(pExpandInfo->pStoreInst, pExpandInfo->getElemPtrs, pExpandInfo->pDynIndex);
+    }
+    m_storeExpandInfo.clear();
+
     for (auto pInst : m_getElemPtrInsts)
     {
         LLPC_ASSERT(pInst->user_empty());
@@ -142,7 +149,7 @@ void SpirvLowerDynIndex::visitGetElementPtrInst(
             }
             else if (pStoreInst != nullptr)
             {
-                ExpandStoreInst(pStoreInst, getElemPtrs, pDynIndex);
+                RecordStoreExpandInfo(pStoreInst, getElemPtrs, pDynIndex);
             }
             else
             {
@@ -295,43 +302,137 @@ void SpirvLowerDynIndex::ExpandLoadInst(
 }
 
 // =====================================================================================================================
+// Record store expansion info after visit, because splitBasicBlock will disturb the visit.
+void SpirvLowerDynIndex::RecordStoreExpandInfo(
+    StoreInst*                   pStoreInst,     // [in] "Store" instruction
+    ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
+    Value*                       pDynIndex)      // [in] Dynamic index
+{
+    StoreExpandInfo expandInfo = {};
+    expandInfo.pStoreInst = pStoreInst;
+    expandInfo.pDynIndex  = pDynIndex;
+
+    for (uint32_t i = 0; i < getElemPtrs.size(); ++i)
+    {
+        expandInfo.getElemPtrs.push_back(getElemPtrs[i]);
+    }
+
+    m_storeExpandInfo.push_back(expandInfo);
+}
+
+// =====================================================================================================================
 // Expands "store" instruction with fixed indexed "getelementptr" instructions.
 void SpirvLowerDynIndex::ExpandStoreInst(
     StoreInst*                   pStoreInst,     // [in] "Store" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
     Value*                       pDynIndex)      // [in] Dynamic index
 {
-    // Expand is something like this:
-    //
-    //   firstPtr  = getElemPtrs[0]
-    //
-    //   secondPtr = getElemPtrs[1]
-    //   firstPtr  = (dynIndex == 1) ? secondPtr : firstPtr
-    //
-    //   secondPtr = getElemPtrs[2]
-    //   firstPtr  = (dynIndex == 2) ? secondPtr : firstPtr
-    //   ...
-    //   secondPtr = getElemPtrs[upperBound - 2]
-    //   firstPtr  = (dynIndex == upperBound - 2) ? secondPtr : firstPtr
-    //
-    //   secondPtr = getElemPtrs[upperBound - 1]
-    //   firstPtr  = (dynIndex == upperBound - 1) ? secondPtr : firstPtr
-    //
-    //   store storeValue, firstPtr
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    const bool robustBufferAccess = m_pContext->GetTargetMachinePipelineOptions()->robustBufferAccess;
+#else
+    const bool robustBufferAccess = false;
+#endif
+    const uint32_t getElemPtrCount = getElemPtrs.size();
     bool isType64 = (pDynIndex->getType()->getPrimitiveSizeInBits() == 64);
-    Instruction* pFirstStoreDest = getElemPtrs[0];
+    Value* pFirstStoreDest = getElemPtrs[0];
 
-    for (uint32_t i = 1, getElemPtrCount = getElemPtrs.size(); i < getElemPtrCount; ++i)
+    if (robustBufferAccess)
     {
-        auto pSecondStoreDest = getElemPtrs[i];
-        auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
-                                      ConstantInt::get(m_pContext->Int32Ty(), i);
-        auto pCond = new ICmpInst(pStoreInst, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
-        pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInst);
-    }
+        // The .entry will be splitted into three blocks, .entry, .store and .endStore
+        //
+        // Expand is something like this:
+        //
+        // .entry
+        //   ...
+        //   if (dynIndex < upperBound) goto .store
+        //   else goto .endStore
+        //
+        // .store
+        //   firstPtr  = getElemPtrs[0]
+        //
+        //   secondPtr = getElemPtrs[1]
+        //   firstPtr  = (dynIndex == 1) ? secondPtr : firstPtr
+        //
+        //   secondPtr = getElemPtrs[2]
+        //   firstPtr  = (dynIndex == 2) ? secondPtr : firstPtr
+        //   ...
+        //   secondPtr = getElemPtrs[upperBound - 2]
+        //   firstPtr  = (dynIndex == upperBound - 2) ? secondPtr : firstPtr
+        //
+        //   secondPtr = getElemPtrs[upperBound - 1]
+        //   firstPtr  = (dynIndex == upperBound - 1) ? secondPtr : firstPtr
+        //
+        //   store storeValue, firstPtr
+        //   goto .endStore
+        //
+        // .endStore
+        //   ...
+        //   ret
 
-    pStoreInst->setOperand(1, pFirstStoreDest);
+        auto pCheckStoreBlock = pStoreInst->getParent();
+        auto pStoreBlock      = pCheckStoreBlock->splitBasicBlock(pStoreInst);
+        auto pEndStoreBlock   = pStoreBlock->splitBasicBlock(pStoreInst);
+
+        Instruction* pCheckStoreInsertPos = &pCheckStoreBlock->getInstList().back();
+        Instruction* pStoreInsertPos      = &pStoreBlock->getInstList().front();
+
+        auto pGetElemPtrCount = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), getElemPtrCount) :
+                                           ConstantInt::get(m_pContext->Int32Ty(), getElemPtrCount);
+
+        auto pDoStore = new ICmpInst(pCheckStoreInsertPos, ICmpInst::ICMP_ULT, pDynIndex, pGetElemPtrCount);
+        BranchInst::Create(pStoreBlock, pEndStoreBlock, pDoStore, pCheckStoreInsertPos);
+
+        for (uint32_t i = 1; i < getElemPtrCount; ++i)
+        {
+            auto pSecondStoreDest = getElemPtrs[i];
+            auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
+                                          ConstantInt::get(m_pContext->Int32Ty(), i);
+            auto pCond = new ICmpInst(pStoreInsertPos, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
+            pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInsertPos);
+        }
+
+        Value* pStoreValue = pStoreInst->getOperand(0);
+        new StoreInst(pStoreValue, pFirstStoreDest, pStoreInsertPos);
+
+        pCheckStoreInsertPos->eraseFromParent();
+
+        LLPC_ASSERT(pStoreInst->user_empty());
+        pStoreInst->dropAllReferences();
+        pStoreInst->eraseFromParent();
+    }
+    else
+    {
+        // .entry
+        //   ...
+        //   firstPtr  = getElemPtrs[0]
+        //
+        //   secondPtr = getElemPtrs[1]
+        //   firstPtr  = (dynIndex == 1) ? secondPtr : firstPtr
+        //
+        //   secondPtr = getElemPtrs[2]
+        //   firstPtr  = (dynIndex == 2) ? secondPtr : firstPtr
+        //   ...
+        //   secondPtr = getElemPtrs[upperBound - 2]
+        //   firstPtr  = (dynIndex == upperBound - 2) ? secondPtr : firstPtr
+        //
+        //   secondPtr = getElemPtrs[upperBound - 1]
+        //   firstPtr  = (dynIndex == upperBound - 1) ? secondPtr : firstPtr
+        //
+        //   store storeValue, firstPtr
+        //   ...
+        //   ret
+
+        for (uint32_t i = 1; i < getElemPtrCount; ++i)
+        {
+            auto pSecondStoreDest = getElemPtrs[i];
+            auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
+                                          ConstantInt::get(m_pContext->Int32Ty(), i);
+            auto pCond = new ICmpInst(pStoreInst, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
+            pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInst);
+        }
+
+        pStoreInst->setOperand(1, pFirstStoreDest);
+    }
 }
 
 } // Llpc

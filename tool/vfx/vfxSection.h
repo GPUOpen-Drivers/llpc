@@ -1119,13 +1119,16 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, autoLayoutDesc, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
+#endif
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 4;
+    static const uint32_t  MemberCount = 5;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;

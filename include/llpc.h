@@ -51,6 +51,8 @@
  * | %Version | Change Description                                                                                     |
  * | -------- | ------------------------------------------------------------------------------------------------------ |
  * |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions. 
+ * |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.                |
+ * |     22.0 | Internal revision.                                                                                     |
  * |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.    |
  **/
 namespace Llpc
@@ -376,6 +378,7 @@ struct ComputePipelineBuildOut
 {
     BinaryData          pipelineBin;        ///< Output pipeline binary data
 };
+
 // =====================================================================================================================
 /// Represents the unified of a pipeline create info.
 struct PipelineBuildInfo
@@ -544,6 +547,7 @@ public:
     static void VKAPI_CALL GetPipelineName(const ComputePipelineBuildInfo* pPipelineInfo,
                                            char* pPipeName,
                                            const size_t nameBufSize);
+
 };
 
 // =====================================================================================================================

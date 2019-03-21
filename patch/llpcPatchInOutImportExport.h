@@ -240,7 +240,8 @@ private:
                                           uint32_t inVertexStride,
                                           uint32_t outVertexCount,
                                           uint32_t outVertexStride,
-                                          uint32_t patchConstCount) const;
+                                          uint32_t patchConstCount,
+                                          uint32_t tessFactorStride) const;
 
     llvm::Value* CalcLdsOffsetForVsOutput(Type*              pOutputTy,
                                           uint32_t           location,
