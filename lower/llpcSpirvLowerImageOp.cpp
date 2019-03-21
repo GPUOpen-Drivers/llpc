@@ -836,6 +836,8 @@ llvm::Value* SpirvLowerImageOp::LoadImageDescriptor(
                     isNonUniform);
                 break;
             }
+        default:
+            break;
         }
     }
     else
