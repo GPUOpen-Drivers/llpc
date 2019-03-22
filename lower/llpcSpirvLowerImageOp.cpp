@@ -153,8 +153,6 @@ void SpirvLowerImageOp::visitCallInst(
         LLPC_ASSERT(callInst.getNumArgOperands() >= 2);
         uint32_t metaOperandIdx = callInst.getNumArgOperands() - 1; // Image call metadata is last argument
         imageCallMeta.U32All =  cast<ConstantInt>(callInst.getArgOperand(metaOperandIdx))->getZExtValue();
-        std::string mangledName = pCallee->getName();
-        auto fmaskMode = GetFmaskMode(imageCallMeta, mangledName);
 
         if ((imageCallMeta.OpKind == ImageOpWrite) || isImageAtomicOp(imageCallMeta.OpKind))
         {
@@ -166,54 +164,29 @@ void SpirvLowerImageOp::visitCallInst(
         }
 
         ConstantInt* pMemoryQualifier = nullptr;
+        ConstantInt* pResourceDescSet = nullptr;
+        ConstantInt* pResourceBinding = nullptr;
+        ConstantInt* pSamplerDescSet  = nullptr;
+        ConstantInt* pSamplerBinding  = nullptr;
+        Value* pResourceIndex = nullptr;
+        Value* pSamplerIndex  = nullptr;
 
-        Value* pResourceDesc    = nullptr;
-        Value* pSamplerDesc     = nullptr;
-        Value* pTexelBufferDesc = nullptr;
-        Value* pFmaskDesc       = nullptr;
-
-        bool hasResource    = (fmaskMode != FmaskOnly);
-        bool hasSampler     = ((imageCallMeta.OpKind == ImageOpSample) ||
-                               (imageCallMeta.OpKind == ImageOpGather) ||
-                               (imageCallMeta.OpKind == ImageOpQueryLod));
-        bool hasTexelBuffer = (hasResource && (imageCallMeta.Dim == DimBuffer));
-        bool hasFmask       = (fmaskMode != FmaskNone);
+        std::string mangledName;
 
         if (isa<LoadInst>(callInst.getOperand(0)))
         {
-            // Load from opaque type
+            // Combined resource and sampler
             auto pLoadCombined = cast<LoadInst>(callInst.getOperand(0));
+            ExtractBindingInfo(pLoadCombined,
+                               &pResourceDescSet,
+                               &pResourceBinding,
+                               &pResourceIndex,
+                               &pMemoryQualifier);
 
-            if (hasSampler)
-            {
-                pSamplerDesc = LoadImageDescriptor(pLoadCombined,
-                                                   ResourceMappingNodeType::DescriptorSampler,
-                                                   &imageCallMeta,
-                                                   &pMemoryQualifier);
-            }
-
-            if (hasTexelBuffer)
-            {
-                pTexelBufferDesc = LoadImageDescriptor(pLoadCombined,
-                                                       ResourceMappingNodeType::DescriptorTexelBuffer,
-                                                       &imageCallMeta,
-                                                       &pMemoryQualifier);
-            }
-            else if (hasResource)
-            {
-                pResourceDesc = LoadImageDescriptor(pLoadCombined,
-                                                    ResourceMappingNodeType::DescriptorResource,
-                                                    &imageCallMeta,
-                                                    &pMemoryQualifier);
-            }
-
-            if (hasFmask)
-            {
-                pFmaskDesc = LoadImageDescriptor(pLoadCombined,
-                                                 ResourceMappingNodeType::DescriptorFmask,
-                                                 &imageCallMeta,
-                                                 &pMemoryQualifier);
-            }
+            // Descriptor set and binging of sampler are the same as those of resource
+            pSamplerDescSet = pResourceDescSet;
+            pSamplerBinding = pResourceBinding;
+            pSamplerIndex   = pResourceIndex;
 
             m_imageLoads.insert(pLoadCombined);
         }
@@ -231,39 +204,20 @@ void SpirvLowerImageOp::visitCallInst(
                 }
                 else
                 {
-                    auto pLoadResource = cast<Instruction>(pLoadCall->getOperand(0));
-                    auto pLoadSampler  = cast<Instruction>(pLoadCall->getOperand(1));
+                    auto pLoadResource = cast<LoadInst>(pLoadCall->getOperand(0));
+                    auto pLoadSampler  = cast<LoadInst>(pLoadCall->getOperand(1));
 
-                    if (hasSampler)
-                    {
-                        pSamplerDesc = LoadImageDescriptor(pLoadSampler,
-                                                           ResourceMappingNodeType::DescriptorSampler,
-                                                           &imageCallMeta,
-                                                           &pMemoryQualifier);
-                    }
+                    ExtractBindingInfo(pLoadResource,
+                                       &pResourceDescSet,
+                                       &pResourceBinding,
+                                       &pResourceIndex,
+                                       &pMemoryQualifier);
 
-                    if (hasTexelBuffer)
-                    {
-                        pTexelBufferDesc = LoadImageDescriptor(pLoadResource,
-                                                               ResourceMappingNodeType::DescriptorTexelBuffer,
-                                                               &imageCallMeta,
-                                                               &pMemoryQualifier);
-                    }
-                    else if (hasResource)
-                    {
-                        pResourceDesc = LoadImageDescriptor(pLoadResource,
-                                                            ResourceMappingNodeType::DescriptorResource,
-                                                            &imageCallMeta,
-                                                            &pMemoryQualifier);
-                    }
-
-                    if (hasFmask)
-                    {
-                        pFmaskDesc = LoadImageDescriptor(pLoadResource,
-                                                         ResourceMappingNodeType::DescriptorFmask,
-                                                         &imageCallMeta,
-                                                         &pMemoryQualifier);
-                    }
+                    ExtractBindingInfo(pLoadSampler,
+                                       &pSamplerDescSet,
+                                       &pSamplerBinding,
+                                       &pSamplerIndex,
+                                       &pMemoryQualifier);
 
                     m_imageLoads.insert(pLoadCall);
 
@@ -283,29 +237,11 @@ void SpirvLowerImageOp::visitCallInst(
                 {
                     // Extract resource from load instruction
                     auto pLoadResource = cast<LoadInst>(pLoadCall->getOperand(0));
-
-                    if (hasTexelBuffer)
-                    {
-                        pTexelBufferDesc = LoadImageDescriptor(pLoadResource,
-                                                               ResourceMappingNodeType::DescriptorTexelBuffer,
-                                                               &imageCallMeta,
-                                                               &pMemoryQualifier);
-                    }
-                    else if (hasResource)
-                    {
-                        pResourceDesc = LoadImageDescriptor(pLoadResource,
-                                                            ResourceMappingNodeType::DescriptorResource,
-                                                            &imageCallMeta,
-                                                            &pMemoryQualifier);
-                    }
-
-                    if (hasFmask)
-                    {
-                        pFmaskDesc = LoadImageDescriptor(pLoadResource,
-                                                         ResourceMappingNodeType::DescriptorFmask,
-                                                         &imageCallMeta,
-                                                         &pMemoryQualifier);
-                    }
+                    ExtractBindingInfo(pLoadResource,
+                                       &pResourceDescSet,
+                                       &pResourceBinding,
+                                       &pResourceIndex,
+                                       &pMemoryQualifier);
 
                     m_imageLoadOperands.insert(pLoadResource);
                     m_imageLoads.insert(pLoadCall);
@@ -321,29 +257,11 @@ void SpirvLowerImageOp::visitCallInst(
                     LLPC_ASSERT(mangledName.find("_Z12SampledImage") == 0);
 
                     auto pLoadResource = cast<LoadInst>(pLoadCall->getOperand(0));
-
-                    if (hasTexelBuffer)
-                    {
-                        pTexelBufferDesc = LoadImageDescriptor(pLoadResource,
-                                                               ResourceMappingNodeType::DescriptorTexelBuffer,
-                                                               &imageCallMeta,
-                                                               &pMemoryQualifier);
-                    }
-                    else if (hasResource)
-                    {
-                        pResourceDesc = LoadImageDescriptor(pLoadResource,
-                                                            ResourceMappingNodeType::DescriptorResource,
-                                                            &imageCallMeta,
-                                                            &pMemoryQualifier);
-                    }
-
-                    if (hasFmask)
-                    {
-                        pFmaskDesc = LoadImageDescriptor(pLoadResource,
-                                                         ResourceMappingNodeType::DescriptorFmask,
-                                                         &imageCallMeta,
-                                                         &pMemoryQualifier);
-                    }
+                    ExtractBindingInfo(pLoadResource,
+                                       &pResourceDescSet,
+                                       &pResourceBinding,
+                                       &pResourceIndex,
+                                       &pMemoryQualifier);
 
                     m_imageLoadOperands.insert(pLoadCall);
                 }
@@ -363,6 +281,8 @@ void SpirvLowerImageOp::visitCallInst(
         }
         else
         {
+            m_pBuilder->SetInsertPoint(&callInst);
+
             mangledName = pCallee->getName();
 
             std::vector<Value*> args;
@@ -372,30 +292,46 @@ void SpirvLowerImageOp::visitCallInst(
                 (imageCallMeta.OpKind == ImageOpQueryLod))
             {
                 // Add sampler only for image sample and image gather
-                LLPC_ASSERT(pSamplerDesc != nullptr);
-                args.push_back(pSamplerDesc);
+                std::unordered_set<Value*> checkedValuesSampler;
+                imageCallMeta.NonUniformSampler = IsNonUniformValue(pSamplerIndex, checkedValuesSampler) ? 1 : 0;
+
+                args.push_back(m_pBuilder->CreateLoadSamplerDesc(pSamplerDescSet->getZExtValue(),
+                                                               pSamplerBinding->getZExtValue(),
+                                                               pSamplerIndex,
+                                                               imageCallMeta.NonUniformSampler));
             }
 
+            std::unordered_set<Value*> checkedValuesResource;
+            imageCallMeta.NonUniformResource = IsNonUniformValue(pResourceIndex, checkedValuesResource) ? 1 : 0;
             imageCallMeta.WriteOnly = callInst.getType()->isVoidTy();
+            auto fmaskMode = GetFmaskMode(imageCallMeta, mangledName);
+
+            uint32_t descSet = pResourceDescSet->getZExtValue();
+            uint32_t binding = pResourceBinding->getZExtValue();
 
             if (fmaskMode != FmaskOnly)
             {
                 if (imageCallMeta.Dim != DimBuffer)
                 {
-                    LLPC_ASSERT(pResourceDesc != nullptr);
-                    args.push_back(pResourceDesc);
+                    args.push_back(m_pBuilder->CreateLoadResourceDesc(descSet,
+                                                                    binding,
+                                                                    pResourceIndex,
+                                                                    imageCallMeta.NonUniformResource));
                 }
                 else
                 {
-                    LLPC_ASSERT(pTexelBufferDesc != nullptr);
-                    args.push_back(pTexelBufferDesc);
+                    args.push_back(m_pBuilder->CreateLoadTexelBufferDesc(descSet,
+                                                                       binding,
+                                                                       pResourceIndex,
+                                                                       imageCallMeta.NonUniformResource));
                 }
             }
-
-            if (hasFmask)
+            if (fmaskMode != FmaskNone)
             {
-                LLPC_ASSERT(pFmaskDesc != nullptr);
-                args.push_back(pFmaskDesc);
+                args.push_back(m_pBuilder->CreateLoadFmaskDesc(descSet,
+                                                             binding,
+                                                             pResourceIndex,
+                                                             imageCallMeta.NonUniformResource));
             }
 
             if (imageCallMeta.OpKind != ImageOpQueryNonLod)
@@ -665,186 +601,116 @@ void SpirvLowerImageOp::visitCallInst(
 }
 
 // =====================================================================================================================
-// Loads image descriptor from the provided load source value. Meanwhile, extract image call metadata and memory
-// qualifier.
-llvm::Value* SpirvLowerImageOp::LoadImageDescriptor(
-    Value*                   pLoadSrc,                // [in] Source value from which the descriptor is loaded
-    ResourceMappingNodeType  descType,                // Descriptor type
-    ShaderImageCallMetadata* pImageCallMeta,          // [out] Image call metadata
-    ConstantInt**            ppMemoryQualifier)       // [out] Memory qualifier
+// Extracts binding info from the specified "load" instruction
+void SpirvLowerImageOp::ExtractBindingInfo(
+    LoadInst*     pLoadInst,            // [in] "Load" instruction
+    ConstantInt** ppDescSet,            // [out] Descriptor set
+    ConstantInt** ppBinding,            // [out] Descriptor binding
+    Value**       ppArrayIndex,         // [out] Descriptor index
+    ConstantInt** ppMemoryQualifier)    // [out] Memory qualifier
 {
-    Value*       pDesc = nullptr;
+    Value* pLoadSrc = pLoadInst->getOperand(0);
+    MDNode* pResMetaNode = nullptr;
+    MDNode* pImageMemoryMetaNode = nullptr;
 
-    if (isa<SelectInst>(pLoadSrc))
+    GetElementPtrInst* pGetElemPtrInst = nullptr;
+    Instruction* pConstExpr = nullptr;
+
+    if (isa<GetElementPtrInst>(pLoadSrc))
     {
-        auto pSelectInst = cast<SelectInst>(pLoadSrc);
-        Value* pValue1 = pSelectInst->getTrueValue();
-        Value* pValue2 = pSelectInst->getFalseValue();
-        pValue1  = LoadImageDescriptor(pValue1,  descType, pImageCallMeta, ppMemoryQualifier);
-        pValue2 = LoadImageDescriptor(pValue2, descType, pImageCallMeta, ppMemoryQualifier);
-        pDesc       = SelectInst::Create(pSelectInst->getCondition(), pValue1, pValue2, "", pSelectInst);
+        pGetElemPtrInst = dyn_cast<GetElementPtrInst>(pLoadSrc);
     }
-    else if (isa<LoadInst>(pLoadSrc))
+    else if (isa<ConstantExpr>(pLoadSrc))
     {
-        ConstantInt* pDescSet    = nullptr;
-        ConstantInt* pBinding    = nullptr;
-        Value*       pArrayIndex = nullptr;
+        pConstExpr = dyn_cast<ConstantExpr>(pLoadSrc)->getAsInstruction();
+        pGetElemPtrInst = dyn_cast<GetElementPtrInst>(pConstExpr);
+    }
 
-        LoadInst* pLoadInst = cast<LoadInst>(pLoadSrc);
-        Value* pLoadSrc = pLoadInst->getOperand(0);
-        MDNode* pResMetaNode = nullptr;
-        MDNode* pImageMemoryMetaNode = nullptr;
+    // Calculate descriptor index for arrayed binding
+    if (pGetElemPtrInst != nullptr)
+    {
+        // Process image array access
 
-        GetElementPtrInst* pGetElemPtrInst = nullptr;
-        Instruction* pConstExpr = nullptr;
+        // Get stride of each array dimension
+        std::vector<uint32_t> strides;
+        Type* pSourceTy = pGetElemPtrInst->getSourceElementType();
+        LLPC_ASSERT(pSourceTy->isArrayTy());
 
-        if (isa<GetElementPtrInst>(pLoadSrc))
+        Type* pElemTy = pSourceTy->getArrayElementType();
+        while (pElemTy->isArrayTy())
         {
-            pGetElemPtrInst = dyn_cast<GetElementPtrInst>(pLoadSrc);
-        }
-        else if (isa<ConstantExpr>(pLoadSrc))
-        {
-            pConstExpr = dyn_cast<ConstantExpr>(pLoadSrc)->getAsInstruction();
-            pGetElemPtrInst = dyn_cast<GetElementPtrInst>(pConstExpr);
-        }
-
-        // Calculate descriptor index for arrayed binding
-        if (pGetElemPtrInst != nullptr)
-        {
-            // Process image array access
-
-            // Get stride of each array dimension
-            std::vector<uint32_t> strides;
-            Type* pSrcTy = pGetElemPtrInst->getSourceElementType();
-            LLPC_ASSERT(pSrcTy->isArrayTy());
-
-            Type* pElemTy = pSrcTy->getArrayElementType();
-            while (pElemTy->isArrayTy())
+            const uint32_t elemCount = pElemTy->getArrayNumElements();
+            for (uint32_t i = 0; i < strides.size(); ++i)
             {
-                const uint32_t elemCount = pElemTy->getArrayNumElements();
-                for (uint32_t i = 0; i < strides.size(); ++i)
-                {
-                    strides[i] *= elemCount;
-                }
-
-                strides.push_back(elemCount);
-                pElemTy = pElemTy->getArrayElementType();
-            }
-            strides.push_back(1);
-
-            // Calculate flatten array index
-            const uint32_t operandCount = pGetElemPtrInst->getNumOperands();
-            LLPC_ASSERT((operandCount - 2) == strides.size());
-
-            for (uint32_t i = 2; i < operandCount; ++i)
-            {
-                Value* pIndex = pGetElemPtrInst->getOperand(i);
-                bool is64bit  = (pIndex->getType()->getPrimitiveSizeInBits() == 64);
-                Constant* pStride = ConstantInt::get(m_pContext->Int32Ty(), strides[i - 2]);
-
-                if (is64bit)
-                {
-                    pIndex = new TruncInst(pIndex, m_pContext->Int32Ty(), "", pLoadInst);
-                }
-                pIndex = BinaryOperator::CreateMul(pStride, pIndex, "", pLoadInst);
-                if (pArrayIndex == nullptr)
-                {
-                    pArrayIndex = pIndex;
-                }
-                else
-                {
-                    pArrayIndex = BinaryOperator::CreateAdd(pArrayIndex, pIndex, "", pLoadInst);
-                }
+                strides[i] *= elemCount;
             }
 
-            // Get resource binding metadata node from global variable
-            Value*  pPointer = pGetElemPtrInst->getPointerOperand();
-            pResMetaNode = cast<GlobalVariable>(pPointer)->getMetadata(gSPIRVMD::Resource);
-            pImageMemoryMetaNode = cast<GlobalVariable>(pPointer)->getMetadata(gSPIRVMD::ImageMemory);
+            strides.push_back(elemCount);
+            pElemTy = pElemTy->getArrayElementType();
         }
-        else
+        strides.push_back(1);
+
+        // Calculate flatten array index
+        const uint32_t operandCount = pGetElemPtrInst->getNumOperands();
+        LLPC_ASSERT((operandCount - 2) == strides.size());
+
+        Value* pArrayIndex = nullptr;
+        for (uint32_t i = 2; i < operandCount; ++i)
         {
-            // Load image from global variable
-            pArrayIndex = ConstantInt::get(m_pContext->Int32Ty(), 0);
+            Value* pIndex = pGetElemPtrInst->getOperand(i);
+            bool isType64 = (pIndex->getType()->getPrimitiveSizeInBits() == 64);
+            Constant* pStride = ConstantInt::get(m_pContext->Int32Ty(), strides[i-2]);
 
-            // Get resource binding metadata node from global variable
-            pResMetaNode = cast<GlobalVariable>(pLoadSrc)->getMetadata(gSPIRVMD::Resource);
-            pImageMemoryMetaNode = cast<GlobalVariable>(pLoadSrc)->getMetadata(gSPIRVMD::ImageMemory);
-        }
-
-        if (pConstExpr != nullptr)
-        {
-            pConstExpr->dropAllReferences();
-            pConstExpr->deleteValue();
-        }
-
-        // Get descriptor set and descriptor binding
-        LLPC_ASSERT(pResMetaNode != nullptr);
-
-        pDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
-        pBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
-
-        if (pImageMemoryMetaNode != nullptr)
-        {
-            *ppMemoryQualifier = mdconst::dyn_extract<ConstantInt>(pImageMemoryMetaNode->getOperand(0));
-        }
-
-        std::unordered_set<Value*> checkedValues;
-        bool isNonUniform = IsNonUniformValue(pArrayIndex, checkedValues);
-
-        m_pBuilder->SetInsertPoint(cast<Instruction>(pLoadInst));
-
-        switch (descType)
-        {
-        case ResourceMappingNodeType::DescriptorSampler:
+            if (isType64)
             {
-                pImageCallMeta->NonUniformSampler = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadSamplerDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
-                break;
+                pIndex =  new TruncInst(pIndex, m_pContext->Int32Ty(), "", pLoadInst);
             }
-        case ResourceMappingNodeType::DescriptorResource:
+            pIndex = BinaryOperator::CreateMul(pStride, pIndex, "", pLoadInst);
+            if (pArrayIndex == nullptr)
             {
-                pImageCallMeta->NonUniformResource = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadResourceDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
-                break;
+                pArrayIndex = pIndex;
             }
-        case ResourceMappingNodeType::DescriptorTexelBuffer:
+            else
             {
-                pImageCallMeta->NonUniformResource = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadTexelBufferDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
-                break;
-            }
-        case ResourceMappingNodeType::DescriptorFmask:
-            {
-                pImageCallMeta->NonUniformResource = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadFmaskDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
-                break;
+                pArrayIndex = BinaryOperator::CreateAdd(pArrayIndex, pIndex, "", pLoadInst);
             }
         default:
             break;
         }
+
+        *ppArrayIndex = pArrayIndex;
+
+        // Get resource binding metadata node from global variable
+        Value*  pSource      = pGetElemPtrInst->getPointerOperand();
+        pResMetaNode = cast<GlobalVariable>(pSource)->getMetadata(gSPIRVMD::Resource);
+        pImageMemoryMetaNode = cast<GlobalVariable>(pSource)->getMetadata(gSPIRVMD::ImageMemory);
     }
     else
     {
-        LLPC_NEVER_CALLED();
+        // Load image from global variable
+        *ppArrayIndex = ConstantInt::get(m_pContext->Int32Ty(), 0);
+
+        // Get resource binding metadata node from global variable
+        pResMetaNode = cast<GlobalVariable>(pLoadSrc)->getMetadata(gSPIRVMD::Resource);
+        pImageMemoryMetaNode = cast<GlobalVariable>(pLoadSrc)->getMetadata(gSPIRVMD::ImageMemory);
     }
-    return pDesc;
+
+    if (pConstExpr != nullptr)
+    {
+        pConstExpr->dropAllReferences();
+        pConstExpr->deleteValue();
+    }
+
+    // Get descriptor set and descriptor binding
+    LLPC_ASSERT(pResMetaNode != nullptr);
+
+    *ppDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
+    *ppBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
+
+    if (pImageMemoryMetaNode != nullptr)
+    {
+        *ppMemoryQualifier = mdconst::dyn_extract<ConstantInt>(pImageMemoryMetaNode->getOperand(0));
+    }
 }
 
 // =====================================================================================================================
