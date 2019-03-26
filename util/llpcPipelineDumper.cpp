@@ -592,6 +592,9 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
     dumpFile << "options.sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
     dumpFile << "options.maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+    dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
+#endif
     dumpFile << "\n";
 }
 
@@ -1000,6 +1003,9 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.sgprLimit);
             pHasher->Update(options.vgprLimit);
             pHasher->Update(options.maxThreadGroupsPerComputeUnit);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+            pHasher->Update(options.forceLoopUnrollCount);
+#endif
         }
     }
 }

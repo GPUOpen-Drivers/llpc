@@ -86,6 +86,14 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
 
     SpirvLower::Init(&module);
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+    auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
+    if (pShaderOptions->forceLoopUnrollCount > 0)
+    {
+        m_forceLoopUnrollCount = pShaderOptions->forceLoopUnrollCount;
+    }
+#endif
+
     if (m_forceLoopUnrollCount == 0)
     {
         return false;
