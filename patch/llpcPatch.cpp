@@ -155,6 +155,10 @@ void Patch::AddPasses(
     if (cl::DisablePatchOpt == false)
     {
         AddOptimizationPasses(pContext, passMgr);
+
+        // Link external libraries to solve LLVM functions after it
+        passMgr.add(CreatePassExternalLibLink(false));
+        passMgr.add(CreatePassDeadFuncRemove());
     }
 
     // Stop timer for optimization passes and restart timer for patching passes.
