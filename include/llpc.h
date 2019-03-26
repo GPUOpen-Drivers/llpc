@@ -221,6 +221,11 @@ struct PipelineOptions
                               ///  without pipeline info, so LLPC needs to do auto descriptor layout.
     bool scalarBlockLayout;   ///< If set, allows scalar block layout of types.
     bool includeIr;           ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    bool robustBufferAccess;  ///< If set, out of bounds accesses to buffer or private array will be handled.
+                              ///  for now this option is used by LLPC shader and affects only the private array,
+                              ///  the out of bounds accesses will be skipped with this setting.
+#endif
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
