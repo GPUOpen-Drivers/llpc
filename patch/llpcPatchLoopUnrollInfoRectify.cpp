@@ -33,6 +33,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Debug.h"
@@ -171,6 +172,7 @@ void PatchLoopUnrollInfoRectify::getAnalysisUsage(
     analysisUsage.addPreserved<LoopInfoWrapperPass>();
     analysisUsage.addRequired<ScalarEvolutionWrapperPass>();
     analysisUsage.addPreserved<ScalarEvolutionWrapperPass>();
+    analysisUsage.addPreserved<DominatorTreeWrapperPass>();
 }
 
 } // Llpc
