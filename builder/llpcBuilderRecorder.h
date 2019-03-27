@@ -89,6 +89,13 @@ public:
 
     ~BuilderRecorder() {}
 
+#ifndef NDEBUG
+    // Link the individual shader modules into a single pipeline module.
+    // This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
+    // set shader stage consistently.
+    llvm::Module* Link(llvm::ArrayRef<llvm::Module*> modules) override final;
+#endif
+
     //
     // Builder methods implemented in BuilderImplDesc
     //
@@ -151,10 +158,21 @@ private:
                               llvm::ArrayRef<llvm::Value*>  args,
                               const llvm::Twine&            instName);
 
+#ifndef NDEBUG
+    // Check that the frontend is consistently telling us which shader stage a function is in.
+    void CheckFuncShaderStage(llvm::Function* pFunc, ShaderStage shaderStage);
+#endif
+
     // -----------------------------------------------------------------------------------------------------------------
 
     bool            m_wantReplay;                             // true to make CreateBuilderReplayer return a replayer
                                                               //   pass
+#ifndef NDEBUG
+    // Only used in a debug build to ensure SetShaderStage is being used consistently.
+    std::map<llvm::Function*, ShaderStage>  m_funcShaderStageMap;           // Map from function to shader stage
+    llvm::Function*                         m_pEnclosingFunc = nullptr;     // Last function written with current
+                                                                            //   shader stage
+#endif
 };
 
 } // Llpc

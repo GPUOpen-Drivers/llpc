@@ -147,6 +147,9 @@ public:
     // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
     virtual llvm::ModulePass* CreateBuilderReplayer() { return nullptr; }
 
+    // Set the current shader stage.
+    void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
+
     // Link the individual shader modules into a single pipeline module. The frontend must have
     // finished calling Builder::Create* methods and finished building the IR. In the case that
     // there are multiple shader modules, they are all freed by this call, and the linked pipeline
@@ -238,6 +241,10 @@ public:
 
 protected:
     Builder(llvm::LLVMContext& context) : llvm::IRBuilder<>(context) {}
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    ShaderStage m_shaderStage = ShaderStageInvalid;   // Current shader stage being built.
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)

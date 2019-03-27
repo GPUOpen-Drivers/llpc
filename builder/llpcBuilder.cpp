@@ -81,7 +81,6 @@ Builder::~Builder()
 
 // =====================================================================================================================
 // Base implementation of linking shader modules into a pipeline module.
-// Shader modules were supplied by SetShaderModules.
 Module* Builder::Link(
     ArrayRef<Module*> modules)     // Array of modules indexed by shader stage, with nullptr entry
                                    //  for any stage not present in the pipeline

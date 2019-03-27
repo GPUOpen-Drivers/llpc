@@ -552,6 +552,9 @@ Result Compiler::BuildPipelineInternal(
 
             PassManager passMgr;
 
+            // Set the shader stage in the Builder.
+            pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(stage));
+
             // Start timer for translate.
             if (TimePassesIsEnabled)
             {
