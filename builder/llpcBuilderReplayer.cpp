@@ -66,6 +66,9 @@ private:
     std::unique_ptr<Builder>                m_pBuilder;                         // The LLPC builder that the builder
                                                                                 //  calls are being replayed on.
     Module*                                 m_pModule;                          // Module that the pass is being run on
+    std::map<Function*, ShaderStage>        m_shaderStageMap;                   // Map function -> shader stage
+    llvm::Function*                         m_pEnclosingFunc = nullptr;         // Last function written with current
+                                                                                //  shader stage
 };
 
 } // anonymous
@@ -156,6 +159,26 @@ void BuilderReplayer::ReplayCall(
     uint32_t  opcode,   // The builder call opcode
     CallInst* pCall)    // [in] The builder call to process
 {
+    // Change shader stage if necessary.
+    Function* pEnclosingFunc = pCall->getParent()->getParent();
+    if (pEnclosingFunc != m_pEnclosingFunc)
+    {
+        m_pEnclosingFunc = pEnclosingFunc;
+
+        auto mapIt = m_shaderStageMap.find(pEnclosingFunc);
+        ShaderStage stage = ShaderStageInvalid;
+        if (mapIt == m_shaderStageMap.end())
+        {
+            stage = GetShaderStageFromFunction(pEnclosingFunc);
+            m_shaderStageMap[pEnclosingFunc] = stage;
+        }
+        else
+        {
+            stage = mapIt->second;
+        }
+        m_pBuilder->SetShaderStage(stage);
+    }
+
     // Set the insert point on the Builder. Also sets debug location to that of pCall.
     m_pBuilder->SetInsertPoint(pCall);
 

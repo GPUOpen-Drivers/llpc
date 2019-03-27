@@ -88,6 +88,31 @@ Builder* Builder::CreateBuilderRecorder(
     return new BuilderRecorder(context, wantReplay);
 }
 
+#ifndef NDEBUG
+// =====================================================================================================================
+// Link the individual shader modules into a single pipeline module.
+// This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
+// set shader stage consistently.
+Module* BuilderRecorder::Link(
+    ArrayRef<Module*> modules)    // Shader stage modules to link
+{
+    for (uint32_t stage = 0; stage != ShaderStageCount; ++stage)
+    {
+        if (Module* pModule = modules[stage])
+        {
+            for (auto& func : *pModule)
+            {
+                if (func.isDeclaration() == false)
+                {
+                    CheckFuncShaderStage(&func, static_cast<ShaderStage>(stage));
+                }
+            }
+        }
+    }
+    return Builder::Link(modules);
+}
+#endif
+
 // =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 Instruction* BuilderRecorder::CreateKill(
@@ -287,6 +312,11 @@ Instruction* BuilderRecorder::Record(
     ArrayRef<Value*>        args,         // Arguments
     const Twine&            instName)     // [in] Name to give instruction
 {
+#ifndef NDEBUG
+    // In a debug build, check that each enclosing function is consistently in the same shader stage.
+    CheckFuncShaderStage(GetInsertBlock()->getParent(), m_shaderStage);
+#endif
+
     // Create mangled name of builder call. This only needs to be mangled on return type.
     std::string mangledName;
     {
@@ -323,4 +353,28 @@ Instruction* BuilderRecorder::Record(
 
     return pCall;
 }
+
+#ifndef NDEBUG
+// =====================================================================================================================
+// Check that the frontend is consistently telling us which shader stage a function is in.
+void BuilderRecorder::CheckFuncShaderStage(
+    Function*   pFunc,        // [in] Function to check
+    ShaderStage shaderStage)  // Shader stage frontend says it is in
+{
+    LLPC_ASSERT(shaderStage < ShaderStageCount);
+    if (pFunc != m_pEnclosingFunc)
+    {
+        auto mapIt = m_funcShaderStageMap.find(pFunc);
+        if (mapIt != m_funcShaderStageMap.end())
+        {
+            LLPC_ASSERT((mapIt->second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
+        }
+        else
+        {
+            m_funcShaderStageMap[pFunc] = shaderStage;
+        }
+    }
+    m_pEnclosingFunc = pFunc;
+}
+#endif
 
