@@ -841,7 +841,7 @@ static Result BuildPipeline(
             pGraphicsPipelineInfo->iaState.patchControlPoints = 3;
         }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+        pGraphicsPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 #endif
 
         void* pPipelineDumpHandle = nullptr;
@@ -908,7 +908,7 @@ static Result BuildPipeline(
         pComputePipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
         pComputePipelineInfo->pfnOutputAlloc = AllocateBuffer;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+        pComputePipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 #endif
 
         void* pPipelineDumpHandle = nullptr;
