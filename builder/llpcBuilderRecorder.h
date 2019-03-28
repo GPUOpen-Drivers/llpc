@@ -38,14 +38,25 @@ namespace Llpc
 // Prefix of all recorded calls.
 static const char* const BuilderCallPrefix = "llpc.call.";
 
-// LLPC call metadata name.
-static const char* const BuilderCallMetadataName = "llpc_call_metadata";
+// LLPC call opcode metadata name.
+static const char* const BuilderCallOpcodeMetadataName = "llpc.call.opcode";
+
+// =====================================================================================================================
+// A class that caches the metadata kind IDs used by BuilderRecorder and BuilderReplayer.
+class BuilderRecorderMetadataKinds
+{
+public:
+    BuilderRecorderMetadataKinds() {}
+    BuilderRecorderMetadataKinds(llvm::LLVMContext& context);
+
+    uint32_t        m_opcodeMetaKindId;                         // Cached metadata kinds for opcode
+};
 
 // =====================================================================================================================
 // Builder recorder, to record all Builder calls as intrinsics
 // Each call to a Builder method causes the insertion of a call to llpc.call.*, so the Builder calls can be replayed
 // later on.
-class BuilderRecorder final : public Builder
+class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds
 {
 public:
     // llpc.call.* opcodes
@@ -72,7 +83,10 @@ public:
     // Given an opcode, get the call name (without the "llpc.call." prefix)
     static llvm::StringRef GetCallName(Opcode opcode);
 
-    BuilderRecorder(llvm::LLVMContext& context, bool wantReplay) : Builder(context), m_wantReplay(wantReplay) {}
+    BuilderRecorder(llvm::LLVMContext& context, bool wantReplay)
+        : Builder(context), BuilderRecorderMetadataKinds(context), m_wantReplay(wantReplay)
+    {}
+
     ~BuilderRecorder() {}
 
     //
@@ -139,7 +153,8 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    bool      m_wantReplay;     // true to make CreateBuilderReplayer return a replayer  pass
+    bool            m_wantReplay;                             // true to make CreateBuilderReplayer return a replayer
+                                                              //   pass
 };
 
 } // Llpc

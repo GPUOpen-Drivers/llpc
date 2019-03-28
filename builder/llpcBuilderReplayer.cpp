@@ -43,16 +43,11 @@ namespace
 
 // =====================================================================================================================
 // Pass to replay Builder calls recorded by BuilderRecorder
-class BuilderReplayer final : public ModulePass
+class BuilderReplayer final : public ModulePass, BuilderRecorderMetadataKinds
 {
 public:
     BuilderReplayer() : ModulePass(ID) {}
-    BuilderReplayer(Builder* pBuilder) :
-        ModulePass(ID),
-        m_pBuilder(pBuilder)
-    {
-        initializeBuilderReplayerPass(*PassRegistry::getPassRegistry());
-    }
+    BuilderReplayer(Builder* pBuilder);
 
     bool runOnModule(Module& module) override;
 
@@ -65,10 +60,12 @@ private:
 
     void ReplayCall(uint32_t opcode, CallInst* pCall);
     void CheckCallAndReplay(Value* pValue);
+
     Value* ProcessCall(uint32_t opcode, CallInst* pCall);
 
-    // The LLPC builder that the builder calls are being replayed on.
-    std::unique_ptr<Builder> m_pBuilder;
+    std::unique_ptr<Builder>                m_pBuilder;                         // The LLPC builder that the builder
+                                                                                //  calls are being replayed on.
+    Module*                                 m_pModule;                          // Module that the pass is being run on
 };
 
 } // anonymous
@@ -84,11 +81,25 @@ ModulePass* Llpc::CreateBuilderReplayer(
 }
 
 // =====================================================================================================================
+// Constructor
+BuilderReplayer::BuilderReplayer(
+    Builder* pBuilder)      // [in] Builder to replay calls into
+    :
+    ModulePass(ID),
+    BuilderRecorderMetadataKinds(pBuilder->getContext()),
+    m_pBuilder(pBuilder)
+{
+    initializeBuilderReplayerPass(*PassRegistry::getPassRegistry());
+}
+
+// =====================================================================================================================
 // Run the BuilderReplayer pass on a module
 bool BuilderReplayer::runOnModule(
     Module& module)   // [in] Module to run this pass on
 {
     LLVM_DEBUG(dbgs() << "Running the pass of replaying LLPC builder calls\n");
+
+    m_pModule = &module;
 
     bool changed = false;
 
@@ -102,7 +113,7 @@ bool BuilderReplayer::runOnModule(
             continue;
         }
 
-        const MDNode* const pFuncMeta = func.getMetadata(BuilderCallMetadataName);
+        const MDNode* const pFuncMeta = func.getMetadata(m_opcodeMetaKindId);
 
         // Skip builder calls that do not have the correct metadata to identify the opcode.
         if (pFuncMeta == nullptr)
@@ -148,6 +159,7 @@ void BuilderReplayer::ReplayCall(
     // Set the insert point on the Builder. Also sets debug location to that of pCall.
     m_pBuilder->SetInsertPoint(pCall);
 
+    // Process the builder call.
     LLVM_DEBUG(dbgs() << "Replaying " << *pCall << "\n");
     Value* pNewValue = ProcessCall(opcode, pCall);
 
@@ -158,7 +170,10 @@ void BuilderReplayer::ReplayCall(
         pCall->replaceAllUsesWith(pNewValue);
         if (auto pNewInst = dyn_cast<Instruction>(pNewValue))
         {
-            pNewInst->takeName(pCall);
+            if (pCall->getName() != "")
+            {
+                pNewInst->takeName(pCall);
+            }
         }
     }
     pCall->eraseFromParent();
@@ -177,7 +192,7 @@ void BuilderReplayer::CheckCallAndReplay(
             if (pFunc->getName().startswith(BuilderCallPrefix))
             {
                 uint32_t opcode = cast<ConstantInt>(cast<ConstantAsMetadata>(
-                                      pFunc->getMetadata(BuilderCallMetadataName)->getOperand(0))
+                                      pFunc->getMetadata(m_opcodeMetaKindId)->getOperand(0))
                                     ->getValue())->getZExtValue();
 
                 ReplayCall(opcode, pCall);
@@ -258,7 +273,10 @@ Value* BuilderReplayer::ProcessCall(
             }
 
             // For the store op case, avoid using the replaceAllUsesWith in the caller.
-            pWaterfallLoop->takeName(pCall);
+            if (pCall->getName() != "")
+            {
+                pWaterfallLoop->takeName(pCall);
+            }
             return nullptr;
         }
 

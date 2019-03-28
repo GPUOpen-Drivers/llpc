@@ -255,6 +255,14 @@ ShaderStage GetShaderStageFromFunction(
 {
     ShaderStage stage = ShaderStageInvalid;
 
+    // First check for the metadata that is added by the builder. This works in the patch phase.
+    MDNode* pStageMetaNode = pFunc->getMetadata(LlpcName::ShaderStageMetadata);
+    if (pStageMetaNode != nullptr)
+    {
+        return ShaderStage(mdconst::dyn_extract<ConstantInt>(pStageMetaNode->getOperand(0))->getZExtValue());
+    }
+
+    // Then check for the execution model metadata that is added by the SPIR-V reader.
     MDNode* pExecModelNode = pFunc->getMetadata(gSPIRVMD::ExecutionModel);
     if (pExecModelNode == nullptr)
     {

@@ -536,8 +536,8 @@ Result Compiler::BuildPipelineInternal(
     // into a single pipeline module.
     if (pPipelineModule == nullptr)
     {
-        Module* modules[ShaderStageCountInternal] = {};
-
+        // Create empty modules and set target machine in each.
+        Module* modules[ShaderStageCount] = {};
         for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
@@ -546,12 +546,11 @@ Result Compiler::BuildPipelineInternal(
                 continue;
             }
 
-            PassManager passMgr;
-
-            // Create the empty module and set its target machine.
             Module* pModule = new Module((Twine("llpc") + GetShaderStageName(ShaderStage(stage))).str(), *pContext);
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
+
+            PassManager passMgr;
 
             // Start timer for translate.
             if (TimePassesIsEnabled)
@@ -582,7 +581,7 @@ Result Compiler::BuildPipelineInternal(
                                   pDynamicLoopUnroll);
 
             // Run the passes.
-            result = CodeGenManager::Run(pModule, passMgr);
+            result = CodeGenManager::Run(modules[stage], passMgr);
             if (result != Result::Success)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -590,7 +589,7 @@ Result Compiler::BuildPipelineInternal(
         }
 
         // Link the shader modules into a single pipeline module.
-        pPipelineModule = LinkShaderModules(pContext, modules);
+        pPipelineModule = pContext->GetBuilder()->Link(modules);
         if (pPipelineModule == nullptr)
         {
             LLPC_ERRS("Failed to link shader modules into pipeline module\n");
@@ -1216,54 +1215,6 @@ void Compiler::CleanOptimizedSpirv(
         spvFreeBuffer(const_cast<void*>(pSpirvBin->pCode));
     }
 #endif
-}
-
-// =====================================================================================================================
-// Create pipeline module and link shader modules into it. Frees shader modules.
-Module* Compiler::LinkShaderModules(
-    Context*          pContext, // [in] Context
-    ArrayRef<Module*> modules)  // Shader modules
-{
-    // Create an empty module then link each shader module into it.
-    bool result = true;
-    Module* pPipelineModule = new Module("llpcPipeline", *pContext);
-    pContext->SetModuleTargetMachine(pPipelineModule);
-    Linker linker(*pPipelineModule);
-
-    for (int32_t stage = 0; (stage < ShaderStageCountInternal); ++stage)
-    {
-        Module* pShaderModule = modules[stage];
-        if (pShaderModule == nullptr)
-        {
-            continue;
-        }
-
-        // Ensure the name of the shader entrypoint of this shader does not clash with any other, by qualifying
-        // the name with the shader stage.
-        for (auto& func : *pShaderModule)
-        {
-            if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
-            {
-                func.setName(Twine(LlpcName::EntryPointPrefix) +
-                             GetShaderStageAbbreviation(ShaderStage(stage), true) +
-                             "." +
-                             func.getName());
-            }
-        }
-
-        // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
-        // linked into pipeline module.
-        if (linker.linkInModule(std::unique_ptr<Module>(pShaderModule)))
-        {
-            result = false;
-        }
-    }
-    if (result == false)
-    {
-        delete pPipelineModule;
-        pPipelineModule = nullptr;
-    }
-    return pPipelineModule;
 }
 
 // =====================================================================================================================

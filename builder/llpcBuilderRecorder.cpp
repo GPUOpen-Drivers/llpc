@@ -72,6 +72,14 @@ StringRef BuilderRecorder::GetCallName(
 }
 
 // =====================================================================================================================
+// BuilderRecordedMetadataKinds constructor : get the metadata kind IDs
+BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(
+    llvm::LLVMContext& context)   // [in] LLVM context
+{
+    m_opcodeMetaKindId = context.getMDKindID(BuilderCallOpcodeMetadataName);
+}
+
+// =====================================================================================================================
 // Create a BuilderRecorder
 Builder* Builder::CreateBuilderRecorder(
     LLVMContext&  context,    // [in] LLVM context
@@ -307,7 +315,7 @@ Instruction* BuilderRecorder::Record(
 
         MDNode* const pFuncMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
 
-        pFunc->setMetadata(BuilderCallMetadataName, pFuncMeta);
+        pFunc->setMetadata(m_opcodeMetaKindId, pFuncMeta);
     }
 
     // Create the call.
@@ -315,3 +323,4 @@ Instruction* BuilderRecorder::Record(
 
     return pCall;
 }
+
