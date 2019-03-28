@@ -826,7 +826,10 @@ static Result BuildPipeline(
                 // If no user data nodes (not compiling from pipeline), lay them out now.
                 if (pShaderInfo->pUserDataNodes == nullptr)
                 {
-                    DoAutoLayoutDesc(ShaderStage(stage), pCompileInfo->spirvBin[stage], pGraphicsPipelineInfo, pShaderInfo);
+                    DoAutoLayoutDesc(static_cast<ShaderStage>(stage),
+                                     pCompileInfo->spirvBin[stage],
+                                     pGraphicsPipelineInfo,
+                                     pShaderInfo);
                 }
             }
         }

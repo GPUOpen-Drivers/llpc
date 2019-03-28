@@ -115,10 +115,10 @@ bool PatchEntryPointMutate::runOnModule(
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageCount; ++shaderStage)
     {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
         {
-            m_shaderStage = ShaderStage(shaderStage);
+            m_shaderStage = static_cast<ShaderStage>(shaderStage);
             ProcessShader();
         }
     }

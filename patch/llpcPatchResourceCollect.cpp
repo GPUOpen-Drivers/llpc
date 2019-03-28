@@ -82,10 +82,10 @@ bool PatchResourceCollect::runOnModule(
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
         {
-            m_shaderStage = ShaderStage(shaderStage);
+            m_shaderStage = static_cast<ShaderStage>(shaderStage);
             ProcessShader();
         }
     }

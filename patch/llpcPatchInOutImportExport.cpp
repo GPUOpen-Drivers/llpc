@@ -125,12 +125,12 @@ bool PatchInOutImportExport::runOnModule(
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
-        auto pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        auto pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (pEntryPoint != nullptr)
         {
             InitPerShader();
             m_pEntryPoint = pEntryPoint;
-            m_shaderStage = ShaderStage(shaderStage);
+            m_shaderStage = static_cast<ShaderStage>(shaderStage);
             ProcessShader();
 
             // Now process the call and return instructions.
