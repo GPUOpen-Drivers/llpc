@@ -4526,6 +4526,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::NoUnwind);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
 
     auto argIt = pFunc->arg_begin();
     Value* pStoredValue = argIt++;
@@ -5786,6 +5787,7 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
 
     pFunc->setCallingConv(CallingConv::C);
     pFunc->addFnAttr(Attribute::NoUnwind);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
 
     auto argIt = pFunc->arg_begin();
 
