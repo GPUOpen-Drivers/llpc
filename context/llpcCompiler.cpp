@@ -546,7 +546,8 @@ Result Compiler::BuildPipelineInternal(
                 continue;
             }
 
-            Module* pModule = new Module((Twine("llpc") + GetShaderStageName(ShaderStage(stage))).str(), *pContext);
+            Module* pModule = new Module((Twine("llpc") + GetShaderStageName(static_cast<ShaderStage>(stage))).str(),
+                                         *pContext);
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
 
@@ -562,7 +563,7 @@ Result Compiler::BuildPipelineInternal(
             }
 
             // SPIR-V translation, then dump the result.
-            passMgr.add(CreateSpirvLowerTranslator(ShaderStage(stage), pShaderInfo));
+            passMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(stage), pShaderInfo));
             if (EnableOuts())
             {
                 passMgr.add(createPrintModulePass(outs(), "\n"
@@ -577,7 +578,7 @@ Result Compiler::BuildPipelineInternal(
             }
 
             // Per-shader SPIR-V lowering passes.
-            SpirvLower::AddPasses(ShaderStage(stage),
+            SpirvLower::AddPasses(static_cast<ShaderStage>(stage),
                                   passMgr,
                                   TimePassesIsEnabled ? &lowerTimer : nullptr,
                                   forceLoopUnrollCount,
@@ -1126,7 +1127,7 @@ void Compiler::TranslateSpirvToLlvm(
                   errMsg) == false)
     {
         report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
-                            GetShaderStageName(ShaderStage(shaderStage)) + " shader): " + errMsg,
+                            GetShaderStageName(static_cast<ShaderStage>(shaderStage)) + " shader): " + errMsg,
                            false);
     }
 
@@ -1187,7 +1188,7 @@ Result Compiler::OptimizeSpirv(
         if (success == false)
         {
             report_fatal_error(Twine("Failed to optimize SPIR-V (") +
-                                GetShaderStageName(ShaderStage(shaderStage) + " shader): " + logBuf,
+                                GetShaderStageName(static_cast<ShaderStage>(shaderStage) + " shader): " + logBuf,
                                false);
         }
     }

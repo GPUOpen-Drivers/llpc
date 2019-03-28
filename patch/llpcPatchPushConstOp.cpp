@@ -78,10 +78,10 @@ bool PatchPushConstOp::runOnModule(
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
         {
-            m_shaderStage = ShaderStage(shaderStage);
+            m_shaderStage = static_cast<ShaderStage>(shaderStage);
             visit(*m_pEntryPoint);
         }
     }
