@@ -147,6 +147,8 @@ namespace LlpcName
     const static char EntryPointPrefix[]              = "llpc.shader.";
     const static char CopyShaderEntryPoint[]          = "llpc.shader.COPY.main";
     const static char NullFsEntryPoint[]              = "llpc.shader.FS.null.main";
+
+    const static char ShaderStageMetadata[]           = "llpc.shaderstage";
 } // LlpcName
 
 // Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify

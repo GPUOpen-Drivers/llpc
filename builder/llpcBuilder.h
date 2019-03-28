@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llpc.h"
 #include "llpcDebug.h"
 
 #include "llvm/IR/IRBuilder.h"
@@ -57,6 +58,76 @@ inline static void InitializeBuilderPasses(
 
 // =====================================================================================================================
 // The LLPC Builder interface
+//
+// The Builder interface is used by the frontend to generate IR for LLPC-specific operations. It is
+// a subclass of llvm::IRBuilder, so it uses its concept of an insertion point with debug location,
+// and it exposes all the IRBuilder methods for building IR. However, unlike IRBuilder, LLPC's
+// Builder is designed to have a single instance that contains some other state used during the IR
+// building process.
+//
+// The frontend can use Builder in one of three ways:
+// 1. BuilderImpl-only with full pipeline state
+// 2. BuilderRecorder with full pipeline state
+// 3. Per-shader frontend compilation (This is proposed but currently unsupported and untested.)
+//
+// 1. BuilderImpl-only with full pipeline state
+//
+//    This is used where the frontend has full pipeline state, and it wants to generate IR for LLPC
+//    operations directly, instead of recording it in the frontend and then replaying the recorded
+//    calls at the start of the middle-end.
+//
+//    The frontend does this:
+//
+//    * Create an instance of BuilderImpl.
+//    * Create an IR module per shader stage.
+//    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
+//      for LLPC operations.
+//    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
+//      pipeline module.
+//    * Run middle-end passes on it.
+//
+// 2. BuilderRecorder with full pipeline state
+//
+//    This is also used where the frontend has full pipeline state, but it wants to record its
+//    Builder::Create* calls such that they get replayed (and generated into normal IR) as the first
+//    middle-end pass.
+//
+//    The frontend's actions are pretty much the same as in (1):
+//
+//    * Create an instance of BuilderRecorder.
+//    * Create an IR module per shader stage.
+//    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
+//      for LLPC operations.
+//    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
+//      pipeline module.
+//    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
+//      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
+//      module).
+//
+//    With this scheme, the intention is that the whole-pipeline IR module after linking is a
+//    representation of the pipeline. For testing purposes, the IR module could be output to a .ll
+//    file, and later read in and compiled through the middle-end passes and backend to ISA.
+//    However, that is not supported yet, as there is still some outside-IR state at that point.
+//
+// 3. Per-shader frontend compilation (This is proposed but currently unsupported and untested.)
+//
+//    The frontend can compile a single shader with no pipeline state available using
+//    BuilderRecorder, without linking at the end, giving a shader IR module containing recorded
+//    llpc.call.* calls but no pipeline state.
+//
+//    The frontend does this:
+//
+//    * Per shader:
+//      - Create an instance of BuilderRecorder.
+//      - Create an IR module per shader stage.
+//      - Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
+//        for LLPC operations.
+//    * Then, later on, bring the shader IR modules together, and link them with Builder::Link()
+//      into a single pipeline IR module.
+//    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
+//      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
+//      module).
+//
 class Builder : public llvm::IRBuilder<>
 {
 public:
@@ -75,6 +146,17 @@ public:
 
     // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
     virtual llvm::ModulePass* CreateBuilderReplayer() { return nullptr; }
+
+    // Link the individual shader modules into a single pipeline module. The frontend must have
+    // finished calling Builder::Create* methods and finished building the IR. In the case that
+    // there are multiple shader modules, they are all freed by this call, and the linked pipeline
+    // module is returned. If there is a single shader module, this might instead just return that.
+    // Before calling this, each shader module needs to have one global function for the shader
+    // entrypoint, then all other functions with internal linkage.
+    // Returns the pipeline module, or nullptr on link failure.
+    virtual llvm::Module* Link(
+        llvm::ArrayRef<llvm::Module*> modules);     // Array of modules indexed by shader stage, with nullptr entry
+                                                    //  for any stage not present in the pipeline
 
     //
     // Methods implemented in BuilderImplDesc:
