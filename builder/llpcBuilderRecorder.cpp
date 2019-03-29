@@ -47,32 +47,32 @@ StringRef BuilderRecorder::GetCallName(
     {
     case Opcode::Nop:
         return "nop";
-    case Opcode::DescLoadBuffer:
-        return "desc.load.buffer";
-    case Opcode::DescLoadSampler:
-        return "desc.load.sampler";
-    case Opcode::DescLoadResource:
-        return "desc.load.resource";
-    case Opcode::DescLoadTexelBuffer:
-        return "desc.load.texel.buffer";
-    case Opcode::DescLoadFmask:
-        return "desc.load.fmask";
-    case Opcode::DescLoadSpillTablePtr:
-        return "desc.load.spill.table.ptr";
-    case Opcode::DescBufferLength:
-        return "desc.buffer.length";
-    case Opcode::MatrixTranspose:
-        return "matrix.transpose";
-    case Opcode::MiscKill:
-        return "misc.kill";
-    case Opcode::MiscReadClock:
-        return "misc.read.clock";
-    case Opcode::DescWaterfallLoop:
-        return "desc.waterfall.loop";
-    case Opcode::DescWaterfallStoreLoop:
-        return "desc.waterfall.store.loop";
-    case SubgroupGetSubgroupSize:
-        return "subgroup.get.subgroup.size";
+    case Opcode::LoadBufferDesc:
+        return "load.buffer.desc";
+    case Opcode::LoadSamplerDesc:
+        return "load.sampler.desc";
+    case Opcode::LoadResourceDesc:
+        return "load.resource.desc";
+    case Opcode::LoadTexelBufferDesc:
+        return "load.texel.buffer.desc";
+    case Opcode::LoadFmaskDesc:
+        return "load.fmask.desc";
+    case Opcode::LoadPushConstantsPtr:
+        return "load.push.constants.ptr";
+    case Opcode::GetBufferDescLength:
+        return "get.buffer.desc.length";
+    case Opcode::TransposeMatrix:
+        return "transpose.matrix";
+    case Opcode::Kill:
+        return "kill";
+    case Opcode::ReadClock:
+        return "read.clock";
+    case Opcode::WaterfallLoop:
+        return "waterfall.loop";
+    case Opcode::WaterfallStoreLoop:
+        return "waterfall.store.loop";
+    case GetSubgroupSize:
+        return "get.subgroup.size";
     case SubgroupElect:
         return "subgroup.elect";
     case SubgroupAll:
@@ -175,16 +175,16 @@ Module* BuilderRecorder::Link(
 Instruction* BuilderRecorder::CreateKill(
     const Twine& instName)  // [in] Name to give final instruction
 {
-    return Record(Opcode::MiscKill, nullptr, {}, instName);
+    return Record(Opcode::Kill, nullptr, {}, instName);
 }
 
 // =====================================================================================================================
 // Create a matrix transpose.
-Value* BuilderRecorder::CreateMatrixTranspose(
+Value* BuilderRecorder::CreateTransposeMatrix(
     Value* const pMatrix,      // [in] Matrix to transpose.
     const Twine& instName)     // [in] Name to give final instruction
 {
-    return Record(Opcode::MatrixTranspose, GetTransposedMatrixTy(pMatrix->getType()), { pMatrix }, instName);
+    return Record(Opcode::TransposeMatrix, GetTransposedMatrixTy(pMatrix->getType()), { pMatrix }, instName);
 }
 
 // =====================================================================================================================
@@ -193,7 +193,7 @@ Instruction* BuilderRecorder::CreateReadClock(
     bool         realtime,   // Whether to read real-time clock counter
     const Twine& instName)   // [in] Name to give final instruction
 {
-    return Record(Opcode::MiscReadClock, getInt64Ty(), getInt1(realtime), instName);
+    return Record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
 }
 
 // =====================================================================================================================
@@ -223,7 +223,7 @@ Instruction* BuilderRecorder::CreateWaterfallLoop(
     if (pNonUniformInst->getType()->isVoidTy() == false)
     {
         // Normal case that pNonUniformInst is not a store so has a return type.
-        pWaterfallLoop = Record(Opcode::DescWaterfallLoop, pNonUniformInst->getType(), args, instName);
+        pWaterfallLoop = Record(Opcode::WaterfallLoop, pNonUniformInst->getType(), args, instName);
     }
     else
     {
@@ -232,7 +232,7 @@ Instruction* BuilderRecorder::CreateWaterfallLoop(
         // llpc.call.waterfall.store.loop. This situation needs to be specially handled in llpcBuilderReplayer.
         SetInsertPoint(pNonUniformInst);
         args[0] = pNonUniformInst->getOperand(operandIdxs[0]);
-        auto pWaterfallStoreLoop = Record(Opcode::DescWaterfallStoreLoop, args[0]->getType(), args, instName);
+        auto pWaterfallStoreLoop = Record(Opcode::WaterfallStoreLoop, args[0]->getType(), args, instName);
         pNonUniformInst->setOperand(operandIdxs[0], pWaterfallStoreLoop);
     }
 
@@ -254,7 +254,7 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
     Type*         pPointeeTy,       // [in] Type that the returned pointer should point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadBuffer,
+    return Record(Opcode::LoadBufferDesc,
                   PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER),
                   {
                       getInt32(descSet),
@@ -274,7 +274,7 @@ Value* BuilderRecorder::CreateLoadSamplerDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadSampler,
+    return Record(Opcode::LoadSamplerDesc,
                   VectorType::get(getInt32Ty(), 4),
                   {
                       getInt32(descSet),
@@ -294,7 +294,7 @@ Value* BuilderRecorder::CreateLoadResourceDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadResource,
+    return Record(Opcode::LoadResourceDesc,
                   VectorType::get(getInt32Ty(), 8),
                   {
                       getInt32(descSet),
@@ -314,7 +314,7 @@ Value* BuilderRecorder::CreateLoadTexelBufferDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadTexelBuffer,
+    return Record(Opcode::LoadTexelBufferDesc,
                   VectorType::get(getInt32Ty(), 4),
                   {
                       getInt32(descSet),
@@ -334,7 +334,7 @@ Value* BuilderRecorder::CreateLoadFmaskDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadFmask,
+    return Record(Opcode::LoadFmaskDesc,
                   VectorType::get(getInt32Ty(), 8),
                   {
                       getInt32(descSet),
@@ -347,21 +347,21 @@ Value* BuilderRecorder::CreateLoadFmaskDesc(
 
 // =====================================================================================================================
 // Create a load of the spill table pointer for push constants.
-Value* BuilderRecorder::CreateLoadSpillTablePtr(
-    Type*         pSpillTableTy,    // [in] Type of the spill table that the returned pointer will point to
+Value* BuilderRecorder::CreateLoadPushConstantsPtr(
+    Type*         pPushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    Type* pRetTy = PointerType::get(pSpillTableTy, ADDR_SPACE_CONST);
-    return Record(Opcode::DescLoadSpillTablePtr, pRetTy, {}, instName);
+    Type* pRetTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
+    return Record(Opcode::LoadPushConstantsPtr, pRetTy, {}, instName);
 }
 
 // =====================================================================================================================
 // Create a buffer length query based on the specified descriptor.
-Value* BuilderRecorder::CreateBufferLength(
+Value* BuilderRecorder::CreateGetBufferDescLength(
     Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
     const Twine&  instName)         // [in] Name to give instruction(s).
 {
-    return Record(Opcode::DescBufferLength, getInt32Ty(), { pBufferDesc }, instName);
+    return Record(Opcode::GetBufferDescLength, getInt32Ty(), { pBufferDesc }, instName);
 }
 
 // =====================================================================================================================
@@ -369,7 +369,7 @@ Value* BuilderRecorder::CreateBufferLength(
 Value* BuilderRecorder::CreateGetSubgroupSize(
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupGetSubgroupSize, getInt32Ty(), {}, instName);
+    return Record(Opcode::GetSubgroupSize, getInt32Ty(), {}, instName);
 }
 
 // =====================================================================================================================

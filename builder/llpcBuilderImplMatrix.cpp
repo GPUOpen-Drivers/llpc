@@ -37,7 +37,7 @@ using namespace llvm;
 
 // =====================================================================================================================
 // Recorder implementations of MatrixBuilder methods
-Value* BuilderImplMatrix::CreateMatrixTranspose(
+Value* BuilderImplMatrix::CreateTransposeMatrix(
     Value* const pMatrix,  // [in] Matrix to transpose.
     const Twine& instName) // [in] Name to give final instruction
 {

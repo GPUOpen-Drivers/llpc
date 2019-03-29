@@ -239,13 +239,14 @@ public:
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
-    // Create a load of the spill table pointer for push constants.
-    virtual llvm::Value* CreateLoadSpillTablePtr(
-        llvm::Type*         pSpillTableTy,      // [in] Type of the spill table that the returned pointer will point to
+    // Create a load of the push constants pointer.
+    // This returns a pointer to the ResourceMappingNodeType::PushConst resource in the top-level user data table.
+    virtual llvm::Value* CreateLoadPushConstantsPtr(
+        llvm::Type*         pPushConstantsTy,   // [in] Type that the returned pointer will point to
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a buffer length query based on the specified descriptor.
-    virtual llvm::Value* CreateBufferLength(
+    virtual llvm::Value* CreateGetBufferDescLength(
         llvm::Value* const  pBufferDesc,        // [in] The buffer descriptor to query.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
@@ -254,7 +255,7 @@ public:
     //
 
     // Create a matrix transpose.
-    virtual llvm::Value* CreateMatrixTranspose(
+    virtual llvm::Value* CreateTransposeMatrix(
         llvm::Value* const pMatrix,            // [in] The matrix to transpose
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 

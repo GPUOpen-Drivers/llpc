@@ -17,8 +17,8 @@ void main()
 ; SHADERTEST: <4 x float> @spirv.image.sample.f32.2D.constoffset({{.*}}, <2 x i32> <i32 2, i32 3>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <4 x i32>{{.*}}@llpc.call.desc.load.sampler.v4i32
-; SHADERTEST: call <8 x i32>{{.*}}@llpc.call.desc.load.resource.v8i32
+; SHADERTEST: call <4 x i32>{{.*}}@llpc.call.load.sampler.desc.v4i32
+; SHADERTEST: call <8 x i32>{{.*}}@llpc.call.load.resource.desc.v8i32
 ; SHADERTEST: call <4 x float> @llpc.image.sample.f32.2D.constoffset{{.*}}({{.*}}, <2 x i32> <i32 2, i32 3>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results

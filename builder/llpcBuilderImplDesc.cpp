@@ -343,23 +343,24 @@ Value* BuilderImplDesc::CreateLoadFmaskDesc(
 }
 
 // =====================================================================================================================
-// Create a load of the spill table pointer for push constants.
-Value* BuilderImplDesc::CreateLoadSpillTablePtr(
-    Type*         pSpillTableTy,    // [in] Type of the spill table that the returned pointer will point to
+// Create a load of the push constants table pointer.
+// This returns a pointer to the ResourceMappingNodeType::PushConst resource in the top-level user data table.
+Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
+    Type*         pPushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    auto pSpillTablePtrTy = PointerType::get(pSpillTableTy, ADDR_SPACE_CONST);
+    auto pPushConstantsPtrTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // generate the code directly.
     Instruction* pInsertPos = &*GetInsertPoint();
-    auto pSpillTableLoadCall = EmitCall(pInsertPos->getModule(),
-                                        LlpcName::DescriptorLoadSpillTable,
-                                        pSpillTablePtrTy,
-                                        {},
-                                        NoAttrib,
-                                        pInsertPos);
-    pSpillTableLoadCall->setName(instName);
-    return pSpillTableLoadCall;
+    auto pPushConstantsLoadCall = EmitCall(pInsertPos->getModule(),
+                                           LlpcName::DescriptorLoadSpillTable,
+                                           pPushConstantsPtrTy,
+                                           {},
+                                           NoAttrib,
+                                           pInsertPos);
+    pPushConstantsLoadCall->setName(instName);
+    return pPushConstantsLoadCall;
 }
 
 // =====================================================================================================================
@@ -382,7 +383,7 @@ Value* BuilderImplDesc::ScalarizeIfUniform(
 
 // =====================================================================================================================
 // Create a buffer length query based on the specified descriptor.
-Value* BuilderImplDesc::CreateBufferLength(
+Value* BuilderImplDesc::CreateGetBufferDescLength(
     Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
     const Twine&  instName)         // [in] Name to give instruction(s).
 {
