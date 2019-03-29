@@ -245,8 +245,8 @@ Value* BuilderReplayer::ProcessCall(
         }
 
     // Replayer implementations of BuilderImplDesc methods
-    case BuilderRecorder::Opcode::DescWaterfallLoop:
-    case BuilderRecorder::Opcode::DescWaterfallStoreLoop:
+    case BuilderRecorder::Opcode::WaterfallLoop:
+    case BuilderRecorder::Opcode::WaterfallStoreLoop:
         {
             SmallVector<uint32_t, 2> operandIdxs;
             for (Value* pOperand : args)
@@ -258,7 +258,7 @@ Value* BuilderReplayer::ProcessCall(
             }
 
             Instruction* pNonUniformInst = nullptr;
-            if (opcode == BuilderRecorder::Opcode::DescWaterfallLoop)
+            if (opcode == BuilderRecorder::Opcode::WaterfallLoop)
             {
                 pNonUniformInst = cast<Instruction>(args[0]);
             }
@@ -290,7 +290,7 @@ Value* BuilderReplayer::ProcessCall(
             // Create the waterfall loop.
             auto pWaterfallLoop = m_pBuilder->CreateWaterfallLoop(pNonUniformInst, operandIdxs);
 
-            if (opcode == BuilderRecorder::Opcode::DescWaterfallLoop)
+            if (opcode == BuilderRecorder::Opcode::WaterfallLoop)
             {
                 return pWaterfallLoop;
             }
@@ -303,7 +303,7 @@ Value* BuilderReplayer::ProcessCall(
             return nullptr;
         }
 
-    case BuilderRecorder::Opcode::DescLoadBuffer:
+    case BuilderRecorder::Opcode::LoadBufferDesc:
         {
             return m_pBuilder->CreateLoadBufferDesc(
                   cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
@@ -315,7 +315,7 @@ Value* BuilderReplayer::ProcessCall(
                       nullptr);                                // pPointeeTy
         }
 
-    case BuilderRecorder::Opcode::DescLoadSampler:
+    case BuilderRecorder::Opcode::LoadSamplerDesc:
         {
             return m_pBuilder->CreateLoadSamplerDesc(
                   cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
@@ -324,7 +324,7 @@ Value* BuilderReplayer::ProcessCall(
                   cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
         }
 
-    case BuilderRecorder::Opcode::DescLoadResource:
+    case BuilderRecorder::Opcode::LoadResourceDesc:
         {
             return m_pBuilder->CreateLoadResourceDesc(
                   cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
@@ -333,7 +333,7 @@ Value* BuilderReplayer::ProcessCall(
                   cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
         }
 
-    case BuilderRecorder::Opcode::DescLoadTexelBuffer:
+    case BuilderRecorder::Opcode::LoadTexelBufferDesc:
         {
             return m_pBuilder->CreateLoadTexelBufferDesc(
                   cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
@@ -342,7 +342,7 @@ Value* BuilderReplayer::ProcessCall(
                   cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
         }
 
-    case BuilderRecorder::Opcode::DescLoadFmask:
+    case BuilderRecorder::Opcode::LoadFmaskDesc:
         {
             return m_pBuilder->CreateLoadFmaskDesc(
                   cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
@@ -351,18 +351,18 @@ Value* BuilderReplayer::ProcessCall(
                   cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
         }
 
-    case BuilderRecorder::Opcode::DescLoadSpillTablePtr:
+    case BuilderRecorder::Opcode::LoadSpillTablePtr:
         {
             return m_pBuilder->CreateLoadSpillTablePtr(
                   pCall->getType()->getPointerElementType());  // pSpillTableTy
         }
 
     // Replayer implementations of BuilderImplMisc methods
-    case BuilderRecorder::Opcode::MiscKill:
+    case BuilderRecorder::Opcode::Kill:
         {
             return m_pBuilder->CreateKill();
         }
-    case BuilderRecorder::Opcode::MiscReadClock:
+    case BuilderRecorder::Opcode::ReadClock:
         {
             bool realtime = (cast<ConstantInt>(args[0])->getZExtValue() != 0);
             return m_pBuilder->CreateReadClock(realtime);

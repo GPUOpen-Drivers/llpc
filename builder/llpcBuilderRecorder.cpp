@@ -46,26 +46,26 @@ StringRef BuilderRecorder::GetCallName(
     {
     case Opcode::Nop:
         return "nop";
-    case Opcode::DescLoadBuffer:
-        return "desc.load.buffer";
-    case Opcode::DescLoadSampler:
-        return "desc.load.sampler";
-    case Opcode::DescLoadResource:
-        return "desc.load.resource";
-    case Opcode::DescLoadTexelBuffer:
-        return "desc.load.texel.buffer";
-    case Opcode::DescLoadFmask:
-        return "desc.load.fmask";
-    case Opcode::DescLoadSpillTablePtr:
-        return "desc.load.spill.table.ptr";
-    case Opcode::MiscKill:
-        return "misc.kill";
-    case Opcode::MiscReadClock:
-        return "misc.read.clock";
-    case Opcode::DescWaterfallLoop:
-        return "desc.waterfall.loop";
-    case Opcode::DescWaterfallStoreLoop:
-        return "desc.waterfall.store.loop";
+    case Opcode::LoadBufferDesc:
+        return "load.buffer.desc";
+    case Opcode::LoadSamplerDesc:
+        return "load.sampler.desc";
+    case Opcode::LoadResourceDesc:
+        return "load.resource.desc";
+    case Opcode::LoadTexelBufferDesc:
+        return "load.texel.buffer.desc";
+    case Opcode::LoadFmaskDesc:
+        return "load.fmask.desc";
+    case Opcode::LoadSpillTablePtr:
+        return "load.spill.table.ptr.desc";
+    case Opcode::Kill:
+        return "kill";
+    case Opcode::ReadClock:
+        return "read.clock";
+    case Opcode::WaterfallLoop:
+        return "waterfall.loop";
+    case Opcode::WaterfallStoreLoop:
+        return "waterfall.store.loop";
     }
     LLPC_NEVER_CALLED();
     return "";
@@ -118,7 +118,7 @@ Module* BuilderRecorder::Link(
 Instruction* BuilderRecorder::CreateKill(
     const Twine& instName)  // [in] Name to give final instruction
 {
-    return Record(Opcode::MiscKill, nullptr, {}, instName);
+    return Record(Opcode::Kill, nullptr, {}, instName);
 }
 
 // =====================================================================================================================
@@ -127,7 +127,7 @@ Instruction* BuilderRecorder::CreateReadClock(
     bool         realtime,   // Whether to read real-time clock counter
     const Twine& instName)   // [in] Name to give final instruction
 {
-    return Record(Opcode::MiscReadClock, getInt64Ty(), getInt1(realtime), instName);
+    return Record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
 }
 
 // =====================================================================================================================
@@ -157,7 +157,7 @@ Instruction* BuilderRecorder::CreateWaterfallLoop(
     if (pNonUniformInst->getType()->isVoidTy() == false)
     {
         // Normal case that pNonUniformInst is not a store so has a return type.
-        pWaterfallLoop = Record(Opcode::DescWaterfallLoop, pNonUniformInst->getType(), args, instName);
+        pWaterfallLoop = Record(Opcode::WaterfallLoop, pNonUniformInst->getType(), args, instName);
     }
     else
     {
@@ -166,7 +166,7 @@ Instruction* BuilderRecorder::CreateWaterfallLoop(
         // llpc.call.waterfall.store.loop. This situation needs to be specially handled in llpcBuilderReplayer.
         SetInsertPoint(pNonUniformInst);
         args[0] = pNonUniformInst->getOperand(operandIdxs[0]);
-        auto pWaterfallStoreLoop = Record(Opcode::DescWaterfallStoreLoop, args[0]->getType(), args, instName);
+        auto pWaterfallStoreLoop = Record(Opcode::WaterfallStoreLoop, args[0]->getType(), args, instName);
         pNonUniformInst->setOperand(operandIdxs[0], pWaterfallStoreLoop);
     }
 
@@ -191,7 +191,7 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
     Type* pDescTy = (pPointeeTy == nullptr) ?
                         cast<Type>(VectorType::get(getInt32Ty(), 4)) :
                         cast<Type>(PointerType::get(pPointeeTy, ADDR_SPACE_CONST));
-    return Record(Opcode::DescLoadBuffer,
+    return Record(Opcode::LoadBufferDesc,
                   pDescTy,
                   {
                       getInt32(descSet),
@@ -211,7 +211,7 @@ Value* BuilderRecorder::CreateLoadSamplerDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadSampler,
+    return Record(Opcode::LoadSamplerDesc,
                   VectorType::get(getInt32Ty(), 4),
                   {
                       getInt32(descSet),
@@ -231,7 +231,7 @@ Value* BuilderRecorder::CreateLoadResourceDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadResource,
+    return Record(Opcode::LoadResourceDesc,
                   VectorType::get(getInt32Ty(), 8),
                   {
                       getInt32(descSet),
@@ -251,7 +251,7 @@ Value* BuilderRecorder::CreateLoadTexelBufferDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadTexelBuffer,
+    return Record(Opcode::LoadTexelBufferDesc,
                   VectorType::get(getInt32Ty(), 4),
                   {
                       getInt32(descSet),
@@ -271,7 +271,7 @@ Value* BuilderRecorder::CreateLoadFmaskDesc(
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::DescLoadFmask,
+    return Record(Opcode::LoadFmaskDesc,
                   VectorType::get(getInt32Ty(), 8),
                   {
                       getInt32(descSet),
@@ -289,7 +289,7 @@ Value* BuilderRecorder::CreateLoadSpillTablePtr(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     Type* pRetTy = PointerType::get(pSpillTableTy, ADDR_SPACE_CONST);
-    return Record(Opcode::DescLoadSpillTablePtr, pRetTy, {}, instName);
+    return Record(Opcode::LoadSpillTablePtr, pRetTy, {}, instName);
 }
 
 // =====================================================================================================================

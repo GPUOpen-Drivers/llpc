@@ -66,18 +66,18 @@ public:
         Nop = 0,
 
         // Descriptor
-        DescWaterfallLoop,
-        DescWaterfallStoreLoop,
-        DescLoadBuffer,
-        DescLoadSampler,
-        DescLoadResource,
-        DescLoadTexelBuffer,
-        DescLoadFmask,
-        DescLoadSpillTablePtr,
+        WaterfallLoop,
+        WaterfallStoreLoop,
+        LoadBufferDesc,
+        LoadSamplerDesc,
+        LoadResourceDesc,
+        LoadTexelBufferDesc,
+        LoadFmaskDesc,
+        LoadSpillTablePtr,
 
         // Misc.
-        MiscKill,
-        MiscReadClock,
+        Kill,
+        ReadClock,
     };
 
     // Given an opcode, get the call name (without the "llpc.call." prefix)
