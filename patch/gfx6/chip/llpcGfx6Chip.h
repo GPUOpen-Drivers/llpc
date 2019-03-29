@@ -115,12 +115,6 @@ struct VsRegConfig
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_1);
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_2);
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_3);
-    DEF_REG(VS_SCRATCH_BYTE_SIZE);
-    DEF_REG(VS_NUM_USED_VGPRS);
-    DEF_REG(VS_NUM_USED_SGPRS);
-    DEF_REG(VS_NUM_AVAIL_VGPRS);
-    DEF_REG(VS_NUM_AVAIL_SGPRS);
-    DEF_REG(USES_VIEWPORT_ARRAY_INDEX);
 
     void Init();
 };
@@ -131,11 +125,6 @@ struct HsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_HS);
     DEF_REG(SPI_SHADER_PGM_RSRC2_HS);
-    DEF_REG(HS_SCRATCH_BYTE_SIZE);
-    DEF_REG(HS_NUM_USED_VGPRS);
-    DEF_REG(HS_NUM_USED_SGPRS);
-    DEF_REG(HS_NUM_AVAIL_VGPRS);
-    DEF_REG(HS_NUM_AVAIL_SGPRS);
     DEF_REG(VGT_LS_HS_CONFIG);
     DEF_REG(VGT_HOS_MIN_TESS_LEVEL);
     DEF_REG(VGT_HOS_MAX_TESS_LEVEL);
@@ -149,11 +138,6 @@ struct EsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_ES);
     DEF_REG(SPI_SHADER_PGM_RSRC2_ES);
-    DEF_REG(ES_SCRATCH_BYTE_SIZE);
-    DEF_REG(ES_NUM_USED_VGPRS);
-    DEF_REG(ES_NUM_USED_SGPRS);
-    DEF_REG(ES_NUM_AVAIL_VGPRS);
-    DEF_REG(ES_NUM_AVAIL_SGPRS);
     DEF_REG(VGT_ESGS_RING_ITEMSIZE);
 
     void Init();
@@ -165,11 +149,6 @@ struct LsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_LS);
     DEF_REG(SPI_SHADER_PGM_RSRC2_LS);
-    DEF_REG(LS_SCRATCH_BYTE_SIZE);
-    DEF_REG(LS_NUM_USED_VGPRS);
-    DEF_REG(LS_NUM_USED_SGPRS);
-    DEF_REG(LS_NUM_AVAIL_VGPRS);
-    DEF_REG(LS_NUM_AVAIL_SGPRS);
     void Init();
 };
 
@@ -179,11 +158,6 @@ struct GsRegConfig
 {
     DEF_REG(SPI_SHADER_PGM_RSRC1_GS);
     DEF_REG(SPI_SHADER_PGM_RSRC2_GS);
-    DEF_REG(GS_SCRATCH_BYTE_SIZE);
-    DEF_REG(GS_NUM_USED_VGPRS);
-    DEF_REG(GS_NUM_USED_SGPRS);
-    DEF_REG(GS_NUM_AVAIL_VGPRS);
-    DEF_REG(GS_NUM_AVAIL_SGPRS);
     DEF_REG(VGT_GS_MAX_VERT_OUT);
     DEF_REG(VGT_GS_ONCHIP_CNTL__CI__VI);
     DEF_REG(VGT_ES_PER_GS);
@@ -220,16 +194,6 @@ struct PsRegConfig
     DEF_REG(PA_SC_MODE_CNTL_1);
     DEF_REG(DB_SHADER_CONTROL);
     DEF_REG(CB_SHADER_MASK);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
-    DEF_REG(PS_WRITES_UAVS);
-    DEF_REG(PS_WRITES_DEPTH);
-#endif
-    DEF_REG(PS_USES_UAVS);
-    DEF_REG(PS_SCRATCH_BYTE_SIZE);
-    DEF_REG(PS_NUM_USED_VGPRS);
-    DEF_REG(PS_NUM_USED_SGPRS);
-    DEF_REG(PS_NUM_AVAIL_VGPRS);
-    DEF_REG(PS_NUM_AVAIL_SGPRS);
 
     void Init();
 };
@@ -238,13 +202,6 @@ struct PsRegConfig
 // Represents the common configuration of registers relevant to all pipeline.
 struct PipelineRegConfig
 {
-    DEF_REG(USER_DATA_LIMIT);
-    DEF_REG(SPILL_THRESHOLD);
-    DEF_REG(PIPELINE_HASH_LO);
-    DEF_REG(PIPELINE_HASH_HI);
-    DEF_REG(API_HW_SHADER_MAPPING_LO);
-    DEF_REG(API_HW_SHADER_MAPPING_HI);
-
     void Init();
 };
 
@@ -259,14 +216,6 @@ struct PipelineVsFsRegConfig: public PipelineRegConfig
     VsRegConfig m_vsRegs;   // VS -> hardware VS
     PsRegConfig m_psRegs;   // FS -> hardware PS
     DEF_REG(VGT_SHADER_STAGES_EN);
-    DEF_REG(API_VS_HASH_DWORD0);
-    DEF_REG(API_VS_HASH_DWORD1);
-    DEF_REG(API_PS_HASH_DWORD0);
-    DEF_REG(API_PS_HASH_DWORD1);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    DEF_REG(INDIRECT_TABLE_ENTRY);
-    DEF_REG(STREAM_OUT_TABLE_ENTRY);
-#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -297,18 +246,6 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
     PsRegConfig m_psRegs;   // FS  -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
-    DEF_REG(API_VS_HASH_DWORD0);
-    DEF_REG(API_VS_HASH_DWORD1);
-    DEF_REG(API_HS_HASH_DWORD0);
-    DEF_REG(API_HS_HASH_DWORD1);
-    DEF_REG(API_DS_HASH_DWORD0);
-    DEF_REG(API_DS_HASH_DWORD1);
-    DEF_REG(API_PS_HASH_DWORD0);
-    DEF_REG(API_PS_HASH_DWORD1);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    DEF_REG(INDIRECT_TABLE_ENTRY);
-    DEF_REG(STREAM_OUT_TABLE_ENTRY);
-#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
@@ -340,16 +277,6 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
     VsRegConfig m_vsRegs;   // Copy shader -> hardware VS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
-    DEF_REG(API_VS_HASH_DWORD0);
-    DEF_REG(API_VS_HASH_DWORD1);
-    DEF_REG(API_GS_HASH_DWORD0);
-    DEF_REG(API_GS_HASH_DWORD1);
-    DEF_REG(API_PS_HASH_DWORD0);
-    DEF_REG(API_PS_HASH_DWORD1);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    DEF_REG(INDIRECT_TABLE_ENTRY);
-    DEF_REG(STREAM_OUT_TABLE_ENTRY);
-#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
@@ -384,20 +311,6 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
     VsRegConfig m_vsRegs;   // Copy shader -> hardware VS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
-    DEF_REG(API_VS_HASH_DWORD0);
-    DEF_REG(API_VS_HASH_DWORD1);
-    DEF_REG(API_HS_HASH_DWORD0);
-    DEF_REG(API_HS_HASH_DWORD1);
-    DEF_REG(API_DS_HASH_DWORD0);
-    DEF_REG(API_DS_HASH_DWORD1);
-    DEF_REG(API_GS_HASH_DWORD0);
-    DEF_REG(API_GS_HASH_DWORD1);
-    DEF_REG(API_PS_HASH_DWORD0);
-    DEF_REG(API_PS_HASH_DWORD1);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    DEF_REG(INDIRECT_TABLE_ENTRY);
-    DEF_REG(STREAM_OUT_TABLE_ENTRY);
-#endif
     DEF_REG(IA_MULTI_VGT_PARAM);
     DEF_REG(VGT_TF_PARAM);
 
@@ -422,11 +335,6 @@ struct CsRegConfig
     DEF_REG(COMPUTE_NUM_THREAD_X);
     DEF_REG(COMPUTE_NUM_THREAD_Y);
     DEF_REG(COMPUTE_NUM_THREAD_Z);
-    DEF_REG(CS_SCRATCH_BYTE_SIZE);
-    DEF_REG(CS_NUM_USED_VGPRS);
-    DEF_REG(CS_NUM_USED_SGPRS);
-    DEF_REG(CS_NUM_AVAIL_VGPRS);
-    DEF_REG(CS_NUM_AVAIL_SGPRS);
     void Init();
 };
 
@@ -437,9 +345,6 @@ struct PipelineCsRegConfig: public PipelineRegConfig
     static const uint32_t MaxDynamicRegs = 16;  // mmCOMPUTE_USER_DATA_0~15
 
     CsRegConfig   m_csRegs;
-
-    DEF_REG(API_CS_HASH_DWORD0);
-    DEF_REG(API_CS_HASH_DWORD1);
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
