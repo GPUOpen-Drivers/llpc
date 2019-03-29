@@ -65,6 +65,11 @@ private:
 
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerImageOp);
 
+    llvm::Value* LoadImageDescriptor(Value*                   pLoadSrc,
+                                     ResourceMappingNodeType  descType,
+                                     ShaderImageCallMetadata* pImageCallMeta,
+                                     ConstantInt**            ppMemoryQualifier);
+
     void ExtractBindingInfo(llvm::LoadInst*     pLoadInst,
                             llvm::ConstantInt** ppDescSet,
                             llvm::ConstantInt** ppBinding,
