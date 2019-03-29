@@ -43,7 +43,7 @@ void main()
 ; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @spirv.image.read.f32.2D
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} {{.*}}@llpc.call.desc.load.buffer.{{[0-9a-z.]*}}{{.*}}(i32 0, i32 1,{{.*}}
+; SHADERTEST: call {{.*}} {{.*}}@llpc.call.load.buffer.desc.{{[0-9a-z.]*}}{{.*}}(i32 0, i32 1,{{.*}}
 ; SHADERTEST-COUNT-2: load <4 x float>
 ; SHADERTEST-COUNT-2: call <4 x float> @llpc.image.sample.f32.2D.dimaware
 ; SHADERTEST-COUNT-2: call <4 x float> @llpc.image.read.f32.2D.dimaware

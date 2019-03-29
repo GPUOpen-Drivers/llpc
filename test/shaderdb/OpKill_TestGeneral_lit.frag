@@ -20,7 +20,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call void{{.*}} @llpc.call.misc.kill
+; SHADERTEST: call void{{.*}} @llpc.call.kill
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call void @llvm.amdgcn.kill

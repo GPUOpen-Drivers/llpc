@@ -29,15 +29,15 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 0, i32 0, i1 false)
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 0, i32 0, i1 false)
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.1D{{.*}}({{.*}}, i32 1, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 1, i32 0, i1 false)
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 1, i32 0, i1 false)
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.Rect{{.*}}({{.*}}, <2 x i32> <i32 2, i32 3>, i32 0,{{.*}})
-; SHADERTEST: call <4 x i32> {{.*}} @llpc.call.desc.load.texel.buffer.v4i32(i32 1, i32 0, i32 %{{[0-9]+}}, i1 false)
+; SHADERTEST: call <4 x i32> {{.*}} @llpc.call.load.texel.buffer.desc.v4i32(i32 1, i32 0, i32 %{{[0-9]+}}, i1 false)
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.Buffer({{.*}}, i32 4, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 2, i32 0,{{.*}}, i1 false)
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 2, i32 0,{{.*}}, i1 false)
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.CubeArray{{.*}}({{.*}}, <3 x i32> <i32 5, i32 6, i32 7>, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 2, i32 0, i1 false)
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 2, i32 0, i1 false)
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.2D.sample{{.*}}({{.*}}, <2 x i32> <i32 8, i32 9>, i32 2, i32 0,{{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

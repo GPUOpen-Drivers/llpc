@@ -102,13 +102,13 @@ public:
                                      bool                isNonUniform,
                                      const llvm::Twine&  instName) override final;
 
-    // Create a load of the spill table pointer.
-    llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
-                                         const llvm::Twine&  instName) override final;
+    // Create a load of the push constants pointer.
+    llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,
+                                            const llvm::Twine&  instName) override final;
 
     // Create a buffer length query based on the specified descriptor.
-    llvm::Value* CreateBufferLength(llvm::Value* const pBufferDesc,
-                                    const llvm::Twine& instName = "") override final;
+    llvm::Value* CreateGetBufferDescLength(llvm::Value* const pBufferDesc,
+                                           const llvm::Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplDesc)
@@ -125,7 +125,7 @@ public:
     BuilderImplMatrix(llvm::LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create a matrix transpose.
-    llvm::Value* CreateMatrixTranspose(llvm::Value* const pMatrix,
+    llvm::Value* CreateTransposeMatrix(llvm::Value* const pMatrix,
                                        const llvm::Twine& instName = "") override final;
 
 private:

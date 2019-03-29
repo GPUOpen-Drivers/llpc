@@ -2644,11 +2644,11 @@ void SpirvLowerGlobal::LowerPushConsts()
         {
             m_pBuilder->SetInsertPoint(&pFunc->getEntryBlock(), pFunc->getEntryBlock().getFirstInsertionPt());
 
-            Type* const pSpillTableType = ArrayType::get(m_pBuilder->getInt8Ty(), 512);
-            Value* pSpillTable = m_pBuilder->CreateLoadSpillTablePtr(pSpillTableType);
+            Type* const pPushConstantsType = ArrayType::get(m_pBuilder->getInt8Ty(), 512);
+            Value* pPushConstants = m_pBuilder->CreateLoadPushConstantsPtr(pPushConstantsType);
 
             Type* const pCastType = global.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST);
-            pSpillTable = m_pBuilder->CreateBitCast(pSpillTable, pCastType);
+            pPushConstants = m_pBuilder->CreateBitCast(pPushConstants, pCastType);
 
             SmallVector<Instruction*, 8> usesToReplace;
 
@@ -2673,7 +2673,7 @@ void SpirvLowerGlobal::LowerPushConsts()
 
             for (Instruction* const pInst : usesToReplace)
             {
-                pInst->replaceUsesOfWith(&global, pSpillTable);
+                pInst->replaceUsesOfWith(&global, pPushConstants);
             }
         }
 

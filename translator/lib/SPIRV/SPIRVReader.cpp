@@ -1806,7 +1806,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             pNewLoad = Builder->CreateInsertValue(pNewLoad, pNewLoadElem, i);
                         }
 
-                        pLoad->replaceAllUsesWith(Builder->CreateMatrixTranspose(pNewLoad));
+                        pLoad->replaceAllUsesWith(Builder->CreateTransposeMatrix(pNewLoad));
                     }
                     else
                     {
@@ -1901,7 +1901,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                             pStoreValue = pMatrix;
                         }
 
-                        pStoreValue = Builder->CreateMatrixTranspose(pStoreValue);
+                        pStoreValue = Builder->CreateTransposeMatrix(pStoreValue);
 
                         // If we are storing a full row major matrix, need to transpose then store the rows.
                         for (uint32_t i = 0; i < rowCount; i++)
@@ -3402,7 +3402,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
     const uint32_t remappedMemberIndex = lookupRemappedTypeElements(pSpvStruct->getType()->getPointerElementType(),
                                                                     memberIndex);
 
-    Value* const pBufferLength = Builder->CreateBufferLength(pStruct);
+    Value* const pBufferLength = Builder->CreateGetBufferDescLength(pStruct);
 
     StructType* const pStructType = cast<StructType>(pStruct->getType()->getPointerElementType());
     const StructLayout* const pStructLayout = M->getDataLayout().getStructLayout(pStructType);
@@ -3903,7 +3903,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
     Value* const pMatrix = transValue(pSpvTranpose->getOpValue(0),
                                       Builder->GetInsertBlock()->getParent(),
                                       Builder->GetInsertBlock());
-    return Builder->CreateMatrixTranspose(pMatrix);
+    return Builder->CreateTransposeMatrix(pMatrix);
 }
 
 /// For instructions, this function assumes they are created in order

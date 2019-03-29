@@ -66,25 +66,25 @@ public:
         Nop = 0,
 
         // Descriptor
-        DescWaterfallLoop,
-        DescWaterfallStoreLoop,
-        DescLoadBuffer,
-        DescLoadSampler,
-        DescLoadResource,
-        DescLoadTexelBuffer,
-        DescLoadFmask,
-        DescLoadSpillTablePtr,
-        DescBufferLength,
+        WaterfallLoop,
+        WaterfallStoreLoop,
+        LoadBufferDesc,
+        LoadSamplerDesc,
+        LoadResourceDesc,
+        LoadTexelBufferDesc,
+        LoadFmaskDesc,
+        LoadPushConstantsPtr,
+        GetBufferDescLength,
 
         // Matrix
-        MatrixTranspose,
+        TransposeMatrix,
 
         // Misc.
-        MiscKill,
-        MiscReadClock,
+        Kill,
+        ReadClock,
 
         // Subgroup
-        SubgroupGetSubgroupSize,
+        GetSubgroupSize,
         SubgroupElect,
         SubgroupAll,
         SubgroupAny,
@@ -166,11 +166,11 @@ public:
                                      bool                isNonUniform,
                                      const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
-                                         const llvm::Twine&  instName) override final;
+    llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,
+                                            const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateBufferLength(llvm::Value* const pBufferDesc,
-                                    const llvm::Twine& instName = "") override final;
+    llvm::Value* CreateGetBufferDescLength(llvm::Value* const pBufferDesc,
+                                           const llvm::Twine& instName = "") override final;
 
     //
     // Builder methods implemented in BuilderImplMisc
@@ -180,7 +180,7 @@ public:
     llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
 
     // Builder methods implemented in BuilderImplMatrix
-    llvm::Value* CreateMatrixTranspose(llvm::Value* const pMatrix, const llvm::Twine& instName = "") override final;
+    llvm::Value* CreateTransposeMatrix(llvm::Value* const pMatrix, const llvm::Twine& instName = "") override final;
 
     //
     // Builder methods implemented in BuilderImplSubgroup
