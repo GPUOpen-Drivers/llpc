@@ -501,7 +501,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
     if (stage == ShaderStageInvalid)
     {
-        stage = pShaderInfo->stage;
+        stage = pShaderInfo->entryStage;
     }
 #endif
 
