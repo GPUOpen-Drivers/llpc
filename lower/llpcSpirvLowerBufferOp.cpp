@@ -628,14 +628,17 @@ void SpirvLowerBufferOp::visitCallInst(
         LLPC_ASSERT(isa<GlobalVariable>(pSrc));
         auto pBlockVarPtr = dyn_cast<GlobalVariable>(pSrc);
         MDNode* pResMetaNode = pBlockVarPtr->getMetadata(gSPIRVMD::Resource);
-        auto pDescSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0));
-        auto pBinding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1));
+        uint32_t descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
+        uint32_t binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
         auto pConstZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
-        auto pConstFalse = ConstantInt::get(m_pContext->BoolTy(), false);
-
-        Value* args[] = { pDescSet, pBinding, pConstZero, pConstFalse };
         auto pVec4Ty = m_pContext->Int32x4Ty();
-        auto pDesc = EmitCall(m_pModule, LlpcName::DescriptorLoadBuffer, pVec4Ty, args, NoAttrib, &callInst);
+
+        m_pBuilder->SetInsertPoint(&callInst);
+        Value* pDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
+                                                        binding,
+                                                        m_pBuilder->getInt32(0),      // index
+                                                        false,                        // isNonUniform
+                                                        nullptr);
         auto pStructTy = StructType::get(*m_pContext, { pVec4Ty, m_pContext->Int32Ty() });
         Value* pStruct = UndefValue::get(pStructTy);
         pStruct = InsertValueInst::Create(pStruct, pDesc, 0, "", &callInst);
