@@ -34,6 +34,7 @@ option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
 option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
 # None
+# This is just a test
 
 set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
 
