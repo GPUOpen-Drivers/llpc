@@ -501,17 +501,43 @@ Result Compiler::BuildPipelineInternal(
     raw_string_ostream ostream(hash);
     ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
     ostream.flush();
-    Timer wholeTimer("total", (Twine("LLPC Total ") + hash).str());
+
+    // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
+    // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
+    // compile multiple pipelines. so we add a dummy record to force all fields is shown.
+    // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
+    // in TimeRecord.
+    TimeRecord timeRecord;
+    struct HackedTimeRecord
+    {
+        double t1;
+        double t2;
+        double t3;
+        ssize_t m1;
+    } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
+    static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
+    memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
+
+    StringMap<TimeRecord> dummyTimeRecords;
+    if (TimePassesIsEnabled)
+    {
+        dummyTimeRecords["DUMMY"] = timeRecord;
+    }
+
+    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ") + hash).str(), dummyTimeRecords);
+    Timer wholeTimer("llpc-total", (Twine("LLPC Total ") + hash).str(), timerGroupTotal);
+
+    TimerGroup timerGroupPhases("llpc", (Twine("LLPC Phases ") + hash).str(), dummyTimeRecords);
+    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroupPhases);
+    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroupPhases);
+    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroupPhases);
+    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroupPhases);
+    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroupPhases);
+
     if (TimePassesIsEnabled)
     {
         wholeTimer.startTimer();
     }
-    TimerGroup timerGroup("llpc", (Twine("LLPC Phases ") + hash).str());
-    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroup);
-    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroup);
-    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroup);
-    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroup);
-    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroup);
 
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext);
