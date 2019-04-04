@@ -66,6 +66,58 @@ StringRef BuilderRecorder::GetCallName(
         return "desc.waterfall.loop";
     case Opcode::DescWaterfallStoreLoop:
         return "desc.waterfall.store.loop";
+    case SubgroupGetSubgroupSize:
+        return "subgroup.get.subgroup.size";
+    case SubgroupElect:
+        return "subgroup.elect";
+    case SubgroupAll:
+        return "subgroup.all";
+    case SubgroupAny:
+        return "subgroup.any";
+    case SubgroupAllEqual:
+        return "subgroup.all.equal";
+    case SubgroupBroadcast:
+        return "subgroup.broadcast";
+    case SubgroupBroadcastFirst:
+        return "subgroup.broadcast.first";
+    case SubgroupBallot:
+        return "subgroup.ballot";
+    case SubgroupInverseBallot:
+        return "subgroup.inverse.ballot";
+    case SubgroupBallotBitExtract:
+        return "subgroup.ballot.bit.extract";
+    case SubgroupBallotBitCount:
+        return "subgroup.ballot.bit.count";
+    case SubgroupBallotInclusiveBitCount:
+        return "subgroup.ballot.inclusive.bit.count";
+    case SubgroupBallotExclusiveBitCount:
+        return "subgroup.ballot.exclusive.bit.count";
+    case SubgroupBallotFindLsb:
+        return "subgroup.ballot.find.lsb";
+    case SubgroupBallotFindMsb:
+        return "subgroup.ballot.find.msb";
+    case SubgroupShuffle:
+        return "subgroup.shuffle";
+    case SubgroupShuffleXor:
+        return "subgroup.shuffle.xor";
+    case SubgroupShuffleUp:
+        return "subgroup.shuffle.up";
+    case SubgroupShuffleDown:
+        return "subgroup.shuffle.down";
+    case SubgroupClusteredReduction:
+        return "subgroup.clustered.reduction";
+    case SubgroupClusteredInclusive:
+        return "subgroup.clustered.inclusive";
+    case SubgroupClusteredExclusive:
+        return "subgroup.clustered.exclusive";
+    case SubgroupQuadBroadcast:
+        return "subgroup.quad.broadcast";
+    case SubgroupQuadSwapHorizontal:
+        return "subgroup.quad.swap.horizontal";
+    case SubgroupQuadSwapVertical:
+        return "subgroup.quad.swap.vertical";
+    case SubgroupQuadSwapDiagonal:
+        return "subgroup.quad.swap.diagonal";
     }
     LLPC_NEVER_CALLED();
     return "";
@@ -290,6 +342,271 @@ Value* BuilderRecorder::CreateLoadSpillTablePtr(
 {
     Type* pRetTy = PointerType::get(pSpillTableTy, ADDR_SPACE_CONST);
     return Record(Opcode::DescLoadSpillTablePtr, pRetTy, {}, instName);
+}
+
+// =====================================================================================================================
+// Create a get subgroup size query.
+Value* BuilderRecorder::CreateGetSubgroupSize(
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupGetSubgroupSize, getInt32Ty(), {}, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup elect.
+Value* BuilderRecorder::CreateSubgroupElect(
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupElect, getInt1Ty(), {}, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup all.
+Value* BuilderRecorder::CreateSubgroupAll(
+    Value* const pValue,   // [in] The value to compare
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupAll, getInt1Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup any
+Value* BuilderRecorder::CreateSubgroupAny(
+    Value* const pValue,   // [in] The value to compare
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupAny, getInt1Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup all equal.
+Value* BuilderRecorder::CreateSubgroupAllEqual(
+    Value* const pValue,   // [in] The value to compare
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupAllEqual, getInt1Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup broadcast.
+Value* BuilderRecorder::CreateSubgroupBroadcast(
+    Value* const pValue,   // [in] The value to broadcast
+    Value* const pIndex,   // [in] The index to broadcast from
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBroadcast, pValue->getType(), { pValue, pIndex }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup broadcast first.
+Value* BuilderRecorder::CreateSubgroupBroadcastFirst(
+    Value* const pValue,   // [in] The value to broadcast
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBroadcastFirst, pValue->getType(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup ballot.
+Value* BuilderRecorder::CreateSubgroupBallot(
+    Value* const pValue,   // [in] The value to contribute
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallot, VectorType::get(getInt32Ty(), 4), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup inverse ballot.
+Value* BuilderRecorder::CreateSubgroupInverseBallot(
+    Value* const pValue,   // [in] The ballot value
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupInverseBallot, getInt1Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup ballot bit extract.
+Value* BuilderRecorder::CreateSubgroupBallotBitExtract(
+    Value* const pValue,   // [in] The ballot value
+    Value* const pIndex,   // [in] The index to extract from the ballot
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallotBitExtract, getInt1Ty(), { pValue, pIndex }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup ballot bit count.
+Value* BuilderRecorder::CreateSubgroupBallotBitCount(
+    Value* const pValue,   // [in] The ballot value
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallotBitCount, getInt32Ty(), pValue, instName);
+}
+
+// Create a subgroup ballot inclusive bit count.
+Value* BuilderRecorder::CreateSubgroupBallotInclusiveBitCount(
+    Value* const pValue,   // [in] The ballot value
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallotInclusiveBitCount, getInt32Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup ballot exclusive bit count.
+Value* BuilderRecorder::CreateSubgroupBallotExclusiveBitCount(
+    Value* const pValue,   // [in] The ballot value
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallotExclusiveBitCount, getInt32Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup ballot find least significant bit.
+Value* BuilderRecorder::CreateSubgroupBallotFindLsb(
+    Value* const pValue,   // [in] The ballot value
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallotFindLsb, getInt32Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup ballot find most significant bit.
+Value* BuilderRecorder::CreateSubgroupBallotFindMsb(
+    Value* const pValue,   // [in] The ballot value
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupBallotFindMsb, getInt32Ty(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup shuffle.
+Value* BuilderRecorder::CreateSubgroupShuffle(
+    Value* const pValue,   // [in] The value to shuffle
+    Value* const pIndex,   // [in] The index to shuffle from
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupShuffle, pValue->getType(), { pValue, pIndex }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup shuffle xor.
+Value* BuilderRecorder::CreateSubgroupShuffleXor(
+    Value* const pValue,   // [in] The value to shuffle
+    Value* const pMask,    // [in] The mask to shuffle with
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupShuffleXor, pValue->getType(), { pValue, pMask }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup shuffle up.
+Value* BuilderRecorder::CreateSubgroupShuffleUp(
+    Value* const pValue,   // [in] The value to shuffle
+    Value* const pOffset,  // [in] The offset to shuffle up to
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupShuffleUp, pValue->getType(), { pValue, pOffset }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup shuffle down.
+Value* BuilderRecorder::CreateSubgroupShuffleDown(
+    Value* const pValue,   // [in] The value to shuffle
+    Value* const pOffset,  // [in] The offset to shuffle down to
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupShuffleDown, pValue->getType(), { pValue, pOffset }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup clustered reduction.
+Value* BuilderRecorder::CreateSubgroupClusteredReduction(
+    GroupArithOp groupArithOp, // The group operation to perform
+    Value* const pValue,       // [in] The value to perform on
+    Value* const pClusterSize, // [in] The cluster size
+    const Twine& instName)     // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupClusteredReduction,
+                  pValue->getType(),
+                  {
+                      getInt32(groupArithOp),
+                      pValue,
+                      pClusterSize
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup clustered inclusive scan.
+Value* BuilderRecorder::CreateSubgroupClusteredInclusive(
+    GroupArithOp groupArithOp, // The group operation to perform
+    Value* const pValue,       // [in] The value to perform on
+    Value* const pClusterSize, // [in] The cluster size
+    const Twine& instName)     // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupClusteredInclusive,
+                  pValue->getType(),
+                  {
+                      getInt32(groupArithOp),
+                      pValue,
+                      pClusterSize
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup clustered exclusive scan.
+Value* BuilderRecorder::CreateSubgroupClusteredExclusive(
+    GroupArithOp groupArithOp, // The group operation to perform
+    Value* const pValue,       // [in] The value to perform on
+    Value* const pClusterSize, // [in] The cluster size
+    const Twine& instName)     // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupClusteredExclusive,
+                  pValue->getType(),
+                  {
+                      getInt32(groupArithOp),
+                      pValue,
+                      pClusterSize
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup quad broadcast.
+Value* BuilderRecorder::CreateSubgroupQuadBroadcast(
+    Value* const pValue,   // [in] The value to broadcast
+    Value* const pIndex,   // [in] The index within the quad to broadcast from
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupQuadBroadcast, pValue->getType(), { pValue, pIndex }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup quad swap horizontal.
+Value* BuilderRecorder::CreateSubgroupQuadSwapHorizontal(
+    Value* const pValue,   // [in] The value to swap
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupQuadSwapHorizontal, pValue->getType(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup quad swap vertical.
+Value* BuilderRecorder::CreateSubgroupQuadSwapVertical(
+    Value* const pValue,   // [in] The value to swap
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupQuadSwapVertical, pValue->getType(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup quad swap diagonal.
+Value* BuilderRecorder::CreateSubgroupQuadSwapDiagonal(
+    Value* const pValue,   // [in] The value to swap
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupQuadSwapDiagonal, pValue->getType(), pValue, instName);
 }
 
 // =====================================================================================================================

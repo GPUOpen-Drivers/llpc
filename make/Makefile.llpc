@@ -68,6 +68,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcBuilderImpl.cpp                 \
         llpcBuilderImplDesc.cpp             \
         llpcBuilderImplMisc.cpp             \
+        llpcBuilderImplSubgroup.cpp         \
         llpcBuilderRecorder.cpp             \
         llpcBuilderReplayer.cpp
 

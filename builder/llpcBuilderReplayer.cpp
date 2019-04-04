@@ -367,6 +367,118 @@ Value* BuilderReplayer::ProcessCall(
             bool realtime = (cast<ConstantInt>(args[0])->getZExtValue() != 0);
             return m_pBuilder->CreateReadClock(realtime);
         }
+
+    // Replayer implementations of BuilderImplSubgroup methods
+    case BuilderRecorder::Opcode::SubgroupGetSubgroupSize:
+        {
+            return m_pBuilder->CreateGetSubgroupSize();
+        }
+    case BuilderRecorder::Opcode::SubgroupElect:
+        {
+            return m_pBuilder->CreateSubgroupElect();
+        }
+    case BuilderRecorder::Opcode::SubgroupAll:
+        {
+            return m_pBuilder->CreateSubgroupAll(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupAny:
+        {
+            return m_pBuilder->CreateSubgroupAny(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupAllEqual:
+        {
+            return m_pBuilder->CreateSubgroupAllEqual(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBroadcast:
+        {
+            return m_pBuilder->CreateSubgroupBroadcast(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBroadcastFirst:
+        {
+            return m_pBuilder->CreateSubgroupBroadcastFirst(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallot:
+        {
+            return m_pBuilder->CreateSubgroupBallot(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupInverseBallot:
+        {
+            return m_pBuilder->CreateSubgroupInverseBallot(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallotBitExtract:
+        {
+            return m_pBuilder->CreateSubgroupBallotBitExtract(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallotBitCount:
+        {
+            return m_pBuilder->CreateSubgroupBallotBitCount(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallotInclusiveBitCount:
+        {
+            return m_pBuilder->CreateSubgroupBallotInclusiveBitCount(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallotExclusiveBitCount:
+        {
+            return m_pBuilder->CreateSubgroupBallotExclusiveBitCount(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallotFindLsb:
+        {
+            return m_pBuilder->CreateSubgroupBallotFindLsb(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupBallotFindMsb:
+        {
+            return m_pBuilder->CreateSubgroupBallotFindMsb(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupShuffle:
+        {
+            return m_pBuilder->CreateSubgroupShuffle(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupShuffleXor:
+        {
+            return m_pBuilder->CreateSubgroupShuffleXor(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupShuffleUp:
+        {
+            return m_pBuilder->CreateSubgroupShuffleUp(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupShuffleDown:
+        {
+            return m_pBuilder->CreateSubgroupShuffleDown(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupClusteredReduction:
+        {
+            Builder::GroupArithOp groupArithOp =
+                static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
+            return m_pBuilder->CreateSubgroupClusteredReduction(groupArithOp, args[1], args[2]);
+        }
+    case BuilderRecorder::Opcode::SubgroupClusteredInclusive:
+        {
+            Builder::GroupArithOp groupArithOp =
+                static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
+            return m_pBuilder->CreateSubgroupClusteredInclusive(groupArithOp, args[1], args[2]);
+        }
+    case BuilderRecorder::Opcode::SubgroupClusteredExclusive:
+        {
+            Builder::GroupArithOp groupArithOp =
+                static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
+            return m_pBuilder->CreateSubgroupClusteredExclusive(groupArithOp, args[1], args[2]);
+        }
+    case BuilderRecorder::Opcode::SubgroupQuadBroadcast:
+        {
+            return m_pBuilder->CreateSubgroupQuadBroadcast(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupQuadSwapHorizontal:
+        {
+            return m_pBuilder->CreateSubgroupQuadSwapHorizontal(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupQuadSwapVertical:
+        {
+            return m_pBuilder->CreateSubgroupQuadSwapVertical(args[0]);
+        }
+    case BuilderRecorder::Opcode::SubgroupQuadSwapDiagonal:
+        {
+            return m_pBuilder->CreateSubgroupQuadSwapDiagonal(args[0]);
+        }
     }
 }
 
