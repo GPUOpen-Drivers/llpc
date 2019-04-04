@@ -207,6 +207,7 @@ target_sources(llpc PRIVATE
     builder/llpcBuilderImpl.cpp
     builder/llpcBuilderImplDesc.cpp
     builder/llpcBuilderImplMisc.cpp
+    builder/llpcBuilderImplSubgroup.cpp
     builder/llpcBuilderRecorder.cpp
     builder/llpcBuilderReplayer.cpp
 )

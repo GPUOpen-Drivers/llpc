@@ -40,3 +40,10 @@ Context& BuilderImplBase::getContext() const
 {
     return *static_cast<Llpc::Context*>(&Builder::getContext());
 }
+
+// =====================================================================================================================
+// Get whether the context we are building in supports DPP operations.
+bool BuilderImplBase::SupportDpp() const
+{
+    return getContext().GetGfxIpVersion().major >= 8;
+}

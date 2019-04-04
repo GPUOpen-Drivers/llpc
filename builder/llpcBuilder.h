@@ -131,6 +131,25 @@ inline static void InitializeBuilderPasses(
 class Builder : public llvm::IRBuilder<>
 {
 public:
+    // The group arithmetic operations the builder can consume.
+    // NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
+    enum GroupArithOp
+    {
+        IAdd,
+        FAdd,
+        IMul,
+        FMul,
+        SMin,
+        UMin,
+        FMin,
+        SMax,
+        UMax,
+        FMax,
+        And,
+        Or,
+        Xor
+    };
+
     virtual ~Builder();
 
     // Create the BuilderImpl. In this implementation, each Builder call writes its IR immediately.
@@ -239,12 +258,167 @@ public:
         bool                realtime,           // Whether to read real-time clock counter
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    //
+    // Methods implemented in BuilderImplSubgroup:
+    //
+
+    // Create a get subgroup size query.
+    virtual llvm::Value* CreateGetSubgroupSize(
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup elect.
+    virtual llvm::Value* CreateSubgroupElect(
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup all.
+    virtual llvm::Value* CreateSubgroupAll(
+        llvm::Value* const pValue,             // [in] The value to compare
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup any
+    virtual llvm::Value* CreateSubgroupAny(
+        llvm::Value* const pValue,             // [in] The value to compare
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup all equal.
+    virtual llvm::Value* CreateSubgroupAllEqual(
+        llvm::Value* const pValue,             // [in] The value to compare
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup broadcast.
+    virtual llvm::Value* CreateSubgroupBroadcast(
+        llvm::Value* const pValue,             // [in] The value to broadcast
+        llvm::Value* const pIndex,             // [in] The index to broadcast from
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup broadcast first.
+    virtual llvm::Value* CreateSubgroupBroadcastFirst(
+        llvm::Value* const pValue,             // [in] The value to broadcast
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot.
+    virtual llvm::Value* CreateSubgroupBallot(
+        llvm::Value* const pValue,             // [in] The value to contribute
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup inverse ballot.
+    virtual llvm::Value* CreateSubgroupInverseBallot(
+        llvm::Value* const pValue,             // [in] The ballot value
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot bit extract.
+    virtual llvm::Value* CreateSubgroupBallotBitExtract(
+        llvm::Value* const pValue,             // [in] The ballot value
+        llvm::Value* const pIndex,             // [in] The index to extract from the ballot
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot bit count.
+    virtual llvm::Value* CreateSubgroupBallotBitCount(
+        llvm::Value* const pValue,             // [in] The ballot value
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot inclusive bit count.
+    virtual llvm::Value* CreateSubgroupBallotInclusiveBitCount(
+        llvm::Value* const pValue,             // [in] The ballot value
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot exclusive bit count.
+    virtual llvm::Value* CreateSubgroupBallotExclusiveBitCount(
+        llvm::Value* const pValue,             // [in] The ballot value
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot find least significant bit.
+    virtual llvm::Value* CreateSubgroupBallotFindLsb(
+        llvm::Value* const pValue,             // [in] The ballot value
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup ballot find most significant bit.
+    virtual llvm::Value* CreateSubgroupBallotFindMsb(
+        llvm::Value* const pValue,             // [in] The ballot value
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup shuffle.
+    virtual llvm::Value* CreateSubgroupShuffle(
+        llvm::Value* const pValue,             // [in] The value to shuffle
+        llvm::Value* const pIndex,             // [in] The index to shuffle from
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup shuffle xor.
+    virtual llvm::Value* CreateSubgroupShuffleXor(
+        llvm::Value* const pValue,             // [in] The value to shuffle
+        llvm::Value* const pMask,              // [in] The mask to shuffle with
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup shuffle up.
+    virtual llvm::Value* CreateSubgroupShuffleUp(
+        llvm::Value* const pValue,             // [in] The value to shuffle
+        llvm::Value* const pDelta,             // [in] The delta to shuffle up to
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup shuffle down.
+    virtual llvm::Value* CreateSubgroupShuffleDown(
+        llvm::Value* const pValue,             // [in] The value to shuffle
+        llvm::Value* const pDelta,             // [in] The delta to shuffle down to
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup clustered reduction.
+    virtual llvm::Value* CreateSubgroupClusteredReduction(
+        GroupArithOp       groupArithOp,       // The group arithmetic operation to perform
+        llvm::Value* const pValue,             // [in] The value to perform on
+        llvm::Value* const pClusterSize,       // [in] The cluster size
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup clustered inclusive scan.
+    virtual llvm::Value* CreateSubgroupClusteredInclusive(
+        GroupArithOp       groupArithOp,       // The group arithmetic operation to perform
+        llvm::Value* const pValue,             // [in] The value to perform on
+        llvm::Value* const pClusterSize,       // [in] The cluster size
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup clustered exclusive scan.
+    virtual llvm::Value* CreateSubgroupClusteredExclusive(
+        GroupArithOp       groupArithOp,       // The group arithmetic operation to perform
+        llvm::Value* const pValue,             // [in] The value to perform on
+        llvm::Value* const pClusterSize,       // [in] The cluster size
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup quad broadcast.
+    virtual llvm::Value* CreateSubgroupQuadBroadcast(
+        llvm::Value* const pValue,             // [in] The value to broadcast
+        llvm::Value* const pIndex,             // [in] the index within the quad to broadcast from
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup quad swap horizontal.
+    virtual llvm::Value* CreateSubgroupQuadSwapHorizontal(
+        llvm::Value* const pValue,             // [in] The value to swap
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup quad swap vertical.
+    virtual llvm::Value* CreateSubgroupQuadSwapVertical(
+        llvm::Value* const pValue,             // [in] The value to swap
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup quad swap diagonal.
+    virtual llvm::Value* CreateSubgroupQuadSwapDiagonal(
+        llvm::Value* const pValue,             // [in] The value to swap
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
 protected:
     Builder(llvm::LLVMContext& context) : llvm::IRBuilder<>(context) {}
 
     // -----------------------------------------------------------------------------------------------------------------
 
     ShaderStage m_shaderStage = ShaderStageInvalid;   // Current shader stage being built.
+
+    typedef llvm::Value* (*PFN_MapToInt32Func)(Builder&                     builder,
+                                               llvm::ArrayRef<llvm::Value*> mappedArgs,
+                                               llvm::ArrayRef<llvm::Value*> passthroughArgs);
+
+    // Create a call that'll map the massage arguments to an i32 type (for functions that only take i32).
+    llvm::Value* CreateMapToInt32(
+        PFN_MapToInt32Func           pfnMapFunc,       // [in] Pointer to the function to call on each i32.
+        llvm::ArrayRef<llvm::Value*> mappedArgs,       // The arguments to massage into an i32 type.
+        llvm::ArrayRef<llvm::Value*> passthroughArgs); // The arguments to pass-through without massaging.
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)

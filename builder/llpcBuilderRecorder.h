@@ -78,6 +78,34 @@ public:
         // Misc.
         MiscKill,
         MiscReadClock,
+
+        // Subgroup
+        SubgroupGetSubgroupSize,
+        SubgroupElect,
+        SubgroupAll,
+        SubgroupAny,
+        SubgroupAllEqual,
+        SubgroupBroadcast,
+        SubgroupBroadcastFirst,
+        SubgroupBallot,
+        SubgroupInverseBallot,
+        SubgroupBallotBitExtract,
+        SubgroupBallotBitCount,
+        SubgroupBallotInclusiveBitCount,
+        SubgroupBallotExclusiveBitCount,
+        SubgroupBallotFindLsb,
+        SubgroupBallotFindMsb,
+        SubgroupShuffle,
+        SubgroupShuffleXor,
+        SubgroupShuffleUp,
+        SubgroupShuffleDown,
+        SubgroupClusteredReduction,
+        SubgroupClusteredInclusive,
+        SubgroupClusteredExclusive,
+        SubgroupQuadBroadcast,
+        SubgroupQuadSwapHorizontal,
+        SubgroupQuadSwapVertical,
+        SubgroupQuadSwapDiagonal,
     };
 
     // Given an opcode, get the call name (without the "llpc.call." prefix)
@@ -144,6 +172,74 @@ public:
 
     llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override final;
     llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
+
+    //
+    // Builder methods implemented in BuilderImplSubgroup
+    //
+
+    llvm::Value* CreateGetSubgroupSize(const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupElect(const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupAll(llvm::Value* const pValue,
+                                   const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupAny(llvm::Value* const pValue,
+                                   const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupAllEqual(llvm::Value* const pValue,
+                                        const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBroadcast(llvm::Value* const pValue,
+                                         llvm::Value* const pIndex,
+                                         const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBroadcastFirst(llvm::Value* const pValue,
+                                              const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallot(llvm::Value* const pValue,
+                                      const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupInverseBallot(llvm::Value* const pValue,
+                                             const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallotBitExtract(llvm::Value* const pValue,
+                                                llvm::Value* const pIndex,
+                                                const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallotBitCount(llvm::Value* const pValue,
+                                              const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallotInclusiveBitCount(llvm::Value* const pValue,
+                                                       const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallotExclusiveBitCount(llvm::Value* const pValue,
+                                                       const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallotFindLsb(llvm::Value* const pValue,
+                                             const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupBallotFindMsb(llvm::Value* const pValue,
+                                             const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupShuffle(llvm::Value* const pValue,
+                                       llvm::Value* const pIndex,
+                                       const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupShuffleXor(llvm::Value* const pValue,
+                                          llvm::Value* const pMask,
+                                          const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupShuffleUp(llvm::Value* const pValue,
+                                         llvm::Value* const pDelta,
+                                         const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupShuffleDown(llvm::Value* const pValue,
+                                           llvm::Value* const pDelta,
+                                           const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupClusteredReduction(GroupArithOp       groupArithOp,
+                                                  llvm::Value* const pValue,
+                                                  llvm::Value* const pClusterSize,
+                                                  const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupClusteredInclusive(GroupArithOp       groupArithOp,
+                                                  llvm::Value* const pValue,
+                                                  llvm::Value* const pClusterSize,
+                                                  const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupClusteredExclusive(GroupArithOp       groupArithOp,
+                                                  llvm::Value* const pValue,
+                                                  llvm::Value* const pClusterSize,
+                                                  const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupQuadBroadcast(llvm::Value* const pValue,
+                                             llvm::Value* const pIndex,
+                                             const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupQuadSwapHorizontal(llvm::Value* const pValue,
+                                                  const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupQuadSwapVertical(llvm::Value* const pValue,
+                                                const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupQuadSwapDiagonal(llvm::Value* const pValue,
+                                                const llvm::Twine& instName) override final;
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
     llvm::ModulePass* CreateBuilderReplayer() override;

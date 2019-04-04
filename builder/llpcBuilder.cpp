@@ -163,3 +163,117 @@ Module* Builder::Link(
     return pPipelineModule;
 }
 
+// =====================================================================================================================
+// Create a map to i32 function. Many AMDGCN intrinsics only take i32's, so we need to massage input data into an i32
+// to allow us to call these intrinsics. This helper takes a function pointer, massage arguments, and passthrough
+// arguments and massages the mappedArgs into i32's before calling the function pointer. Note that all massage
+// arguments must have the same type.
+Value* Builder::CreateMapToInt32(
+    PFN_MapToInt32Func pfnMapFunc,      // [in] The function to call on each provided i32.
+    ArrayRef<Value*>   mappedArgs,      // The arguments to be massaged into i32's and passed to function.
+    ArrayRef<Value*>   passthroughArgs) // The arguments to be passed through as is (no massaging).
+{
+    // We must have at least one argument to massage.
+    LLPC_ASSERT(mappedArgs.size() > 0);
+
+    Type* const pType = mappedArgs[0]->getType();
+
+    // Check the massage types all match.
+    for (uint32_t i = 1; i < mappedArgs.size(); i++)
+    {
+        LLPC_ASSERT(mappedArgs[i]->getType() == pType);
+    }
+
+    if (mappedArgs[0]->getType()->isVectorTy())
+    {
+        // For vectors we extract each vector component and map them individually.
+        const uint32_t compCount = pType->getVectorNumElements();
+
+        SmallVector<Value*, 4> results;
+
+        for (uint32_t i = 0; i < compCount; i++)
+        {
+            SmallVector<Value*, 4> newMappedArgs;
+
+            for (Value* const pMappedArg : mappedArgs)
+            {
+                newMappedArgs.push_back(CreateExtractElement(pMappedArg, i));
+            }
+
+            results.push_back(CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs));
+        }
+
+        Value* pResult = UndefValue::get(VectorType::get(results[0]->getType(), compCount));
+
+        for (uint32_t i = 0; i < compCount; i++)
+        {
+            pResult = CreateInsertElement(pResult, results[i], i);
+        }
+
+        return pResult;
+    }
+    else if (pType->isIntegerTy() && pType->getIntegerBitWidth() < 32)
+    {
+        SmallVector<Value*, 4> newMappedArgs;
+
+        Type* const pVectorType = VectorType::get(pType, (pType->getPrimitiveSizeInBits() == 16) ? 2 : 4);
+        Value* const pUndef = UndefValue::get(pVectorType);
+
+        for (Value* const pMappedArg : mappedArgs)
+        {
+            Value* const pNewMappedArg = CreateInsertElement(pUndef, pMappedArg, static_cast<uint64_t>(0));
+            newMappedArgs.push_back(CreateBitCast(pNewMappedArg, getInt32Ty()));
+        }
+
+        Value* const pResult = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
+        return CreateExtractElement(CreateBitCast(pResult, pVectorType), static_cast<uint64_t>(0));
+    }
+    else if (pType->getPrimitiveSizeInBits() == 64)
+    {
+        SmallVector<Value*, 4> castMappedArgs;
+
+        for (Value* const pMappedArg : mappedArgs)
+        {
+            castMappedArgs.push_back(CreateBitCast(pMappedArg, VectorType::get(getInt32Ty(), 2)));
+        }
+
+        Value* pResult = UndefValue::get(castMappedArgs[0]->getType());
+
+        for (uint32_t i = 0; i < 2; i++)
+        {
+            SmallVector<Value*, 4> newMappedArgs;
+
+            for (Value* const pCastMappedArg : castMappedArgs)
+            {
+                newMappedArgs.push_back(CreateExtractElement(pCastMappedArg, i));
+            }
+
+            Value* const pResultComp = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
+
+            pResult = CreateInsertElement(pResult, pResultComp, i);
+        }
+
+        return CreateBitCast(pResult, pType);
+    }
+    else if (pType->isFloatingPointTy())
+    {
+        SmallVector<Value*, 4> newMappedArgs;
+
+        for (Value* const pMappedArg : mappedArgs)
+        {
+            newMappedArgs.push_back(CreateBitCast(pMappedArg, getIntNTy(pMappedArg->getType()->getPrimitiveSizeInBits())));
+        }
+
+        Value* const pResult = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
+        return CreateBitCast(pResult, pType);
+    }
+    else if (pType->isIntegerTy(32))
+    {
+        return pfnMapFunc(*this, mappedArgs, passthroughArgs);
+    }
+    else
+    {
+        LLPC_NEVER_CALLED();
+        return nullptr;
+    }
+}
