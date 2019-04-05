@@ -42,6 +42,22 @@ class Function;
 class Module;
 } // llvm
 
+namespace std
+{
+
+template<>
+struct hash<llvm::StringRef>
+{
+    typedef llvm::StringRef argument_type;
+    typedef std::size_t result_type;
+    result_type operator()(argument_type const& str) const noexcept
+    {
+        return llvm::hash_value(str);
+    }
+};
+
+} // std
+
 namespace Llpc
 {
 class Context;
@@ -67,7 +83,7 @@ class EmuLib
     struct EmuLibArchive
     {
         std::unique_ptr<llvm::object::Archive> archive;       // The bitcode archive
-        std::map<llvm::StringRef, EmuLibFunction> functions;  // Store of already-parsed functions from this archive
+        std::unordered_map<llvm::StringRef, EmuLibFunction> functions;  // Store of already-parsed functions from this archive
 
         EmuLibArchive(std::unique_ptr<llvm::object::Archive> archive) : archive(std::move(archive)) {}
     };
@@ -75,7 +91,7 @@ class EmuLib
     Context* pContext;                                    // The LLPC context
     std::vector<EmuLibArchive> m_archives;                // Bitcode archives that make up this EmuLib
     std::vector<std::unique_ptr<llvm::Module>> m_modules; // Modules that have been parsed out of archives
-    std::map<llvm::StringRef, size_t> m_symbolIndices;    // All available symbols in this EmuLib and the indices
+    std::unordered_map<llvm::StringRef, size_t> m_symbolIndices;    // All available symbols in this EmuLib and the indices
                                                           // in m_archives
 public:
     EmuLib(Context* pContext) : pContext(pContext) {}
