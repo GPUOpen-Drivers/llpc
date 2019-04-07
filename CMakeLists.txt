@@ -34,6 +34,8 @@ option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
 option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 # None
 
+set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+
 ### Compiler Options ###################################################################################################
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -561,5 +563,10 @@ if(ICD_BUILD_LLPC)
     if(EXISTS ${XGL_SPVGEN_PATH})
         add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
     endif()
+endif()
+
+# Lit tests
+if(ICD_BUILD_LLPC)
+    add_subdirectory(test)
 endif()
 
