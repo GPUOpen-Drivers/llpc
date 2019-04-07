@@ -135,12 +135,26 @@ cd builds/Release64
 make -j$(nproc)
 ```
 
-Then, run the test with below instructions:
+Now, the tests can be run in the same directory using:
 ```
-cd <vulkandriver_path>/drivers/llpc/test 
-cmake . -B../build -DLLVM_DIR=<vulkandriver_path>/drivers/xgl/builds/Release64/llvm/lib/cmake/llvm -DAMDLLPC_DIR=<vulkandriver_path>/drivers/xgl/builds/Release64/llpc
-cd ../build
-make test
+make -j$(nproc) check-amdllpc
+```
+
+That command (re)builds amdllpc and spvgen.so if necessary. If the spvgen.so build fails with
+an error like this:
+```
+drivers/spvgen/source/spvgen.cpp:51:10: fatal error: doc.h: No such file or directory
+```
+
+then you need to fetch the external sources (glslang and SPIRV-Tools) used by SPVGEN:
+```
+(cd ../../../spvgen/external && python fetch_external_sources.py)
+```
+and then retry the `check-amdllpc`.
+
+When you need to investigate a test failure, run a single test from that same build directory like this example:
+```
+llvm/bin/llvm-lit -v llpc/test/shaderdb/OpAtomicIIncrement_TestVariablePointer_lit.spvas
 ```
 
 ## Third Party Software  
