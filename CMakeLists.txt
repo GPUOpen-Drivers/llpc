@@ -426,6 +426,11 @@ add_library(vfx STATIC "")
 
 target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 
+if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
+    target_compile_definitions(vfx PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
+    target_compile_definitions(vfx PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+endif()
+
 target_sources(vfx PRIVATE
     tool/vfx/vfxParser.cpp
     tool/vfx/vfxPipelineDoc.cpp

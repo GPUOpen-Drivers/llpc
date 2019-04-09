@@ -13,7 +13,7 @@
 **
 ** MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS KHRONOS
 ** STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS SPECIFICATIONS AND
-** HEADER INFORMATION ARE LOCATED AT https://www.khronos.org/registry/ 
+** HEADER INFORMATION ARE LOCATED AT https://www.khronos.org/registry/
 **
 ** THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 ** OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -65,7 +65,7 @@ enum Entrypoints {
     Fmax = 27,
     Fmin = 28,
     Fmod = 29,
-    Fract = 30, 
+    Fract = 30,
     Frexp = 31,
     Hypot = 32,
     Ilogb = 33,
@@ -130,28 +130,28 @@ enum Entrypoints {
     Native_sin = 92,
     Native_sqrt = 93,
     Native_tan = 94,
-    
+
     // Common
     FClamp = 95,
     Degrees = 96,
     FMax_common = 97,
-    FMin_common = 98, 
+    FMin_common = 98,
     Mix = 99,
     Radians = 100,
     Step = 101,
     Smoothstep = 102,
     Sign = 103,
-    
+
     // Geometrics
     Cross = 104,
-    Distance = 105, 
+    Distance = 105,
     Length = 106,
     Normalize = 107,
     Fast_distance = 108,
     Fast_length = 109,
     Fast_normalize = 110,
 
-    // Images - Deprecated 
+    // Images - Deprecated
     Read_imagef = 111,
     Read_imagei = 112,
     Read_imageui = 113,
@@ -188,7 +188,7 @@ enum Entrypoints {
     Get_image_array_size = 138,
     Get_image_num_samples = 139,
     Get_image_num_mip_levels = 140,
-    
+
     // Integers
     SAbs = 141,
     SAbs_diff = 142,
@@ -199,9 +199,9 @@ enum Entrypoints {
     SRhadd = 147,
     URhadd = 148,
     SClamp = 149,
-    UClamp = 150, 
+    UClamp = 150,
     Clz = 151,
-    Ctz = 152,    
+    Ctz = 152,
     SMad_hi = 153,
     UMad_sat = 154,
     SMad_sat = 155,
@@ -234,18 +234,18 @@ enum Entrypoints {
     Vstorea_halfn = 180,
     Vstorea_halfn_r = 181,
 
-    // Vector Misc 
+    // Vector Misc
     Shuffle = 182,
     Shuffle2 = 183,
 
-    // 
+    //
     Printf = 184,
     Prefetch = 185,
-    
+
     // Relationals
     Bitselect = 186,
     Select = 187,
-        
+
     // pipes
     Read_pipe = 188,
     Write_pipe = 189,
@@ -260,7 +260,7 @@ enum Entrypoints {
     Work_group_commit_write_pipe = 198,
     Get_pipe_num_packets = 199,
     Get_pipe_max_packets = 200,
-    
+
     // more integers
     UAbs = 201,
     UAbs_diff = 202,

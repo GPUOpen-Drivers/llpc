@@ -174,15 +174,6 @@ inline bool isIntelSubgroupOpCode(Op OpCode) {
   return OpSubgroupShuffleINTEL <= OC && OC <= OpSubgroupImageBlockWriteINTEL;
 }
 
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-inline bool isAnisoLodOpCode(Op OpCode) {
-  return (OpCode == OpImageSampleAnisoLodAMD)     ||
-         (OpCode == OpImageSampleDrefAnisoLodAMD) ||
-         (OpCode == OpImageGatherAnisoLodAMD)     ||
-         (OpCode == OpImageDrefGatherAnisoLodAMD);
-}
-#endif
-
 } // namespace SPIRV
 
 #endif // SPIRV_LIBSPIRV_SPIRVOPCODE_H

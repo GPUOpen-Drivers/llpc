@@ -33,6 +33,7 @@
 #include "llvm/IR/InstVisitor.h"
 
 #include "llpcPatch.h"
+#include "llpcPipelineShaders.h"
 #include <unordered_set>
 
 namespace Llpc
@@ -47,7 +48,13 @@ class PatchGroupOp :
 public:
     PatchGroupOp();
 
-    virtual bool runOnModule(llvm::Module& module);
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+    }
+
+    virtual bool runOnModule(llvm::Module& module) override;
     virtual void visitCallInst(llvm::CallInst& callInst);
 
     // -----------------------------------------------------------------------------------------------------------------

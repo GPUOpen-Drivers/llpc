@@ -211,12 +211,6 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityImageGatherBiasLodAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityFragmentMaskAMD, { CapabilityShader });
   ADD_VEC_INIT(CapabilityFloat16ImageAMD, { CapabilityShader });
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-  ADD_VEC_INIT(CapabilityPropertyIdAttachmentAMD, { CapabilityShader });
-#endif
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  ADD_VEC_INIT(CapabilityAnisotropicLodCompensationAMD, { CapabilityShader });
-#endif
   ADD_VEC_INIT(CapabilityVariablePointersStorageBuffer, { CapabilityShader });
   ADD_VEC_INIT(CapabilityVariablePointers, { CapabilityVariablePointersStorageBuffer });
   ADD_VEC_INIT(CapabilityShaderNonUniformEXT, { CapabilityShader });
@@ -445,9 +439,6 @@ template <> inline void SPIRVMap<BuiltIn, SPIRVCapVec>::init() {
   ADD_VEC_INIT(BuiltInSubgroupLtMaskKHR, { CapabilitySubgroupBallotKHR });
   ADD_VEC_INIT(BuiltInDeviceIndex, { CapabilityDeviceGroup });
   ADD_VEC_INIT(BuiltInViewIndex, { CapabilityMultiView });
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-  ADD_VEC_INIT(BuiltInPropertyIdAMD, { CapabilityPropertyIdAttachmentAMD });
-#endif
 }
 
 template <> inline void SPIRVMap<MemorySemanticsMask, SPIRVCapVec>::init() {

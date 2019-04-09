@@ -2407,12 +2407,6 @@ _SPIRV_OP(ImageSparseDrefGather, true, 6, true, 3)
 _SPIRV_OP(ImageSparseRead, true, 5, true, 2)
 _SPIRV_OP(FragmentMaskFetchAMD, true, 5)
 _SPIRV_OP(FragmentFetchAMD, true, 6)
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-_SPIRV_OP(ImageSampleAnisoLodAMD, true, 6, true, 2)
-_SPIRV_OP(ImageSampleDrefAnisoLodAMD, true, 6, true, 3)
-_SPIRV_OP(ImageGatherAnisoLodAMD, true, 6, true, 3)
-_SPIRV_OP(ImageDrefGatherAnisoLodAMD, true, 6, true, 3)
-#endif
 #undef _SPIRV_OP
 
 // SpecConstantOp instruction
@@ -2458,9 +2452,6 @@ _SPIRV_OP(SubgroupReadInvocationKHR, true, 5, false)
 _SPIRV_OP(SubgroupAllKHR, true, 4, false)
 _SPIRV_OP(SubgroupAnyKHR, true, 4, false)
 _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
-#if VKI_KHR_SHADER_CLOCK
-_SPIRV_OP(ReadClockKHR, true, 4)
-#endif
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase:public SPIRVInstTemplateBase {
 protected:

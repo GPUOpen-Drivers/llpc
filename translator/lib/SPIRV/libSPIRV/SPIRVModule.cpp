@@ -658,7 +658,7 @@ SPIRVEntryPoint* SPIRVModuleImpl::getEntryPoint(SPIRVId EP) const {
   return nullptr;
 }
 
-SPIRVEntryPoint* 
+SPIRVEntryPoint*
 SPIRVModuleImpl::getEntryPoint(SPIRVExecutionModelKind ExecModel,
                                const char *Name) const {
   for (auto EntryPoint : EntryPointVec) {
@@ -1386,7 +1386,6 @@ spv_ostream &operator<<(spv_ostream &O, SPIRVModule &M) {
     O << SPIRVExtInstImport(&M, I.first, SPIRVBuiltinSetNameMap::map(I.second));
 
   O << SPIRVMemoryModel(&M);
-
 
   for (auto &I:MI.EntryPointVec)
       O << *I;

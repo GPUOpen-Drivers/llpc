@@ -49,8 +49,9 @@
 //* @page VersionHistory
 //* %Version History
 //* | %Version | Change Description                                                                                    |
-//* |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions. 
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
+//* |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions.                                           |
 //* |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
 //* |     22.0 | Internal revision.                                                                                    |
 //* |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.   |
@@ -226,6 +227,9 @@ struct PipelineOptions
     bool robustBufferAccess;  ///< If set, out of bounds accesses to buffer or private array will be handled.
                               ///  for now this option is used by LLPC shader and affects only the private array,
                               ///  the out of bounds accesses will be skipped with this setting.
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25
+    bool includeIrBinary;     ///< If set, the IR binary for all compiled shaders will be included in the pipeline ELF.
 #endif
 };
 

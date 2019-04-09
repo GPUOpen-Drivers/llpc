@@ -72,7 +72,16 @@ bool PatchGroupOp::runOnModule(
     m_changed = false;
 
     // Invoke handling of "callInst" instruction
-    visit(m_pModule);
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
+    {
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStage(shaderStage));
+        if (m_pEntryPoint != nullptr)
+        {
+            m_shaderStage = ShaderStage(shaderStage);
+            visit(*m_pEntryPoint);
+        }
+    }
 
     // Remove replaced "call" instructions
     for (auto pGroupCall : m_groupCalls)
@@ -90,7 +99,7 @@ bool PatchGroupOp::runOnModule(
 void PatchGroupOp::visitCallInst(
     CallInst & callInst) // [in] "Call" instruction
 {
-    const auto waveSize = m_pContext->GetGpuProperty()->waveSize;
+    const auto waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
 
     auto pCallee = callInst.getCalledFunction();
     if (pCallee == nullptr)

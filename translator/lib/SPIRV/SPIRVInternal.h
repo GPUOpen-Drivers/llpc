@@ -357,9 +357,6 @@ namespace gSPIRVName {
   const static char ImageCallModConstOffsets[]            = ".constoffsets";
   const static char ImageCallModSample[]                  = ".sample";
   const static char ImageCallModMinLod[]                  = ".minlod";
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  const static char ImageCallModAnisoLod[]                = ".anisolod";
-#endif
   const static char ImageCallModFmaskBased[]              = ".fmaskbased";
   const static char ImageCallModFmaskId[]                 = ".fmaskid";
   const static char ImageCallModFmaskValue[]              = ".fmaskvalue";
@@ -604,12 +601,6 @@ SPIRVMap<Op, SPIRVImageOpInfo>::init() {
   add(OpImageSampleProjExplicitLod,           { ImageOpSample,                  2,              InvalidOperIdx, true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
   add(OpImageSampleProjDrefImplicitLod,       { ImageOpSample,                  3,              3,              true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
   add(OpImageSampleProjDrefExplicitLod,       { ImageOpSample,                  3,              3,              true,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  add(OpImageSampleAnisoLodAMD,               { ImageOpSample,                  2,              InvalidOperIdx, false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
-  add(OpImageSampleDrefAnisoLodAMD,           { ImageOpSample,                  3,              3,              false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
-  add(OpImageGatherAnisoLodAMD,               { ImageOpGather,                  3,              InvalidOperIdx, false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
-  add(OpImageDrefGatherAnisoLodAMD,           { ImageOpGather,                  3,              3,              false,   false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
-#endif
   add(OpImageFetch,                           { ImageOpFetch,                   2,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
   add(OpImageGather,                          { ImageOpGather,                  3,              InvalidOperIdx, false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });
   add(OpImageDrefGather,                      { ImageOpGather,                  3,              3,              false,  false,  InvalidOperIdx, InvalidOperIdx, InvalidOperIdx });

@@ -1551,26 +1551,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpKill>(SPIRVValue* SV,
   return Kill;
 }
 
-#if VKI_KHR_SHADER_CLOCK
-template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(SPIRVValue* SV, BasicBlock* BB) {
-  auto BI = static_cast<SPIRVInstruction*>(SV);
-  auto Scope = static_cast<spv::Scope>(static_cast<SPIRVConstant*>(BI->getOperands()[0])->getZExtIntValue());
-  assert(Scope == spv::ScopeDevice || Scope == spv::ScopeWorkgroup);
-
-  Value* ReadClock = Builder->CreateReadClock(Scope == spv::ScopeDevice);
-
-  auto RetBTy = BI->getType();
-  if (RetBTy->isTypeVectorInt(32)) {
-    assert(BI->getType()->getVectorComponentCount() == 2); // Must be uvec2
-    ReadClock = Builder->CreateBitCast(ReadClock, transType(RetBTy)); // uint64 -> uvec2
-  } else {
-    assert(RetBTy->isTypeInt(64));
-  }
-
-  return ReadClock;
-}
-#endif
-
 template<spv::Op> Value* SPIRVToLLVM::transValueWithOpcode(SPIRVValue* SV, BasicBlock* BB) {
   LLPC_NOT_IMPLEMENTED();
   return nullptr;
@@ -2611,12 +2591,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpImageSparseGather:
   case OpImageSparseDrefGather:
   case OpImageSparseRead:
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  case OpImageSampleAnisoLodAMD:
-  case OpImageSampleDrefAnisoLodAMD:
-  case OpImageGatherAnisoLodAMD:
-  case OpImageDrefGatherAnisoLodAMD:
-#endif
   {
     return mapValue(BV,
         transSPIRVImageOpFromInst(
@@ -2715,9 +2689,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   return mapValue(BV, transValueWithOpcode<op>(BV, BB))
 
   HANDLE_OPCODE(OpKill);
-#if VKI_KHR_SHADER_CLOCK
-  HANDLE_OPCODE(OpReadClockKHR);
-#endif
 
 #undef HANDLE_OPCODE
 
@@ -3398,9 +3369,6 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     //    Format: prefix.image[sparse].op.[f32|i32|u32].dim[.proj][.dref][.lodnz][.bias][.lod][.grad]
     //                                                      [.constoffset][.offset]
     //                                                      [.constoffsets][.sample][.minlod]
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-    //                                                      [.anisolod]
-#endif
 
     // Add call prefix
     SS << gSPIRVName::ImageCallPrefix;
@@ -3617,10 +3585,6 @@ SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
     if (Mask & ImageOperandsVolatileTexelKHRMask)
       SS << gSPIRVName::ImageCallVolatileTexel;
 
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-    if (isAnisoLodOpCode(OC))
-      SS << gSPIRVName::ImageCallModAnisoLod;
-#endif
     // Fmask usage is determined by resource node binding
     if (Desc->MS)
         SS << gSPIRVName::ImageCallModPatchFmaskUsage;

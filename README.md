@@ -123,14 +123,7 @@ amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 
 
 ## Test with SHADERDB
-You can use [shaderdb](https://github.com/GPUOpen-Drivers/xgl/tree/master/test/shadertest) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
- 
-* Run the test without lit
-```
-python testShaders.py [-h] [--shaderdb <path_to_shaderdb>] [--gfxip <major.minor.step>] <path_to_amdllpc> <path_to_spvgen>
-```
-
-* Run the test with lit
+You can use [shaderdb](https://github.com/GPUOpen-Drivers/llpc/tree/master/test) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
 
 By integrating with [lit](http://llvm.org/docs/CommandGuide/lit.html), the test will check the correctness of shader compilation result with the pattern specified in test files.
 
@@ -144,7 +137,7 @@ make -j$(nproc)
 
 Then, run the test with below instructions:
 ```
-cd <vulkandriver_path>/drivers/xgl/test/shadertest 
+cd <vulkandriver_path>/drivers/llpc/test 
 cmake . -B../build -DLLVM_DIR=<vulkandriver_path>/drivers/xgl/builds/Release64/llvm/lib/cmake/llvm -DAMDLLPC_DIR=<vulkandriver_path>/drivers/xgl/builds/Release64/llpc
 cd ../build
 make test

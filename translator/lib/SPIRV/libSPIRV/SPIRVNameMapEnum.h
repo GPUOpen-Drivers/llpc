@@ -403,9 +403,6 @@ template <> inline void SPIRVMap<BuiltIn, std::string>::init() {
   add(BuiltInBaryCoordSmoothCentroidAMD, "BuiltInBaryCoordSmoothCentroidAMD");
   add(BuiltInBaryCoordSmoothSampleAMD, "BuiltInBaryCoordSmoothSampleAMD");
   add(BuiltInBaryCoordPullModelAMD, "BuiltInBaryCoordPullModelAMD");
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-  add(BuiltInPropertyIdAMD, "BuiltInPropertyIdAMD");
-#endif
 }
 SPIRV_DEF_NAMEMAP(BuiltIn, SPIRVBuiltInNameMap)
 
@@ -525,16 +522,6 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityImageGatherBiasLodAMD, "ImageGatherBiasLodAMD");
   add(CapabilityFragmentMaskAMD, "FragmentMaskAMD");
   add(CapabilityFloat16ImageAMD, "Float16ImageAMD");
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-  add(CapabilityPropertyIdAttachmentAMD, "PropertyIdAttachmentAMD");
-#endif
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  add(CapabilityAnisotropicLodCompensationAMD, "AnisotropicLodCompensationAMD");
-#endif
-#if VKI_KHR_SHADER_CLOCK
-  add(CapabilityShaderClockWorkgroupKHR, "ShaderClockWorkgroupKHR");
-  add(CapabilityShaderClockDeviceKHR, "ShaderClockDeviceKHR");
-#endif
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
   add(CapabilityShaderNonUniformEXT, "ShaderNonUniformEXT");

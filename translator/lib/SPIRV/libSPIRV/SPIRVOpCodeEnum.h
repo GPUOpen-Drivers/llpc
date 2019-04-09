@@ -355,15 +355,6 @@ _SPIRV_OP(GroupUMaxNonUniformAMD, 5006)
 _SPIRV_OP(GroupSMaxNonUniformAMD, 5007)
 _SPIRV_OP(FragmentMaskFetchAMD, 5011)
 _SPIRV_OP(FragmentFetchAMD, 5012)
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-_SPIRV_OP(ImageSampleAnisoLodAMD, 5050)
-_SPIRV_OP(ImageSampleDrefAnisoLodAMD, 5051)
-_SPIRV_OP(ImageGatherAnisoLodAMD, 5052)
-_SPIRV_OP(ImageDrefGatherAnisoLodAMD, 5053)
-#endif
-#if VKI_KHR_SHADER_CLOCK
-_SPIRV_OP(ReadClockKHR, 5055)
-#endif
 _SPIRV_OP(SubgroupShuffleINTEL, 5571)
 _SPIRV_OP(SubgroupShuffleDownINTEL, 5572)
 _SPIRV_OP(SubgroupShuffleUpINTEL, 5573)

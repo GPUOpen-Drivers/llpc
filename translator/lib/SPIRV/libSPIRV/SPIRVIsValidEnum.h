@@ -477,9 +477,6 @@ inline bool isValid(spv::BuiltIn V) {
   case BuiltInBaryCoordSmoothCentroidAMD:
   case BuiltInBaryCoordSmoothSampleAMD:
   case BuiltInBaryCoordPullModelAMD:
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-  case BuiltInPropertyIdAMD:
-#endif
     return true;
   default:
     return false;
@@ -613,16 +610,6 @@ inline bool isValid(spv::Capability V) {
   case CapabilityImageGatherBiasLodAMD:
   case CapabilityFragmentMaskAMD:
   case CapabilityFloat16ImageAMD:
-#if VKI_3RD_PARTY_IP_PROPERTY_ID
-  case CapabilityPropertyIdAttachmentAMD:
-#endif
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  case CapabilityAnisotropicLodCompensationAMD:
-#endif
-#if VKI_KHR_SHADER_CLOCK
-  case CapabilityShaderClockWorkgroupKHR:
-  case CapabilityShaderClockDeviceKHR:
-#endif
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
   case CapabilityShaderNonUniformEXT:
@@ -1003,15 +990,6 @@ inline bool isValid(spv::Op V) {
   case OpGroupFMaxNonUniformAMD:
   case OpGroupUMaxNonUniformAMD:
   case OpGroupSMaxNonUniformAMD:
-#if VKI_3RD_PARTY_IP_ANISOTROPIC_LOD_COMPENSATION
-  case OpImageSampleAnisoLodAMD:
-  case OpImageSampleDrefAnisoLodAMD:
-  case OpImageGatherAnisoLodAMD:
-  case OpImageDrefGatherAnisoLodAMD:
-#endif
-#if VKI_KHR_SHADER_CLOCK
-  case OpReadClockKHR:
-#endif
   case OpSubgroupShuffleINTEL:
   case OpSubgroupShuffleDownINTEL:
   case OpSubgroupShuffleUpINTEL:
