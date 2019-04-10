@@ -513,7 +513,8 @@ PRIVATE
     ${LLVM_INCLUDE_DIRS}
 )
 
-target_include_directories(amdllpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
+set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
+target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})
 
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -550,3 +551,15 @@ elseif(WIN32)
 endif()
     llvm_map_components_to_libnames(llvm_libs amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})
+
+### Add Subdirectories #################################################################################################
+
+# SPVGEN
+set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../spvgen CACHE PATH "Specify the path to SPVGEN.")
+
+if(ICD_BUILD_LLPC)
+    if(EXISTS ${XGL_SPVGEN_PATH})
+        add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
+    endif()
+endif()
+
