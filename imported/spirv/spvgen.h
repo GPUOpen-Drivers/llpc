@@ -204,7 +204,8 @@ void SH_IMPORT_EXPORT vfxPrintDoc(
 }
 #endif
 
-static inline bool InitSpvGen()
+static inline bool InitSpvGen(
+    const char* pSpvGenDir = nullptr)
 {
     return true;
 }
@@ -336,7 +337,7 @@ DECL_EXPORT_FUNC(vfxGetRenderDoc);
 DECL_EXPORT_FUNC(vfxGetPipelineDoc);
 DECL_EXPORT_FUNC(vfxPrintDoc);
 
-bool InitSpvGen();
+bool InitSpvGen(const char* pSpvGenDir = nullptr);
 
 #endif
 
@@ -369,11 +370,7 @@ DEFI_EXPORT_FUNC(vfxPrintDoc);
 
 #include <windows.h>
 // SPIR-V generator Windows DLL name
-#ifdef UNICODE
-static const wchar_t* SpvGeneratorName = L"spvgen.dll";
-#else
 static const char* SpvGeneratorName = "spvgen.dll";
-#endif
 
 #define INITFUNC(func) \
   g_pfn##func = reinterpret_cast<PFN_##func>(GetProcAddress(hModule, #func));\
@@ -412,7 +409,8 @@ static const char* SpvGeneratorName = "spvgen.so";
 // =====================================================================================================================
 // Initialize SPIR-V generator entry-points
 // This can be called multiple times in the same application.
-bool InitSpvGen()
+bool InitSpvGen(
+    const char* pSpvGenDir)   // [in] Directory to load SPVGEN library from, or null to use OS's default search path
 {
     if (g_pfnspvGetVersion != nullptr)
     {
@@ -421,10 +419,19 @@ bool InitSpvGen()
     }
 
     bool success = true;
+    const char* pLibName = SpvGeneratorName;
+    std::string libNameBuffer;
+    if (pSpvGenDir != nullptr)
+    {
+        libNameBuffer = pSpvGenDir;
+        libNameBuffer += "/";
+        libNameBuffer += pLibName;
+        pLibName = libNameBuffer.c_str();
+    }
 #ifdef _WIN32
-    HMODULE hModule = LoadLibrary(SpvGeneratorName);
+    HMODULE hModule = LoadLibraryA(pLibName);
 #else
-    void* hModule = dlopen(SpvGeneratorName, RTLD_GLOBAL | RTLD_NOW);
+    void* hModule = dlopen(pLibName, RTLD_GLOBAL | RTLD_NOW);
 #endif
 
     if (hModule != NULL)
