@@ -134,6 +134,9 @@ static cl::opt<std::string> EntryTarget("entry-target",
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
 
+// -spvgen-dir: load SPVGEN from specified directory
+static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
+
 static cl::opt<bool> RobustBufferAccess("robust-buffer-access",
                                         cl::desc("Validate if the index is out of bounds"), cl::init(false));
 
@@ -362,6 +365,16 @@ static Result Init(
         newArgs.push_back(shaderCacheFileDirOption);
 
         result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
+    }
+
+    if ((result == Result::Success) && (SpvGenDir != ""))
+    {
+        // -spvgen-dir option: preload spvgen from the given directory
+        if (InitSpvGen(SpvGenDir.c_str()) == false)
+        {
+            LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
+            result = Result::ErrorUnavailable;
+        }
     }
 
     return result;
@@ -1485,7 +1498,7 @@ int32_t main(
             }
         }
     }
-    else
+    else if (result == Result::Success)
     {
         // Otherwise, join all input files into the same pipeline.
         if ((InFiles.size() == 1) &&
