@@ -273,6 +273,8 @@ Compiler::Compiler(
 
     if (m_instanceCount == 0)
     {
+        auto& passRegistry = *PassRegistry::getPassRegistry();
+
         // Initialize LLVM target: AMDGPU
         LLVMInitializeAMDGPUTargetInfo();
         LLVMInitializeAMDGPUTarget();
@@ -281,8 +283,11 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
 
+        // Initialize special passes which are checked in PassManager
+        initializeJumpThreadingPass(passRegistry);
+        initializePrintModulePassWrapperPass(passRegistry);
+
         // Initialize passes so they can be referenced by -llpc-stop-before etc.
-        auto& passRegistry = *PassRegistry::getPassRegistry();
         InitializeUtilPasses(passRegistry);
         InitializeLowerPasses(passRegistry);
         InitializeBuilderPasses(passRegistry);
@@ -501,7 +506,7 @@ Result Compiler::BuildPipelineInternal(
     raw_string_ostream ostream(hash);
     ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
     ostream.flush();
-
+    uint32_t passIndex = 0;
     // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
     // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
     // compile multiple pipelines. so we add a dummy record to force all fields is shown.
@@ -577,7 +582,7 @@ Result Compiler::BuildPipelineInternal(
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
 
-            PassManager passMgr;
+            PassManager passMgr(&passIndex);
 
             // Set the shader stage in the Builder.
             pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(stage));
@@ -633,7 +638,7 @@ Result Compiler::BuildPipelineInternal(
     // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
     // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
     // manager.
-    PassManager passMgr;
+    PassManager passMgr(&passIndex);
     passMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
 
     raw_svector_ostream elfStream(*pPipelineElf);
@@ -669,7 +674,7 @@ Result Compiler::BuildPipelineInternal(
     }
 
     // A separate "whole pipeline" pass manager for code generation.
-    PassManager codeGenPassMgr;
+    PassManager codeGenPassMgr(&passIndex);
 
     if (result == Result::Success)
     {
