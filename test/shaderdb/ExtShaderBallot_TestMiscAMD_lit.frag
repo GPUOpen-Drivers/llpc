@@ -33,11 +33,11 @@ void main()
 ; SHADERTEST: call {{.*}} i32 @_Z8MbcntAMDl
 ; SHADERTEST: call i32 @_Z18WriteInvocationAMDiii
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: tail call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
-; SHADERTEST: tail call i64 @llvm.amdgcn.icmp.i32
-; SHADERTEST: tail call i32 @llvm.amdgcn.mbcnt.lo
-; SHADERTEST: tail call i32 @llvm.amdgcn.mbcnt.hi
-; SHADERTEST: tail call i32 @llvm.amdgcn.writelane
+; SHADERTEST: call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
+; SHADERTEST: call i64 @llvm.amdgcn.icmp.i32
+; SHADERTEST: call i32 @llvm.amdgcn.mbcnt.lo
+; SHADERTEST: call i32 @llvm.amdgcn.mbcnt.hi
+; SHADERTEST: call i32 @llvm.amdgcn.writelane
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -33,17 +33,21 @@
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include <llvm/IR/LegacyPassManager.h>
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include <llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h>
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include <llvm/Transforms/IPO/ForceFunctionAttrs.h>
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
+#include <llvm/Transforms/Scalar/GVN.h>
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
@@ -68,7 +72,14 @@ namespace cl
 opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
 
 // -include-llvm-ir: include LLVM IR as a separate section in the ELF binary
-opt<bool> IncludeLlvmIr("include-llvm-ir", desc("Include LLVM IR as a separate section in the ELF binary"), init(false));
+opt<bool> IncludeLlvmIr("include-llvm-ir",
+                        desc("Include LLVM IR as a separate section in the ELF binary"),
+                        init(false));
+
+// -use-llvm-opt: Use LLVM's standard optimization set instead of the curated optimization set
+opt<bool> UseLlvmOpt("use-llvm-opt",
+                     desc("Use LLVM's standard optimization set instead of the curated optimization set"),
+                     init(false));
 
 } // cl
 
@@ -202,43 +213,109 @@ void Patch::AddOptimizationPasses(
     legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
 {
     // Set up standard optimization passes.
-    // NOTE: Doing this here is temporary; really the whole of LLPC should be using the
-    // PassManagerBuilder mechanism, adding its own passes at the provided hook points.
-    PassManagerBuilder passBuilder;
-    passBuilder.OptLevel = 3; // -O3
-    passBuilder.DisableGVNLoadPRE = true;
-    passBuilder.DivergentTarget = true;
+    if (cl::UseLlvmOpt == false)
+    {
+        uint32_t optLevel = 3;
+        bool expensiveCombines = false;
+        bool disableGvnLoadPre = true;
 
-    passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
-        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
-        {
-            passMgr.add(CreatePatchPeepholeOpt());
-            passMgr.add(createInstSimplifyLegacyPass());
-        });
-    passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
-        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
-        {
-            // We run our peephole pass just before the scalarizer to ensure that our simplification optimizations are
-            // performed before the scalarizer. One important case this helps with is when you have bit casts whose
-            // source is a PHI - we want to make sure that the PHI does not have an i8 type before the scalarizer is
-            // called, otherwise a different kind of PHI mess is generated.
-            passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createForceFunctionAttrsLegacyPass());
+        passMgr.add(createIPSCCPPass());
+        passMgr.add(createCalledValuePropagationPass());
+        passMgr.add(createGlobalOptimizerPass());
+        passMgr.add(createPromoteMemoryToRegisterPass());
+        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(createCFGSimplificationPass());
+        passMgr.add(createSROAPass());
+        passMgr.add(createEarlyCSEPass(true));
+        passMgr.add(createSpeculativeExecutionIfHasBranchDivergencePass());
+        passMgr.add(createCorrelatedValuePropagationPass());
+        passMgr.add(createCFGSimplificationPass());
+        passMgr.add(createAggressiveInstCombinerPass());
+        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(createCFGSimplificationPass());
+        passMgr.add(createReassociatePass());
+        passMgr.add(createLoopRotatePass());
+        passMgr.add(createLICMPass());
+        passMgr.add(createCFGSimplificationPass());
+        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createIndVarSimplifyPass());
+        passMgr.add(createLoopIdiomPass());
+        passMgr.add(CreatePatchLoopUnrollInfoRectify());
+        passMgr.add(createLoopDeletionPass());
+        passMgr.add(createSimpleLoopUnrollPass(optLevel));
+        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createScalarizerPass());
+        passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(createMergedLoadStoreMotionPass());
+        passMgr.add(createGVNPass(disableGvnLoadPre));
+        passMgr.add(createSCCPPass());
+        passMgr.add(createBitTrackingDCEPass());
+        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createCorrelatedValuePropagationPass());
+        passMgr.add(createAggressiveDCEPass());
+        passMgr.add(createCFGSimplificationPass());
+        passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(createFloat2IntPass());
+        passMgr.add(createLoopRotatePass());
+        passMgr.add(createCFGSimplificationPass(1, true, true, false, true));
+        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(createLoopUnrollPass(optLevel));
+        passMgr.add(createInstructionCombiningPass(expensiveCombines));
+        passMgr.add(createLICMPass());
+        passMgr.add(createStripDeadPrototypesPass());
+        passMgr.add(createGlobalDCEPass());
+        passMgr.add(createConstantMergePass());
+        passMgr.add(createLoopSinkPass());
+        passMgr.add(createInstSimplifyLegacyPass());
+        passMgr.add(createDivRemPairsPass());
+        passMgr.add(createCFGSimplificationPass());
+    }
+    else
+    {
+        PassManagerBuilder passBuilder;
+        passBuilder.OptLevel = 3; // -O3
+        passBuilder.DisableGVNLoadPRE = true;
+        passBuilder.DivergentTarget = true;
 
-            // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer allows
-            // us to much more easily identify dead parts of vectors that we do not need to do any computation for.
-            passMgr.add(createScalarizerPass());
+        passBuilder.addExtension(PassManagerBuilder::EP_Peephole,
+                                 [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+                                 {
+                                     passMgr.add(CreatePatchPeepholeOpt());
+                                     passMgr.add(createInstSimplifyLegacyPass());
+                                 });
+        passBuilder.addExtension(PassManagerBuilder::EP_LoopOptimizerEnd,
+            [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+            {
+                // We run our peephole pass just before the scalarizer to ensure that our simplification optimizations
+                // are performed before the scalarizer. One important case this helps with is when you have bit casts
+                // whose source is a PHI - we want to make sure that the PHI does not have an i8 type before the
+                // scalarizer is called, otherwise a different kind of PHI mess is generated.
+                passMgr.add(CreatePatchPeepholeOpt());
 
-            // We add an extra inst simplify here to make sure that dead PHI nodes that are easily identified post
-            // running the scalarizer can be folded away before instruction combining tries to re-create them.
-            passMgr.add(createInstSimplifyLegacyPass());
-        });
-    passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
-        [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
-        {
-            passMgr.add(CreatePatchLoopUnrollInfoRectify());
-        });
+                // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer
+                // allows us to much more easily identify dead parts of vectors that we do not need to do any
+                // computation for.
+                passMgr.add(createScalarizerPass());
 
-    passBuilder.populateModulePassManager(passMgr);
+                // We add an extra inst simplify here to make sure that dead PHI nodes that are easily identified post
+                // running the scalarizer can be folded away before instruction combining tries to re-create them.
+                passMgr.add(createInstSimplifyLegacyPass());
+            });
+        passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
+                                 [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
+                                 {
+                                     passMgr.add(CreatePatchLoopUnrollInfoRectify());
+                                 });
+
+        passBuilder.populateModulePassManager(passMgr);
+    }
 }
 
 // =====================================================================================================================

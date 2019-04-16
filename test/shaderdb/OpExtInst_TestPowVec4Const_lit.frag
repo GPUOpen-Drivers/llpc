@@ -22,10 +22,10 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = insertelement <4 x float> <float 1.200000e+01, float undef, float undef, float undef>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: {{.*}} call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

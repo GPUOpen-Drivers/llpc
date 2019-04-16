@@ -16,11 +16,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 0x3FF7154760000000
 ; SHADERTEST: %{{[0-9]*}} = fsub float 0.000000e+00, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.exp2.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.exp2.f32(float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.exp2.f32(float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.exp2.f32(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = fsub float %{{.*}}, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = fadd float %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.fdiv.fast(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.fdiv.fast(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

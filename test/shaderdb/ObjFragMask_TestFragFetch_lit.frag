@@ -39,10 +39,10 @@ void main()
 ; SHADERTEST: call i32 @llpc.image.fetch.u32.SubpassData.fmaskvalue
 ; SHADERTEST: call <4 x i32> @llpc.image.fetch.u32.SubpassData.sample
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: tail call <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32
-; SHADERTEST: tail call float @llvm.amdgcn.image.load.3d.f32.i32
-; SHADERTEST: tail call <4 x float> @llvm.amdgcn.image.load.2darraymsaa.v4f32.i32
-; SHADERTEST: tail call float @llvm.amdgcn.image.load.2d.f32.i32
+; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32
+; SHADERTEST: call float @llvm.amdgcn.image.load.3d.f32.i32
+; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2darraymsaa.v4f32.i32
+; SHADERTEST: call float @llvm.amdgcn.image.load.2d.f32.i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

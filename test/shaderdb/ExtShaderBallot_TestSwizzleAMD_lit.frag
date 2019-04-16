@@ -30,9 +30,9 @@ void main()
 ; SHADERTEST: call i32 @_Z21SwizzleInvocationsAMDiDv4_i
 ; SHADERTEST: call i32 @_Z27SwizzleInvocationsMaskedAMDiDv3_i
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: tail call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 8272)
-; SHADERTEST: tail call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 8078)
-; SHADERTEST: tail call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 6627)
+; SHADERTEST: call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 8272)
+; SHADERTEST: call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 8078)
+; SHADERTEST: call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 6627)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
