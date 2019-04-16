@@ -51,7 +51,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} i1 @"func
 ; SHADERTEST: define internal {{.*}} i1 @"func({{.*}}"(i32 {{.*}} %i1, <2 x i32> {{.*}} %i2, <3 x i32> {{.*}} %i3, <4 x i32> {{.*}} %i4, float {{.*}} %f1, <2 x float> {{.*}} %f2, <3 x float> {{.*}} %f3, <4 x float> {{.*}} %f4, i32 {{.*}} %b1, <2 x i32> {{.*}} %b2, <3 x i32> {{.*}} %b3, <4 x i32> {{.*}} %b4)
