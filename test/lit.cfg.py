@@ -31,6 +31,7 @@ llvm_config.use_default_substitutions()
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%gfxip', config.gfxip))
+config.substitutions.append(('%spvgendir%', ''))
 
 tool_dirs = [config.llvm_tools_dir, config.amdllpc_dir]
 
