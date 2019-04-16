@@ -26,8 +26,8 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.floor.f32(float %{{[0-9]*}})
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.floor.f32(float %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = tail call float @llvm.floor.f32(float %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = tail call float @llvm.floor.f32(float %.bitcast.i{{[0-9]*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.floor.f32(float %{{[0-9]*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.floor.f32(float %.bitcast.i{{[0-9]*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

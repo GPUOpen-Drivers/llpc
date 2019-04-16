@@ -25,10 +25,10 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} { double, i32 } @_Z11frexpStructd(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} { <3 x double>, <3 x i32> } @_Z11frexpStructDv3_d(<3 x double> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

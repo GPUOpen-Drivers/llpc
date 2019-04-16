@@ -26,8 +26,8 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} double @_Z5ldexpdi(double %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x double> @_Z5ldexpDv3_dDv3_i(<3 x double> %{{.*}}, <3 x i32> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call double @llvm.amdgcn.ldexp.f64(double %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call double @llvm.amdgcn.ldexp.f64(double %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.ldexp.f64(double %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.ldexp.f64(double %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

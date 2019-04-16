@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z5fractf(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x float> @_Z5fractDv3_f(<3 x float> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.fract.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.fract.f32(float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.fract.f32(float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.fract.f32(float %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

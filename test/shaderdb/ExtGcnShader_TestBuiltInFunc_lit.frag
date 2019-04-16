@@ -27,11 +27,11 @@ void main()
 ; SHADERTEST: call {{.*}} <2 x float> @_Z16CubeFaceCoordAMDDv3_f
 ; SHADERTEST: call {{.*}} i64 @_Z7TimeAMDv
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: tail call float @llvm.amdgcn.cubeid
-; SHADERTEST: tail call float @llvm.amdgcn.cubema
-; SHADERTEST: tail call float @llvm.amdgcn.cubesc
-; SHADERTEST: tail call float @llvm.amdgcn.cubetc
-; SHADERTEST: tail call i64 @llvm.amdgcn.s.memtime
+; SHADERTEST: call float @llvm.amdgcn.cubeid
+; SHADERTEST: call float @llvm.amdgcn.cubema
+; SHADERTEST: call float @llvm.amdgcn.cubesc
+; SHADERTEST: call float @llvm.amdgcn.cubetc
+; SHADERTEST: call i64 @llvm.amdgcn.s.memtime
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

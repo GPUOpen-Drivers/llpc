@@ -30,9 +30,9 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call <2 x float> @llpc.input.interpolate.evalij.offset.v2f32(<2 x float> %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call <4 x float> @llpc.input.import.interpolant.v4f32{{.*}}v2f32({{.*}}<2 x float> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.interp.mov(i32 2, i32 1, i32 1, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.mov(i32 2, i32 1, i32 1, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

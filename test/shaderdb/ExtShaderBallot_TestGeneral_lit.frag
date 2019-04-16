@@ -47,10 +47,10 @@ void main(void)
 ; SHADERTEST: call i32 @_Z26SubgroupFirstInvocationKHRi
 ; SHADERTEST: call void @llpc.output.export.generic{{.*}}f32
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: tail call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
-; SHADERTEST: tail call i64 @llvm.amdgcn.icmp.i32
-; SHADERTEST: tail call i32 @llvm.amdgcn.readlane
-; SHADERTEST: tail call i32 @llvm.amdgcn.readfirstlane
+; SHADERTEST: call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
+; SHADERTEST: call i64 @llvm.amdgcn.icmp.i32
+; SHADERTEST: call i32 @llvm.amdgcn.readlane
+; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -16,10 +16,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z5ldexpDv4_fDv4_i(<4 x float> %{{.*}}, <4 x i32> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
