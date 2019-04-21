@@ -31,9 +31,9 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: <4 x float> @"func("
-; SHADERTEST: <label>
+; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST:  ret <4 x float>
-; SHADERTEST: <label>
+; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST:  ret <4 x float>
 
 ; SHADERTEST: AMDLLPC SUCCESS

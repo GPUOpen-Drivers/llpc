@@ -27,7 +27,7 @@ void main ( )
 ; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %{{[0-9]+}})
 ; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %{{[0-9]+}})
 ; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 274, i32 %{{[0-9]+}})
-; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 3, i32 %{{[0-9]+}})
+; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 immarg 3, i32 %{{[0-9]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

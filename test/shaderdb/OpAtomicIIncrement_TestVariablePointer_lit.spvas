@@ -5,7 +5,7 @@
 ; SHADERTEST; call i32 @llpc.buffer.atomic.iincrement.i32(<4 x i32> %{{[0-9]*}}, i32 0, i32 0, i1 false)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.buffer.atomic.add(i32 1, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i1 false)
+; SHADERTEST: call i32 @llvm.amdgcn.buffer.atomic.add.i32(i32 1, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i1 false)
 
 ; SHADERTEST : AMDLLPC SUCCESS
 ; END_SHADERTEST

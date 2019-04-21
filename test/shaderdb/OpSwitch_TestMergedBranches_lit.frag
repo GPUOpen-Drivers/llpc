@@ -30,7 +30,7 @@ void main()
 ; SHADERTEST:    i32 0, label %{{[0-9]*}}
 ; SHADERTEST:    i32 1, label %{{[0-9]*}}
 ; SHADERTEST:  ]
-; SHADERTEST:  <label>
+; SHADERTEST: {{^[A-Za-z0-9]+:}}
 
 
 ; SHADERTEST: AMDLLPC SUCCESS
