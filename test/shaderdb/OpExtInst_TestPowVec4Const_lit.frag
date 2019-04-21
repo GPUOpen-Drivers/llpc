@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = {{.*}} call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: {{.*}} call void @llvm.amdgcn.exp.f32(i32 0, i32 15, float 1.200000e+01, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 true, i1 true)
+; SHADERTEST: {{.*}} call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

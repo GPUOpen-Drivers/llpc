@@ -8,7 +8,7 @@
 ; SHADERTEST:    i64 2, label %{{[0-9]*}}
 ; SHADERTEST:  ]
 
-; SHADERTEST: <label>
+; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST: br label %{{[0-9]*}}
 
 ; SHADERTEST : AMDLLPC SUCCESS

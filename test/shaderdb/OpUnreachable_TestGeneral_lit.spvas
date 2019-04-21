@@ -2,10 +2,10 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: <label>
+; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST: unreachable
 ; SHADERTEST: unreachable
-; SHADERTEST: <label>
+; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST: unreachable
 ; SHADERTEST: unreachable
 
