@@ -421,12 +421,6 @@ struct ResourceUsage
 
         struct
         {
-            std::vector<BasicType>    inputTypes;       // Array of basic types of vertex inputs (vertex input location
-                                                        // -> vertex input type, used by "auto-layout-desc" option)
-        } vs;
-
-        struct
-        {
             struct
             {
                 uint32_t inVertexStride;                // Stride of vertices of input patch (in DWORD, correspond to
@@ -786,7 +780,8 @@ public:
 
     // Gets pipeline hash code
     uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_hash); }
-    virtual uint64_t GetShaderHashCode(ShaderStage stage) const = 0;
+
+    virtual uint64_t GetShaderHashCode(ShaderStage stage) const;
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
@@ -804,10 +799,6 @@ protected:
     void InitShaderResourceUsage(ShaderStage shaderStage);
 
     void InitShaderInterfaceData(ShaderStage shaderStage);
-
-    void UpdateShaderHashForPipelineShaderInfo(ShaderStage               stage,
-                                               const PipelineShaderInfo* pShaderInfo,
-                                               MetroHash::MetroHash64*   pHasher) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

@@ -32,8 +32,6 @@
 
 #include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/DiagnosticInfo.h"
-#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Debug.h"
@@ -84,35 +82,6 @@ using namespace llvm;
 namespace Llpc
 {
 
-// =====================================================================================================================
-// Handler for diagnosis in code generation, derived from the standard one.
-class LlpcDiagnosticHandler: public llvm::DiagnosticHandler
-{
-    bool handleDiagnostics(const DiagnosticInfo &diagInfo) override
-    {
-        if (EnableOuts() || EnableErrs())
-        {
-            if ((diagInfo.getSeverity() == DS_Error) || (diagInfo.getSeverity() == DS_Warning))
-            {
-                DiagnosticPrinterRawOStream printStream(outs());
-                printStream << "ERROR: LLVM DIAGNOSIS INFO: ";
-                diagInfo.print(printStream);
-                printStream << "\n";
-                outs().flush();
-            }
-            else if (EnableOuts())
-            {
-                DiagnosticPrinterRawOStream printStream(outs());
-                printStream << "\n\n=====  LLVM DIAGNOSIS START  =====\n\n";
-                diagInfo.print(printStream);
-                printStream << "\n\n=====  LLVM DIAGNOSIS END  =====\n\n";
-                outs().flush();
-            }
-        }
-        LLPC_ASSERT(diagInfo.getSeverity() != DS_Error);
-        return true;
-    }
-};
 
 // =====================================================================================================================
 // Creates the TargetMachine if not already created, and stores it in the context. It then persists as long as
@@ -268,8 +237,6 @@ Result CodeGenManager::AddTargetPasses(
 
     auto pTargetMachine = pContext->GetTargetMachine();
 
-    pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
-
 #if LLPC_ENABLE_EXCEPTION
     try
 #endif
@@ -287,48 +254,6 @@ Result CodeGenManager::AddTargetPasses(
     }
 #endif
 
-    pContext->setDiagnosticHandlerCallBack(nullptr);
-    return result;
-}
-
-// =====================================================================================================================
-// Runs passes on the module, with the diagnostic handler installed
-Result CodeGenManager::Run(
-    Module*               pModule,  // [in] LLVM module
-    legacy::PassManager&  passMgr)  // [in] Pass manager to run
-{
-    Result result = Result::Success;
-
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
-
-    pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
-
-    if (result == Result::Success)
-    {
-        LLVM_DEBUG(dbgs() << "Start code generation: \n"<< *pModule);
-
-        bool success = false;
-#if LLPC_ENABLE_EXCEPTION
-        try
-#endif
-        {
-            passMgr.run(*pModule);
-            success = true;
-        }
-#if LLPC_ENABLE_EXCEPTION
-        catch (const char*)
-        {
-            success = false;
-        }
-#endif
-
-        if (success == false)
-        {
-            result = Result::ErrorInvalidShader;
-        }
-    }
-
-    pContext->setDiagnosticHandlerCallBack(nullptr);
     return result;
 }
 

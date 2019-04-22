@@ -61,8 +61,8 @@ static cl::list<uint32_t> DisablePassIndices("disable-pass-indices", cl::ZeroOrM
 } // llvm
 
 using namespace llvm;
-using namespace Llpc;
-
+namespace Llpc
+{
 // =====================================================================================================================
 // Get the PassInfo for a registered pass given short name
 static const PassInfo* GetPassInfo(
@@ -94,7 +94,7 @@ static AnalysisID GetPassIdFromName(
 
 // =====================================================================================================================
 // Constructor
-Llpc::PassManager::PassManager(
+PassManager::PassManager(
     uint32_t* pPassIndex)   // [in,out] Pointer of PassIndex
     :
     m_pPassIndex(pPassIndex)
@@ -110,7 +110,7 @@ Llpc::PassManager::PassManager(
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
-void Llpc::PassManager::add(
+void PassManager::add(
     Pass* pPass)    // [in] Pass to add to the pass manager
 {
     // Do not add any passes after calling stop(), except immutable passes.
@@ -164,8 +164,30 @@ void Llpc::PassManager::add(
 
 // =====================================================================================================================
 // Stop adding passes to the pass manager, except immutable ones.
-void Llpc::PassManager::stop()
+void PassManager::stop()
 {
     m_stopped = true;
 }
 
+// =====================================================================================================================
+// Runs passes on the module
+bool PassManager::run(
+    Module* pModule)  // [in] LLVM module
+{
+    bool success = false;
+#if LLPC_ENABLE_EXCEPTION
+    try
+#endif
+    {
+        success = legacy::PassManager::run(*pModule);
+    }
+#if LLPC_ENABLE_EXCEPTION
+    catch (const char*)
+    {
+        success = false;
+    }
+#endif
+    return success;
+}
+
+} // Llpc
