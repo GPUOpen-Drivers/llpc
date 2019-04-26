@@ -101,6 +101,8 @@ Context::Context(
     m_tys.pDoubleTy   = Type::getDoubleTy(*this);
     m_tys.pVoidTy     = Type::getVoidTy(*this);
 
+    m_tys.pInt16x2Ty    = VectorType::get(m_tys.pInt16Ty, 2);
+    m_tys.pInt16x4Ty    = VectorType::get(m_tys.pInt16Ty, 4);
     m_tys.pInt32x2Ty    = VectorType::get(m_tys.pInt32Ty, 2);
     m_tys.pInt32x3Ty    = VectorType::get(m_tys.pInt32Ty, 3);
     m_tys.pInt32x4Ty    = VectorType::get(m_tys.pInt32Ty, 4);
