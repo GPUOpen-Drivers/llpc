@@ -1420,101 +1420,35 @@ Value* FragColorExport::Run(
             {
                 // Convert the components to float value if necessary
                 comps[i] = ConvertToFloat(comps[i], signedness, pInsertPos);
+            }
 
-                if (expFmt == EXP_FORMAT_UNORM16_ABGR)
-                {
-                    // int(round(clamp(c, 0.0, 1.0) * 65535.0))
+            StringRef funcName = (expFmt == EXP_FORMAT_SNORM16_ABGR) ?
+                ("llvm.amdgcn.cvt.pknorm.i16") : ("llvm.amdgcn.cvt.pknorm.u16");
 
-                    // %comp = @llvm.amdgcn.fmed3.f32(float %comp, float 0.0, float 1.0)
-                    args.clear();
-                    args.push_back(comps[i]);
-                    args.push_back(ConstantFP::get(m_pContext->FloatTy(), 0.0));
-                    args.push_back(ConstantFP::get(m_pContext->FloatTy(), 1.0));
-                    comps[i] = EmitCall(m_pModule,
-                                        "llvm.amdgcn.fmed3.f32",
-                                        m_pContext->FloatTy(),
-                                        args,
-                                        NoAttrib,
-                                        pInsertPos);
+            for (uint32_t i = 0; i < compCount; i += 2)
+            {
+                args.clear();
+                args.push_back(comps[i]);
+                args.push_back(comps[i + 1]);
+                Value* pComps = EmitCall(m_pModule,
+                                            funcName,
+                                            m_pContext->Int16x2Ty(),
+                                            args,
+                                            NoAttrib,
+                                            pInsertPos);
 
-                    // %comp = fmul float %comp, 65535.0
-                    comps[i] = BinaryOperator::Create(BinaryOperator::FMul,
-                                                      comps[i],
-                                                      ConstantFP::get(m_pContext->FloatTy(), 65535.0),
-                                                      "",
-                                                      pInsertPos);
+                pComps = new BitCastInst(pComps, m_pContext->Float16x2Ty(), "", pInsertPos);
 
-                    // %comp = fadd float %comp, 0.5
-                    comps[i] = BinaryOperator::Create(BinaryOperator::FAdd,
-                                                      comps[i],
-                                                      ConstantFP::get(m_pContext->FloatTy(), 0.5),
-                                                      "",
-                                                      pInsertPos);
+                comps[i] = ExtractElementInst::Create(pComps,
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        "",
+                                                        pInsertPos);
 
-                    // %comp = fptoui float %comp to i32
-                    comps[i] = new FPToUIInst(comps[i], m_pContext->Int32Ty(), "", pInsertPos);
+                comps[i + 1] = ExtractElementInst::Create(pComps,
+                                                            ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                            "",
+                                                            pInsertPos);
 
-                    // %comp = trunc i32 %comp to i16
-                    comps[i] = new TruncInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
-
-                    // %comp = bitcast i16 %comp to half
-                    comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
-                }
-                else
-                {
-                    LLPC_ASSERT(expFmt == EXP_FORMAT_SNORM16_ABGR);
-
-                    // int(round(clamp(c, -1.0, 1.0) * 32767.0))
-
-                    // %comp = @llvm.amdgcn.fmed3.f32(float %comp, float -1.0, float 1.0)
-                    args.clear();
-                    args.push_back(comps[i]);
-                    args.push_back(ConstantFP::get(m_pContext->FloatTy(), -1.0));
-                    args.push_back(ConstantFP::get(m_pContext->FloatTy(), 1.0));
-                    comps[i] = EmitCall(m_pModule,
-                                        "llvm.amdgcn.fmed3.f32",
-                                        m_pContext->FloatTy(),
-                                        args,
-                                        NoAttrib,
-                                        pInsertPos);
-
-                    // %comp = fmul float %comp, 32767.0
-                    comps[i] = BinaryOperator::Create(BinaryOperator::FMul,
-                                                      comps[i],
-                                                      ConstantFP::get(m_pContext->FloatTy(), 32767.0),
-                                                      "",
-                                                      pInsertPos);
-
-                    // %cond = fcmp oge float %36, 0.0
-                    auto pCond = new FCmpInst(pInsertPos,
-                                              FCmpInst::FCMP_OGE,
-                                              comps[i],
-                                              ConstantFP::get(m_pContext->FloatTy(), 0.0),
-                                              "");
-
-                    // %select = select i1 %cond, float 0.5, float -0.5
-                    auto pSelect = SelectInst::Create(pCond,
-                                                      ConstantFP::get(m_pContext->FloatTy(), 0.5),
-                                                      ConstantFP::get(m_pContext->FloatTy(), -0.5),
-                                                      "",
-                                                      pInsertPos);
-
-                    // %comp = fadd float %comp, %select
-                    comps[i] = BinaryOperator::Create(BinaryOperator::FAdd,
-                                                      comps[i],
-                                                      pSelect,
-                                                      "",
-                                                      pInsertPos);
-
-                    // %comp = fptosi float %comp to i32
-                    comps[i] = new FPToSIInst(comps[i], m_pContext->Int32Ty(), "", pInsertPos);
-
-                    // %comp = trunc i32 %comp to i16
-                    comps[i] = new TruncInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
-
-                    // %comp = bitcast i16 %comp to half
-                    comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
-                }
             }
 
             for (uint32_t i = compCount; i < 4; ++i)
@@ -1534,71 +1468,34 @@ Value* FragColorExport::Run(
             {
                 // Convert the components to int value if necessary
                 comps[i] = ConvertToInt(comps[i], signedness, pInsertPos);
+            }
 
-                if (expFmt == EXP_FORMAT_UINT16_ABGR)
-                {
-                    // clamp(c, 0, 65535)
+            StringRef funcName = (expFmt == EXP_FORMAT_SINT16_ABGR) ?
+                ("llvm.amdgcn.cvt.pk.i16") : ("llvm.amdgcn.cvt.pk.u16");
 
-                    // %cond = icmp ult i32 %comp, 65535
-                    auto pCond = new ICmpInst(pInsertPos,
-                                              ICmpInst::ICMP_ULT,
-                                              comps[i],
-                                              ConstantInt::get(m_pContext->Int32Ty(), 65535),
-                                              "");
+            for (uint32_t i = 0; i < compCount; i += 2)
+            {
+                args.clear();
+                args.push_back(comps[i]);
+                args.push_back(comps[i + 1]);
+                Value* pComps = EmitCall(m_pModule,
+                                            funcName,
+                                            m_pContext->Int16x2Ty(),
+                                            args,
+                                            NoAttrib,
+                                            pInsertPos);
 
-                    // %comp = select i1 %cond, i32 %comp, i32 65535
-                    comps[i] = SelectInst::Create(pCond,
-                                                  comps[i],
-                                                  ConstantInt::get(m_pContext->Int32Ty(), 65535),
-                                                  "",
-                                                  pInsertPos);
+                pComps = new BitCastInst(pComps, m_pContext->Float16x2Ty(), "", pInsertPos);
 
-                    // %comp = trunc i32 %comp to i16
-                    comps[i] = new TruncInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
+                comps[i] = ExtractElementInst::Create(pComps,
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        "",
+                                                        pInsertPos);
 
-                    // %comp = bitcast i16 %comp to half
-                    comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
-                }
-                else
-                {
-                    LLPC_ASSERT(expFmt == EXP_FORMAT_SINT16_ABGR);
-
-                    // clamp(c, -32768, 32767)
-
-                    // %cond = icmp slt i32 %comp, 32767
-                    auto pCond = new ICmpInst(pInsertPos,
-                                              ICmpInst::ICMP_SLT,
-                                              comps[i],
-                                              ConstantInt::get(m_pContext->Int32Ty(), 32767),
-                                              "");
-
-                    // %comp = select i1 %cond, i32 %comp, i32 32767
-                    comps[i] = SelectInst::Create(pCond,
-                                                  comps[i],
-                                                  ConstantInt::get(m_pContext->Int32Ty(), 32767),
-                                                  "",
-                                                  pInsertPos);
-
-                    // %cond = icmp sgt i32 %comp, -32768
-                    pCond = new ICmpInst(pInsertPos,
-                                              ICmpInst::ICMP_SGT,
-                                              comps[i],
-                                              ConstantInt::get(m_pContext->Int32Ty(), -32768),
-                                              "");
-
-                    // %comp = select i1 %cond, i32 %comp, i32 -32768
-                    comps[i] = SelectInst::Create(pCond,
-                                                  comps[i],
-                                                  ConstantInt::get(m_pContext->Int32Ty(), -32768),
-                                                  "",
-                                                  pInsertPos);
-
-                    // %comp = trunc i32 %comp to i16
-                    comps[i] = new TruncInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
-
-                    // %comp = bitcast i16 %comp to half
-                    comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
-                }
+                comps[i + 1] = ExtractElementInst::Create(pComps,
+                                                            ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                            "",
+                                                            pInsertPos);
             }
 
             for (uint32_t i = compCount; i < 4; ++i)
