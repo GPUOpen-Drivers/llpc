@@ -346,15 +346,16 @@ ShaderStage GetShaderStageFromCallingConv(
 // =====================================================================================================================
 // Gets the argument from the specified function according to the argument index.
 Value* GetFunctionArgument(
-    Function* pFunc,    // [in] LLVM function
-    uint32_t  idx)      // Index of the query argument
+    Function*     pFunc,    // [in] LLVM function
+    uint32_t      idx,      // Index of the query argument
+    const Twine&  name)     // Name to give the argument if currently empty
 {
-    auto pArg = pFunc->arg_begin();
-    while (idx-- > 0)
+    Argument* pArg = &pFunc->arg_begin()[idx];
+    if ((name.isTriviallyEmpty() == false) && (pArg->getName() == ""))
     {
-        ++pArg;
+        pArg->setName(name);
     }
-    return &*pArg;
+    return pArg;
 }
 
 // =====================================================================================================================
