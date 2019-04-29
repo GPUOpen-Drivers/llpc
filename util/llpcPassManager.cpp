@@ -169,25 +169,4 @@ void PassManager::stop()
     m_stopped = true;
 }
 
-// =====================================================================================================================
-// Runs passes on the module
-bool PassManager::run(
-    Module* pModule)  // [in] LLVM module
-{
-    bool success = false;
-#if LLPC_ENABLE_EXCEPTION
-    try
-#endif
-    {
-        success = legacy::PassManager::run(*pModule);
-    }
-#if LLPC_ENABLE_EXCEPTION
-    catch (const char*)
-    {
-        success = false;
-    }
-#endif
-    return success;
-}
-
 } // Llpc

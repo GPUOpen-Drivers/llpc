@@ -45,7 +45,6 @@ public:
 
     void add(llvm::Pass* pPass) override;
     void stop();
-    bool run(llvm::Module* pModule);
 
 private:
     bool              m_stopped = false;         // Whether we have already stopped adding new passes.

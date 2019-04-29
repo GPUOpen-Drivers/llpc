@@ -649,7 +649,7 @@ Result Compiler::BuildPipelineInternal(
                                   pDynamicLoopUnroll);
 
             // Run the passes.
-            bool success = lowerPassMgr.run(modules[stage]);
+            bool success = RunPasses(&lowerPassMgr, modules[stage]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -696,7 +696,7 @@ Result Compiler::BuildPipelineInternal(
     // Run the "whole pipeline" passes, excluding the target backend.
     if (result == Result::Success)
     {
-        bool success = patchPassMgr.run(pPipelineModule);
+        bool success = RunPasses(&patchPassMgr, pPipelineModule);
         if (success)
         {
             CodeGenManager::SetupTargetFeatures(pPipelineModule);
@@ -730,7 +730,7 @@ Result Compiler::BuildPipelineInternal(
     // Run the target backend codegen passes.
     if (result == Result::Success)
     {
-        bool success = codeGenPassMgr.run(pPipelineModule);
+        bool success = RunPasses(&codeGenPassMgr, pPipelineModule);
         if (success == false)
         {
             LLPC_ERRS("Fails to generate GPU ISA codes\n");
@@ -1948,6 +1948,29 @@ uint32_t Compiler::ChooseLoopUnrollCountCandidate(
     }
 
     return optimalCandidateIdx;
+}
+
+// =====================================================================================================================
+// Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
+bool Compiler::RunPasses(
+    PassManager*  pPassMgr, // [in] Pass manager
+    Module*       pModule)  // [in/out] Module
+{
+    bool success = false;
+#if LLPC_ENABLE_EXCEPTION
+    try
+#endif
+    {
+        pPassMgr->run(*pModule);
+        success = true;
+    }
+#if LLPC_ENABLE_EXCEPTION
+    catch (const char*)
+    {
+        success = false;
+    }
+#endif
+    return success;
 }
 
 // =====================================================================================================================
