@@ -226,7 +226,7 @@ ShaderStage GetShaderStageFromFunction(llvm::Function* pFunc);
 ShaderStage GetShaderStageFromCallingConv(uint32_t stageMask, llvm::CallingConv::ID callConv);
 
 // Gets the argument from the specified function according to the argument index.
-llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx);
+llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx, const llvm::Twine& name = "");
 
 // Checks if one type can be bitcasted to the other (type1 -> type2).
 bool CanBitCast(const llvm::Type* pTy1, const llvm::Type* pTy2);
