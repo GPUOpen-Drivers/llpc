@@ -53,6 +53,12 @@ using namespace llvm;
 using namespace Llpc;
 using namespace SPIRV;
 
+struct ResourceNodeSet
+{
+    std::vector<ResourceMappingNode> nodes;   // Vector of resource mapping nodes
+    std::map<uint32_t, uint32_t> bindingMap;  // Map from binding to index in nodes vector
+};
+
 // -auto-layout-desc: automatically create descriptor layout based on resource usages
 //
 // NOTE: This option is deprecated and will be ignored, and is present only for compatibility.
@@ -438,7 +444,8 @@ void DoAutoLayoutDesc(
     }
 
     // Collect ResourceMappingNode entries in sets.
-    std::map<uint32_t, std::vector<ResourceMappingNode>> resNodeSets;
+    std::map<uint32_t, ResourceNodeSet> resNodeSets;
+    std::map<std::pair<uint32_t, uint32_t>, uint32_t> bindingIndex;
     uint32_t pushConstSize = 0;
     for (uint32_t i = 0, varCount = module->getNumVariables(); i < varCount; ++i)
     {
@@ -461,10 +468,25 @@ void DoAutoLayoutDesc(
         default:
             {
                 SPIRVWord binding = SPIRVID_INVALID;
-                SPIRVWord descSet = SPIRVID_INVALID;
-                if (pVar->hasDecorate(DecorationBinding, 0, &binding) &&
-                    pVar->hasDecorate(DecorationDescriptorSet, 0, &descSet))
+                SPIRVWord descSet = 0;
+                if (pVar->hasDecorate(DecorationBinding, 0, &binding))
                 {
+                    // Test shaderdb/OpDecorationGroup_TestGroupAndGroupMember_lit.spvas
+                    // defines a variable with a binding but no set. Handle that case.
+                    pVar->hasDecorate(DecorationDescriptorSet, 0, &descSet);
+
+                    // Find/create the node entry for this set and binding.
+                    ResourceNodeSet& resNodeSet = resNodeSets[descSet];
+                    auto iteratorAndCreated = resNodeSet.bindingMap.insert({binding, resNodeSet.nodes.size()});
+                    uint32_t nodesIndex = iteratorAndCreated.first->second;
+                    if (iteratorAndCreated.second)
+                    {
+                        resNodeSet.nodes.push_back({});
+                        resNodeSet.nodes.back().type = ResourceMappingNodeType::Unknown;
+                    }
+                    ResourceMappingNode* pNode = &resNodeSet.nodes[nodesIndex];
+
+                    // Get the element type and array size.
                     auto pVarElemTy = pVar->getType()->getPointerElementType();
                     uint32_t arraySize = 1;
                     while (pVarElemTy->isTypeArray())
@@ -473,54 +495,84 @@ void DoAutoLayoutDesc(
                         pVarElemTy = pVarElemTy->getArrayElementType();
                     }
 
-                    std::vector<ResourceMappingNode>& set = resNodeSets[descSet];
-                    uint32_t nextOffset = 0;
-                    if (set.size() != 0)
-                    {
-                        nextOffset = set.back().offsetInDwords + set.back().sizeInDwords;
-                    }
-                    set.push_back({});
-
+                    // Map the SPIR-V opcode to descriptor type and size.
+                    ResourceMappingNodeType nodeType;
+                    uint32_t sizeInDwords;
                     switch (pVarElemTy->getOpCode())
                     {
                     case OpTypeSampler:
                         {
                             // Sampler descriptor.
-                            set.back().type = ResourceMappingNodeType::DescriptorSampler;
-                            set.back().sizeInDwords = 4 * arraySize;
+                            nodeType = ResourceMappingNodeType::DescriptorSampler;
+                            sizeInDwords = 4 * arraySize;
                             break;
                         }
                     case OpTypeImage:
                         {
                             // Image descriptor.
                             auto pImageType = static_cast<SPIRVTypeImage*>(pVarElemTy);
-                            set.back().type = (pImageType->getDescriptor().Dim == spv::DimBuffer) ?
+                            nodeType = (pImageType->getDescriptor().Dim == spv::DimBuffer) ?
                                 ResourceMappingNodeType::DescriptorTexelBuffer :
                                 ResourceMappingNodeType::DescriptorResource;
-                            set.back().sizeInDwords = 8 * arraySize;
+                            sizeInDwords = 8 * arraySize;
                             break;
                         }
                     case OpTypeSampledImage:
                         {
                             // Combined image and sampler descriptors.
-                            set.back().type = ResourceMappingNodeType::DescriptorCombinedTexture;
-                            set.back().sizeInDwords = 12 * arraySize;
+                            nodeType = ResourceMappingNodeType::DescriptorCombinedTexture;
+                            sizeInDwords = 12 * arraySize;
                             break;
                         }
                     default:
                         {
                             // Normal buffer.
-                            set.back().type = ResourceMappingNodeType::DescriptorBuffer;
-                            set.back().sizeInDwords = 4 * arraySize;
+                            nodeType = ResourceMappingNodeType::DescriptorBuffer;
+                            sizeInDwords = 4 * arraySize;
                             break;
                         }
                     }
-                    set.back().srdRange.set = descSet;
-                    set.back().srdRange.binding = binding;
-                    set.back().offsetInDwords = nextOffset;
+
+                    // Check if the node already had a different type set. A DescriptorResource/DescriptorTexelBuffer
+                    // and a DescriptorSampler can use the same set/binding, in which case it is
+                    // DescriptorCombinedTexture.
+                    if (pNode->type == ResourceMappingNodeType::Unknown)
+                    {
+                        pNode->type = nodeType;
+                    }
+                    else if (pNode->type != nodeType)
+                    {
+                        LLPC_ASSERT(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                     (nodeType == ResourceMappingNodeType::DescriptorResource) ||
+                                     (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                     (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
+                                    ((pNode->type == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                                     (pNode->type == ResourceMappingNodeType::DescriptorResource) ||
+                                     (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                                     (pNode->type == ResourceMappingNodeType::DescriptorSampler)));
+                        pNode->type = ResourceMappingNodeType::DescriptorCombinedTexture;
+                        sizeInDwords = 12 * arraySize;
+                    }
+
+                    // Fill out the rest of the node.
+                    pNode->sizeInDwords = sizeInDwords;
+                    pNode->srdRange.set = descSet;
+                    pNode->srdRange.binding = binding;
                 }
                 break;
             }
+        }
+    }
+
+    // Allocate dword offset to each node.
+    for (auto& it : resNodeSets)
+    {
+        ResourceNodeSet& resNodeSet = it.second;
+        uint32_t offsetInDwords = 0;
+        for (auto& node : resNodeSet.nodes)
+        {
+            node.offsetInDwords = offsetInDwords;
+            offsetInDwords += node.sizeInDwords;
         }
     }
 
@@ -530,7 +582,7 @@ void DoAutoLayoutDesc(
     uint32_t resNodeCount = topLevelCount;
     for (const auto& resNodeSet : resNodeSets)
     {
-        resNodeCount += resNodeSet.second.size();
+        resNodeCount += resNodeSet.second.nodes.size();
     }
     auto pResNodes = new ResourceMappingNode[resNodeCount];
     auto pNextTable = pResNodes + topLevelCount;
@@ -544,9 +596,9 @@ void DoAutoLayoutDesc(
         pResNode->sizeInDwords = 1;
         pResNode->offsetInDwords = topLevelOffset;
         topLevelOffset += pResNode->sizeInDwords;
-        pResNode->tablePtr.nodeCount = resNodeSet.second.size();
+        pResNode->tablePtr.nodeCount = resNodeSet.second.nodes.size();
         pResNode->tablePtr.pNext = pNextTable;
-        for (auto& resNode : resNodeSet.second)
+        for (auto& resNode : resNodeSet.second.nodes)
         {
             *pNextTable++ = resNode;
         }
