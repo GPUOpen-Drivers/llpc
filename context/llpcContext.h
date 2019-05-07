@@ -107,6 +107,7 @@ public:
     llvm::Type* DoubleTy() const { return m_tys.pDoubleTy; }
     llvm::Type* VoidTy() const { return m_tys.pVoidTy; }
 
+    llvm::Type* Int16x2Ty() const { return m_tys.pInt16x2Ty; }
     llvm::Type* Int32x2Ty() const { return m_tys.pInt32x2Ty; }
     llvm::Type* Int32x3Ty() const { return m_tys.pInt32x3Ty; }
     llvm::Type* Int32x4Ty() const { return m_tys.pInt32x4Ty; }
@@ -292,6 +293,7 @@ private:
         llvm::Type* pDoubleTy;    // Double
         llvm::Type* pVoidTy;      // Void
 
+        llvm::Type* pInt16x2Ty;   // Int16 x 2
         llvm::Type* pInt32x2Ty;   // Int32 x 2
         llvm::Type* pInt32x3Ty;   // Int32 x 3
         llvm::Type* pInt32x4Ty;   // Int32 x 4
