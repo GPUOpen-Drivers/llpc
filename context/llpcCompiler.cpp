@@ -653,6 +653,19 @@ Result Compiler::BuildPipelineInternal(
                                          *pContext);
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
+        }
+
+        // Give the pipeline state to the Builder. (If we know we are using BuilderRecorder, in a future change
+        // we could choose to delay this until after linking into a pipeline module.)
+        pContext->GetPipelineContext()->SetBuilderPipelineState(pContext->GetBuilder());
+
+        for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+        {
+            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+            if ((pShaderInfo == nullptr) || (pShaderInfo->pModuleData == nullptr))
+            {
+                continue;
+            }
 
             PassManager lowerPassMgr(&passIndex);
 

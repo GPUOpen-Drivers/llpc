@@ -107,6 +107,7 @@ llvm::ModulePass* CreatePatchResourceCollect();
 llvm::ModulePass* CreatePatchSetupTargetFeatures();
 
 class Context;
+class PipelineState;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations, as the base class.

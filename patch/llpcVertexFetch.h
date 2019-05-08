@@ -37,6 +37,7 @@ namespace Llpc
 {
 
 class Context;
+class PipelineState;
 class ShaderSystemValues;
 
 // Represents vertex format info corresponding to vertex attribute format (VkFormat).
@@ -66,7 +67,7 @@ struct VertexCompFormatInfo
 class VertexFetch
 {
 public:
-    VertexFetch(llvm::Function* pEntrypoint, ShaderSystemValues* pShaderSysValues);
+    VertexFetch(llvm::Function* pEntrypoint, ShaderSystemValues* pShaderSysValues, PipelineState* pPipelineState);
 
     static const VertexFormatInfo* GetVertexFormatInfo(VkFormat format);
 
@@ -115,6 +116,7 @@ private:
     llvm::Module*       m_pModule;          // LLVM module
     Context*            m_pContext;         // LLPC context
     ShaderSystemValues* m_pShaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
+    PipelineState*      m_pPipelineState;   // Pipeline state
 
     const VkPipelineVertexInputStateCreateInfo*   m_pVertexInput; // Vertex input info
     const VkPipelineVertexInputDivisorStateCreateInfoEXT* m_pVertexDivisor; // Vertex input divisor info

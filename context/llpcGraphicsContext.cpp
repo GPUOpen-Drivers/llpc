@@ -735,26 +735,26 @@ void GraphicsContext::DoUserDataNodeMerge()
         while (rangeValues.empty() == false)
         {
             // Find the next block of duplicate rangeValues.
-            uint32_t duplicatesCount = 1;
-            for (; duplicatesCount != rangeValues.size(); ++duplicatesCount)
+            uint32_t duplicateCount = 1;
+            for (; duplicateCount != rangeValues.size(); ++duplicateCount)
             {
-                if ((rangeValues[0].set != rangeValues[duplicatesCount].set) || (rangeValues[0].binding != rangeValues[duplicatesCount].binding))
+                if ((rangeValues[0].set != rangeValues[duplicateCount].set) || (rangeValues[0].binding != rangeValues[duplicateCount].binding))
                 {
                     break;
                 }
-                LLPC_ASSERT((rangeValues[0].type == rangeValues[duplicatesCount].type) &&
+                LLPC_ASSERT((rangeValues[0].type == rangeValues[duplicateCount].type) &&
                             "Descriptor range value merge conflict: type");
-                LLPC_ASSERT((rangeValues[0].arraySize == rangeValues[duplicatesCount].arraySize) &&
+                LLPC_ASSERT((rangeValues[0].arraySize == rangeValues[duplicateCount].arraySize) &&
                             "Descriptor range value merge conflict: arraySize");
                 LLPC_ASSERT((memcmp(rangeValues[0].pValue,
-                                    rangeValues[duplicatesCount].pValue,
+                                    rangeValues[duplicateCount].pValue,
                                     rangeValues[0].arraySize * sizeof(uint32_t)) == 0) &&
                             "Descriptor range value merge conflict: value");
             }
 
             // Keep the merged range.
             mergedRangeValues.push_back(rangeValues[0]);
-            rangeValues = rangeValues.slice(duplicatesCount);
+            rangeValues = rangeValues.slice(duplicateCount);
         }
     }
 

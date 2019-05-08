@@ -30,6 +30,7 @@
  */
 #define DEBUG_TYPE "llpc-patch-descriptor-load"
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -73,6 +74,7 @@ PatchDescriptorLoad::PatchDescriptorLoad()
     Patch(ID)
 {
     initializePipelineShadersPass(*PassRegistry::getPassRegistry());
+    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
     initializePatchDescriptorLoadPass(*PassRegistry::getPassRegistry());
 }
 
@@ -85,6 +87,8 @@ bool PatchDescriptorLoad::runOnModule(
 
     Patch::Init(&module);
     m_changed = false;
+
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
     // Invoke handling of "call" instruction
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
@@ -203,7 +207,8 @@ void PatchDescriptorLoad::visitCallInst(
         // been set up in PatchEntryPointMutate. That happens if PatchPushConst has unspilled all push constants.
         if (callInst.use_empty() == false)
         {
-            auto pSpilledPushConstTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
+            auto pSpilledPushConstTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->
+                                                GetSpilledPushConstTablePtr(m_pPipelineState);
             callInst.replaceAllUsesWith(pSpilledPushConstTablePtr);
         }
         m_descLoadCalls.push_back(&callInst);
@@ -222,80 +227,45 @@ void PatchDescriptorLoad::visitCallInst(
         uint32_t descSize   = 0;
         uint32_t dynDescIdx = InvalidValue;
         Value*   pDesc = nullptr;
-        auto  pDescRangeValue = GetDescriptorRangeValue(nodeType1, pDescSet->getZExtValue(), pBinding->getZExtValue());
+        Constant* pDescRangeValue = nullptr;
+        if (nodeType1 == ResourceMappingNodeType::DescriptorSampler)
+        {
+            pDescRangeValue = GetDescriptorRangeValue(nodeType1, pDescSet->getZExtValue(), pBinding->getZExtValue());
+        }
 
         if (pDescRangeValue != nullptr)
         {
-            // Descriptor range value (immutable sampler in Vulkan)
-            LLPC_ASSERT(nodeType1 == ResourceMappingNodeType::DescriptorSampler);
+            // Descriptor range value (immutable sampler in Vulkan). pDescRangeValue is a constant array of
+            // <4 x i32> descriptors.
+            IRBuilder<> builder(*m_pContext);
+            builder.SetInsertPoint(&callInst);
 
-            uint32_t descSizeInDword = pDescPtrTy->getPointerElementType()->getVectorNumElements();
-
-            if ((pDescRangeValue->arraySize == 1) || isa<ConstantInt>(pArrayOffset))
+            if (pDescRangeValue->getType()->getArrayNumElements() == 1)
             {
-                // Array size is 1 or array offset is constant
-                uint32_t arrayOffset = 0;
-                if (isa<ConstantInt>(pArrayOffset))
-                {
-                    arrayOffset = cast<ConstantInt>(pArrayOffset)->getZExtValue();
-                }
-
-                const uint32_t* pDescValue = pDescRangeValue->pValue + arrayOffset * descSizeInDword;
-
-                std::vector<Constant*> descElems;
-                for (uint32_t i = 0; i < descSizeInDword; ++i)
-                {
-                    descElems.push_back(ConstantInt::get(m_pContext->Int32Ty(), pDescValue[i]));
-                }
-                pDesc = ConstantVector::get(descElems);
+                // Immutable descriptor array is size 1, so we can assume index 0.
+                pDesc = builder.CreateExtractValue(pDescRangeValue, 0);
+            }
+            else if (auto pConstArrayOffset = dyn_cast<ConstantInt>(pArrayOffset))
+            {
+                // Array index is constant.
+                uint32_t index = pConstArrayOffset->getZExtValue();
+                pDesc = builder.CreateExtractValue(pDescRangeValue, {index});
             }
             else
             {
-                // Array size is greater than 1 and array offset is non-constant
-                GlobalVariable* pDescs = nullptr;
+                // Array index is variable.
+                GlobalVariable* pDescs = new GlobalVariable(*m_pModule,
+                                                            pDescRangeValue->getType(),
+                                                            true, // isConstant
+                                                            GlobalValue::InternalLinkage,
+                                                            pDescRangeValue,
+                                                            "",
+                                                            nullptr,
+                                                            GlobalValue::NotThreadLocal,
+                                                            ADDR_SPACE_CONST);
 
-                if (m_descs.find(pDescRangeValue) == m_descs.end())
-                {
-                    std::vector<Constant*> descs;
-                    for (uint32_t i = 0; i < pDescRangeValue->arraySize; ++i)
-                    {
-                        const uint32_t* pDescValue = pDescRangeValue->pValue + i * descSizeInDword;
-
-                        std::vector<Constant*> descElems;
-                        for (uint32_t j = 0; j < descSizeInDword; ++j)
-                        {
-                            descElems.push_back(ConstantInt::get(m_pContext->Int32Ty(), pDescValue[j]));
-                        }
-
-                        descs.push_back(ConstantVector::get(descElems));
-                    }
-
-                    auto pDescsTy = ArrayType::get(VectorType::get(m_pContext->Int32Ty(), descSizeInDword),
-                                                   pDescRangeValue->arraySize);
-
-                    pDescs = new GlobalVariable(*m_pModule,
-                                                pDescsTy,
-                                                true, // isConstant
-                                                GlobalValue::InternalLinkage,
-                                                ConstantArray::get(pDescsTy, descs),
-                                                "",
-                                                nullptr,
-                                                GlobalValue::NotThreadLocal,
-                                                ADDR_SPACE_CONST);
-
-                    m_descs[pDescRangeValue] = pDescs;
-                }
-                else
-                {
-                    pDescs = m_descs[pDescRangeValue];
-                }
-
-                std::vector<Value*> idxs;
-                idxs.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-                idxs.push_back(pArrayOffset);
-
-                auto pDescPtr = GetElementPtrInst::Create(nullptr, pDescs, idxs, "", &callInst);
-                pDesc = new LoadInst(pDescPtr, "", &callInst);
+                auto pDescPtr = builder.CreateGEP(pDescs, {builder.getInt32(0), pArrayOffset});
+                pDesc = builder.CreateLoad(pDescPtr);
             }
         }
 
@@ -318,7 +288,7 @@ void PatchDescriptorLoad::visitCallInst(
             if (dynDescIdx != InvalidValue)
             {
                 // Dynamic descriptors
-                pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(dynDescIdx);
+                pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(m_pPipelineState, dynDescIdx);
                 if (pDesc != nullptr)
                 {
                     auto pDescTy = VectorType::get(m_pContext->Int32Ty(), descSizeInDword);
@@ -423,7 +393,7 @@ void PatchDescriptorLoad::visitCallInst(
             else if (nodeType1 == ResourceMappingNodeType::PushConst)
             {
                 auto pDescTablePtr =
-                    m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(pDescSet->getZExtValue());
+                    m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, pDescSet->getZExtValue());
 
                 Value* pDescTableAddr = new PtrToIntInst(pDescTablePtr,
                                                          m_pContext->Int64Ty(),
@@ -538,11 +508,12 @@ void PatchDescriptorLoad::visitCallInst(
                 }
                 else if ((cl::EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
                 {
-                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetShadowDescTablePtr(descSet);
+                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->
+                                      GetShadowDescTablePtr(m_pPipelineState, descSet);
                 }
                 else
                 {
-                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(descSet);
+                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, descSet);
                 }
                 auto pDescPtr = GetElementPtrInst::Create(nullptr, pDescTablePtr, idxs, "", &callInst);
                 auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", &callInst);
@@ -565,28 +536,39 @@ void PatchDescriptorLoad::visitCallInst(
 
 // =====================================================================================================================
 // Gets the descriptor value of the specified descriptor.
-const DescriptorRangeValue* PatchDescriptorLoad::GetDescriptorRangeValue(
+Constant* PatchDescriptorLoad::GetDescriptorRangeValue(
     ResourceMappingNodeType   nodeType,   // Type of the resource mapping node
     uint32_t                  descSet,    // ID of descriptor set
     uint32_t                  binding     // ID of descriptor binding
     ) const
 {
-    auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
-    const DescriptorRangeValue* pDescRangValue = nullptr;
-    for (uint32_t i = 0; i < pShaderInfo->descriptorRangeValueCount; ++i)
+    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
+    for (const ResourceNode& node : userDataNodes)
     {
-        auto pRangeValue = &pShaderInfo->pDescriptorRangeValues[i];
-        if ((pRangeValue->type == nodeType) &&
-            (pRangeValue->set == descSet) &&
-            (pRangeValue->binding == binding))
+        if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
         {
-            pDescRangValue = pRangeValue;
-            break;
+            for (const ResourceNode& innerNode : node.innerTable)
+            {
+                if (((innerNode.type == ResourceMappingNodeType::DescriptorSampler) ||
+                     (innerNode.type == ResourceMappingNodeType::DescriptorCombinedTexture)) &&
+                    (innerNode.set == descSet) &&
+                    (innerNode.binding == binding))
+                {
+                    return innerNode.pImmutableValue;
+                }
+            }
+        }
+        else if (((node.type == ResourceMappingNodeType::DescriptorSampler) ||
+                  (node.type == ResourceMappingNodeType::DescriptorCombinedTexture)) &&
+                 (node.set == descSet) &&
+                 (node.binding == binding))
+        {
+            return node.pImmutableValue;
         }
     }
-    return pDescRangValue;
-
+    return nullptr;
 }
+
 // =====================================================================================================================
 // Calculates the offset and size for the specified descriptor.
 //
@@ -601,7 +583,6 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
     uint32_t*                 pDynDescIdx     // [out] Calculated index of dynamic descriptor
     ) const
 {
-    auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
     bool exist = false;
     ResourceMappingNodeType foundNodeType = ResourceMappingNodeType::Unknown;
 
@@ -627,9 +608,10 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
         nodeType1 = ResourceMappingNodeType::DescriptorResource;
     }
 
-    for (uint32_t i = 0; (i < pShaderInfo->userDataNodeCount) && (exist == false); ++i)
+    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
+    for (uint32_t i = 0; (i < userDataNodes.size()) && (exist == false); ++i)
     {
-        auto pSetNode = &pShaderInfo->pUserDataNodes[i];
+        auto pSetNode = &userDataNodes[i];
         if  ((pSetNode->type == ResourceMappingNodeType::DescriptorResource) ||
              (pSetNode->type == ResourceMappingNodeType::DescriptorSampler) ||
              (pSetNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
@@ -637,8 +619,8 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
              (pSetNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
              (pSetNode->type == ResourceMappingNodeType::DescriptorBufferCompact))
         {
-            if ((descSet == pSetNode->srdRange.set) &&
-                (binding == pSetNode->srdRange.binding) &&
+            if ((descSet == pSetNode->set) &&
+                (binding == pSetNode->binding) &&
                 ((nodeType1 == pSetNode->type) ||
                  (nodeType2 == pSetNode->type) ||
                  ((nodeType1 == ResourceMappingNodeType::DescriptorBuffer) &&
@@ -673,9 +655,9 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
         }
         else if (pSetNode->type == ResourceMappingNodeType::DescriptorTableVaPtr)
         {
-            for (uint32_t j = 0; (j < pSetNode->tablePtr.nodeCount) && (exist == false); ++j)
+            for (uint32_t j = 0; (j < pSetNode->innerTable.size()) && (exist == false); ++j)
             {
-                auto pNode = &pSetNode->tablePtr.pNext[j];
+                auto pNode = &pSetNode->innerTable[j];
                 switch (pNode->type)
                 {
                 case ResourceMappingNodeType::DescriptorResource:
@@ -685,8 +667,8 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                 case ResourceMappingNodeType::DescriptorBuffer:
                 case ResourceMappingNodeType::PushConst:
                     {
-                        if ((pNode->srdRange.set == descSet) &&
-                            (pNode->srdRange.binding == binding) &&
+                        if ((pNode->set == descSet) &&
+                            (pNode->binding == binding) &&
                             ((nodeType1 == pNode->type) ||
                              (nodeType2 == pNode->type)))
                         {
@@ -728,8 +710,8 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                     {
                         // TODO: Check descriptor binding in Vulkan API call to make sure sampler and texture are
                         // bound in this way.
-                        if ((pNode->srdRange.set == descSet) &&
-                            (pNode->srdRange.binding == binding) &&
+                        if ((pNode->set == descSet) &&
+                            (pNode->binding == binding) &&
                             ((nodeType1 == ResourceMappingNodeType::DescriptorResource) ||
                             (nodeType1 == ResourceMappingNodeType::DescriptorSampler)))
                         {

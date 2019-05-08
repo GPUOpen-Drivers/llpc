@@ -35,6 +35,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcPipelineContext.h"
 
@@ -257,6 +258,23 @@ uint64_t PipelineContext::GetShaderHashCode(
 
     return (pModuleData == nullptr) ? 0 :
         MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash));
+}
+
+// =====================================================================================================================
+// Set pipeline state in Builder
+void PipelineContext::SetBuilderPipelineState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    // Give the user data nodes and descriptor range values to the Builder.
+    // The user data nodes have been merged so they are the same in each shader stage. Get them from
+    // the first active stage.
+    uint32_t stageMask = GetShaderStageMask();
+    auto pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+    ArrayRef<ResourceMappingNode> userDataNodes(pShaderInfo->pUserDataNodes,
+                                                pShaderInfo->userDataNodeCount);
+    ArrayRef<DescriptorRangeValue> descriptorRangeValues(pShaderInfo->pDescriptorRangeValues,
+                                                         pShaderInfo->descriptorRangeValueCount);
+    pBuilder->SetUserDataNodes(userDataNodes, descriptorRangeValues);
 }
 
 } // Llpc

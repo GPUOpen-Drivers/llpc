@@ -40,6 +40,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchPushConstOp.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -63,6 +64,8 @@ PatchPushConstOp::PatchPushConstOp()
     :
     Patch(ID)
 {
+    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
+    initializePatchPushConstOpPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
@@ -71,6 +74,7 @@ void PatchPushConstOp::getAnalysisUsage(
     AnalysisUsage& analysisUsage // [out] The analysis usage.
     ) const
 {
+    analysisUsage.addRequired<PipelineStateWrapper>();
     analysisUsage.addRequired<PipelineShaders>();
     analysisUsage.addPreserved<PipelineShaders>();
     analysisUsage.setPreservesCFG();
@@ -93,6 +97,7 @@ bool PatchPushConstOp::runOnModule(
         return false;
     }
 
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     const PipelineShaders& pipelineShaders = getAnalysis<PipelineShaders>();
     for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
@@ -155,10 +160,9 @@ void PatchPushConstOp::visitCallInst(
     LLPC_UNUSED(pCallee);
 
     auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
-    auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
     uint32_t pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
     LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
-    auto pPushConstNode = &pShaderInfo->pUserDataNodes[pushConstNodeIdx];
+    auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pushConstNodeIdx];
 
     if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)
     {

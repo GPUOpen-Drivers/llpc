@@ -68,6 +68,7 @@ PatchInOutImportExport::PatchInOutImportExport()
     memset(&m_gfxIp, 0, sizeof(m_gfxIp));
     InitPerShader();
 
+    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
     initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchInOutImportExportPass(*PassRegistry::getPassRegistry());
 }
@@ -107,6 +108,7 @@ bool PatchInOutImportExport::runOnModule(
     Patch::Init(&module);
 
     m_gfxIp = m_pContext->GetGfxIpVersion();
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
@@ -174,7 +176,7 @@ void PatchInOutImportExport::ProcessShader()
     if (m_shaderStage == ShaderStageVertex)
     {
         // Create vertex fetch manager
-        m_pVertexFetch = new VertexFetch(m_pEntryPoint, m_pipelineSysValues.Get(m_pEntryPoint));
+        m_pVertexFetch = new VertexFetch(m_pEntryPoint, m_pipelineSysValues.Get(m_pEntryPoint), m_pPipelineState);
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
@@ -4342,7 +4344,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
                 (m_shaderStage == ShaderStageTessEval) ||
                 (m_shaderStage == ShaderStageCopyShader));
 
-    Value* pStreamOutBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetStreamOutBufDesc(xfbBuffer);
+    Value* pStreamOutBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetStreamOutBufDesc(m_pPipelineState, xfbBuffer);
 
     const auto& xfbStrides = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
     uint32_t xfbStride = xfbStrides[xfbBuffer];

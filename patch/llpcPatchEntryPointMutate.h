@@ -33,6 +33,7 @@
 #include "llvm/IR/InstVisitor.h"
 
 #include "llpcPatch.h"
+#include "llpcPipelineState.h"
 
 namespace Llpc
 {
@@ -50,6 +51,7 @@ public:
 
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
         // Does not preserve PipelineShaders because it replaces the entrypoints.
     }
@@ -67,7 +69,7 @@ private:
 
     llvm::FunctionType* GenerateEntryPointType(uint64_t* pInRegMask) const;
 
-    bool IsResourceMappingNodeActive(const ResourceMappingNode* pNode, bool isRootNode) const;
+    bool IsResourceNodeActive(const ResourceNode* pNode, bool isRootNode) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -76,6 +78,8 @@ private:
 
     bool    m_hasTs;    // Whether the pipeline has tessllation shader
     bool    m_hasGs;    // Whether the pipeline has geometry shader
+    PipelineState*  m_pPipelineState = nullptr;
+                        // PipelineState from PipelineStateWrapper pass
 };
 
 } // Llpc
