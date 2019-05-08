@@ -36,6 +36,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 
 namespace Llpc
@@ -56,6 +57,7 @@ public:
 
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
         analysisUsage.addPreserved<PipelineShaders>();
     }
@@ -328,6 +330,7 @@ private:
 
     std::vector<llvm::CallInst*> m_importCalls; // List of "call" instructions to import inputs
     std::vector<llvm::CallInst*> m_exportCalls; // List of "call" instructions to export outputs
+    PipelineState*          m_pPipelineState = nullptr; // PipelineState from PipelineStateWrapper pass
 };
 
 } // Llpc

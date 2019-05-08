@@ -49,6 +49,7 @@ namespace Llpc
 {
 
 class Context;
+class PipelineState;
 
 // =====================================================================================================================
 // Initialize the pass that gets created by a Builder
@@ -82,6 +83,7 @@ inline static void InitializeBuilderPasses(
 //
 //    * Create an instance of BuilderImpl.
 //    * Create an IR module per shader stage.
+//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
 //    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
 //      for LLPC operations.
 //    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
@@ -98,6 +100,7 @@ inline static void InitializeBuilderPasses(
 //
 //    * Create an instance of BuilderRecorder.
 //    * Create an IR module per shader stage.
+//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
 //    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
 //      for LLPC operations.
 //    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
@@ -126,6 +129,7 @@ inline static void InitializeBuilderPasses(
 //        for LLPC operations.
 //    * Then, later on, bring the shader IR modules together, and link them with Builder::Link()
 //      into a single pipeline IR module.
+//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
 //    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
 //      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
 //      module).
@@ -167,6 +171,18 @@ public:
 
     // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
     virtual llvm::ModulePass* CreateBuilderReplayer() { return nullptr; }
+
+    // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
+    // supplied to the shader as a hierarchical table (max two levels) of descriptors.
+    // "immutableDescs" contains descriptors (currently limited to samplers), whose values are hard
+    // coded by the application. Each one is a duplicate of one in "nodes". A use of one of these immutable
+    // descriptors in the applicable Create* method is converted directly to the constant value.
+    //
+    // If using a BuilderImpl, this method must be called before any Create* methods.
+    // If using a BuilderRecorder, it can be delayed until after linking.
+    void SetUserDataNodes(
+        llvm::ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
+        llvm::ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
 
     // Set the current shader stage.
     void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
@@ -421,11 +437,12 @@ public:
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
 protected:
-    Builder(llvm::LLVMContext& context) : llvm::IRBuilder<>(context) {}
+    Builder(llvm::LLVMContext& context);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    ShaderStage m_shaderStage = ShaderStageInvalid;   // Current shader stage being built.
+    ShaderStage     m_shaderStage     = ShaderStageInvalid; // Current shader stage being built.
+    PipelineState*  m_pPipelineState  = nullptr;            // Pipeline state
 
     llvm::Type* GetTransposedMatrixTy(
         llvm::Type* const pMatrixType) const; // [in] The matrix type to tranpose

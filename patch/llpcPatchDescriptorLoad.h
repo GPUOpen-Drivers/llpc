@@ -35,6 +35,7 @@
 #include <unordered_set>
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 
 namespace Llpc
@@ -51,6 +52,7 @@ public:
 
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
         analysisUsage.addPreserved<PipelineShaders>();
     }
@@ -73,9 +75,9 @@ private:
                                                         uint32_t*                 pStride,
                                                         uint32_t*                 pDynDescIdx) const;
 
-    const DescriptorRangeValue* GetDescriptorRangeValue(ResourceMappingNodeType   nodeType,
-                                                        uint32_t                  descSet,
-                                                        uint32_t                  binding) const;
+    llvm::Constant* GetDescriptorRangeValue(ResourceMappingNodeType   nodeType,
+                                            uint32_t                  descSet,
+                                            uint32_t                  binding) const;
 
     void PatchWaterfallLastUseCalls();
 
@@ -94,6 +96,9 @@ private:
 
     // Map from descriptor range value to global variables modeling related descriptors (act as immediate constants)
     std::unordered_map<const DescriptorRangeValue*, llvm::GlobalVariable*> m_descs;
+
+    PipelineState*                      m_pPipelineState = nullptr;
+                                                              // PipelineState from PipelineStateWrapper pass
 };
 
 } // Llpc

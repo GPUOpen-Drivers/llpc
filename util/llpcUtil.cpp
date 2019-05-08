@@ -154,4 +154,37 @@ bool CreateDirectory(
 #endif
 }
 
+// =====================================================================================================================
+// Helper macro
+#define CASE_CLASSENUM_TO_STRING(TYPE, ENUM) \
+    case TYPE::ENUM: pString = #ENUM; break;
+
+// =====================================================================================================================
+// Translate enum "ResourceMappingNodeType" to string
+const char* GetResourceMappingNodeTypeName(
+    ResourceMappingNodeType type)  // Resource map node type
+{
+    const char* pString = nullptr;
+    switch (type)
+    {
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, Unknown)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorResource)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorSampler)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorCombinedTexture)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTexelBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorFmask)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBuffer)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorTableVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, IndirectUserDataVaPtr)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, PushConst)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+    return pString;
+}
+
 } // Llpc

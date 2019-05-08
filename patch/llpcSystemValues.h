@@ -40,6 +40,9 @@
 namespace Llpc
 {
 
+class PipelineState;
+struct ResourceNode;
+
 // =====================================================================================================================
 // "Shader system values" are values set up in a shader entrypoint, such as the ES->GS ring buffer descriptor, or the
 // user descriptor table pointer, that some passes need access to. The ShaderSystemValues class has an instance for each
@@ -83,13 +86,13 @@ public:
     llvm::ArrayRef<llvm::Value*> GetEmitCounterPtr();
 
     // Get descriptor table pointer
-    llvm::Value* GetDescTablePtr(uint32_t descSet);
+    llvm::Value* GetDescTablePtr(PipelineState* pPipelineState, uint32_t descSet);
 
     // Get shadow descriptor table pointer
-    llvm::Value* GetShadowDescTablePtr(uint32_t descSet);
+    llvm::Value* GetShadowDescTablePtr(PipelineState* pPipelineState, uint32_t descSet);
 
     // Get dynamic descriptor
-    llvm::Value* GetDynamicDesc(uint32_t dynDescIdx);
+    llvm::Value* GetDynamicDesc(PipelineState* pPipelineState, uint32_t dynDescIdx);
 
     // Get global internal table pointer
     llvm::Value* GetInternalGlobalTablePtr();
@@ -101,26 +104,29 @@ public:
     llvm::Value* GetNumWorkgroups();
 
     // Get spilled push constant pointer
-    llvm::Value* GetSpilledPushConstTablePtr();
+    llvm::Value* GetSpilledPushConstTablePtr(PipelineState* pPipelineState);
 
     // Get vertex buffer table pointer
-    llvm::Value* GetVertexBufTablePtr();
+    llvm::Value* GetVertexBufTablePtr(PipelineState* pPipelineState);
 
     // Get stream-out buffer descriptor
-    llvm::Value* GetStreamOutBufDesc(uint32_t xfbBuffer);
+    llvm::Value* GetStreamOutBufDesc(PipelineState* pPipelineState, uint32_t xfbBuffer);
 
 private:
     // Get stream-out buffer table pointer
-    llvm::Instruction* GetStreamOutTablePtr();
+    llvm::Instruction* GetStreamOutTablePtr(PipelineState* pPipelineState);
 
     // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
     llvm::Instruction* MakePointer(llvm::Value* pLowValue, llvm::Type* pPtrTy, uint32_t highValue);
 
     // Get 64-bit extended resource node value
-    llvm::Value* GetExtendedResourceNodeValue(uint32_t resNodeIdx, llvm::Type* pResNodeTy, uint32_t highValue);
+    llvm::Value* GetExtendedResourceNodeValue(PipelineState* pPipelineState,
+                                              uint32_t resNodeIdx,
+                                              llvm::Type* pResNodeTy,
+                                              uint32_t highValue);
 
     // Get 32 bit resource node value
-    llvm::Value* GetResourceNodeValue(uint32_t resNodeIdx);
+    llvm::Value* GetResourceNodeValue(PipelineState* pPipelineState, uint32_t resNodeIdx);
 
     // Get spill table pointer
     llvm::Instruction* GetSpillTablePtr();
@@ -134,10 +140,10 @@ private:
                                          llvm::Instruction* pInsertPos) const;
 
     // Find resource node by type
-    const ResourceMappingNode* FindResourceNodeByType(ResourceMappingNodeType type);
+    const ResourceNode* FindResourceNodeByType(PipelineState* pPipelineState, ResourceMappingNodeType type);
 
     // Find resource node by descriptor set ID
-    uint32_t FindResourceNodeByDescSet(uint32_t descSet);
+    uint32_t FindResourceNodeByDescSet(PipelineState* pPipelineState, uint32_t descSet);
 
     // -----------------------------------------------------------------------------------------------------------------
 

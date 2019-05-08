@@ -55,6 +55,9 @@ uint32_t ShaderStageToMask(ShaderStage stage);
 // Create directory.
 bool CreateDirectory(const char* pDir);
 
+// Translate enum "ResourceMappingNodeType" to string
+const char* GetResourceMappingNodeTypeName(ResourceMappingNodeType type);
+
 // =====================================================================================================================
 // Increments a pointer by nBytes by first casting it to a uint8_t*.
 //

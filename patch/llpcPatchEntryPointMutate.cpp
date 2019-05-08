@@ -93,6 +93,7 @@ PatchEntryPointMutate::PatchEntryPointMutate()
     m_hasTs(false),
     m_hasGs(false)
 {
+    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
     initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchEntryPointMutatePass(*PassRegistry::getPassRegistry());
 }
@@ -105,6 +106,8 @@ bool PatchEntryPointMutate::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
     Patch::Init(&module);
+
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
@@ -260,8 +263,8 @@ void PatchEntryPointMutate::ProcessShader()
 
 // =====================================================================================================================
 // Checks whether the specified resource mapping node is active.
-bool PatchEntryPointMutate::IsResourceMappingNodeActive(
-    const ResourceMappingNode* pNode,        // [in] Resource mapping node
+bool PatchEntryPointMutate::IsResourceNodeActive(
+    const ResourceNode* pNode,               // [in] Resource mapping node
     bool isRootNode                          // TRUE if node is in root level
     ) const
 {
@@ -322,9 +325,9 @@ bool PatchEntryPointMutate::IsResourceMappingNodeActive(
     else if (pNode->type == ResourceMappingNodeType::DescriptorTableVaPtr)
     {
         // Check if any contained descriptor node is active
-        for (uint32_t i = 0; i < pNode->tablePtr.nodeCount; ++i)
+        for (uint32_t i = 0; i < pNode->innerTable.size(); ++i)
         {
-            if (IsResourceMappingNodeActive(pNode->tablePtr.pNext + i, false))
+            if (IsResourceNodeActive(&pNode->innerTable[i], false))
             {
                 active = true;
                 break;
@@ -346,8 +349,8 @@ bool PatchEntryPointMutate::IsResourceMappingNodeActive(
                     (pNode->type != ResourceMappingNodeType::IndirectUserDataVaPtr));
 
         DescriptorPair descPair = {};
-        descPair.descSet = pNode->srdRange.set;
-        descPair.binding = pNode->srdRange.binding;
+        descPair.descSet = pNode->set;
+        descPair.binding = pNode->binding;
 
         active = (pResUsage1->descPairs.find(descPair.u64All) != pResUsage1->descPairs.end());
         if ((active == false) && (pResUsage2 != nullptr))
@@ -369,7 +372,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     uint32_t userDataIdx = 0;
     std::vector<Type*> argTys;
 
-    auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
+    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
     auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
     auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
@@ -399,11 +402,11 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     bool reserveStreamOutTable = false;
     bool reserveEsGsLdsSize = false;
 
-    if (pShaderInfo->userDataNodeCount > 0)
+    if (userDataNodes.size() > 0)
     {
-        for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+        for (uint32_t i = 0; i < userDataNodes.size(); ++i)
         {
-            auto pNode = &pShaderInfo->pUserDataNodes[i];
+            auto pNode = &userDataNodes[i];
              // NOTE: Per PAL request, the value of IndirectTableEntry is the node offset + 1.
              // and indirect user data should not be counted in possible spilled user data.
             if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
@@ -460,7 +463,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 continue;
             }
 
-            if (IsResourceMappingNodeActive(pNode, true) == false)
+            if (IsResourceNodeActive(pNode, true) == false)
             {
                 continue;
             }
@@ -610,9 +613,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     // Allocate register for stream-out buffer table
     if (reserveStreamOutTable)
     {
-        for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+        for (uint32_t i = 0; i < userDataNodes.size(); ++i)
         {
-            auto pNode = &pShaderInfo->pUserDataNodes[i];
+            auto pNode = &userDataNodes[i];
             if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
             {
                 argTys.push_back(m_pContext->Int32Ty());
@@ -654,9 +657,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
     // Descriptor table and vertex buffer table
     uint32_t actualAvailUserDataCount = 0;
-    for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+    for (uint32_t i = 0; i < userDataNodes.size(); ++i)
     {
-        auto pNode = &pShaderInfo->pUserDataNodes[i];
+        auto pNode = &userDataNodes[i];
 
         // "IndirectUserDataVaPtr" can't be spilled, it is treated as internal user data
         if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
@@ -669,7 +672,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             continue;
         }
 
-        if (IsResourceMappingNodeActive(pNode, true) == false)
+        if (IsResourceNodeActive(pNode, true) == false)
         {
             continue;
         }
@@ -780,9 +783,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
-            for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+            for (uint32_t i = 0; i < userDataNodes.size(); ++i)
             {
-                auto pNode = &pShaderInfo->pUserDataNodes[i];
+                auto pNode = &userDataNodes[i];
                 if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
                 {
                     argTys.push_back(m_pContext->Int32Ty());

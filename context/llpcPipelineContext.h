@@ -789,6 +789,9 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
 
+    // Set pipeline state in Builder
+    void SetBuilderPipelineState(Builder* pBuilder) const;
+
 protected:
     // Gets dummy vertex input create info
     virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return nullptr; }

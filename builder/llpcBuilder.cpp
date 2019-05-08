@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderImpl.h"
+#include "llpcPipelineState.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
 
@@ -75,8 +76,28 @@ Builder* Builder::CreateBuilderImpl(
 }
 
 // =====================================================================================================================
+Builder::Builder(
+    LLVMContext& context) // [in] LLPC context
+    :
+    IRBuilder<>(context)
+{
+    m_pPipelineState = new PipelineState(&context);
+}
+
+// =====================================================================================================================
 Builder::~Builder()
 {
+    delete m_pPipelineState;
+}
+
+// =====================================================================================================================
+// Set the resource mapping nodes for the given shader stage.
+// This stores the nodes as IR metadata.
+void Builder::SetUserDataNodes(
+    ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
+    ArrayRef<DescriptorRangeValue>  rangeValues)      // The descriptor range values
+{
+    m_pPipelineState->SetUserDataNodes(nodes, rangeValues);
 }
 
 // =====================================================================================================================
@@ -131,14 +152,27 @@ Module* Builder::Link(
     if (pPipelineModule != nullptr)
     {
         pPipelineModule->setModuleIdentifier("llpcPipeline");
+
+        // Record pipeline state into IR metadata.
+        if (m_pPipelineState != nullptr)
+        {
+            m_pPipelineState->RecordState(pPipelineModule);
+        }
     }
     else
     {
-        // Create an empty module then link each shader module into it.
+        // Create an empty module then link each shader module into it. We record pipeline state into IR
+        // metadata before the link, to avoid problems with a Constant for an immutable descriptor value
+        // disappearing when modules are deleted.
         bool result = true;
         pPipelineModule = new Module("llpcPipeline", getContext());
         static_cast<Llpc::Context*>(&getContext())->SetModuleTargetMachine(pPipelineModule);
         Linker linker(*pPipelineModule);
+
+        if (m_pPipelineState != nullptr)
+        {
+            m_pPipelineState->RecordState(pPipelineModule);
+        }
 
         for (int32_t stage = 0; stage < ShaderStageCount; ++stage)
         {

@@ -64,7 +64,8 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::SmallVector<llvm::Instruction*, 8> m_instsToRemove; // List of instructions to remove.
+    llvm::SmallVector<llvm::Instruction*, 8> m_instsToRemove;   // List of instructions to remove.
+    PipelineState*  m_pPipelineState = nullptr;                 // PipelineState from PipelineStateWrapper pass
 };
 
 } // Llpc
