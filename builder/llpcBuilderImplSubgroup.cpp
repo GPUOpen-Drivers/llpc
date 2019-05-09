@@ -194,7 +194,6 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotInclusiveBitCount(
     Value* const pValue,   // [in] The ballot value to inclusively bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Type* const pType = pValue->getType();
     Value* const pExclusiveBitCount = CreateSubgroupBallotExclusiveBitCount(pValue, instName);
     Value* const pInverseBallot = CreateSubgroupInverseBallot(pValue, instName);
     Value* const pInclusiveBitCount = CreateAdd(pExclusiveBitCount, getInt32(1));
@@ -556,9 +555,7 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
 
         // Start the WWM section by setting the inactive invocations.
         Value* const pSetInactive = CreateSetInactive(pValue, pIdentity);
-
-        // Start the WWM section by setting the inactive lanes.
-        Value* pResult = CreateSetInactive(pValue, CreateGroupArithmeticIdentity(groupArithOp, pValue->getType()));
+        Value* pResult = pSetInactive;
 
         // The DS swizzle is xor'ing by 0x1 with an and mask of 0x1f, which swaps from N <-> N+1. We don't want the N's
         // to perform the operation, only the N+1's, so we use a mask of 0xa (0b1010) to stop the N's doing anything.
