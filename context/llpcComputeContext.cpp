@@ -92,6 +92,25 @@ const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
 }
 
 // =====================================================================================================================
+// Gets the hash code of input shader with specified shader stage.
+uint64_t ComputeContext::GetShaderHashCode(
+    ShaderStage stage       // Shader stage
+    ) const
+{
+    auto pShaderInfo = GetPipelineShaderInfo(stage);
+    LLPC_ASSERT(pShaderInfo != nullptr);
+
+    MetroHash::MetroHash64 hasher;
+
+    UpdateShaderHashForPipelineShaderInfo(ShaderStageCompute, pShaderInfo, &hasher);
+    hasher.Update(m_pPipelineInfo->deviceIndex);
+
+    uint64_t hash;
+    hasher.Finalize(reinterpret_cast<uint8_t* const>(&hash));
+    return hash;
+}
+
+// =====================================================================================================================
 // Gets wave size for the specified shader stage
 //
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.

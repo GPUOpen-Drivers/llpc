@@ -34,7 +34,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: <4 x float> @spirv.image.sample.f32.2D.grad.minlod({{.*}}, <2 x float> <float 0x3FB99999A0000000, float 0x3FB99999A0000000>, <2 x float> <float 1.000000e+00, float 1.000000e+00>, <2 x float> <float 0x3FF19999A0000000, float 0x3FF19999A0000000>, {{.*}})

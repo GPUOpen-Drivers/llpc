@@ -18,7 +18,7 @@ void main ( )
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{[a-zA-Z_]+}} void @_Z16EmitStreamVertexi(i32 1)
 ; SHADERTEST: call {{[a-zA-Z_]+}} void @_Z18EndStreamPrimitivei(i32 1)

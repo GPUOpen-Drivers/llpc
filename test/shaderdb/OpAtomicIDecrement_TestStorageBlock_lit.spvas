@@ -1,15 +1,16 @@
+
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST; call i32 @llpc.buffer.atomic.idecrement.i32(<4 x i32> %{{[0-9]*}}, i32 24, i32 0, i1 false)
-; SHADERTEST: store i32
+; SHADERTEST: call void @llpc.buffer.store.v4i8(<4 x i32> %{{[0-9]*}}, i32 0, <4 x i8> %{{[0-9]*}}, i32 0, i1 false)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.sub.i32(i32 1, <4 x i32> %{{[0-9]*}}, i32 24, i32 0, i32 0)
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 
-; SHADERTEST: AMDLLPC SUCCESS
+; SHADERTEST : AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 ; SPIR-V

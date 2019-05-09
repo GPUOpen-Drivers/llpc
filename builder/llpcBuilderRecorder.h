@@ -74,10 +74,6 @@ public:
         DescLoadTexelBuffer,
         DescLoadFmask,
         DescLoadSpillTablePtr,
-        DescBufferLength,
-
-        // Matrix
-        MatrixTranspose,
 
         // Misc.
         MiscKill,
@@ -107,6 +103,7 @@ public:
     llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
                                            llvm::ArrayRef<uint32_t> operandIdxs,
                                            const llvm::Twine&       instName) override final;
+
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
                                       uint32_t            binding,
                                       llvm::Value*        pDescIndex,
@@ -141,18 +138,12 @@ public:
     llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
                                          const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateBufferLength(llvm::Value* const pBufferDesc,
-                                    const llvm::Twine& instName = "") override final;
-
     //
     // Builder methods implemented in BuilderImplMisc
     //
 
     llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override final;
     llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
-
-    // Builder methods implemented in BuilderImplMatrix
-    llvm::Value* CreateMatrixTranspose(llvm::Value* const pMatrix, const llvm::Twine& instName = "") override final;
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
     llvm::ModulePass* CreateBuilderReplayer() override;

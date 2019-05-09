@@ -797,7 +797,7 @@ void PatchCopyShader::ExportGenericOutput(
         args.push_back(pOutputValue);
 
         instName = LlpcName::OutputExportGeneric;
-        instName += GetTypeName(pOutputTy);
+        instName += GetTypeNameForScalarOrVector(pOutputTy);
 
         EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }

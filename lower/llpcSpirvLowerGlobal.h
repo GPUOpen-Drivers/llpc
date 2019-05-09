@@ -72,8 +72,6 @@ private:
     void LowerInput();
     void LowerOutput();
     void LowerInOutInPlace();
-    void LowerBufferBlock();
-    void LowerPushConsts();
 
     llvm::Value* AddCallInstForInOutImport(llvm::Type*        pInOutTy,
                                            uint32_t           addrSpace,
@@ -118,8 +116,6 @@ private:
                                 uint32_t                   locOffset,
                                 uint32_t                   xfbLocOffset,
                                 const ShaderInOutMetadata& outputMeta);
-
-    void ReplaceConstWithInsts(Constant* const pConst);
 
     // -----------------------------------------------------------------------------------------------------------------
 

@@ -60,25 +60,25 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: @{{.*}} = internal addrspace(3) global i32
-; SHADERTEST: @{{.*}} = internal addrspace(3) global [4 x i32]
-; SHADERTEST: atomicrmw add i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw add i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @{{.*}}, i32 0, i32 1), i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw min i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umin i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @{{.*}}, i32 0, i32 0), i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw max i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umax i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @{{.*}}, i32 0, i32 2), i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @{{.*}}, i32 0, i32 3), i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xchg i32 addrspace(3)* @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xchg i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} monotonic
+; SHADERTEST: @imem = internal addrspace(3) global i32
+; SHADERTEST: @umem = internal addrspace(3) global [4 x i32]
+; SHADERTEST: atomicrmw volatile add i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile add i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @umem, i32 0, i32 1), i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile min i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile umin i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @umem, i32 0, i32 0), i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile max i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile umax i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @umem, i32 0, i32 2), i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile and i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile and i32 addrspace(3)* getelementptr inbounds ([4 x i32], [4 x i32] addrspace(3)* @umem, i32 0, i32 3), i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile or i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile or i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile xor i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile xor i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile xchg i32 addrspace(3)* @imem, i32 %{{[0-9]*}} seq_cst,
+; SHADERTEST: atomicrmw volatile xchg i32 addrspace(3)* %{{[0-9]*}}, i32 %{{[0-9]*}} seq_cst,
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

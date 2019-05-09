@@ -33,12 +33,6 @@ project(shadertest
       CXX
   )
 
-if(DEFINED XGL_LLVM_SRC_PATH)
-  # This is a build where LLPC lit testing is integrated into AMDVLK cmake files.
-  set(AMDLLPC_TEST_DEPS amdllpc spvgen FileCheck count not)
-  set(LLVM_DIR ${XGL_LLVM_SRC_PATH})
-endif()
-
 if(DEFINED LLVM_DIR)
   set(BUILD_EXTERNAL NO)
 else()
@@ -75,6 +69,8 @@ configure_lit_site_cfg(
 
 add_lit_testsuite(check-amdllpc "Running the AMDLLPC regression tests"
   ${CMAKE_CURRENT_BINARY_DIR}
+  ARGS
+    --verbose
   DEPENDS
     ${AMDLLPC_TEST_DEPS}
 )

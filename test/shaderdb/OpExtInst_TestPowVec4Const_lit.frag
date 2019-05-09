@@ -12,7 +12,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z3powDv4_fDv4_f(<4 x float> %{{.*}}, <4 x float> %{{.*}})
 ; SHADERTEST: store float 1.200000e+01, float addrspace(5)* %{{.*}}

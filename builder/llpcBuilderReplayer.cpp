@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderRecorder.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 
 #include "llvm/Support/Debug.h"
@@ -90,7 +89,7 @@ BuilderReplayer::BuilderReplayer(
     Builder* pBuilder)      // [in] Builder to replay calls into
     :
     ModulePass(ID),
-    BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pBuilder->getContext())),
+    BuilderRecorderMetadataKinds(pBuilder->getContext()),
     m_pBuilder(pBuilder)
 {
     initializeBuilderReplayerPass(*PassRegistry::getPassRegistry());
@@ -143,8 +142,6 @@ bool BuilderReplayer::runOnModule(
             ReplayCall(opcode, pCall);
         }
 
-        func.clearMetadata();
-        LLPC_ASSERT(func.user_empty());
         funcsToRemove.push_back(&func);
     }
 
@@ -360,11 +357,6 @@ Value* BuilderReplayer::ProcessCall(
                   pCall->getType()->getPointerElementType());  // pSpillTableTy
         }
 
-    case BuilderRecorder::Opcode::DescBufferLength:
-        {
-            return m_pBuilder->CreateBufferLength(args[0]);
-        }
-
     // Replayer implementations of BuilderImplMisc methods
     case BuilderRecorder::Opcode::MiscKill:
         {
@@ -374,10 +366,6 @@ Value* BuilderReplayer::ProcessCall(
         {
             bool realtime = (cast<ConstantInt>(args[0])->getZExtValue() != 0);
             return m_pBuilder->CreateReadClock(realtime);
-        }
-    case BuilderRecorder::Opcode::MatrixTranspose:
-        {
-            return m_pBuilder->CreateMatrixTranspose(args[0]);
         }
     }
 }

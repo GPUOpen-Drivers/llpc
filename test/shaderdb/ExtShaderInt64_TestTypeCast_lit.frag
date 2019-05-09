@@ -35,7 +35,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: fptosi <3 x float> %{{[0-9]*}} to <3 x i64>
 ; SHADERTEST: fptosi <3 x double> %{{[0-9]*}} to <3 x i64>

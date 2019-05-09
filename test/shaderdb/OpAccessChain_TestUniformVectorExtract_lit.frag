@@ -16,14 +16,12 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: [[GEPVAR:%[^ ]+]] = getelementptr <{ [4 x double], i32 }>, <{ [4 x double], i32 }> addrspace(7)* {{%[^,]+}}, i64 0, i32 0, i64 %
-; SHADERTEST: load double, double addrspace(7)* [[GEPVAR]], align 8
-; SHADERTEST: [[GEP16:%[^ ]+]] = getelementptr inbounds i8, i8 addrspace(7)* {{%[^,]+}}, i64 16
-; SHADERTEST: [[BC:%[^ ]+]] = bitcast i8 addrspace(7)* [[GEP16]] to double addrspace(7)*
-; SHADERTEST: load double, double addrspace(7)* [[BC]], align 8
+; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false)
+; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 16, i1 true, i32 0, i1 false)
+
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

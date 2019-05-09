@@ -11,10 +11,10 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: store <4 x i32> <i32 1, i32 0, i32 1, i32 0>,
+; SHADERTEST: zext <4 x i1> <i1 true, i1 false, i1 true, i1 false> to <4 x i32>
 ; SHADERTEST-COUNT-2: call {{.*}} i32 @{{.*}}all{{.*}}(<4 x i32> %{{[0-9]*}})
 
 ; SHADERTEST: AMDLLPC SUCCESS

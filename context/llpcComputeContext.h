@@ -50,6 +50,7 @@ public:
     virtual ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
     virtual InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
     virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const;
+    virtual uint64_t GetShaderHashCode(ShaderStage stage) const;
 
     // Checks whether the pipeline is graphics or compute
     virtual bool IsGraphics() const { return false; }

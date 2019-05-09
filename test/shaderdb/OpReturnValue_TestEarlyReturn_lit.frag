@@ -28,9 +28,9 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: <4 x float> @{{.*}}
+; SHADERTEST: <4 x float> @"func("
 ; SHADERTEST: {{^[A-Za-z0-9]+:}}
 ; SHADERTEST:  ret <4 x float>
 ; SHADERTEST: {{^[A-Za-z0-9]+:}}

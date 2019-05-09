@@ -46,7 +46,6 @@ class Builder;
 class ComputeContext;
 class Context;
 class GraphicsContext;
-class PassManager;
 
 // Enumerates types of shader binary.
 enum class BinaryType : uint32_t
@@ -57,22 +56,14 @@ enum class BinaryType : uint32_t
     Elf,          // ELF
 };
 
-// Represents the information of a shader module
-struct ShaderModuleInfo
-{
-    uint32_t        cacheHash[4];            // hash code for calculate pipeline cache key
-    uint32_t        debugInfoSize;           // Byte size of debug instructions
-    bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
-    bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
-    bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
-};
-
 // Represents output data of building a shader module.
 struct ShaderModuleData : public ShaderModuleDataHeader
 {
-    BinaryType       binType;                 // Shader binary type
-    BinaryData       binCode;                 // Shader binary data
-    ShaderModuleInfo moduleInfo;              // Shader module info
+    BinaryType      binType;                 // Shader binary type
+    BinaryData      binCode;                 // Shader binary data
+    bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
+    bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
+    bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
 };
 
 // Represents the properties of GPU device.
@@ -225,12 +216,8 @@ private:
     void ReleaseContext(Context* pContext);
 
     static Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut);
-
     static void CleanOptimizedSpirv(BinaryData* pSpirvBin);
-
-    static void TrimSpirvDebugInfo(const BinaryData* pSpvBinCode, uint32_t bufferSize, void* pTrimCode);
-
-    static Result CollectInfoFromSpirvBinary(const BinaryData* pSpvBinCode, ShaderModuleInfo* pShaderModuleInfo);
+    Result CollectInfoFromSpirvBinary(ShaderModuleData* pModuleData) const;
 
     void GetPipelineStatistics(const void*             pCode,
                                size_t                  codeSize,
@@ -242,26 +229,19 @@ private:
 
     static llvm::Module* LinkShaderModules(Context* pContext, llvm::ArrayRef<llvm::Module*> modules);
 
-    bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule);
-
     ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
                                         MetroHash::Hash*    pCacheHash,
-                                        BinaryData*         pElfBin,
+                                        const void**        ppElf,
+                                        size_t*             pElfSize,
                                         ShaderCache**       ppShaderCache,
                                         CacheEntryHandle*   phEntry);
 
     void UpdateShaderCaches(bool                bInsert,
-                            const BinaryData*   pElfBin,
+                            const void*         pElf,
+                            size_t              elfSize,
                             ShaderCache**       ppShaderCache,
                             CacheEntryHandle*   phEntry,
                             uint32_t            shaderCacheCount);
-
-    void BuildShaderCacheHash(Context* pContext, MetroHash::Hash* pFragmentHash, MetroHash::Hash* pNonFragmentHash);
-
-    void MergeElfBinary(Context*          pContext,
-                        const BinaryData* pFragmentElf,
-                        const BinaryData* pNonFragmentElf,
-                        ElfPackage*       pPipelineElf);
 
     // -----------------------------------------------------------------------------------------------------------------
 

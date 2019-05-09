@@ -33,20 +33,21 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: getelementptr { <3 x float>, [2 x <3 x float>] }, { <3 x float>, [2 x <3 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 1
+; SHADERTEST: getelementptr { <3 x float>, [2 x <3 x float>] }, { <3 x float>, [2 x <3 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 1, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr { <3 x float>, [2 x <3 x float>] }, { <3 x float>, [2 x <3 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 1
+; SHADERTEST: getelementptr { <4 x double>, [4 x <4 x double>] }, { <4 x double>, [4 x <4 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr { <4 x double>, [4 x <4 x double>] }, { <4 x double>, [4 x <4 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 2, i32 3
+; SHADERTEST: getelementptr { <4 x double>, [4 x <4 x double>] }, { <4 x double>, [4 x <4 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
 
-; SHADERTEST: %llpc.matrix.column = type <{ [3 x float], [4 x i8] }>
-; SHADERTEST: %llpc.matrix.column.2 = type <{ [4 x double] }>
-
-; SHADERTEST: getelementptr inbounds (<{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }>, <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 1
-; SHADERTEST: getelementptr <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }>, <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2, i32 1, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }>, <{ [3 x float], [4 x i8], [2 x %llpc.matrix.column] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 2, i32 %{{[0-9]*}}, i32 0, i32 1
-; SHADERTEST: getelementptr <{ [4 x double], [4 x %llpc.matrix.column.2] }>, <{ [4 x double], [4 x %llpc.matrix.column.2] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr inbounds (<{ [4 x double], [4 x %llpc.matrix.column.2] }>, <{ [4 x double], [4 x %llpc.matrix.column.2] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 2, i32 0, i32 3
-; SHADERTEST: getelementptr <{ [4 x double], [4 x %llpc.matrix.column.2] }>, <{ [4 x double], [4 x %llpc.matrix.column.2] }> addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 0, i32 %{{[0-9]*}}
-
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false
+; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false)
+; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 false, i32 0, i1 false)
+; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 false, i32 0, i1 false
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

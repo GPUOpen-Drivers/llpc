@@ -22,7 +22,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} double @_Z7refractddd(double %{{.*}}, double %{{.*}}, double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x double> @_Z7refractDv4_dDv4_dd(<4 x double> %{{.*}}, <4 x double> %{{.*}}, double %{{.*}})

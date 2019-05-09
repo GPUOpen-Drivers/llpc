@@ -78,11 +78,12 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Add patch passes to pass manager for per stage cache
-void Patch::AddPrePatchPasses(
-    Context*             pContext,     // [in] LLPC context
-    legacy::PassManager& passMgr,      // [in/out] Pass manager to add passes to
-    llvm::Timer*         pPatchTimer)  // [in] Timer to time patch passes with, nullptr if not timing
+// Add whole-pipeline patch passes to pass manager
+void Patch::AddPasses(
+    Context*              pContext, // [in] LLPC context
+    legacy::PassManager&  passMgr,  // [in/out] Pass manager to add passes to
+    llvm::Timer*          pPatchTimer,  // [in] Timer to time patch passes with, nullptr if not timing
+    llvm::Timer*          pOptTimer)    // [in] Timer to time LLVM optimization passes with, nullptr if not timing
 {
     // Start timer for patching passes.
     if (pPatchTimer != nullptr)
@@ -103,28 +104,6 @@ void Patch::AddPrePatchPasses(
     // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
     passMgr.add(CreatePatchResourceCollect());
 
-    // Stop timer for optimization passes and restart timer for patching passes.
-    if (pPatchTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, false));
-    }
-}
-
-// =====================================================================================================================
-// Add whole-pipeline patch passes to pass manager
-void Patch::AddPasses(
-    Context*              pContext,      // [in] LLPC context
-    legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
-    uint32_t              skipStageMask, // Mask indicating which shader stages should be skipped in processing
-    llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
-    llvm::Timer*          pOptTimer)     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
-{
-    // Start timer for patching passes.
-    if (pPatchTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, true));
-    }
-
     // Generate copy shader if necessary.
     passMgr.add(CreatePatchCopyShader());
 
@@ -136,6 +115,9 @@ void Patch::AddPasses(
 
     // Patch push constant loading (should be done before external library link)
     passMgr.add(CreatePatchPushConstOp());
+
+    // Patch buffer operations (should be done before external library link)
+    passMgr.add(CreatePatchBufferOp());
 
     // Patch group operations (should be done before external library link)
     passMgr.add(CreatePatchGroupOp());
@@ -165,9 +147,6 @@ void Patch::AddPasses(
         passMgr.add(CreateStartStopTimer(pOptTimer, true));
     }
 
-    // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
-    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */true, skipStageMask));
-
     // Add some optimization passes
 
     // Need to run a first promote mem 2 reg to remove alloca's whose only args are lifetimes
@@ -189,12 +168,8 @@ void Patch::AddPasses(
         passMgr.add(CreateStartStopTimer(pPatchTimer, true));
     }
 
-    // Patch buffer operations (must be after optimizations)
-    passMgr.add(CreatePatchBufferOp());
-    passMgr.add(createInstructionCombiningPass(false));
-
-    // Fully prepare the pipeline ABI (must be after optimizations)
-    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false, skipStageMask));
+    // Prepare pipeline ABI.
+    passMgr.add(CreatePatchPreparePipelineAbi());
 
     // Set up target features in shader entry-points.
     passMgr.add(CreatePatchSetupTargetFeatures());

@@ -143,55 +143,45 @@ bool SpirvLowerResourceCollect::runOnModule(
         {
         case SPIRAS_Constant:
             {
-                if (pGlobal->hasMetadata(gSPIRVMD::PushConst))
+                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
+
+                auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+                auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
+
+                // TODO: Will support separated texture resource/sampler.
+                DescriptorType descType = DescriptorType::Texture;
+
+                // NOTE: For texture buffer and image buffer, the descriptor type should be set to "TexelBuffer".
+                if (pGlobalTy->isPointerTy())
                 {
-                    // Push constant
-                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
-                    auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                    m_pResUsage->pushConstSizeInBytes = pushConstSize;
-                }
-                else
-                {
-                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-
-                    auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                    auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
-
-                    // TODO: Will support separated texture resource/sampler.
-                    DescriptorType descType = DescriptorType::Texture;
-
-                    // NOTE: For texture buffer and image buffer, the descriptor type should be set to "TexelBuffer".
-                    if (pGlobalTy->isPointerTy())
+                    Type* pImageType = pGlobalTy->getPointerElementType();
+                    std::string imageTypeName = pImageType->getStructName();
+                    // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
+                    if (imageTypeName.find(".SampledImage") != std::string::npos)
                     {
-                        Type* pImageType = pGlobalTy->getPointerElementType();
-                        std::string imageTypeName = pImageType->getStructName();
-                        // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
-                        if (imageTypeName.find(".SampledImage") != std::string::npos)
-                        {
-                            auto pos = imageTypeName.find("_");
-                            LLPC_ASSERT(pos != std::string::npos);
+                        auto pos = imageTypeName.find("_");
+                        LLPC_ASSERT(pos != std::string::npos);
 
-                            ++pos;
-                            Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
-                            if (dim == DimBuffer)
-                            {
-                                descType = DescriptorType::TexelBuffer;
-                            }
-                            else if (dim == DimSubpassData)
-                            {
-                                LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
-                                m_pResUsage->builtInUsage.fs.fragCoord = true;
-                                useViewIndex = true;
-                            }
+                        ++pos;
+                        Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
+                        if (dim == DimBuffer)
+                        {
+                            descType = DescriptorType::TexelBuffer;
+                        }
+                        else if (dim == DimSubpassData)
+                        {
+                            LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+                            m_pResUsage->builtInUsage.fs.fragCoord = true;
+                            useViewIndex = true;
                         }
                     }
-
-                    DescriptorBinding bindingInfo = {};
-                    bindingInfo.descType  = descType;
-                    bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
-
-                    CollectDescriptorUsage(descSet, binding, &bindingInfo);
                 }
+
+                DescriptorBinding bindingInfo = {};
+                bindingInfo.descType  = descType;
+                bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
+
+                CollectDescriptorUsage(descSet, binding, &bindingInfo);
                 break;
             }
         case SPIRAS_Private:
@@ -270,6 +260,14 @@ bool SpirvLowerResourceCollect::runOnModule(
                 bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
 
                 CollectDescriptorUsage(descSet, binding, &bindingInfo);
+                break;
+            }
+        case SPIRAS_PushConst:
+            {
+                // Push constant
+                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
+                auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+                m_pResUsage->pushConstSizeInBytes = pushConstSize;
                 break;
             }
         default:
@@ -966,7 +964,14 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             }
 
             // Special stage-specific processing
-            if (m_shaderStage == ShaderStageFragment)
+            if (m_shaderStage == ShaderStageVertex)
+            {
+                if (addrSpace == SPIRAS_Input)
+                {
+                    CollectVertexInputUsage(pBaseTy, (inOutMeta.Signedness != 0), startLoc, locCount);
+                }
+            }
+            else if (m_shaderStage == ShaderStageFragment)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
@@ -1541,7 +1546,14 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             }
 
             // Special stage-specific processing
-            if (m_shaderStage == ShaderStageFragment)
+            if (m_shaderStage == ShaderStageVertex)
+            {
+                if (addrSpace == SPIRAS_Input)
+                {
+                    CollectVertexInputUsage(pBaseTy, (inOutMeta.Signedness != 0), startLoc, locCount);
+                }
+            }
+            else if (m_shaderStage == ShaderStageFragment)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
@@ -1635,6 +1647,74 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                 }
             }
         }
+    }
+}
+
+// =====================================================================================================================
+// Collects the usage info of vertex inputs (particularly for the map from vertex input location to vertex basic type).
+void SpirvLowerResourceCollect::CollectVertexInputUsage(
+    const Type* pVertexTy,  // [in] Vertex input type
+    bool        signedness, // Whether the type is signed (valid for integer type)
+    uint32_t    startLoc,   // Start location
+    uint32_t    locCount)   // Count of locations
+{
+    auto bitWidth = pVertexTy->getScalarSizeInBits();
+    auto pCompTy  = pVertexTy->isVectorTy() ? pVertexTy->getVectorElementType() : pVertexTy;
+
+    // Get basic type of vertex input
+    BasicType basicTy = BasicType::Unknown;
+    if (pCompTy->isIntegerTy())
+    {
+        // Integer type
+        if (bitWidth == 8)
+        {
+            basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
+        }
+        else if (bitWidth == 16)
+        {
+            basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
+        }
+        else if (bitWidth == 32)
+        {
+            basicTy = signedness ? BasicType::Int : BasicType::Uint;
+        }
+        else
+        {
+            LLPC_ASSERT(bitWidth == 64);
+            basicTy = signedness ? BasicType::Int64 : BasicType::Uint64;
+        }
+    }
+    else if (pCompTy->isFloatingPointTy())
+    {
+        // Floating-point type
+        if (bitWidth == 16)
+        {
+            basicTy = BasicType::Float16;
+        }
+        else if (bitWidth == 32)
+        {
+            basicTy = BasicType::Float;
+        }
+        else
+        {
+            LLPC_ASSERT(bitWidth == 64);
+            basicTy = BasicType::Double;
+        }
+    }
+    else
+    {
+        LLPC_NEVER_CALLED();
+    }
+
+    auto& vsInputTypes = m_pResUsage->inOutUsage.vs.inputTypes;
+    while ((startLoc + locCount) > vsInputTypes.size())
+    {
+        vsInputTypes.push_back(BasicType::Unknown);
+    }
+
+    for (uint32_t i = 0; i < locCount; ++i)
+    {
+        vsInputTypes[startLoc + i] = basicTy;
     }
 }
 

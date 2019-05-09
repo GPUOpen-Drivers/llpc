@@ -49,17 +49,11 @@ namespace Llpc
 
 // =====================================================================================================================
 // Pass to prepare the pipeline ABI
-class PatchPreparePipelineAbi final : public Patch
+class PatchPreparePipelineAbi : public Patch
 {
 public:
     static char ID;
-    PatchPreparePipelineAbi(
-        bool    onlySetCallingConvs = false,
-        uint32_t skipStageMask = 0)
-        :
-        Patch(ID),
-        m_onlySetCallingConvs(onlySetCallingConvs),
-        m_skipStageMask(skipStageMask)
+    PatchPreparePipelineAbi() : Patch(ID)
     {
         initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
         initializePatchPreparePipelineAbiPass(*PassRegistry::getPassRegistry());
@@ -92,17 +86,14 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineShaders*  m_pPipelineShaders;    // API shaders in the pipeline
+    PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline
 
-    bool              m_hasVs;               // Whether the pipeline has vertex shader
-    bool              m_hasTcs;              // Whether the pipeline has tessellation control shader
-    bool              m_hasTes;              // Whether the pipeline has tessellation evaluation shader
-    bool              m_hasGs;               // Whether the pipeline has geometry shader
+    bool              m_hasVs;              // Whether the pipeline has vertex shader
+    bool              m_hasTcs;             // Whether the pipeline has tessellation control shader
+    bool              m_hasTes;             // Whether the pipeline has tessellation evaluation shader
+    bool              m_hasGs;              // Whether the pipeline has geometry shader
 
-    GfxIpVersion      m_gfxIp;               // Graphics IP version info
-
-    const bool        m_onlySetCallingConvs; // Whether to only set the calling conventions
-    const uint32_t    m_skipStageMask;       // Mask indicating which shader stages should be skipped in processing
+    GfxIpVersion      m_gfxIp;              // Graphics IP version info
 };
 
 char PatchPreparePipelineAbi::ID = 0;
@@ -111,17 +102,15 @@ char PatchPreparePipelineAbi::ID = 0;
 
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
-ModulePass* Llpc::CreatePatchPreparePipelineAbi(
-    bool     onlySetCallingConvs, // Should we only set the calling conventions, or do the full prepare.
-    uint32_t skipStageMask)       // Mask of stages to be skipped
+ModulePass* Llpc::CreatePatchPreparePipelineAbi()
 {
-    return new PatchPreparePipelineAbi(onlySetCallingConvs, skipStageMask);
+    return new PatchPreparePipelineAbi();
 }
 
 // =====================================================================================================================
 // Run the pass on the specified LLVM module.
 bool PatchPreparePipelineAbi::runOnModule(
-    Module& module) // [in,out] LLVM module to be run on
+    Module& module)  // [in,out] LLVM module to be run on
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
@@ -136,22 +125,18 @@ bool PatchPreparePipelineAbi::runOnModule(
 
     m_gfxIp = m_pContext->GetGfxIpVersion();
 
-    // If we've only to set the calling conventions, do that now.
-    if (m_onlySetCallingConvs)
+    if (m_gfxIp.major >= 9)
     {
-        SetCallingConvs(module);
+        MergeShaderAndSetCallingConvs(module);
     }
     else
     {
-        if (m_gfxIp.major >= 9)
-        {
-            MergeShaderAndSetCallingConvs(module);
-        }
-
-        SetAbiEntryNames(module);
-
-        AddAbiMetadata(module);
+        SetCallingConvs(module);
     }
+
+    SetAbiEntryNames(module);
+
+    AddAbiMetadata(module);
 
     return true; // Modified the module.
 }
@@ -161,6 +146,8 @@ bool PatchPreparePipelineAbi::runOnModule(
 void PatchPreparePipelineAbi::SetCallingConvs(
     Module& module)   // [in] LLVM module
 {
+    LLPC_ASSERT(m_gfxIp.major < 9);
+
     const bool hasTs = (m_hasTcs || m_hasTes);
 
     // NOTE: For each entry-point, set the calling convention appropriate to the hardware shader stage. The action here
@@ -286,15 +273,7 @@ void PatchPreparePipelineAbi::SetCallingConv(
     auto pEntryPoint = m_pPipelineShaders->GetEntryPoint(shaderStage);
     if (pEntryPoint != nullptr)
     {
-        if (m_skipStageMask & ShaderStageToMask(shaderStage))
-        {
-            pEntryPoint->setLinkage(GlobalValue::InternalLinkage);
-            pEntryPoint->setCallingConv(CallingConv::C);
-        }
-        else
-        {
-            pEntryPoint->setCallingConv(callingConv);
-        }
+        pEntryPoint->setCallingConv(callingConv);
     }
 }
 

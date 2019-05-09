@@ -28,8 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerGlobal.
  ***********************************************************************************************************************
  */
-
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/PassSupport.h"
@@ -38,7 +36,6 @@
 
 #include <unordered_set>
 #include "SPIRVInternal.h"
-#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerGlobal.h"
 
@@ -134,9 +131,6 @@ bool SpirvLowerGlobal::runOnModule(
         }
     }
 
-    LowerBufferBlock();
-    LowerPushConsts();
-
     return true;
 }
 
@@ -227,16 +221,16 @@ void SpirvLowerGlobal::visitCallInst(
             if (isa<GetElementPtrInst>(pLoadSrc))
             {
                 // The interpolant is an element of the input
-                GetElementPtrInst* pGetElemPtr = cast<GetElementPtrInst>(pLoadSrc);
+                GetElementPtrInst* pGetElemInst = cast<GetElementPtrInst>(pLoadSrc);
 
                 std::vector<Value*> indexOperands;
-                for (uint32_t i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
+                for (uint32_t i = 0, indexOperandCount = pGetElemInst->getNumIndices(); i < indexOperandCount; ++i)
                 {
-                    indexOperands.push_back(ToInt32Value(m_pContext, pGetElemPtr->getOperand(1 + i), &callInst));
+                    indexOperands.push_back(ToInt32Value(m_pContext, pGetElemInst->getOperand(1 + i), &callInst));
                 }
                 uint32_t operandIdx = 0;
 
-                auto pInput = cast<GlobalVariable>(pGetElemPtr->getPointerOperand());
+                auto pInput = cast<GlobalVariable>(pGetElemInst->getPointerOperand());
                 auto pInputTy = pInput->getType()->getContainedType(0);
 
                 MDNode* pMetaNode = pInput->getMetadata(gSPIRVMD::InOut);
@@ -294,11 +288,6 @@ void SpirvLowerGlobal::visitLoadInst(
     Value* pLoadSrc = loadInst.getOperand(0);
     const uint32_t addrSpace = pLoadSrc->getType()->getPointerAddressSpace();
 
-    if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
-    {
-        return;
-    }
-
     // Skip if "load" instructions are not expected to be handled
     const bool isTcsInput  = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Input));
     const bool isTcsOutput = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Output));
@@ -310,43 +299,18 @@ void SpirvLowerGlobal::visitLoadInst(
         return;
     }
 
-    if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pLoadSrc))
+    if (isa<GetElementPtrInst>(pLoadSrc))
     {
+        GetElementPtrInst* pGetElemInst = cast<GetElementPtrInst>(pLoadSrc);
+
         std::vector<Value*> indexOperands;
-
-        GlobalVariable* pInOut = nullptr;
-
-        // Loop back through the get element pointer to find the global variable.
-        for (GetElementPtrInst* pCurrGetElemPtr = pGetElemPtr;
-             pCurrGetElemPtr != nullptr;
-             pCurrGetElemPtr = dyn_cast<GetElementPtrInst>(pCurrGetElemPtr->getPointerOperand()))
+        for (uint32_t i = 0, indexOperandCount = pGetElemInst->getNumIndices(); i < indexOperandCount; ++i)
         {
-            LLPC_ASSERT(pCurrGetElemPtr != nullptr);
-
-            // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
-            // when concatenating two GEP indices together.
-            if (indexOperands.empty() == false)
-            {
-                indexOperands.erase(indexOperands.begin());
-            }
-
-            SmallVector<Value*, 8> indices;
-
-            for (Value* const pIndex : pCurrGetElemPtr->indices())
-            {
-                indices.push_back(ToInt32Value(m_pContext, pIndex, &loadInst));
-            }
-
-            indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
-
-            pInOut = dyn_cast<GlobalVariable>(pCurrGetElemPtr->getPointerOperand());
+            indexOperands.push_back(ToInt32Value(m_pContext, pGetElemInst->getOperand(1 + i), &loadInst));
         }
-
-        // The root of the gep should always be the global variable.
-        LLPC_ASSERT(pInOut != nullptr);
-
         uint32_t operandIdx = 0;
 
+        auto pInOut = cast<GlobalVariable>(pGetElemInst->getPointerOperand());
         auto pInOutTy = pInOut->getType()->getContainedType(0);
 
         MDNode* pMetaNode = pInOut->getMetadata(gSPIRVMD::InOut);
@@ -496,11 +460,6 @@ void SpirvLowerGlobal::visitStoreInst(
 
     const uint32_t addrSpace = pStoreDest->getType()->getPointerAddressSpace();
 
-    if ((addrSpace != SPIRAS_Input) && (addrSpace != SPIRAS_Output))
-    {
-        return;
-    }
-
     // Skip if "store" instructions are not expected to be handled
     const bool isTcsOutput = ((m_shaderStage == ShaderStageTessControl) && (addrSpace == SPIRAS_Output));
     if ((m_instVisitFlags.checkStore == false) || (isTcsOutput == false))
@@ -508,40 +467,18 @@ void SpirvLowerGlobal::visitStoreInst(
         return;
     }
 
-    if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pStoreDest))
+    if (isa<GetElementPtrInst>(pStoreDest))
     {
+        GetElementPtrInst* pGetElemInst = cast<GetElementPtrInst>(pStoreDest);
+
         std::vector<Value*> indexOperands;
-
-        GlobalVariable* pOutput = nullptr;
-
-        // Loop back through the get element pointer to find the global variable.
-        for (GetElementPtrInst* pCurrGetElemPtr = pGetElemPtr;
-             pCurrGetElemPtr != nullptr;
-             pCurrGetElemPtr = dyn_cast<GetElementPtrInst>(pCurrGetElemPtr->getPointerOperand()))
+        for (uint32_t i = 0, indexOperandCount = pGetElemInst->getNumIndices(); i < indexOperandCount; ++i)
         {
-            LLPC_ASSERT(pCurrGetElemPtr != nullptr);
-
-            // If we have previous index operands, we need to remove the first operand (a zero index into the pointer)
-            // when concatenating two GEP indices together.
-            if (indexOperands.empty() == false)
-            {
-                indexOperands.erase(indexOperands.begin());
-            }
-
-            SmallVector<Value*, 8> indices;
-
-            for (Value* const pIndex : pCurrGetElemPtr->indices())
-            {
-                indices.push_back(ToInt32Value(m_pContext, pIndex, &storeInst));
-            }
-
-            indexOperands.insert(indexOperands.begin(), indices.begin(), indices.end());
-
-            pOutput = dyn_cast<GlobalVariable>(pCurrGetElemPtr->getPointerOperand());
+            indexOperands.push_back(ToInt32Value(m_pContext, pGetElemInst->getOperand(1 + i), &storeInst));
         }
-
         uint32_t operandIdx = 0;
 
+        auto pOutput = cast<GlobalVariable>(pGetElemInst->getPointerOperand());
         auto pOutputTy = pOutput->getType()->getContainedType(0);
 
         MDNode* pMetaNode = pOutput->getMetadata(gSPIRVMD::InOut);
@@ -775,33 +712,93 @@ void SpirvLowerGlobal::MapOutputToProxy(
 // Removes those constant expressions that reference global variables.
 void SpirvLowerGlobal::RemoveConstantExpr()
 {
+    std::unordered_map<ConstantExpr*, Instruction*> constantExprMap;
     // Collect contant expressions and translate them to regular instructions
-    for (GlobalVariable& global : m_pModule->globals())
+    for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
     {
-        auto addSpace = global.getType()->getAddressSpace();
+        auto addSpace = pGlobal->getType()->getAddressSpace();
 
-        // Remove constant expressions for global variables in these address spaces
-        bool isGlobalVar = (addSpace == SPIRAS_Private) || (addSpace == SPIRAS_Input) || (addSpace == SPIRAS_Output);
+        // Remove constant expressions for these global variables
+        auto isGlobalVar = ((addSpace == SPIRAS_Private) || (addSpace == SPIRAS_Input) ||
+            (addSpace == SPIRAS_Output));
 
         if (isGlobalVar == false)
         {
             continue;
         }
 
-        SmallVector<Constant*, 8> constantUsers;
+        auto pGlobalVar = cast<GlobalVariable>(pGlobal);
 
-        for (User* const pUser : global.users())
+        std::vector<Instruction*> insts;
+        for (auto pUser : pGlobalVar->users())
         {
-            if (Constant* const pConst = dyn_cast<Constant>(pUser))
+            auto pConstExpr = dyn_cast<ConstantExpr>(pUser);
+            if (pConstExpr != nullptr)
             {
-                constantUsers.push_back(pConst);
+                // Map this constant expression to normal instruction if it has not been visited
+                if (constantExprMap.find(pConstExpr) == constantExprMap.end())
+                {
+                    if (pConstExpr->user_empty() == false)
+                    {
+                        auto pInst = pConstExpr->getAsInstruction();
+                        insts.push_back(pInst);
+                        constantExprMap[pConstExpr] = pInst;
+                    }
+                    else
+                    {
+                        pConstExpr->removeDeadConstantUsers();
+                        pConstExpr->dropAllReferences();
+                    }
+                }
             }
         }
+    }
 
-        for (Constant* const pConst : constantUsers)
+    if (constantExprMap.empty() == false)
+    {
+        // Replace constant expressions with the mapped normal instructions
+
+        // NOTE: Make sure extracted instructions from constant expressions to be inserted to
+        // a function only once. This is forced by LLVM.
+        std::unordered_set<Instruction*> insertedInsts;
+
+        // NOTE: It seems user list of constant expression is incorrect. Here, we traverse all instructions
+        // in the entry-point and do replacement.
+        for (auto pBlock = m_pEntryPoint->begin(), pBlockEnd = m_pEntryPoint->end(); pBlock != pBlockEnd; ++pBlock)
         {
-            ReplaceConstWithInsts(pConst);
+            for (auto pInst = pBlock->begin(), pInstEnd = pBlock->end(); pInst != pInstEnd; ++pInst)
+            {
+                for (auto pOperand = pInst->op_begin(), pOperandEnd = pInst->op_end();
+                    pOperand != pOperandEnd;
+                    ++pOperand)
+                {
+                    if (isa<ConstantExpr>(pOperand))
+                    {
+                        auto pConstExpr = cast<ConstantExpr>(pOperand);
+                        if (constantExprMap.find(pConstExpr) != constantExprMap.end())
+                        {
+                            // Instruction not inserted
+                            if (insertedInsts.find(constantExprMap[pConstExpr]) == insertedInsts.end())
+                            {
+                                constantExprMap[pConstExpr]->insertBefore(&*pInst);
+                                insertedInsts.insert(constantExprMap[pConstExpr]);
+                            }
+
+                            pInst->replaceUsesOfWith(pConstExpr, constantExprMap[pConstExpr]);
+                            break;
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    // Remove constant expressions
+    for (auto& constExprMap : constantExprMap)
+    {
+        auto pConstExpr = constExprMap.first;
+        pConstExpr->removeDeadConstantUsers();
+        pConstExpr->dropAllReferences();
     }
 }
 
@@ -854,10 +851,10 @@ void SpirvLowerGlobal::LowerInput()
         std::unordered_set<GetElementPtrInst*> getElemInsts;
         for (auto pInterpCall : m_interpCalls)
         {
-            GetElementPtrInst* pGetElemPtr = dyn_cast<GetElementPtrInst>(pInterpCall->getArgOperand(0));
-            if (pGetElemPtr != nullptr)
+            GetElementPtrInst* pGetElemInst = dyn_cast<GetElementPtrInst>(pInterpCall->getArgOperand(0));
+            if (pGetElemInst != nullptr)
             {
-                getElemInsts.insert(pGetElemPtr);
+                getElemInsts.insert(pGetElemInst);
             }
 
             LLPC_ASSERT(pInterpCall->use_empty());
@@ -865,12 +862,12 @@ void SpirvLowerGlobal::LowerInput()
             pInterpCall->eraseFromParent();
         }
 
-        for (auto pGetElemPtr : getElemInsts)
+        for (auto pGetElemInst : getElemInsts)
         {
-            if (pGetElemPtr->use_empty())
+            if (pGetElemInst->use_empty())
             {
-                pGetElemPtr->dropAllReferences();
-                pGetElemPtr->eraseFromParent();
+                pGetElemInst->dropAllReferences();
+                pGetElemInst->eraseFromParent();
             }
         }
     }
@@ -1025,15 +1022,15 @@ void SpirvLowerGlobal::LowerInOutInPlace()
     }
     visit(m_pModule);
 
-    llvm::DenseSet<GetElementPtrInst*> getElemInsts;
+    std::unordered_set<GetElementPtrInst*> getElemInsts;
 
     // Remove unnecessary "load" instructions
     for (auto pLoadInst : m_loadInsts)
     {
-        GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pLoadInst->getPointerOperand());
-        if (pGetElemPtr != nullptr)
+        GetElementPtrInst* pGetElemInst = dyn_cast<GetElementPtrInst>(pLoadInst->getOperand(0)); // Load source
+        if (pGetElemInst != nullptr)
         {
-            getElemInsts.insert(pGetElemPtr);
+            getElemInsts.insert(pGetElemInst);
         }
 
         LLPC_ASSERT(pLoadInst->use_empty());
@@ -1041,15 +1038,26 @@ void SpirvLowerGlobal::LowerInOutInPlace()
         pLoadInst->eraseFromParent();
     }
 
+    // Remove unnecessary "getelementptr" instructions which are referenced by "load" instructions only
+    for (auto pGetElemInst : getElemInsts)
+    {
+        if (pGetElemInst->use_empty())
+        {
+            pGetElemInst->dropAllReferences();
+            pGetElemInst->eraseFromParent();
+        }
+    }
+
     m_loadInsts.clear();
+    getElemInsts.clear();
 
     // Remove unnecessary "store" instructions
     for (auto pStoreInst : m_storeInsts)
     {
-        GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pStoreInst->getPointerOperand());
-        if (pGetElemPtr != nullptr)
+        GetElementPtrInst* pGetElemInst = dyn_cast<GetElementPtrInst>(pStoreInst->getOperand(1)); // Store destination
+        if (pGetElemInst != nullptr)
         {
-            getElemInsts.insert(pGetElemPtr);
+            getElemInsts.insert(pGetElemInst);
         }
 
         LLPC_ASSERT(pStoreInst->use_empty());
@@ -1057,29 +1065,18 @@ void SpirvLowerGlobal::LowerInOutInPlace()
         pStoreInst->eraseFromParent();
     }
 
-    m_storeInsts.clear();
-
-    // Remove unnecessary "getelementptr" instructions
-    while (getElemInsts.empty() == false)
+    // Remove unnecessary "getelementptr" instructions which are referenced by "store" instructions only
+    for (auto pGetElemInst : getElemInsts)
     {
-        GetElementPtrInst* const pGetElemPtr = *getElemInsts.begin();
-        getElemInsts.erase(pGetElemPtr);
-
-        // If the GEP still has any uses, skip processing it.
-        if (pGetElemPtr->use_empty() == false)
+        if (pGetElemInst->use_empty())
         {
-            continue;
+            pGetElemInst->dropAllReferences();
+            pGetElemInst->eraseFromParent();
         }
-
-        // If the GEP is GEPing into another GEP, record that GEP as something we need to visit too.
-        if (GetElementPtrInst* const pOtherGetElemInst = dyn_cast<GetElementPtrInst>(pGetElemPtr->getPointerOperand()))
-        {
-            getElemInsts.insert(pOtherGetElemInst);
-        }
-
-        pGetElemPtr->dropAllReferences();
-        pGetElemPtr->eraseFromParent();
     }
+
+    m_storeInsts.clear();
+    getElemInsts.clear();
 
     // Remove inputs if they are lowered in-place
     if (m_lowerInputInPlace)
@@ -1371,7 +1368,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 
                         // NOTE: Here we add suffix to differentiate the type of "offset" (could be 16-bit or 32-bit
                         // floating-point type)
-                        suffix = "." + GetTypeName(pAuxInterpValue->getType());
+                        suffix = "." + GetTypeNameForScalarOrVector(pAuxInterpValue->getType());
                     }
                     else
                     {
@@ -2254,437 +2251,6 @@ void SpirvLowerGlobal::CollectGsXfbOutputInfo(
     xfbOutInfo.xfbLocOffset = xfbLocOffset;
 
     pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
-}
-
-// =====================================================================================================================
-// Replace a constant with instructions using a builder.
-void SpirvLowerGlobal::ReplaceConstWithInsts(
-    Constant* const pConst)   // [in/out] The constant to replace with instructions.
-{
-    SmallSet<Constant*, 8> otherConsts;
-
-    for (User* const pUser : pConst->users())
-    {
-        if (Constant* const pOtherConst = dyn_cast<Constant>(pUser))
-        {
-            otherConsts.insert(pOtherConst);
-        }
-    }
-
-    for (Constant* const pOtherConst : otherConsts)
-    {
-        ReplaceConstWithInsts(pOtherConst);
-    }
-
-    otherConsts.clear();
-
-    SmallVector<Value*, 8> users;
-
-    for (User* const pUser : pConst->users())
-    {
-        users.push_back(pUser);
-    }
-
-    for (Value* const pUser : users)
-    {
-        Instruction* const pInst = dyn_cast<Instruction>(pUser);
-        LLPC_ASSERT(pInst != nullptr);
-
-        // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
-        if (PHINode* const pPhiNode = dyn_cast<PHINode>(pInst))
-        {
-            const uint32_t incomingValueCount = pPhiNode->getNumIncomingValues();
-            for (uint32_t i = 0; i < incomingValueCount; i++)
-            {
-                if (pPhiNode->getIncomingValue(i) == pConst)
-                {
-                    m_pBuilder->SetInsertPoint(pPhiNode->getIncomingBlock(i)->getTerminator());
-                    break;
-                }
-            }
-        }
-        else
-        {
-            m_pBuilder->SetInsertPoint(pInst);
-        }
-
-        if (ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pConst))
-        {
-            Instruction* const pInsertInst = m_pBuilder->Insert(pConstExpr->getAsInstruction());
-            pInst->replaceUsesOfWith(pConstExpr, pInsertInst);
-        }
-        else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConst))
-        {
-            Value* pResultValue = UndefValue::get(pConstVector->getType());
-            for (uint32_t i = 0; i < pConstVector->getNumOperands(); i++)
-            {
-                // Have to not use the builder here because it will constant fold and we are trying to undo that now!
-                Instruction* const pInsertInst = InsertElementInst::Create(pResultValue,
-                                                                           pConstVector->getOperand(i),
-                                                                           m_pBuilder->getInt32(i));
-                pResultValue = m_pBuilder->Insert(pInsertInst);
-            }
-            pInst->replaceUsesOfWith(pConstVector, pResultValue);
-        }
-        else
-        {
-            LLPC_NEVER_CALLED();
-        }
-    }
-
-    pConst->removeDeadConstantUsers();
-    pConst->destroyConstant();
-}
-
-// =====================================================================================================================
-// Lowers buffer blocks.
-void SpirvLowerGlobal::LowerBufferBlock()
-{
-    SmallVector<GlobalVariable*, 8> globalsToRemove;
-
-    for (GlobalVariable& global : m_pModule->globals())
-    {
-        // Skip anything that is not a block.
-        if (global.getAddressSpace() != SPIRAS_Uniform)
-        {
-            continue;
-        }
-
-        MDNode* const pResMetaNode = global.getMetadata(gSPIRVMD::Resource);
-        LLPC_ASSERT(pResMetaNode != nullptr);
-
-        const uint32_t descSet = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(0))->getZExtValue();
-        const uint32_t binding = mdconst::dyn_extract<ConstantInt>(pResMetaNode->getOperand(1))->getZExtValue();
-
-        SmallVector<Constant*, 8> constantUsers;
-
-        for (User* const pUser : global.users())
-        {
-            if (Constant* const pConst = dyn_cast<Constant>(pUser))
-            {
-                constantUsers.push_back(pConst);
-            }
-        }
-
-        for (Constant* const pConst : constantUsers)
-        {
-            ReplaceConstWithInsts(pConst);
-        }
-
-        // Record of all the functions that our global is used within.
-        SmallSet<Function*, 4> funcsUsedIn;
-
-        for (User* const pUser : global.users())
-        {
-            if (Instruction* const pInst = dyn_cast<Instruction>(pUser))
-            {
-                funcsUsedIn.insert(pInst->getFunction());
-            }
-        }
-
-        for (Function* const pFunc : funcsUsedIn)
-        {
-            // Check if our block is an array of blocks.
-            if (global.getType()->getPointerElementType()->isArrayTy())
-            {
-                Type* const pElementType = global.getType()->getPointerElementType()->getArrayElementType();
-                Type* const pBlockType = pElementType->getPointerTo(global.getAddressSpace());
-
-                SmallVector<BitCastInst*, 8> bitCastsToModify;
-                SmallVector<GetElementPtrInst*, 8> getElemPtrsToReplace;
-
-                // We need to run over the users of the global, find the GEPs, and add a load for each.
-                for (User* const pUser : global.users())
-                {
-                    // Skip over non-instructions.
-                    if (isa<Instruction>(pUser) == false)
-                    {
-                        continue;
-                    }
-
-                    GetElementPtrInst* pGetElemPtr = dyn_cast<GetElementPtrInst>(pUser);
-
-                    if (pGetElemPtr == nullptr)
-                    {
-                        // Skip all bitcasts, looking for a GEP.
-                        for (BitCastInst* pBitCast = dyn_cast<BitCastInst>(pUser);
-                             pBitCast != nullptr;
-                             pBitCast = dyn_cast<BitCastInst>(pBitCast->getOperand(0)))
-                        {
-                            pGetElemPtr = dyn_cast<GetElementPtrInst>(pBitCast);
-                        }
-
-                        // If even after we've stripped away all the bitcasts we did not find a gep, we need to modify
-                        // the bitcast instead.
-                        if (pGetElemPtr == nullptr)
-                        {
-                            BitCastInst* const pBitCast = dyn_cast<BitCastInst>(pUser);
-                            LLPC_ASSERT(pBitCast != nullptr);
-
-                            bitCastsToModify.push_back(pBitCast);
-                            continue;
-                        }
-                    }
-
-                    // Skip instructions in other functions.
-                    if (pGetElemPtr->getFunction() != pFunc)
-                    {
-                        continue;
-                    }
-
-                    getElemPtrsToReplace.push_back(pGetElemPtr);
-                }
-
-                // All bitcasts recorded here are for GEPs that indexed by 0, 0 into the arrayed resource, and LLVM
-                // has been clever enough to realise that doing a GEP of 0, 0 is actually a no-op (because the pointer
-                // does not change!), and has removed it.
-                for (BitCastInst* const pBitCast : bitCastsToModify)
-                {
-                    m_pBuilder->SetInsertPoint(pBitCast);
-
-                    Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
-                                                                                binding,
-                                                                                m_pBuilder->getInt32(0),
-                                                                                false,
-                                                                                m_pBuilder->getInt8Ty());
-
-                    // If the global variable is a constant, the data it points to is invariant.
-                    if (global.isConstant())
-                    {
-                        m_pBuilder->CreateInvariantStart(pBufferDesc);
-                    }
-
-                    pBitCast->replaceUsesOfWith(&global, m_pBuilder->CreateBitCast(pBufferDesc, pBlockType));
-                }
-
-                for (GetElementPtrInst* const pGetElemPtr : getElemPtrsToReplace)
-                {
-                    // The second index is the block offset, so we need at least two indices!
-                    LLPC_ASSERT(pGetElemPtr->getNumIndices() >= 2);
-
-                    m_pBuilder->SetInsertPoint(pGetElemPtr);
-
-                    SmallVector<Value*, 8> indices;
-
-                    for (Value* const pIndex : pGetElemPtr->indices())
-                    {
-                        indices.push_back(pIndex);
-                    }
-
-                    // The first index should always be zero.
-                    LLPC_ASSERT(isa<ConstantInt>(indices[0]) && (cast<ConstantInt>(indices[0])->getZExtValue() == 0));
-
-                    // The second index is the block index.
-                    Value* const pBlockIndex = indices[1];
-
-                    bool isNonUniform = false;
-
-                    // Run the users of the block index to check for any nonuniform calls.
-                    for (User* const pUser : pBlockIndex->users())
-                    {
-                        CallInst* const pCall = dyn_cast<CallInst>(pUser);
-
-                        // If the user is not a call, bail.
-                        if (pCall == nullptr)
-                        {
-                            continue;
-                        }
-
-                        const std::string nonUniformPrefix = std::string("_Z16") + std::string(gSPIRVMD::NonUniform);
-
-                        // If the call is our non uniform decoration, record we are non uniform.
-                        if (pCall->getCalledFunction()->getName().startswith(nonUniformPrefix))
-                        {
-                            isNonUniform = true;
-                            break;
-                        }
-                    }
-
-                    Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
-                                                                                binding,
-                                                                                pBlockIndex,
-                                                                                isNonUniform,
-                                                                                m_pBuilder->getInt8Ty());
-
-                    // If the global variable is a constant, the data it points to is invariant.
-                    if (global.isConstant())
-                    {
-                        m_pBuilder->CreateInvariantStart(pBufferDesc);
-                    }
-
-                    Value* const pBitCast = m_pBuilder->CreateBitCast(pBufferDesc, pBlockType);
-
-                    // We need to remove the block index from the original gep indices so that we can use them.
-                    indices[1] = indices[0];
-
-                    ArrayRef<Value*> newIndices(indices);
-                    newIndices = newIndices.drop_front(1);
-
-                    Value* pNewGetElemPtr = nullptr;
-
-                    if (pGetElemPtr->isInBounds())
-                    {
-                        pNewGetElemPtr = m_pBuilder->CreateInBoundsGEP(pBitCast, newIndices);
-                    }
-                    else
-                    {
-                        pNewGetElemPtr = m_pBuilder->CreateGEP(pBitCast, newIndices);
-                    }
-
-                    pGetElemPtr->replaceAllUsesWith(pNewGetElemPtr);
-                    pGetElemPtr->eraseFromParent();
-                }
-            }
-            else
-            {
-                m_pBuilder->SetInsertPoint(&pFunc->getEntryBlock(), pFunc->getEntryBlock().getFirstInsertionPt());
-
-                Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
-                                                                            binding,
-                                                                            m_pBuilder->getInt32(0),
-                                                                            false,
-                                                                            m_pBuilder->getInt8Ty());
-
-                // If the global variable is a constant, the data it points to is invariant.
-                if (global.isConstant())
-                {
-                    m_pBuilder->CreateInvariantStart(pBufferDesc);
-                }
-
-                Value* const pBitCast = m_pBuilder->CreateBitCast(pBufferDesc, global.getType());
-
-                SmallVector<Instruction*, 8> usesToReplace;
-
-                for (User* const pUser : global.users())
-                {
-                    // Skip over non-instructions that we've already made useless.
-                    if (isa<Instruction>(pUser) == false)
-                    {
-                        continue;
-                    }
-
-                    Instruction* const pInst = cast<Instruction>(pUser);
-
-                    // Skip instructions in other functions.
-                    if (pInst->getFunction() != pFunc)
-                    {
-                        continue;
-                    }
-
-                    usesToReplace.push_back(pInst);
-                }
-
-                for (Instruction* const pUse : usesToReplace)
-                {
-                    pUse->replaceUsesOfWith(&global, pBitCast);
-                }
-            }
-        }
-
-        globalsToRemove.push_back(&global);
-    }
-
-    for (GlobalVariable* const pGlobal : globalsToRemove)
-    {
-        m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
-        if (pGlobal->isConstant() == false)
-        {
-            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
-        }
-
-        pGlobal->dropAllReferences();
-        pGlobal->eraseFromParent();
-    }
-}
-
-// =====================================================================================================================
-// Lowers push constants.
-void SpirvLowerGlobal::LowerPushConsts()
-{
-    SmallVector<GlobalVariable*, 1> globalsToRemove;
-
-    for (GlobalVariable& global : m_pModule->globals())
-    {
-        // Skip anything that is not a push constant.
-        if ((global.getAddressSpace() != SPIRAS_Constant) || (global.hasMetadata(gSPIRVMD::PushConst) == false))
-        {
-            continue;
-        }
-
-        // There should only be a single push constant variable!
-        LLPC_ASSERT(globalsToRemove.empty());
-
-        SmallVector<Constant*, 8> constantUsers;
-
-        for (User* const pUser : global.users())
-        {
-            if (Constant* const pConst = dyn_cast<Constant>(pUser))
-            {
-                constantUsers.push_back(pConst);
-            }
-        }
-
-        for (Constant* const pConst : constantUsers)
-        {
-            ReplaceConstWithInsts(pConst);
-        }
-
-        // Record of all the functions that our global is used within.
-        SmallSet<Function*, 4> funcsUsedIn;
-
-        for (User* const pUser : global.users())
-        {
-            if (Instruction* const pInst = dyn_cast<Instruction>(pUser))
-            {
-                funcsUsedIn.insert(pInst->getFunction());
-            }
-        }
-
-        for (Function* const pFunc : funcsUsedIn)
-        {
-            m_pBuilder->SetInsertPoint(&pFunc->getEntryBlock(), pFunc->getEntryBlock().getFirstInsertionPt());
-
-            Type* const pSpillTableType = ArrayType::get(m_pBuilder->getInt8Ty(), 512);
-            Value* pSpillTable = m_pBuilder->CreateLoadSpillTablePtr(pSpillTableType);
-
-            Type* const pCastType = global.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST);
-            pSpillTable = m_pBuilder->CreateBitCast(pSpillTable, pCastType);
-
-            SmallVector<Instruction*, 8> usesToReplace;
-
-            for (User* const pUser : global.users())
-            {
-                // Skip over non-instructions that we've already made useless.
-                if (isa<Instruction>(pUser) == false)
-                {
-                    continue;
-                }
-
-                Instruction* const pInst = cast<Instruction>(pUser);
-
-                // Skip instructions in other functions.
-                if (pInst->getFunction() != pFunc)
-                {
-                    continue;
-                }
-
-                usesToReplace.push_back(pInst);
-            }
-
-            for (Instruction* const pInst : usesToReplace)
-            {
-                pInst->replaceUsesOfWith(&global, pSpillTable);
-            }
-        }
-
-        globalsToRemove.push_back(&global);
-    }
-
-    for (GlobalVariable* const pGlobal : globalsToRemove)
-    {
-        pGlobal->dropAllReferences();
-        pGlobal->eraseFromParent();
-    }
 }
 
 } // Llpc

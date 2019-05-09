@@ -47,13 +47,17 @@ class PassManager;
 } // legacy
 
 class PassRegistry;
+void initializeSpirvLowerAccessChainPass(PassRegistry&);
+void initializeSpirvLowerAggregateLoadStorePass(PassRegistry&);
 void initializeSpirvLowerAlgebraTransformPass(PassRegistry&);
+void initializeSpirvLowerBufferOpPass(PassRegistry&);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
 void initializeSpirvLowerDynIndexPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
+void initializeSpirvLowerPushConstPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
 void initializeSpirvLowerTranslatorPass(PassRegistry&);
 
@@ -66,26 +70,34 @@ namespace Llpc
 inline static void InitializeLowerPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
+  initializeSpirvLowerAccessChainPass(passRegistry);
+  initializeSpirvLowerAggregateLoadStorePass(passRegistry);
   initializeSpirvLowerAlgebraTransformPass(passRegistry);
+  initializeSpirvLowerBufferOpPass(passRegistry);
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
   initializeSpirvLowerDynIndexPass(passRegistry);
   initializeSpirvLowerGlobalPass(passRegistry);
   initializeSpirvLowerImageOpPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
   initializeSpirvLowerLoopUnrollControlPass(passRegistry);
+  initializeSpirvLowerPushConstPass(passRegistry);
   initializeSpirvLowerResourceCollectPass(passRegistry);
   initializeSpirvLowerTranslatorPass(passRegistry);
 }
 
 class Context;
 
-llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt);
+llvm::ModulePass* CreateSpirvLowerAccessChain();
+llvm::ModulePass* CreateSpirvLowerAggregateLoadStore();
+llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding , bool enableFloatOpt);
+llvm::ModulePass* CreateSpirvLowerBufferOp();
 llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
 llvm::ModulePass* CreateSpirvLowerDynIndex();
 llvm::ModulePass* CreateSpirvLowerGlobal();
 llvm::ModulePass* CreateSpirvLowerImageOp();
 llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
 llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
+llvm::ModulePass* CreateSpirvLowerPushConst();
 llvm::ModulePass* CreateSpirvLowerResourceCollect();
 llvm::ModulePass* CreateSpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo* pShaderInfo);
 

@@ -67,7 +67,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcBuilder.cpp                     \
         llpcBuilderImpl.cpp                 \
         llpcBuilderImplDesc.cpp             \
-        llpcBuilderImplMatrix.cpp           \
         llpcBuilderImplMisc.cpp             \
         llpcBuilderRecorder.cpp             \
         llpcBuilderReplayer.cpp
@@ -85,13 +84,17 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     # llpc/lower
     CPPFILES +=                                 \
         llpcSpirvLower.cpp                      \
+        llpcSpirvLowerAccessChain.cpp           \
+        llpcSpirvLowerAggregateLoadStore.cpp    \
         llpcSpirvLowerAlgebraTransform.cpp      \
+        llpcSpirvLowerBufferOp.cpp              \
         llpcSpirvLowerConstImmediateStore.cpp   \
         llpcSpirvLowerDynIndex.cpp              \
         llpcSpirvLowerGlobal.cpp                \
         llpcSpirvLowerImageOp.cpp               \
         llpcSpirvLowerInstMetaRemove.cpp        \
         llpcSpirvLowerLoopUnrollControl.cpp     \
+        llpcSpirvLowerPushConst.cpp             \
         llpcSpirvLowerResourceCollect.cpp       \
         llpcSpirvLowerTranslator.cpp
 

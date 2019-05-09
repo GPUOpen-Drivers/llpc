@@ -15,15 +15,17 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 1.000000e+00, <4 x i32> {{%[^,]+}}, i32 0, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 1.000000e+00, <4 x i32> {{%[^,]+}}, i32 16, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 1.000000e+00, <4 x i32> {{%[^,]+}}, i32 32, i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.f32(float 1.000000e+00, <4 x i32> {{%[^,]+}}, i32 48, i32 0, i32 0)
-; SHADERTEST: call float @llvm.amdgcn.raw.buffer.load.f32(<4 x i32> {{%[^,]+}}, i32 0, i32 0, i32 0)
-; SHADERTEST: call float @llvm.amdgcn.raw.buffer.load.f32(<4 x i32> {{%[^,]+}}, i32 16, i32 0, i32 0)
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call void @llpc.buffer.store.v4i8(<4 x i32> %{{[0-9]*}}, i32 0
+; SHADERTEST: call void @llpc.buffer.store.v4i8(<4 x i32> %{{[0-9]*}}, i32 16
+; SHADERTEST: call void @llpc.buffer.store.v4i8(<4 x i32> %{{[0-9]*}}, i32 32
+; SHADERTEST: call void @llpc.buffer.store.v4i8(<4 x i32> %{{[0-9]*}}, i32 48
+; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 0
+; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 16
+; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 32
+; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 48
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

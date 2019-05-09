@@ -405,7 +405,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     bool useFixedLayout = (m_shaderStage == ShaderStageCompute);
     bool reserveVbTable = false;
     bool reserveStreamOutTable = false;
-    bool reserveEsGsLdsSize = false;
 
     if (pShaderInfo->userDataNodeCount > 0)
     {
@@ -492,15 +491,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
             }
 
-            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-            // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
-            const auto gfxIp = m_pContext->GetGfxIpVersion();
-            if (((gfxIp.major >= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
-                )
-            {
-                availUserDataCount -= 1;
-                reserveEsGsLdsSize = true;
-            }
             break;
         }
     case ShaderStageTessEval:
@@ -525,15 +515,11 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
             }
 
-            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-            // with PAL's GS on-chip behavior. i.e. GS is GFX8
-            if ((m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
-                )
+            if (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
             {
                 // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
                 // with PAL's GS on-chip behavior.
                 availUserDataCount -= 1;
-                reserveEsGsLdsSize = true;
             }
 
             break;
@@ -741,7 +727,11 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
-            if (reserveEsGsLdsSize)
+            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+            // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
+            const auto gfxIp = m_pContext->GetGfxIpVersion();
+            if (((gfxIp.major >= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+                )
             {
                 argTys.push_back(m_pContext->Int32Ty());
                 *pInRegMask |= (1ull << (argIdx++));
@@ -821,7 +811,10 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
-            if (reserveEsGsLdsSize)
+            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+            // with PAL's GS on-chip behavior. i.e. GS is GFX8
+            if ((m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
+                )
             {
                 argTys.push_back(m_pContext->Int32Ty());
                 *pInRegMask |= (1ull << (argIdx++));

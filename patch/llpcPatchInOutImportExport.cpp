@@ -2827,7 +2827,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                                   pFrontFacing,
                                   ConstantInt::get(m_pContext->Int32Ty(),
                                   0));
-            pInput = CastInst::CreateIntegerCast(pInput, pInputTy, false, "", pInsertPos);
+            pInput = CastInst::Create(Instruction::ZExt, pInput, m_pContext->Int32Ty(), "", pInsertPos);
             break;
         }
     case BuiltInPointCoord:
@@ -2855,9 +2855,13 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInHelperInvocation:
         {
-            pInput = EmitCall(m_pModule, "llvm.amdgcn.ps.live", m_pContext->BoolTy(), args, Attribute::ReadNone, pInsertPos);
+            std::vector<Attribute::AttrKind> attribs;
+            attribs.push_back(Attribute::ReadNone);
+
+            pInput = EmitCall(m_pModule, "llvm.amdgcn.ps.live", m_pContext->BoolTy(), args, attribs, pInsertPos);
             pInput = BinaryOperator::CreateNot(pInput, "", pInsertPos);
-            pInput = CastInst::CreateIntegerCast(pInput, pInputTy, false, "", pInsertPos);
+
+            pInput = new ZExtInst(pInput, m_pContext->Int32Ty(), "", pInsertPos);
             break;
         }
     case BuiltInPrimitiveId:
@@ -4621,190 +4625,6 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
 }
 
 // =====================================================================================================================
-// Combines scalar values store to vector store
-uint32_t PatchInOutImportExport::CombineBufferStore(
-    const std::vector<Value*>& storeValues,   // [in] Values to store
-    uint32_t                   startIdx,      // Starting index for load operation in the load value array
-    uint32_t                   valueOffset,   // Value offset as a bias of buffer store offset
-    Value*                     pBufDesc,      // [in] Buffer descriptor
-    Value*                     pStoreOffset,  // [in] Buffer store offset
-    Value*                     pBufBase,      // [in] Buffer base offset
-    CoherentFlag               coherent,      // Buffer coherency
-    Instruction*               pInsertPos)    // [in] Where to insert write instructions
-{
-
-    std::vector<uint32_t> formats;
-
-    if (m_gfxIp.major <= 9)
-    {
-        formats =
-        {
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32)),
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32)),
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32_32)),
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32_32_32)),
-        };
-    }
-
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
-
-    Type* storeTys[4] =
-    {
-        m_pContext->Int32Ty(),
-        m_pContext->Int32x2Ty(),
-        m_pContext->Int32x3Ty(),
-        m_pContext->Int32x4Ty(),
-    };
-
-    std::string funcName = "llvm.amdgcn.raw.tbuffer.store.";
-
-    // Start from 4-component combination
-    uint32_t compCount = 4;
-    for (; compCount > 0; compCount--)
-    {
-        // GFX6 does not support 3-component combination
-        if ((m_gfxIp.major == 6) && (compCount == 3))
-            continue;
-
-        if (startIdx + compCount <= storeValues.size())
-        {
-            funcName += GetTypeName(storeTys[compCount - 1]);
-            Value* pStoreValue = nullptr;
-            if (compCount > 1)
-            {
-                auto pStoreTy = VectorType::get(m_pContext->Int32Ty(), compCount);
-                pStoreValue = UndefValue::get(pStoreTy);
-
-                for (uint32_t i = 0; i < compCount; ++i)
-                {
-                    pStoreValue = InsertElementInst::Create(pStoreValue,
-                                                            storeValues[startIdx + i],
-                                                            ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                            "",
-                                                            pInsertPos);
-                }
-            }
-            else
-            {
-                pStoreValue = storeValues[startIdx];
-            }
-
-            std::vector<Value*> args;
-
-            args.push_back(pStoreValue);                                                     // vdata
-            args.push_back(pBufDesc);                                                       // rsrc
-
-            auto pWriteOffset = BinaryOperator::CreateAdd(pStoreOffset,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), valueOffset * 4),
-                                                            "",
-                                                            pInsertPos);
-            args.push_back(pWriteOffset);                                                     // voffset
-            args.push_back(pBufBase);                                                        // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), formats[compCount - 1]));    // format
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));         // glc
-
-            EmitCall(m_pModule, funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
-
-            break;
-        }
-    }
-
-    return compCount;
-}
-
-// =====================================================================================================================
-// Combines scalar values load to vector load
-uint32_t PatchInOutImportExport::CombineBufferLoad(
-    std::vector<Value*>& loadValues,    // [in/out] Values to load
-    uint32_t             startIdx,      // Starting index for load operation in the load value array
-    Value *              pBufDesc,      // [in] Buffer descriptor
-    Value *              pLoadOffset,   // [in] Buffer load offset
-    Value *              pBufBase,      // [in] Buffer base offset
-    CoherentFlag         coherent,      // Buffer coherency
-    Instruction*         pInsertPos)    // [in] Where to insert write instructions
-{
-    std::vector<uint32_t> formats;
-
-    if (m_gfxIp.major <= 9)
-    {
-        formats =
-        {
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32)),
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32)),
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32_32)),
-            ((BUF_NUM_FORMAT_FLOAT<<4) | (BUF_DATA_FORMAT_32_32_32_32)),
-        };
-    }
-
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
-
-    Type* loadTyps[4] =
-    {
-        m_pContext->Int32Ty(),
-        m_pContext->Int32x2Ty(),
-        m_pContext->Int32x3Ty(),
-        m_pContext->Int32x4Ty(),
-    };
-
-    std::string funcName = "llvm.amdgcn.raw.tbuffer.load.";
-    LLPC_ASSERT(loadValues.size() > 0);
-
-    // 4-component combination
-    uint32_t compCount = 4;
-    for (; compCount > 0; compCount--)
-    {
-        // GFX6 does not support 3-component combination
-        if ((m_gfxIp.major == 6) && (compCount == 3))
-            continue;
-
-        if (startIdx + compCount <= loadValues.size())
-        {
-            funcName += GetTypeName(loadTyps[compCount - 1]);
-
-            Value* pLoadValue = nullptr;
-            std::vector<Value*> args;
-            args.push_back(pBufDesc);                                                      // rsrc
-
-            auto pWriteOffset = BinaryOperator::CreateAdd(pLoadOffset,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), startIdx * 4),
-                                                            "",
-                                                            pInsertPos);
-            args.push_back(pWriteOffset);                                                   // voffset
-            args.push_back(pBufBase);                                                       // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), formats[compCount - 1]));  // format
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc
-
-            pLoadValue = EmitCall(m_pModule, funcName, loadTyps[compCount - 1], args, NoAttrib, pInsertPos);
-            LLPC_ASSERT(pLoadValue != nullptr);
-            if (compCount > 1)
-            {
-                for (uint32_t i = 0; i < compCount; i++)
-                {
-                    loadValues[startIdx + i] = ExtractElementInst::Create(pLoadValue,
-                                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                                        "",
-                                                                        pInsertPos);
-                }
-            }
-            else
-            {
-                loadValues[startIdx] = pLoadValue;
-            }
-
-            break;
-        }
-    }
-
-    return compCount;
-}
-
-// =====================================================================================================================
 // Store value to stream-out buffer
 void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     Value*        pStoreValue,        // [in] Value to store
@@ -5429,37 +5249,39 @@ Value* PatchInOutImportExport::ReadValueFromLds(
                                                "",
                                                pInsertPos);
 
-        CoherentFlag coherent = {};
-        if (m_gfxIp.major <= 9)
+        for (uint32_t i = 0; i < numChannels; ++i)
         {
-            coherent.bits.glc = true;
-        }
-
-        else
-        {
-            LLPC_NOT_IMPLEMENTED();
-        }
-
-        for (uint32_t i = 0, combineCount = 0; i < numChannels; i += combineCount)
-        {
-            combineCount = CombineBufferLoad(loadValues,
-                                        i,
-                                        pOffChipLdsDesc,
-                                        pLdsOffset,
-                                        pOffChipLdsBase,
-                                        coherent,
-                                        pInsertPos);
-
-            for (uint32_t j = i; j < i + combineCount; ++j)
+            std::vector<Value*> args;
+            args.push_back(pOffChipLdsDesc);                                                // rsrc
+            if (m_gfxIp.major <= 9)
             {
-                if (bitWidth == 8)
-                {
-                    loadValues[j] = new TruncInst(loadValues[j], m_pContext->Int8Ty(), "", pInsertPos);
-                }
-                else if (bitWidth == 16)
-                {
-                    loadValues[j] = new TruncInst(loadValues[j], m_pContext->Int16Ty(), "", pInsertPos);
-                }
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+                args.push_back(pLdsOffset);                                                     // voffset
+                args.push_back(pOffChipLdsBase);                                                // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                 // offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
+                loadValues[i] = EmitCall(m_pModule,
+                                         "llvm.amdgcn.tbuffer.load.i32",
+                                         m_pContext->Int32Ty(),
+                                         args,
+                                         NoAttrib,
+                                         pInsertPos);
+            }
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
+
+            if (bitWidth == 8)
+            {
+                loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int8Ty(), "", pInsertPos);
+            }
+            else if (bitWidth == 16)
+            {
+                loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int16Ty(), "", pInsertPos);
             }
         }
     }
@@ -5578,21 +5400,109 @@ void PatchInOutImportExport::WriteValueToLds(
                                                "",
                                                pInsertPos);
 
-        auto pOffChipLdsDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetOffChipLdsDesc();
+        uint32_t stride = 0;
 
-        CoherentFlag coherent = {};
-        coherent.bits.glc = true;
-
-        for (uint32_t i = 0, combineCount = 0; i < numChannels; i += combineCount)
+        for (uint32_t i = 0; i < numChannels; i += stride)
         {
-            combineCount = CombineBufferStore(storeValues,
-                                                i,
-                                                i,
-                                                pOffChipLdsDesc,
-                                                pLdsOffset,
-                                                pOffChipLdsBase,
-                                                coherent,
-                                                pInsertPos);
+            Value* pStoreValue = nullptr;
+
+            BufDataFormat dfmt;
+
+            StringRef funcName;
+
+            if (i + 3 < numChannels)
+            {
+                // Merge values[i:i+3] into a <4 x i32> vector
+                auto pStoreValueTy = VectorType::get(m_pContext->Int32Ty(), 4);
+                pStoreValue = UndefValue::get(pStoreValueTy);
+
+                for (uint32_t j = 0; j < 4; ++j)
+                {
+                    pStoreValue = InsertElementInst::Create(pStoreValue,
+                                                            storeValues[i+j],
+                                                            ConstantInt::get(m_pContext->Int32Ty(), j),
+                                                            "",
+                                                            pInsertPos);
+                }
+
+                if (m_gfxIp.major <= 9)
+                {
+                    dfmt = BUF_DATA_FORMAT_32_32_32_32;
+                    funcName = "llvm.amdgcn.tbuffer.store.v4i32";
+                }
+                else
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                }
+
+                stride = 4;
+            }
+            else if (i + 1 < numChannels)
+            {
+                // Merge values[i:i+1] into a <2 x i32> vector
+                auto pStoreValueTy = VectorType::get(m_pContext->Int32Ty(), 2);
+                pStoreValue = UndefValue::get(pStoreValueTy);
+
+                for (uint32_t j = 0; j < 2; ++j)
+                {
+                    pStoreValue = InsertElementInst::Create(pStoreValue,
+                                                            storeValues[i+j],
+                                                            ConstantInt::get(m_pContext->Int32Ty(), j),
+                                                            "",
+                                                            pInsertPos);
+                }
+
+                if (m_gfxIp.major <= 9)
+                {
+                    dfmt = BUF_DATA_FORMAT_32_32;
+                    funcName = "llvm.amdgcn.tbuffer.store.v2i32";
+                }
+                else
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                }
+
+                stride = 2;
+            }
+            else
+            {
+                // No need to merge for a single value
+                pStoreValue = storeValues[i];
+
+                if (m_gfxIp.major <= 9)
+                {
+                    dfmt = BUF_DATA_FORMAT_32;
+                    funcName = "llvm.amdgcn.tbuffer.store.i32";
+                }
+                else
+                {
+                    LLPC_NOT_IMPLEMENTED();
+                }
+
+                stride = 1;
+            }
+
+            std::vector<Value*> args;
+
+            args.push_back(pStoreValue);                                                           // vdata
+            args.push_back(m_pipelineSysValues.Get(m_pEntryPoint)->GetOffChipLdsDesc());              // rsrc
+            if (m_gfxIp.major <= 9)
+            {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                        // vindex
+                args.push_back(pLdsOffset);                                                        // voffset
+                args.push_back(pOffChipLdsBase);                                                   // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), i * 4));                    // offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), dfmt));                     // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));     // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                      // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                     // slc
+
+                EmitCall(m_pModule, funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            }
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
         }
     }
     else // Write to on-chip LDS
@@ -5771,32 +5681,35 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
                                                     "",
                                                     pInsertPos);
 
-        auto pTfBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetTessFactorBufDesc();
-        std::vector<Value*> tfValues(tessFactors.size());
-        for (uint32_t i = 0; i < tessFactors.size(); i++)
+        for (uint32_t i = 0; i < tessFactors.size(); ++i)
         {
-            tfValues[i] = new BitCastInst(tessFactors[i], m_pContext->Int32Ty(), "", pInsertPos);
-        }
-
-        CoherentFlag coherent = {};
-        coherent.bits.glc = true;
-
-        for (uint32_t i = 0, combineCount = 0; i < tessFactors.size(); i+= combineCount)
-        {
-            uint32_t  tfValueOffset = i + tessFactorOffset;
+            uint32_t  tessFactorByteOffset = i * 4 + tessFactorOffset * 4;
             if (m_gfxIp.major <= 8)
             {
                 // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-                tfValueOffset += (m_pContext->IsTessOffChip() ? 1 : 0);
+                tessFactorByteOffset += (m_pContext->IsTessOffChip() ? 4 : 0);
             }
-            combineCount = CombineBufferStore(tfValues,
-                                              i,
-                                              tfValueOffset,
-                                              pTfBufDesc,
-                                              pTfBufferOffset,
-                                              pTfBufferBase,
-                                              coherent,
-                                              pInsertPos);
+
+            std::vector<Value*> args;
+
+            args.push_back(tessFactors[i]);                                                     // vdata
+            args.push_back(m_pipelineSysValues.Get(m_pEntryPoint)->GetTessFactorBufDesc());        // rsrc
+            if (m_gfxIp.major <= 9)
+            {
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
+                args.push_back(pTfBufferOffset);                                                // voffset
+                args.push_back(pTfBufferBase);                                                  // soffset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), tessFactorByteOffset));  // offset
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
+                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_FLOAT));  // nfmt
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
+                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                  // slc
+                EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            }
+            else
+            {
+                LLPC_NOT_IMPLEMENTED();
+            }
         }
     }
     else

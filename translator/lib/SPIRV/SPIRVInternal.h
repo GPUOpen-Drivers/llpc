@@ -182,9 +182,10 @@ enum SPIRAddressSpace {
   SPIRAS_Local     = 3,  // AMDGPUAS::LOCAL_ADDRESS
   SPIRAS_Constant  = 4,  // AMDGPUAS::CONSTANT_ADDRESS
   SPIRAS_Private   = 5,  // AMDGPUAS::PRIVATE_ADDRESS
-  SPIRAS_Uniform   = 7,  // Memory buffer descriptor
   SPIRAS_Input     = 64,
   SPIRAS_Output    = 65,
+  SPIRAS_Uniform   = 66,
+  SPIRAS_PushConst = 67,
   SPIRAS_Count,
 };
 
@@ -212,9 +213,8 @@ inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init() {
   add(SPIRAS_Output, StorageClassOutput);
   add(SPIRAS_Uniform, StorageClassUniform);
   add(SPIRAS_Private, StorageClassPrivate);
-  add(SPIRAS_Constant, StorageClassPushConstant);
+  add(SPIRAS_PushConst, StorageClassPushConstant);
   add(SPIRAS_Uniform, StorageClassStorageBuffer);
-  add(SPIRAS_Global, StorageClassPhysicalStorageBufferEXT);
 }
 typedef SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind> SPIRSPIRVAddrSpaceMap;
 

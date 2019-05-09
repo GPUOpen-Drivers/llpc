@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderRecorder.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 
@@ -59,10 +58,6 @@ StringRef BuilderRecorder::GetCallName(
         return "desc.load.fmask";
     case Opcode::DescLoadSpillTablePtr:
         return "desc.load.spill.table.ptr";
-    case Opcode::DescBufferLength:
-        return "desc.buffer.length";
-    case Opcode::MatrixTranspose:
-        return "matrix.transpose";
     case Opcode::MiscKill:
         return "misc.kill";
     case Opcode::MiscReadClock:
@@ -124,15 +119,6 @@ Instruction* BuilderRecorder::CreateKill(
     const Twine& instName)  // [in] Name to give final instruction
 {
     return Record(Opcode::MiscKill, nullptr, {}, instName);
-}
-
-// =====================================================================================================================
-// Create a matrix transpose.
-Value* BuilderRecorder::CreateMatrixTranspose(
-    Value* const pMatrix,      // [in] Matrix to transpose.
-    const Twine& instName)     // [in] Name to give final instruction
-{
-    return Record(Opcode::MatrixTranspose, GetTransposedMatrixTy(pMatrix->getType()), { pMatrix }, instName);
 }
 
 // =====================================================================================================================
@@ -202,8 +188,11 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
     Type*         pPointeeTy,       // [in] Type that the returned pointer should point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
+    Type* pDescTy = (pPointeeTy == nullptr) ?
+                        cast<Type>(VectorType::get(getInt32Ty(), 4)) :
+                        cast<Type>(PointerType::get(pPointeeTy, ADDR_SPACE_CONST));
     return Record(Opcode::DescLoadBuffer,
-                  PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER),
+                  pDescTy,
                   {
                       getInt32(descSet),
                       getInt32(binding),
@@ -304,15 +293,6 @@ Value* BuilderRecorder::CreateLoadSpillTablePtr(
 }
 
 // =====================================================================================================================
-// Create a buffer length query based on the specified descriptor.
-Value* BuilderRecorder::CreateBufferLength(
-    Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
-    const Twine&  instName)         // [in] Name to give instruction(s).
-{
-    return Record(Opcode::DescBufferLength, getInt32Ty(), { pBufferDesc }, instName);
-}
-
-// =====================================================================================================================
 // This is a BuilderRecorder. If it was created with wantReplay=true, create the BuilderReplayer pass.
 ModulePass* BuilderRecorder::CreateBuilderReplayer()
 {
@@ -346,7 +326,7 @@ Instruction* BuilderRecorder::Record(
         if (pRetTy != nullptr)
         {
             mangledNameStream << ".";
-            GetTypeName(pRetTy, mangledNameStream);
+            GetTypeNameForScalarOrVector(pRetTy, mangledNameStream);
         }
         else
         {

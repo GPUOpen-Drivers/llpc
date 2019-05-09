@@ -258,7 +258,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
                 (pDestTy->getScalarType()->isDoubleTy() && fp64Control.denormFlushToZero))
             {
                 // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-                std::string instName = "llvm.canonicalize." + GetTypeName(pDestTy);
+                std::string instName = "llvm.canonicalize." + GetTypeNameForScalarOrVector(pDestTy);
                 auto pCanonical = EmitCall(m_pModule,
                                            instName,
                                            pDestTy,
@@ -283,14 +283,14 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
 
             // -trunc(x * 1/y)
             Value* pTrunc = EmitCall(m_pModule,
-                                     "llvm.amdgcn.rcp." + GetTypeName(pDestTy),
+                                     "llvm.amdgcn.rcp." + GetTypeNameForScalarOrVector(pDestTy),
                                      pDestTy,
                                      { pSrc2 },
                                      NoAttrib,
                                      &binaryOp);
             pTrunc = BinaryOperator::CreateFMul(pTrunc, pSrc1, "", &binaryOp);
             pTrunc = EmitCall(m_pModule,
-                              "llvm.trunc." + GetTypeName(pDestTy),
+                              "llvm.trunc." + GetTypeNameForScalarOrVector(pDestTy),
                               pDestTy,
                               { pTrunc },
                               NoAttrib,
@@ -299,7 +299,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
 
             // -trunc(x/y) * y + x
             auto pFRem = EmitCall(m_pModule,
-                                  "llvm.fmuladd." + GetTypeName(pDestTy),
+                                  "llvm.fmuladd." + GetTypeNameForScalarOrVector(pDestTy),
                                   pDestTy,
                                   { pTrunc, pSrc2, pSrc1 },
                                   NoAttrib,
@@ -437,7 +437,7 @@ void SpirvLowerAlgebraTransform::visitCallInst(
             (pDestTy->getScalarType()->isDoubleTy() && fp64Control.denormFlushToZero))
         {
             // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
-            std::string instName = "llvm.canonicalize." + GetTypeName(pDestTy);
+            std::string instName = "llvm.canonicalize." + GetTypeNameForScalarOrVector(pDestTy);
             auto pCanonical = EmitCall(m_pModule,
                                         instName,
                                         pDestTy,

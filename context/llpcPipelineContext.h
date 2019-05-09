@@ -395,11 +395,11 @@ struct ResourceUsage
         std::map<uint32_t, uint32_t> perPatchOutputLocMap;
 
         // Map from built-in IDs to specially assigned locations
-        std::map<uint32_t, uint32_t> builtInInputLocMap;
-        std::map<uint32_t, uint32_t> builtInOutputLocMap;
+        std::unordered_map<uint32_t, uint32_t> builtInInputLocMap;
+        std::unordered_map<uint32_t, uint32_t> builtInOutputLocMap;
 
-        std::map<uint32_t, uint32_t> perPatchBuiltInInputLocMap;
-        std::map<uint32_t, uint32_t> perPatchBuiltInOutputLocMap;
+        std::unordered_map<uint32_t, uint32_t> perPatchBuiltInInputLocMap;
+        std::unordered_map<uint32_t, uint32_t> perPatchBuiltInOutputLocMap;
 
         // Transform feedback strides
         uint32_t xfbStrides[MaxTransformFeedbackBuffers];
@@ -418,6 +418,12 @@ struct ResourceUsage
         uint32_t    perPatchOutputMapLocCount;
 
         uint32_t    expCount;   // Export count (number of "exp" instructions) for generic outputs
+
+        struct
+        {
+            std::vector<BasicType>    inputTypes;       // Array of basic types of vertex inputs (vertex input location
+                                                        // -> vertex input type, used by "auto-layout-desc" option)
+        } vs;
 
         struct
         {
@@ -780,8 +786,7 @@ public:
 
     // Gets pipeline hash code
     uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_hash); }
-
-    virtual uint64_t GetShaderHashCode(ShaderStage stage) const;
+    virtual uint64_t GetShaderHashCode(ShaderStage stage) const = 0;
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
@@ -799,6 +804,10 @@ protected:
     void InitShaderResourceUsage(ShaderStage shaderStage);
 
     void InitShaderInterfaceData(ShaderStage shaderStage);
+
+    void UpdateShaderHashForPipelineShaderInfo(ShaderStage               stage,
+                                               const PipelineShaderInfo* pShaderInfo,
+                                               MetroHash::MetroHash64*   pHasher) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

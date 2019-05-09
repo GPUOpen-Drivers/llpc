@@ -13,7 +13,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call spir_func { i32, i32 } @_Z9IAddCarryii
 ; SHADERTEST: call spir_func { <4 x i32>, <4 x i32> } @_Z9IAddCarryDv4_iDv4_i

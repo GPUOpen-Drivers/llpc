@@ -84,35 +84,6 @@ public:
     static std::string GetPipelineInfoFileName(PipelineBuildInfo                pipelineInfo,
                                                const MetroHash::Hash*           pHash);
 
-    static void UpdateHashForPipelineShaderInfo(ShaderStage               stage,
-                                                const PipelineShaderInfo* pShaderInfo,
-                                                bool                      isCacheHash,
-                                                MetroHash::MetroHash64*   pHasher);
-
-    static void UpdateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo* pVertexInput,
-                                              MetroHash::MetroHash64*                     pHasher);
-
-    // Update hash for map object
-    template <class MapType>
-    static void UpdateHashForMap(MapType& m, MetroHash::MetroHash64* pHasher)
-    {
-        pHasher->Update(m.size());
-        for (auto mapIt : m)
-        {
-            pHasher->Update(mapIt.first);
-            pHasher->Update(mapIt.second);
-        }
-    }
-
-    static void UpdateHashForNonFragmentState(
-        const GraphicsPipelineBuildInfo* pPipeline,
-        bool                             isCacheHash,
-        MetroHash::MetroHash64*          pHasher);
-
-    static void UpdateHashForFragmentState(
-        const GraphicsPipelineBuildInfo* pPipeline,
-        MetroHash::MetroHash64*          pHasher);
-
 private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
 
@@ -134,6 +105,10 @@ private:
                                       std::ostream&                    dumpFile);
     static void DumpPipelineOptions(const PipelineOptions*   pOptions,
                                     std::ostream&            dumpFile);
+    static void UpdateHashForPipelineShaderInfo(ShaderStage               stage,
+                                                const PipelineShaderInfo* pShaderInfo,
+                                                bool                      isCacheHash,
+                                                MetroHash::MetroHash64*   pHasher);
 
     static void UpdateHashForResourceMappingNode(const ResourceMappingNode* pUserDataNode,
                                                  bool                       isRootNode,

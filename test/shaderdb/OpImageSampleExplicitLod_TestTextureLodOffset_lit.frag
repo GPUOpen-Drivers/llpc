@@ -20,7 +20,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: <4 x float> @spirv.image.sample.f32.1D.lod.constoffset({{.*}}, float 5.000000e-01, float 0x3FD99999A0000000, i32 6, {{.*}})

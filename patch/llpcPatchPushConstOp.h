@@ -30,14 +30,11 @@
  */
 #pragma once
 
+#include "llvm/IR/InstVisitor.h"
+
+#include <unordered_set>
 #include "llpcPatch.h"
-
-namespace llvm
-{
-
-class CallInst;
-
-}
+#include "llpcPipelineShaders.h"
 
 namespace Llpc
 {
@@ -45,26 +42,33 @@ namespace Llpc
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for push constant operations.
 class PatchPushConstOp:
-    public Patch
+    public Patch,
+    public llvm::InstVisitor<PatchPushConstOp>
 {
 public:
     PatchPushConstOp();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
-    bool runOnModule(llvm::Module& module) override;
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineShaders>();
+        analysisUsage.addPreserved<PipelineShaders>();
+    }
+
+    virtual bool runOnModule(llvm::Module& module) override;
+    virtual void visitCallInst(llvm::CallInst& callInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static char ID; // ID of this pass
+    static char ID;   // ID of this pass
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchPushConstOp);
 
-    void visitCallInst(llvm::CallInst& callInst);
-
     // -----------------------------------------------------------------------------------------------------------------
 
-    llvm::SmallVector<llvm::Instruction*, 8> m_instsToRemove; // List of instructions to remove.
+    std::unordered_set<llvm::CallInst*> m_pushConstCalls; // List of "call" instructions to emulate push constant
+                                                          // operations
+    std::unordered_set<llvm::Function*> m_descLoadFuncs;  // Set of descriptor load functions
 };
 
 } // Llpc

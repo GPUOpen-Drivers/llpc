@@ -23,11 +23,11 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call i32 {{.*}}@llpc.call.desc.buffer.length.i32(
-; SHADERTEST: call i32 {{.*}}@llpc.call.desc.buffer.length.i32(
+; SHADERTEST: call i32 @llpc.buffer.arraylength(<4 x i32> %{{[0-9]*}}, i32 28, i32 4)
+; SHADERTEST: call i32 @llpc.buffer.arraylength(<4 x i32> %{{[0-9]*}}, i32 16, i32 64)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

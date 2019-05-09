@@ -30,12 +30,10 @@
  */
 #define DEBUG_TYPE "llpc-patch-push-const"
 
-#include "llvm/IR/ValueMap.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "SPIRVInternal.h"
-#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchPushConstOp.h"
@@ -63,21 +61,12 @@ PatchPushConstOp::PatchPushConstOp()
     :
     Patch(ID)
 {
+    initializePipelineShadersPass(*PassRegistry::getPassRegistry());
+    initializePatchPushConstOpPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
-// Get the analysis usage of this pass.
-void PatchPushConstOp::getAnalysisUsage(
-    AnalysisUsage& analysisUsage // [out] The analysis usage.
-    ) const
-{
-    analysisUsage.addRequired<PipelineShaders>();
-    analysisUsage.addPreserved<PipelineShaders>();
-    analysisUsage.setPreservesCFG();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V patching pass on the specified LLVM module.
+// Executes this SPIR-V lowering pass on the specified LLVM module.
 bool PatchPushConstOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
@@ -85,63 +74,38 @@ bool PatchPushConstOp::runOnModule(
 
     Patch::Init(&module);
 
-    Function* const pFunc = module.getFunction(LlpcName::DescriptorLoadSpillTable);
-
-    // If there was no spill table load, bail.
-    if (pFunc == nullptr)
-    {
-        return false;
-    }
-
-    const PipelineShaders& pipelineShaders = getAnalysis<PipelineShaders>();
+    // Invoke handling of "call" instruction
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (uint32_t shaderStage = 0; shaderStage < ShaderStageCountInternal; ++shaderStage)
     {
-        m_pEntryPoint = pipelineShaders.GetEntryPoint(static_cast<ShaderStage>(shaderStage));
-
-        // If we don't have an entry point for the shader stage, bail.
-        if (m_pEntryPoint == nullptr)
+        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
+        if (m_pEntryPoint != nullptr)
         {
-            continue;
-        }
-
-        m_shaderStage = static_cast<ShaderStage>(shaderStage);
-
-        for (User* const pUser : pFunc->users())
-        {
-            CallInst* const pCall = dyn_cast<CallInst>(pUser);
-
-            // If the user is not a call, bail.
-            if (pCall == nullptr)
-            {
-                continue;
-            }
-
-            // If the call is not in the entry point, bail.
-            if (pCall->getFunction() != m_pEntryPoint)
-            {
-                continue;
-            }
-
-            visitCallInst(*pCall);
+            m_shaderStage = static_cast<ShaderStage>(shaderStage);
+            visit(*m_pEntryPoint);
         }
     }
 
-    const bool changed = (m_instsToRemove.empty() == false);
-
-    // Remove unnecessary instructions.
-    while (m_instsToRemove.empty() == false)
+    // Remove unnecessary push constant load calls
+    for (auto pCallInst: m_pushConstCalls)
     {
-        Instruction* const pInst = m_instsToRemove.pop_back_val();
-        pInst->dropAllReferences();
-        pInst->eraseFromParent();
+        pCallInst->dropAllReferences();
+        pCallInst->eraseFromParent();
     }
+    m_pushConstCalls.clear();
 
-    if (pFunc->user_empty())
+    // Remove unnecessary push constant load functions
+    for (auto pFunc : m_descLoadFuncs)
     {
-        pFunc->eraseFromParent();
+        if (pFunc->user_empty())
+        {
+            pFunc->dropAllReferences();
+            pFunc->eraseFromParent();
+        }
     }
+    m_descLoadFuncs.clear();
 
-    return changed;
+    return true;
 }
 
 // =====================================================================================================================
@@ -149,109 +113,77 @@ bool PatchPushConstOp::runOnModule(
 void PatchPushConstOp::visitCallInst(
     CallInst& callInst) // [in] "Call" instruction
 {
-    Function* const pCallee = callInst.getCalledFunction();
-    LLPC_ASSERT(pCallee != nullptr);
-    LLPC_ASSERT(pCallee->getName().equals(LlpcName::DescriptorLoadSpillTable));
-
-    auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
-    auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
-    uint32_t pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
-    LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
-    auto pPushConstNode = &pShaderInfo->pUserDataNodes[pushConstNodeIdx];
-
-    if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)
+    auto pCallee = callInst.getCalledFunction();
+    if (pCallee == nullptr)
     {
-        auto pPushConst = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.resNodeValues[pushConstNodeIdx]);
+        return;
+    }
 
-        IRBuilder<> builder(*m_pContext);
-        builder.SetInsertPoint(callInst.getFunction()->getEntryBlock().getFirstNonPHI());
+    auto mangledName = pCallee->getName();
 
-        Value* pPushConstPointer = builder.CreateAlloca(pPushConst->getType());
-        builder.CreateStore(pPushConst, pPushConstPointer);
+    if (mangledName.startswith(LlpcName::PushConstLoad))
+    {
+        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
+        uint32_t pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
+        LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
+        auto pPushConstNode = &pShaderInfo->pUserDataNodes[pushConstNodeIdx];
 
-        Type* const pCastType = callInst.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
-
-        pPushConstPointer = builder.CreateBitCast(pPushConstPointer, pCastType);
-
-        ValueMap<Value*, Value*> valueMap;
-
-        valueMap[&callInst] = pPushConstPointer;
-
-        SmallVector<Value*, 8> workList;
-
-        for (User* const pUser : callInst.users())
+        auto pMemberOffsetInBytes = callInst.getArgOperand(1);
+        if (isa<Constant>(pMemberOffsetInBytes) == false)
         {
-            workList.push_back(pUser);
+            // NOTE: Push constant only supports uniform control flow, so we can use uniform offset safely.
+            std::vector<Value*> args;
+            args.push_back(pMemberOffsetInBytes);
+            auto pMemberOffsetInBytes = EmitCall(m_pModule,
+                                                 "llvm.amdgcn.readfirstlane",
+                                                 m_pContext->Int32Ty(),
+                                                 args,
+                                                 NoAttrib,
+                                                 &callInst);
+            callInst.setArgOperand(1, pMemberOffsetInBytes);
         }
 
-        m_instsToRemove.push_back(&callInst);
-
-        while (workList.empty() == false)
+        if (pPushConstNode->offsetInDwords < pIntfData->spillTable.offsetInDwords)
         {
-            Instruction* const pInst = dyn_cast<Instruction>(workList.pop_back_val());
+            auto pPushConst = GetFunctionArgument(m_pEntryPoint,
+                                                  pIntfData->entryArgIdxs.resNodeValues[pushConstNodeIdx]);
 
-            // If the value is not an instruction, bail.
-            if (pInst == nullptr)
+            // Load push constant per dword
+            Type* pLoadTy = callInst.getType();
+
+            LLPC_ASSERT(pLoadTy->isVectorTy() &&
+                        pLoadTy->getVectorElementType()->isIntegerTy() &&
+                        (pLoadTy->getScalarSizeInBits() == 8));
+
+            uint32_t dwordCount = pLoadTy->getVectorNumElements() / 4;
+
+            Instruction* pInsertPos = &callInst;
+
+            Value* pLoadValue = UndefValue::get(VectorType::get(m_pContext->Int32Ty(), dwordCount));
+            for (uint32_t i = 0; i < dwordCount; ++i)
             {
-                continue;
+                Value* pDwordIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                Value* pDestIdx = pDwordIdx;
+                Value* pMemberDwordOffset = BinaryOperator::Create(Instruction::AShr,
+                                                                   pMemberOffsetInBytes,
+                                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                                   "",
+                                                                   pInsertPos);
+                pDwordIdx = BinaryOperator::Create(Instruction::Add, pDwordIdx, pMemberDwordOffset, "", pInsertPos);
+                Value* pTmp = ExtractElementInst::Create(pPushConst, pDwordIdx, "", pInsertPos);
+                pLoadValue = InsertElementInst::Create(pLoadValue, pTmp, pDestIdx, "", pInsertPos);
             }
 
-            m_instsToRemove.push_back(pInst);
+            pLoadValue = new BitCastInst(pLoadValue,
+                                         VectorType::get(m_pContext->Int8Ty(), pLoadTy->getVectorNumElements()),
+                                         "",
+                                         pInsertPos);
 
-            if (BitCastInst* const pBitCast = dyn_cast<BitCastInst>(pInst))
-            {
-                LLPC_ASSERT(valueMap.count(pBitCast->getOperand(0)) > 0);
+            callInst.replaceAllUsesWith(pLoadValue);
 
-                Type* const pCastType = pBitCast->getType();
-                LLPC_ASSERT(pCastType->isPointerTy());
-                LLPC_ASSERT(pCastType->getPointerAddressSpace() == ADDR_SPACE_CONST);
-
-                Type* const pNewType = pCastType->getPointerElementType()->getPointerTo(ADDR_SPACE_PRIVATE);
-
-                builder.SetInsertPoint(pBitCast);
-                valueMap[pBitCast] = builder.CreateBitCast(valueMap[pBitCast->getOperand(0)], pNewType);
-
-                for (User* const pUser : pBitCast->users())
-                {
-                    workList.push_back(pUser);
-                }
-            }
-            else if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pInst))
-            {
-                LLPC_ASSERT(valueMap.count(pGetElemPtr->getPointerOperand()) > 0);
-
-                SmallVector<Value*, 8> indices;
-
-                for (Value* const pIndex : pGetElemPtr->indices())
-                {
-                    indices.push_back(pIndex);
-                }
-
-                builder.SetInsertPoint(pGetElemPtr);
-                valueMap[pGetElemPtr] = builder.CreateInBoundsGEP(valueMap[pGetElemPtr->getPointerOperand()],
-                                                                    indices);
-
-                for (User* const pUser : pGetElemPtr->users())
-                {
-                    workList.push_back(pUser);
-                }
-            }
-            else if (LoadInst* const pLoad = dyn_cast<LoadInst>(pInst))
-            {
-                LLPC_ASSERT(valueMap.count(pLoad->getPointerOperand()) > 0);
-
-                builder.SetInsertPoint(pLoad);
-
-                LoadInst* const pNewLoad = builder.CreateLoad(valueMap[pLoad->getPointerOperand()]);
-
-                valueMap[pLoad] = pNewLoad;
-
-                pLoad->replaceAllUsesWith(pNewLoad);
-            }
-            else
-            {
-                LLPC_NEVER_CALLED();
-            }
+            m_pushConstCalls.insert(&callInst);
+            m_descLoadFuncs.insert(pCallee);
         }
     }
 }
@@ -260,6 +192,5 @@ void PatchPushConstOp::visitCallInst(
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patch operations for push constant operations.
-INITIALIZE_PASS_BEGIN(PatchPushConstOp, DEBUG_TYPE, "Patch LLVM for push constant operations", false, false)
-INITIALIZE_PASS_DEPENDENCY(PipelineShaders)
-INITIALIZE_PASS_END(PatchPushConstOp, DEBUG_TYPE, "Patch LLVM for push constant operations", false, false)
+INITIALIZE_PASS(PatchPushConstOp, DEBUG_TYPE,
+                "Patch LLVM for push constant operations", false, false)

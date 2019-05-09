@@ -1,13 +1,14 @@
+
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, <{ [4294967295 x float] }> addrspace(7)* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: AMDLLPC SUCCESS
+; SHADERTEST: %{{[0-9]+}} = getelementptr { [4294967295 x float] }, { [4294967295 x float] } addrspace(66)* @1, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = getelementptr { [4294967295 x float] }, { [4294967295 x float] } addrspace(66)* @2, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = getelementptr { [4294967295 x float] }, { [4294967295 x float] } addrspace(66)* @3, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = getelementptr { [4294967295 x float] }, { [4294967295 x float] } addrspace(66)* @4, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = getelementptr { [4294967295 x float] }, { [4294967295 x float] } addrspace(66)* @5, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = getelementptr { [4294967295 x float] }, { [4294967295 x float] } addrspace(66)* @0, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST : AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 ; SPIR-V

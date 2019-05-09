@@ -142,6 +142,35 @@ const char* PipelineContext::GetGpuNameAbbreviation() const
 }
 
 // =====================================================================================================================
+// Updates hash code context from pipeline shader info for shader hash code.
+void PipelineContext::UpdateShaderHashForPipelineShaderInfo(
+    ShaderStage               stage,           // Shader stage
+    const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
+    MetroHash::MetroHash64*   pHasher          // [in,out] Haher to generate hash code
+    ) const
+{
+    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+    pHasher->Update(stage);
+    pHasher->Update(pModuleData->hash);
+
+    if (pShaderInfo->pEntryTarget)
+    {
+        size_t entryNameLen = strlen(pShaderInfo->pEntryTarget);
+        pHasher->Update(reinterpret_cast<const uint8_t*>(pShaderInfo->pEntryTarget), entryNameLen);
+    }
+
+    if ((pShaderInfo->pSpecializationInfo) && (pShaderInfo->pSpecializationInfo->mapEntryCount > 0))
+    {
+        auto pSpecializationInfo = pShaderInfo->pSpecializationInfo;
+        pHasher->Update(pSpecializationInfo->mapEntryCount);
+        pHasher->Update(reinterpret_cast<const uint8_t*>(pSpecializationInfo->pMapEntries),
+                        sizeof(VkSpecializationMapEntry) * pSpecializationInfo->mapEntryCount);
+        pHasher->Update(pSpecializationInfo->dataSize);
+        pHasher->Update(reinterpret_cast<const uint8_t*>(pSpecializationInfo->pData), pSpecializationInfo->dataSize);
+    }
+}
+
+// =====================================================================================================================
 // Initializes resource usage of the specified shader stage.
 void PipelineContext::InitShaderResourceUsage(
     ShaderStage shaderStage)    // Shader stage
@@ -239,21 +268,6 @@ void PipelineContext::InitShaderInterfaceData(
 
     memset(&pIntfData->entryArgIdxs, 0, sizeof(pIntfData->entryArgIdxs));
     pIntfData->entryArgIdxs.spillTable = InvalidValue;
-}
-
-// =====================================================================================================================
-// Gets the hash code of input shader with specified shader stage.
-uint64_t PipelineContext::GetShaderHashCode(
-    ShaderStage stage       // Shader stage
-) const
-{
-    auto pShaderInfo = GetPipelineShaderInfo(stage);
-    LLPC_ASSERT(pShaderInfo != nullptr);
-
-    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-
-    return (pModuleData == nullptr) ? 0 :
-        MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash));
 }
 
 } // Llpc

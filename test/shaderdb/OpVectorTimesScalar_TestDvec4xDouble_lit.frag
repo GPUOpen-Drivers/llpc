@@ -19,7 +19,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{.*}} = insertelement <4 x double> undef, double %{{.*}}, i32 0
 ; SHADERTEST: %{{.*}} = shufflevector <4 x double> %{{.*}}, <4 x double> undef, <4 x i32> zeroinitializer

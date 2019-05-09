@@ -1123,7 +1123,7 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIrBinary, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeAmdIl, MemberTypeBool, false);
 #endif
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
@@ -1131,7 +1131,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 6;
+    static const uint32_t  MemberCount = 5;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;

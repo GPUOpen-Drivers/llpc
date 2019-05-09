@@ -41,17 +41,14 @@ class PassManager final :
     public llvm::legacy::PassManager
 {
 public:
-    PassManager(uint32_t* pPassIndex);
+    PassManager();
 
     void add(llvm::Pass* pPass) override;
     void stop();
 
 private:
-    bool              m_stopped = false;         // Whether we have already stopped adding new passes.
-    llvm::AnalysisID  m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
-    llvm::AnalysisID  m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
-    llvm::AnalysisID  m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
-    uint32_t*         m_pPassIndex;              // Pass Index
+    bool              m_stopped = false;        // Whether we have already stopped adding new passes.
+    llvm::AnalysisID  m_dumpCfgAfter = nullptr; // -dump-cfg-after pass id
 };
 
 } // Llpc
