@@ -70,8 +70,12 @@ bool PipelineShaders::runOnModule(
         if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
         {
             auto shaderStage = GetShaderStageFromFunction(&func);
-            m_entryPoints[shaderStage] = &func;
-            m_entryPointMap[&func] = shaderStage;
+
+            if (shaderStage != ShaderStageInvalid)
+            {
+                m_entryPoints[shaderStage] = &func;
+                m_entryPointMap[&func] = shaderStage;
+            }
         }
     }
     return false;

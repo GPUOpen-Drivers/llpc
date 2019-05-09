@@ -15,12 +15,14 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 16, i1 true, i32 0, i1 false)
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 32, i1 true, i32 0, i1 false)
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 48, i1 true, i32 0, i1 false)
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> {{%[^,]+}}, i32 20, i32 0)
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> {{%[^,]+}}, i32 36, i32 0)
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> {{%[^,]+}}, i32 52, i32 0)
+; SHADERTEST-DAG: call <2 x i32> @llvm.amdgcn.s.buffer.load.v2i32(<4 x i32> {{%[^,]+}}, i32 0, i32 0)
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> {{%[^,]+}}, i32 8, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

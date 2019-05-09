@@ -32,6 +32,8 @@
 
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
@@ -126,6 +128,12 @@ opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dyn
 // -force-loop-unroll-count: Force to set the loop unroll count; this option will ignore dynamic loop unroll.
 opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
 
+// -trim-debug-info: Trim debug information in SPIR-V binary
+opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
+
+// -enable-per-stage-cache: Enable shader cache per shader stage
+opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(false));
+
 extern opt<bool> EnableOuts;
 
 extern opt<bool> EnableErrs;
@@ -170,6 +178,36 @@ static void FatalErrorHandler(
     throw("LLVM fatal error");
 #endif
 }
+
+// =====================================================================================================================
+// Handler for diagnosis in pass run, derived from the standard one.
+class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
+{
+    bool handleDiagnostics(const DiagnosticInfo& diagInfo) override
+    {
+        if (EnableOuts() || EnableErrs())
+        {
+            if ((diagInfo.getSeverity() == DS_Error) || (diagInfo.getSeverity() == DS_Warning))
+            {
+                DiagnosticPrinterRawOStream printStream(outs());
+                printStream << "ERROR: LLVM DIAGNOSIS INFO: ";
+                diagInfo.print(printStream);
+                printStream << "\n";
+                outs().flush();
+            }
+            else if (EnableOuts())
+            {
+                DiagnosticPrinterRawOStream printStream(outs());
+                printStream << "\n\n=====  LLVM DIAGNOSIS START  =====\n\n";
+                diagInfo.print(printStream);
+                printStream << "\n\n=====  LLVM DIAGNOSIS END  =====\n\n";
+                outs().flush();
+            }
+        }
+        LLPC_ASSERT(diagInfo.getSeverity() != DS_Error);
+        return true;
+    }
+};
 
 // =====================================================================================================================
 // Creates LLPC compiler from the specified info.
@@ -273,6 +311,8 @@ Compiler::Compiler(
 
     if (m_instanceCount == 0)
     {
+        auto& passRegistry = *PassRegistry::getPassRegistry();
+
         // Initialize LLVM target: AMDGPU
         LLVMInitializeAMDGPUTargetInfo();
         LLVMInitializeAMDGPUTarget();
@@ -281,8 +321,11 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
 
+        // Initialize special passes which are checked in PassManager
+        initializeJumpThreadingPass(passRegistry);
+        initializePrintModulePassWrapperPass(passRegistry);
+
         // Initialize passes so they can be referenced by -llpc-stop-before etc.
-        auto& passRegistry = *PassRegistry::getPassRegistry();
         InitializeUtilPasses(passRegistry);
         InitializeLowerPasses(passRegistry);
         InitializeBuilderPasses(passRegistry);
@@ -407,9 +450,9 @@ Result Compiler::BuildShaderModule(
     Result result = Result::Success;
 
     // Currently, copy SPIR-V binary as output shader module data
-    size_t allocSize = sizeof(ShaderModuleData) + pShaderInfo->shaderBin.codeSize;
     void* pAllocBuf = nullptr;
     BinaryType binType = BinaryType::Spirv;
+    ShaderModuleInfo moduleInfo = {};
 
     // Check the type of input shader binary
     if (IsSpirvBinary(&pShaderInfo->shaderBin))
@@ -419,6 +462,10 @@ Result Compiler::BuildShaderModule(
         {
             LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
             result = Result::Unsupported;
+        }
+        if (result == Result::Success)
+        {
+            CollectInfoFromSpirvBinary(&pShaderInfo->shaderBin, &moduleInfo);
         }
     }
     else if (IsLlvmBitcode(&pShaderInfo->shaderBin))
@@ -430,10 +477,17 @@ Result Compiler::BuildShaderModule(
         result = Result::ErrorInvalidShader;
     }
 
+    auto codeSize = pShaderInfo->shaderBin.codeSize;
+    if (cl::TrimDebugInfo)
+    {
+        codeSize -= moduleInfo.debugInfoSize;
+    }
+
     if (result == Result::Success)
     {
         if (pShaderInfo->pfnOutputAlloc != nullptr)
         {
+            size_t allocSize = sizeof(ShaderModuleData) + codeSize;
             pAllocBuf = pShaderInfo->pfnOutputAlloc(pShaderInfo->pInstance,
                                                     pShaderInfo->pUserData,
                                                     allocSize);
@@ -452,28 +506,44 @@ Result Compiler::BuildShaderModule(
         memset(pModuleData, 0, sizeof(*pModuleData));
 
         pModuleData->binType = binType;
-        pModuleData->binCode.codeSize = pShaderInfo->shaderBin.codeSize;
+        pModuleData->binCode.codeSize = codeSize;
         MetroHash::Hash hash = {};
         MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
                           pShaderInfo->shaderBin.codeSize,
                           hash.bytes);
         static_assert(sizeof(pModuleData->hash) == sizeof(hash), "Unexpected value!");
-
         memcpy(pModuleData->hash, hash.dwords, sizeof(hash));
-        if (cl::EnablePipelineDump)
-        {
-            PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(),
-                                          &pShaderInfo->shaderBin,
-                                          &hash);
-        }
+        pModuleData->moduleInfo = moduleInfo;
 
         void* pCode = VoidPtrInc(pAllocBuf, sizeof(ShaderModuleData));
-        memcpy(pCode, pShaderInfo->shaderBin.pCode, pShaderInfo->shaderBin.codeSize);
-        pModuleData->binCode.pCode = pCode;
-        if (pModuleData->binType == BinaryType::Spirv)
+
+        if ((binType == BinaryType::Spirv) && cl::EnablePipelineDump)
         {
-            CollectInfoFromSpirvBinary(pModuleData);
+            PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(),
+                &pShaderInfo->shaderBin,
+                &hash);
         }
+
+        // Copy SPIR-V binary to output buffer
+        if ((binType == BinaryType::Spirv) && cl::TrimDebugInfo)
+        {
+            TrimSpirvDebugInfo(&pShaderInfo->shaderBin, codeSize, pCode);
+        }
+        else
+        {
+            memcpy(pCode, pShaderInfo->shaderBin.pCode, pShaderInfo->shaderBin.codeSize);
+
+        }
+        pModuleData->binCode.pCode = pCode;
+
+        // Calculate SPIR-V cache hash
+        MetroHash::Hash cacheHash = {};
+        MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pModuleData->binCode.pCode),
+            pModuleData->binCode.codeSize,
+            cacheHash.bytes);
+        static_assert(sizeof(pModuleData->moduleInfo.cacheHash) == sizeof(cacheHash), "Unexpected value!");
+        memcpy(pModuleData->moduleInfo.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+
         pShaderOut->pModuleData = pModuleData;
     }
 
@@ -501,17 +571,45 @@ Result Compiler::BuildPipelineInternal(
     raw_string_ostream ostream(hash);
     ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
     ostream.flush();
-    Timer wholeTimer("total", (Twine("LLPC Total ") + hash).str());
+    uint32_t passIndex = 0;
+    // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
+    // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
+    // compile multiple pipelines. so we add a dummy record to force all fields is shown.
+    // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
+    // in TimeRecord.
+    TimeRecord timeRecord;
+    struct HackedTimeRecord
+    {
+        double t1;
+        double t2;
+        double t3;
+        ssize_t m1;
+    } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
+    static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
+    memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
+
+    StringMap<TimeRecord> dummyTimeRecords;
+    if (TimePassesIsEnabled)
+    {
+        dummyTimeRecords["DUMMY"] = timeRecord;
+    }
+
+    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ") + hash).str(), dummyTimeRecords);
+    Timer wholeTimer("llpc-total", (Twine("LLPC Total ") + hash).str(), timerGroupTotal);
+
+    TimerGroup timerGroupPhases("llpc", (Twine("LLPC Phases ") + hash).str(), dummyTimeRecords);
+    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroupPhases);
+    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroupPhases);
+    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroupPhases);
+    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroupPhases);
+    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroupPhases);
+
     if (TimePassesIsEnabled)
     {
         wholeTimer.startTimer();
     }
-    TimerGroup timerGroup("llpc", (Twine("LLPC Phases ") + hash).str());
-    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroup);
-    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroup);
-    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroup);
-    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroup);
-    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroup);
+
+    pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
 
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext);
@@ -551,7 +649,7 @@ Result Compiler::BuildPipelineInternal(
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
 
-            PassManager passMgr;
+            PassManager lowerPassMgr(&passIndex);
 
             // Set the shader stage in the Builder.
             pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(stage));
@@ -559,14 +657,14 @@ Result Compiler::BuildPipelineInternal(
             // Start timer for translate.
             if (TimePassesIsEnabled)
             {
-                passMgr.add(CreateStartStopTimer(&translateTimer, true));
+                lowerPassMgr.add(CreateStartStopTimer(&translateTimer, true));
             }
 
             // SPIR-V translation, then dump the result.
-            passMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(stage), pShaderInfo));
+            lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(stage), pShaderInfo));
             if (EnableOuts())
             {
-                passMgr.add(createPrintModulePass(outs(), "\n"
+                lowerPassMgr.add(createPrintModulePass(outs(), "\n"
                             "===============================================================================\n"
                             "// LLPC SPIRV-to-LLVM translation results\n"));
             }
@@ -574,21 +672,22 @@ Result Compiler::BuildPipelineInternal(
             // Stop timer for translate.
             if (TimePassesIsEnabled)
             {
-                passMgr.add(CreateStartStopTimer(&translateTimer, false));
+                lowerPassMgr.add(CreateStartStopTimer(&translateTimer, false));
             }
 
             // Per-shader SPIR-V lowering passes.
             SpirvLower::AddPasses(static_cast<ShaderStage>(stage),
-                                  passMgr,
+                                  lowerPassMgr,
                                   TimePassesIsEnabled ? &lowerTimer : nullptr,
                                   forceLoopUnrollCount,
                                   pDynamicLoopUnroll);
 
             // Run the passes.
-            result = CodeGenManager::Run(modules[stage], passMgr);
-            if (result != Result::Success)
+            bool success = RunPasses(&lowerPassMgr, modules[stage]);
+            if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+                result = Result::ErrorInvalidShader;
             }
         }
 
@@ -601,75 +700,226 @@ Result Compiler::BuildPipelineInternal(
         }
     }
 
-    // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-    //
-    // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
-    // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
-    // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
-    // manager.
-    PassManager passMgr;
-    passMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
-
-    raw_svector_ostream elfStream(*pPipelineElf);
-
+    // Run necessary patch pass to prepare per shader stage cache
+    PassManager prePatchPassMgr(&passIndex);
     if (result == Result::Success)
     {
-        if (EnableOuts())
-        {
-            passMgr.add(createPrintModulePass(outs(), "\n"
-                        "===============================================================================\n"
-                        "// LLPC pipeline linking results\n"));
-        }
-
         // Patching.
-        Patch::AddPasses(pContext,
-                         passMgr,
-                         TimePassesIsEnabled ? &patchTimer : nullptr,
-                         TimePassesIsEnabled ? &optTimer : nullptr);
+        Patch::AddPrePatchPasses(pContext,
+                                 prePatchPassMgr,
+                                 TimePassesIsEnabled ? &patchTimer : nullptr);
+
+	bool success = RunPasses(&prePatchPassMgr, pPipelineModule);
+        if (success == false)
+        {
+            result = Result::ErrorInvalidShader;
+        }
     }
 
-    // Run the "whole pipeline" passes, excluding the target backend.
-    if (result == Result::Success)
+    constexpr uint32_t ShaderCacheCount = 2;
+    ShaderEntryState fragmentCacheEntryState = ShaderEntryState::New;
+    ShaderCache* pFragmentShaderCache[ShaderCacheCount] = { nullptr, nullptr };
+    CacheEntryHandle hFragmentEntry[ShaderCacheCount] = { nullptr, nullptr };
+
+    ShaderEntryState nonFragmentCacheEntryState = ShaderEntryState::New;
+    ShaderCache* pNonFragmentShaderCache[ShaderCacheCount] = { nullptr, nullptr };
+    CacheEntryHandle hNonFragmentEntry[ShaderCacheCount] = { nullptr, nullptr };
+
+    BinaryData fragmentElf = {};
+    BinaryData nonFragmentElf = {};
+
+    bool checkPerStageCache = pContext->IsGraphics() && cl::EnablePerStageCache;
+    if (checkPerStageCache && (result == Result::Success))
     {
-        result = CodeGenManager::Run(pPipelineModule, passMgr);
+        // Check per stage shader cache
+        MetroHash::Hash fragmentHash = {};
+        MetroHash::Hash nonFragmentHash = {};
+        BuildShaderCacheHash(pContext, &fragmentHash, &nonFragmentHash);
+
+        uint32_t stageMask = pContext->GetShaderStageMask();
+        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+        if (stageMask & ShaderStageToMask(ShaderStageFragment))
+        {
+            fragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
+                                                            &fragmentHash,
+                                                            &fragmentElf,
+                                                            pFragmentShaderCache,
+                                                            hFragmentEntry);
+        }
+
+        if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+        {
+            nonFragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
+                                                            &nonFragmentHash,
+                                                            &nonFragmentElf,
+                                                            pNonFragmentShaderCache,
+                                                            hNonFragmentEntry);
+        }
+    }
+
+    if ((checkPerStageCache == false) ||
+        (fragmentCacheEntryState == ShaderEntryState::Compiling) ||
+        (nonFragmentCacheEntryState == ShaderEntryState::Compiling))
+    {
+        // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
+        //
+        // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
+        // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
+        // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
+        // manager.
+        PassManager patchPassMgr(&passIndex);
+        patchPassMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
+
+        ElfPackage partialPipelineElf;
+
+        // Store result to partialPipelineElf for partial pipeline compile
+        bool partialCompile = (fragmentCacheEntryState == ShaderEntryState::Ready) || (nonFragmentCacheEntryState == ShaderEntryState::Ready);
+        raw_svector_ostream elfStream(partialCompile ? partialPipelineElf : *pPipelineElf);
+
+        uint32_t skipStageMask = 0;
+        if (fragmentCacheEntryState == ShaderEntryState::Ready)
+        {
+            skipStageMask = ShaderStageToMask(ShaderStageFragment);
+        }
+
+        if (nonFragmentCacheEntryState == ShaderEntryState::Ready)
+        {
+            skipStageMask = pContext->GetShaderStageMask() & ~ShaderStageToMask(ShaderStageFragment);
+        }
+
         if (result == Result::Success)
         {
-            CodeGenManager::SetupTargetFeatures(pPipelineModule);
+            // Patching.
+            Patch::AddPasses(pContext,
+                             patchPassMgr,
+                             skipStageMask,
+                             TimePassesIsEnabled ? &patchTimer : nullptr,
+                             TimePassesIsEnabled ? &optTimer : nullptr);
         }
-        else
+
+        // At this point, we have finished with the Builder. No patch pass should be using Builder.
+        delete pContext->GetBuilder();
+        pContext->SetBuilder(nullptr);
+
+        // Run the "whole pipeline" passes, excluding the target backend.
+        if (result == Result::Success)
         {
-            LLPC_ERRS("Fails to run whole pipeline passes\n");
+            bool success = RunPasses(&patchPassMgr, pPipelineModule);
+            if (success)
+            {
+                CodeGenManager::SetupTargetFeatures(pPipelineModule);
+            }
+            else
+            {
+                LLPC_ERRS("Fails to run whole pipeline passes\n");
+                result = Result::ErrorInvalidShader;
+            }
+        }
+
+        // A separate "whole pipeline" pass manager for code generation.
+        PassManager codeGenPassMgr(&passIndex);
+
+        if (result == Result::Success)
+        {
+            if (TimePassesIsEnabled)
+            {
+                codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, true));
+            }
+
+            // Code generation.
+            result = CodeGenManager::AddTargetPasses(pContext, codeGenPassMgr, elfStream);
+
+            if (TimePassesIsEnabled)
+            {
+                codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, false));
+            }
+        }
+
+        // Run the target backend codegen passes.
+        if (result == Result::Success)
+        {
+            bool success = RunPasses(&codeGenPassMgr, pPipelineModule);
+            if (success == false)
+            {
+                LLPC_ERRS("Fails to generate GPU ISA codes\n");
+                result = Result::ErrorInvalidShader;
+            }
+        }
+
+        // Only non-fragment shaders are compiled
+        if ((fragmentCacheEntryState == ShaderEntryState::Ready) &&
+            (nonFragmentCacheEntryState == ShaderEntryState::Compiling))
+        {
+            BinaryData pipelineElf = {};
+            if (result == Result::Success)
+            {
+                BinaryData nonFragmentPipelineElf = {};
+                nonFragmentPipelineElf.pCode = partialPipelineElf.data();
+                nonFragmentPipelineElf.codeSize = partialPipelineElf.size();
+
+                MergeElfBinary(pContext, &fragmentElf, &nonFragmentPipelineElf, pPipelineElf);
+
+                pipelineElf.codeSize = pPipelineElf->size();
+                pipelineElf.pCode = pPipelineElf->data();
+            }
+
+            UpdateShaderCaches(result == Result::Success,
+                               &pipelineElf,
+                               pNonFragmentShaderCache,
+                               hNonFragmentEntry,
+                               ShaderCacheCount);
+        }
+
+        // Only fragment shader is compiled
+        if ((nonFragmentCacheEntryState == ShaderEntryState::Ready) &&
+            (fragmentCacheEntryState == ShaderEntryState::Compiling))
+        {
+            BinaryData pipelineElf = {};
+            if (result == Result::Success)
+            {
+                BinaryData fragmentPipelineElf = {};
+                fragmentPipelineElf.pCode = partialPipelineElf.data();
+                fragmentPipelineElf.codeSize = partialPipelineElf.size();
+
+                MergeElfBinary(pContext, &fragmentPipelineElf, &nonFragmentElf, pPipelineElf);
+
+                pipelineElf.codeSize = pPipelineElf->size();
+                pipelineElf.pCode = pPipelineElf->data();
+            }
+
+            UpdateShaderCaches(result == Result::Success,
+                               &pipelineElf,
+                               pFragmentShaderCache,
+                               hFragmentEntry,
+                               ShaderCacheCount);
+        }
+
+        // Whole pipeline is compiled
+        if ((fragmentCacheEntryState == ShaderEntryState::Compiling) &&
+            (nonFragmentCacheEntryState == ShaderEntryState::Compiling))
+        {
+            BinaryData pipelineElf = {};
+            pipelineElf.codeSize = pPipelineElf->size();
+            pipelineElf.pCode = pPipelineElf->data();
+            UpdateShaderCaches((result == Result::Success),
+                               &pipelineElf,
+                               pFragmentShaderCache,
+                               hFragmentEntry,
+                               ShaderCacheCount);
+
+            UpdateShaderCaches(result == Result::Success,
+                               &pipelineElf,
+                               pNonFragmentShaderCache,
+                               hNonFragmentEntry,
+                               ShaderCacheCount);
         }
     }
-
-    // A separate "whole pipeline" pass manager for code generation.
-    PassManager codeGenPassMgr;
-
-    if (result == Result::Success)
+    else
     {
-        if (TimePassesIsEnabled)
-        {
-            codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, true));
-        }
-
-        // Code generation.
-        result = CodeGenManager::AddTargetPasses(pContext, codeGenPassMgr, elfStream);
-
-        if (TimePassesIsEnabled)
-        {
-            codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, false));
-        }
+        MergeElfBinary(pContext, &fragmentElf, &nonFragmentElf, pPipelineElf);
     }
 
-    // Run the target backend codegen passes.
-    if (result == Result::Success)
-    {
-        result = CodeGenManager::Run(pPipelineModule, codeGenPassMgr);
-        if (result != Result::Success)
-        {
-            LLPC_ERRS("Fails to generate GPU ISA codes\n");
-        }
-    }
+    pContext->setDiagnosticHandlerCallBack(nullptr);
 
     if (TimePassesIsEnabled)
     {
@@ -710,9 +960,8 @@ Result Compiler::BuildGraphicsPipeline(
     GraphicsPipelineBuildOut*        pPipelineOut,      // [out] Output of building this graphics pipeline
     void*                            pPipelineDumpFile) // [in] Handle of pipeline dump file
 {
-    Result           result  = Result::Success;
-    const void*      pElf    = nullptr;
-    size_t           elfSize = 0;
+    Result           result = Result::Success;
+    BinaryData       elfBin = {};
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
     {
@@ -769,7 +1018,7 @@ Result Compiler::BuildGraphicsPipeline(
     ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
     CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
 
-    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &pElf, &elfSize, pShaderCache, hEntry);
+    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
 
     constexpr uint32_t CandidateCount = 4;
     uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
@@ -838,11 +1087,11 @@ Result Compiler::BuildGraphicsPipeline(
 
         if (result == Result::Success)
         {
-            elfSize = candidateElfs[candidateIdx].size();
-            pElf = candidateElfs[candidateIdx].data();
+            elfBin.codeSize = candidateElfs[candidateIdx].size();
+            elfBin.pCode = candidateElfs[candidateIdx].data();
         }
 
-        UpdateShaderCaches((result == Result::Success), pElf, elfSize, pShaderCache, hEntry, ShaderCacheCount);
+        UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
     }
 
     if (result == Result::Success)
@@ -850,7 +1099,7 @@ Result Compiler::BuildGraphicsPipeline(
         void* pAllocBuf = nullptr;
         if (pPipelineInfo->pfnOutputAlloc != nullptr)
         {
-            pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfSize);
+            pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfBin.codeSize);
         }
         else
         {
@@ -859,9 +1108,9 @@ Result Compiler::BuildGraphicsPipeline(
         }
 
         uint8_t* pCode = static_cast<uint8_t*>(pAllocBuf);
-        memcpy(pCode, pElf, elfSize);
+        memcpy(pCode, elfBin.pCode, elfBin.codeSize);
 
-        pPipelineOut->pipelineBin.codeSize = elfSize;
+        pPipelineOut->pipelineBin.codeSize = elfBin.codeSize;
         pPipelineOut->pipelineBin.pCode = pCode;
     }
 
@@ -920,8 +1169,7 @@ Result Compiler::BuildComputePipeline(
     ComputePipelineBuildOut*        pPipelineOut,      // [out] Output of building this compute pipeline
     void*                           pPipelineDumpFile) // [in] Handle of pipeline dump file
 {
-    const void*      pElf      = nullptr;
-    size_t           elfSize   = 0;
+    BinaryData elfBin = {};
 
     Result result = ValidatePipelineShaderInfo(ShaderStageCompute, &pPipelineInfo->cs);
 
@@ -959,7 +1207,7 @@ Result Compiler::BuildComputePipeline(
     ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
     CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
 
-    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &pElf, &elfSize, pShaderCache, hEntry);
+    cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
 
     constexpr uint32_t CandidateCount = 4;
     uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
@@ -1031,11 +1279,11 @@ Result Compiler::BuildComputePipeline(
 
         if (result == Result::Success)
         {
-            elfSize = candidateElfs[candidateIdx].size();
-            pElf = candidateElfs[candidateIdx].data();
+            elfBin.codeSize = candidateElfs[candidateIdx].size();
+            elfBin.pCode = candidateElfs[candidateIdx].data();
         }
 
-        UpdateShaderCaches((result == Result::Success), pElf, elfSize, pShaderCache, hEntry, ShaderCacheCount);
+        UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
     }
 
     if (result == Result::Success)
@@ -1043,13 +1291,13 @@ Result Compiler::BuildComputePipeline(
         void* pAllocBuf = nullptr;
         if (pPipelineInfo->pfnOutputAlloc != nullptr)
         {
-            pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfSize);
+            pAllocBuf = pPipelineInfo->pfnOutputAlloc(pPipelineInfo->pInstance, pPipelineInfo->pUserData, elfBin.codeSize);
             if (pAllocBuf != nullptr)
             {
                 uint8_t* pCode = static_cast<uint8_t*>(pAllocBuf);
-                memcpy(pCode, pElf, elfSize);
+                memcpy(pCode, elfBin.pCode, elfBin.codeSize);
 
-                pPipelineOut->pipelineBin.codeSize = elfSize;
+                pPipelineOut->pipelineBin.codeSize = elfBin.codeSize;
                 pPipelineOut->pipelineBin.pCode = pCode;
             }
             else
@@ -1522,6 +1770,7 @@ void Compiler::InitGpuWorkaround()
             m_gpuWorkarounds.gfx9.fixLsVgprInput = 1;
         }
     }
+
 }
 // =====================================================================================================================
 // Acquires a free context from context pool.
@@ -1560,6 +1809,29 @@ Context* Compiler::AcquireContext()
 }
 
 // =====================================================================================================================
+// Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
+bool Compiler::RunPasses(
+    PassManager*  pPassMgr, // [in] Pass manager
+    Module*       pModule)  // [in/out] Module
+{
+    bool success = false;
+#if LLPC_ENABLE_EXCEPTION
+    try
+#endif
+    {
+        pPassMgr->run(*pModule);
+        success = true;
+    }
+#if LLPC_ENABLE_EXCEPTION
+    catch (const char*)
+    {
+        success = false;
+    }
+#endif
+    return success;
+}
+
+// =====================================================================================================================
 // Releases LLPC context.
 void Compiler::ReleaseContext(
     Context* pContext)    // [in] LLPC context
@@ -1571,98 +1843,147 @@ void Compiler::ReleaseContext(
 // =====================================================================================================================
 // Collect information from SPIR-V binary
 Result Compiler::CollectInfoFromSpirvBinary(
-    ShaderModuleData* pModuleData   // [in] The shader module data
-    ) const
+    const BinaryData*  pSpvBinCode,                 // [in] SPIR-V binary data
+    ShaderModuleInfo*  pShaderModuleInfo            // [out] Shader module information
+    )
 {
     Result result = Result::Success;
 
-    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pModuleData->binCode.pCode);
-    const uint32_t* pEnd = pCode + pModuleData->binCode.codeSize / sizeof(uint32_t);
+    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pSpvBinCode->pCode);
+    const uint32_t* pEnd = pCode + pSpvBinCode->codeSize / sizeof(uint32_t);
 
-    if (IsSpirvBinary(&pModuleData->binCode))
+    const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
+
+    // Parse SPIR-V instructions
+    std::unordered_set<uint32_t> capabilities;
+
+    while (pCodePos < pEnd)
     {
-        const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
+        uint32_t opCode = (pCodePos[0] & OpCodeMask);
+        uint32_t wordCount = (pCodePos[0] >> WordCountShift);
 
-        // Parse SPIR-V instructions
-        std::unordered_set<uint32_t> capabilities;
-
-        bool exit = false;
-        while (pCodePos < pEnd)
+        if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
         {
-            uint32_t opCode = (pCodePos[0] & OpCodeMask);
-            uint32_t wordCount = (pCodePos[0] >> WordCountShift);
+            LLPC_ERRS("Invalid SPIR-V binary\n");
+            result = Result::ErrorInvalidShader;
+            break;
+        }
 
-            if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+        // Parse each instruction and find those we are interested in
+        switch (opCode)
+        {
+        case spv::OpCapability:
             {
-                LLPC_ERRS("Invalid SPIR-V binary\n");
-                result = Result::ErrorInvalidShader;
+                LLPC_ASSERT(wordCount == 2);
+                auto capability = static_cast<spv::Capability>(pCodePos[1]);
+                capabilities.insert(capability);
                 break;
             }
-
-            // Parse each instruction and find those we are interested in
-
-            // NOTE: SPIR-V binary has fixed instruction layout. This is stated in the spec "2.4 Logical
-            // Layout of a Module". We can simply skip those sections we do not interested in and exit
-            // instruction scan early.
-            switch (opCode)
+        case spv::OpString:
+        case spv::OpSource:
+        case spv::OpSourceContinued:
+        case spv::OpSourceExtension:
+        case spv::OpName:
+        case spv::OpMemberName:
+        case spv::OpLine:
+        case spv::OpNop:
+        case spv::OpNoLine:
+        case spv::OpModuleProcessed:
             {
-            case spv::OpCapability:
-                {
-                    LLPC_ASSERT(wordCount == 2);
-                    auto capability = static_cast<spv::Capability>(pCodePos[1]);
-                    capabilities.insert(capability);
-                    break;
-                }
-            default:
-                {
-                    // Other instructions beyond info-collecting scope, exit
-                    exit = true;
-                    break;
-                }
+                pShaderModuleInfo->debugInfoSize += wordCount * sizeof(uint32_t);
+                break;
             }
-
-            if (exit)
+        default:
             {
                 break;
             }
-            else
-            {
-                pCodePos += wordCount;
-            }
         }
-
-        if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) != capabilities.end())
-        {
-            pModuleData->enableVarPtrStorageBuf = true;
-        }
-
-        if (capabilities.find(spv::CapabilityVariablePointers) != capabilities.end())
-        {
-            pModuleData->enableVarPtr = true;
-        }
-
-        if ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformVote) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformBallot) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformShuffle) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformShuffleRelative) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformClustered) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroupNonUniformQuad) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilitySubgroupBallotKHR) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilitySubgroupVoteKHR) != capabilities.end()) ||
-            (capabilities.find(spv::CapabilityGroups) != capabilities.end()))
-        {
-            pModuleData->useSubgroupSize = true;
-        }
+        pCodePos += wordCount;
     }
-    else
+
+    if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) != capabilities.end())
     {
-        result = Result::ErrorInvalidShader;
-        LLPC_ERRS("Invalid SPIR-V binary\n");
+        pShaderModuleInfo->enableVarPtrStorageBuf = true;
+    }
+
+    if (capabilities.find(spv::CapabilityVariablePointers) != capabilities.end())
+    {
+        pShaderModuleInfo->enableVarPtr = true;
+    }
+
+    if ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformVote) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformBallot) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformShuffle) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformShuffleRelative) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformClustered) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroupNonUniformQuad) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilitySubgroupBallotKHR) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilitySubgroupVoteKHR) != capabilities.end()) ||
+        (capabilities.find(spv::CapabilityGroups) != capabilities.end()))
+    {
+        pShaderModuleInfo->useSubgroupSize = true;
     }
 
     return result;
+}
+
+// =====================================================================================================================
+// Removes all debug instructions for SPIR-V binary.
+void Compiler::TrimSpirvDebugInfo(
+    const BinaryData* pSpvBin,   // [in] SPIR-V binay code
+    uint32_t          bufferSize,    // Output buffer size in bytes
+    void*             pTrimSpvBin)     // [out] Trimmed SPIR-V binary code
+{
+    LLPC_ASSERT(bufferSize > sizeof(SpirvHeader));
+
+    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pSpvBin->pCode);
+    const uint32_t* pEnd = pCode + pSpvBin->codeSize / sizeof(uint32_t);
+    const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
+
+    uint32_t* pTrimEnd = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, bufferSize));
+    uint32_t* pTrimCodePos = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, sizeof(SpirvHeader)));
+
+    // Copy SPIR-V header
+    memcpy(pTrimSpvBin, pCode, sizeof(SpirvHeader));
+
+    // Copy SPIR-V instructions
+    while (pCodePos < pEnd)
+    {
+        uint32_t opCode = (pCodePos[0] & OpCodeMask);
+        uint32_t wordCount = (pCodePos[0] >> WordCountShift);
+        switch (opCode)
+        {
+        case spv::OpString:
+        case spv::OpSource:
+        case spv::OpSourceContinued:
+        case spv::OpSourceExtension:
+        case spv::OpName:
+        case spv::OpMemberName:
+        case spv::OpLine:
+        case spv::OpNop:
+        case spv::OpNoLine:
+        case spv::OpModuleProcessed:
+            {
+                // Skip debug instructions
+                break;
+            }
+        default:
+            {
+                // Copy other instructions
+                LLPC_ASSERT(pCodePos + wordCount <= pEnd);
+                LLPC_ASSERT(pTrimCodePos + wordCount <= pTrimEnd);
+                memcpy(pTrimCodePos, pCodePos, wordCount * sizeof(uint32_t));
+                pTrimCodePos += wordCount;
+                break;
+            }
+        }
+
+        pCodePos += wordCount;
+    }
+
+    LLPC_ASSERT(pTrimCodePos == pTrimEnd);
 }
 
 // =====================================================================================================================
@@ -1890,8 +2211,7 @@ uint32_t Compiler::ChooseLoopUnrollCountCandidate(
 ShaderEntryState Compiler::LookUpShaderCaches(
     IShaderCache*                    pAppPipelineCache, // [in]    App's pipeline cache
     MetroHash::Hash*                 pCacheHash,        // [in]    Hash code of the shader
-    const void**                     ppElf,             // [inout] Pointer to shader data
-    size_t*                          pElfSize,          // [inout] Pointer to the size of shader data in bytes
+    BinaryData*                      pElfBin,           // [inout] Pointer to shader data
     ShaderCache**                    ppShaderCache,     // [in]    Array of shader caches.
     CacheEntryHandle*                phEntry            // [in]    Array of handles of the shader caches entry
     )
@@ -1924,7 +2244,7 @@ ShaderEntryState Compiler::LookUpShaderCaches(
         cacheEntryState = ppShaderCache[i]->FindShader(*pCacheHash, true, &phEntry[i]);
         if (cacheEntryState == ShaderEntryState::Ready)
         {
-            result = ppShaderCache[i]->RetrieveShader(phEntry[i], ppElf, pElfSize);
+            result = ppShaderCache[i]->RetrieveShader(phEntry[i], &pElfBin->pCode, &pElfBin->codeSize);
             // Re-try if shader cache return error unknown
             if (result == Result::ErrorUnknown)
             {
@@ -1939,8 +2259,8 @@ ShaderEntryState Compiler::LookUpShaderCaches(
                     // App's pipeline cache misses while internal cache hits
                     if (phEntry[0] != nullptr)
                     {
-                        LLPC_ASSERT(*pElfSize > 0);
-                        ppShaderCache[0]->InsertShader(phEntry[0], *ppElf, *pElfSize);
+                        LLPC_ASSERT(pElfBin->codeSize > 0);
+                        ppShaderCache[0]->InsertShader(phEntry[0], pElfBin->pCode, pElfBin->codeSize);
                     }
                 }
                 break;
@@ -1955,8 +2275,7 @@ ShaderEntryState Compiler::LookUpShaderCaches(
 // Update the shader caches with the given entry handle, based on the "bInsert" flag.
 void Compiler::UpdateShaderCaches(
     bool                             bInsert,           // [in] To insert data or reset the shader caches
-    const void*                      pElf,              // [in] Pointer to shader data
-    size_t                           elfSize,           // [in] Size of shader data in bytes
+    const BinaryData*                pElfBin,           // [in] Pointer to shader data
     ShaderCache**                    ppShaderCache,     // [in] Array of shader caches; one for App's pipeline cache and one for internal cache
     CacheEntryHandle*                phEntry,           // [in] Array of handles of the shader caches entry
     uint32_t                         shaderCacheCount   // [in] Shader caches count
@@ -1968,8 +2287,8 @@ void Compiler::UpdateShaderCaches(
         {
             if (bInsert)
             {
-                LLPC_ASSERT(elfSize > 0);
-                ppShaderCache[i]->InsertShader(phEntry[i], pElf, elfSize);
+                LLPC_ASSERT(pElfBin->codeSize > 0);
+                ppShaderCache[i]->InsertShader(phEntry[i], pElfBin->pCode, pElfBin->codeSize);
             }
             else
             {
@@ -1977,6 +2296,88 @@ void Compiler::UpdateShaderCaches(
             }
         }
     }
+}
+
+// =====================================================================================================================
+// Builds hash code from input context for per shader stage cache
+void Compiler::BuildShaderCacheHash(
+    Context*         pContext,           // [in] Acquired context
+    MetroHash::Hash* pFragmentHash,      // [out] Hash code of fragment shader
+    MetroHash::Hash* pNonFragmentHash)   // [out] Hash code of all non-fragment shader
+{
+    MetroHash::MetroHash64 fragmentHasher;
+    MetroHash::MetroHash64 nonFragmentHasher;
+    auto stageMask = pContext->GetShaderStageMask();
+    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+
+    // Build hash per shader stage
+    for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))
+    {
+        if ((stageMask & ShaderStageToMask(stage)) == 0)
+        {
+            continue;
+        }
+
+        auto pShaderInfo = pContext->GetPipelineShaderInfo(stage);
+        auto pResUsage = pContext->GetShaderResourceUsage(stage);
+        MetroHash::MetroHash64 hasher;
+
+        // Update common shader info
+        PipelineDumper::UpdateHashForPipelineShaderInfo(stage, pShaderInfo, true, &hasher);
+        hasher.Update(pPipelineInfo->iaState.deviceIndex);
+
+        // Update input/output usage
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.inputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.outputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchInputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchOutputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.builtInInputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.builtInOutputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInInputLocMap, &hasher);
+        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInOutputLocMap, &hasher);
+
+        if (stage == ShaderStageVertex)
+        {
+            PipelineDumper::UpdateHashForVertexInputState(pPipelineInfo->pVertexInput, &hasher);
+        }
+        MetroHash::Hash  hash = {};
+        hasher.Finalize(hash.bytes);
+
+        // Add per stage hash code to fragmentHasher or nonFragmentHaser per shader stage
+        auto shaderHashCode = MetroHash::Compact64(&hash);
+        if (stage == ShaderStageFragment)
+        {
+            fragmentHasher.Update(shaderHashCode);
+        }
+        else
+        {
+            nonFragmentHasher.Update(shaderHashCode);
+        }
+    }
+
+    // Add addtional pipeline state to final hasher
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
+    {
+        PipelineDumper::UpdateHashForFragmentState(pPipelineInfo, &fragmentHasher);
+        fragmentHasher.Finalize(pFragmentHash->bytes);
+    }
+
+    if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+    {
+        PipelineDumper::UpdateHashForNonFragmentState(pPipelineInfo, true, &nonFragmentHasher);
+        nonFragmentHasher.Finalize(pNonFragmentHash->bytes);
+    }
+}
+
+// =====================================================================================================================
+// Merge ELF binary of fragment shader and ELF binary of non-fragment shaders into single ELF binary
+void Compiler::MergeElfBinary(
+    Context*          pContext,        // [in] Pipeline context
+    const BinaryData* pFragmentElf,    // [in] ELF binary of fragment shader
+    const BinaryData* pNonFragmentElf, // [in] ELF binary of non-fragment shaders
+    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
+{
+
 }
 
 } // Llpc

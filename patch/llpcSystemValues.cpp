@@ -710,11 +710,6 @@ Instruction* ShaderSystemValues::MakePointer(
             ConstantInt::get(pLowValue->getType(), highValue)
         };
         pExtendedPtrValue = ConstantVector::get(elements);
-        pInsertPos = dyn_cast<Instruction>(pLowValue);
-        if (pInsertPos == nullptr)
-        {
-            pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        }
     }
     pExtendedPtrValue = InsertElementInst::Create(pExtendedPtrValue,
                                           pLowValue,

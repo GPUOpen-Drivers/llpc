@@ -20,13 +20,13 @@ void main (void)
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call void @llpc.output.export.generic{{.*}}v4f64
 ; SHADERTEST: call void @llpc.output.export.generic{{.*}}f32
-; SHADERTEST: call void @llpc.output.export.generic{{.*}}f64
 ; SHADERTEST: call double @llpc.output.import.generic.f64{{.*}}
+; SHADERTEST: call void @llpc.output.export.generic{{.*}}f64
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -16,7 +16,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} i32 @_Z4smodii(i32 %{{[0-9]*}}, i32 6)
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
@@ -24,9 +24,9 @@ void main()
 ; SHADERTEST: icmp slt i32 %{{[0-9]*}}, 0
 ; SHADERTEST: icmp ne i32 %{{[0-9]*}}, 0
 ; SHADERTEST: and i1 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: shl nsw i32 %{{[0-9]*}}, 4
-; SHADERTEST: add nsw i32 %{{[0-9]*}}, 96
+; SHADERTEST: add nsw i32 %{{[0-9]*}}, 6
 ; SHADERTEST: select i1 %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
+; SHADERTEST: getelementptr <{ [6 x [4 x float]] }>,
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

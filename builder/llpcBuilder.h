@@ -48,6 +48,8 @@ void initializeBuilderReplayerPass(PassRegistry&);
 namespace Llpc
 {
 
+class Context;
+
 // =====================================================================================================================
 // Initialize the pass that gets created by a Builder
 inline static void InitializeBuilderPasses(
@@ -174,15 +176,12 @@ public:
         const llvm::Twine&        instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a load of a buffer descriptor.
-    // Currently supports returning non-fat-pointer <4 x i32> descriptor when pPointeeTy is nullptr.
-    // TODO: It is intended to remove that functionality once LLPC has switched to fat pointers.
     virtual llvm::Value* CreateLoadBufferDesc(
         uint32_t            descSet,            // Descriptor set
         uint32_t            binding,            // Descriptor binding
         llvm::Value*        pDescIndex,         // [in] Descriptor index
         bool                isNonUniform,       // Whether the descriptor index is non-uniform
-        llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to (null to return
-                                                //    a non-fat-pointer <4 x i32> descriptor instead)
+        llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
@@ -226,6 +225,20 @@ public:
         llvm::Type*         pSpillTableTy,      // [in] Type of the spill table that the returned pointer will point to
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    // Create a buffer length query based on the specified descriptor.
+    virtual llvm::Value* CreateBufferLength(
+        llvm::Value* const  pBufferDesc,        // [in] The buffer descriptor to query.
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    //
+    // Methods implemented in BuilderImplMatrix:
+    //
+
+    // Create a matrix transpose.
+    virtual llvm::Value* CreateMatrixTranspose(
+        llvm::Value* const pMatrix,            // [in] The matrix to transpose
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
     //
     // Methods implemented in BuilderImplMisc:
     //
@@ -239,6 +252,9 @@ public:
         bool                realtime,           // Whether to read real-time clock counter
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
+    Llpc::Context& getContext() const;
+
 protected:
     Builder(llvm::LLVMContext& context) : llvm::IRBuilder<>(context) {}
 
@@ -246,6 +262,8 @@ protected:
 
     ShaderStage m_shaderStage = ShaderStageInvalid;   // Current shader stage being built.
 
+    llvm::Type* GetTransposedMatrixTy(
+        llvm::Type* const pMatrixType) const; // [in] The matrix type to tranpose
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)
@@ -255,4 +273,3 @@ private:
 llvm::ModulePass* CreateBuilderReplayer(Builder* pBuilder);
 
 } // Llpc
-

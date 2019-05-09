@@ -50,7 +50,6 @@ public:
     virtual ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
     virtual InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
     virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const;
-    virtual uint64_t GetShaderHashCode(ShaderStage stage) const;
 
     // Checks whether the pipeline is graphics or compute
     virtual bool IsGraphics() const { return true; }
@@ -98,17 +97,6 @@ public:
 
     void InitShaderInfoForNullFs();
 
-protected:
-    // Gets dummy vertex input create info
-    virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return &m_dummyVertexInput; }
-
-    // Gets dummy vertex binding info
-    virtual std::vector<VkVertexInputBindingDescription>* GetDummyVertexBindings() { return &m_dummyVertexBindings; }
-
-    // Gets dummy vertex attribute info
-    virtual std::vector<VkVertexInputAttributeDescription>* GetDummyVertexAttributes()
-        { return &m_dummyVertexAttribs; }
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(GraphicsContext);
@@ -127,11 +115,6 @@ private:
 
     ResourceUsage   m_resUsages[ShaderStageGfxCount];   // Resource usages of all graphics shader stages
     InterfaceData   m_intfData[ShaderStageGfxCount];    // Interface data of all graphics shader stages
-
-    // Dummy vertex-specific info (for vertex shader only)
-    VkPipelineVertexInputStateCreateInfo           m_dummyVertexInput;    // Dummy vertex input create info
-    std::vector<VkVertexInputBindingDescription>   m_dummyVertexBindings; // Dummy vertex binding info
-    std::vector<VkVertexInputAttributeDescription> m_dummyVertexAttribs;  // Dummy vertex attribute info
 
     bool            m_tessOffchip; // Whether to enable tessellation off-chip mode
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode

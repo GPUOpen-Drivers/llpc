@@ -97,6 +97,7 @@ public:
   bool isTypeInt(unsigned Bits = 0) const;
   bool isTypeOpaque() const;
   bool isTypePointer() const;
+  bool isTypeForwardPointer() const;
   bool isTypeSampler() const;
   bool isTypeStruct() const;
   bool isTypeScalar() const;
@@ -257,16 +258,18 @@ private:
   SPIRVId ElemTypeId;
 };
 
-class SPIRVTypeForwardPointer : public SPIRVEntryNoId<OpTypeForwardPointer> {
+class SPIRVTypeForwardPointer : public SPIRVType {
 public:
   SPIRVTypeForwardPointer(SPIRVModule *M, SPIRVTypePointer *Pointer,
                           SPIRVStorageClassKind SC)
-      : SPIRVEntryNoId(M, 3), Pointer(Pointer), SC(SC) {}
+      : SPIRVType(M, 3, OpTypeForwardPointer, Pointer->getId()), Pointer(Pointer), SC(SC) {}
 
-  SPIRVTypeForwardPointer()
-      : Pointer(nullptr), SC(StorageClassUniformConstant) {}
+  SPIRVTypeForwardPointer() : SPIRVType(OpTypeForwardPointer), Pointer(nullptr), SC(StorageClassUniformConstant) {}
 
   SPIRVTypePointer *getPointer() const { return Pointer; }
+  void setPointer(SPIRVTypePointer *const P) { Pointer = P; }
+  SPIRVStorageClassKind getStorageClass() const { return SC; }
+
   _SPIRV_DCL_ENCDEC
 private:
   SPIRVTypePointer *Pointer;

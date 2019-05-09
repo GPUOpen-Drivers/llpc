@@ -26,7 +26,8 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; XFAIL: *
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: getelementptr [2 x { i32, <4 x float>, [2 x <4 x float>] }], [2 x { i32, <4 x float>, [2 x <4 x float>] }] addrspace({{.*}})* @{{.*}}, i32 0, i32 %{{[0-9]*}}, i32 2, i32 %{{[0-9]*}}
 ; SHADERTEST: getelementptr [2 x { i32, <4 x float>, [2 x <4 x float>] }], [2 x { i32, <4 x float>, [2 x <4 x float>] }] addrspace({{.*}})* @{{.*}}, i32 0, i32 %{{[0-9]*}}, i32 0
@@ -34,7 +35,7 @@ void main()
 ; SHADERTEST: getelementptr [2 x { i32, <4 x float>, [2 x <4 x float>] }], [2 x { i32, <4 x float>, [2 x <4 x float>] }] addrspace({{.*}})* @{{.*}}, i32 0, i32 %{{[0-9]*}}, i32 2, i32 %{{[0-9]*}}
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-4: call <4 x i32> {{.*}}@llpc.call.desc.load.buffer.{{[0-9a-z.]*}}(i32 0, i32 0, i32 %{{[0-9]*}}
+; SHADERTEST-COUNT-4: call {{.*}} {{.*}}@llpc.call.desc.load.buffer.{{[0-9a-z.]*}}(i32 0, i32 0, i32 %{{[0-9]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

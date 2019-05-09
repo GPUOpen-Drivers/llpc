@@ -30,33 +30,41 @@
  */
 #pragma once
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/InstVisitor.h"
 
-#include <unordered_set>
 #include "llpcPatch.h"
 
 namespace Llpc
 {
 
-class PipelineShaders;
-
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for buffer operations
-class PatchBufferOp:
-    public Patch,
+class PatchBufferOp final:
+    public llvm::FunctionPass,
     public llvm::InstVisitor<PatchBufferOp>
 {
 public:
     PatchBufferOp();
 
-    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
-    {
-        analysisUsage.addRequired<PipelineShaders>();
-        analysisUsage.addPreserved<PipelineShaders>();
-    }
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
+    bool runOnFunction(llvm::Function& function) override;
 
-    virtual bool runOnModule(llvm::Module& module) override;
-    virtual void visitCallInst(llvm::CallInst& callInst);
+    // Visitors
+    void visitAtomicCmpXchgInst(AtomicCmpXchgInst& atomicCmpXchgInst);
+    void visitAtomicRMWInst(llvm::AtomicRMWInst& atomicRmwInst);
+    void visitBitCastInst(llvm::BitCastInst& bitCastInst);
+    void visitCallInst(llvm::CallInst& callInst);
+    void visitExtractElementInst(llvm::ExtractElementInst& extractElementInst);
+    void visitGetElementPtrInst(llvm::GetElementPtrInst& getElemPtrInst);
+    void visitInsertElementInst(llvm::InsertElementInst& insertElementInst);
+    void visitLoadInst(llvm::LoadInst& loadInst);
+    void visitMemCpyInst(llvm::MemCpyInst& memCpyInst);
+    void visitMemMoveInst(llvm::MemMoveInst& memMoveInst);
+    void visitMemSetInst(llvm::MemSetInst& memSetInst);
+    void visitPHINode(llvm::PHINode& phiNode);
+    void visitSelectInst(llvm::SelectInst& selectInst);
+    void visitStoreInst(llvm::StoreInst& storeInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -65,12 +73,23 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchBufferOp);
 
-    void ReplaceCallee(llvm::CallInst* pCallInst, const char* pOrigNamePrefix, const char* pNewNamePrefix);
+    llvm::Instruction* GetPointerOperandAsInst(llvm::Value* const pValue);
+    llvm::Value* GetBaseAddressFromBufferDesc(llvm::Value* const pBufferDesc) const;
+    void CopyMetadata(llvm::Value* const pDest, const llvm::Value* const pSrc) const;
+    llvm::PointerType* GetRemappedType(llvm::Type* const pType) const;
+    bool RemoveUsersForInvariantStarts(llvm::Value* const pValue);
+    llvm::Value* ReplaceLoad(llvm::LoadInst* const pLoadInst);
+    void ReplaceStore(llvm::StoreInst* const pStoreInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    bool                                m_changed;       // Whether the pass has modified code so far
-    std::unordered_set<llvm::CallInst*> m_replacedCalls;
+    using Replacement = std::pair<llvm::Value*, llvm::Value*>;
+    llvm::DenseMap<llvm::Instruction*, Replacement> m_replacementMap;      // The replacement map.
+    llvm::DenseSet<llvm::Value*>                    m_invariantSet;        // The invariant set.
+    llvm::DenseSet<llvm::Value*>                    m_divergenceSet;       // The divergence set.
+    llvm::LegacyDivergenceAnalysis*                 m_pDivergenceAnalysis; // The divergence analysis.
+    std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;            // The IRBuilder.
+    Context*                                        m_pContext;            // The LLPC Context.
 };
 
 } // Llpc

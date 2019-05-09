@@ -9,7 +9,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call i32 @llvm.ctpop.i32
 ; SHADERTEST: add nuw nsw i32 %{{[0-9*]}}, 2

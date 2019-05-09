@@ -24,13 +24,12 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: load <3 x float>, <3 x float>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <12 x i8> @llpc.buffer.load.v12i8
-; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8
+; SHADERTEST: load <3 x float>, <3 x float>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call <2 x i32> @llvm.amdgcn.s.buffer.load.v2i32

@@ -134,6 +134,9 @@ static cl::opt<std::string> EntryTarget("entry-target",
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
 
+// -spvgen-dir: load SPVGEN from specified directory
+static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
+
 static cl::opt<bool> RobustBufferAccess("robust-buffer-access",
                                         cl::desc("Validate if the index is out of bounds"), cl::init(false));
 
@@ -204,6 +207,7 @@ struct CompileInfo
     ComputePipelineBuildOut     compPipelineOut;                // Output of building compute pipeline
     void*                       pPipelineBuf;                   // Alllocation buffer of building pipeline
     void*                       pPipelineInfoFile;              // VFX-style file containing pipeline info
+    const char*                 pFileNames;                     // Names of input shader source files
 };
 
 // =====================================================================================================================
@@ -361,6 +365,16 @@ static Result Init(
         newArgs.push_back(shaderCacheFileDirOption);
 
         result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
+    }
+
+    if ((result == Result::Success) && (SpvGenDir != ""))
+    {
+        // -spvgen-dir option: preload spvgen from the given directory
+        if (InitSpvGen(SpvGenDir.c_str()) == false)
+        {
+            LLPC_ERRS("Failed to load SPVGEN from specified directory\n");
+            result = Result::ErrorUnavailable;
+        }
     }
 
     return result;
@@ -865,6 +879,14 @@ static Result BuildPipeline(
 #endif
         }
 
+        if (TimePassesIsEnabled)
+        {
+            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pGraphicsPipelineInfo);
+            outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
+                   << " Files: " << pCompileInfo->pFileNames << "\n";
+            outs().flush();
+        }
+
         result = pCompiler->BuildGraphicsPipeline(pGraphicsPipelineInfo, pPipelineOut, pPipelineDumpHandle);
 
         if (result == Result::Success)
@@ -929,6 +951,14 @@ static Result BuildPipeline(
 #else
             pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pComputePipelineInfo, nullptr);
 #endif
+        }
+
+        if (TimePassesIsEnabled)
+        {
+            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pComputePipelineInfo);
+            outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
+                   << " Files: " << pCompileInfo->pFileNames << "\n";
+            outs().flush();
         }
 
         result = pCompiler->BuildComputePipeline(pComputePipelineInfo, pPipelineOut, pPipelineDumpHandle);
@@ -1053,18 +1083,21 @@ static void EnableMemoryLeakDetection()
 // =====================================================================================================================
 // Process one pipeline.
 static Result ProcessPipeline(
-    ICompiler*            pCompiler,  // LLPC context
-    ArrayRef<std::string> inFiles)    // Input filename(s)
+    ICompiler*            pCompiler,   // [in] LLPC context
+    ArrayRef<std::string> inFiles,     // Input filename(s)
+    uint32_t              startFile,   // Index of the starting file name being processed in the file name array
+    uint32_t*             pNextFile)   // [out] Index of next file name being processed in the file name array
 {
     Result result = Result::Success;
     CompileInfo compileInfo = {};
+    std::string fileNames;
 
     result = InitCompileInfo(&compileInfo);
 
     //
     // Translate sources to SPIR-V binary
     //
-    for (uint32_t i = 0; (i < inFiles.size()) && (result == Result::Success); ++i)
+    for (uint32_t i = startFile; (i < inFiles.size()) && (result == Result::Success); ++i)
     {
         const std::string& inFile = inFiles[i];
         std::string spvBinFile;
@@ -1130,7 +1163,11 @@ static Result ProcessPipeline(
             if (result == Result::Success)
             {
                 uint32_t stageMask = GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
-                if (stageMask != 0)
+                if ((stageMask & compileInfo.stageMask) != 0)
+                {
+                    break;
+                }
+                else if (stageMask != 0)
                 {
                     for (uint32_t stage = ShaderStageVertex; stage < ShaderStageCount; ++stage)
                     {
@@ -1224,6 +1261,11 @@ static Result ProcessPipeline(
                             }
                         }
                     }
+
+                    fileNames += inFile;
+                    fileNames += " ";
+                    *pNextFile = i + 1;
+                    break;
                 }
             }
             else
@@ -1268,6 +1310,11 @@ static Result ProcessPipeline(
                     LLPC_ERRS("File " << inFile << ": Fail to determine shader stage\n");
                     result = Result::ErrorInvalidShader;
                 }
+
+                if (compileInfo.stageMask & ShaderStageToMask(static_cast<ShaderStage>(shaderStage)))
+                {
+                    break;
+                }
             }
 
             if (result == Result::Success)
@@ -1290,10 +1337,19 @@ static Result ProcessPipeline(
             result = CompileGlsl(inFile, &stage, spvBinFile);
             if (result == Result::Success)
             {
+                if (compileInfo.stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+                {
+                    break;
+                }
+
                 compileInfo.stageMask |= ShaderStageToMask(stage);
                 result = GetSpirvBinaryFromFile(spvBinFile, &compileInfo.spirvBin[stage]);
             }
         }
+
+        fileNames += inFile;
+        fileNames += " ";
+        *pNextFile = i + 1;
     }
 
     //
@@ -1309,6 +1365,7 @@ static Result ProcessPipeline(
     //
     if ((result == Result::Success) && ToLink)
     {
+        compileInfo.pFileNames = fileNames.c_str();
         result = BuildPipeline(pCompiler, &compileInfo);
         if (result == Result::Success)
         {
@@ -1324,6 +1381,54 @@ static Result ProcessPipeline(
     return result;
 }
 
+#ifdef WIN_OS
+// =====================================================================================================================
+// Finds all filenames which can match input file name
+void FindAllMatchFiles(
+    const std::string&        inFile,         // [in] Input file name, include wildcard
+    std::vector<std::string>* pOutFiles)      // [out] Output file names which can match input file name
+{
+    WIN32_FIND_DATAA data = {};
+
+    // Separate folder name
+    std::string folderName;
+    auto separatorPos = inFile.find_last_of("/\\");
+    if (separatorPos != std::string::npos)
+    {
+        folderName = inFile.substr(0, separatorPos + 1);
+    }
+
+    // Search first file
+    HANDLE pSearchHandle = FindFirstFileA(inFile.c_str(), &data);
+    if (pSearchHandle == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
+    // Copy first file's name
+    pOutFiles->push_back(folderName + data.cFileName);
+
+    // Copy other file names
+    while (FindNextFileA(pSearchHandle, &data))
+    {
+        pOutFiles->push_back(folderName + data.cFileName);
+    }
+
+    FindClose(pSearchHandle);
+    return;
+}
+#else
+// =====================================================================================================================
+// Finds all filenames which can match input file name
+void FindAllMatchFiles(
+    const std::string&        inFile,         // [in] Input file name, include wildcard
+    std::vector<std::string>* pOutFiles)      // [out] Output file names which can match input file name
+{
+    // Linux shell extends wildcard automatically. we needn't implement it in linux.
+    LLPC_NEVER_CALLED();
+}
+
+#endif
 // =====================================================================================================================
 // Main function of LLPC standalone tool, entry-point.
 //
@@ -1364,22 +1469,80 @@ int32_t main(
 
     if (IsPipelineInfoFile(InFiles[0]) || IsLlvmIrFile(InFiles[0]))
     {
+        uint32_t nextFile = 0;
+
         // The first input file is a pipeline file or LLVM IR file. Assume they all are, and compile each one
         // separately but in the same context.
         for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
         {
-            result = ProcessPipeline(pCompiler, InFiles[i]);
+            if (InFiles[i].find_last_of("*?") != std::string::npos)
+            {
+                std::vector<std::string> matchFiles;
+                FindAllMatchFiles(InFiles[i], &matchFiles);
+                if (matchFiles.size() == 0)
+                {
+                    LLPC_ERRS("\nFailed to read file " << InFiles[i] << "\n");
+                    result = Result::ErrorInvalidValue;
+                }
+                else
+                {
+                    for (uint32_t j = 0; (j < matchFiles.size()) && (result == Result::Success); ++j)
+                    {
+                        result = ProcessPipeline(pCompiler, matchFiles[j], 0, &nextFile);
+                    }
+                }
+            }
+            else
+            {
+                result = ProcessPipeline(pCompiler, InFiles[i], 0, &nextFile);
+            }
         }
     }
-    else
+    else if (result == Result::Success)
     {
         // Otherwise, join all input files into the same pipeline.
-        SmallVector<std::string, 6> inFiles;
-        for (const auto &inFile : InFiles)
+        if ((InFiles.size() == 1) &&
+            (InFiles[0].find_last_of("*?") != std::string::npos))
         {
-            inFiles.push_back(inFile);
+            std::vector<std::string> matchFiles;
+            FindAllMatchFiles(InFiles[0], &matchFiles);
+            if (matchFiles.size() == 0)
+            {
+                LLPC_ERRS("\nFailed to read file " << InFiles[0] << "\n");
+                result = Result::ErrorInvalidValue;
+            }
+            else
+            {
+                uint32_t nextFile = 0;
+                for (uint32_t i = 0; (i < matchFiles.size()) && (result == Result::Success); ++i)
+                {
+                    result = ProcessPipeline(pCompiler, matchFiles[i], 0, &nextFile);
+                }
+            }
         }
-        result = ProcessPipeline(pCompiler, inFiles);
+        else
+        {
+            SmallVector<std::string, 6> inFiles;
+            for (const auto& inFile : InFiles)
+            {
+                if (InFiles[0].find_last_of("*?") != std::string::npos)
+                {
+                    LLPC_ERRS("\nCan't use wilecard if multiple filename is set in command\n");
+                    result = Result::ErrorInvalidValue;
+                    break;
+                }
+                inFiles.push_back(inFile);
+            }
+
+            if (result == Result::Success)
+            {
+                uint32_t nextFile = 0;
+                for (; result == Result::Success && nextFile < inFiles.size();)
+                {
+                    result = ProcessPipeline(pCompiler, inFiles, nextFile, &nextFile);
+                }
+            }
+        }
     }
 
     pCompiler->Destroy();

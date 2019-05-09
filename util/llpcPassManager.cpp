@@ -32,6 +32,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 
+#include "llpcDebug.h"
 #include "llpcPassManager.h"
 
 namespace llvm
@@ -49,13 +50,19 @@ static cl::opt<std::string> DumpCfgAfter("dump-cfg-after",
                                          cl::desc("Dump CFG as .dot files after specified pass"),
                                          cl::init(""));
 
+// -dump-pass-name : dump executed pass name
+static cl::opt<bool> DumpPassName("dump-pass-name", cl::desc("Dump executed pass name"), cl::init(false));
+
+// -disable-pass-indices: indices of passes to be disabled
+static cl::list<uint32_t> DisablePassIndices("disable-pass-indices", cl::ZeroOrMore, cl::desc("Indices of passes to be disabled"));
+
 } // cl
 
 } // llvm
 
 using namespace llvm;
-using namespace Llpc;
-
+namespace Llpc
+{
 // =====================================================================================================================
 // Get the PassInfo for a registered pass given short name
 static const PassInfo* GetPassInfo(
@@ -87,18 +94,23 @@ static AnalysisID GetPassIdFromName(
 
 // =====================================================================================================================
 // Constructor
-Llpc::PassManager::PassManager() :
-    legacy::PassManager()
+PassManager::PassManager(
+    uint32_t* pPassIndex)   // [in,out] Pointer of PassIndex
+    :
+    m_pPassIndex(pPassIndex)
 {
     if (cl::DumpCfgAfter.empty() == false)
     {
         m_dumpCfgAfter = GetPassIdFromName(cl::DumpCfgAfter);
     }
+
+    m_jumpThreading = GetPassIdFromName("jump-threading");
+    m_printModule = GetPassIdFromName("print-module");
 }
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
-void Llpc::PassManager::add(
+void PassManager::add(
     Pass* pPass)    // [in] Pass to add to the pass manager
 {
     // Do not add any passes after calling stop(), except immutable passes.
@@ -107,10 +119,31 @@ void Llpc::PassManager::add(
         return;
     }
 
+    AnalysisID passId = pPass->getPassID();
+
     // Skip the jump threading pass as it interacts really badly with the structurizer.
-    if (pPass->getPassName().equals("Jump Threading"))
+    if (passId == m_jumpThreading)
     {
         return;
+    }
+
+    if (passId != m_printModule)
+    {
+        uint32_t passIndex = (*m_pPassIndex)++;
+
+        for (auto disableIndex : cl::DisablePassIndices)
+        {
+            if (disableIndex == passIndex)
+            {
+                LLPC_OUTS("Pass[" << passIndex << "] = " << pPass->getPassName() << " (disabled)\n");
+                return;
+            }
+        }
+
+        if (cl::DumpPassName)
+        {
+            LLPC_OUTS("Pass[" << passIndex << "] = " << pPass->getPassName() << "\n");
+        }
     }
 
     // Add the pass to the superclass pass manager.
@@ -122,7 +155,6 @@ void Llpc::PassManager::add(
         legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
     }
 
-    AnalysisID passId = pPass->getPassID();
     if (passId == m_dumpCfgAfter)
     {
         // Add a CFG printer pass after it.
@@ -132,8 +164,9 @@ void Llpc::PassManager::add(
 
 // =====================================================================================================================
 // Stop adding passes to the pass manager, except immutable ones.
-void Llpc::PassManager::stop()
+void PassManager::stop()
 {
     m_stopped = true;
 }
 
+} // Llpc

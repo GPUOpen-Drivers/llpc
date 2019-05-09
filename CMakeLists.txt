@@ -34,6 +34,8 @@ option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
 option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 # None
 
+set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+
 ### Compiler Options ###################################################################################################
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -101,6 +103,7 @@ elseif(WIN32)
                 /wd4201 # nonstandard extension used : nameless struct/union
                 /wd4244 # 'X' : conversion from 'Y' to 'Z', possible loss of data
                 /wd4245 # 'X' : conversion from 'Y' to 'Z', signed/unsigned mismatch
+                /wd4250 # 'X': inherits 'Y' via dominance
                 /wd4291 # no matching operator delete found; memory will not be freed if initialization throws an exception
                 /wd4267 # 'return' : conversion from 'size_t' to 'unsigned int', possible loss of data
                 /wd4389 # '==' : signed/unsigned mismatch
@@ -153,6 +156,9 @@ target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(llpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
+if(ICD_BUILD_LLPC)
+    target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
+endif()
 
 if(XGL_LLVM_UPSTREAM)
     target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
@@ -204,6 +210,7 @@ target_sources(llpc PRIVATE
     builder/llpcBuilder.cpp
     builder/llpcBuilderImpl.cpp
     builder/llpcBuilderImplDesc.cpp
+    builder/llpcBuilderImplMatrix.cpp
     builder/llpcBuilderImplMisc.cpp
     builder/llpcBuilderRecorder.cpp
     builder/llpcBuilderReplayer.cpp
@@ -223,17 +230,13 @@ target_sources(llpc PRIVATE
 # llpc/lower
 target_sources(llpc PRIVATE
     lower/llpcSpirvLower.cpp
-    lower/llpcSpirvLowerAccessChain.cpp
-    lower/llpcSpirvLowerAggregateLoadStore.cpp
     lower/llpcSpirvLowerAlgebraTransform.cpp
-    lower/llpcSpirvLowerBufferOp.cpp
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
-    lower/llpcSpirvLowerPushConst.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
     lower/llpcSpirvLowerTranslator.cpp
 )
@@ -513,7 +516,8 @@ PRIVATE
     ${LLVM_INCLUDE_DIRS}
 )
 
-target_include_directories(amdllpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
+set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
+target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})
 
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -550,3 +554,20 @@ elseif(WIN32)
 endif()
     llvm_map_components_to_libnames(llvm_libs amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})
+
+### Add Subdirectories #################################################################################################
+
+# SPVGEN
+set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../spvgen CACHE PATH "Specify the path to SPVGEN.")
+
+if(ICD_BUILD_LLPC)
+    if(EXISTS ${XGL_SPVGEN_PATH})
+        add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
+    endif()
+endif()
+
+# Lit tests
+if(ICD_BUILD_LLPC)
+    add_subdirectory(test)
+endif()
+

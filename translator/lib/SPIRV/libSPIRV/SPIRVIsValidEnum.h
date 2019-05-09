@@ -87,6 +87,7 @@ inline bool isValid(spv::AddressingModel V) {
   case AddressingModelLogical:
   case AddressingModelPhysical32:
   case AddressingModelPhysical64:
+  case AddressingModelPhysicalStorageBuffer64EXT:
     return true;
   default:
     return false;
@@ -167,6 +168,7 @@ inline bool isValid(spv::StorageClass V) {
   case StorageClassAtomicCounter:
   case StorageClassImage:
   case StorageClassStorageBuffer:
+  case StorageClassPhysicalStorageBufferEXT:
     return true;
   default:
     return false;

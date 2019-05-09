@@ -49,18 +49,14 @@ using namespace object;
 void EmuLib::AddArchive(
     MemoryBufferRef buffer) // Buffer required to create the archive
 {
-    m_archives.push_back(EmuLibArchive(cantFail(Archive::create(buffer), "Failed to parse archive")));
+    m_archives.emplace_back(cantFail(Archive::create(buffer), "Failed to parse archive"));
 
     // Update symbol index in the symbol index map
     auto& archive = m_archives.back();
     auto index = m_archives.size() - 1;
     for (auto& symbol : archive.archive->symbols())
     {
-        auto symbolIndexIt = m_symbolIndices.find(symbol.getName());
-        if (symbolIndexIt == m_symbolIndices.end())
-        {
-            m_symbolIndices[symbol.getName()] = index;
-        }
+        m_symbolIndices.insert(std::make_pair(symbol.getName(), index));
     }
 }
 
@@ -154,12 +150,12 @@ Function* EmuLib::GetFunction(
                     auto funcIt = unknownKindFuncs.find(&libFunc);
                     if (funcIt == unknownKindFuncs.end())
                     {
-                        // Native if isn't in non-native list and unknonw list
+                        // Native if isn't in non-native list and unknown list
                         archive.functions[libFunc.getName()] = EmuLibFunction(&libFunc, true);
                     }
                     else
                     {
-                        // Non-native if any referenced unknown kind function is non-natigve.
+                        // Non-native if any referenced unknown kind function is non-native.
                         for (auto pFunc : funcIt->second)
                         {
                             if (GetFunction(pFunc->getName(), true) == nullptr)

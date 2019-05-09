@@ -186,19 +186,17 @@ Instruction* BuilderImplDesc::CreateWaterfallLoop(
 
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
-// TODO: Currently supports returning non-fat-pointer <4 x i32> descriptor when pPointeeTy is nullptr. It is intended
-// to remove that functionality once LLPC has switched to fat pointers.
 Value* BuilderImplDesc::CreateLoadBufferDesc(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
     Value*        pDescIndex,       // [in] Descriptor index
     bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    Type*         pPointeeTy,       // [in] Type that the returned pointer should point to (nullptr to return a
-                                    //    non-fat-pointer <4 x i32> descriptor)
+    Type* const   pPointeeTy,       // [in] Type that the returned pointer should point to.
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    LLPC_ASSERT(pPointeeTy == nullptr && "Fat pointers not supported yet");
-    Instruction* pInsertPos = &*GetInsertPoint();
+    LLPC_ASSERT(pPointeeTy != nullptr);
+
+    Instruction* const pInsertPos = &*GetInsertPoint();
     pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
 
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
@@ -217,7 +215,15 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
                                      NoAttrib,
                                      pInsertPos);
     pBufDescLoadCall->setName(instName);
-    return pBufDescLoadCall;
+
+    pBufDescLoadCall = EmitCall(pInsertPos->getModule(),
+                                LlpcName::LateLaunderFatPointer,
+                                getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER),
+                                pBufDescLoadCall,
+                                Attribute::ReadNone,
+                                pInsertPos);
+
+    return CreateBitCast(pBufDescLoadCall, PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER));
 }
 
 // =====================================================================================================================
@@ -374,3 +380,20 @@ Value* BuilderImplDesc::ScalarizeIfUniform(
     return pValue;
 }
 
+// =====================================================================================================================
+// Create a buffer length query based on the specified descriptor.
+Value* BuilderImplDesc::CreateBufferLength(
+    Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
+    const Twine&  instName)         // [in] Name to give instruction(s).
+{
+    // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
+    // in patch buffer op.
+    Instruction* const pInsertPos = &*GetInsertPoint();
+
+    return EmitCall(pInsertPos->getModule(),
+                    LlpcName::LateBufferLength,
+                    getInt32Ty(),
+                    pBufferDesc,
+                    Attribute::ReadNone,
+                    pInsertPos);
+}

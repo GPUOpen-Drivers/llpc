@@ -1,0 +1,96 @@
+#version 450 core
+
+layout(set = 0, binding = 0 ) uniform sampler1D samp1D;
+layout(set = 0, binding = 1 ) uniform sampler1D samp1D_2;
+layout(set = 0, binding = 1 ) uniform sampler2D samp2D;
+layout(set = 0, binding = 2 ) uniform sampler3D samp3D;
+layout(set = 0, binding = 3 ) uniform samplerCube sampCube;
+layout(set = 0, binding = 4 ) uniform sampler1DArray samp1DA;
+layout(set = 0, binding = 5 ) uniform sampler2DArray samp2DA;
+layout(set = 0, binding = 6 ) uniform samplerCubeArray sampCubeA;
+layout(set = 0, binding = 7 ) uniform sampler1DShadow samp1DS;
+layout(set = 0, binding = 8 ) uniform sampler2DShadow samp2DS;
+layout(set = 0, binding = 9 ) uniform samplerCubeShadow sampCubeS;
+layout(set = 0, binding = 10) uniform sampler1DArrayShadow samp1DAS;
+layout(set = 0, binding = 11) uniform sampler2DArrayShadow samp2DAS;
+layout(set = 0, binding = 12) uniform samplerCubeArrayShadow sampCubeAS;
+
+layout(set = 1, binding = 0) buffer BO
+{
+    int mOut;
+};
+
+void main()
+{
+    int temp = 0;
+
+    temp += textureQueryLevels(samp1D);
+    temp += textureQueryLevels(samp1D_2);
+    temp += textureQueryLevels(samp2D);
+    temp += textureQueryLevels(samp3D);
+    temp += textureQueryLevels(sampCube);
+    temp += textureQueryLevels(samp1DA);
+    temp += textureQueryLevels(samp2DA);
+    temp += textureQueryLevels(sampCubeA);
+    temp += textureQueryLevels(samp1DS);
+    temp += textureQueryLevels(samp2DS);
+    temp += textureQueryLevels(sampCubeS);
+    temp += textureQueryLevels(samp1DAS);
+    temp += textureQueryLevels(samp2DAS);
+    temp += textureQueryLevels(sampCubeAS);
+
+    mOut = temp;
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 0, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.1D{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 1, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.1D{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 1, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.2D{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 2, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.3D{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 3, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.Cube{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 4, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.1DArray{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 5, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.2DArray{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 6, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.CubeArray{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 7, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.1D{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 8, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.2D{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 9, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.Cube{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 10, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.1DArray{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 11, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.2DArray{{.*}}({{.*}},{{.*}})
+; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.desc.load.resource.v8i32(i32 0, i32 12, i32 0, i1 false)
+; SHADERTEST: call i32 @llpc.image.querynonlod.levels.CubeArray{{.*}}({{.*}},{{.*}})
+
+; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1d.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1d.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.2d.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.3d.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.cube.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1darray.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.2darray.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.cube.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1d.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.2d.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.cube.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1darray.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.2darray.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.cube.f32.i32(i32 8, i32 undef,{{.*}}, i32 0, i32 0)
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

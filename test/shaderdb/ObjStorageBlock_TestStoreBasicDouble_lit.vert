@@ -19,17 +19,23 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 0
-; SHADERTEST: call void @llpc.buffer.store.v8i8(<4 x i32> %{{[0-9]*}}, i32 0
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 16
-; SHADERTEST: call void @llpc.buffer.store.v16i8(<4 x i32> %{{[0-9]*}}, i32 16
-; SHADERTEST: call <24 x i8> @llpc.buffer.load.v24i8(<4 x i32> %{{[0-9]*}}, i32 32
-; SHADERTEST: call void @llpc.buffer.store.v24i8(<4 x i32> %{{[0-9]*}}, i32 32
-; SHADERTEST: call <32 x i8> @llpc.buffer.load.v32i8(<4 x i32> %{{[0-9]*}}, i32 64
-; SHADERTEST: call void @llpc.buffer.store.v32i8(<4 x i32> %{{[0-9]*}}, i32 64
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call <2 x float> @llvm.amdgcn.raw.buffer.load.v2f32(<4 x i32> {{%[^,]+}}, i32 0, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v2f32(<2 x float> {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 0, i32 0, i32 0)
+; SHADERTEST: call <4 x float> @llvm.amdgcn.raw.buffer.load.v4f32(<4 x i32> {{%[^,]+}}, i32 16, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4f32(<4 x float> {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 16, i32 0, i32 0)
+; SHADERTEST: call <4 x float> @llvm.amdgcn.raw.buffer.load.v4f32(<4 x i32> {{%[^,]+}}, i32 32, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.raw.buffer.load.v2f32(<4 x i32> {{%[^,]+}}, i32 48, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4f32(<4 x float> {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 32, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v2f32(<2 x float> {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 48, i32 0, i32 0)
+; SHADERTEST: call <4 x float> @llvm.amdgcn.raw.buffer.load.v4f32(<4 x i32> {{%[^,]+}}, i32 64, i32 0, i32 0)
+; SHADERTEST: call <4 x float> @llvm.amdgcn.raw.buffer.load.v4f32(<4 x i32> {{%[^,]+}}, i32 80, i32 0, i32 0)
+; SHADERTEST: shufflevector <8 x i32> {{%[^,]+}}, <8 x i32> undef, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+; SHADERTEST: shufflevector <8 x i32> {{%[^,]+}}, <8 x i32> undef, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4f32(<4 x float> {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 64, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4f32(<4 x float> {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 80, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

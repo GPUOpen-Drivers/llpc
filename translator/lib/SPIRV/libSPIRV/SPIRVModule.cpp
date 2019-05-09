@@ -208,6 +208,8 @@ public:
   SPIRVEntry *replaceForward(SPIRVForward *, SPIRVEntry *) override;
   void eraseInstruction(SPIRVInstruction *, SPIRVBasicBlock *) override;
 
+  SPIRVEntry *replaceForwardPointer(SPIRVTypeForwardPointer *, SPIRVTypePointer *);
+
   // Type creation functions
   template <class T> T *addType(T *Ty);
   SPIRVTypeArray *addArrayType(SPIRVType *, SPIRVConstant *) override;
@@ -587,6 +589,9 @@ SPIRVEntry *SPIRVModuleImpl::addEntry(SPIRVEntry *Entry) {
     if (exist(Id, &Mapped)) {
       if (Mapped->getOpCode() == OpForward) {
         replaceForward(static_cast<SPIRVForward *>(Mapped), Entry);
+      } else if (Mapped->getOpCode() == OpTypeForwardPointer) {
+        replaceForwardPointer(static_cast<SPIRVTypeForwardPointer *>(Mapped),
+                              static_cast<SPIRVTypePointer *>(Entry));
       } else {
         assert(Mapped == Entry && "Id used twice");
       }
@@ -912,6 +917,15 @@ SPIRVEntry *SPIRVModuleImpl::replaceForward(SPIRVForward *Forward,
   Entry->takeAnnotations(Forward);
   delete Forward;
   return Entry;
+}
+
+SPIRVEntry *SPIRVModuleImpl::replaceForwardPointer(SPIRVTypeForwardPointer *Forward,
+                                                   SPIRVTypePointer *Entry) {
+  SPIRVId Id = Entry->getId();
+  SPIRVId ForwardId = Forward->getId();
+  assert(ForwardId == Id);
+  Forward->setPointer(Entry);
+  return Forward;
 }
 
 void SPIRVModuleImpl::eraseInstruction(SPIRVInstruction *I,

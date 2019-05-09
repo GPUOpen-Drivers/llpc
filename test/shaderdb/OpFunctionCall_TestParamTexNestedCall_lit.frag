@@ -29,10 +29,10 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @"func1
-; SHADERTEST: define internal {{.*}} <4 x float> @"func1({{.*}};{{.*}};"([4 x %spirv.SampledImage.float{{.*}} %s2D, <2 x float> {{.*}} %coord)
+; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @{{.*}}
+; SHADERTEST: define internal {{.*}} <4 x float> @{{.*}}([4 x %spirv.SampledImage.float{{.*}}, <2 x float> {{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -13,12 +13,12 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: i1 @_Z5isinff
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i1 @llvm.amdgcn.class.f32(float %{{[0-9]*}}, i32 516) #3
+; SHADERTEST: call i1 @llvm.amdgcn.class.f32(float %{{[0-9]*}}, i32 516)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -1,12 +1,10 @@
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST : %{.*} = getelementptr { [256 x <4 x i32>], i32 }, { [256 x <4 x i32>], i32 } {.*} {.*}, i32 0, i32 0, i32 %{.*}
-; SHADERTEST : %{.*} = load <4 x i32>, <4 x i32> addrspace(66)* %{.*}
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST : %{.*} = call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{.*}, i32 %{.*}, i1 true, i32 0, i1 false)
-; SHADERTEST : AMDLLPC SUCCESS
+; SHADERTEST: %{{.*}} = getelementptr <{ [256 x [4 x i32]], i32 }>, <{ [256 x [4 x i32]], i32 }> {{.*}} {{.*}}, i32 0, i32 0, i32 %{{.*}}
+; SHADERTEST: %{{.*}} = load <4 x i32>, <4 x i32> addrspace(7)* %{{.*}}
+; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 [CsGlsl]

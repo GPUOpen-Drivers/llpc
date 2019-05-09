@@ -389,8 +389,7 @@ public:
   void memoryAccessUpdate(const std::vector<SPIRVWord> &MemoryAccess) {
     if (!MemoryAccess.size())
       return;
-    assert((MemoryAccess.size() == 1 || MemoryAccess.size() == 2) &&
-           "Invalid memory access operand size");
+    assert((MemoryAccess.size() <= 4) && "Invalid memory access operand size");
     TheMemoryAccessMask = MemoryAccess[0];
 
     unsigned Idx = 1;
