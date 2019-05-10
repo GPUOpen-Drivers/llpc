@@ -19,7 +19,7 @@ config.test_format = lit.formats.ShTest(True)
 config.suffixes = ['.vert', '.tesc', '.tese', '.geom', '.frag', '.comp', '.spvas', '.pipe', '.ll']
 
 # excludes: A list of directories  and fles to exclude from the testsuite.
-config.excludes = ['CMakeLists.txt', 'litScripts', 'internal']
+config.excludes = ['CMakeLists.txt', 'litScripts', 'internal', 'avoid', 'error']
 
 # test_source_root: The root path where tests are located.
 config.test_source_root = os.path.dirname(__file__)
@@ -31,6 +31,7 @@ llvm_config.use_default_substitutions()
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%gfxip', config.gfxip))
+config.substitutions.append(('%spvgendir%', config.spvgen_dir))
 
 tool_dirs = [config.llvm_tools_dir, config.amdllpc_dir]
 

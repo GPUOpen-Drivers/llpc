@@ -32,6 +32,8 @@
 
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
@@ -170,6 +172,35 @@ static void FatalErrorHandler(
     throw("LLVM fatal error");
 #endif
 }
+// =====================================================================================================================
+// Handler for diagnosis in pass run, derived from the standard one.
+class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
+{
+    bool handleDiagnostics(const DiagnosticInfo& diagInfo) override
+    {
+        if (EnableOuts() || EnableErrs())
+        {
+            if ((diagInfo.getSeverity() == DS_Error) || (diagInfo.getSeverity() == DS_Warning))
+            {
+                DiagnosticPrinterRawOStream printStream(outs());
+                printStream << "ERROR: LLVM DIAGNOSIS INFO: ";
+                diagInfo.print(printStream);
+                printStream << "\n";
+                outs().flush();
+            }
+            else if (EnableOuts())
+            {
+                DiagnosticPrinterRawOStream printStream(outs());
+                printStream << "\n\n=====  LLVM DIAGNOSIS START  =====\n\n";
+                diagInfo.print(printStream);
+                printStream << "\n\n=====  LLVM DIAGNOSIS END  =====\n\n";
+                outs().flush();
+            }
+        }
+        LLPC_ASSERT(diagInfo.getSeverity() != DS_Error);
+        return true;
+    }
+};
 
 // =====================================================================================================================
 // Creates LLPC compiler from the specified info.
@@ -273,6 +304,8 @@ Compiler::Compiler(
 
     if (m_instanceCount == 0)
     {
+        auto& passRegistry = *PassRegistry::getPassRegistry();
+
         // Initialize LLVM target: AMDGPU
         LLVMInitializeAMDGPUTargetInfo();
         LLVMInitializeAMDGPUTarget();
@@ -281,8 +314,11 @@ Compiler::Compiler(
         LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUDisassembler();
 
+        // Initialize special passes which are checked in PassManager
+        initializeJumpThreadingPass(passRegistry);
+        initializePrintModulePassWrapperPass(passRegistry);
+
         // Initialize passes so they can be referenced by -llpc-stop-before etc.
-        auto& passRegistry = *PassRegistry::getPassRegistry();
         InitializeUtilPasses(passRegistry);
         InitializeLowerPasses(passRegistry);
         InitializeBuilderPasses(passRegistry);
@@ -501,17 +537,45 @@ Result Compiler::BuildPipelineInternal(
     raw_string_ostream ostream(hash);
     ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
     ostream.flush();
-    Timer wholeTimer("total", (Twine("LLPC Total ") + hash).str());
+    uint32_t passIndex = 0;
+    // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
+    // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
+    // compile multiple pipelines. so we add a dummy record to force all fields is shown.
+    // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
+    // in TimeRecord.
+    TimeRecord timeRecord;
+    struct HackedTimeRecord
+    {
+        double t1;
+        double t2;
+        double t3;
+        ssize_t m1;
+    } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
+    static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
+    memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
+
+    StringMap<TimeRecord> dummyTimeRecords;
+    if (TimePassesIsEnabled)
+    {
+        dummyTimeRecords["DUMMY"] = timeRecord;
+    }
+
+    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ") + hash).str(), dummyTimeRecords);
+    Timer wholeTimer("llpc-total", (Twine("LLPC Total ") + hash).str(), timerGroupTotal);
+
+    TimerGroup timerGroupPhases("llpc", (Twine("LLPC Phases ") + hash).str(), dummyTimeRecords);
+    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroupPhases);
+    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroupPhases);
+    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroupPhases);
+    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroupPhases);
+    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroupPhases);
+
     if (TimePassesIsEnabled)
     {
         wholeTimer.startTimer();
     }
-    TimerGroup timerGroup("llpc", (Twine("LLPC Phases ") + hash).str());
-    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroup);
-    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroup);
-    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroup);
-    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroup);
-    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroup);
+
+    pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
 
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext);
@@ -551,7 +615,7 @@ Result Compiler::BuildPipelineInternal(
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
 
-            PassManager passMgr;
+            PassManager lowerPassMgr(&passIndex);
 
             // Set the shader stage in the Builder.
             pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(stage));
@@ -559,14 +623,14 @@ Result Compiler::BuildPipelineInternal(
             // Start timer for translate.
             if (TimePassesIsEnabled)
             {
-                passMgr.add(CreateStartStopTimer(&translateTimer, true));
+                lowerPassMgr.add(CreateStartStopTimer(&translateTimer, true));
             }
 
             // SPIR-V translation, then dump the result.
-            passMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(stage), pShaderInfo));
+            lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(stage), pShaderInfo));
             if (EnableOuts())
             {
-                passMgr.add(createPrintModulePass(outs(), "\n"
+                lowerPassMgr.add(createPrintModulePass(outs(), "\n"
                             "===============================================================================\n"
                             "// LLPC SPIRV-to-LLVM translation results\n"));
             }
@@ -574,21 +638,22 @@ Result Compiler::BuildPipelineInternal(
             // Stop timer for translate.
             if (TimePassesIsEnabled)
             {
-                passMgr.add(CreateStartStopTimer(&translateTimer, false));
+                lowerPassMgr.add(CreateStartStopTimer(&translateTimer, false));
             }
 
             // Per-shader SPIR-V lowering passes.
             SpirvLower::AddPasses(static_cast<ShaderStage>(stage),
-                                  passMgr,
+                                  lowerPassMgr,
                                   TimePassesIsEnabled ? &lowerTimer : nullptr,
                                   forceLoopUnrollCount,
                                   pDynamicLoopUnroll);
 
             // Run the passes.
-            result = CodeGenManager::Run(modules[stage], passMgr);
-            if (result != Result::Success)
+            bool success = RunPasses(&lowerPassMgr, modules[stage]);
+            if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+                result = Result::ErrorInvalidShader;
             }
         }
 
@@ -607,8 +672,8 @@ Result Compiler::BuildPipelineInternal(
     // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
     // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
     // manager.
-    PassManager passMgr;
-    passMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
+        PassManager patchPassMgr(&passIndex);
+        patchPassMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
 
     raw_svector_ostream elfStream(*pPipelineElf);
 
@@ -616,14 +681,14 @@ Result Compiler::BuildPipelineInternal(
     {
         if (EnableOuts())
         {
-            passMgr.add(createPrintModulePass(outs(), "\n"
-                        "===============================================================================\n"
-                        "// LLPC pipeline linking results\n"));
+            patchPassMgr.add(createPrintModulePass(outs(), "\n"
+                             "===============================================================================\n"
+                             "// LLPC pipeline linking results\n"));
         }
 
         // Patching.
         Patch::AddPasses(pContext,
-                         passMgr,
+                         patchPassMgr,
                          TimePassesIsEnabled ? &patchTimer : nullptr,
                          TimePassesIsEnabled ? &optTimer : nullptr);
     }
@@ -631,19 +696,20 @@ Result Compiler::BuildPipelineInternal(
     // Run the "whole pipeline" passes, excluding the target backend.
     if (result == Result::Success)
     {
-        result = CodeGenManager::Run(pPipelineModule, passMgr);
-        if (result == Result::Success)
+        bool success = RunPasses(&patchPassMgr, pPipelineModule);
+        if (success)
         {
             CodeGenManager::SetupTargetFeatures(pPipelineModule);
         }
         else
         {
             LLPC_ERRS("Fails to run whole pipeline passes\n");
+            result = Result::ErrorInvalidShader;
         }
     }
 
     // A separate "whole pipeline" pass manager for code generation.
-    PassManager codeGenPassMgr;
+    PassManager codeGenPassMgr(&passIndex);
 
     if (result == Result::Success)
     {
@@ -664,12 +730,15 @@ Result Compiler::BuildPipelineInternal(
     // Run the target backend codegen passes.
     if (result == Result::Success)
     {
-        result = CodeGenManager::Run(pPipelineModule, codeGenPassMgr);
-        if (result != Result::Success)
+        bool success = RunPasses(&codeGenPassMgr, pPipelineModule);
+        if (success == false)
         {
             LLPC_ERRS("Fails to generate GPU ISA codes\n");
+            result = Result::ErrorInvalidShader;
         }
     }
+
+    pContext->setDiagnosticHandlerCallBack(nullptr);
 
     if (TimePassesIsEnabled)
     {
@@ -1879,6 +1948,29 @@ uint32_t Compiler::ChooseLoopUnrollCountCandidate(
     }
 
     return optimalCandidateIdx;
+}
+
+// =====================================================================================================================
+// Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
+bool Compiler::RunPasses(
+    PassManager*  pPassMgr, // [in] Pass manager
+    Module*       pModule)  // [in/out] Module
+{
+    bool success = false;
+#if LLPC_ENABLE_EXCEPTION
+    try
+#endif
+    {
+        pPassMgr->run(*pModule);
+        success = true;
+    }
+#if LLPC_ENABLE_EXCEPTION
+    catch (const char*)
+    {
+        success = false;
+    }
+#endif
+    return success;
 }
 
 // =====================================================================================================================

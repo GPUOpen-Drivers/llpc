@@ -484,25 +484,36 @@ void DoAutoLayoutDesc(
                     switch (pVarElemTy->getOpCode())
                     {
                     case OpTypeSampler:
-                        // Sampler descriptor.
-                        set.back().type = ResourceMappingNodeType::DescriptorSampler;
-                        set.back().sizeInDwords = 4 * arraySize;
-                        break;
+                        {
+                            // Sampler descriptor.
+                            set.back().type = ResourceMappingNodeType::DescriptorSampler;
+                            set.back().sizeInDwords = 4 * arraySize;
+                            break;
+                        }
                     case OpTypeImage:
-                        // Image descriptor.
-                        set.back().type = ResourceMappingNodeType::DescriptorTexelBuffer;
-                        set.back().sizeInDwords = 8 * arraySize;
-                        break;
+                        {
+                            // Image descriptor.
+                            auto pImageType = static_cast<SPIRVTypeImage*>(pVarElemTy);
+                            set.back().type = (pImageType->getDescriptor().Dim == spv::DimBuffer) ?
+                                ResourceMappingNodeType::DescriptorTexelBuffer :
+                                ResourceMappingNodeType::DescriptorResource;
+                            set.back().sizeInDwords = 8 * arraySize;
+                            break;
+                        }
                     case OpTypeSampledImage:
-                        // Combined image and sampler descriptors.
-                        set.back().type = ResourceMappingNodeType::DescriptorCombinedTexture;
-                        set.back().sizeInDwords = 12 * arraySize;
-                        break;
+                        {
+                            // Combined image and sampler descriptors.
+                            set.back().type = ResourceMappingNodeType::DescriptorCombinedTexture;
+                            set.back().sizeInDwords = 12 * arraySize;
+                            break;
+                        }
                     default:
-                        // Normal buffer.
-                        set.back().type = ResourceMappingNodeType::DescriptorBuffer;
-                        set.back().sizeInDwords = 4 * arraySize;
-                        break;
+                        {
+                            // Normal buffer.
+                            set.back().type = ResourceMappingNodeType::DescriptorBuffer;
+                            set.back().sizeInDwords = 4 * arraySize;
+                            break;
+                        }
                     }
                     set.back().srdRange.set = descSet;
                     set.back().srdRange.binding = binding;

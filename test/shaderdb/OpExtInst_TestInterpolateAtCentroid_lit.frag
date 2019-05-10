@@ -15,7 +15,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z21interpolateAtCentroidPf(float addrspace(64)* @f1_1)
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z21interpolateAtCentroidPDv4_f(<4 x float> addrspace(64)* @f4_1)

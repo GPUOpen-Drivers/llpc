@@ -1485,7 +1485,11 @@ OStream& operator<<(
                 startPos = endPos;
             }
         }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
         else if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
+#else
+        else if (strncmp(pSection->pName, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
+#endif
         {
             // Output binary based sections
             out << (pSection->pName[0] == 0 ? "(null)" : pSection->pName)

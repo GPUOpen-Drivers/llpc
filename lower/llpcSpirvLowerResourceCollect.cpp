@@ -964,14 +964,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             }
 
             // Special stage-specific processing
-            if (m_shaderStage == ShaderStageVertex)
-            {
-                if (addrSpace == SPIRAS_Input)
-                {
-                    CollectVertexInputUsage(pBaseTy, (inOutMeta.Signedness != 0), startLoc, locCount);
-                }
-            }
-            else if (m_shaderStage == ShaderStageFragment)
+            if (m_shaderStage == ShaderStageFragment)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
@@ -1546,14 +1539,7 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
             }
 
             // Special stage-specific processing
-            if (m_shaderStage == ShaderStageVertex)
-            {
-                if (addrSpace == SPIRAS_Input)
-                {
-                    CollectVertexInputUsage(pBaseTy, (inOutMeta.Signedness != 0), startLoc, locCount);
-                }
-            }
-            else if (m_shaderStage == ShaderStageFragment)
+            if (m_shaderStage == ShaderStageFragment)
             {
                 if (addrSpace == SPIRAS_Input)
                 {
@@ -1647,74 +1633,6 @@ void SpirvLowerResourceCollect::CollectInOutUsage(
                 }
             }
         }
-    }
-}
-
-// =====================================================================================================================
-// Collects the usage info of vertex inputs (particularly for the map from vertex input location to vertex basic type).
-void SpirvLowerResourceCollect::CollectVertexInputUsage(
-    const Type* pVertexTy,  // [in] Vertex input type
-    bool        signedness, // Whether the type is signed (valid for integer type)
-    uint32_t    startLoc,   // Start location
-    uint32_t    locCount)   // Count of locations
-{
-    auto bitWidth = pVertexTy->getScalarSizeInBits();
-    auto pCompTy  = pVertexTy->isVectorTy() ? pVertexTy->getVectorElementType() : pVertexTy;
-
-    // Get basic type of vertex input
-    BasicType basicTy = BasicType::Unknown;
-    if (pCompTy->isIntegerTy())
-    {
-        // Integer type
-        if (bitWidth == 8)
-        {
-            basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
-        }
-        else if (bitWidth == 16)
-        {
-            basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
-        }
-        else if (bitWidth == 32)
-        {
-            basicTy = signedness ? BasicType::Int : BasicType::Uint;
-        }
-        else
-        {
-            LLPC_ASSERT(bitWidth == 64);
-            basicTy = signedness ? BasicType::Int64 : BasicType::Uint64;
-        }
-    }
-    else if (pCompTy->isFloatingPointTy())
-    {
-        // Floating-point type
-        if (bitWidth == 16)
-        {
-            basicTy = BasicType::Float16;
-        }
-        else if (bitWidth == 32)
-        {
-            basicTy = BasicType::Float;
-        }
-        else
-        {
-            LLPC_ASSERT(bitWidth == 64);
-            basicTy = BasicType::Double;
-        }
-    }
-    else
-    {
-        LLPC_NEVER_CALLED();
-    }
-
-    auto& vsInputTypes = m_pResUsage->inOutUsage.vs.inputTypes;
-    while ((startLoc + locCount) > vsInputTypes.size())
-    {
-        vsInputTypes.push_back(BasicType::Unknown);
-    }
-
-    for (uint32_t i = 0; i < locCount; ++i)
-    {
-        vsInputTypes[startLoc + i] = basicTy;
     }
 }
 

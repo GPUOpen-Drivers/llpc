@@ -18,7 +18,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{.*}} = call {{.*}} <3 x float> @_Z17VectorTimesMatrixDv2_fDv3_Dv2_f(<2 x float> %{{.*}}, [3 x <2 x float>] %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS

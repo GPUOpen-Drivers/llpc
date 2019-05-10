@@ -116,8 +116,6 @@ GraphicsContext::GraphicsContext(
         InitShaderResourceUsage(static_cast<ShaderStage>(stage));
         InitShaderInterfaceData(static_cast<ShaderStage>(stage));
     }
-
-    memset(&m_dummyVertexInput, 0, sizeof(m_dummyVertexInput));
 }
 
 // =====================================================================================================================
@@ -266,57 +264,6 @@ void GraphicsContext::InitShaderInfoForNullFs()
     // Add usage info for dummy output
     pResUsage->inOutUsage.fs.cbShaderMask = 0;
     pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
-}
-
-// =====================================================================================================================
-// Gets the hash code of input shader with specified shader stage.
-//
-// NOTE: This function must be same with BilManager::GenerateShaderHashCode
-uint64_t GraphicsContext::GetShaderHashCode(
-    ShaderStage shaderStage     // Shader stage
-    ) const
-{
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
-
-    uint64_t shaderHash = 0;
-    auto pShaderInfo = GetPipelineShaderInfo(shaderStage);
-
-    if (pShaderInfo->pModuleData != nullptr)
-    {
-        MetroHash::MetroHash64 hasher;
-
-        UpdateShaderHashForPipelineShaderInfo(shaderStage, pShaderInfo, &hasher);
-        hasher.Update(m_pPipelineInfo->iaState.deviceIndex);
-
-        if (shaderStage == ShaderStageTessControl)
-        {
-            hasher.Update(m_pPipelineInfo->iaState.patchControlPoints);
-        }
-        else if ((shaderStage == ShaderStageVertex) &&
-                 (m_pPipelineInfo->pVertexInput != nullptr) &&
-                 (m_pPipelineInfo->pVertexInput->vertexBindingDescriptionCount > 0) &&
-                 (m_pPipelineInfo->pVertexInput->vertexAttributeDescriptionCount > 0))
-        {
-            auto pVertexInput = m_pPipelineInfo->pVertexInput;
-            hasher.Update(pVertexInput->vertexBindingDescriptionCount);
-            hasher.Update(reinterpret_cast<const uint8_t*>(pVertexInput->pVertexBindingDescriptions),
-                          sizeof(VkVertexInputBindingDescription) * pVertexInput->vertexBindingDescriptionCount);
-            hasher.Update(pVertexInput->vertexAttributeDescriptionCount);
-            hasher.Update(reinterpret_cast<const uint8_t*>(pVertexInput->pVertexAttributeDescriptions),
-                          sizeof(VkVertexInputAttributeDescription) * pVertexInput->vertexAttributeDescriptionCount);
-        }
-        else if (shaderStage == ShaderStageFragment)
-        {
-            if (m_pPipelineInfo->rsState.perSampleShading)
-            {
-                hasher.Update(m_pPipelineInfo->rsState.perSampleShading);
-            }
-        }
-
-        hasher.Finalize(reinterpret_cast<uint8_t* const>(&shaderHash));
-    }
-
-    return shaderHash;
 }
 
 // =====================================================================================================================

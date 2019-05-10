@@ -46,6 +46,7 @@ class Builder;
 class ComputeContext;
 class Context;
 class GraphicsContext;
+class PassManager;
 
 // Enumerates types of shader binary.
 enum class BinaryType : uint32_t
@@ -228,6 +229,8 @@ private:
                                             uint32_t            candidateCount) const;
 
     static llvm::Module* LinkShaderModules(Context* pContext, llvm::ArrayRef<llvm::Module*> modules);
+
+    bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule);
 
     ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
                                         MetroHash::Hash*    pCacheHash,
