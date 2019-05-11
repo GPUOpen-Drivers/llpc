@@ -53,8 +53,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} i1 @"func
-; SHADERTEST: define internal {{.*}} i1 @"func({{.*}}"(i32 {{.*}} %i1, <2 x i32> {{.*}} %i2, <3 x i32> {{.*}} %i3, <4 x i32> {{.*}} %i4, float {{.*}} %f1, <2 x float> {{.*}} %f2, <3 x float> {{.*}} %f3, <4 x float> {{.*}} %f4, i32 {{.*}} %b1, <2 x i32> {{.*}} %b2, <3 x i32> {{.*}} %b3, <4 x i32> {{.*}} %b4)
+; SHADERTEST: call {{.*}} i1 @{{.*}}
+; SHADERTEST: define internal {{.*}} i1 @{{.*}}(i32{{.*}}, <2 x i32>{{.*}}, <3 x i32>{{.*}}, <4 x i32>{{.*}}, float{{.*}}, <2 x float>{{.*}}, <3 x float>{{.*}}, <4 x float>{{.*}}, i32{{.*}}, <2 x i32>{{.*}}, <3 x i32>{{.*}}, <4 x i32>{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

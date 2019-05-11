@@ -163,3 +163,26 @@ Module* Builder::Link(
     return pPipelineModule;
 }
 
+// =====================================================================================================================
+// Gets new matrix type after doing matrix transposing.
+Type* Builder::GetTransposedMatrixTy(
+    Type* const pMatrixType // [in] The matrix type to get the transposed type from.
+    ) const
+{
+    LLPC_ASSERT(pMatrixType->isArrayTy());
+
+    Type* const pColumnVectorType = pMatrixType->getArrayElementType();
+    LLPC_ASSERT(pColumnVectorType->isVectorTy());
+
+    const uint32_t columnCount = pMatrixType->getArrayNumElements();
+    const uint32_t rowCount = pColumnVectorType->getVectorNumElements();
+
+    return ArrayType::get(VectorType::get(pColumnVectorType->getVectorElementType(), columnCount), rowCount);
+}
+
+// =====================================================================================================================
+// Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
+Context& Builder::getContext() const
+{
+    return *static_cast<Llpc::Context*>(&IRBuilder<>::getContext());
+}

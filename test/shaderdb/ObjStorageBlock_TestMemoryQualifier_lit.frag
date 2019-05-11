@@ -17,6 +17,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
+; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results

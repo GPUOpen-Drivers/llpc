@@ -19,7 +19,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = bitcast <3 x i32> %{{.*}} to <3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = bitcast <12 x i8> %{{.*}} to <3 x float>
+; SHADERTEST: load <3 x float>,
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[a-z]*}} = bitcast <2 x i32> %{{.*}} to <2 x float>
 ; SHADERTEST: AMDLLPC SUCCESS

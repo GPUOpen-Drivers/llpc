@@ -18,7 +18,8 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: fcmp ogt <3 x float>
+; SHADERTEST: load <3 x float>,
+; SHADERTEST: fcmp ogt float
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: fcmp ogt float
 ; SHADERTEST: AMDLLPC SUCCESS

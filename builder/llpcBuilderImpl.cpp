@@ -33,10 +33,3 @@
 
 using namespace Llpc;
 using namespace llvm;
-
-// =====================================================================================================================
-// Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-Context& BuilderImplBase::getContext() const
-{
-    return *static_cast<Llpc::Context*>(&Builder::getContext());
-}

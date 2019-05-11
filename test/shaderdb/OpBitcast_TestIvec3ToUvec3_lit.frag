@@ -17,7 +17,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
-; SHADERTEST: bitcast <12 x i8> %{{[0-9]*}} to <3 x i32>
+; SHADERTEST: load <3 x i32>,
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -27,7 +27,7 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call double @llvm.floor.f64(double %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = tail call double @llvm.floor.f64(double %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = tail call double @llvm.floor.f64(double %.i{{[0-9]*}}.upto1.extract)
+; SHADERTEST: %{{[0-9]*}} = tail call double @llvm.floor.f64(double
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -103,6 +103,7 @@ elseif(WIN32)
                 /wd4201 # nonstandard extension used : nameless struct/union
                 /wd4244 # 'X' : conversion from 'Y' to 'Z', possible loss of data
                 /wd4245 # 'X' : conversion from 'Y' to 'Z', signed/unsigned mismatch
+                /wd4250 # 'X': inherits 'Y' via dominance
                 /wd4291 # no matching operator delete found; memory will not be freed if initialization throws an exception
                 /wd4267 # 'return' : conversion from 'size_t' to 'unsigned int', possible loss of data
                 /wd4389 # '==' : signed/unsigned mismatch
@@ -155,6 +156,9 @@ target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(llpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
+if(ICD_BUILD_LLPC)
+    target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
+endif()
 
 if(XGL_LLVM_UPSTREAM)
     target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
@@ -206,6 +210,7 @@ target_sources(llpc PRIVATE
     builder/llpcBuilder.cpp
     builder/llpcBuilderImpl.cpp
     builder/llpcBuilderImplDesc.cpp
+    builder/llpcBuilderImplMatrix.cpp
     builder/llpcBuilderImplMisc.cpp
     builder/llpcBuilderRecorder.cpp
     builder/llpcBuilderReplayer.cpp
@@ -225,17 +230,13 @@ target_sources(llpc PRIVATE
 # llpc/lower
 target_sources(llpc PRIVATE
     lower/llpcSpirvLower.cpp
-    lower/llpcSpirvLowerAccessChain.cpp
-    lower/llpcSpirvLowerAggregateLoadStore.cpp
     lower/llpcSpirvLowerAlgebraTransform.cpp
-    lower/llpcSpirvLowerBufferOp.cpp
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
-    lower/llpcSpirvLowerPushConst.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
     lower/llpcSpirvLowerTranslator.cpp
 )

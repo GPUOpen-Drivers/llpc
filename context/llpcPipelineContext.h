@@ -395,11 +395,11 @@ struct ResourceUsage
         std::map<uint32_t, uint32_t> perPatchOutputLocMap;
 
         // Map from built-in IDs to specially assigned locations
-        std::unordered_map<uint32_t, uint32_t> builtInInputLocMap;
-        std::unordered_map<uint32_t, uint32_t> builtInOutputLocMap;
+        std::map<uint32_t, uint32_t> builtInInputLocMap;
+        std::map<uint32_t, uint32_t> builtInOutputLocMap;
 
-        std::unordered_map<uint32_t, uint32_t> perPatchBuiltInInputLocMap;
-        std::unordered_map<uint32_t, uint32_t> perPatchBuiltInOutputLocMap;
+        std::map<uint32_t, uint32_t> perPatchBuiltInInputLocMap;
+        std::map<uint32_t, uint32_t> perPatchBuiltInOutputLocMap;
 
         // Transform feedback strides
         uint32_t xfbStrides[MaxTransformFeedbackBuffers];

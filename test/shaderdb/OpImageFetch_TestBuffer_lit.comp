@@ -1,0 +1,28 @@
+#version 450 core
+
+layout(set = 0, binding = 0) uniform samplerBuffer samp;
+
+layout(set = 0, binding = 1) buffer BO
+{
+    vec4 mOut;
+};
+
+void main()
+{
+    vec4 temp1 = texelFetch(samp, 3);
+    mOut = temp1;
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
+; SHADERTEST: call <4 x i32> {{.*}} @llpc.call.desc.load.texel.buffer.v4i32(i32 0, i32 0, i32 0, i1 false)
+; SHADERTEST: call <4 x float> @llpc.image.fetch.f32.Buffer({{.*}}, i32 3,{{.*}})
+
+; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST: call <4 x float> @llvm.amdgcn.struct.buffer.load.format.v4f32({{.*}}, i32 3, i32 0, i32 0, i32 0)
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

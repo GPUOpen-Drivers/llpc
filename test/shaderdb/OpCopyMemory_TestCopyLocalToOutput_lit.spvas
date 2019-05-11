@@ -2,8 +2,8 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = load <4 x float>, <4 x float> addrspace({{[0-9]+}})* %color
-; SHADERTEST: store <4 x float> %{{[0-9]+}}, <4 x float> addrspace({{[0-9]+}})* @f4
+; SHADERTEST: %{{[0-9]+}} = load <4 x float>, <4 x float> addrspace({{[0-9]+}})* %{{.*}}
+; SHADERTEST: store <4 x float> %{{[0-9]+}}, <4 x float> addrspace({{[0-9]+}})* @{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
 ; SHADERTEST: @llvm.amdgcn.exp.f32
 ; SHADERTEST: AMDLLPC SUCCESS

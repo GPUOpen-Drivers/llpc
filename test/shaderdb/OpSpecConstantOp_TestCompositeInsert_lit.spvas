@@ -4,7 +4,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: store <3 x float>  %{{[0-9]*}}, <3 x float> addrspace({{[0-9]*}})* @{{.*}}
 
-; SHADERTEST : AMDLLPC SUCCESS
+; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 ; SPIR-V

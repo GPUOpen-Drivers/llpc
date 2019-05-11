@@ -92,13 +92,25 @@ SPIRVType *SPIRVType::getFunctionReturnType() const {
 }
 
 SPIRVType *SPIRVType::getPointerElementType() const {
-  assert(OpCode == OpTypePointer && "Not a pointer type");
-  return static_cast<const SPIRVTypePointer *const>(this)->getElementType();
+  switch (OpCode) {
+  case OpTypePointer:
+    return static_cast<const SPIRVTypePointer *const>(this)->getElementType();
+  case OpTypeForwardPointer:
+    return static_cast<const SPIRVTypeForwardPointer *const>(this)->getPointer()->getElementType();
+  default:
+    llvm_unreachable("Not a pointer type");
+  }
 }
 
 SPIRVStorageClassKind SPIRVType::getPointerStorageClass() const {
-  assert(OpCode == OpTypePointer && "Not a pointer type");
-  return static_cast<const SPIRVTypePointer *const>(this)->getStorageClass();
+  switch (OpCode) {
+  case OpTypePointer:
+    return static_cast<const SPIRVTypePointer *const>(this)->getStorageClass();
+  case OpTypeForwardPointer:
+    return static_cast<const SPIRVTypeForwardPointer *const>(this)->getPointer()->getPointerStorageClass();
+  default:
+    llvm_unreachable("Not a pointer type");
+  }
 }
 
 SPIRVType *SPIRVType::getStructMemberType(size_t Index) const {
@@ -203,6 +215,8 @@ bool SPIRVType::isTypeInt(unsigned Bits) const {
 }
 
 bool SPIRVType::isTypePointer() const { return OpCode == OpTypePointer; }
+
+bool SPIRVType::isTypeForwardPointer() const { return OpCode == OpTypeForwardPointer; }
 
 bool SPIRVType::isTypeOpaque() const { return OpCode == OpTypeOpaque; }
 
@@ -314,7 +328,6 @@ void SPIRVTypeForwardPointer::encode(spv_ostream &O) const {
 
 void SPIRVTypeForwardPointer::decode(std::istream &I) {
   auto Decoder = getDecoder(I);
-  SPIRVId PointerId;
-  Decoder >> PointerId >> SC;
+  Decoder >> Id >> SC;
 }
 } // namespace SPIRV

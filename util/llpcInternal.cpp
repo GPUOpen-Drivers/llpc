@@ -156,8 +156,8 @@ CallInst* EmitCall(
 }
 
 // =====================================================================================================================
-// Gets LLVM-style name for scalar or vector type.
-void GetTypeNameForScalarOrVector(
+// Gets LLVM-style name for type.
+void GetTypeName(
     Type*         pTy,         // [in] Type to get mangle name
     raw_ostream&  nameStream)  // [in,out] Stream to write the type name into
 {
@@ -177,6 +177,23 @@ void GetTypeNameForScalarOrVector(
         }
         break;
     }
+
+    if (auto pStructTy = dyn_cast<StructType>(pTy))
+    {
+        nameStream << "s[";
+        if (pStructTy->getNumElements() != 0)
+        {
+            GetTypeName(pStructTy->getElementType(0), nameStream);
+            for (uint32_t i = 1; i < pStructTy->getNumElements(); ++i)
+            {
+                nameStream << ",";
+                GetTypeName(pStructTy->getElementType(i), nameStream);
+            }
+        }
+        nameStream << "]";
+        return;
+    }
+
     if (auto pVectorTy = dyn_cast<VectorType>(pTy))
     {
         nameStream << "v" << pVectorTy->getNumElements();
@@ -201,14 +218,14 @@ void GetTypeNameForScalarOrVector(
 }
 
 // =====================================================================================================================
-// Gets LLVM-style name for scalar or vector type.
-std::string GetTypeNameForScalarOrVector(
+// Gets LLVM-style name for type.
+std::string GetTypeName(
     Type* pTy)  // [in] Type to get mangle name
 {
     std::string name;
     raw_string_ostream nameStream(name);
 
-    GetTypeNameForScalarOrVector(pTy, nameStream);
+    GetTypeName(pTy, nameStream);
     return nameStream.str();
 }
 
@@ -230,13 +247,13 @@ void AddTypeMangling(
     if ((pReturnTy != nullptr) && (pReturnTy->isVoidTy() == false))
     {
         nameStream << ".";
-        GetTypeNameForScalarOrVector(pReturnTy, nameStream);
+        GetTypeName(pReturnTy, nameStream);
     }
 
     for (auto pArg : args)
     {
         nameStream << ".";
-        GetTypeNameForScalarOrVector(pArg->getType(), nameStream);
+        GetTypeName(pArg->getType(), nameStream);
     }
 }
 

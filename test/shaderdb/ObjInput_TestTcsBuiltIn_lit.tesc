@@ -33,7 +33,6 @@ void main (void)
 ; SHADERTEST-COUNT-1: call i32 @llpc.input.import.builtin.PrimitiveId{{.*}}
 ; SHADERTEST-COUNT-3: call i32 @llpc.input.import.builtin.InvocationId{{.*}}
 ; SHADERTEST-COUNT-1: call float @llpc.input.import.builtin.Position.f32{{.*}}
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline linking results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
