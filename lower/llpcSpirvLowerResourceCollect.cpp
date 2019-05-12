@@ -143,45 +143,55 @@ bool SpirvLowerResourceCollect::runOnModule(
         {
         case SPIRAS_Constant:
             {
-                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-
-                auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
-
-                // TODO: Will support separated texture resource/sampler.
-                DescriptorType descType = DescriptorType::Texture;
-
-                // NOTE: For texture buffer and image buffer, the descriptor type should be set to "TexelBuffer".
-                if (pGlobalTy->isPointerTy())
+                if (pGlobal->hasMetadata(gSPIRVMD::PushConst))
                 {
-                    Type* pImageType = pGlobalTy->getPointerElementType();
-                    std::string imageTypeName = pImageType->getStructName();
-                    // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
-                    if (imageTypeName.find(".SampledImage") != std::string::npos)
-                    {
-                        auto pos = imageTypeName.find("_");
-                        LLPC_ASSERT(pos != std::string::npos);
+                    // Push constant
+                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
+                    auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+                    m_pResUsage->pushConstSizeInBytes = pushConstSize;
+                }
+                else
+                {
+                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
 
-                        ++pos;
-                        Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
-                        if (dim == DimBuffer)
+                    auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+                    auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
+
+                    // TODO: Will support separated texture resource/sampler.
+                    DescriptorType descType = DescriptorType::Texture;
+
+                    // NOTE: For texture buffer and image buffer, the descriptor type should be set to "TexelBuffer".
+                    if (pGlobalTy->isPointerTy())
+                    {
+                        Type* pImageType = pGlobalTy->getPointerElementType();
+                        std::string imageTypeName = pImageType->getStructName();
+                        // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
+                        if (imageTypeName.find(".SampledImage") != std::string::npos)
                         {
-                            descType = DescriptorType::TexelBuffer;
-                        }
-                        else if (dim == DimSubpassData)
-                        {
-                            LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
-                            m_pResUsage->builtInUsage.fs.fragCoord = true;
-                            useViewIndex = true;
+                            auto pos = imageTypeName.find("_");
+                            LLPC_ASSERT(pos != std::string::npos);
+
+                            ++pos;
+                            Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
+                            if (dim == DimBuffer)
+                            {
+                                descType = DescriptorType::TexelBuffer;
+                            }
+                            else if (dim == DimSubpassData)
+                            {
+                                LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+                                m_pResUsage->builtInUsage.fs.fragCoord = true;
+                                useViewIndex = true;
+                            }
                         }
                     }
+
+                    DescriptorBinding bindingInfo = {};
+                    bindingInfo.descType  = descType;
+                    bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
+
+                    CollectDescriptorUsage(descSet, binding, &bindingInfo);
                 }
-
-                DescriptorBinding bindingInfo = {};
-                bindingInfo.descType  = descType;
-                bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
-
-                CollectDescriptorUsage(descSet, binding, &bindingInfo);
                 break;
             }
         case SPIRAS_Private:
@@ -260,14 +270,6 @@ bool SpirvLowerResourceCollect::runOnModule(
                 bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
 
                 CollectDescriptorUsage(descSet, binding, &bindingInfo);
-                break;
-            }
-        case SPIRAS_PushConst:
-            {
-                // Push constant
-                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
-                auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                m_pResUsage->pushConstSizeInBytes = pushConstSize;
                 break;
             }
         default:

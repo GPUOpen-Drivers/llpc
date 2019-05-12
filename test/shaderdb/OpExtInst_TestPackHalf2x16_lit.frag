@@ -19,7 +19,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} i32 @_Z12packHalf2x16Dv2_f(<2 x float> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = bitcast <8 x i8> %{{.*}} to <2 x float>
+; SHADERTEST: load <2 x float>,
 ; SHADERTEST: %{{[0-9]*}} = extractelement <2 x float> %{{.*}}, i32 1
 ; SHADERTEST: %{{[0-9]*}} = fptrunc float %{{.*}} to half
 ; SHADERTEST: %{{[0-9]*}} = bitcast half %{{.*}} to i16

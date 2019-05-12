@@ -117,7 +117,6 @@ namespace LlpcName
     const static char BufferLoadScalarAligned[]       = "llpc.buffer.load.scalar.aligned.";
     const static char BufferStore[]                   = "llpc.buffer.store.";
     const static char BufferStoreScalarAligned[]      = "llpc.buffer.store.scalar.aligned.";
-    const static char BufferArrayLength[]             = "llpc.buffer.arraylength";
     const static char InlineConstLoadUniform[]        = "llpc.inlineconst.load.uniform.";
     const static char InlineConstLoad[]               = "llpc.inlineconst.load.";
     const static char PushConstLoad[]                 = "llpc.pushconst.load.";
@@ -133,6 +132,10 @@ namespace LlpcName
     const static char DescriptorLoadAddress[]         = "llpc.descriptor.load.address";
     const static char DescriptorLoadTexelBuffer[]     = "llpc.descriptor.load.texelbuffer";
     const static char DescriptorLoadSpillTable[]      = "llpc.descriptor.load.spilltable";
+
+    const static char LaterCallPrefix[]               = "llpc.late.";
+    const static char LateLaunderFatPointer[]         = "llpc.late.launder.fat.pointer";
+    const static char LateBufferLength[]              = "llpc.late.buffer.desc.length";
 
     const static char ImageCallPrefix[]               = "llpc.image";
 
@@ -212,9 +215,9 @@ llvm::CallInst* EmitCall(llvm::Module*                             pModule,
 // Adds LLVM-style type mangling suffix for the specified return type and args to the name.
 void AddTypeMangling(llvm::Type* pReturnTy, llvm::ArrayRef<llvm::Value*> args, std::string& name);
 
-// Gets LLVM-style name for scalar or vector type.
-void GetTypeNameForScalarOrVector(llvm::Type* pTy, llvm::raw_ostream& nameStream);
-std::string GetTypeNameForScalarOrVector(llvm::Type* pTy);
+// Gets LLVM-style name for type.
+void GetTypeName(llvm::Type* pTy, llvm::raw_ostream& nameStream);
+std::string GetTypeName(llvm::Type* pTy);
 
 // Gets the shader stage from the specified LLVM module.
 ShaderStage GetShaderStageFromModule(llvm::Module* pModule);

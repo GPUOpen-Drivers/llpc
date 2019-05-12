@@ -882,7 +882,7 @@ static Result BuildPipeline(
         if (TimePassesIsEnabled)
         {
             auto hash = Llpc::IPipelineDumper::GetPipelineHash(pGraphicsPipelineInfo);
-            outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash) 
+            outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
                    << " Files: " << pCompileInfo->pFileNames << "\n";
             outs().flush();
         }
@@ -956,7 +956,7 @@ static Result BuildPipeline(
         if (TimePassesIsEnabled)
         {
             auto hash = Llpc::IPipelineDumper::GetPipelineHash(pComputePipelineInfo);
-            outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash) 
+            outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
                    << " Files: " << pCompileInfo->pFileNames << "\n";
             outs().flush();
         }

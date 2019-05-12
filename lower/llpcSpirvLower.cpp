@@ -67,9 +67,6 @@ namespace cl
 // -lower-dyn-index: lower SPIR-V dynamic (non-constant) index in access chain
 static opt<bool> LowerDynIndex("lower-dyn-index", desc("Lower SPIR-V dynamic (non-constant) index in access chain"));
 
-// -disable-lower-opt: disable optimization for SPIR-V lowering
-static opt<bool> DisableLowerOpt("disable-lower-opt", desc("Disable optimization for SPIR-V lowering"));
-
 } // cl
 
 } // llvm
@@ -84,8 +81,8 @@ void SpirvLower::AddPasses(
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
     llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
     uint32_t              forceLoopUnrollCount,   // 0 or force loop unroll count
-    bool*                 pNeedDynamicLoopUnroll) // nullptr or where to store flag of whether dynamic loop unrolling
-                                                  //  is needed
+    bool*                 pNeedDynamicLoopUnroll) // [out] nullptr or where to store flag of whether dynamic loop
+                                                  // unrolling is needed
 {
     // Start timer for lowering passes.
     if (pLowerTimer != nullptr)
@@ -115,19 +112,13 @@ void SpirvLower::AddPasses(
     // Control loop unrolling
     passMgr.add(CreateSpirvLowerLoopUnrollControl(forceLoopUnrollCount));
 
-    // Lower SPIR-V access chain
-    passMgr.add(CreateSpirvLowerAccessChain());
-
-    // Lower SPIR-V buffer operations (load and store)
-    passMgr.add(CreateSpirvLowerBufferOp());
-
     // Lower SPIR-V global variables, inputs, and outputs
     passMgr.add(CreateSpirvLowerGlobal());
 
     // Lower SPIR-V constant immediate store.
     passMgr.add(CreateSpirvLowerConstImmediateStore());
 
-    // Lower SPIR-V algebraic transforms, constant folding must be done before istruction combining pass.
+    // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
     passMgr.add(CreateSpirvLowerAlgebraTransform(true, false));
 
     // Lower SPIR-V dynamic index in access chain
@@ -135,9 +126,6 @@ void SpirvLower::AddPasses(
     {
         passMgr.add(CreateSpirvLowerDynIndex());
     }
-
-    // Lower SPIR-V load/store operations on aggregate type
-    passMgr.add(CreateSpirvLowerAggregateLoadStore());
 
     // Remove reduant load/store operations and do minimal optimization
     // It is required by SpirvLowerImageOp.
@@ -155,9 +143,6 @@ void SpirvLower::AddPasses(
 
     // Lower SPIR-V algebraic transforms
     passMgr.add(CreateSpirvLowerAlgebraTransform(false, true));
-
-    // Lower SPIR-V push constant load
-    passMgr.add(CreateSpirvLowerPushConst());
 
     // Lower SPIR-V image operations (sample, fetch, gather, read/write),
     passMgr.add(CreateSpirvLowerImageOp());

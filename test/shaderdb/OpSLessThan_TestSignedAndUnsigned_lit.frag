@@ -25,9 +25,6 @@ void main()
 ; SHADERTEST: icmp slt <2 x i32>
 ; SHADERTEST: icmp ult <2 x i32>
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: icmp ult <2 x i32>
-
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

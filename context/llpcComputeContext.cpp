@@ -91,7 +91,6 @@ const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
     return &m_pPipelineInfo->cs;
 }
 
-
 // =====================================================================================================================
 // Gets wave size for the specified shader stage
 //

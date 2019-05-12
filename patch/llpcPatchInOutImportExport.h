@@ -191,6 +191,23 @@ private:
 
     void CreateStreamOutBufferStoreFunction(llvm::Value*  pStoreValue, uint32_t xfbStrde, std::string& funcName);
 
+    uint32_t CombineBufferStore(const std::vector<llvm::Value*>& storeValues,
+                                  uint32_t                         startIdx,
+                                  uint32_t                         valueOffset,
+                                  llvm::Value*                     pBufDesc,
+                                  llvm::Value*                     pStoreOffset,
+                                  llvm::Value*                     pBufBase,
+                                  CoherentFlag                     coherent,
+                                  llvm::Instruction*               pInsertPos);
+
+    uint32_t CombineBufferLoad(std::vector<llvm::Value*>& loadValues,
+                                 uint32_t                   startIdx,
+                                 llvm::Value*               pBufDesc,
+                                 llvm::Value*               pLoadOffset,
+                                 llvm::Value*               pBufBase,
+                                 CoherentFlag               coherent,
+                                 llvm::Instruction*         pInsertPos);
+
     void StoreValueToEsGsRing(llvm::Value*        pStoreValue,
                               uint32_t            location,
                               uint32_t            compIdx,

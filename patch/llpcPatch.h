@@ -90,7 +90,7 @@ inline static void InitializePatchPasses(
   initializePatchSetupTargetFeaturesPass(passRegistry);
 }
 
-llvm::ModulePass* CreatePatchBufferOp();
+llvm::FunctionPass* CreatePatchBufferOp();
 llvm::ModulePass* CreatePatchCopyShader();
 llvm::ModulePass* CreatePatchDescriptorLoad();
 llvm::ModulePass* CreatePatchEntryPointMutate();
@@ -101,7 +101,7 @@ llvm::ModulePass* CreatePatchLlvmIrInclusion();
 llvm::FunctionPass* CreatePatchLoopUnrollInfoRectify();
 llvm::ModulePass* CreatePatchNullFragShader();
 llvm::FunctionPass* CreatePatchPeepholeOpt();
-llvm::ModulePass* CreatePatchPreparePipelineAbi();
+llvm::ModulePass* CreatePatchPreparePipelineAbi(bool onlySetCallingConvs, uint32_t skipStageMask);
 llvm::ModulePass* CreatePatchPushConstOp();
 llvm::ModulePass* CreatePatchResourceCollect();
 llvm::ModulePass* CreatePatchSetupTargetFeatures();
@@ -124,9 +124,13 @@ public:
     }
     virtual ~Patch() {}
 
-    static Result PreRun(llvm::Module* pModule);
+    static void AddPrePatchPasses(Context*                   pContext,
+                                  llvm::legacy::PassManager& passMgr,
+                                  llvm::Timer*               pPatchTimer);
+
     static void AddPasses(Context*                    pContext,
                           llvm::legacy::PassManager&  passMgr,
+                          uint32_t                    skipStageMask,
                           llvm::Timer*                pPatchTimer,
                           llvm::Timer*                pOptTimer);
 

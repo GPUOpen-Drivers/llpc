@@ -2,9 +2,11 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
-; SHADERTEST: call <16 x i8> @llpc.pushconst.load.v16i8
+; SHADERTEST:  [[V0:%.*]] = call {{.*}} @llpc.call.desc.load.spill.table.ptr
+; SHADERTEST:  [[V1:%.*]] = bitcast {{.*}} [[V0]]
+; SHADERTEST:  load <4 x float>, <4 x float> addrspace(4)* [[V1]], align 16
 
-; SHADERTEST : AMDLLPC SUCCESS
+; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 ; SPIR-V

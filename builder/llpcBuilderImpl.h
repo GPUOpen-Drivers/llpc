@@ -35,8 +35,6 @@
 namespace Llpc
 {
 
-class Context;
-
 // =====================================================================================================================
 // Builder implementation base class
 class BuilderImplBase : public Builder
@@ -108,11 +106,31 @@ public:
     llvm::Value* CreateLoadSpillTablePtr(llvm::Type*         pSpillTableTy,
                                          const llvm::Twine&  instName) override final;
 
+    // Create a buffer length query based on the specified descriptor.
+    llvm::Value* CreateBufferLength(llvm::Value* const pBufferDesc,
+                                    const llvm::Twine& instName = "") override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplDesc)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplDesc)
 
     llvm::Value* ScalarizeIfUniform(llvm::Value* pValue, bool isNonUniform);
+};
+
+// =====================================================================================================================
+// Builder implementation subclass for matrix operations
+class BuilderImplMatrix : virtual public BuilderImplBase
+{
+public:
+    BuilderImplMatrix(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+
+    // Create a matrix transpose.
+    llvm::Value* CreateMatrixTranspose(llvm::Value* const pMatrix,
+                                       const llvm::Twine& instName = "") override final;
+
+private:
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMatrix)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplMatrix)
 };
 
 // =====================================================================================================================
@@ -323,11 +341,12 @@ private:
 
 // =====================================================================================================================
 // The Builder implementation, encompassing all the individual builder implementation subclasses
-class BuilderImpl final : public BuilderImplDesc, BuilderImplMisc, BuilderImplSubgroup
+class BuilderImpl final : public BuilderImplDesc, public BuilderImplMatrix, public BuilderImplMisc, BuilderImplSubgroup
 {
 public:
     BuilderImpl(llvm::LLVMContext& context) : BuilderImplBase(context),
                                               BuilderImplDesc(context),
+                                              BuilderImplMatrix(context),
                                               BuilderImplMisc(context),
                                               BuilderImplSubgroup(context)
     {}

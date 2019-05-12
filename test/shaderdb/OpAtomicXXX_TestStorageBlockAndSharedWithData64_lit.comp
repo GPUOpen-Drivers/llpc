@@ -84,59 +84,31 @@ void main ()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: @lds = internal addrspace(3) global { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }
-; SHADERTEST: call i64 @llpc.buffer.atomic.umin.i64(<4 x i32> %{{[0-9]*}}, i32 0, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.umax.i64(<4 x i32> %{{[0-9]*}}, i32 8, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.and.i64(<4 x i32> %{{[0-9]*}}, i32 16, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.or.i64(<4 x i32> %{{[0-9]*}}, i32 24, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.xor.i64(<4 x i32> %{{[0-9]*}}, i32 32, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.smin.i64(<4 x i32> %{{[0-9]*}}, i32 40, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.smax.i64(<4 x i32> %{{[0-9]*}}, i32 48, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.and.i64(<4 x i32> %{{[0-9]*}}, i32 56, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.or.i64(<4 x i32> %{{[0-9]*}}, i32 64, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.xor.i64(<4 x i32> %{{[0-9]*}}, i32 72, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.iadd.i64(<4 x i32> %{{[0-9]*}}, i32 80, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.exchange.i64(<4 x i32> %{{[0-9]*}}, i32 88, i64 %{{[0-9]*}}, i32 0, i1 false)
-; SHADERTEST: call i64 @llpc.buffer.atomic.compareexchange.i64(<4 x i32> %{{[0-9]*}}, i32 96, i64 %{{[0-9]*}}, i64 78187493520, i32 0, i1 false)
-; SHADERTEST: atomicrmw volatile umin i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 0), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile umax i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 1), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 2), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 3), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 4), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile min i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 5), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile max i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 6), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 7), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 8), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 9), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile add i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 10), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xchg i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 11), i64 %{{[0-9]*}} seq_cst
-
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: atomicrmw volatile umin i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile umax i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile and i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile or i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xor i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile min i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile max i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile and i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile or i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xor i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile add i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xchg i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile umin i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 0), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile umax i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 1), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 2), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 3), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 4), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile min i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 5), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile max i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 6), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 7), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 8), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 9), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile add i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 10), i64 %{{[0-9]*}} seq_cst
-; SHADERTEST: atomicrmw volatile xchg i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @lds, i32 0, i32 11), i64 %{{[0-9]*}} seq_cst
+; SHADERTEST: atomicrmw umin i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umax i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw or i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw xor i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw min i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw max i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw or i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw xor i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw add i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: cmpxchg i64 addrspace({{.*}})* %{{[0-9]*}}, i64 78187493520, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umin i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 0), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umax i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 1), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 2), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 3), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 4), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw min i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 5), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw max i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 6), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 7), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 8), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 9), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw add i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 10), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: cmpxchg i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 12), i64 78187493520, i64 %{{[0-9]*}} monotonic
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

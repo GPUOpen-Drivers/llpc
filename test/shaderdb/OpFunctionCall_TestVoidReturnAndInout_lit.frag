@@ -17,7 +17,7 @@ void func(void)
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: define internal {{.*}} void @"func("()
+; SHADERTEST: define internal {{.*}} void @{{.*}}()
 ; SHADERTEST: ret void
 ; SHADERTEST: AMDLLPC SUCCESS
 */

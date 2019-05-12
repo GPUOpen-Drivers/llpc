@@ -39,7 +39,7 @@
 #undef Status
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 24
+#define LLPC_INTERFACE_MAJOR_VERSION 26
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0

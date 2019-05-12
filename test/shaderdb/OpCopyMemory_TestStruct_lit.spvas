@@ -1,11 +1,39 @@
-
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = load { <4 x float>, <4 x float>, <4 x float>, <4 x float> }, { <4 x float>, <4 x float>, <4 x float>, <4 x float> } addrspace({{[0-9]+}})* @{{[0-9]+}}
-; SHADERTEST: store { <4 x float>, <4 x float>, <4 x float>, <4 x float> } %{{[0-9]+}}, { <4 x float>, <4 x float>, <4 x float>, <4 x float> } addrspace({{[0-9]+}})* %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = load { <4 x float>, <4 x float>, <4 x float>, <4 x float> }, { <4 x float>, <4 x float>, <4 x float>, <4 x float> } addrspace({{[0-9]+}})* %{{[0-9]+}}
-; SHADERTEST: store { <4 x float>, <4 x float>, <4 x float>, <4 x float> } %{{[0-9]+}}, { <4 x float>, <4 x float>, <4 x float>, <4 x float> } addrspace({{[0-9]+}})* @{{[0-9]+}}
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> } undef
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: load <4 x float>,
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> } undef
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+; SHADERTEST: extractvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
+; SHADERTEST: store <4 x float>
+
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4f32
 ; SHADERTEST: @llvm.amdgcn.raw.buffer.load.v4f32

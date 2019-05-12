@@ -22,8 +22,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z19interpolateAtSamplePfi(float addrspace(64)* @f1_1, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z19interpolateAtSamplePDv4_fi(<4 x float> addrspace(64)* @f4_1, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z19interpolateAtSamplePfi(float addrspace(64)* @{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z19interpolateAtSamplePDv4_fi(<4 x float> addrspace(64)* @{{.*}}, i32 %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[0-9]*}} = call <2 x float> @llpc.input.interpolate.evalij.sample(i32 %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call float @llpc.input.import.interpolant.f32.i32.i32.i32.i32.v2f32(i32 0, i32 0, i32 0, i32 0, <2 x float> %{{.*}})

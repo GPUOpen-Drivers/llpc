@@ -172,7 +172,15 @@ if __name__=='__main__':
                        gfxip = gfxip_str + gfx[3]
 
                     if compile_name == "amdllpc":
-                        cmd = COMPILER + gfxip + " -enable-outs=0 " + SHADER_SRC + "/" + gfx + "/" + f + " 2>&1 >> " + RESULT + "/" + gfx + "/" + f + ".log"
+                        val = ""
+                        if f.endswith(".spvas"):
+                            file = open(SHADER_SRC + "/" + gfx + "/" + f, "r")
+                            fileContents = file.read()
+                            file.close()
+                            if re.search("RUN:.*-val=false", fileContents):
+                                val = "-val=false"
+
+                        cmd = COMPILER + gfxip + " " + val + " -enable-outs=0 " + SHADER_SRC + "/" + gfx + "/" + f + " 2>&1 >> " + RESULT + "/" + gfx + "/" + f + ".log"
                     if sub_index == 0 :
                         # Run test in sync-compile mode to setup context cache
                         result = compile(cmd, gfx, f, compile_name)

@@ -132,22 +132,23 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
+; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: add i8 %{{[0-9]*}}, 16,
-; SHADERTEST: add i8 %{{[0-9]*}}, 32,
-; SHADERTEST: add i8 %{{[0-9]*}}, 64,
-; SHADERTEST: add i8 %{{[0-9]*}}, -16,
-; SHADERTEST: add i8 %{{[0-9]*}}, -32,
-; SHADERTEST: add i8 %{{[0-9]*}}, -64,
+; SHADERTEST: add i8 %{{[0-9]*}}, 16
+; SHADERTEST: add i8 %{{[0-9]*}}, 32
+; SHADERTEST: add i8 %{{[0-9]*}}, 64
+; SHADERTEST: add i8 %{{[0-9]*}}, -16
+; SHADERTEST: add i8 %{{[0-9]*}}, -32
+; SHADERTEST: add i8 %{{[0-9]*}}, -64
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: add i8 %{{[0-9]*}}, 16,
-; SHADERTEST: add i8 %{{[0-9]*}}, 32,
-; SHADERTEST: add i8 %{{[0-9]*}}, 64,
-; SHADERTEST: add i8 %{{[0-9]*}}, -16,
-; SHADERTEST: add i8 %{{[0-9]*}}, -32,
-; SHADERTEST: add i8 %{{[0-9]*}}, -64,
+; SHADERTEST: add i8 %{{[0-9]*}}, 16
+; SHADERTEST: add i8 %{{[0-9]*}}, 32
+; SHADERTEST: add i8 %{{[0-9]*}}, 64
+; SHADERTEST: add i8 %{{[0-9]*}}, -16
+; SHADERTEST: add i8 %{{[0-9]*}}, -32
+; SHADERTEST: add i8 %{{[0-9]*}}, -64
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

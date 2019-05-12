@@ -82,7 +82,6 @@ using namespace llvm;
 namespace Llpc
 {
 
-
 // =====================================================================================================================
 // Creates the TargetMachine if not already created, and stores it in the context. It then persists as long as
 // the context.

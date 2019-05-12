@@ -23,7 +23,7 @@ void main()
 ; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 0
 ; SHADERTEST: %{{.*}} = insertelement <4 x float> undef, float %{{.*}}, i32 0
 ; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 3,
+; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 3
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{.*}} = extractelement <3 x float> %{{.*}}, i32 2
 ; SHADERTEST: %{{.*}} = insertelement <4 x float> <float undef, float {{.*}}, float {{.*}}, float undef>, float %{{.*}}, i32 0

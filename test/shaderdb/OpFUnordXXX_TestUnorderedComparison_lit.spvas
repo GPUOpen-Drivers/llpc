@@ -8,7 +8,7 @@
 ; SHADERTEST-COUNT-1: fcmp une <3 x double>
 ; SHADERTEST-COUNT-1: fcmp ugt <3 x double>
 ; SHADERTEST-COUNT-1: fcmp uge <3 x double>
-; SHADERTEST : AMDLLPC SUCCESS
+; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 ; SPIR-V
