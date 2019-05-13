@@ -34,7 +34,7 @@ void main()
 ; SHADERTEST: call i32 @_Z18WriteInvocationAMDiii
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
-; SHADERTEST: call i64 @llvm.amdgcn.icmp.i32
+; SHADERTEST: call i64 @llvm.amdgcn.icmp
 ; SHADERTEST: call i32 @llvm.amdgcn.mbcnt.lo
 ; SHADERTEST: call i32 @llvm.amdgcn.mbcnt.hi
 ; SHADERTEST: call i32 @llvm.amdgcn.writelane
