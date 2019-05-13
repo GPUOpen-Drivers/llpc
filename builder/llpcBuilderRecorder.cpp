@@ -356,6 +356,15 @@ Value* BuilderRecorder::CreateLoadSpillTablePtr(
 }
 
 // =====================================================================================================================
+// Create a buffer length query based on the specified descriptor.
+Value* BuilderRecorder::CreateBufferLength(
+    Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
+    const Twine&  instName)         // [in] Name to give instruction(s).
+{
+    return Record(Opcode::DescBufferLength, getInt32Ty(), { pBufferDesc }, instName);
+}
+
+// =====================================================================================================================
 // Create a get subgroup size query.
 Value* BuilderRecorder::CreateGetSubgroupSize(
     const Twine& instName) // [in] Name to give instruction(s)
@@ -618,14 +627,6 @@ Value* BuilderRecorder::CreateSubgroupQuadSwapDiagonal(
     const Twine& instName) // [in] Name to give instruction(s)
 {
     return Record(Opcode::SubgroupQuadSwapDiagonal, pValue->getType(), pValue, instName);
-}
-
-// Create a buffer length query based on the specified descriptor.
-Value* BuilderRecorder::CreateBufferLength(
-    Value* const  pBufferDesc,      // [in] The buffer descriptor to query.
-    const Twine&  instName)         // [in] Name to give instruction(s).
-{
-    return Record(Opcode::DescBufferLength, getInt32Ty(), { pBufferDesc }, instName);
 }
 
 // =====================================================================================================================
