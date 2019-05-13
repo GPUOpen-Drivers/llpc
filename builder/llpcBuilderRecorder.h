@@ -179,6 +179,9 @@ public:
     llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override final;
     llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
 
+    // Builder methods implemented in BuilderImplMatrix
+    llvm::Value* CreateMatrixTranspose(llvm::Value* const pMatrix, const llvm::Twine& instName = "") override final;
+
     //
     // Builder methods implemented in BuilderImplSubgroup
     //
@@ -246,8 +249,6 @@ public:
                                                 const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupQuadSwapDiagonal(llvm::Value* const pValue,
                                                 const llvm::Twine& instName) override final;
-    // Builder methods implemented in BuilderImplMatrix
-    llvm::Value* CreateMatrixTranspose(llvm::Value* const pMatrix, const llvm::Twine& instName = "") override final;
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
     llvm::ModulePass* CreateBuilderReplayer() override;

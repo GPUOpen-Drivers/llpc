@@ -375,6 +375,10 @@ Value* BuilderReplayer::ProcessCall(
             bool realtime = (cast<ConstantInt>(args[0])->getZExtValue() != 0);
             return m_pBuilder->CreateReadClock(realtime);
         }
+    case BuilderRecorder::Opcode::MatrixTranspose:
+        {
+            return m_pBuilder->CreateMatrixTranspose(args[0]);
+        }
 
     // Replayer implementations of BuilderImplSubgroup methods
     case BuilderRecorder::Opcode::SubgroupGetSubgroupSize:
@@ -486,10 +490,6 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::SubgroupQuadSwapDiagonal:
         {
             return m_pBuilder->CreateSubgroupQuadSwapDiagonal(args[0]);
-        }
-    case BuilderRecorder::Opcode::MatrixTranspose:
-        {
-            return m_pBuilder->CreateMatrixTranspose(args[0]);
         }
     }
 }
