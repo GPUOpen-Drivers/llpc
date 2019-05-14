@@ -6701,13 +6701,14 @@ Value* PatchInOutImportExport::AdjustCentroidIJ(
 {
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
     auto pPrimMask = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
     Value* pIJ = nullptr;
 
-    if(pPipelineInfo->rsState.numSamples <= 1)
+    if (builtInUsage.centroid && builtInUsage.center)
     {
-        // NOTE: If multi-sample is disabled, centroid I/J provided by hardware natively may be invalid. We have to
-        // adjust it with center I/J.
+        // NOTE: If both centroid and center are enabled, centroid I/J provided by hardware natively may be invalid. We have to
+        // adjust it with center I/J on condition of bc_optimize flag.
+        // bc_optimize = pPrimMask[31], when bc_optimize is on, pPrimMask is less than zero
         auto pCond = new ICmpInst(pInsertPos,
                                  ICmpInst::ICMP_SLT,
                                  pPrimMask,
