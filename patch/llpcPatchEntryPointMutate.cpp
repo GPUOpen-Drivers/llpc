@@ -171,13 +171,6 @@ void PatchEntryPointMutate::ProcessShader()
                                                     builtInUsage.baryCoordNoPersp);
         spiPsInputAddr.bits.LINEAR_CENTROID_ENA  = ((builtInUsage.noperspective && builtInUsage.centroid) ||
                                                     builtInUsage.baryCoordNoPerspCentroid);
-        if (pPipelineInfo->rsState.numSamples <= 1)
-        {
-            // NOTE: If multi-sample is disabled, I/J calculation for "centroid" interpolation mode depends
-            // on "center" mode.
-            spiPsInputAddr.bits.PERSP_CENTER_ENA  |= spiPsInputAddr.bits.PERSP_CENTROID_ENA;
-            spiPsInputAddr.bits.LINEAR_CENTER_ENA |= spiPsInputAddr.bits.LINEAR_CENTROID_ENA;
-        }
         spiPsInputAddr.bits.POS_X_FLOAT_ENA      = builtInUsage.fragCoord;
         spiPsInputAddr.bits.POS_Y_FLOAT_ENA      = builtInUsage.fragCoord;
         spiPsInputAddr.bits.POS_Z_FLOAT_ENA      = builtInUsage.fragCoord;
