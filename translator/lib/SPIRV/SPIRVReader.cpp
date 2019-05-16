@@ -1552,15 +1552,17 @@ BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
   // flags on the handled instruction
   if (SPIRVGenFastMath && isa<FPMathOperator>(Inst)) {
     llvm::FastMathFlags FMF;
-    // Enable "no NaN" only if there isn't any floating point control flags
-    if (FpControlFlags.U32All == 0)
-      FMF.setNoNaNs();
     FMF.setAllowReciprocal();
     // Enable contraction when "NoContraction" decoration is not specified
     bool AllowContract = !BV->hasDecorate(DecorationNoContraction);
     FMF.setAllowContract(AllowContract);
     // AllowRessociation should be same with AllowContract
     FMF.setAllowReassoc(AllowContract);
+    // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
+    if (FpControlFlags.U32All == 0) {
+      FMF.setNoNaNs();
+      FMF.setNoSignedZeros(AllowContract);
+    }
     Inst->setFastMathFlags(FMF);
   }
   return Inst;

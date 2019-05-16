@@ -28,9 +28,9 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: fadd reassoc nnan arcp contract <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: fmul reassoc nnan arcp contract <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: fsub reassoc nnan arcp contract <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: fadd reassoc nnan nsz arcp contract <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: fmul reassoc nnan nsz arcp contract <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: fsub reassoc nnan nsz arcp contract <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: call <4 x half> @_Z4fdivDv4_DhDv4_Dh(<4 x half> %{{[0-9]*}}, <4 x half> %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
