@@ -250,8 +250,7 @@ SPIRVValue * constantCompositeExtract(SPIRVValue *Composite,
                                       SPIRVType *ObjectTy,
                                       std::vector<uint32_t> &Indices) {
   SPIRVModule *BM = Composite->getModule();
-  SPIRVType *CompositeTy = Composite->getType();
-  assert(CompositeTy->isTypeComposite());
+  assert(Composite->getType()->isTypeComposite());
 
   for (auto I : Indices) {
     if (Composite->getOpCode() == OpUndef ||

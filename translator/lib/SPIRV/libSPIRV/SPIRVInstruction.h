@@ -541,6 +541,7 @@ protected:
       static_cast<SPIRVTypeImage *>(ImagePointerTy->getPointerElementType());
     assert((ImageTy->getSampledType() == Type->getPointerElementType()) &&
            (ImageTy->getDescriptor().Dim != DimSubpassData));
+    (void)ImageTy;
   }
 
   SPIRVId Image;
@@ -566,6 +567,7 @@ protected:
 
     auto ResidentCodeTy = getValueType(ResidentCode);
     assert(ResidentCodeTy->isTypeInt() && ResidentCodeTy->isTypeScalar());
+    (void)ResidentCodeTy;
   }
 
   SPIRVId ResidentCode;
@@ -2079,6 +2081,7 @@ protected:
       getValueType(Struct)->getPointerElementType() : getValueType(Struct);
     assert(StructTy->isTypeStruct());
     assert(StructTy->getStructMemberType(MemberIndex)->isTypeRuntimeArray());
+    (void)StructTy;
   }
   SPIRVId Struct;
   SPIRVWord MemberIndex;

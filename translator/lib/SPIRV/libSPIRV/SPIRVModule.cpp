@@ -613,6 +613,7 @@ SPIRVEntry *SPIRVModuleImpl::addEntry(SPIRVEntry *Entry) {
   if (ValidateCapability) {
     for (auto &I:Entry->getRequiredCapability()) {
       assert(CapMap.count(I));
+      (void)I;
     }
   }
   return Entry;
@@ -875,10 +876,9 @@ SPIRVBasicBlock *SPIRVModuleImpl::addBasicBlock(SPIRVFunction *Func,
 
 const SPIRVDecorateGeneric *
 SPIRVModuleImpl::addDecorate(const SPIRVDecorateGeneric *Dec) {
-  SPIRVId Id = Dec->getTargetId();
   SPIRVEntry *Target = nullptr;
-  bool Found = exist(Id, &Target);
-  assert (Found && "Decorate target does not exist");
+  assert(exist(Dec->getTargetId(), &Target) && "Decorate target does not exist");
+  (void)Target;
   if (!Dec->getOwner())
     DecorateSet.insert(Dec);
   addCapabilities(Dec->getRequiredCapability());
@@ -921,9 +921,7 @@ SPIRVEntry *SPIRVModuleImpl::replaceForward(SPIRVForward *Forward,
 
 SPIRVEntry *SPIRVModuleImpl::replaceForwardPointer(SPIRVTypeForwardPointer *Forward,
                                                    SPIRVTypePointer *Entry) {
-  SPIRVId Id = Entry->getId();
-  SPIRVId ForwardId = Forward->getId();
-  assert(ForwardId == Id);
+  assert(Forward->getId() == Entry->getId());
   Forward->setPointer(Entry);
   return Forward;
 }

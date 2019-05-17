@@ -152,6 +152,7 @@ void PatchPushConstOp::visitCallInst(
     Function* const pCallee = callInst.getCalledFunction();
     LLPC_ASSERT(pCallee != nullptr);
     LLPC_ASSERT(pCallee->getName().equals(LlpcName::DescriptorLoadSpillTable));
+    LLPC_UNUSED(pCallee);
 
     auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
     auto pShaderInfo = m_pContext->GetPipelineShaderInfo(m_shaderStage);
