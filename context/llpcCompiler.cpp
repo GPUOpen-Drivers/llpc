@@ -1943,6 +1943,7 @@ void Compiler::TrimSpirvDebugInfo(
     const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
 
     uint32_t* pTrimEnd = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, bufferSize));
+    LLPC_UNUSED(pTrimEnd);
     uint32_t* pTrimCodePos = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, sizeof(SpirvHeader)));
 
     // Copy SPIR-V header

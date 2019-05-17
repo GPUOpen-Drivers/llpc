@@ -864,11 +864,10 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
 {
     SPIRVTypeForwardPointer* const pSpvForwardPointerType = static_cast<SPIRVTypeForwardPointer*>(pSpvType);
-    SPIRVType* const pSpvPointeeType = pSpvForwardPointerType->getPointerElementType();
     const SPIRVStorageClassKind storageClass = pSpvForwardPointerType->getPointerStorageClass();
 
     // Forward pointers must always point to structs.
-    LLPC_ASSERT(pSpvPointeeType->isTypeStruct());
+    LLPC_ASSERT(pSpvForwardPointerType->getPointerElementType()->isTypeStruct());
 
     // We first have to map the pointed-to-struct to an opaque struct so we can have a forward reference to the struct.
     StructType* const pPointeeType = StructType::create(*Context);
@@ -1007,6 +1006,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
     SPIRVWord arrayStride = 0;
     const bool hasArrayStride = pSpvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
     LLPC_ASSERT(hasArrayStride ^ (arrayStride == 0));
+    LLPC_UNUSED(hasArrayStride);
 
     const uint64_t storeSize = M->getDataLayout().getTypeStoreSize(pElementType);
 

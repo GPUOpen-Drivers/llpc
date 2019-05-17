@@ -2230,6 +2230,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     // Field "genericOutByteSizes" now gets set when generating the copy shader. Just assert that we agree on the
     // byteSize.
     LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
+    LLPC_UNUSED(genericOutByteSizes);
 
     if (compCount == 1)
     {
