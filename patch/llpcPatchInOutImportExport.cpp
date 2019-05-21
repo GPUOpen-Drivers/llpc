@@ -2937,7 +2937,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                             inOutUsage.builtInInputLocMap.end());
                 loc = inOutUsage.builtInInputLocMap[BuiltInCullDistance];
                 locCount = (builtInUsage.clipDistance + builtInUsage.cullDistance > 4) ? 2 : 1;
-                startChannel = builtInUsage.clipDistance;
+                startChannel = builtInUsage.clipDistance % 4;
             }
 
             auto& interpInfo = inOutUsage.fs.interpInfo;
