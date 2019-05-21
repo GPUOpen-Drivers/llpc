@@ -102,12 +102,6 @@ bool PatchResourceCollect::runOnModule(
             bool gsOnChip = m_pContext->CheckGsOnChipValidity();
             m_pContext->SetGsOnChip(gsOnChip);
         }
-
-        // Do user data node merge for merged shader
-        if (m_pContext->GetGfxIpVersion().major >= 9)
-        {
-            m_pContext->DoUserDataNodeMerge();
-        }
     }
 
     return true;

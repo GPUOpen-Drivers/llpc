@@ -409,19 +409,29 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
              // and indirect user data should not be counted in possible spilled user data.
             if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
             {
+                // Only the first shader stage needs a vertex buffer table.
+                if ((m_pContext->GetShaderStageMask() & (ShaderStageToMask(m_shaderStage) - 1)) == 0)
+                {
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                pIntfData->vbTable.resNodeIdx = pNode->offsetInDwords + 1;
+                    pIntfData->vbTable.resNodeIdx = pNode->offsetInDwords + 1;
 #endif
-                reserveVbTable = true;
+                    reserveVbTable = true;
+                }
                 continue;
             }
 
             if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
             {
+                // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
+                if ((m_pContext->GetShaderStageMask() &
+                     (ShaderStageToMask(ShaderStageFragment) - ShaderStageToMask(m_shaderStage))) ==
+                    ShaderStageToMask(m_shaderStage))
+                {
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
+                    pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
 #endif
-                reserveStreamOutTable = true;
+                    reserveStreamOutTable = true;
+                }
                 continue;
             }
 
@@ -573,44 +583,47 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
 
     // Allocate register for stream-out buffer table
-    for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
+    if (reserveStreamOutTable)
     {
-        auto pNode = &pShaderInfo->pUserDataNodes[i];
-        if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
+        for (uint32_t i = 0; i < pShaderInfo->userDataNodeCount; ++i)
         {
-            argTys.push_back(m_pContext->Int32Ty());
-            LLPC_ASSERT(pNode->sizeInDwords == 1);
-            switch (m_shaderStage)
+            auto pNode = &pShaderInfo->pUserDataNodes[i];
+            if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
             {
-            case ShaderStageVertex:
+                argTys.push_back(m_pContext->Int32Ty());
+                LLPC_ASSERT(pNode->sizeInDwords == 1);
+                switch (m_shaderStage)
                 {
-                    pIntfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
-                    pIntfData->entryArgIdxs.vs.streamOutData.tablePtr = argIdx;
-                    break;
+                case ShaderStageVertex:
+                    {
+                        pIntfData->userDataUsage.vs.streamOutTablePtr = userDataIdx;
+                        pIntfData->entryArgIdxs.vs.streamOutData.tablePtr = argIdx;
+                        break;
+                    }
+                case ShaderStageTessEval:
+                    {
+                        pIntfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
+                        pIntfData->entryArgIdxs.tes.streamOutData.tablePtr = argIdx;
+                        break;
+                    }
+                // Allocate dummpy stream-out register for Geometry shader
+                case ShaderStageGeometry:
+                    {
+                        break;
+                    }
+                default:
+                    {
+                        LLPC_NEVER_CALLED();
+                        break;
+                    }
                 }
-            case ShaderStageTessEval:
-                {
-                    pIntfData->userDataUsage.tes.streamOutTablePtr = userDataIdx;
-                    pIntfData->entryArgIdxs.tes.streamOutData.tablePtr = argIdx;
-                    break;
-                }
-            // Allocate dummpy stream-out register for Geometry shader
-            case ShaderStageGeometry:
-                {
-                    break;
-                }
-            default:
-                {
-                    LLPC_NEVER_CALLED();
-                    break;
-                }
-            }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-            pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+                pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
 #endif
-            *pInRegMask |= (1ull << (argIdx++));
-            ++userDataIdx;
-            break;
+                *pInRegMask |= (1ull << (argIdx++));
+                ++userDataIdx;
+                break;
+            }
         }
     }
 

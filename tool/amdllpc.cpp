@@ -208,6 +208,7 @@ struct CompileInfo
     void*                       pPipelineBuf;                   // Alllocation buffer of building pipeline
     void*                       pPipelineInfoFile;              // VFX-style file containing pipeline info
     const char*                 pFileNames;                     // Names of input shader source files
+    bool                        doAutoLayout;                   // Whether to auto layout descriptors
 };
 
 // =====================================================================================================================
@@ -798,8 +799,8 @@ static Result BuildShaderModules(
 // =====================================================================================================================
 // Builds pipeline and do linking.
 static Result BuildPipeline(
-    ICompiler*    pCompiler,     // [in] LLPC compiler object
-    CompileInfo*  pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
+    ICompiler*    pCompiler,        // [in] LLPC compiler object
+    CompileInfo*  pCompileInfo)     // [in,out] Compilation info of LLPC standalone tool
 {
     Result result = Result::Success;
 
@@ -820,6 +821,7 @@ static Result BuildPipeline(
             &pGraphicsPipelineInfo->fs,
         };
 
+        uint32_t userDataOffset = 0;
         for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
         {
             if (pCompileInfo->stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
@@ -836,13 +838,14 @@ static Result BuildPipeline(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
                 pShaderInfo->entryStage = static_cast<ShaderStage>(stage);
 #endif
-                // If no user data nodes (not compiling from pipeline), lay them out now.
-                if (pShaderInfo->pUserDataNodes == nullptr)
+                // If not compiling from pipeline, lay out user data now.
+                if (pCompileInfo->doAutoLayout)
                 {
                     DoAutoLayoutDesc(static_cast<ShaderStage>(stage),
                                      pCompileInfo->spirvBin[stage],
                                      pGraphicsPipelineInfo,
-                                     pShaderInfo);
+                                     pShaderInfo,
+                                     userDataOffset);
                 }
             }
         }
@@ -922,10 +925,15 @@ static Result BuildPipeline(
 #endif
         pShaderInfo->pModuleData  = pShaderOut->pModuleData;
 
-        // If no user data nodes (not compiling from pipeline), lay them out now.
-        if (pShaderInfo->pUserDataNodes == nullptr)
+        // If not compiling from pipeline, lay out user data now.
+        if (pCompileInfo->doAutoLayout)
         {
-            DoAutoLayoutDesc(ShaderStageCompute, pCompileInfo->spirvBin[ShaderStageCompute], nullptr, pShaderInfo);
+            uint32_t userDataOffset = 0;
+            DoAutoLayoutDesc(ShaderStageCompute,
+                             pCompileInfo->spirvBin[ShaderStageCompute],
+                             nullptr,
+                             pShaderInfo,
+                             userDataOffset);
         }
 
         pComputePipelineInfo->pInstance      = nullptr; // Dummy, unused
@@ -1090,6 +1098,7 @@ static Result ProcessPipeline(
     Result result = Result::Success;
     CompileInfo compileInfo = {};
     std::string fileNames;
+    compileInfo.doAutoLayout = true;
 
     result = InitCompileInfo(&compileInfo);
 
@@ -1264,6 +1273,7 @@ static Result ProcessPipeline(
                     fileNames += inFile;
                     fileNames += " ";
                     *pNextFile = i + 1;
+                    compileInfo.doAutoLayout = false;
                     break;
                 }
             }

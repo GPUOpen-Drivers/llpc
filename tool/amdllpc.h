@@ -38,5 +38,6 @@
 void DoAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
                       Llpc::BinaryData                  spirvBin,
                       Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,
-                      Llpc::PipelineShaderInfo*         pShaderInfo);
+                      Llpc::PipelineShaderInfo*         pShaderInfo,
+                      uint32_t&                         topLevelOffset);
 

@@ -632,6 +632,9 @@ Result Compiler::BuildPipelineInternal(
         }
     }
 
+    // Merge user data for shader stages into one.
+    pContext->GetPipelineContext()->DoUserDataNodeMerge();
+
     // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules
     // into a single pipeline module.
     if (pPipelineModule == nullptr)

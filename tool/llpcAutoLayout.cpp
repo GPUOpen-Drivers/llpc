@@ -102,7 +102,9 @@ void DoAutoLayoutDesc(
     BinaryData                  spirvBin,       // SPIR-V binary
     GraphicsPipelineBuildInfo*  pPipelineInfo,  // [in/out] Graphics pipeline info, will have dummy information filled
                                                 //   in. nullptr if not a graphics pipeline.
-    PipelineShaderInfo*         pShaderInfo)    // [in/out] Shader info, will have user data nodes added to it
+    PipelineShaderInfo*         pShaderInfo,    // [in/out] Shader info, will have user data nodes added to it
+    uint32_t&                   topLevelOffset) // [in/out] User data offset; ensures that multiple shader stages use
+                                                //    disjoint offsets
 {
     // Read the SPIR-V.
     std::string spirvCode(static_cast<const char*>(spirvBin.pCode), spirvBin.codeSize);
@@ -589,7 +591,6 @@ void DoAutoLayoutDesc(
     auto pResNode = pResNodes;
 
     // Add a node for each set.
-    uint32_t topLevelOffset = 0;
     for (const auto& resNodeSet : resNodeSets)
     {
         pResNode->type = ResourceMappingNodeType::DescriptorTableVaPtr;
