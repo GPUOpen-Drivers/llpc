@@ -31,6 +31,8 @@
 #pragma once
 
 #include "llpcPipelineContext.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace Llpc
 {
@@ -101,12 +103,7 @@ private:
     LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(GraphicsContext);
 
-    void MergeUserDataNode(uint32_t                    nodeCount1,
-                           const ResourceMappingNode*  pNodes1,
-                           uint32_t                    nodeCount2,
-                           const ResourceMappingNode*  pNodes2,
-                           uint32_t*                   pMergedNodeCount,
-                           const ResourceMappingNode** ppMergedNodes);
+    llvm::ArrayRef<ResourceMappingNode> MergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode>& allNodes);
 
     const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
 
@@ -119,7 +116,10 @@ private:
     bool            m_tessOffchip; // Whether to enable tessellation off-chip mode
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode
 
-    std::vector<ResourceMappingNode*>  m_allocUserDataNodes;    // Allocated user data nodes for merged shader
+    llvm::SmallVector<std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingNode>>, 4>
+                    m_allocUserDataNodes;               // Allocated merged user data nodes
+    std::unique_ptr<llvm::SmallVectorImpl<DescriptorRangeValue>>
+                    m_allocDescriptorRangeValues;       // Allocated merged descriptor range values
 };
 
 } // Llpc

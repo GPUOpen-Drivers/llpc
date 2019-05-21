@@ -121,10 +121,6 @@ GraphicsContext::GraphicsContext(
 // =====================================================================================================================
 GraphicsContext::~GraphicsContext()
 {
-    for (auto pAllocNodes : m_allocUserDataNodes)
-    {
-        delete pAllocNodes;
-    }
 }
 
 // =====================================================================================================================
@@ -671,64 +667,186 @@ bool GraphicsContext::CheckGsOnChipValidity()
 }
 
 // =====================================================================================================================
-// Does user data node merging for merged shader
+// Does user data node merging for all shader stages
 void GraphicsContext::DoUserDataNodeMerge()
 {
-    const bool hasVs  = ((m_stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
-    const bool hasTcs = ((m_stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
-    const bool hasTes = ((m_stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
-    const bool hasGs  = ((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    uint32_t stageMask = GetShaderStageMask();
+    SmallVector<ResourceMappingNode, 8> allNodes;
 
-    const bool hasTs = (hasTcs || hasTes);
-
-    // Merge user data nodes only if tessellation shader or geometry shader is present
-    if (hasTs || hasGs)
+    // No need to merge if there is only one shader stage.
+    if (isPowerOf2_32(stageMask))
     {
-        // Merge user data nodes for LS-HS merged shader
-        if (hasVs && hasTcs)
+        return;
+    }
+
+    // Collect user data nodes from all shader stages into one big table.
+    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    {
+        if ((stageMask >> stage) & 1)
         {
-            uint32_t mergedNodeCount = 0;
-            const ResourceMappingNode* pMergedNodes = nullptr;
-
-            auto pShaderInfo1 = const_cast<PipelineShaderInfo*>(&m_pPipelineInfo->vs);
-            auto pShaderInfo2 = const_cast<PipelineShaderInfo*>(&m_pPipelineInfo->tcs);
-
-            MergeUserDataNode(pShaderInfo1->userDataNodeCount,
-                              pShaderInfo1->pUserDataNodes,
-                              pShaderInfo2->userDataNodeCount,
-                              pShaderInfo2->pUserDataNodes,
-                              &mergedNodeCount,
-                              &pMergedNodes);
-
-            pShaderInfo1->userDataNodeCount = mergedNodeCount;
-            pShaderInfo1->pUserDataNodes    = pMergedNodes;
-            pShaderInfo2->userDataNodeCount = mergedNodeCount;
-            pShaderInfo2->pUserDataNodes    = pMergedNodes;
-        }
-
-        // Merge user data nodes for ES-GS merged shader
-        if (((hasTs && hasTes) || ((hasTs == false) && hasVs)) && hasGs)
-        {
-            uint32_t mergedNodeCount = 0;
-            const ResourceMappingNode* pMergedNodes = nullptr;
-
-            auto pShaderInfo1 = hasTs ? const_cast<PipelineShaderInfo*>(&m_pPipelineInfo->tes) :
-                                        const_cast<PipelineShaderInfo*>(&m_pPipelineInfo->vs);
-            auto pShaderInfo2 = const_cast<PipelineShaderInfo*>(&m_pPipelineInfo->gs);
-
-            MergeUserDataNode(pShaderInfo1->userDataNodeCount,
-                              pShaderInfo1->pUserDataNodes,
-                              pShaderInfo2->userDataNodeCount,
-                              pShaderInfo2->pUserDataNodes,
-                              &mergedNodeCount,
-                              &pMergedNodes);
-
-            pShaderInfo1->userDataNodeCount = mergedNodeCount;
-            pShaderInfo1->pUserDataNodes    = pMergedNodes;
-            pShaderInfo2->userDataNodeCount = mergedNodeCount;
-            pShaderInfo2->pUserDataNodes    = pMergedNodes;
+            auto pShaderInfo = GetPipelineShaderInfo(ShaderStage(stage));
+            for (const ResourceMappingNode& node : ArrayRef<ResourceMappingNode>(pShaderInfo->pUserDataNodes,
+                                                                                 pShaderInfo->userDataNodeCount))
+            {
+                allNodes.push_back(node);
+            }
         }
     }
+
+    // Sort and merge.
+    ArrayRef<ResourceMappingNode> mergedNodes = MergeUserDataNodeTable(allNodes);
+
+    // Collect descriptor range values (immutable descriptors) from all shader stages into one big table.
+    SmallVector<DescriptorRangeValue, 8> allRangeValues;
+    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    {
+        if ((stageMask >> stage) & 1)
+        {
+            auto pShaderInfo = GetPipelineShaderInfo(ShaderStage(stage));
+            for (const DescriptorRangeValue& rangeValue :
+                        ArrayRef<DescriptorRangeValue>(pShaderInfo->pDescriptorRangeValues,
+                                                       pShaderInfo->descriptorRangeValueCount))
+            {
+                allRangeValues.push_back(rangeValue);
+            }
+        }
+    }
+
+    // Sort them by set and binding, so we can spot duplicates.
+    std::sort(allRangeValues.begin(),
+              allRangeValues.end(),
+              [](const DescriptorRangeValue& left, const DescriptorRangeValue& right)
+              {
+                  if (left.set != right.set)
+                  {
+                      return left.set < right.set;
+                  }
+                  return left.binding < right.binding;
+              });
+
+    if (allRangeValues.empty() == false)
+    {
+        // Create a new table with merged duplicates.
+        m_allocDescriptorRangeValues = make_unique<SmallVector<DescriptorRangeValue, 8>>();
+        auto &mergedRangeValues = *m_allocDescriptorRangeValues;
+        ArrayRef<DescriptorRangeValue> rangeValues = allRangeValues;
+
+        while (rangeValues.empty() == false)
+        {
+            // Find the next block of duplicate rangeValues.
+            uint32_t duplicatesCount = 1;
+            for (; duplicatesCount != rangeValues.size(); ++duplicatesCount)
+            {
+                if ((rangeValues[0].set != rangeValues[duplicatesCount].set) || (rangeValues[0].binding != rangeValues[duplicatesCount].binding))
+                {
+                    break;
+                }
+                LLPC_ASSERT((rangeValues[0].type == rangeValues[duplicatesCount].type) &&
+                            "Descriptor range value merge conflict: type");
+                LLPC_ASSERT((rangeValues[0].arraySize == rangeValues[duplicatesCount].arraySize) &&
+                            "Descriptor range value merge conflict: arraySize");
+                LLPC_ASSERT((memcmp(rangeValues[0].pValue,
+                                    rangeValues[duplicatesCount].pValue,
+                                    rangeValues[0].arraySize * sizeof(uint32_t)) == 0) &&
+                            "Descriptor range value merge conflict: value");
+            }
+
+            // Keep the merged range.
+            mergedRangeValues.push_back(rangeValues[0]);
+            rangeValues = rangeValues.slice(duplicatesCount);
+        }
+    }
+
+    // Point each shader stage at the merged user data nodes and descriptor range values.
+    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    {
+        if ((stageMask >> stage) & 1)
+        {
+            auto pShaderInfo = const_cast<PipelineShaderInfo*>(GetPipelineShaderInfo(ShaderStage(stage)));
+            pShaderInfo->pUserDataNodes = mergedNodes.data();
+            pShaderInfo->userDataNodeCount = mergedNodes.size();
+            if (m_allocDescriptorRangeValues)
+            {
+                pShaderInfo->pDescriptorRangeValues = m_allocDescriptorRangeValues->data();
+                pShaderInfo->descriptorRangeValueCount = m_allocDescriptorRangeValues->size();
+            }
+        }
+    }
+}
+
+// =====================================================================================================================
+// Merge user data nodes that have been collected into one big table
+ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
+    SmallVectorImpl<ResourceMappingNode>& allNodes)   // Table of nodes
+{
+    // Sort the nodes by offset, so we can spot duplicates.
+    std::sort(allNodes.begin(),
+              allNodes.end(),
+              [](const ResourceMappingNode& left, const ResourceMappingNode& right)
+              {
+                  return left.offsetInDwords < right.offsetInDwords;
+              });
+
+    // Merge duplicates.
+    m_allocUserDataNodes.push_back(make_unique<SmallVector<ResourceMappingNode, 8>>());
+    auto& mergedNodes = *m_allocUserDataNodes.back();
+    ArrayRef<ResourceMappingNode> nodes = allNodes;
+
+    while (nodes.empty() == false)
+    {
+        // Find the next block of duplicate nodes.
+        uint32_t duplicatesCount = 1;
+        for (; duplicatesCount != nodes.size(); ++duplicatesCount)
+        {
+            if (nodes[0].offsetInDwords != nodes[duplicatesCount].offsetInDwords)
+            {
+                break;
+            }
+            LLPC_ASSERT((nodes[0].type == nodes[duplicatesCount].type) && "User data merge conflict: type");
+            LLPC_ASSERT((nodes[0].sizeInDwords == nodes[duplicatesCount].sizeInDwords) &&
+                        "User data merge conflict: size");
+            LLPC_ASSERT((nodes[0].type != ResourceMappingNodeType::IndirectUserDataVaPtr) &&
+                        "User data merge conflict: only one shader stage expected to have vertex buffer");
+            LLPC_ASSERT((nodes[0].type != ResourceMappingNodeType::StreamOutTableVaPtr) &&
+                        "User data merge conflict: only one shader stage expected to have stream out");
+            if (nodes[0].type != ResourceMappingNodeType::DescriptorTableVaPtr)
+            {
+                LLPC_ASSERT((nodes[0].srdRange.set == nodes[duplicatesCount].srdRange.set) &&
+                            (nodes[0].srdRange.binding == nodes[duplicatesCount].srdRange.binding) &&
+                            "User data merge conflict: set or binding");
+            }
+        }
+
+        if ((duplicatesCount == 1) || (nodes[0].type != ResourceMappingNodeType::DescriptorTableVaPtr))
+        {
+            // Keep the merged node.
+            mergedNodes.push_back(nodes[0]);
+        }
+        else
+        {
+            // Merge the inner tables too. First collect nodes from all inner tables.
+            SmallVector<ResourceMappingNode, 8> allInnerNodes;
+
+            for (uint32_t i = 0; i != duplicatesCount; ++i)
+            {
+                const auto& node = nodes[0];
+                ArrayRef<ResourceMappingNode> innerTable(node.tablePtr.pNext, node.tablePtr.nodeCount);
+                allInnerNodes.insert(allInnerNodes.end(), innerTable.begin(), innerTable.end());
+            }
+
+            // Call recursively to sort and merge.
+            auto mergedInnerNodes = MergeUserDataNodeTable(allInnerNodes);
+
+            // Finished merging the inner tables. Keep the merged DescriptorTableVaPtr node.
+            ResourceMappingNode modifiedNode = nodes[0];
+            modifiedNode.tablePtr.nodeCount = mergedInnerNodes.size();
+            modifiedNode.tablePtr.pNext = &mergedInnerNodes[0];
+            mergedNodes.push_back(modifiedNode);
+        }
+
+        nodes = nodes.slice(duplicatesCount);
+    }
+    return mergedNodes;
 }
 
 // =====================================================================================================================
@@ -847,161 +965,6 @@ uint32_t GraphicsContext::GetShaderWaveSize(
     uint32_t waveSize = m_pGpuProperty->waveSize;
 
     return waveSize;
-}
-
-// =====================================================================================================================
-// Compare the offsets of the two user data node (use "less" relational operator).
-static inline bool CompareNode(
-    const ResourceMappingNode* pNodes1, // [in] The first user data node
-    const ResourceMappingNode* pNodes2) // [in] The second user data node
-{
-    return (pNodes1->offsetInDwords < pNodes2->offsetInDwords);
-}
-
-// =====================================================================================================================
-// Merges user data nodes for LS-HS/ES-GS merged shader.
-//
-// NOTE: We assume those user data nodes are sorted in asceding order of the DWORD offset.
-void GraphicsContext::MergeUserDataNode(
-    uint32_t                    nodeCount1,         // Count of user data nodes of the first shader
-    const ResourceMappingNode*  pNodes1,            // [in] User data nodes of the firset shader
-    uint32_t                    nodeCount2,         // Count of user data nodes of the second shader
-    const ResourceMappingNode*  pNodes2,            // [in] User data nodes of the second shader
-    uint32_t*                   pMergedNodeCount,   // [out] Count of user data nodes of the merged shader
-    const ResourceMappingNode** ppMergedNodes)      // [out] User data nodes of the merged shader
-{
-    uint32_t mergedNodeCount = 0;
-    ResourceMappingNode* pMergedNodes = nullptr;
-
-    if ((nodeCount1 > 0) && (nodeCount2 > 0))
-    {
-        // Sort the two lists
-        std::vector<const ResourceMappingNode*> nodes1;
-        std::vector<const ResourceMappingNode*> nodes2;
-
-        for (uint32_t i = 0; i < nodeCount1; ++i)
-        {
-            nodes1.push_back(&pNodes1[i]);
-        }
-
-        for (uint32_t i = 0; i < nodeCount2; ++i)
-        {
-            nodes2.push_back(&pNodes2[i]);
-        }
-
-        std::sort(nodes1.begin(), nodes1.end(), CompareNode);
-        std::sort(nodes2.begin(), nodes2.end(), CompareNode);
-
-        // Merge the two lists
-        std::vector<ResourceMappingNode> mergedNodes;
-
-        uint32_t nodeOffset = 0;
-
-        uint32_t nodeIdx1 = 0;
-        uint32_t nodeIdx2 = 0;
-
-        // Visit the two lists until one of them is finished
-        while ((nodeIdx1 < nodeCount1) && (nodeIdx2 < nodeCount2))
-        {
-            const ResourceMappingNode* pNode1 = nodes1[nodeIdx1];
-            const ResourceMappingNode* pNode2 = nodes2[nodeIdx2];
-
-            ResourceMappingNode mergedNode = {};
-
-            if (pNode1->offsetInDwords < pNode2->offsetInDwords)
-            {
-                LLPC_ASSERT(pNode1->offsetInDwords >= nodeOffset);
-                LLPC_ASSERT(pNode1->offsetInDwords + pNode1->sizeInDwords <= pNode2->offsetInDwords); // Not overlapped
-                mergedNode = *pNode1;
-
-                nodeOffset = pNode1->offsetInDwords + pNode1->sizeInDwords;
-                ++nodeIdx1;
-            }
-            else if (pNode2->offsetInDwords < pNode1->offsetInDwords)
-            {
-                LLPC_ASSERT(pNode2->offsetInDwords >= nodeOffset);
-                LLPC_ASSERT(pNode2->offsetInDwords + pNode2->sizeInDwords <= pNode1->offsetInDwords); // Not overlapped
-                mergedNode = *pNode2;
-
-                nodeOffset = pNode2->offsetInDwords + pNode2->sizeInDwords;
-                ++nodeIdx2;
-            }
-            else
-            {
-                LLPC_ASSERT((pNode1->type == pNode2->type) && (pNode1->sizeInDwords == pNode2->sizeInDwords));
-
-                auto nodeType       = pNode1->type;
-                auto offsetInDwords = pNode1->offsetInDwords;
-                auto sizeInDwords   = pNode1->sizeInDwords;
-                LLPC_ASSERT(offsetInDwords >= nodeOffset);
-
-                if (nodeType == ResourceMappingNodeType::DescriptorTableVaPtr)
-                {
-                    // Table pointer, do further merging
-                    mergedNode.type           = nodeType;
-                    mergedNode.sizeInDwords   = sizeInDwords;
-                    mergedNode.offsetInDwords = offsetInDwords;
-
-                    MergeUserDataNode(pNode1->tablePtr.nodeCount,
-                                      pNode1->tablePtr.pNext,
-                                      pNode2->tablePtr.nodeCount,
-                                      pNode2->tablePtr.pNext,
-                                      &mergedNode.tablePtr.nodeCount,
-                                      &mergedNode.tablePtr.pNext);
-                }
-                else
-                {
-                    // Not table pointer, all fields should be identical
-                    LLPC_ASSERT(memcmp(pNode1, pNode2, sizeof(ResourceMappingNode)) == 0);
-                    mergedNode = *pNode1;
-                }
-
-                nodeOffset = offsetInDwords + sizeInDwords;
-                ++nodeIdx1;
-                ++nodeIdx2;
-            }
-
-            mergedNodes.push_back(mergedNode);
-        }
-
-        // Handle the remaining part of the list if it is not finished
-        while (nodeIdx1 < nodeCount1)
-        {
-            const ResourceMappingNode* pNode1 = nodes1[nodeIdx1];
-            mergedNodes.push_back(*pNode1);
-            ++nodeIdx1;
-        }
-
-        // Handle the remaining part of the list if it is not finished
-        while (nodeIdx2 < nodeCount2)
-        {
-            const ResourceMappingNode* pNode2 = nodes2[nodeIdx2];
-            mergedNodes.push_back(*pNode2);
-            ++nodeIdx2;
-        }
-
-        mergedNodeCount = mergedNodes.size();
-
-        pMergedNodes = new ResourceMappingNode[mergedNodeCount];
-        LLPC_ASSERT(pMergedNodes != nullptr);
-        memcpy(pMergedNodes, mergedNodes.data(), sizeof(ResourceMappingNode) * mergedNodeCount);
-
-        // Record those allocated user data nodes (will be freed during cleanup)
-        m_allocUserDataNodes.push_back(pMergedNodes);
-    }
-    else if (nodeCount1 > 0)
-    {
-        mergedNodeCount = nodeCount1;
-        pMergedNodes = const_cast<ResourceMappingNode*>(pNodes1);
-    }
-    else if (nodeCount2 > 0)
-    {
-        mergedNodeCount = nodeCount2;
-        pMergedNodes = const_cast<ResourceMappingNode*>(pNodes2);
-    }
-
-    *pMergedNodeCount = mergedNodeCount;
-    *ppMergedNodes = pMergedNodes;
 }
 
 } // Llpc

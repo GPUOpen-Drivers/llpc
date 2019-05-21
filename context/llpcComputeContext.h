@@ -75,8 +75,8 @@ public:
     // Enables GS on-chip mode
     virtual void SetGsOnChip(bool gsOnChip) { LLPC_NEVER_CALLED(); }
 
-    // Does user data node merge for merged shader
-    virtual void DoUserDataNodeMerge() { LLPC_NEVER_CALLED(); }
+    // Does user data node merging for all shader stages
+    virtual void DoUserDataNodeMerge() { }
 
     // Gets float control settings of the specified shader stage for the provide floating-point type.
     virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const;
