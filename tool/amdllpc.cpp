@@ -1417,17 +1417,6 @@ void FindAllMatchFiles(
     FindClose(pSearchHandle);
     return;
 }
-#else
-// =====================================================================================================================
-// Finds all filenames which can match input file name
-void FindAllMatchFiles(
-    const std::string&        inFile,         // [in] Input file name, include wildcard
-    std::vector<std::string>* pOutFiles)      // [out] Output file names which can match input file name
-{
-    // Linux shell extends wildcard automatically. we needn't implement it in linux.
-    LLPC_NEVER_CALLED();
-}
-
 #endif
 // =====================================================================================================================
 // Main function of LLPC standalone tool, entry-point.
@@ -1475,6 +1464,7 @@ int32_t main(
         // separately but in the same context.
         for (uint32_t i = 0; (i < InFiles.size()) && (result == Result::Success); ++i)
         {
+#ifdef WIN_OS
             if (InFiles[i].find_last_of("*?") != std::string::npos)
             {
                 std::vector<std::string> matchFiles;
@@ -1493,6 +1483,7 @@ int32_t main(
                 }
             }
             else
+#endif
             {
                 result = ProcessPipeline(pCompiler, InFiles[i], 0, &nextFile);
             }
@@ -1501,6 +1492,7 @@ int32_t main(
     else if (result == Result::Success)
     {
         // Otherwise, join all input files into the same pipeline.
+#ifdef WIN_OS
         if ((InFiles.size() == 1) &&
             (InFiles[0].find_last_of("*?") != std::string::npos))
         {
@@ -1521,16 +1513,19 @@ int32_t main(
             }
         }
         else
+#endif
         {
             SmallVector<std::string, 6> inFiles;
             for (const auto& inFile : InFiles)
             {
+#ifdef WIN_OS
                 if (InFiles[0].find_last_of("*?") != std::string::npos)
                 {
                     LLPC_ERRS("\nCan't use wilecard if multiple filename is set in command\n");
                     result = Result::ErrorInvalidValue;
                     break;
                 }
+#endif
                 inFiles.push_back(inFile);
             }
 
