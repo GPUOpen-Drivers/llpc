@@ -983,33 +983,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 }
             }
 
-            // NOTE: Order of these arguments could not be changed. The rule is very similar to function default
-            // parameters: vertex ID [, relative vertex ID, primitive ID [, instance ID]]
-            auto nextShaderStage = m_pContext->GetNextShaderStage(ShaderStageVertex);
-            // NOTE: For tessellation control shader, we always need relative vertex ID.
-            if (builtInUsage.vs.vertexIndex || builtInUsage.vs.primitiveId || builtInUsage.vs.instanceIndex ||
-                (nextShaderStage == ShaderStageTessControl))
-            {
-                argTys.push_back(m_pContext->Int32Ty()); // Vertex ID
-                entryArgIdxs.vs.vertexId = argIdx++;
-            }
+            // NOTE: The order of these arguments is determined by hardware.
+            argTys.push_back(m_pContext->Int32Ty()); // Vertex ID
+            entryArgIdxs.vs.vertexId = argIdx++;
 
-            if (builtInUsage.vs.primitiveId || builtInUsage.vs.instanceIndex ||
-                (nextShaderStage == ShaderStageTessControl))
-            {
-                // NOTE: For tessellation control shader, we always need relative vertex ID.
-                argTys.push_back(m_pContext->Int32Ty()); // Relative vertex ID (auto index)
-                entryArgIdxs.vs.relVertexId = argIdx++;
+            argTys.push_back(m_pContext->Int32Ty()); // Relative vertex ID (auto index)
+            entryArgIdxs.vs.relVertexId = argIdx++;
 
-                argTys.push_back(m_pContext->Int32Ty()); // Primitive ID
-                entryArgIdxs.vs.primitiveId = argIdx++;
-            }
+            argTys.push_back(m_pContext->Int32Ty()); // Primitive ID
+            entryArgIdxs.vs.primitiveId = argIdx++;
 
-            if (builtInUsage.vs.instanceIndex)
-            {
-                argTys.push_back(m_pContext->Int32Ty()); // Instance ID
-                entryArgIdxs.vs.instanceId = argIdx++;
-            }
+            argTys.push_back(m_pContext->Int32Ty()); // Instance ID
+            entryArgIdxs.vs.instanceId = argIdx++;
 
             break;
         }
