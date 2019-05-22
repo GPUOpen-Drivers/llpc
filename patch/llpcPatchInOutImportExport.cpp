@@ -2363,66 +2363,36 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
     uint32_t     builtInId,     // ID of the built-in variable
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
-    Value* pInput = UndefValue::get(pInputTy);
-
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
 
     switch (builtInId)
     {
     case BuiltInVertexIndex:
-        {
-            pInput = m_pVertexFetch->GetVertexIndex();
-            break;
-        }
+        return m_pVertexFetch->GetVertexIndex();
     case BuiltInInstanceIndex:
-        {
-            pInput = m_pVertexFetch->GetInstanceIndex();
-            break;
-        }
+        return m_pVertexFetch->GetInstanceIndex();
     case BuiltInBaseVertex:
-        {
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.baseVertex);
-            break;
-        }
+        return GetFunctionArgument(m_pEntryPoint, entryArgIdxs.baseVertex);
     case BuiltInBaseInstance:
-        {
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.baseInstance);
-            break;
-        }
+        return GetFunctionArgument(m_pEntryPoint, entryArgIdxs.baseInstance);
     case BuiltInDrawIndex:
-        {
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.drawIndex);
-            break;
-        }
+        return GetFunctionArgument(m_pEntryPoint, entryArgIdxs.drawIndex);
     case BuiltInViewIndex:
-        {
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.viewIndex);
-            break;
-        }
+        return GetFunctionArgument(m_pEntryPoint, entryArgIdxs.viewIndex);
     case BuiltInSubgroupSize:
-        {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
-            break;
-        }
+        return ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
     case BuiltInSubgroupLocalInvocationId:
-        {
-            pInput = GetSubgroupLocalInvocationId(pInsertPos);
-            break;
-        }
+        return GetSubgroupLocalInvocationId(pInsertPos);
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
-            break;
+            auto pPipelineInfo =
+                reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+            return ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
         }
     default:
-        {
-            LLPC_NEVER_CALLED();
-            break;
-        }
+        LLPC_NEVER_CALLED();
+        return UndefValue::get(pInputTy);
     }
-
-    return pInput;
 }
 
 // =====================================================================================================================
