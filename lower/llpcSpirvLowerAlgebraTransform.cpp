@@ -409,17 +409,32 @@ void SpirvLowerAlgebraTransform::visitCallInst(
         // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
         forceFMul = true;
     }
-    else if (m_pContext->GetGfxIpVersion().major <= 8)
+    else
     {
-        // NOTE: For pre-GFX9, MIN, MAX, CLAMP are out of float control.
-        if (pCallee->isIntrinsic() &&
-            ((pCallee->getIntrinsicID() == Intrinsic::minnum) || (pCallee->getIntrinsicID() == Intrinsic::maxnum)))
+        // Disable fast math for gl_Position
+        auto calleeName = pCallee->getName();
+        if (calleeName.startswith(LlpcName::OutputExportBuiltIn))
         {
-            forceFMul = true;
+            uint32_t value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+            if (value == BuiltInPosition)
+            {
+                Value* pOutput = callInst.getOperand(callInst.getNumArgOperands() - 1);
+                DisableFastMath(pOutput);
+            }
         }
-        else if (pCallee->getName().startswith("_Z6fclamp") || pCallee->getName().startswith("_Z6nclamp"))
+
+        if (m_pContext->GetGfxIpVersion().major <= 8)
         {
-            forceFMul = true;
+            // NOTE: For pre-GFX9, MIN, MAX, CLAMP are out of float control.
+            if (pCallee->isIntrinsic() &&
+                ((pCallee->getIntrinsicID() == Intrinsic::minnum) || (pCallee->getIntrinsicID() == Intrinsic::maxnum)))
+            {
+                forceFMul = true;
+            }
+            else if (pCallee->getName().startswith("_Z6fclamp") || pCallee->getName().startswith("_Z6nclamp"))
+            {
+                forceFMul = true;
+            }
         }
     }
 
@@ -510,6 +525,48 @@ bool SpirvLowerAlgebraTransform::IsOperandNoContract(
         }
     }
     return false;
+}
+
+// =====================================================================================================================
+// Disable fast math for all values related with the specified value
+void SpirvLowerAlgebraTransform::DisableFastMath(
+    Value* pValue)   // [in] Value to disable fast math
+{
+    std::set<Instruction*> allValues;
+    std::list<Instruction*> workSet;
+    if (isa<Instruction>(pValue))
+    {
+        allValues.insert(cast<Instruction>(pValue));
+        workSet.push_back(cast<Instruction>(pValue));
+    }
+
+    auto it = workSet.begin();
+    while (workSet.empty() == false)
+    {
+        if (isa<FPMathOperator>(*it))
+        {
+            // Reset fast math flags to default
+            auto pInst = cast<Instruction>(*it);
+            llvm::FastMathFlags fastMathFlags;
+            pInst->copyFastMathFlags(fastMathFlags);
+        }
+
+        for (Value* pOperand : (*it)->operands())
+        {
+            if (isa<Instruction>(pOperand))
+            {
+                // Add new values
+                auto pInst = cast<Instruction>(pOperand);
+                if (allValues.find(pInst) == allValues.end())
+                {
+                    allValues.insert(pInst);
+                    workSet.push_back(pInst);
+                }
+            }
+        }
+
+        it = workSet.erase(it);
+    }
 }
 
 } // Llpc
