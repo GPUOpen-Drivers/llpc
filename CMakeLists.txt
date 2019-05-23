@@ -216,6 +216,7 @@ target_sources(llpc PRIVATE
     builder/llpcBuilderImplSubgroup.cpp
     builder/llpcBuilderRecorder.cpp
     builder/llpcBuilderReplayer.cpp
+    builder/llpcPipelineState.cpp
 )
 
 # llpc/context
