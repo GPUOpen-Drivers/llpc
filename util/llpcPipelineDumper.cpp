@@ -709,7 +709,7 @@ void PipelineDumper::DumpPipelineOptions(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
     dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
     dumpFile << "options.includeIrBinary = " << pOptions->includeIrBinary << "\n";
 #endif
 }
@@ -884,7 +884,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
     hasher.Update(pPipeline->options.robustBufferAccess);
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
     hasher.Update(pPipeline->options.includeIrBinary);
 #endif
 
@@ -966,7 +966,7 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
         pHasher->Update(pPipeline->options.robustBufferAccess);
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
         pHasher->Update(pPipeline->options.includeIrBinary);
 #endif
     }
@@ -1559,55 +1559,56 @@ OStream& operator<<(
                 startPos = endPos;
             }
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
-        else if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
-#else
-        else if (strncmp(pSection->pName, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
-#endif
-        {
-            // Output binary based sections
-            out << (pSection->pName[0] == 0 ? "(null)" : pSection->pName)
-                << " (size = " << pSection->secHead.sh_size << " bytes)\n";
-
-            std::vector<ElfSymbol> symbols;
-            reader.GetSymbolsBySectionIndex(secIdx, symbols);
-
-            uint32_t symIdx = 0;
-            uint32_t startPos = 0;
-            uint32_t endPos = 0;
-
-            while (startPos < pSection->secHead.sh_size)
-            {
-                if (symIdx < symbols.size())
-                {
-                    endPos = static_cast<uint32_t>(symbols[symIdx].value);
-                }
-                else
-                {
-                    endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
-                }
-
-                OutputBinary(pSection->pData, startPos, endPos, out);
-
-                if (symIdx < symbols.size())
-                {
-                    out << "    " << symbols[symIdx].pSymName
-                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size << ")\n";
-                }
-                ++symIdx;
-                startPos = endPos;
-            }
-        }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 464
         else if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0)
 #else
         else if (strncmp(pSection->pName, ".AMDGPU.comment.", sizeof(".AMDGPU.comment.") - 1) == 0)
 #endif
         {
-            // Output text based sections
-            out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
+            if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)
+#else
+            if (strncmp(pSection->pName, ".AMDGPU.comment.amdil", sizeof(".AMDGPU.comment.amdil") - 1) == 0)
+#endif
+            {
+                // Output text based sections
+                out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
 
-            OutputText(pSection->pData, 0, static_cast<uint32_t>(pSection->secHead.sh_size), out);
+                std::vector<ElfSymbol> symbols;
+                reader.GetSymbolsBySectionIndex(secIdx, symbols);
+                uint32_t symIdx = 0;
+                uint32_t startPos = 0;
+                uint32_t endPos = 0;
+                while (startPos < pSection->secHead.sh_size)
+                {
+                    if (symIdx < symbols.size())
+                    {
+                        endPos = static_cast<uint32_t>(symbols[symIdx].value);
+                    }
+                    else
+                    {
+                        endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
+                    }
+
+                    OutputText(pSection->pData, startPos, endPos, out);
+                    out << "\n";
+
+                    if (symIdx < symbols.size())
+                    {
+                        out << "    " << symbols[symIdx].pSymName
+                            << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size << ")\n";
+                    }
+                    ++symIdx;
+                    startPos = endPos;
+                }
+            }
+            else
+            {
+                // Output text based sections
+                out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
+
+                OutputText(pSection->pData, 0, static_cast<uint32_t>(pSection->secHead.sh_size), out);
+            }
         }
         else
         {
