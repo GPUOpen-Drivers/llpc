@@ -1489,6 +1489,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         cl::LogFileOuts.ArgStr,
         cl::EnableShadowDescriptorTable.ArgStr,
         cl::ShadowDescTablePtrHigh.ArgStr,
+        "amdgpu-scratch-bounds-checking",
     };
 
     std::set<StringRef> effectingOptions;
