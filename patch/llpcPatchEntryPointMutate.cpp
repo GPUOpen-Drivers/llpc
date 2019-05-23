@@ -154,7 +154,6 @@ void PatchEntryPointMutate::ProcessShader()
     if (m_shaderStage == ShaderStageFragment)
     {
         auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
         SpiPsInputAddr spiPsInputAddr = {};
 
         spiPsInputAddr.bits.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
