@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 26
+#define LLPC_INTERFACE_MAJOR_VERSION 27
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
 //* |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
 //* |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions.                                           |
 //* |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
@@ -229,7 +230,7 @@ struct PipelineOptions
                               ///  for now this option is used by LLPC shader and affects only the private array,
                               ///  the out of bounds accesses will be skipped with this setting.
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
     bool includeIrBinary;     ///< If set, the IR binary for all compiled shaders will be included in the pipeline ELF.
 #endif
 };
