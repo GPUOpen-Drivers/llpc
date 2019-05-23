@@ -71,7 +71,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcBuilderImplMisc.cpp             \
         llpcBuilderImplSubgroup.cpp         \
         llpcBuilderRecorder.cpp             \
-        llpcBuilderReplayer.cpp
+        llpcBuilderReplayer.cpp             \
+        llpcPipelineState.cpp
 
     # llpc/context
     CPPFILES +=                             \
