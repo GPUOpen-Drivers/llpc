@@ -130,7 +130,7 @@ By integrating with [lit](http://llvm.org/docs/CommandGuide/lit.html), the test 
 First, enable LLVM utils build when you [build](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) Vulkan driver and amdllpc:
 ```
 cd <vulkandriver_path>/drivers/xgl
-cmake -H. -Bbuilds/Release64 -DLLVM_BUILD_UTILS=ON -DLLVM_INCLUDE_UTILS=ON
+cmake -H. -Bbuilds/Release64 -DXGL_BUILD_LIT=ON
 cd builds/Release64
 make -j$(nproc)
 ```

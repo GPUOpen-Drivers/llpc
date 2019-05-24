@@ -41,7 +41,7 @@
 #include "llpc.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcInternal.h"

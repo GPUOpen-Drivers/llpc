@@ -24,15 +24,15 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcElf.cpp
- * @brief LLPC source file: contains implementation of LLPC ELF utilities.
+ * @file  llpcElfReader.cpp
+ * @brief LLPC source file: contains implementation of LLPC ELF reading utilities.
  ***********************************************************************************************************************
  */
-#define DEBUG_TYPE "llpc-elf"
+#define DEBUG_TYPE "llpc-elf-reader"
 
 #include <algorithm>
 #include <string.h>
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 
 using namespace llvm;
 
@@ -127,7 +127,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
 
             // Where the data is located for this section
             const uint32_t sectionDataOffset = static_cast<uint32_t>(pSectionHeader->sh_offset);
-            auto pBuf =  new ElfReadSectionBuffer<typename Elf::SectionHeader>;
+            auto pBuf = new SectionBuffer;
 
             result = (pBuf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
 
@@ -251,7 +251,7 @@ uint32_t ElfReader<Elf>::GetSectionCount()
 template<class Elf>
 Result ElfReader<Elf>::GetSectionDataBySectionIndex(
     uint32_t           secIdx,          // Section index
-    ElfSectionBuffer** ppSectionData    // [out] Section data
+    SectionBuffer**    ppSectionData    // [out] Section data
     ) const
 {
     Result result = Result::ErrorInvalidValue;
@@ -269,7 +269,7 @@ template<class Elf>
 Result ElfReader<Elf>::GetSectionDataBySortingIndex(
     uint32_t           sortIdx,         // Sorting index
     uint32_t*          pSecIdx,         // [out] Section index
-    ElfSectionBuffer** ppSectionData    // [out] Section data
+    SectionBuffer**    ppSectionData    // [out] Section data
     ) const
 {
     Result result = Result::ErrorInvalidValue;
@@ -317,12 +317,66 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
             }
         }
 
-        sort(secSymbols.begin(), secSymbols.end(),
+        std::sort(secSymbols.begin(), secSymbols.end(),
              [](const ElfSymbol& a, const ElfSymbol& b)
              {
                  return a.value < b.value;
              });
     }
+}
+
+// =====================================================================================================================
+// Checks whether the input name is a valid symbol.
+template<class Elf>
+bool ElfReader<Elf>::IsValidSymbol(
+    const char* pSymbolName)  // [in] Symbol name
+{
+    auto& pSection = m_sections[m_symSecIdx];
+    const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->pData);
+
+    auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSection->pData);
+    uint32_t symCount = GetSymbolCount();
+    bool findSymbol = false;
+    for (uint32_t idx = 0; idx < symCount; ++idx)
+    {
+        auto pName = pStrTab + symbols[idx].st_name;
+        if (strcmp(pName, pSymbolName) == 0)
+        {
+            findSymbol = true;
+            break;
+        }
+    }
+    return findSymbol;
+}
+
+// =====================================================================================================================
+// Gets note according to note type
+template<class Elf>
+ElfNote ElfReader<Elf>::GetNote(
+    Util::Abi::PipelineAbiNoteType noteType) // Note type
+{
+    uint32_t noteSecIdx = m_map[NoteName];
+    LLPC_ASSERT(noteSecIdx > 0);
+
+    auto pNoteSection = m_sections[noteSecIdx];
+    ElfNote noteNode = {};
+    const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
+
+    size_t offset = 0;
+    while (offset < pNoteSection->secHead.sh_size)
+    {
+        const NoteHeader* pNote = reinterpret_cast<const NoteHeader*>(pNoteSection->pData + offset);
+        const uint32_t noteNameSize = Pow2Align(pNote->nameSize, 4);
+        if (pNote->type == noteType)
+        {
+            memcpy(&noteNode.hdr, pNote, sizeof(NoteHeader));
+            noteNode.pData = pNoteSection->pData + offset + noteHeaderSize + noteNameSize;
+            break;
+        }
+        offset += noteHeaderSize + noteNameSize + Pow2Align(pNote->descSize, 4);
+    }
+
+    return noteNode;
 }
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432

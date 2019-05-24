@@ -44,7 +44,7 @@
 #include "llpc.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 #include "llpcPipelineDumper.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
@@ -1247,7 +1247,7 @@ OStream& operator<<(
 
     for (uint32_t sortIdx = 0; sortIdx < sectionCount; ++sortIdx)
     {
-        typename ElfReader<Elf>::ElfSectionBuffer* pSection = nullptr;
+        typename ElfReader<Elf>::SectionBuffer* pSection = nullptr;
         uint32_t secIdx = 0;
         Result result = reader.GetSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
         LLPC_ASSERT(result == Result::Success);
@@ -1269,9 +1269,9 @@ OStream& operator<<(
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
                 const uint32_t noteNameSize = Pow2Align(pNode->nameSize, 4);
-                switch (pNode->type)
+                switch (static_cast<uint32_t>(pNode->type))
                 {
-                case Util::Abi::PipelineAbiNoteType::HsaIsa:
+                case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::HsaIsa):
                 {
                     out << "    HsaIsa                       (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1286,7 +1286,7 @@ OStream& operator<<(
                         << pGpu->gfxipStepping << "\n";
                     break;
                 }
-                case Util::Abi::PipelineAbiNoteType::AbiMinorVersion:
+                case static_cast<uint32_t>(Util::Abi::PipelineAbiNoteType::AbiMinorVersion):
                 {
                     out << "    AbiMinorVersion              (name = "
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
@@ -1296,170 +1296,168 @@ OStream& operator<<(
                     out << "        minor = " << pCodeVersion->minorVersion << "\n";
                     break;
                 }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-                case Util::Abi::PipelineAbiNoteType::LegacyMetadata:
-#endif
-                case Util::Abi::PipelineAbiNoteType::PalMetadata:
+
+                case static_cast<uint32_t>(LegacyMetadata):
                 {
-                    if (pNode->type == LegacyMetadata)
+                    out << "    PalMetadata                  (name = "
+                        << pNode->name << "  size = " << pNode->descSize << ")\n";
+
+                    const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
+                    auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
+                        pSection->pData + offset + noteHeaderSize + noteNameSize);
+
+                    std::map<uint32_t, uint32_t> sortedConfigs;
+                    for (uint32_t i = 0; i < configCount; ++i)
                     {
-                        out << "    PalMetadata                  (name = "
-                            << pNode->name << "  size = " << pNode->descSize << ")\n";
+                        sortedConfigs[pConfig[i].key] = pConfig[i].value;
+                    }
 
-                        const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
-                        auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
-                            pSection->pData + offset + noteHeaderSize + noteNameSize);
-
-                        std::map<uint32_t, uint32_t> sortedConfigs;
-                        for (uint32_t i = 0; i < configCount; ++i)
+                    for (auto config : sortedConfigs)
+                    {
+                        const char* pRegName = nullptr;
+                        if (gfxIp.major <= 8)
                         {
-                            sortedConfigs[pConfig[i].key] = pConfig[i].value;
+                            pRegName = Gfx6::GetRegisterNameString(gfxIp, config.first * 4);
+                        }
+                        else
+                        {
+                            pRegName = Gfx9::GetRegisterNameString(gfxIp, config.first * 4);
+                        }
+                        auto length = snprintf(formatBuf,
+                            sizeof(formatBuf),
+                            "        %-45s = 0x%08X\n",
+                            pRegName,
+                            config.second);
+                        LLPC_UNUSED(length);
+                        out << formatBuf;
+                    }
+                    break;
+                }
+
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                case static_cast<uint32_t>(PalMetadataOld):
+                case static_cast<uint32_t>(PalMetadata):
+                {
+                    out << "    PalMetadata                  (name = "
+                        << pNode->name << "  size = " << pNode->descSize << ")\n";
+
+                    auto pBuffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
+                    reader.InitMsgPack(pBuffer, pNode->descSize);
+
+                    while (reader.GetNextMsgItem())
+                    {
+                        auto msgIterStatus = reader.GetMsgIteratorStatus();
+                        auto pItem = reader.GetMsgItem();
+                        if (msgIterStatus == MsgPackIteratorMapKey)
+                        {
+                            out << "\n";
+                            for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
+                            {
+                                out << "    ";
+                            }
                         }
 
-                        for (auto config : sortedConfigs)
+                        switch (pItem->type)
                         {
-                            const char* pRegName = nullptr;
-                            if (gfxIp.major <= 8)
+                        case CWP_ITEM_MAP:
+                        {
+                            out << "{";
+                            break;
+                        }
+                        case CWP_ITEM_STR:
+                        {
+                            OutputText(reinterpret_cast<const uint8_t*>(pItem->as.str.start),
+                                0,
+                                pItem->as.str.length,
+                                out);
+                            if (msgIterStatus == MsgPackIteratorMapKey)
                             {
-                                pRegName = Gfx6::GetRegisterNameString(gfxIp, config.first * 4);
+                                out << ": ";
+                            }
+                            break;
+                        }
+                        case CWP_ITEM_ARRAY:
+                        {
+                            out << "[ ";
+                            break;
+                        }
+                        case CWP_ITEM_BIN:
+                        {
+                            OutputBinary(reinterpret_cast<const uint8_t*>(pItem->as.bin.start),
+                                0,
+                                pItem->as.bin.length,
+                                out);
+                            break;
+                        }
+                        case CWP_ITEM_BOOLEAN:
+                        {
+                            out << pItem->as.boolean << " ";
+                            break;
+                        }
+                        case CWP_ITEM_POSITIVE_INTEGER:
+                        case CWP_ITEM_NEGATIVE_INTEGER:
+                        {
+                            if (msgIterStatus == MsgPackIteratorMapKey)
+                            {
+                                LLPC_ASSERT(pItem->as.u64 < UINT32_MAX);
+                                const char* pRegName = nullptr;
+                                uint32_t regId = static_cast<uint32_t>(pItem->as.u64 * 4);
+                                if (gfxIp.major <= 8)
+                                {
+                                    pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
+                                }
+                                else
+                                {
+                                    pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
+                                }
+                                auto length = snprintf(formatBuf,
+                                    sizeof(formatBuf),
+                                    "%-45s ",
+                                    pRegName);
+                                LLPC_UNUSED(length);
+                                out << formatBuf;
                             }
                             else
                             {
-                                pRegName = Gfx9::GetRegisterNameString(gfxIp, config.first * 4);
+                                auto length = snprintf(formatBuf,
+                                    sizeof(formatBuf),
+                                    "0x%016" PRIX64 " ",
+                                    pItem->as.u64);
+                                LLPC_UNUSED(length);
+                                out << formatBuf;
                             }
-                            auto length = snprintf(formatBuf,
-                                sizeof(formatBuf),
-                                "        %-45s = 0x%08X\n",
-                                pRegName,
-                                config.second);
-                            LLPC_UNUSED(length);
-                            out << formatBuf;
+                            break;
                         }
-                    }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-                    else
-                    {
-                        out << "    PalMetadata                  (name = "
-                            << pNode->name << "  size = " << pNode->descSize << ")\n";
-
-                        auto pBuffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
-                        reader.InitMsgPack(pBuffer, pNode->descSize);
-
-                        while (reader.GetNextMsgItem())
+                        case CWP_ITEM_FLOAT:
                         {
-                            auto msgIterStatus = reader.GetMsgIteratorStatus();
-                            auto pItem = reader.GetMsgItem();
-                            if (msgIterStatus == MsgPackIteratorMapKey)
-                            {
-                                out << "\n";
-                                for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
-                                {
-                                    out << "    ";
-                                }
-                            }
-
-                            switch (pItem->type)
-                            {
-                            case CWP_ITEM_MAP:
-                            {
-                                out << "{";
-                                break;
-                            }
-                            case CWP_ITEM_STR:
-                            {
-                                OutputText(reinterpret_cast<const uint8_t*>(pItem->as.str.start),
-                                    0,
-                                    pItem->as.str.length,
-                                    out);
-                                if (msgIterStatus == MsgPackIteratorMapKey)
-                                {
-                                    out << ": ";
-                                }
-                                break;
-                            }
-                            case CWP_ITEM_ARRAY:
-                            {
-                                out << "[ ";
-                                break;
-                            }
-                            case CWP_ITEM_BIN:
-                            {
-                                OutputBinary(reinterpret_cast<const uint8_t*>(pItem->as.bin.start),
-                                    0,
-                                    pItem->as.bin.length,
-                                    out);
-                                break;
-                            }
-                            case CWP_ITEM_BOOLEAN:
-                            {
-                                out << pItem->as.boolean << " ";
-                                break;
-                            }
-                            case CWP_ITEM_POSITIVE_INTEGER:
-                            case CWP_ITEM_NEGATIVE_INTEGER:
-                            {
-                                if (msgIterStatus == MsgPackIteratorMapKey)
-                                {
-                                    LLPC_ASSERT(pItem->as.u64 < UINT32_MAX);
-                                    const char* pRegName = nullptr;
-                                    uint32_t regId = static_cast<uint32_t>(pItem->as.u64 * 4);
-                                    if (gfxIp.major <= 8)
-                                    {
-                                        pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
-                                    }
-                                    else
-                                    {
-                                        pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
-                                    }
-                                    auto length = snprintf(formatBuf,
-                                        sizeof(formatBuf),
-                                        "%-45s ",
-                                        pRegName);
-                                    LLPC_UNUSED(length);
-                                    out << formatBuf;
-                                }
-                                else
-                                {
-                                    auto length = snprintf(formatBuf,
-                                        sizeof(formatBuf),
-                                        "0x%016" PRIX64 " ",
-                                        pItem->as.u64);
-                                    LLPC_UNUSED(length);
-                                    out << formatBuf;
-                                }
-                                break;
-                            }
-                            case CWP_ITEM_FLOAT:
-                            {
-                                out << pItem->as.real << " ";
-                                break;
-                            }
-                            case CWP_ITEM_DOUBLE:
-                            {
-                                out << pItem->as.long_real << " ";
-                                break;
-                            }
-                            default:
-                            {
-                                LLPC_NEVER_CALLED();
-                                break;
-                            }
-                            }
-
-                            reader.UpdateMsgPackStatus(
-                                [&](MsgPackIteratorStatus status)
-                            {
-                                if (status == MsgPackIteratorMapValue)
-                                    out << "}";
-                                else
-                                    out << "]";
-                            }
-                            );
+                            out << pItem->as.real << " ";
+                            break;
                         }
+                        case CWP_ITEM_DOUBLE:
+                        {
+                            out << pItem->as.long_real << " ";
+                            break;
+                        }
+                        default:
+                        {
+                            LLPC_NEVER_CALLED();
+                            break;
+                        }
+                        }
+
+                        reader.UpdateMsgPackStatus(
+                            [&](MsgPackIteratorStatus status)
+                        {
+                            if (status == MsgPackIteratorMapValue)
+                                out << "}";
+                            else
+                                out << "]";
+                        }
+                        );
                     }
-#endif
                     break;
                 }
+#endif
                 default:
                 {
                     if (static_cast<uint32_t>(pNode->type) == NT_AMD_AMDGPU_ISA)

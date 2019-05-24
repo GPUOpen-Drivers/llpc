@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerDynIndex.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerDynIndex.
+ * @file  llpcSpirvLowerMemoryOp.h
+ * @brief LLPC header file: contains declaration of class Llpc::SpirvLowerMemoryOp.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -48,23 +48,23 @@ struct StoreExpandInfo
 };
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering opertions for dynamic index in access chain.
-class SpirvLowerDynIndex:
+// Represents the pass of SPIR-V lowering memory operations.
+class SpirvLowerMemoryOp:
     public SpirvLower,
-    public llvm::InstVisitor<SpirvLowerDynIndex>
+    public llvm::InstVisitor<SpirvLowerMemoryOp>
 {
 public:
-    SpirvLowerDynIndex();
+    SpirvLowerMemoryOp();
 
     virtual bool runOnModule(llvm::Module& module);
     virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
-
+    virtual void visitExtractElementInst(llvm::ExtractElementInst& extractElementInst);
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerDynIndex);
+    LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerMemoryOp);
 
     bool NeedExpandDynamicIndex(llvm::GetElementPtrInst* pGetElemPtr,
                                 uint32_t*                pOperandIndex,
@@ -79,8 +79,8 @@ private:
                          llvm::ArrayRef<llvm::GetElementPtrInst*> getElemPtrs,
                          llvm::Value*                             pDynIndex);
 
-    std::unordered_set<llvm::Instruction*> m_getElemPtrInsts;
-    std::unordered_set<llvm::Instruction*> m_loadInsts;
+    std::unordered_set<llvm::Instruction*> m_removeInsts;
+    std::unordered_set<llvm::Instruction*> m_preRemoveInsts;
     SmallVector<StoreExpandInfo, 1>        m_storeExpandInfo;
 };
 

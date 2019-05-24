@@ -72,9 +72,10 @@ GraphicsContext::GraphicsContext(
     const GpuProperty*               pGpuProp,         // [in] GPU Property
     const WorkaroundFlags*           pGpuWorkarounds,  // [in] GPU workarounds
     const GraphicsPipelineBuildInfo* pPipelineInfo,    // [in] Graphics pipeline build info
-    MetroHash::Hash*                 pHash)            // [in] Pipeline hash code
+    MetroHash::Hash*                 pPipelineHash,    // [in] Pipeline hash code
+    MetroHash::Hash*                 pCacheHash)       // [in] Cache hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pHash),
+    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pPipelineHash, pCacheHash),
     m_pPipelineInfo(pPipelineInfo),
     m_stageMask(0),
     m_activeStageCount(0),

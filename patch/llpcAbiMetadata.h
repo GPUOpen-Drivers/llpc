@@ -46,7 +46,12 @@ struct HwReg
 // Invalid metadata key and value which shouldn't be exported to ELF.
 constexpr uint32_t InvalidMetadataKey   = 0xFFFFFFFF;
 constexpr uint32_t InvalidMetadataValue = 0xBAADBEEF;
+
+// The note record types of PAL metadata, for use by the ELF dumper. We have our own definitions
+// here to maintain compatibility with different PAL versions.
 constexpr Util::Abi::PipelineAbiNoteType LegacyMetadata = static_cast<Util::Abi::PipelineAbiNoteType>(12);
+constexpr Util::Abi::PipelineAbiNoteType PalMetadataOld = static_cast<Util::Abi::PipelineAbiNoteType>(13);
+constexpr Util::Abi::PipelineAbiNoteType PalMetadata = static_cast<Util::Abi::PipelineAbiNoteType>(32);
 
 // Defines PAL metadata entries based on the specified name and type of this metadata
 #define DEF_META(_name, _type) \
@@ -152,4 +157,28 @@ DEF_META(CS_PERFORMANCE_DATA_BUFFER_SIZE, CsPerformanceDataBufferSize)
 DEF_META(PS_WRITES_UAVS, PsWritesUavs)
 DEF_META(PS_WRITES_DEPTH, PsWritesDepth)
 #endif
+
+// The names of API shader stages used in PAL metadata, in ShaderStage order.
+static const char* ApiStageNames[] =
+{
+    ".vertex",
+    ".hull",
+    ".domain",
+    ".geometry",
+    ".pixel",
+    ".compute"
+};
+
+// The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
+static const char* HwStageNames[] =
+{
+    ".ls",
+    ".hs",
+    ".es",
+    ".gs",
+    ".vs",
+    ".ps",
+    ".cs"
+};
+
 } // Llpc

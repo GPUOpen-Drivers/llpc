@@ -88,11 +88,11 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcSpirvLower.cpp                      \
         llpcSpirvLowerAlgebraTransform.cpp      \
         llpcSpirvLowerConstImmediateStore.cpp   \
-        llpcSpirvLowerDynIndex.cpp              \
         llpcSpirvLowerGlobal.cpp                \
         llpcSpirvLowerImageOp.cpp               \
         llpcSpirvLowerInstMetaRemove.cpp        \
         llpcSpirvLowerLoopUnrollControl.cpp     \
+        llpcSpirvLowerMemoryOp.cpp              \
         llpcSpirvLowerResourceCollect.cpp       \
         llpcSpirvLowerTranslator.cpp
 
@@ -164,7 +164,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     # llpc/util
     CPPFILES +=                             \
         llpcDebug.cpp                       \
-        llpcElf.cpp                         \
+        llpcElfReader.cpp                   \
+        llpcElfWriter.cpp                   \
         llpcEmuLib.cpp                      \
         llpcFile.cpp                        \
         llpcInternal.cpp                    \
@@ -358,7 +359,7 @@ else
     # llpc/util
     CPPFILES +=                             \
         llpcPipelineDumper.cpp              \
-        llpcElf.cpp                         \
+        llpcElfReader.cpp                   \
         llpcUtil.cpp
 
     ifneq ($(LLPC_PLATFORM), win)

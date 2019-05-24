@@ -49,7 +49,7 @@ class PassManager;
 class PassRegistry;
 void initializeSpirvLowerAlgebraTransformPass(PassRegistry&);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
-void initializeSpirvLowerDynIndexPass(PassRegistry&);
+void initializeSpirvLowerMemoryOpPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
 void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
@@ -68,7 +68,7 @@ inline static void InitializeLowerPasses(
 {
   initializeSpirvLowerAlgebraTransformPass(passRegistry);
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
-  initializeSpirvLowerDynIndexPass(passRegistry);
+  initializeSpirvLowerMemoryOpPass(passRegistry);
   initializeSpirvLowerGlobalPass(passRegistry);
   initializeSpirvLowerImageOpPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
@@ -81,7 +81,7 @@ class Context;
 
 llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt);
 llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
-llvm::ModulePass* CreateSpirvLowerDynIndex();
+llvm::ModulePass* CreateSpirvLowerMemoryOp();
 llvm::ModulePass* CreateSpirvLowerGlobal();
 llvm::ModulePass* CreateSpirvLowerImageOp();
 llvm::ModulePass* CreateSpirvLowerInstMetaRemove();

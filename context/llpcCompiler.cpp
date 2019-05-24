@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-compiler"
 
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
@@ -56,7 +57,8 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
+#include "llpcElfWriter.h"
 #include "llpcFile.h"
 #include "llpcPassLoopInfoCollect.h"
 #include "llpcPassManager.h"
@@ -132,7 +134,7 @@ opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop un
 opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
 
 // -enable-per-stage-cache: Enable shader cache per shader stage
-opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(false));
+opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(true));
 
 extern opt<bool> EnableOuts;
 
@@ -728,7 +730,14 @@ Result Compiler::BuildPipelineInternal(
     BinaryData fragmentElf = {};
     BinaryData nonFragmentElf = {};
 
-    bool checkPerStageCache = pContext->IsGraphics() && cl::EnablePerStageCache;
+    uint32_t stageMask = pContext->GetShaderStageMask();
+
+    // Only enable per stage cache for full graphic pipeline
+    bool checkPerStageCache = cl::EnablePerStageCache &&
+                              pContext->IsGraphics() &&
+                              (stageMask & ShaderStageToMask(ShaderStageVertex)) &&
+                              (stageMask & ShaderStageToMask(ShaderStageFragment));
+
     if (checkPerStageCache && (result == Result::Success))
     {
         // Check per stage shader cache
@@ -736,24 +745,41 @@ Result Compiler::BuildPipelineInternal(
         MetroHash::Hash nonFragmentHash = {};
         BuildShaderCacheHash(pContext, &fragmentHash, &nonFragmentHash);
 
-        uint32_t stageMask = pContext->GetShaderStageMask();
-        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
-        if (stageMask & ShaderStageToMask(ShaderStageFragment))
+        // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
+        // is used in non-fragment shader stages.
+        for (ShaderStage stage = ShaderStageVertex; stage < ShaderStageFragment; stage = static_cast<ShaderStage>(stage + 1))
         {
-            fragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
-                                                            &fragmentHash,
-                                                            &fragmentElf,
-                                                            pFragmentShaderCache,
-                                                            hFragmentEntry);
+            if (stageMask & ShaderStageToMask(stage))
+            {
+                auto pResUsage = pContext->GetShaderResourceUsage(stage);
+                if (pResUsage->globalConstant)
+                {
+                    checkPerStageCache = false;
+                    break;
+                }
+            }
         }
 
-        if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+        if (checkPerStageCache)
         {
-            nonFragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
-                                                            &nonFragmentHash,
-                                                            &nonFragmentElf,
-                                                            pNonFragmentShaderCache,
-                                                            hNonFragmentEntry);
+            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+            if (stageMask & ShaderStageToMask(ShaderStageFragment))
+            {
+                fragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
+                                                             &fragmentHash,
+                                                             &fragmentElf,
+                                                             pFragmentShaderCache,
+                                                             hFragmentEntry);
+            }
+
+            if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+            {
+                nonFragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
+                                                                &nonFragmentHash,
+                                                                &nonFragmentElf,
+                                                                pNonFragmentShaderCache,
+                                                                hNonFragmentEntry);
+            }
         }
     }
 
@@ -1031,7 +1057,12 @@ Result Compiler::BuildGraphicsPipeline(
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
+        GraphicsContext graphicsContext(m_gfxIp,
+                                        &m_gpuProperty,
+                                        &m_gpuWorkarounds,
+                                        pPipelineInfo,
+                                        &pipelineHash,
+                                        &cacheHash);
         result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                shaderInfo,
                                                forceLoopUnrollCount,
@@ -1054,7 +1085,12 @@ Result Compiler::BuildGraphicsPipeline(
             for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
                 forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                GraphicsContext graphicsContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
+                GraphicsContext graphicsContext(m_gfxIp,
+                                                &m_gpuProperty,
+                                                &m_gpuWorkarounds,
+                                                pPipelineInfo,
+                                                &pipelineHash,
+                                                &cacheHash);
                 result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                        shaderInfo,
                                                        forceLoopUnrollCount,
@@ -1220,7 +1256,12 @@ Result Compiler::BuildComputePipeline(
         PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
-        ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
+        ComputeContext computeContext(m_gfxIp,
+                                      &m_gpuProperty,
+                                      &m_gpuWorkarounds,
+                                      pPipelineInfo,
+                                      &pipelineHash,
+                                      &cacheHash);
 
         result = BuildComputePipelineInternal(&computeContext,
                                               pPipelineInfo,
@@ -1244,7 +1285,12 @@ Result Compiler::BuildComputePipeline(
             for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
             {
                 forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                ComputeContext computeContext(m_gfxIp, &m_gpuProperty, &m_gpuWorkarounds, pPipelineInfo, &pipelineHash);
+                ComputeContext computeContext(m_gfxIp,
+                                              &m_gpuProperty,
+                                              &m_gpuWorkarounds,
+                                              pPipelineInfo,
+                                              &pipelineHash,
+                                              &cacheHash);
 
                 result = BuildComputePipelineInternal(&computeContext,
                                                       pPipelineInfo,
@@ -2008,7 +2054,7 @@ void Compiler::GetPipelineStatistics(
     uint32_t sectionCount = reader.GetSectionCount();
     for (uint32_t secIdx = 0; secIdx < sectionCount; ++secIdx)
     {
-        typename ElfReader<Elf64>::ElfSectionBuffer* pSection = nullptr;
+        typename ElfReader<Elf64>::SectionBuffer* pSection = nullptr;
         bool isCompute = false;
         Result result = reader.GetSectionDataBySectionIndex(secIdx, &pSection);
         LLPC_ASSERT(result == Result::Success);
@@ -2052,6 +2098,53 @@ void Compiler::GetPipelineStatistics(
                         }
                     }
                 }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
+                else if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
+                {
+                    // Msgpack metadata.
+                    msgpack::Document document;
+                    if (document.readFromBlob(StringRef(reinterpret_cast<const char*>(pSection->pData + offset +
+                                                            noteHeaderSize + Pow2Align(pNode->nameSize,
+                                                          sizeof(uint32_t))),
+                                                        pNode->descSize),
+                                              false))
+                    {
+                        auto hwStages = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
+                                                          .getArray(true)[0]
+                                                          .getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages]
+                                                          .getMap(true);
+                        auto stageIt = hwStages.find(".ps");
+                        if (stageIt == hwStages.end())
+                        {
+                            stageIt = hwStages.find(".cs");
+                            isCompute = true;
+                        }
+
+                        if (stageIt != hwStages.end())
+                        {
+                            auto hwStage = stageIt->second.getMap(true);
+                            auto node = hwStage[Util::Abi::HardwareStageMetadataKey::VgprCount];
+
+                            if (node.getKind() == msgpack::Type::UInt)
+                            {
+                                pPipelineStats->numUsedVgprs = node.getUInt();
+                            }
+
+                            node = hwStage[Util::Abi::HardwareStageMetadataKey::VgprLimit];
+                            if (node.getKind() == msgpack::Type::UInt)
+                            {
+                                pPipelineStats->numAvailVgprs = node.getUInt();
+                            }
+
+                            node = hwStage[Util::Abi::PipelineMetadataKey::ScratchMemorySize];
+                            if (node.getKind() == msgpack::Type::UInt)
+                            {
+                                pPipelineStats->useScratchBuffer = (node.getUInt() > 0);
+                            }
+                        }
+                    }
+                }
+#endif
 
                 offset += noteHeaderSize + Pow2Align(pNode->nameSize, sizeof(uint32_t)) +
                           Pow2Align(pNode->descSize, sizeof(uint32_t));
@@ -2377,7 +2470,227 @@ void Compiler::MergeElfBinary(
     const BinaryData* pNonFragmentElf, // [in] ELF binary of non-fragment shaders
     ElfPackage*       pPipelineElf)    // [out] Final ELF binary
 {
+    auto FragmentIsaSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsMainEntry)];
+    auto FragmentIntrlTblSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlTblPtr)];
+    auto FragmentDisassemblySymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsDisassembly)];
+    auto FragmentIntrlDataSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlData)];
+    auto FragmentAmdIlSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsAmdIl)];
 
+    ElfWriter<Elf64> writer(m_gfxIp);
+    ElfReader<Elf64> reader(m_gfxIp);
+
+    // Load ELF binary
+    auto result = writer.ReadFromBuffer(pNonFragmentElf->pCode, pNonFragmentElf->codeSize);
+    LLPC_ASSERT(result == Result::Success);
+
+    auto fragmentCodesize = pFragmentElf->codeSize;
+    result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
+    LLPC_ASSERT(result == Result::Success);
+
+    // Merge GPU ISA code
+    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentTextSection = nullptr;
+    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentTextSection = nullptr;
+    std::vector<ElfSymbol> fragmentSymbols;
+    std::vector<ElfSymbol*> nonFragmentSymbols;
+
+    auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
+    auto nonFragmentSecIndex = writer.GetSectionIndex(TextName);
+    reader.GetSectionDataBySectionIndex(fragmentTextSecIndex, &pFragmentTextSection);
+    reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
+
+    writer.GetSectionDataBySectionIndex(nonFragmentSecIndex, &pNonFragmentTextSection);
+    writer.GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
+    ElfSymbol* pFragmentIsaSymbol = nullptr;
+    ElfSymbol* pNonFragmentIsaSymbol = nullptr;
+    std::string firstIsaSymbolName;
+
+    for (auto pSymbol : nonFragmentSymbols)
+    {
+        if (firstIsaSymbolName.empty())
+        {
+            // NOTE: Entry name of the first shader stage is missed in disassembly section, we have to add it back
+            // when merge disassembly sections.
+            if (strncmp(pSymbol->pSymName, "_amdgpu_", strlen("_amdgpu_")) == 0)
+            {
+                firstIsaSymbolName = pSymbol->pSymName;
+            }
+        }
+
+        if (strcmp(pSymbol->pSymName, FragmentIsaSymbolName) == 0)
+        {
+            pNonFragmentIsaSymbol = pSymbol;
+        }
+
+        if (pNonFragmentIsaSymbol == nullptr)
+        {
+            continue;
+        }
+
+        // Reset all symbols after _amdgpu_ps_main
+        pSymbol->secIdx = InvalidValue;
+    }
+
+    size_t isaOffset = (pNonFragmentIsaSymbol == nullptr) ?
+                       Pow2Align(pNonFragmentTextSection->secHead.sh_size, 0x100) :
+                       pNonFragmentIsaSymbol->value;
+    for (auto& fragmentSymbol : fragmentSymbols)
+    {
+        if (strcmp(fragmentSymbol.pSymName, FragmentIsaSymbolName) == 0)
+        {
+            // Modify ISA code
+            pFragmentIsaSymbol = &fragmentSymbol;
+            ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+            writer.MergeSection(pNonFragmentTextSection,
+                                isaOffset,
+                                nullptr,
+                                pFragmentTextSection,
+                                pFragmentIsaSymbol->value,
+                                nullptr,
+                                &newSection);
+            writer.SetSection(nonFragmentSecIndex, &newSection);
+        }
+
+        if (pFragmentIsaSymbol == nullptr)
+        {
+            continue;
+        }
+
+        // Update fragment shader related symbols
+        ElfSymbol* pSymbol = nullptr;
+        pSymbol = writer.GetSymbol(fragmentSymbol.pSymName);
+        pSymbol->secIdx = nonFragmentSecIndex;
+        pSymbol->pSecName = nullptr;
+        pSymbol->value = isaOffset + fragmentSymbol.value - pFragmentIsaSymbol->value;
+        pSymbol->size = fragmentSymbol.size;
+    }
+
+    // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
+    LLPC_ASSERT((reader.IsValidSymbol(FragmentIntrlTblSymbolName) == false) &&
+                (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
+                (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
+                (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
+
+    // Merge ISA disassemble
+    auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+    auto nonFragmentDisassemblySecIndex = writer.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentDisassemblySection = nullptr;
+    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentDisassemblySection = nullptr;
+    reader.GetSectionDataBySectionIndex(fragmentDisassemblySecIndex, &pFragmentDisassemblySection);
+    writer.GetSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &pNonFragmentDisassemblySection);
+    if (pNonFragmentDisassemblySection != nullptr)
+    {
+        LLPC_ASSERT(pFragmentDisassemblySection != nullptr);
+        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
+        // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
+        // for all section data.
+        auto pFragmentDisassemblySectionEnd = pFragmentDisassemblySection->pData +
+                                              pFragmentDisassemblySection->secHead.sh_size - 1;
+        uint8_t lastChar = *pFragmentDisassemblySectionEnd;
+        const_cast<uint8_t*>(pFragmentDisassemblySectionEnd)[0] = '\0';
+        auto pFragmentDisassembly = strstr(reinterpret_cast<const char*>(pFragmentDisassemblySection->pData),
+                                          FragmentIsaSymbolName);
+        const_cast<uint8_t*>(pFragmentDisassemblySectionEnd)[0] = lastChar;
+
+        auto fragmentDisassemblyOffset =
+            (pFragmentDisassembly == nullptr) ?
+            0 :
+            (pFragmentDisassembly - reinterpret_cast<const char*>(pFragmentDisassemblySection->pData));
+
+        auto pDisassemblyEnd = strstr(reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData),
+                                     FragmentIsaSymbolName);
+        auto disassemblySize = (pDisassemblyEnd == nullptr) ?
+                              pNonFragmentDisassemblySection->secHead.sh_size :
+                              pDisassemblyEnd - reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData);
+
+        ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+        writer.MergeSection(pNonFragmentDisassemblySection,
+                            disassemblySize,
+                            firstIsaSymbolName.c_str(),
+                            pFragmentDisassemblySection,
+                            fragmentDisassemblyOffset,
+                            FragmentIsaSymbolName,
+                            &newSection);
+        writer.SetSection(nonFragmentDisassemblySecIndex, &newSection);
+    }
+
+    // Merge LLVM IR disassemble
+    const std::string LlvmIrSectionName = std::string(Util::Abi::AmdGpuCommentName) + ".llvmir";
+    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentLlvmIrSection = nullptr;
+    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentLlvmIrSection = nullptr;
+
+    auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(LlvmIrSectionName.c_str());
+    auto nonFragmentLlvmIrSecIndex = writer.GetSectionIndex(LlvmIrSectionName.c_str());
+    reader.GetSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &pFragmentLlvmIrSection);
+    writer.GetSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &pNonFragmentLlvmIrSection);
+
+    if (pNonFragmentLlvmIrSection != nullptr)
+    {
+        LLPC_ASSERT(pFragmentLlvmIrSection != nullptr);
+
+        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
+        // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
+        // for all section data.
+        auto pFragmentLlvmIrSectionEnd = pFragmentLlvmIrSection->pData +
+                                         pFragmentLlvmIrSection->secHead.sh_size - 1;
+        uint8_t lastChar = *pFragmentLlvmIrSectionEnd;
+        const_cast<uint8_t*>(pFragmentLlvmIrSectionEnd)[0] = '\0';
+        auto pFragmentLlvmIrStart = strstr(reinterpret_cast<const char*>(pFragmentLlvmIrSection->pData),
+                                           FragmentIsaSymbolName);
+        const_cast<uint8_t*>(pFragmentLlvmIrSectionEnd)[0] = lastChar;
+
+        auto fragmentLlvmIrOffset =
+            (pFragmentLlvmIrStart == nullptr) ?
+            0 :
+            (pFragmentLlvmIrStart - reinterpret_cast<const char*>(pFragmentLlvmIrSection->pData));
+
+        auto pLlvmIrEnd = strstr(reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData),
+                                 FragmentIsaSymbolName);
+        auto llvmIrSize = (pLlvmIrEnd == nullptr) ?
+                          pNonFragmentLlvmIrSection->secHead.sh_size :
+                          pLlvmIrEnd - reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData);
+
+        ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+        writer.MergeSection(pNonFragmentLlvmIrSection,
+                            llvmIrSize,
+                            firstIsaSymbolName.c_str(),
+                            pFragmentLlvmIrSection,
+                            fragmentLlvmIrOffset,
+                            FragmentIsaSymbolName,
+                            &newSection);
+        writer.SetSection(nonFragmentLlvmIrSecIndex, &newSection);
+    }
+
+    // Merge PAL metadata
+    ElfNote nonFragmentMetaNote = {};
+    ElfNote nonFragmentLegacyMetaNote = {};
+    nonFragmentMetaNote = writer.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    nonFragmentLegacyMetaNote = writer.GetNote(Util::Abi::PipelineAbiNoteType::LegacyMetadata);
+
+    if (nonFragmentLegacyMetaNote.pData != nullptr)
+    {
+        LLPC_ASSERT(nonFragmentMetaNote.pData == nullptr);
+        ElfNote fragmentLegacyMetaNote = {};
+        ElfNote newLegacyMetaNote = {};
+        fragmentLegacyMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::LegacyMetadata);
+        writer.MergeLegacyMetaNote(pContext, &nonFragmentLegacyMetaNote, &fragmentLegacyMetaNote, &newLegacyMetaNote);
+        writer.SetNote(&newLegacyMetaNote);
+    }
+    else
+    {
+        LLPC_ASSERT(nonFragmentMetaNote.pData != nullptr);
+        ElfNote fragmentMetaNote = {};
+        ElfNote newMetaNote = {};
+        fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+        writer.MergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
+        writer.SetNote(&newMetaNote);
+    }
+
+    writer.WriteToBuffer(pPipelineElf);
 }
 
 } // Llpc

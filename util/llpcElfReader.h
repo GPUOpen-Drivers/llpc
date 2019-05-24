@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcElf.h
- * @brief LLPC header file: contains declaration of LLPC ELF utilities.
+ * @file  llpcElfReader.h
+ * @brief LLPC header file: contains declaration of LLPC ELF reading utilities.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -49,6 +49,8 @@ namespace llvm
 
 namespace Llpc
 {
+
+template<class Elf> class ElfWriter;
 
 // LLVM backend special section name
 static const char   AmdGpuDisasmName[] = ".AMDGPU.disasm"; // Name of ".AMDGPU.disasm" section
@@ -326,18 +328,9 @@ struct Elf64
 };
 #pragma pack (pop)
 
-// Represents a named buffer to hold section data and metadata.
-template<class ElfSectionHeader>
-struct ElfWriteSectionBuffer
-{
-    uint8_t*          pData;      // Pointer to binary data buffer
-    char*             pName;      // Section name
-    ElfSectionHeader  secHead;    // Section metadata
-};
-
 // Represents a named buffer to hold constant section data and metadata.
 template<class ElfSectionHeader>
-struct ElfReadSectionBuffer
+struct ElfSectionBuffer
 {
     const uint8_t*    pData;      // Pointer to binary data buffer
     const char*       pName;      // Section name
@@ -365,8 +358,8 @@ struct ElfReloc
 // Represents info of ELF note
 struct ElfNote
 {
-    NoteHeader hdr;       // Note header
-    uint32_t*  pData;     // The content of the note
+    NoteHeader             hdr;      // Note header
+    const uint8_t*         pData;    // The content of the note
 };
 
 typedef llvm::SmallString<1024> ElfPackage;
@@ -397,7 +390,7 @@ template<class Elf>
 class ElfReader
 {
 public:
-    typedef ElfReadSectionBuffer<typename Elf::SectionHeader> ElfSectionBuffer;
+    typedef ElfSectionBuffer<typename Elf::SectionHeader> SectionBuffer;
     ElfReader(GfxIpVersion gfxIp);
     ~ElfReader();
 
@@ -412,14 +405,19 @@ public:
     Result GetSectionData(const char* pName, const void** ppData, size_t* pDataLength) const;
 
     uint32_t GetSectionCount();
-    Result GetSectionDataBySectionIndex(uint32_t secIdx, ElfSectionBuffer** ppSectionData) const;
-    Result GetSectionDataBySortingIndex(uint32_t sortIdx, uint32_t* pSecIdx, ElfSectionBuffer** ppSectionData) const;
+    Result GetSectionDataBySectionIndex(uint32_t secIdx, SectionBuffer** ppSectionData) const;
+    Result GetSectionDataBySortingIndex(uint32_t sortIdx, uint32_t* pSecIdx, SectionBuffer** ppSectionData) const;
 
     // Determine if a section with the specified name is present in this ELF.
     bool IsSectionPresent(const char* pName) const { return (m_map.find(pName) != m_map.end()); }
 
     uint32_t GetSymbolCount();
     void GetSymbol(uint32_t idx, ElfSymbol* pSymbol);
+
+    bool IsValidSymbol(const char* pSymbolName);
+
+    ElfNote GetNote(Util::Abi::PipelineAbiNoteType noteType);
+
     void GetSymbolsBySectionIndex(uint32_t secIndx, std::vector<ElfSymbol>& secSymbols);
 
     uint32_t GetRelocationCount();
@@ -454,8 +452,7 @@ private:
 
     typename Elf::FormatHeader        m_header;     // ELF header
     std::map<std::string, uint32_t>   m_map;        // Map between section name and section index
-
-    std::vector<ElfReadSectionBuffer<typename Elf::SectionHeader>*> m_sections; // List of section data and headers
+    std::vector<SectionBuffer*>       m_sections;   // List of section data and headers
 
     int32_t   m_symSecIdx;      // Index of symbol section
     int32_t   m_relocSecIdx;    // Index of relocation section
@@ -466,6 +463,7 @@ private:
     std::vector<MsgPackIterator> m_iteratorStack;    // MsgPack iterator stack
     uint32_t                     m_msgPackMapLevel;  // The map level of current message item
 #endif
+    friend class ElfWriter<Elf>;
 };
 
 } // Llpc

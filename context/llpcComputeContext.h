@@ -44,7 +44,8 @@ public:
                    const GpuProperty*              pGpuProp,
                    const WorkaroundFlags*          pGpuWorkarounds,
                    const ComputePipelineBuildInfo* pPipelineInfo,
-                   MetroHash::Hash*                pHash);
+                   MetroHash::Hash*                pPipelineHash,
+                   MetroHash::Hash*                pCacheHash);
     virtual ~ComputeContext() {}
 
     virtual ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);

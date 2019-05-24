@@ -48,10 +48,12 @@ PipelineContext::PipelineContext(
     GfxIpVersion           gfxIp,           // Graphics IP version info
     const GpuProperty*     pGpuProp,        // [in] GPU property
     const WorkaroundFlags* pGpuWorkarounds, // [in] GPU workarounds
-    MetroHash::Hash*       pHash)           // [in] Pipeline hash code
+    MetroHash::Hash*       pPipelineHash,   // [in] Pipeline hash code
+    MetroHash::Hash*       pCacheHash)      // [in] Cache hash code
     :
     m_gfxIp(gfxIp),
-    m_hash(*pHash),
+    m_pipelineHash(*pPipelineHash),
+    m_cacheHash(*pCacheHash),
     m_pGpuProperty(pGpuProp),
     m_pGpuWorkarounds(pGpuWorkarounds)
 {
@@ -154,6 +156,7 @@ void PipelineContext::InitShaderResourceUsage(
     pResUsage->resourceWrite = false;
     pResUsage->resourceRead = false;
     pResUsage->perShaderTable = false;
+    pResUsage->globalConstant = false;
 
     pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
     pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;

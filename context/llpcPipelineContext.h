@@ -164,6 +164,7 @@ struct ResourceUsage
     bool                       resourceWrite;         // Whether shader does resource-write operations (UAV)
     bool                       resourceRead;          // Whether shader does resource-read operrations (UAV)
     bool                       perShaderTable;        // Whether per shader stage table is used
+    bool                       globalConstant;        // Whether global constant is used
     uint32_t                   numSgprsAvailable;     // Number of available SGPRs
     uint32_t                   numVgprsAvailable;     // Number of available VGPRs
 
@@ -714,7 +715,8 @@ public:
     PipelineContext(GfxIpVersion           gfxIp,
                     const GpuProperty*     pGpuProp,
                     const WorkaroundFlags* pGpuWorkarounds,
-                    MetroHash::Hash*       pHash);
+                    MetroHash::Hash*       pPipelineHash,
+                    MetroHash::Hash*       pCacheHash);
     virtual ~PipelineContext();
 
     // Gets resource usage of the specified shader stage
@@ -779,7 +781,8 @@ public:
     const WorkaroundFlags* GetGpuWorkarounds() const { return m_pGpuWorkarounds; }
 
     // Gets pipeline hash code
-    uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_hash); }
+    uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_pipelineHash); }
+    uint64_t GetCacheHashCode() const { return MetroHash::Compact64(&m_cacheHash); }
 
     virtual uint64_t GetShaderHashCode(ShaderStage stage) const;
 
@@ -803,7 +806,8 @@ protected:
     // -----------------------------------------------------------------------------------------------------------------
 
     GfxIpVersion           m_gfxIp;         // Graphics IP version info
-    MetroHash::Hash        m_hash;          // Pipeline hash code
+    MetroHash::Hash        m_pipelineHash;  // Pipeline hash code
+    MetroHash::Hash        m_cacheHash;     // Cache hash code
     const GpuProperty*     m_pGpuProperty;  // GPU Property
     const WorkaroundFlags* m_pGpuWorkarounds;  // GPU workarounds
 
