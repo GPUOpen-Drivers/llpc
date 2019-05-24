@@ -224,16 +224,22 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 auto pLsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
                 auto pHsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl);
 
-                auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
-                pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+                if (pHsEntryPoint != nullptr)
+                {
+                    auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
+                    pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+                }
             }
 
             auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
             auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
 
             {
-                auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
-                pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                if (pGsEntryPoint != nullptr)
+                {
+                    auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
+                    pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                }
 
                 SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
             }
@@ -246,8 +252,11 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 auto pLsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
                 auto pHsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessControl);
 
-                auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
-                pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+                if (pHsEntryPoint != nullptr)
+                {
+                    auto pLsHsEntryPoint = shaderMerger.GenerateLsHsEntryPoint(pLsEntryPoint, pHsEntryPoint);
+                    pLsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
+                }
             }
 
             {
@@ -261,8 +270,11 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
 
             {
-                auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
-                pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                if (pGsEntryPoint != nullptr)
+                {
+                    auto pEsGsEntryPoint = shaderMerger.GenerateEsGsEntryPoint(pEsEntryPoint, pGsEntryPoint);
+                    pEsGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                }
 
                 SetCallingConv(ShaderStageCopyShader, CallingConv::AMDGPU_VS);
             }

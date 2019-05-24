@@ -33,7 +33,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include "llpcAbiMetadata.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 
 namespace Llpc
 {
@@ -195,7 +195,10 @@ struct PsRegConfig
     DEF_REG(DB_SHADER_CONTROL);
     DEF_REG(CB_SHADER_MASK);
 
+    static uint32_t GetPsInputCntlStart();
+    static uint32_t GetPsUserDataStart();
     void Init();
+
 };
 
 // =====================================================================================================================

@@ -33,7 +33,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcCodeGenManager.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 #include "llpcGfx9ConfigBuilder.h"
 
 namespace llvm

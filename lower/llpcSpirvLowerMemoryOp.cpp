@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerDynIndex.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerDynIndex.
+ * @file  llpcSpirvLowerMemoryOp.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerMemoryOp.
  ***********************************************************************************************************************
  */
 #include "llvm/IR/Instructions.h"
@@ -35,9 +35,9 @@
 
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
-#include "llpcSpirvLowerDynIndex.h"
+#include "llpcSpirvLowerMemoryOp.h"
 
-#define DEBUG_TYPE "llpc-spirv-lower-dyn-index"
+#define DEBUG_TYPE "llpc-spirv-lower-memory-op"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -48,42 +48,42 @@ namespace Llpc
 
 // =====================================================================================================================
 // Initializes static members.
-char SpirvLowerDynIndex::ID = 0;
+char SpirvLowerMemoryOp::ID = 0;
 
 // =====================================================================================================================
-// Pass creator, creates the pass of SPIR-V lowering operations for dynamic index in access chain
-ModulePass* CreateSpirvLowerDynIndex()
+// Pass creator, creates the pass of SPIR-V lowering memory operations.
+ModulePass* CreateSpirvLowerMemoryOp()
 {
-    return new SpirvLowerDynIndex();
+    return new SpirvLowerMemoryOp();
 }
 
 // =====================================================================================================================
-SpirvLowerDynIndex::SpirvLowerDynIndex()
+SpirvLowerMemoryOp::SpirvLowerMemoryOp()
     :
     SpirvLower(ID)
 {
-    initializeSpirvLowerDynIndexPass(*PassRegistry::getPassRegistry());
+    initializeSpirvLowerMemoryOpPass(*PassRegistry::getPassRegistry());
 }
 
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
-bool SpirvLowerDynIndex::runOnModule(
+bool SpirvLowerMemoryOp::runOnModule(
     Module& module)  // [in,out] LLVM module to be run on
 {
-    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Dyn-Index\n");
+    LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Memory-Op\n");
 
     SpirvLower::Init(&module);
 
     visit(m_pModule);
 
     // Remove those instructions that are replaced by this lower pass
-    for (auto pInst : m_loadInsts)
+    for (auto pInst : m_preRemoveInsts)
     {
         LLPC_ASSERT(pInst->user_empty());
         pInst->dropAllReferences();
         pInst->eraseFromParent();
     }
-    m_loadInsts.clear();
+    m_preRemoveInsts.clear();
 
     for (uint32_t i = 0; i < m_storeExpandInfo.size(); i++)
     {
@@ -92,22 +92,66 @@ bool SpirvLowerDynIndex::runOnModule(
     }
     m_storeExpandInfo.clear();
 
-    for (auto pInst : m_getElemPtrInsts)
+    for (auto pInst : m_removeInsts)
     {
         LLPC_ASSERT(pInst->user_empty());
         pInst->dropAllReferences();
         pInst->eraseFromParent();
     }
-    m_getElemPtrInsts.clear();
+    m_removeInsts.clear();
 
-    LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Dyn-Index: " << module);
+    LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Memory-Op " << module);
 
     return true;
 }
 
 // =====================================================================================================================
+// Visits "extractelement" instruction.
+void SpirvLowerMemoryOp::visitExtractElementInst(
+    ExtractElementInst& extractElementInst)  // "ExtractElement" instruction
+{
+    auto pSrc = extractElementInst.getOperand(0);
+    if (pSrc->getType()->isVectorTy() &&
+        isa<LoadInst>(pSrc) &&
+        pSrc->hasOneUse())
+    {
+        // NOTE: Optimize loading vector component for local variable and memory block
+        // Original pattern:
+        // %1 = load <4 x float> addrspace(7)* %2
+        // %2 = extractelement <4 x float> %1, i32 0
+        // after transform:
+        // %1 = bitcast <4 x float> addrspace(7)* %2 to[4 x float] addrspace(7)*
+        // %3 = getelementptr[4 x float] addrspace(7)* %2, i32 0, i32 0
+        // %4 = load float addrspace(7)* %3
+
+        auto pLoadInst = cast<LoadInst>(pSrc);
+        auto pLoadPtr = pLoadInst->getOperand(0);
+        auto addrSpace = pLoadPtr->getType()->getPointerAddressSpace();
+
+        if ((addrSpace == SPIRAS_Local) || (addrSpace == SPIRAS_Uniform))
+        {
+            auto pSrcTy = pSrc->getType();
+            auto pCastTy = ArrayType::get(pSrcTy->getVectorElementType(), pSrcTy->getVectorNumElements());
+            auto pCastPtrTy = pCastTy->getPointerTo(addrSpace);
+            auto pCastPtr = new BitCastInst(pLoadPtr, pCastPtrTy, "", &extractElementInst);
+            Value* idxs[] =
+            {
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                extractElementInst.getOperand(1)
+            };
+            auto pElementPtr = GetElementPtrInst::Create(nullptr, pCastPtr, idxs, "", &extractElementInst);
+            auto pNewLoad = new LoadInst(pElementPtr, "", &extractElementInst);
+            extractElementInst.replaceAllUsesWith(pNewLoad);
+
+            m_preRemoveInsts.insert(&extractElementInst);
+            m_removeInsts.insert(pLoadInst);
+        }
+    }
+}
+
+// =====================================================================================================================
 // Visits "getelementptr" instruction.
-void SpirvLowerDynIndex::visitGetElementPtrInst(
+void SpirvLowerMemoryOp::visitGetElementPtrInst(
     GetElementPtrInst& getElemPtrInst) // "GetElementPtr" instruction
 {
     uint32_t operandIndex = InvalidValue;
@@ -158,13 +202,13 @@ void SpirvLowerDynIndex::visitGetElementPtrInst(
         }
 
         // Collect replaced instructions that will be removed
-        m_getElemPtrInsts.insert(&getElemPtrInst);
+        m_removeInsts.insert(&getElemPtrInst);
     }
 }
 
 // =====================================================================================================================
 // Checks whether the specified "getelementptr" instruction contains dynamic index and is therefore able to be expanded.
-bool SpirvLowerDynIndex::NeedExpandDynamicIndex(
+bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
     GetElementPtrInst* pGetElemPtr,       // [in] "GetElementPtr" instruction
     uint32_t*          pOperandIndex,     // [out] Index of the operand that represents a dynamic index
     uint32_t*          pDynIndexBound     // [out] Upper bound of dynamic index
@@ -262,7 +306,7 @@ bool SpirvLowerDynIndex::NeedExpandDynamicIndex(
 
 // =====================================================================================================================
 // Expands "load" instruction with constant-index "getelementptr" instructions.
-void SpirvLowerDynIndex::ExpandLoadInst(
+void SpirvLowerMemoryOp::ExpandLoadInst(
     LoadInst*                    pLoadInst,       // [in] "Load" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,     // [in] A group of "getelementptr" with constant indices
     Value*                       pDynIndex)       // [in] Dynamic index
@@ -298,12 +342,12 @@ void SpirvLowerDynIndex::ExpandLoadInst(
     }
 
     pLoadInst->replaceAllUsesWith(pFirstLoadValue);
-    m_loadInsts.insert(pLoadInst);
+    m_preRemoveInsts.insert(pLoadInst);
 }
 
 // =====================================================================================================================
 // Record store expansion info after visit, because splitBasicBlock will disturb the visit.
-void SpirvLowerDynIndex::RecordStoreExpandInfo(
+void SpirvLowerMemoryOp::RecordStoreExpandInfo(
     StoreInst*                   pStoreInst,     // [in] "Store" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
     Value*                       pDynIndex)      // [in] Dynamic index
@@ -322,7 +366,7 @@ void SpirvLowerDynIndex::RecordStoreExpandInfo(
 
 // =====================================================================================================================
 // Expands "store" instruction with fixed indexed "getelementptr" instructions.
-void SpirvLowerDynIndex::ExpandStoreInst(
+void SpirvLowerMemoryOp::ExpandStoreInst(
     StoreInst*                   pStoreInst,     // [in] "Store" instruction
     ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
     Value*                       pDynIndex)      // [in] Dynamic index
@@ -438,6 +482,6 @@ void SpirvLowerDynIndex::ExpandStoreInst(
 } // Llpc
 
 // =====================================================================================================================
-// Initializes the pass of SPIR-V lowering opertions for dynamic index in access chain.
-INITIALIZE_PASS(SpirvLowerDynIndex, DEBUG_TYPE,
-                "Lower SPIR-V dynamic index in access chain", false, false)
+// Initializes the pass of SPIR-V lowering the memory operations.
+INITIALIZE_PASS(SpirvLowerMemoryOp, DEBUG_TYPE,
+                "Lower SPIR-V memory operations", false, false)

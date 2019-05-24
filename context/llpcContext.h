@@ -250,6 +250,11 @@ public:
         return m_pPipelineContext->GetPiplineHashCode();
     }
 
+    uint64_t GetCacheHashCode() const
+    {
+        return m_pPipelineContext->GetCacheHashCode();
+    }
+
     uint64_t GetShaderHashCode(ShaderStage shaderStage) const
     {
         return m_pPipelineContext->GetShaderHashCode(shaderStage);

@@ -234,11 +234,11 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLower.cpp
     lower/llpcSpirvLowerAlgebraTransform.cpp
     lower/llpcSpirvLowerConstImmediateStore.cpp
-    lower/llpcSpirvLowerDynIndex.cpp
     lower/llpcSpirvLowerGlobal.cpp
     lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
+    lower/llpcSpirvLowerMemoryOp.cpp
     lower/llpcSpirvLowerResourceCollect.cpp
     lower/llpcSpirvLowerTranslator.cpp
 )
@@ -315,8 +315,9 @@ target_sources(llpc PRIVATE
 
 # llpc/util
 target_sources(llpc PRIVATE
-    util/llpcElf.cpp
     util/llpcDebug.cpp
+    util/llpcElfReader.cpp
+    util/llpcElfWriter.cpp
     util/llpcEmuLib.cpp
     util/llpcInternal.cpp
     util/llpcFile.cpp

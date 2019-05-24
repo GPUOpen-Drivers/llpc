@@ -36,6 +36,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
@@ -109,6 +110,20 @@ bool PatchBufferOp::runOnFunction(
     {
         visit(*pBlock);
     }
+
+    // Some instructions can modify the CFG and thus have to be performed after the normal visitors.
+    for (Instruction* const pInst : m_postVisitInsts)
+    {
+        if (MemSetInst* const pMemSet = dyn_cast<MemSetInst>(pInst))
+        {
+            PostVisitMemSetInst(*pMemSet);
+        }
+        else if (MemCpyInst* const pMemCpy = dyn_cast<MemCpyInst>(pInst))
+        {
+            PostVisitMemCpyInst(*pMemCpy);
+        }
+    }
+    m_postVisitInsts.clear();
 
     const bool changed = (m_replacementMap.empty() == false);
 
@@ -240,6 +255,17 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
 
         pResultValue = m_pBuilder->CreateInsertValue(pResultValue, pAtomicCall, static_cast<uint64_t>(0));
         CopyMetadata(pResultValue, &atomicCmpXchgInst);
+
+        // NOTE: If we have a strong compare exchange, LLVM optimization will always set the compare result to "Equal".
+        // Thus, we have to correct this behaviour and do the comparison by ourselves.
+        if (atomicCmpXchgInst.isWeak() == false)
+        {
+            Value* const pValueEqual = m_pBuilder->CreateICmpEQ(pAtomicCall, atomicCmpXchgInst.getCompareOperand());
+            CopyMetadata(pValueEqual, &atomicCmpXchgInst);
+
+            pResultValue = m_pBuilder->CreateInsertValue(pResultValue, pValueEqual, static_cast<uint64_t>(1));
+            CopyMetadata(pResultValue, &atomicCmpXchgInst);
+        }
 
         // Record the atomic instruction so we remember to delete it later.
         m_replacementMap[&atomicCmpXchgInst] = std::make_pair(nullptr, nullptr);
@@ -669,56 +695,14 @@ void PatchBufferOp::visitMemCpyInst(
     const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
     const uint32_t srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
 
-    // If both of the address spaces are not fat pointers, bail.
-    if ((destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER) &&
-        (srcAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER))
+    // If either of the address spaces are fat pointers.
+    if ((destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) ||
+        (srcAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER))
     {
-        return;
+        // Handling memcpy requires us to modify the CFG, so we need to do it after the initial visit pass.
+        m_postVisitInsts.push_back(&memCpyInst);
     }
-
-    m_pBuilder->SetInsertPoint(&memCpyInst);
-
-    const uint32_t destAlignment = memCpyInst.getParamAlignment(0);
-    const uint32_t srcAlignment = memCpyInst.getParamAlignment(1);
-
-    // We assume LLVM is not introducing variable length mem copies.
-    ConstantInt* const pLength = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
-    LLPC_ASSERT(pLength != nullptr);
-
-    // Get an vector type that is the length of the memcpy.
-    VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLength->getZExtValue());
-
-    PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
-    Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
-    CopyMetadata(pCastDest, &memCpyInst);
-
-    PointerType* const pCastSrcType = pMemoryType->getPointerTo(srcAddrSpace);
-    Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrc, pCastSrcType);
-    CopyMetadata(pCastSrc, &memCpyInst);
-
-    LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, srcAlignment);
-    CopyMetadata(pSrcLoad, &memCpyInst);
-
-    StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, destAlignment);
-    CopyMetadata(pDestStore, &memCpyInst);
-
-    // Record the memcpy instruction so we remember to delete it later.
-    m_replacementMap[&memCpyInst] = std::make_pair(nullptr, nullptr);
-
-    // Visit the load and store instructions to fold away fat pointer load/stores we might have just created.
-    if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
-    {
-        visitBitCastInst(*pCast);
-    }
-
-    if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastSrc))
-    {
-        visitBitCastInst(*pCast);
-    }
-
-    visitLoadInst(*pSrcLoad);
-    visitStoreInst(*pDestStore);
-}
+};
 
 // =====================================================================================================================
 // Visits "memmove" instruction.
@@ -791,66 +775,12 @@ void PatchBufferOp::visitMemSetInst(
 
     const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
 
-    // If the address spaces is not fat pointer, bail.
-    if (destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER)
+    // If the address spaces is a fat pointer.
+    if (destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER)
     {
-        return;
+        // Handling memset requires us to modify the CFG, so we need to do it after the initial visit pass.
+        m_postVisitInsts.push_back(&memSetInst);
     }
-
-    m_pBuilder->SetInsertPoint(&memSetInst);
-
-    const uint32_t destAlignment = memSetInst.getParamAlignment(0);
-
-    // We assume LLVM is not introducing variable length mem sets.
-    ConstantInt* const pLength = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
-    LLPC_ASSERT(pLength != nullptr);
-
-    // Get a vector type that is the length of the memset.
-    VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLength->getZExtValue());
-
-    Value* const pValue = memSetInst.getArgOperand(1);
-
-    Value* pNewValue = nullptr;
-
-    if (Constant* const pConst = dyn_cast<Constant>(pValue))
-    {
-        pNewValue = ConstantVector::getSplat(pMemoryType->getVectorNumElements(), pConst);
-    }
-    else
-    {
-        Value* const pMemoryPointer = m_pBuilder->CreateAlloca(pMemoryType);
-        CopyMetadata(pMemoryPointer, &memSetInst);
-
-        Type* const pInt8PtrTy = m_pBuilder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
-        Value* const pCastMemoryPointer = m_pBuilder->CreateBitCast(pMemoryPointer, pInt8PtrTy);
-        CopyMetadata(pCastMemoryPointer, &memSetInst);
-
-        Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
-                                                        pValue,
-                                                        pMemoryType->getVectorNumElements(),
-                                                        1);
-        CopyMetadata(pMemSet, &memSetInst);
-
-        pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
-        CopyMetadata(pNewValue, &memSetInst);
-    }
-
-    PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
-    Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
-    CopyMetadata(pCastDest, &memSetInst);
-
-    StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pNewValue, pCastDest, destAlignment);
-    CopyMetadata(pDestStore, &memSetInst);
-
-    // Record the memset instruction so we remember to delete it later.
-    m_replacementMap[&memSetInst] = std::make_pair(nullptr, nullptr);
-
-    // Visit the store instruction to fold away the fat pointer store.
-    if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
-    {
-        visitBitCastInst(*pCast);
-    }
-    visitStoreInst(*pDestStore);
 }
 
 // =====================================================================================================================
@@ -1042,6 +972,321 @@ void PatchBufferOp::visitStoreInst(
 
     // Record the store instruction so we remember to delete it later.
     m_replacementMap[&storeInst] = std::make_pair(nullptr, nullptr);
+}
+
+// =====================================================================================================================
+// Post-process visits "memcpy" instruction.
+void PatchBufferOp::PostVisitMemCpyInst(
+    MemCpyInst& memCpyInst) // [in] The memcpy instruction
+{
+    Value* const pDest = memCpyInst.getArgOperand(0);
+    Value* const pSrc = memCpyInst.getArgOperand(1);
+
+    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
+    const uint32_t srcAddrSpace = pSrc->getType()->getPointerAddressSpace();
+
+    m_pBuilder->SetInsertPoint(&memCpyInst);
+
+    const uint32_t destAlignment = memCpyInst.getParamAlignment(0);
+    const uint32_t srcAlignment = memCpyInst.getParamAlignment(1);
+
+    ConstantInt* const pConstantLength = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
+
+    const uint64_t constantLength = (pConstantLength != nullptr) ? pConstantLength->getZExtValue() : 0;
+
+    // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
+    // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
+    // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
+    // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
+    if ((pConstantLength == nullptr) || (constantLength > MinMemOpLoopBytes))
+    {
+        // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
+        // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
+        // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
+        // 2. Worst case we have to load/store a single byte per loop.
+        uint32_t stride = (pConstantLength == nullptr) ? 1 : 16;
+
+        while (stride != 1)
+        {
+            // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
+            const uint32_t minStride = std::min(stride, 4u);
+            if ((destAlignment >= minStride) && (srcAlignment >= minStride) && ((constantLength % stride) == 0))
+            {
+                break;
+            }
+
+            stride /= 2;
+        }
+
+        Type* pCastDestType = nullptr;
+        Type* pCastSrcType = nullptr;
+
+        if (stride == 16)
+        {
+            pCastDestType = m_pContext->Int32x4Ty()->getPointerTo(destAddrSpace);
+            pCastSrcType = m_pContext->Int32x4Ty()->getPointerTo(srcAddrSpace);
+        }
+        else
+        {
+            LLPC_ASSERT(stride < 8);
+            pCastDestType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
+            pCastSrcType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(srcAddrSpace);
+        }
+
+        Value* pLength = memCpyInst.getArgOperand(2);
+
+        Type* const pLengthType = pLength->getType();
+
+        Value* const pIndex = MakeLoop(ConstantInt::get(pLengthType, 0),
+                                       pLength,
+                                       ConstantInt::get(pLengthType, stride),
+                                       &memCpyInst);
+
+        // Get the current index into our source pointer.
+        Value* const pSrcPtr = m_pBuilder->CreateGEP(pSrc, pIndex);
+        CopyMetadata(pSrcPtr, &memCpyInst);
+
+        Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrcPtr, pCastSrcType);
+        CopyMetadata(pCastSrc, &memCpyInst);
+
+        // Perform a load for the value.
+        LoadInst* const pSrcLoad = m_pBuilder->CreateLoad(pCastSrc);
+        CopyMetadata(pSrcLoad, &memCpyInst);
+
+        // Get the current index into our destination pointer.
+        Value* const pDestPtr = m_pBuilder->CreateGEP(pDest, pIndex);
+        CopyMetadata(pDestPtr, &memCpyInst);
+
+        Value* const pCastDest = m_pBuilder->CreateBitCast(pDestPtr, pCastDestType);
+        CopyMetadata(pCastDest, &memCpyInst);
+
+        // And perform a store for the value at this byte.
+        StoreInst* const pDestStore = m_pBuilder->CreateStore(pSrcLoad, pCastDest);
+        CopyMetadata(pDestStore, &memCpyInst);
+
+        // Visit the newly added instructions to turn them into fat pointer variants.
+        if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pSrcPtr))
+        {
+            visitGetElementPtrInst(*pGetElemPtr);
+        }
+
+        if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pDestPtr))
+        {
+            visitGetElementPtrInst(*pGetElemPtr);
+        }
+
+        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastSrc))
+        {
+            visitBitCastInst(*pCast);
+        }
+
+        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        {
+            visitBitCastInst(*pCast);
+        }
+
+        visitLoadInst(*pSrcLoad);
+
+        visitStoreInst(*pDestStore);
+    }
+    else
+    {
+        // Get an vector type that is the length of the memcpy.
+        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pConstantLength->getZExtValue());
+
+        PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
+        Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
+        CopyMetadata(pCastDest, &memCpyInst);
+
+        PointerType* const pCastSrcType = pMemoryType->getPointerTo(srcAddrSpace);
+        Value* const pCastSrc = m_pBuilder->CreateBitCast(pSrc, pCastSrcType);
+        CopyMetadata(pCastSrc, &memCpyInst);
+
+        LoadInst* const pSrcLoad = m_pBuilder->CreateAlignedLoad(pCastSrc, srcAlignment);
+        CopyMetadata(pSrcLoad, &memCpyInst);
+
+        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pSrcLoad, pCastDest, destAlignment);
+        CopyMetadata(pDestStore, &memCpyInst);
+
+        // Visit the newly added instructions to turn them into fat pointer variants.
+        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        {
+            visitBitCastInst(*pCast);
+        }
+
+        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastSrc))
+        {
+            visitBitCastInst(*pCast);
+        }
+
+        visitLoadInst(*pSrcLoad);
+        visitStoreInst(*pDestStore);
+    }
+
+    // Record the memcpy instruction so we remember to delete it later.
+    m_replacementMap[&memCpyInst] = std::make_pair(nullptr, nullptr);
+}
+
+// =====================================================================================================================
+// Post-process visits "memset" instruction.
+void PatchBufferOp::PostVisitMemSetInst(
+    MemSetInst& memSetInst) // [in] The memset instruction
+{
+    Value* const pDest = memSetInst.getArgOperand(0);
+
+    const uint32_t destAddrSpace = pDest->getType()->getPointerAddressSpace();
+
+    m_pBuilder->SetInsertPoint(&memSetInst);
+
+    Value* const pValue = memSetInst.getArgOperand(1);
+
+    const uint32_t destAlignment = memSetInst.getParamAlignment(0);
+
+    ConstantInt* const pConstantLength = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
+
+    const uint64_t constantLength = (pConstantLength != nullptr) ? pConstantLength->getZExtValue() : 0;
+
+    // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
+    // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
+    // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
+    // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
+    if ((pConstantLength == nullptr) || (constantLength > MinMemOpLoopBytes))
+    {
+        // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
+        // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
+        // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
+        // 2. Worst case we have to load/store a single byte per loop.
+        uint32_t stride = (pConstantLength == nullptr) ? 1 : 16;
+
+        while (stride != 1)
+        {
+            // We only care about DWORD alignment (4 bytes) so clamp the max check here to that.
+            const uint32_t minStride = std::min(stride, 4u);
+            if ((destAlignment >= minStride) && ((constantLength % stride) == 0))
+            {
+                break;
+            }
+
+            stride /= 2;
+        }
+
+        Type* pCastDestType = nullptr;
+
+        if (stride == 16)
+        {
+            pCastDestType = m_pContext->Int32x4Ty()->getPointerTo(destAddrSpace);
+        }
+        else
+        {
+            LLPC_ASSERT(stride < 8);
+            pCastDestType = m_pBuilder->getIntNTy(stride * 8)->getPointerTo(destAddrSpace);
+        }
+
+        Value* pNewValue = nullptr;
+
+        if (Constant* const pConst = dyn_cast<Constant>(pValue))
+        {
+            pNewValue = ConstantVector::getSplat(stride, pConst);
+            pNewValue = m_pBuilder->CreateBitCast(pNewValue, pCastDestType->getPointerElementType());
+            CopyMetadata(pNewValue, &memSetInst);
+        }
+        else
+        {
+            Value* const pMemoryPointer = m_pBuilder->CreateAlloca(pCastDestType->getPointerElementType());
+            CopyMetadata(pMemoryPointer, &memSetInst);
+
+            Type* const pInt8PtrTy = m_pBuilder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
+            Value* const pCastMemoryPointer = m_pBuilder->CreateBitCast(pMemoryPointer, pInt8PtrTy);
+            CopyMetadata(pCastMemoryPointer, &memSetInst);
+
+            Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
+                                                            pValue,
+                                                            stride,
+                                                            1);
+            CopyMetadata(pMemSet, &memSetInst);
+
+            pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
+            CopyMetadata(pNewValue, &memSetInst);
+        }
+
+        Value* const pLength = memSetInst.getArgOperand(2);
+
+        Type* const pLengthType = pLength->getType();
+
+        Value* const pIndex = MakeLoop(ConstantInt::get(pLengthType, 0),
+                                       pLength,
+                                       ConstantInt::get(pLengthType, stride),
+                                       &memSetInst);
+
+        // Get the current index into our destination pointer.
+        Value* const pDestPtr = m_pBuilder->CreateGEP(pDest, pIndex);
+        CopyMetadata(pDestPtr, &memSetInst);
+
+        Value* const pCastDest = m_pBuilder->CreateBitCast(pDestPtr, pCastDestType);
+        CopyMetadata(pCastDest, &memSetInst);
+
+        // And perform a store for the value at this byte.
+        StoreInst* const pDestStore = m_pBuilder->CreateStore(pNewValue, pCastDest);
+        CopyMetadata(pDestStore, &memSetInst);
+
+        if (GetElementPtrInst* const pGetElemPtr = dyn_cast<GetElementPtrInst>(pDestPtr))
+        {
+            visitGetElementPtrInst(*pGetElemPtr);
+        }
+
+        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        {
+            visitBitCastInst(*pCast);
+        }
+
+        visitStoreInst(*pDestStore);
+    }
+    else
+    {
+        // Get a vector type that is the length of the memset.
+        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pConstantLength->getZExtValue());
+
+        Value* pNewValue = nullptr;
+
+        if (Constant* const pConst = dyn_cast<Constant>(pValue))
+        {
+            pNewValue = ConstantVector::getSplat(pMemoryType->getVectorNumElements(), pConst);
+        }
+        else
+        {
+            Value* const pMemoryPointer = m_pBuilder->CreateAlloca(pMemoryType);
+            CopyMetadata(pMemoryPointer, &memSetInst);
+
+            Type* const pInt8PtrTy = m_pBuilder->getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE);
+            Value* const pCastMemoryPointer = m_pBuilder->CreateBitCast(pMemoryPointer, pInt8PtrTy);
+            CopyMetadata(pCastMemoryPointer, &memSetInst);
+
+            Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
+                                                            pValue,
+                                                            pMemoryType->getVectorNumElements(),
+                                                            1);
+            CopyMetadata(pMemSet, &memSetInst);
+
+            pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
+            CopyMetadata(pNewValue, &memSetInst);
+        }
+
+        PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
+        Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
+        CopyMetadata(pCastDest, &memSetInst);
+
+        if (BitCastInst* const pCast = dyn_cast<BitCastInst>(pCastDest))
+        {
+            visitBitCastInst(*pCast);
+        }
+
+        StoreInst* const pDestStore = m_pBuilder->CreateAlignedStore(pNewValue, pCastDest, destAlignment);
+        CopyMetadata(pDestStore, &memSetInst);
+        visitStoreInst(*pDestStore);
+    }
+
+    // Record the memset instruction so we remember to delete it later.
+    m_replacementMap[&memSetInst] = std::make_pair(nullptr, nullptr);
 }
 
 // =====================================================================================================================
@@ -1729,6 +1974,53 @@ void PatchBufferOp::ReplaceStore(
             break;
         }
     }
+}
+
+// =====================================================================================================================
+// Make a loop, returning the the value of the loop counter. This modifies the insertion point of the builder.
+Instruction* PatchBufferOp::MakeLoop(
+    Value* const       pLoopStart,  // [in] The start index of the loop.
+    Value* const       pLoopEnd,    // [in] The end index of the loop.
+    Value* const       pLoopStride, // [in] The stride of the loop.
+    Instruction* const pInsertPos)  // [in] The position to insert the loop in the instruction stream.
+{
+    Value* const pInitialCond = m_pBuilder->CreateICmpNE(pLoopStart, pLoopEnd);
+
+    BasicBlock* const pOrigBlock = pInsertPos->getParent();
+
+    Instruction* const pTerminator = SplitBlockAndInsertIfThen(pInitialCond, pInsertPos, false);
+
+    m_pBuilder->SetInsertPoint(pTerminator);
+
+    // Create a phi node for the loop counter.
+    PHINode* const pLoopCounter = m_pBuilder->CreatePHI(pLoopStart->getType(), 2);
+    CopyMetadata(pLoopCounter, pInsertPos);
+
+    // Set the loop counter to start value (initialization).
+    pLoopCounter->addIncoming(pLoopStart, pOrigBlock);
+
+    // Calculate the next value of the loop counter by doing loopCounter + loopStride.
+    Value* const pLoopNextValue = m_pBuilder->CreateAdd(pLoopCounter, pLoopStride);
+    CopyMetadata(pLoopNextValue, pInsertPos);
+
+    // And set the loop counter to the next value.
+    pLoopCounter->addIncoming(pLoopNextValue, pTerminator->getParent());
+
+    // Our loop condition is just whether the next value of the loop counter is less than the end value.
+    Value* const pCond = m_pBuilder->CreateICmpULT(pLoopNextValue, pLoopEnd);
+    CopyMetadata(pCond, pInsertPos);
+
+    // And our replacement terminator just branches back to the if body if there is more loop iterations to be done.
+    Instruction* const pNewTerminator = m_pBuilder->CreateCondBr(pCond,
+                                                                 pTerminator->getParent(),
+                                                                 pTerminator->getSuccessor(0));
+    CopyMetadata(pNewTerminator, pInsertPos);
+
+    pTerminator->eraseFromParent();
+
+    m_pBuilder->SetInsertPoint(pNewTerminator);
+
+    return pLoopCounter;
 }
 
 } // Llpc

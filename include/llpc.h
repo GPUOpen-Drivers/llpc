@@ -37,6 +37,7 @@
 #undef False
 #undef DestroyAll
 #undef Status
+#undef Bool
 
 /// LLPC major interface version.
 #define LLPC_INTERFACE_MAJOR_VERSION 26

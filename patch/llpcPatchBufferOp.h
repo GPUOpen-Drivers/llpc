@@ -80,6 +80,12 @@ private:
     bool RemoveUsersForInvariantStarts(llvm::Value* const pValue);
     llvm::Value* ReplaceLoad(llvm::LoadInst* const pLoadInst);
     void ReplaceStore(llvm::StoreInst* const pStoreInst);
+    llvm::Instruction* MakeLoop(llvm::Value* const       pLoopStart,
+                                llvm::Value* const       pLoopEnd,
+                                llvm::Value* const       pLoopStride,
+                                llvm::Instruction* const pInsertPos);
+    void PostVisitMemCpyInst(llvm::MemCpyInst& memCpyInst);
+    void PostVisitMemSetInst(llvm::MemSetInst& memSetInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -88,8 +94,11 @@ private:
     llvm::DenseSet<llvm::Value*>                    m_invariantSet;        // The invariant set.
     llvm::DenseSet<llvm::Value*>                    m_divergenceSet;       // The divergence set.
     llvm::LegacyDivergenceAnalysis*                 m_pDivergenceAnalysis; // The divergence analysis.
+    llvm::SmallVector<llvm::Instruction*, 16>       m_postVisitInsts;      // The post process instruction set.
     std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;            // The IRBuilder.
     Context*                                        m_pContext;            // The LLPC Context.
+
+    static constexpr uint32_t MinMemOpLoopBytes = 256;
 };
 
 } // Llpc

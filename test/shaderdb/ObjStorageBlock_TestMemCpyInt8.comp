@@ -1,0 +1,26 @@
+#version 450
+
+#extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+
+#define SIZE 65536
+
+layout(set = 0, binding = 0) buffer _ {
+    int8_t a[SIZE];
+    int8_t b[SIZE];
+};
+
+void main() {
+    for (int i = 0; i < SIZE; i++) {
+        a[i] = b[i];
+    }
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call float @llvm.amdgcn.buffer.load.ubyte(
+; SHADERTEST: call void @llvm.amdgcn.buffer.store.byte(
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

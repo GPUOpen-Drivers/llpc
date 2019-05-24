@@ -1,0 +1,882 @@
+﻿/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *  SOFTWARE.
+ *
+ **********************************************************************************************************************/
+/**
+ ***********************************************************************************************************************
+ * @file  llpcElfWriter.cpp
+ * @brief LLPC source file: contains implementation of LLPC ELF writing utilities.
+ ***********************************************************************************************************************
+ */
+#define DEBUG_TYPE "llpc-elf-writer"
+
+#include <algorithm>
+#include <string.h>
+#include "llvm/ADT/SmallString.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
+
+#include "llpcContext.h"
+#include "llpcElfWriter.h"
+#include "llpcGfx6Chip.h"
+#include "llpcGfx9Chip.h"
+
+using namespace llvm;
+
+namespace Llpc
+{
+
+// =====================================================================================================================
+template<class Elf>
+ElfWriter<Elf>::ElfWriter(
+    GfxIpVersion gfxIp)         // Graphics IP version info
+    :
+    m_gfxIp(gfxIp),
+    m_textSecIdx(InvalidValue),
+    m_noteSecIdx(InvalidValue),
+    m_symSecIdx(InvalidValue),
+    m_strtabSecIdx(InvalidValue)
+{
+}
+
+// =====================================================================================================================
+template<class Elf>
+ElfWriter<Elf>::~ElfWriter()
+{
+    for (auto& section : m_sections)
+    {
+        delete[] section.pData;
+    }
+    m_sections.clear();
+
+    for (auto& note : m_notes)
+    {
+        delete[] note.pData;
+    }
+    m_notes.clear();
+
+    for (auto& sym : m_symbols)
+    {
+        if (sym.nameOffset == InvalidValue)
+        {
+            delete[] sym.pSymName;
+        }
+    }
+    m_symbols.clear();
+}
+
+// =====================================================================================================================
+// Merge base section and input section into merged section
+template<class Elf>
+void ElfWriter<Elf>::MergeSection(
+    const SectionBuffer*    pSection1,          // [in] The first section buffer to merge
+    size_t                  section1Size,       // Byte size of the first section
+    const char*             pPrefixString1,     // [in] Prefix string of the first section's contents
+    const SectionBuffer*    pSection2,          // [in] The second section buffer to merge
+    size_t                  section2Offset,     // Byte offset of the second section
+    const char*             pPrefixString2,     // [in] Prefix string of the second section's contents
+    SectionBuffer*          pNewSection)        // [out] Merged section
+{
+    std::string prefix1;
+    std::string prefix2;
+
+    // Build prefix1 if it is needed
+    if (pPrefixString1 != nullptr)
+    {
+        if (strncmp(reinterpret_cast<const char*>(pSection1->pData),
+                    pPrefixString1,
+                    strlen(pPrefixString1)) != 0)
+        {
+            prefix1 = pPrefixString1;
+            prefix1 += ":\n";
+        }
+    }
+
+    // Build appendPrefixString if it is needed
+    if (pPrefixString2 != nullptr)
+    {
+        if (strncmp(reinterpret_cast<const char*>(pSection2->pData + section2Offset),
+                    pPrefixString2,
+                    strlen(pPrefixString2)) != 0)
+        {
+            prefix2 = pPrefixString2;
+            prefix2 += ":\n";
+        }
+    }
+
+    // Build merged section
+    size_t newSectionSize = section1Size +
+                            (pSection2->secHead.sh_size - section2Offset) +
+                            prefix1.length() + prefix2.length();
+
+    auto pMergedData = new uint8_t[newSectionSize];
+    *pNewSection = *pSection1;
+    pNewSection->pData = pMergedData;
+    pNewSection->secHead.sh_size = newSectionSize;
+
+    auto pData = pMergedData;
+
+    // Copy prefix1
+    if (prefix1.length() > 0)
+    {
+        memcpy(pData, prefix1.data(), prefix1.length());
+        pData += prefix1.length();
+    }
+
+    // Copy base section content
+    auto baseCopySize = std::min(section1Size, static_cast<size_t>(pSection1->secHead.sh_size));
+    memcpy(pData, pSection1->pData, baseCopySize);
+    pData += baseCopySize;
+
+    // Fill alignment data with NOP instruction to match backend's behavior
+    if (baseCopySize < section1Size)
+    {
+        // NOTE: All disassemble section don't have any alignmeent requirement, so it happen only if we merge
+        // .text section.
+        constexpr uint32_t Nop = 0xBF800000;
+        uint32_t* pDataDw = reinterpret_cast<uint32_t*>(pData);
+        for (uint32_t i = 0; i < (section1Size - baseCopySize) / sizeof(uint32_t); ++i)
+        {
+            pDataDw[i] = Nop;
+        }
+        pData += (section1Size - baseCopySize);
+    }
+
+    // Copy append prefix
+    if (prefix2.length() > 0)
+    {
+        memcpy(pData, prefix2.data(), prefix2.length());
+        pData += prefix2.length();
+    }
+
+    // Copy append section content
+    memcpy(pData,
+           pSection2->pData + section2Offset,
+           pSection2->secHead.sh_size - section2Offset);
+}
+
+// =====================================================================================================================
+// Merges the map item pair from source map to destination map. and if the key doesn't exist in source,
+// remove it in destination too.
+template<class Elf>
+void ElfWriter<Elf>::MergeMapItem(
+    std::map<uint32_t, uint32_t>& destMap,     // [in,out] Destination map
+    std::map<uint32_t, uint32_t>& srcMap,      // [in] Source map
+    uint32_t                      key)         // Key to check in source map
+{
+    auto srcIt = srcMap.find(key);
+    if (srcIt != srcMap.end())
+    {
+        destMap[key] = srcIt->second;
+    }
+    else
+    {
+        destMap.erase(key);
+    }
+}
+
+// =====================================================================================================================
+// A woarkaround to support erase in llvm::msgpack::MapDocNode.
+class MapDocNode : public llvm::msgpack::MapDocNode
+{
+public:
+    MapTy::iterator erase(MapTy::iterator _Where)
+    {
+        return Map->erase(_Where);
+    }
+};
+
+// =====================================================================================================================
+// Merges the map item pair from source map to destination map for llvm::msgpack::MapDocNode.
+template<class Elf>
+void ElfWriter<Elf>::MergeMapItem(
+    llvm::msgpack::MapDocNode& destMap,    // [in,out] Destination map
+    llvm::msgpack::MapDocNode& srcMap,     // [in] Source map
+    uint32_t                    key)       // Key to check in source map
+{
+    auto srcKeyNode = srcMap.getDocument()->getNode(key);
+    auto srcIt = srcMap.find(srcKeyNode);
+    if (srcIt != srcMap.end())
+    {
+        LLPC_ASSERT(srcIt->first.getUInt() == key);
+        destMap[destMap.getDocument()->getNode(key)] = srcIt->second;
+    }
+    else
+    {
+        auto destKeyNode = destMap.getDocument()->getNode(key);
+        auto destIt = destMap.find(destKeyNode);
+        if (destIt != destMap.end())
+        {
+            LLPC_ASSERT(destIt->first.getUInt() == key);
+            static_cast<MapDocNode&>(destMap).erase(destIt);
+        }
+    }
+}
+
+// =====================================================================================================================
+// Merges fragment shader related info for legacy meta notes.
+template<class Elf>
+void ElfWriter<Elf>::MergeLegacyMetaNote(
+    Context*       pContext,      // [in] Pipeline context
+    const ElfNote* pNote1,        // [in] The first note section to merge
+    const ElfNote* pNote2,        // [in] The second note section to merge (contain fragment shader info)
+    ElfNote*       pNewNote)      // [out] Merged note section
+{
+    auto gfxIp = pContext->GetGfxIpVersion();
+
+    auto pDestNoteData = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(pNote1->pData);
+    uint32_t destNoteCount = pNote1->hdr.descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
+
+    auto pSrcNoteData = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(pNote2->pData);
+    uint32_t srcNoteCount = pNote2->hdr.descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
+
+    std::map<uint32_t, uint32_t> destEntries;
+    std::map<uint32_t, uint32_t> srcEntries;
+    for (uint32_t i = 0; i < destNoteCount; i++)
+    {
+        destEntries[pDestNoteData[i].key] = pDestNoteData[i].value;
+    }
+
+    for (uint32_t i = 0; i < srcNoteCount; i++)
+    {
+        srcEntries[pSrcNoteData[i].key] = pSrcNoteData[i].value;
+    }
+
+    // Merage PS special meta data
+    static const uint32_t MetadataKeys[] =
+    {
+        mmAPI_PS_HASH_DWORD0,
+        mmAPI_PS_HASH_DWORD1,
+        mmAPI_PS_HASH_DWORD2,
+        mmAPI_PS_HASH_DWORD3,
+        mmPS_USES_UAVS,
+        mmPS_USES_ROVS,
+        mmPS_NUM_USED_VGPRS,
+        mmPS_NUM_USED_SGPRS,
+        mmPS_NUM_AVAIL_VGPRS,
+        mmPS_NUM_AVAIL_SGPRS,
+        mmPS_LDS_BYTE_SIZE,
+        mmPS_SCRATCH_BYTE_SIZE,
+        mmPS_PERFORMANCE_DATA_BUFFER_SIZE,
+        mmPS_WRITES_UAVS,
+        mmPS_WRITES_DEPTH,
+    };
+
+    for (uint32_t i = 0; i < sizeof(MetadataKeys) / sizeof(MetadataKeys[0]); ++i)
+    {
+        MergeMapItem(destEntries, srcEntries, MetadataKeys[i]);
+    }
+
+    auto hash64 = pContext->GetPiplineHashCode();
+    destEntries[mmPIPELINE_HASH_LO] = uint32_t(hash64);
+    destEntries[mmPIPELINE_HASH_HI] = uint32_t(hash64 >> 32);
+
+    destEntries[mmUSER_DATA_LIMIT] = std::max(destEntries[mmUSER_DATA_LIMIT], srcEntries[mmUSER_DATA_LIMIT]);
+    destEntries[mmSPILL_THRESHOLD] = std::min(destEntries[mmSPILL_THRESHOLD], srcEntries[mmSPILL_THRESHOLD]);
+
+    // Merge fragment shader hardware registers
+    Gfx6::PsRegConfig gfx6PsConfig;
+    Gfx9::PsRegConfig gfx9PsConfig;
+    Util::Abi::PalMetadataNoteEntry* pRegEntry = nullptr;
+    uint32_t regCount = 0;
+    uint32_t psInputCntlBase = 0;
+    uint32_t psUserDataBase = 0;
+    if (gfxIp.major < 9)
+    {
+        gfx6PsConfig.Init();
+        pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx6PsConfig);
+        psInputCntlBase = gfx6PsConfig.GetPsInputCntlStart();
+        psUserDataBase = gfx6PsConfig.GetPsUserDataStart();
+        regCount = sizeof(gfx6PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
+    }
+    else
+    {
+        gfx9PsConfig.Init(gfxIp);
+        pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx9PsConfig);
+        psInputCntlBase = Gfx9::mmSPI_PS_INPUT_CNTL_0;
+        psUserDataBase = Gfx9::mmSPI_SHADER_USER_DATA_PS_0;
+        regCount = sizeof(gfx9PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
+    }
+
+    for (uint32_t i = 0; i < regCount; ++i)
+    {
+        if (pRegEntry[i].key != InvalidMetadataKey)
+        {
+            MergeMapItem(destEntries, srcEntries, pRegEntry[i].key);
+        }
+    }
+
+    constexpr uint32_t PsInputCntlCount = 32;
+    for (uint32_t i = 0; i < PsInputCntlCount; ++i)
+    {
+        MergeMapItem(destEntries, srcEntries, psInputCntlBase + i);
+    }
+
+    for (uint32_t i = 0; i < pContext->GetGpuProperty()->maxUserDataCount; ++i)
+    {
+        MergeMapItem(destEntries, srcEntries, psUserDataBase + i);
+    }
+
+    // Build new note section
+    constexpr size_t MinMetadataKeyCount = sizeof(MetadataKeys) / sizeof(MetadataKeys[0]);
+
+    // NOTE: Usestd::max is to workaround the build error
+    Util::Abi::PalMetadataNoteEntry* pEntry =
+        new Util::Abi::PalMetadataNoteEntry[std::max(destEntries.size(), MinMetadataKeyCount)];
+
+    uint32_t i = 0;
+    for (auto mapIt : destEntries)
+    {
+        pEntry[i].key = mapIt.first;
+        pEntry[i++].value = mapIt.second;
+    }
+
+    *pNewNote = *pNote1;
+    pNewNote->pData = reinterpret_cast<uint8_t*>(pEntry);
+    pNewNote->hdr.descSize = sizeof(Util::Abi::PalMetadataNoteEntry) * destEntries.size();
+}
+
+// =====================================================================================================================
+// Merges fragment shader related info for meta notes.
+template<class Elf>
+void ElfWriter<Elf>::MergeMetaNote(
+    Context*       pContext,       // [in] The first note section to merge
+    const ElfNote* pNote1,         // [in] The second note section to merge (contain fragment shader info)
+    const ElfNote* pNote2,         // [in] Note section contains fragment shader info
+    ElfNote*       pNewNote)       // [out] Merged note section
+{
+    msgpack::Document destDocument;
+    msgpack::Document srcDocument;
+
+    auto success = destDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote1->pData),
+                                                       pNote1->hdr.descSize),
+                                             false);
+    LLPC_ASSERT(success);
+
+    success = srcDocument.readFromBlob(StringRef(reinterpret_cast<const char*>(pNote2->pData),
+                                                 pNote2->hdr.descSize),
+                                       false);
+    LLPC_ASSERT(success);
+    LLPC_UNUSED(success);
+
+    auto destPipeline = destDocument.getRoot().
+        getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+    auto srcPipeline = srcDocument.getRoot().
+        getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0];
+
+    // Copy .num_interpolants
+    auto srcNumIterpIt = srcPipeline.getMap(true).find(StringRef(Util::Abi::PipelineMetadataKey::NumInterpolants));
+    if (srcNumIterpIt != srcPipeline.getMap(true).end())
+    {
+        destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::NumInterpolants] = srcNumIterpIt->second;
+    }
+
+    // Copy .spill_threshold
+    auto destSpillThreshold = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold].getUInt();
+    auto srcSpillThreshold = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold].getUInt();
+    destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::SpillThreshold] =
+        destDocument.getNode(std::min(srcSpillThreshold, destSpillThreshold));
+
+    // Copy .user_data_limit
+    auto destUserDataLimit = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+    auto srcUserDataLimit = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit].getUInt();
+    destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::UserDataLimit] =
+        destDocument.getNode(std::max(destUserDataLimit, srcUserDataLimit));
+
+    // Copy whole .ps hw stage
+    auto destHwStages = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+    auto srcHwStages = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+    auto pHwPsStageName = HwStageNames[static_cast<uint32_t>(Util::Abi::HardwareStage::Ps)];
+    destHwStages[pHwPsStageName] = srcHwStages[pHwPsStageName];
+
+    // Copy whole .pixel shader
+    auto destShaders = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Shaders].getMap(true);
+    auto srcShaders = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Shaders].getMap(true);
+    destShaders[ApiStageNames[ShaderStageFragment]] = srcShaders[ApiStageNames[ShaderStageFragment]];
+
+    // Update pipeline hash
+    auto pipelineHash = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+    pipelineHash[0] = destDocument.getNode(pContext->GetPiplineHashCode());
+    pipelineHash[1] = destDocument.getNode(pContext->GetPiplineHashCode());
+
+    // Merge fragment shader related registers
+    auto destRegisters = destPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+    auto srcRegisters = srcPipeline.getMap(true)[Util::Abi::PipelineMetadataKey::Registers].getMap(true);
+
+    auto gfxIp = pContext->GetGfxIpVersion();
+    Gfx6::PsRegConfig gfx6PsConfig;
+    Gfx9::PsRegConfig gfx9PsConfig;
+    Util::Abi::PalMetadataNoteEntry* pRegEntry = nullptr;
+    uint32_t regCount = 0;
+    uint32_t psInputCntlBase = 0;
+    uint32_t psUserDataBase = 0;
+    if (gfxIp.major < 9)
+    {
+        gfx6PsConfig.Init();
+        pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx6PsConfig);
+        psInputCntlBase = gfx6PsConfig.GetPsInputCntlStart();
+        psUserDataBase = gfx6PsConfig.GetPsUserDataStart();
+        regCount = sizeof(gfx6PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
+    }
+    else
+    {
+        gfx9PsConfig.Init(gfxIp);
+        pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx9PsConfig);
+        psInputCntlBase = Gfx9::mmSPI_PS_INPUT_CNTL_0;
+        psUserDataBase = Gfx9::mmSPI_SHADER_USER_DATA_PS_0;
+        regCount = sizeof(gfx9PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
+    }
+
+    for (uint32_t i = 0; i < regCount; ++i)
+    {
+        if (pRegEntry[i].key != InvalidMetadataKey)
+        {
+            MergeMapItem(destRegisters, srcRegisters, pRegEntry[i].key);
+        }
+    }
+
+    constexpr uint32_t PsInputCntlCount = 32;
+    for (uint32_t i = 0; i < PsInputCntlCount; ++i)
+    {
+        MergeMapItem(destRegisters, srcRegisters, psInputCntlBase + i);
+    }
+
+    for (uint32_t i = 0; i < pContext->GetGpuProperty()->maxUserDataCount; ++i)
+    {
+        MergeMapItem(destRegisters, srcRegisters, psUserDataBase + i);
+    }
+
+    std::string destBlob;
+    destDocument.writeToBlob(destBlob);
+    *pNewNote = *pNote1;
+    auto pData = new uint8_t[destBlob.size() + 4]; // 4 is for additional alignment spece
+    memcpy(pData, destBlob.data(), destBlob.size());
+    pNewNote->hdr.descSize = destBlob.size();
+    pNewNote->pData = pData;
+}
+
+// =====================================================================================================================
+// Gets symbol according to symbol name, and creates a new one if it doesn't exist.
+template<class Elf>
+ElfSymbol* ElfWriter<Elf>::GetSymbol(
+    const char* pSymbolName)   // [in] Symbol name
+{
+    for (auto& symbol : m_symbols)
+    {
+        if (strcmp(pSymbolName, symbol.pSymName) == 0)
+        {
+            return &symbol;
+        }
+    }
+
+    // Create new symbol
+    ElfSymbol newSymbol = {};
+    char* pNewSymName = new char[strlen(pSymbolName) + 1];
+    strcpy(pNewSymName, pSymbolName);
+
+    newSymbol.pSymName = pNewSymName;
+    newSymbol.nameOffset = InvalidValue;
+    newSymbol.secIdx = InvalidValue;
+    m_symbols.push_back(newSymbol);
+
+    return &m_symbols.back();
+}
+
+// =====================================================================================================================
+// Gets note according to noteType.
+template<class Elf>
+ElfNote ElfWriter<Elf>::GetNote(
+    Util::Abi::PipelineAbiNoteType noteType)  // Note type
+{
+    for (auto& note : m_notes)
+    {
+        if (note.hdr.type == noteType)
+        {
+            return note;
+        }
+    }
+
+    ElfNote note = {};
+    return note;
+}
+
+// =====================================================================================================================
+// Replaces exist note with input note according to input note type.
+template<class Elf>
+void ElfWriter<Elf>::SetNote(
+    ElfNote* pNote)   // [in] Input note
+{
+    for (auto& note : m_notes)
+    {
+        if (note.hdr.type == pNote->hdr.type)
+        {
+            LLPC_ASSERT(note.pData != pNote->pData);
+            delete[] note.pData;
+            note = *pNote;
+            return;
+        }
+    }
+
+    LLPC_NEVER_CALLED();
+}
+
+// =====================================================================================================================
+// Replace exist section with input section according to section index
+template<class Elf>
+void ElfWriter<Elf>::SetSection(
+    uint32_t          secIndex,   //  Section index
+    SectionBuffer*    pSection)   // [in] Input section
+{
+    LLPC_ASSERT(secIndex < m_sections.size());
+    LLPC_ASSERT(pSection->pName == m_sections[secIndex].pName);
+    LLPC_ASSERT(pSection->pData != m_sections[secIndex].pData);
+
+    delete[] m_sections[secIndex].pData;
+    m_sections[secIndex] = *pSection;
+}
+
+// =====================================================================================================================
+// Determines the size needed for a memory buffer to store this ELF.
+template<class Elf>
+size_t ElfWriter<Elf>::GetRequiredBufferSizeBytes()
+{
+    // Update offsets and size values
+    CalcSectionHeaderOffset();
+
+    size_t totalBytes = sizeof(typename Elf::FormatHeader);
+
+    // Iterate through the section list
+    for (auto& section : m_sections)
+    {
+        totalBytes += section.secHead.sh_size;
+    }
+
+    totalBytes += m_header.e_shentsize * m_header.e_shnum;
+    totalBytes += m_header.e_phentsize * m_header.e_phnum;
+
+    return totalBytes;
+}
+
+// =====================================================================================================================
+// Assembles ELF notes and add them to .note section
+template<class Elf>
+void ElfWriter<Elf>::AssembleNotes()
+{
+    auto pNoteSection = &m_sections[m_noteSecIdx];
+    const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
+    uint32_t noteSize = 0;
+    for (auto& note : m_notes)
+    {
+        const uint32_t noteNameSize = Pow2Align(note.hdr.nameSize, sizeof(uint32_t));
+        noteSize += noteHeaderSize + noteNameSize + Pow2Align(note.hdr.descSize, sizeof(uint32_t));
+    }
+
+    delete[] pNoteSection->pData;
+    uint8_t* pData = new uint8_t[std::max(noteSize, noteHeaderSize)];
+    LLPC_ASSERT(pData != nullptr);
+    pNoteSection->pData = pData;
+    pNoteSection->secHead.sh_size = noteSize;
+
+    for (auto& note : m_notes)
+    {
+        memcpy(pData, &note.hdr, noteHeaderSize);
+        pData += noteHeaderSize;
+        const uint32_t noteNameSize = Pow2Align(note.hdr.nameSize, sizeof(uint32_t));
+        memcpy(pData, &note.hdr.name, noteNameSize);
+        pData += noteNameSize;
+        const uint32_t noteDescSize = Pow2Align(note.hdr.descSize, sizeof(uint32_t));
+        memcpy(pData, note.pData, noteDescSize);
+        pData += noteDescSize;
+    }
+
+    LLPC_ASSERT(pNoteSection->secHead.sh_size == static_cast<uint32_t>(pData - pNoteSection->pData));
+}
+
+// =====================================================================================================================
+// Assembles ELF symbols and symbol info to .symtab section
+template<class Elf>
+void ElfWriter<Elf>::AssembleSymbols()
+{
+    auto pStrTabSection = &m_sections[m_strtabSecIdx];
+    auto newStrTabSize = 0;
+    uint32_t symbolCount = 0;
+    for (auto& symbol : m_symbols)
+    {
+        if (symbol.nameOffset == InvalidValue)
+        {
+            newStrTabSize += strlen(symbol.pSymName) + 1;
+        }
+
+        if (symbol.secIdx != InvalidValue)
+        {
+            symbolCount++;
+        }
+    }
+
+    if (newStrTabSize > 0)
+    {
+        uint32_t strTabOffset = pStrTabSection->secHead.sh_size;
+        auto pStrTabBuffer = new uint8_t[pStrTabSection->secHead.sh_size + newStrTabSize];
+        memcpy(pStrTabBuffer, pStrTabSection->pData, pStrTabSection->secHead.sh_size);
+        delete[] pStrTabSection->pData;
+
+        pStrTabSection->pData = pStrTabBuffer;
+        pStrTabSection->secHead.sh_size += newStrTabSize;
+
+        for (auto& symbol : m_symbols)
+        {
+            if (symbol.nameOffset == InvalidValue)
+            {
+                auto symNameSize = strlen(symbol.pSymName) + 1;
+                memcpy(pStrTabBuffer + strTabOffset, symbol.pSymName, symNameSize);
+                symbol.nameOffset = strTabOffset;
+                delete[] symbol.pSymName;
+                symbol.pSymName = reinterpret_cast<const char*>(pStrTabBuffer + strTabOffset);
+                strTabOffset += symNameSize;
+            }
+        }
+    }
+
+    auto symSectionSize = sizeof(typename Elf::Symbol) * symbolCount;
+    auto pSymbolSection = &m_sections[m_symSecIdx];
+    LLPC_ASSERT(pSymbolSection->pData != nullptr);
+    LLPC_ASSERT(pSymbolSection->secHead.sh_size > 0);
+
+    if (symSectionSize > pSymbolSection->secHead.sh_size)
+    {
+        delete[] pSymbolSection->pData;
+        pSymbolSection->pData = new uint8_t[symSectionSize];
+    }
+    pSymbolSection->secHead.sh_size = symSectionSize;
+
+    auto pSymbol = reinterpret_cast<typename Elf::Symbol*>(const_cast<uint8_t*>(pSymbolSection->pData));
+    for (auto& symbol : m_symbols)
+    {
+        if (symbol.secIdx != InvalidValue)
+        {
+            pSymbol->st_name = symbol.nameOffset;
+            pSymbol->st_info = 0;
+            pSymbol->st_other = 0;
+            pSymbol->st_shndx = symbol.secIdx;
+            pSymbol->st_value = symbol.value;
+            pSymbol->st_size = symbol.size;
+            ++pSymbol;
+        }
+    }
+
+    LLPC_ASSERT(pSymbolSection->secHead.sh_size ==
+                static_cast<uint32_t>(reinterpret_cast<uint8_t*>(pSymbol) - pSymbolSection->pData));
+}
+
+// =====================================================================================================================
+// Determines the offset of the section header table by totaling the sizes of each binary chunk written to the ELF file,
+// accounting for alignment.
+template<class Elf>
+void ElfWriter<Elf>::CalcSectionHeaderOffset()
+{
+    uint32_t sharedHdrOffset = 0;
+
+    const uint32_t elfHdrSize = sizeof(typename Elf::FormatHeader);
+    const uint32_t pHdrSize = sizeof(typename Elf::Phdr);
+
+    sharedHdrOffset += elfHdrSize;
+    sharedHdrOffset += m_header.e_phnum * pHdrSize;
+
+    for (auto& section : m_sections)
+    {
+        const uint32_t secSzBytes = section.secHead.sh_size;
+        sharedHdrOffset += secSzBytes;
+    }
+
+    m_header.e_phoff = m_header.e_phnum > 0 ? elfHdrSize : 0;
+    m_header.e_shoff = sharedHdrOffset;
+}
+
+// =====================================================================================================================
+// Writes the data out to the given buffer in ELF format. Assumes the buffer has been pre-allocated with adequate
+// space, which can be determined with a call to "GetRequireBufferSizeBytes()".
+template<class Elf>
+void ElfWriter<Elf>::WriteToBuffer(
+    ElfPackage* pElf)   // [in] Output buffer to write ELF data
+{
+    LLPC_ASSERT(pElf != nullptr);
+
+    // Update offsets and size values
+    AssembleNotes();
+    AssembleSymbols();
+
+    const size_t reqSize = GetRequiredBufferSizeBytes();
+    pElf->resize(reqSize);
+    auto pData = pElf->data();
+    memset(pData, 0, reqSize);
+
+    char* pBuffer = static_cast<char*>(pData);
+
+    // ELF header comes first
+    const uint32_t elfHdrSize = sizeof(typename Elf::FormatHeader);
+    memcpy(pBuffer, &m_header, elfHdrSize);
+    pBuffer += elfHdrSize;
+
+    LLPC_ASSERT(m_header.e_phnum == 0);
+
+    // Write each section buffer
+    for (auto& section : m_sections)
+    {
+        section.secHead.sh_offset = static_cast<uint32_t>(pBuffer - pData);
+        const uint32_t sizeBytes = section.secHead.sh_size;
+        memcpy(pBuffer, section.pData, sizeBytes);
+        pBuffer += sizeBytes;
+    }
+
+    LLPC_ASSERT(m_header.e_shoff == static_cast<uint32_t>(pBuffer - pData));
+    const uint32_t secHdrSize = sizeof(typename Elf::SectionHeader);
+    for (auto& section : m_sections)
+    {
+        memcpy(pBuffer, &section.secHead, secHdrSize);
+        pBuffer += secHdrSize;
+    }
+
+    LLPC_ASSERT((pBuffer - pData) == reqSize);
+}
+
+// =====================================================================================================================
+template<class Elf>
+Result ElfWriter<Elf>::ReadFromBuffer(
+    const void* pBuffer,    // [in] Buffer to read data from
+    size_t      bufSize)    // Size of the buffer
+{
+    ElfReader<Elf> reader(m_gfxIp);
+    auto result = reader.ReadFromBuffer(pBuffer, &bufSize);
+    if (result != Llpc::Result::Success)
+    {
+        return result;
+    }
+
+    m_header = reader.m_header;
+    m_sections.resize(reader.m_sections.size());
+    for (size_t i = 0; i < reader.m_sections.size(); ++i)
+    {
+        auto pSection = reader.m_sections[i];
+        m_sections[i].secHead = pSection->secHead;
+        m_sections[i].pName = pSection->pName;
+        auto pData = new uint8_t[pSection->secHead.sh_size + 1];
+        memcpy(pData, pSection->pData, pSection->secHead.sh_size);
+        pData[pSection->secHead.sh_size] = 0;
+        m_sections[i].pData = pData;
+    }
+
+    m_map = reader.m_map;
+    LLPC_ASSERT(m_header.e_phnum == 0);
+
+    m_noteSecIdx = m_map[NoteName];
+    m_textSecIdx = m_map[TextName];
+    m_symSecIdx = m_map[SymTabName];
+    m_strtabSecIdx = m_map[StrTabName];
+    LLPC_ASSERT(m_noteSecIdx > 0);
+    LLPC_ASSERT(m_textSecIdx > 0);
+    LLPC_ASSERT(m_symSecIdx > 0);
+    LLPC_ASSERT(m_strtabSecIdx > 0);
+
+    auto pNoteSection = &m_sections[m_noteSecIdx];
+    const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
+    size_t offset = 0;
+    while (offset < pNoteSection->secHead.sh_size)
+    {
+        const NoteHeader* pNote = reinterpret_cast<const NoteHeader*>(pNoteSection->pData + offset);
+        const uint32_t noteNameSize = Pow2Align(pNote->nameSize, 4);
+        ElfNote noteNode;
+        memcpy(&noteNode.hdr, pNote, noteHeaderSize);
+        memcpy(noteNode.hdr.name, pNote->name, noteNameSize);
+
+        const uint32_t noteDescSize = Pow2Align(pNote->descSize, 4);
+        auto pData = new uint8_t[noteDescSize];
+        memcpy(pData, pNoteSection->pData + offset + noteHeaderSize + noteNameSize, noteDescSize);
+        noteNode.pData = pData;
+
+        offset += noteHeaderSize + noteNameSize + noteDescSize;
+        m_notes.push_back(noteNode);
+    }
+
+    auto pSymSection = &m_sections[m_symSecIdx];
+    const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx].pData);
+
+    auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSymSection->pData);
+    auto symCount = static_cast<uint32_t>(pSymSection->secHead.sh_size / pSymSection->secHead.sh_entsize);
+
+    for (uint32_t idx = 0; idx < symCount; ++idx)
+    {
+        ElfSymbol symbol = {};
+        symbol.secIdx = symbols[idx].st_shndx;
+        symbol.pSecName = m_sections[symbol.secIdx].pName;
+        symbol.pSymName = pStrTab + symbols[idx].st_name;
+        symbol.size = symbols[idx].st_size;
+        symbol.value = symbols[idx].st_value;
+        symbol.nameOffset = symbols[idx].st_name;
+        m_symbols.push_back(symbol);
+    }
+
+    std::sort(m_symbols.begin(), m_symbols.end(),
+        [](const ElfSymbol & a, const ElfSymbol & b)
+        {
+            return (a.secIdx < b.secIdx) || ((a.secIdx == b.secIdx) && (a.value < b.value));
+        });
+    return result;
+}
+
+// =====================================================================================================================
+// Gets section data by section index.
+template<class Elf>
+Result ElfWriter<Elf>::GetSectionDataBySectionIndex(
+    uint32_t                 secIdx,          // Section index
+    const SectionBuffer**    ppSectionData    // [out] Section data
+    ) const
+{
+    Result result = Result::ErrorInvalidValue;
+    if (secIdx < m_sections.size())
+    {
+        *ppSectionData = &m_sections[secIdx];
+        result = Result::Success;
+    }
+    return result;
+}
+
+// =====================================================================================================================
+// Gets all associated symbols by section index.
+template<class Elf>
+void ElfWriter<Elf>::GetSymbolsBySectionIndex(
+    uint32_t                secIdx,         // Section index
+    std::vector<ElfSymbol*>& secSymbols)    // [out] ELF symbols
+{
+    uint32_t symCount = m_symbols.size();
+
+    for (uint32_t idx = 0; idx < symCount; ++idx)
+    {
+        if (m_symbols[idx].secIdx == secIdx)
+        {
+            secSymbols.push_back(&m_symbols[idx]);
+        }
+    }
+}
+
+template class ElfWriter<Elf64>;
+
+} // Llpc

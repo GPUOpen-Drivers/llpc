@@ -58,19 +58,6 @@
 
 using namespace llvm;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-// -lower-dyn-index: lower SPIR-V dynamic (non-constant) index in access chain
-static opt<bool> LowerDynIndex("lower-dyn-index", desc("Lower SPIR-V dynamic (non-constant) index in access chain"));
-
-} // cl
-
-} // llvm
-
 namespace Llpc
 {
 
@@ -121,11 +108,8 @@ void SpirvLower::AddPasses(
     // Lower SPIR-V algebraic transforms, constant folding must be done before instruction combining pass.
     passMgr.add(CreateSpirvLowerAlgebraTransform(true, false));
 
-    // Lower SPIR-V dynamic index in access chain
-    if (cl::LowerDynIndex)
-    {
-        passMgr.add(CreateSpirvLowerDynIndex());
-    }
+    // Lower SPIR-V memory operations
+    passMgr.add(CreateSpirvLowerMemoryOp());
 
     // Remove reduant load/store operations and do minimal optimization
     // It is required by SpirvLowerImageOp.

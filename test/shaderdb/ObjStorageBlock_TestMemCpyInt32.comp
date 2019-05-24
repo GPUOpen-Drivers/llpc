@@ -1,0 +1,24 @@
+#version 450
+
+#define SIZE 65536
+
+layout(set = 0, binding = 0) buffer _ {
+    int a[SIZE];
+    int b[SIZE];
+};
+
+void main() {
+    for (int i = 0; i < SIZE; i++) {
+        a[i] = b[i];
+    }
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: %{{[0-9]*}} = call <4 x float> @llvm.amdgcn.raw.buffer.load.v4f32(
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4f32(<4 x float> %{{[0-9]*}}
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

@@ -272,6 +272,9 @@ public:
         bool                realtime,           // Whether to read real-time clock counter
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
+    Llpc::Context& getContext() const;
+
     //
     // Methods implemented in BuilderImplSubgroup:
     //
@@ -416,8 +419,6 @@ public:
     virtual llvm::Value* CreateSubgroupQuadSwapDiagonal(
         llvm::Value* const pValue,             // [in] The value to swap
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
-    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-    Llpc::Context& getContext() const;
 
 protected:
     Builder(llvm::LLVMContext& context) : llvm::IRBuilder<>(context) {}
@@ -425,6 +426,9 @@ protected:
     // -----------------------------------------------------------------------------------------------------------------
 
     ShaderStage m_shaderStage = ShaderStageInvalid;   // Current shader stage being built.
+
+    llvm::Type* GetTransposedMatrixTy(
+        llvm::Type* const pMatrixType) const; // [in] The matrix type to tranpose
 
     typedef llvm::Value* (*PFN_MapToInt32Func)(Builder&                     builder,
                                                llvm::ArrayRef<llvm::Value*> mappedArgs,
@@ -435,9 +439,6 @@ protected:
         PFN_MapToInt32Func           pfnMapFunc,       // [in] Pointer to the function to call on each i32.
         llvm::ArrayRef<llvm::Value*> mappedArgs,       // The arguments to massage into an i32 type.
         llvm::ArrayRef<llvm::Value*> passthroughArgs); // The arguments to pass-through without massaging.
-
-    llvm::Type* GetTransposedMatrixTy(
-        llvm::Type* const pMatrixType) const; // [in] The matrix type to tranpose
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)

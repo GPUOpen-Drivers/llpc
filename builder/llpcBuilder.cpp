@@ -278,6 +278,7 @@ Value* Builder::CreateMapToInt32(
     }
 }
 
+// =====================================================================================================================
 // Gets new matrix type after doing matrix transposing.
 Type* Builder::GetTransposedMatrixTy(
     Type* const pMatrixType // [in] The matrix type to get the transposed type from.

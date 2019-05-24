@@ -43,7 +43,7 @@
 #include "spirvExt.h"
 #include "llpcCodeGenManager.h"
 #include "llpcContext.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 #include "llpcFile.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"

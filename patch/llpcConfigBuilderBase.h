@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpcContext.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
 
 namespace Llpc
 {
@@ -88,12 +89,28 @@ protected:
 private:
     // Set pseudo-register in PAL metadata
     void SetPseudoRegister(uint32_t reg, uint32_t value);
+    // Return whether we are generating MsgPack
+    bool GeneratingMsgPack() const { return m_document ? true : false; }
+    // Get the MsgPack map node for the specified API shader in the ".shaders" map
+    llvm::msgpack::MapDocNode GetApiShaderNode(uint32_t apiStage);
+    // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
+    llvm::msgpack::MapDocNode GetHwShaderNode(Util::Abi::HardwareStage hwStage);
     // Set USER_DATA_LIMIT (called once for the whole pipeline)
     void SetUserDataLimit();
     // Set SPILL_THRESHOLD (called once for the whole pipeline)
     void SetSpillThreshold();
     // Set PIPELINE_HASH (called once for the whole pipeline)
     void SetPipelineHash();
+
+    // -----------------------------------------------------------------------------------------------------------------
+    std::unique_ptr<llvm::msgpack::Document>  m_document;       // The MsgPack document
+    llvm::msgpack::MapDocNode                 m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
+    llvm::msgpack::MapDocNode                 m_apiShaderNodes[ShaderStageCount];
+                                                                // MsgPack map node for each API shader's node in
+                                                                //  ".shaders"
+    llvm::msgpack::MapDocNode                 m_hwShaderNodes[uint32_t(Util::Abi::HardwareStage::Count)];
+                                                                // MsgPack map node for each HW shader's node in
+                                                                //  ".hardware_stages"
 };
 
 } // Llpc

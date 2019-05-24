@@ -54,9 +54,10 @@ ComputeContext::ComputeContext(
     const GpuProperty*              pGpuProp,         // [in] GPU Property
     const WorkaroundFlags*          pGpuWorkarounds,  // [in] GPU workarounds
     const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
-    MetroHash::Hash*                pHash)            // [in] Pipeline hash code
+    MetroHash::Hash*                pPipelineHash,    // [in] Pipeline hash code
+    MetroHash::Hash*                pCacheHash)       // [in] Cache hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pHash),
+    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pPipelineHash, pCacheHash),
     m_pPipelineInfo(pPipelineInfo)
 {
     InitShaderResourceUsage(ShaderStageCompute);

@@ -48,7 +48,7 @@
 #include "llpcAbiMetadata.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 #include "llpcInternal.h"
 #include "llpcPassLoopInfoCollect.h"
 

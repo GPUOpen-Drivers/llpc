@@ -33,7 +33,7 @@
 
 #include "llpc.h"
 #include "llpcDebug.h"
-#include "llpcElf.h"
+#include "llpcElfReader.h"
 #include "llpcUtil.h"
 #include "palPipelineAbi.h"
 
