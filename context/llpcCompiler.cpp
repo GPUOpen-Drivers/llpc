@@ -2430,6 +2430,14 @@ void Compiler::BuildShaderCacheHash(
         PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInInputLocMap, &hasher);
         PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInOutputLocMap, &hasher);
 
+        if (stage == ShaderStageGeometry)
+        {
+            // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to
+            // locations of generic outputs). We have to add it to shader hash calculation.
+            PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.gs.builtInOutLocs, &hasher);
+        }
+
+        // Update vertex input state
         if (stage == ShaderStageVertex)
         {
             PipelineDumper::UpdateHashForVertexInputState(pPipelineInfo->pVertexInput, &hasher);
