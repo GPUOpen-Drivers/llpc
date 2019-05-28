@@ -1131,16 +1131,17 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
     }
 
     // Now non-image-related handling.
-    const bool isBufferBlockPointer = (storageClass == StorageClassStorageBuffer) ||
-                                      (storageClass == StorageClassUniform) ||
-                                      (storageClass == StorageClassPushConstant) ||
-                                      (storageClass == StorageClassPhysicalStorageBufferEXT);
+    const bool explicitlyLaidOut =
+        (storageClass == StorageClassStorageBuffer) ||
+        (storageClass == StorageClassUniform) ||
+        (storageClass == StorageClassPushConstant) ||
+        (storageClass == StorageClassPhysicalStorageBufferEXT);
 
     Type* const pPointeeType = transType(pSpvType->getPointerElementType(),
                                          matrixStride,
                                          isColumnMajor,
                                          true,
-                                         isBufferBlockPointer);
+                                         explicitlyLaidOut);
 
     return PointerType::get(pPointeeType, SPIRSPIRVAddrSpaceMap::rmap(storageClass));
 }
