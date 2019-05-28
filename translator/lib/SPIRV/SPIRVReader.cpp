@@ -5149,7 +5149,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         }
     }
 
-    Type* const pVarType = transType(pSpvVar->getType())->getPointerElementType();
+    Type* const pPtrType = transType(pSpvVar->getType());
+    Type* const pVarType = pPtrType->getPointerElementType();
 
     SPIRVValue* const pSpvInitializer = pSpvVar->getInitializer();
 
@@ -5236,7 +5237,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         }
     }
 
-    uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
+    const uint32_t addrSpace = pPtrType->getPointerAddressSpace();
     string varName = pSpvVar->getName();
 
     GlobalVariable* const pGlobalVar = new GlobalVariable(*M,
