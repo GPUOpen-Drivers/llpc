@@ -89,6 +89,12 @@ private:
 
     void PatchWaterfallLastUseCalls();
 
+    // Create a non-strided, non-swizzled buffer descriptor with the given
+    // base address (64-bit integer) and size in bytes (32-bit integer).
+    llvm::Value* buildBufferDescriptor(llvm::Value* pBaseAddr,
+                                       llvm::Value* pBufSize,
+                                       llvm::Instruction* pInsertPoint);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     // Descriptor size
