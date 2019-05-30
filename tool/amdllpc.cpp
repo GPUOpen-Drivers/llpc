@@ -710,6 +710,8 @@ static Result AssembleSpirv(
         memset(pSpvText, 0, textSize + 1);
 
         size_t realSize = fread(pSpvText, 1, textSize, pInFile);
+        pSpvText[realSize] = '\0';
+
         int32_t binSize = realSize * 4 + 1024; // Estimated SPIR-V binary size
         uint32_t* pSpvBin = new uint32_t[binSize / sizeof(uint32_t)];
         LLPC_ASSERT(pSpvBin != nullptr);
