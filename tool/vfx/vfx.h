@@ -41,6 +41,13 @@
 #define VFX_REVISION 1
 
 #include "llpc.h"
+
+#ifdef _WIN32
+#define VFXAPI __cdecl
+#else
+#define VFXAPI
+#endif
+
 using namespace Llpc;
 
 extern int Snprintf(char* pOutput, size_t bufSize, const char* pFormat, ...);
@@ -642,7 +649,7 @@ typedef struct VfxPipelineState* VfxPipelineStatePtr;
 namespace Vfx
 {
 
-bool vfxParseFile(
+bool VFXAPI vfxParseFile(
     const char*  pFilename,
     unsigned int numMacro,
     const char*  pMacros[],
@@ -650,18 +657,18 @@ bool vfxParseFile(
     void**       ppDoc,
     const char** ppErrorMsg);
 
-void vfxCloseDoc(
+void VFXAPI vfxCloseDoc(
     void* pDoc);
 
-void vfxGetRenderDoc(
+void VFXAPI vfxGetRenderDoc(
     void*              pDoc,
     VfxRenderStatePtr* pRenderState);
 
-void vfxGetPipelineDoc(
+void VFXAPI vfxGetPipelineDoc(
     void*                pDoc,
     VfxPipelineStatePtr* pPipelineState);
 
-void vfxPrintDoc(
+void VFXAPI vfxPrintDoc(
     void*                pDoc);
 
 } // Vfx

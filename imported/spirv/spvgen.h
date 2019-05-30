@@ -36,9 +36,14 @@
 #define SPVGEN_MAJOR_VERSION(version)  (version >> 16)
 #define SPVGEN_MINOR_VERSION(version)  (version & 0xFFFF)
 
+#ifdef _WIN32
+    #define SPVAPI __cdecl
+#else
+    #define SPVAPI
+#endif
+
 #ifndef SH_IMPORT_EXPORT
     #ifdef _WIN32
-        #define SPVAPI __cdecl
         #ifdef SH_EXPORTING
             #define SH_IMPORT_EXPORT __declspec(dllexport)
         #else
@@ -46,7 +51,6 @@
         #endif
     #else
         #define SH_IMPORT_EXPORT
-        #define SPVAPI
     #endif
 #endif
 
@@ -337,7 +341,7 @@ DECL_EXPORT_FUNC(vfxGetRenderDoc);
 DECL_EXPORT_FUNC(vfxGetPipelineDoc);
 DECL_EXPORT_FUNC(vfxPrintDoc);
 
-bool InitSpvGen(const char* pSpvGenDir = nullptr);
+bool SPVAPI InitSpvGen(const char* pSpvGenDir = nullptr);
 
 #endif
 
@@ -409,7 +413,7 @@ static const char* SpvGeneratorName = "spvgen.so";
 // =====================================================================================================================
 // Initialize SPIR-V generator entry-points
 // This can be called multiple times in the same application.
-bool InitSpvGen(
+bool SPVAPI InitSpvGen(
     const char* pSpvGenDir)   // [in] Directory to load SPVGEN library from, or null to use OS's default search path
 {
     if (g_pfnspvGetVersion != nullptr)
