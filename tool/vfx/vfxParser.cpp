@@ -1546,7 +1546,7 @@ namespace Vfx
 {
 // =====================================================================================================================
 // Parses input file
-bool vfxParseFile(
+bool VFXAPI vfxParseFile(
     const char*     pFilename,      // [in] Input file name
     unsigned int    numMacro,       // Number of marcos
     const char*     pMacros[],      // [in] Marco list, Two strings are a macro, and macro will be extract before parse
@@ -1574,7 +1574,7 @@ bool vfxParseFile(
 
 // =====================================================================================================================
 // Closes document handle
-void vfxCloseDoc(
+void VFXAPI vfxCloseDoc(
     void* pDoc)    // [in] Document handle
 {
     delete reinterpret_cast<Document*>(pDoc);
@@ -1584,7 +1584,7 @@ void vfxCloseDoc(
 // Gets render document from document handle
 //
 // NOTE: The document contents are not accessable after call vfxCloseDoc
-void vfxGetRenderDoc(
+void VFXAPI vfxGetRenderDoc(
     void*              pDoc,         // [in] Document handle
     VfxRenderStatePtr* pRenderState) // [out] Pointer of struct VfxRenderState
 {
@@ -1595,7 +1595,7 @@ void vfxGetRenderDoc(
 // Gets pipeline document from document handle
 //
 // NOTE: The document contents are not accessable after call vfxCloseDoc
-void vfxGetPipelineDoc(
+void VFXAPI vfxGetPipelineDoc(
     void*                pDoc,            // [in] Document handle
     VfxPipelineStatePtr* pPipelineState)  // [out] Pointer of struct VfxPipelineState
 {
@@ -1604,7 +1604,7 @@ void vfxGetPipelineDoc(
 
 // =====================================================================================================================
 // Print Document to STDOUT
-void vfxPrintDoc(
+void VFXAPI vfxPrintDoc(
     void*                pDoc)            // [in] Document handle
 {
    reinterpret_cast<Document*>(pDoc)->PrintSelf();
