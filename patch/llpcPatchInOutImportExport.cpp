@@ -1529,9 +1529,7 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
-        auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
-        if (pGpuWorkarounds->gfx6.shaderZExport &&
-            ((m_pFragDepth != nullptr) || (m_pFragStencilRef != nullptr) || (m_pSampleMask != nullptr)))
+        if ((m_pFragDepth != nullptr) || (m_pFragStencilRef != nullptr) || (m_pSampleMask != nullptr))
         {
             auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
             Value* pFragDepth = pUndef;
@@ -4176,39 +4174,11 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
     uint32_t     builtInId,     // ID of the built-in variable
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
-
-    const auto pUndef = UndefValue::get(m_pContext->FloatTy());
-
-    std::vector<Value*> args;
-
     switch (builtInId)
     {
     case BuiltInFragDepth:
         {
-            if (pGpuWorkarounds->gfx6.shaderZExport)
-            {
-                m_pFragDepth = pOutput;
-            }
-            else
-            {
-                args.clear();
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_Z));  // tgt
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0x1));           // en
-
-                // src0 ~ src3
-                args.push_back(pOutput);
-                args.push_back(pUndef);
-                args.push_back(pUndef);
-                args.push_back(pUndef);
-
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // vm
-
-                // "Done" flag is valid for exporting MRT
-                m_pLastExport = cast<CallInst>(
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
-            }
+            m_pFragDepth = pOutput;
             break;
         }
     case BuiltInSampleMask:
@@ -4218,60 +4188,13 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
             // NOTE: Only gl_SampleMask[0] is valid for us.
             std::vector<uint32_t> idxs;
             idxs.push_back(0);
-            Value* pSampleMask = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
-            pSampleMask = new BitCastInst(pSampleMask, m_pContext->FloatTy(), "", pInsertPos);
-
-            if (pGpuWorkarounds->gfx6.shaderZExport)
-            {
-                m_pSampleMask = pSampleMask;
-            }
-            else
-            {
-                args.clear();
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_Z));  // tgt
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0x4));           // en
-
-                // src0 ~ src3
-                args.push_back(pUndef);
-                args.push_back(pUndef);
-                args.push_back(pSampleMask);
-                args.push_back(pUndef);
-
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // vm
-
-                // "Done" flag is valid for exporting MRT
-                m_pLastExport = cast<CallInst>(
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
-            }
+            m_pSampleMask = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
+            m_pSampleMask = new BitCastInst(m_pSampleMask, m_pContext->FloatTy(), "", pInsertPos);
             break;
         }
     case BuiltInFragStencilRefEXT:
         {
-            Value* pFragStencilRef = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
-            if (pGpuWorkarounds->gfx6.shaderZExport)
-            {
-                m_pFragStencilRef = pFragStencilRef;
-            }
-            else
-            {
-                args.clear();
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_Z));  // tgt
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0x2));           // en
-
-                // src0 ~ src3
-                args.push_back(pUndef);
-                args.push_back(pFragStencilRef);
-                args.push_back(pUndef);
-                args.push_back(pUndef);
-
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
-                args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // vm
-
-                // "Done" flag is valid for exporting MRT
-                m_pLastExport = cast<CallInst>(
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
-            }
+            m_pFragStencilRef = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
             break;
         }
     default:

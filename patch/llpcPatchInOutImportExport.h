@@ -307,7 +307,7 @@ private:
     llvm::Value*            m_pClipDistance;            // Correspond to "out float gl_ClipDistance[]"
     llvm::Value*            m_pCullDistance;            // Correspond to "out float gl_CullDistance[]"
     llvm::Value*            m_pPrimitiveId;             // Correspond to "out int gl_PrimitiveID"
-    // NOTE: For GFX6, gl_FragDepth, gl_FragStencilRef and gl_SampleMask[] are exported at the same time with one "EXP"
+    // NOTE: gl_FragDepth, gl_FragStencilRef and gl_SampleMask[] are exported at the same time with one "EXP"
     // instruction. Thus, the export is delayed.
     llvm::Value*            m_pFragDepth;               // Correspond to "out float gl_FragDepth"
     llvm::Value*            m_pFragStencilRef;          // Correspond to "out int gl_FragStencilRef"
