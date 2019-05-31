@@ -431,25 +431,48 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageTessControl:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 3);
-                    Value* pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-                    Value* pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
+                    // Builtin Call has different number of operands
+                    Value* pElemIdx = nullptr;
+                    Value* pVertexIdx = nullptr;
+                    if (callInst.getNumArgOperands() > 1)
+                    {
+                        pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
+                    }
+
+                    if (callInst.getNumArgOperands() > 2)
+                    {
+                        pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
+                    }
 
                     pInput = PatchTcsBuiltInInputImport(pInputTy, builtInId, pElemIdx, pVertexIdx, &callInst);
                     break;
                 }
             case ShaderStageTessEval:
                 {
-                    LLPC_ASSERT(callInst.getNumArgOperands() == 3);
-                    Value* pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-                    Value* pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
+                    // Builtin Call has different number of operands
+                    Value *pElemIdx = nullptr;
+                    Value* pVertexIdx = nullptr;
+                    if (callInst.getNumArgOperands() > 1)
+                    {
+                        pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
+                    }
+
+                    if (callInst.getNumArgOperands() > 2)
+                    {
+                        pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
+                    }
 
                     pInput = PatchTesBuiltInInputImport(pInputTy, builtInId, pElemIdx, pVertexIdx, &callInst);
                     break;
                 }
             case ShaderStageGeometry:
                 {
-                    Value* pVertexIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
+                    // Builtin Call has different number of operands
+                    Value* pVertexIdx = nullptr;
+                    if (callInst.getNumArgOperands() > 1)
+                    {
+                        pVertexIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
+                    }
                     pInput = PatchGsBuiltInInputImport(pInputTy, builtInId, pVertexIdx, &callInst);
                     break;
                 }
