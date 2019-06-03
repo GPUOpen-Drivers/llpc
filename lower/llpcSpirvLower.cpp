@@ -58,6 +58,21 @@
 
 using namespace llvm;
 
+namespace llvm
+{
+
+namespace cl
+{
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27
+// -lower-dyn-index: lower SPIR-V dynamic (non-constant) index in access chain
+static opt<bool> LowerDynIndex("lower-dyn-index", desc("Lower SPIR-V dynamic (non-constant) index in access chain"));
+#endif
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
