@@ -1349,7 +1349,6 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG(&pConfig->m_psRegs, CB_SHADER_MASK, cbShaderMask);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, pResUsage->inOutUsage.fs.interpInfo.size());
 
-    const auto& interpInfo = pResUsage->inOutUsage.fs.interpInfo;
     uint32_t pointCoordLoc = InvalidValue;
     if (pResUsage->inOutUsage.builtInInputLocMap.find(spv::BuiltInPointCoord) !=
         pResUsage->inOutUsage.builtInInputLocMap.end())
@@ -1358,18 +1357,25 @@ Result ConfigBuilder::BuildPsRegConfig(
         pointCoordLoc = pResUsage->inOutUsage.builtInInputLocMap[spv::BuiltInPointCoord];
     }
 
-    for (uint32_t i = 0; i < interpInfo.size(); ++i)
+    // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
+    // were identified in the shader.
+    const std::vector<FsInterpInfo> dummyInterpInfo {{ 0, false, false, false }};
+    const auto& fsInterpInfo = pResUsage->inOutUsage.fs.interpInfo;
+    const auto* pInterpInfo = (fsInterpInfo.size() == 0) ? &dummyInterpInfo : &fsInterpInfo;
+
+    for (uint32_t i = 0; i < pInterpInfo->size(); ++i)
     {
-        LLPC_ASSERT(((interpInfo[i].loc     == InvalidFsInterpInfo.loc) &&
-                     (interpInfo[i].flat    == InvalidFsInterpInfo.flat) &&
-                     (interpInfo[i].custom  == InvalidFsInterpInfo.custom) &&
-                     (interpInfo[i].is16bit == InvalidFsInterpInfo.is16bit)) == false);
+        const auto& interpInfoElem = (*pInterpInfo)[i];
+        LLPC_ASSERT(((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
+                     (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
+                     (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
+                     (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)) == false);
 
         regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
-        spiPsInputCntl.bits.FLAT_SHADE = interpInfo[i].flat;
-        spiPsInputCntl.bits.OFFSET = interpInfo[i].loc;
+        spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;
+        spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
 
-        if (interpInfo[i].custom)
+        if (interpInfoElem.custom)
         {
             // NOTE: Force parameter cache data to be read in passthrough mode.
             static const uint32_t PassThroughMode = (1 << 5);
@@ -1378,7 +1384,7 @@ Result ConfigBuilder::BuildPsRegConfig(
         }
         else
         {
-            if (interpInfo[i].is16bit)
+            if (interpInfoElem.is16bit)
             {
                 // NOTE: Enable 16-bit interpolation mode for non-passthrough mode. Attribute 0 is always valid.
                 spiPsInputCntl.bits.FP16_INTERP_MODE = true;
