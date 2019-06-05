@@ -212,18 +212,7 @@ void PatchInOutImportExport::ProcessShader()
     {
         // Calculate and store thread ID
         auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
-
-        std::vector<Value*> args;
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
-
-        {
-            args.clear();
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-            args.push_back(m_pThreadId);
-            m_pThreadId = EmitCall(m_pModule, "llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, NoAttrib, &*pInsertPos);
-        }
+        m_pThreadId = GetSubgroupLocalInvocationId(&*pInsertPos);
     }
 
     // Initialize calculation factors for tessellation shader
@@ -2348,6 +2337,11 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
             pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
+    case BuiltInSubgroupLocalInvocationId:
+        {
+            pInput = GetSubgroupLocalInvocationId(pInsertPos);
+            break;
+        }
     case BuiltInDeviceIndex:
         {
             auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
@@ -2453,6 +2447,11 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
     case BuiltInSubgroupSize:
         {
             pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            break;
+        }
+    case BuiltInSubgroupLocalInvocationId:
+        {
+            pInput = GetSubgroupLocalInvocationId(pInsertPos);
             break;
         }
     case BuiltInDeviceIndex:
@@ -2621,6 +2620,11 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
             pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
+    case BuiltInSubgroupLocalInvocationId:
+        {
+            pInput = GetSubgroupLocalInvocationId(pInsertPos);
+            break;
+        }
     case BuiltInDeviceIndex:
         {
             auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
@@ -2714,6 +2718,11 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
     case BuiltInSubgroupSize:
         {
             pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            break;
+        }
+    case BuiltInSubgroupLocalInvocationId:
+        {
+            pInput = GetSubgroupLocalInvocationId(pInsertPos);
             break;
         }
     case BuiltInDeviceIndex:
@@ -3020,6 +3029,11 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
             break;
         }
+    case BuiltInSubgroupLocalInvocationId:
+        {
+            pInput = GetSubgroupLocalInvocationId(pInsertPos);
+            break;
+        }
     case BuiltInDeviceIndex:
         {
             auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
@@ -3180,6 +3194,11 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     case BuiltInSubgroupSize:
         {
             pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            break;
+        }
+    case BuiltInSubgroupLocalInvocationId:
+        {
+            pInput = GetSubgroupLocalInvocationId(pInsertPos);
             break;
         }
     case BuiltInDeviceIndex:
@@ -6723,6 +6742,36 @@ Value* PatchInOutImportExport::AdjustCentroidIJ(
     }
 
     return pIJ;
+}
+
+// =====================================================================================================================
+// Get Subgroup local invocation Id
+Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
+    Instruction* pInsertPos)  // [in] Where to insert this call
+{
+    std::vector<Value*> args;
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+    Value* pSubgroupLocalInvocationId = EmitCall(m_pModule,
+                                                "llvm.amdgcn.mbcnt.lo",
+                                                m_pContext->Int32Ty(),
+                                                args,
+                                                NoAttrib,
+                                                &*pInsertPos);
+
+    {
+        args.clear();
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+        args.push_back(pSubgroupLocalInvocationId);
+        pSubgroupLocalInvocationId = EmitCall(m_pModule,
+                                                "llvm.amdgcn.mbcnt.hi",
+                                                m_pContext->Int32Ty(),
+                                                args,
+                                                NoAttrib,
+                                                &*pInsertPos);
+    }
+
+    return pSubgroupLocalInvocationId;
 }
 
 } // Llpc

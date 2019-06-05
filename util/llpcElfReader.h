@@ -34,6 +34,8 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "llvm/BinaryFormat/MsgPackDocument.h"
+
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
@@ -370,15 +372,23 @@ enum MsgPackIteratorStatus : uint32_t
     MsgPackIteratorNone,
     MsgPackIteratorMapKey,
     MsgPackIteratorMapValue,
-    MsgPackIteratorArray
+    MsgPackIteratorArray,
+    MsgPackIteratorArrayValue,
+    MsgPackIteratorMapBegin,
+    MsgPackIteratorMapPair,
+    MsgPackIteratorMapEnd,
+    MsgPackIteratorArrayEnd,
 };
 
 // Represents the struct of message packer iterator
 struct MsgPackIterator
 {
-    MsgPackIteratorStatus status;  // Iterator status
-    uint32_t              index;   // Index in map or array
-    uint32_t              size;    // Size of map or array
+    MsgPackIteratorStatus status;                               // Iterator status
+    llvm::msgpack::MapDocNode::MapTy::iterator     mapIt;       // Iterator of current map node
+    llvm::msgpack::MapDocNode::MapTy::iterator     mapEnd;      // End iterator of current map node
+    llvm::msgpack::ArrayDocNode::ArrayTy::iterator arrayIt;     // Iterator of current array node
+    llvm::msgpack::ArrayDocNode::ArrayTy::iterator arrayEnd;    // End Iterator of current array node
+    llvm::msgpack::DocNode*                        pNode;       // Current node
 };
 
 // =====================================================================================================================
@@ -431,18 +441,17 @@ public:
     }
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-    void InitMsgPack(const void* pBuffer, uint32_t sizeInBytes);
+    void InitMsgPackDocument(const void* pBuffer, uint32_t sizeInBytes);
 
-    bool GetNextMsgItem();
+    bool GetNextMsgNode();
 
-    const cwpack_item* GetMsgItem() const;
+    const llvm::msgpack::DocNode* GetMsgNode() const;
 
     MsgPackIteratorStatus GetMsgIteratorStatus() const;
 
-    void UpdateMsgPackStatus(std::function<void(MsgPackIteratorStatus)> callback);
-
     uint32_t GetMsgMapLevel() const;
 #endif
+
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ElfReader);
 
@@ -459,7 +468,7 @@ private:
     int32_t   m_strtabSecIdx;   // Index of string table section
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-    cw_unpack_context            m_msgPackContext;   // Context of MsgPack
+    llvm::msgpack::Document      m_document;         // MsgPack document
     std::vector<MsgPackIterator> m_iteratorStack;    // MsgPack iterator stack
     uint32_t                     m_msgPackMapLevel;  // The map level of current message item
 #endif

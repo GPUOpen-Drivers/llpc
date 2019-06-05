@@ -381,20 +381,21 @@ ElfNote ElfReader<Elf>::GetNote(
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
 // =====================================================================================================================
-// Initialize MsgPack context and related visitor iterators
+// Initialize MsgPack document and related visitor iterators
 template<class Elf>
-void ElfReader<Elf>::InitMsgPack(
+void ElfReader<Elf>::InitMsgPackDocument(
     const void* pBuffer,       // [in] Message buffer
     uint32_t    sizeInBytes)   // Buffer size in bytes
 {
-    memset(&m_msgPackContext, 0, sizeof(m_msgPackContext));
-    cw_unpack_context_init(&m_msgPackContext, pBuffer, sizeInBytes, nullptr, nullptr);
+    m_document.readFromBlob(StringRef(reinterpret_cast<const char*>(pBuffer), sizeInBytes), false);
+
+    auto pRoot = &m_document.getRoot();
+    LLPC_ASSERT(pRoot->isMap());
 
     m_iteratorStack.clear();
     MsgPackIterator iter = { };
-    iter.status = MsgPackIteratorNone;
-    iter.index = 0;
-    iter.size = 0;
+    iter.pNode = &(pRoot->getMap(true));
+    iter.status = MsgPackIteratorMapBegin;
     m_iteratorStack.push_back(iter);
 
     m_msgPackMapLevel = 0;
@@ -403,26 +404,164 @@ void ElfReader<Elf>::InitMsgPack(
 // =====================================================================================================================
 // Advances the MsgPack context to the next item token and return true if success.
 template<class Elf>
-bool ElfReader<Elf>::GetNextMsgItem()
+bool ElfReader<Elf>::GetNextMsgNode()
 {
-    cw_unpack_next(&m_msgPackContext);
-    return m_msgPackContext.return_code == CWP_RC_OK;
+    if (m_iteratorStack.empty())
+    {
+        return false;
+    }
+
+    MsgPackIterator curIter = m_iteratorStack.back();
+    bool skipPostCheck = false;
+    if (curIter.status == MsgPackIteratorMapBegin)
+    {
+        auto pMap = &(curIter.pNode->getMap(true));
+        curIter.mapIt = pMap->begin();
+        curIter.mapEnd = pMap->end();
+        m_msgPackMapLevel++;
+        curIter.status = MsgPackIteratorMapPair;
+        m_iteratorStack.push_back(curIter);
+        skipPostCheck = true;
+    }
+    else if (curIter.status == MsgPackIteratorMapPair)
+    {
+        LLPC_ASSERT((curIter.mapIt->first.isMap() == false) && (curIter.mapIt->first.isArray() == false));
+        curIter.status = MsgPackIteratorMapKey;
+        m_iteratorStack.push_back(curIter);
+    }
+    else if (curIter.status == MsgPackIteratorMapKey)
+    {
+        if (curIter.mapIt->second.isMap())
+        {
+            curIter.status = MsgPackIteratorMapBegin;
+            curIter.pNode = &(curIter.mapIt->second.getMap(true));
+        }
+        else if (curIter.mapIt->second.isArray())
+        {
+            curIter.status = MsgPackIteratorArray;
+            auto pArray = &(curIter.mapIt->second.getArray(true));
+            curIter.arrayIt = pArray->begin();
+            curIter.arrayEnd = pArray->end();
+            curIter.pNode = pArray;
+        }
+        else
+        {
+            curIter.status = MsgPackIteratorMapValue;
+        }
+        m_iteratorStack.back() = curIter;
+        skipPostCheck = true;
+    }
+    else if (curIter.status == MsgPackIteratorArray)
+    {
+        curIter.arrayIt = curIter.pNode->getArray(true).begin();
+        curIter.arrayEnd = curIter.pNode->getArray(true).end();
+        if (curIter.arrayIt->isMap())
+        {
+            curIter.status = MsgPackIteratorMapBegin;
+            curIter.pNode = &(curIter.arrayIt->getMap(true));
+        }
+        else if (curIter.arrayIt->isArray())
+        {
+            curIter.status = MsgPackIteratorArray;
+            auto pArray = &(curIter.arrayIt->getArray(true));
+            curIter.arrayIt = pArray->begin();
+            curIter.arrayEnd = pArray->end();
+            curIter.pNode = pArray;
+        }
+        else
+        {
+            curIter.status = MsgPackIteratorArrayValue;
+        }
+        m_iteratorStack.push_back(curIter);
+        skipPostCheck = true;
+    }
+    else if (curIter.status == MsgPackIteratorMapValue)
+    {
+        m_iteratorStack.pop_back();
+    }
+    else if (curIter.status == MsgPackIteratorArrayValue)
+    {
+        m_iteratorStack.pop_back();
+    }
+    else if (curIter.status == MsgPackIteratorMapEnd)
+    {
+        m_iteratorStack.pop_back();
+        m_iteratorStack.pop_back();
+        m_msgPackMapLevel--;
+    }
+    else if (curIter.status == MsgPackIteratorArrayEnd)
+    {
+        m_iteratorStack.pop_back();
+        m_iteratorStack.pop_back();
+    }
+
+    // Post check for end visit map or array element
+    if ((m_iteratorStack.size() > 0) && (skipPostCheck == false))
+    {
+        auto pNextIter = &m_iteratorStack.back();
+        if (pNextIter->status == MsgPackIteratorMapPair)
+        {
+            pNextIter->mapIt++;
+            if (pNextIter->mapIt == pNextIter->mapEnd)
+            {
+                pNextIter->status = MsgPackIteratorMapEnd;
+            }
+        }
+        else if (pNextIter->status == MsgPackIteratorArray)
+        {
+            pNextIter->arrayIt++;
+            curIter = *pNextIter;
+            if (curIter.arrayIt == curIter.arrayEnd)
+            {
+                curIter.status = MsgPackIteratorArrayEnd;
+            }
+            else if (curIter.arrayIt->isMap())
+            {
+                curIter.status = MsgPackIteratorMapBegin;
+                curIter.pNode = &(curIter.arrayIt->getMap(true));
+            }
+            else if (curIter.arrayIt->isArray())
+            {
+                curIter.status = MsgPackIteratorArray;
+                auto pArray = &(curIter.arrayIt->getArray(true));
+                curIter.arrayIt = pArray->begin();
+                curIter.arrayEnd = pArray->end();
+                curIter.pNode = pArray;
+            }
+            else
+            {
+                curIter.status = MsgPackIteratorArrayValue;
+            }
+            m_iteratorStack.push_back(curIter);
+        }
+    }
+
+    return m_iteratorStack.size() > 0;
 }
 
 // =====================================================================================================================
-// Gets MsgPack item.
+// Gets MsgPack node.
 template<class Elf>
-const cwpack_item* ElfReader<Elf>::GetMsgItem() const
+const llvm::msgpack::DocNode* ElfReader<Elf>::GetMsgNode() const
 {
-    return &m_msgPackContext.item;
-}
-
-// =====================================================================================================================
-// Gets the status of message packer iterator.
-template<class Elf>
-MsgPackIteratorStatus ElfReader<Elf>::GetMsgIteratorStatus() const
-{
-    return m_iteratorStack.back().status;
+    LLPC_ASSERT(m_iteratorStack.size() > 0);
+    auto pCurIter = &(m_iteratorStack.back());
+    if (pCurIter->status == MsgPackIteratorArrayValue)
+    {
+        return &(*pCurIter->arrayIt);
+    }
+    else if (pCurIter->status == MsgPackIteratorMapValue)
+    {
+        return &(pCurIter->mapIt->second);
+    }
+    else if (pCurIter->status == MsgPackIteratorMapKey)
+    {
+        return &(pCurIter->mapIt->first);
+    }
+    else
+    {
+        return pCurIter->pNode;
+    }
 }
 
 // =====================================================================================================================
@@ -434,61 +573,13 @@ uint32_t ElfReader<Elf>::GetMsgMapLevel() const
 }
 
 // =====================================================================================================================
-// Gets the map level of current message item.
+// Gets the status of message packer iterator.
 template<class Elf>
-void ElfReader<Elf>::UpdateMsgPackStatus(
-    std::function<void(MsgPackIteratorStatus)> callback) // Callback function for array or map finish
+MsgPackIteratorStatus ElfReader<Elf>::GetMsgIteratorStatus() const
 {
-    auto pCurIter = &m_iteratorStack.back();
-
-    if ((m_msgPackContext.item.type == CWP_ITEM_MAP) || (m_msgPackContext.item.type == CWP_ITEM_ARRAY))
-    {
-        // Begin a new map or array
-        MsgPackIterator iter = { };
-
-        iter.status = (m_msgPackContext.item.type == CWP_ITEM_MAP) ? MsgPackIteratorMapKey : MsgPackIteratorArray;
-        iter.index = 0;
-        iter.size = m_msgPackContext.item.as.map.size;
-        m_iteratorStack.push_back(iter);
-
-        if (m_msgPackContext.item.type == CWP_ITEM_MAP)
-        {
-            ++m_msgPackMapLevel;
-        }
-    }
-    else if ((GetMsgIteratorStatus() == MsgPackIteratorMapValue) || (GetMsgIteratorStatus() == MsgPackIteratorArray))
-    {
-        // Visit a map value or array item
-        ++pCurIter->index;
-        while ((pCurIter->index == pCurIter->size) && (m_iteratorStack.size() > 1))
-        {
-            if (pCurIter->status == MsgPackIteratorMapValue)
-            {
-                callback(pCurIter->status);
-                --m_msgPackMapLevel;
-            }
-            else
-            {
-                callback(pCurIter->status);
-            }
-            m_iteratorStack.pop_back();
-            pCurIter = &m_iteratorStack.back();
-            ++ pCurIter->index;
-        }
-
-        if (pCurIter->status == MsgPackIteratorMapValue)
-        {
-            pCurIter->status = MsgPackIteratorMapKey;
-        }
-    }
-    else if (pCurIter->status == MsgPackIteratorMapKey)
-    {
-        // Visit a map key
-        LLPC_ASSERT((m_msgPackContext.item.type == CWP_ITEM_STR) ||
-                    (m_msgPackContext.item.type == CWP_ITEM_POSITIVE_INTEGER));
-        pCurIter->status = MsgPackIteratorMapValue;
-    }
+    return m_iteratorStack.back().status;
 }
+
 #endif
 
 // Explicit instantiations for ELF utilities

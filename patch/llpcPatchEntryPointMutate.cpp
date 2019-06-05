@@ -408,14 +408,27 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
              // and indirect user data should not be counted in possible spilled user data.
             if (pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr)
             {
-                // Only the first shader stage needs a vertex buffer table.
-                if ((m_pContext->GetShaderStageMask() & (ShaderStageToMask(m_shaderStage) - 1)) == 0)
+                // Only the vertex shader needs a vertex buffer table.
+                if (m_shaderStage == ShaderStageVertex)
                 {
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                    pIntfData->vbTable.resNodeIdx = pNode->offsetInDwords + 1;
-#endif
                     reserveVbTable = true;
                 }
+                else if (m_pContext->GetGfxIpVersion().major >= 9)
+                {
+                    // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
+                    // table, to ensure that the merged shader gets one.
+                    if ((m_shaderStage == ShaderStageTessControl) ||
+                        ((m_shaderStage == ShaderStageGeometry) && (m_hasTs == false)))
+                    {
+                        reserveVbTable = true;
+                    }
+                }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
+                if (reserveVbTable)
+                {
+                    pIntfData->vbTable.resNodeIdx = pNode->offsetInDwords + 1;
+                }
+#endif
                 continue;
             }
 
@@ -426,11 +439,24 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                      (ShaderStageToMask(ShaderStageFragment) - ShaderStageToMask(m_shaderStage))) ==
                     ShaderStageToMask(m_shaderStage))
                 {
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                    pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
-#endif
                     reserveStreamOutTable = true;
                 }
+                else if (m_pContext->GetGfxIpVersion().major >= 9)
+                {
+                    // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
+                    // table, to ensure that the merged shader gets one.
+                    if ((m_shaderStage == ShaderStageTessEval) ||
+                        ((m_shaderStage == ShaderStageVertex) && (m_hasTs == false)))
+                    {
+                        reserveStreamOutTable = true;
+                    }
+                }
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
+                if (reserveStreamOutTable)
+                {
+                    pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
+                }
+#endif
                 continue;
             }
 

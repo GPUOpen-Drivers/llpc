@@ -47,3 +47,11 @@ bool BuilderImplBase::SupportDpp() const
 {
     return getContext().GetGfxIpVersion().major >= 8;
 }
+
+// =====================================================================================================================
+// Get whether the context we are building in support the bpermute operation.
+bool BuilderImplBase::SupportBPermute() const
+{
+    return getContext().GetGfxIpVersion().major >= 8;
+}
+

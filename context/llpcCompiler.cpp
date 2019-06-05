@@ -2433,10 +2433,19 @@ void Compiler::BuildShaderCacheHash(
         PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInInputLocMap, &hasher);
         PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInOutputLocMap, &hasher);
 
+        if (stage == ShaderStageGeometry)
+        {
+            // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to
+            // locations of generic outputs). We have to add it to shader hash calculation.
+            PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.gs.builtInOutLocs, &hasher);
+        }
+
+        // Update vertex input state
         if (stage == ShaderStageVertex)
         {
             PipelineDumper::UpdateHashForVertexInputState(pPipelineInfo->pVertexInput, &hasher);
         }
+
         MetroHash::Hash  hash = {};
         hasher.Finalize(hash.bytes);
 
@@ -2578,6 +2587,10 @@ void Compiler::MergeElfBinary(
                 (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
+    LLPC_UNUSED(FragmentIntrlTblSymbolName);
+    LLPC_UNUSED(FragmentDisassemblySymbolName);
+    LLPC_UNUSED(FragmentIntrlDataSymbolName);
+    LLPC_UNUSED(FragmentAmdIlSymbolName);
 
     // Merge ISA disassemble
     auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);

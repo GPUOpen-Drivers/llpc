@@ -71,7 +71,7 @@ void main()
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.or.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.xor.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.swap.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.buffer.atomic.cmpswap(i32 %{{[0-9]*}}, i32 28, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i1 false)
+; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.cmpswap.i32(i32 %{{[0-9]*}}, i32 28, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.add.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 4, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.umin.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 8, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.umax.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 12, i32 0, i32 0)
@@ -79,7 +79,7 @@ void main()
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.or.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.xor.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.swap.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 0, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.buffer.atomic.cmpswap(i32 %{{[0-9]*}}, i32 16, <4 x i32> %{{[0-9]*}}, i32 0, i32 %{{[0-9]*}}, i1 false)
+; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.cmpswap.i32(i32 %{{[0-9]*}}, i32 16, <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

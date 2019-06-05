@@ -29,15 +29,11 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call i64 @llpc.subgroup.ballot
-; SHADERTEST: call {{.*}} i32 @_Z8MbcntAMDl
-; SHADERTEST: call i32 @_Z18WriteInvocationAMDiii
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
-; SHADERTEST: call i64 @llvm.amdgcn.icmp
-; SHADERTEST: call i32 @llvm.amdgcn.mbcnt.lo
-; SHADERTEST: call i32 @llvm.amdgcn.mbcnt.hi
-; SHADERTEST: call i32 @llvm.amdgcn.writelane
+; SHADERTEST: call <4 x i32> (...) @llpc.call.subgroup.ballot.v4i32(
+; SHADERTEST: call i32 (...) @llpc.call.subgroup.mbcnt.i32(
+; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.write.invocation.v2i32(
+; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.write.invocation.v3i32(
+; SHADERTEST: call <4 x float> (...) @llpc.call.subgroup.write.invocation.v4f32(
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

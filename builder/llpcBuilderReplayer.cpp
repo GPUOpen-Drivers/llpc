@@ -491,6 +491,22 @@ Value* BuilderReplayer::ProcessCall(
         {
             return m_pBuilder->CreateSubgroupQuadSwapDiagonal(args[0]);
         }
+    case BuilderRecorder::Opcode::SubgroupSwizzleQuad:
+        {
+            return m_pBuilder->CreateSubgroupSwizzleQuad(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupSwizzleMask:
+        {
+            return m_pBuilder->CreateSubgroupSwizzleMask(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::SubgroupWriteInvocation:
+        {
+            return m_pBuilder->CreateSubgroupWriteInvocation(args[0], args[1], args[2]);
+        }
+    case BuilderRecorder::Opcode::SubgroupMbcnt:
+        {
+            return m_pBuilder->CreateSubgroupMbcnt(args[0]);
+        }
     }
 }
 

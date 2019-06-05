@@ -110,6 +110,10 @@ public:
         SubgroupQuadSwapHorizontal,
         SubgroupQuadSwapVertical,
         SubgroupQuadSwapDiagonal,
+        SubgroupSwizzleQuad,
+        SubgroupSwizzleMask,
+        SubgroupWriteInvocation,
+        SubgroupMbcnt,
     };
 
     // Given an opcode, get the call name (without the "llpc.call." prefix)
@@ -249,6 +253,18 @@ public:
                                                 const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupQuadSwapDiagonal(llvm::Value* const pValue,
                                                 const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupSwizzleQuad(llvm::Value* const pValue,
+                                           llvm::Value* const pOffset,
+                                           const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupSwizzleMask(llvm::Value* const pValue,
+                                           llvm::Value* const pMask,
+                                           const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupWriteInvocation(llvm::Value* const pInputValue,
+                                               llvm::Value* const pWriteValue,
+                                               llvm::Value* const pIndex,
+                                               const llvm::Twine& instName) override final;
+    llvm::Value* CreateSubgroupMbcnt(llvm::Value* const pMask,
+                                     const llvm::Twine& instName ) override final;
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
     llvm::ModulePass* CreateBuilderReplayer() override;

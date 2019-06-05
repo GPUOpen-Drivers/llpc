@@ -1342,119 +1342,112 @@ OStream& operator<<(
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
 
                     auto pBuffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
-                    reader.InitMsgPack(pBuffer, pNode->descSize);
+                    reader.InitMsgPackDocument(pBuffer, pNode->descSize);
 
-                    while (reader.GetNextMsgItem())
+                    do
                     {
+                        auto pNode = reader.GetMsgNode();
                         auto msgIterStatus = reader.GetMsgIteratorStatus();
-                        auto pItem = reader.GetMsgItem();
-                        if (msgIterStatus == MsgPackIteratorMapKey)
+                        switch (pNode->getKind())
                         {
-                            out << "\n";
-                            for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
+                        case msgpack::Type::Int:
+                        case msgpack::Type::UInt:
                             {
-                                out << "    ";
-                            }
-                        }
-
-                        switch (pItem->type)
-                        {
-                        case CWP_ITEM_MAP:
-                        {
-                            out << "{";
-                            break;
-                        }
-                        case CWP_ITEM_STR:
-                        {
-                            OutputText(reinterpret_cast<const uint8_t*>(pItem->as.str.start),
-                                0,
-                                pItem->as.str.length,
-                                out);
-                            if (msgIterStatus == MsgPackIteratorMapKey)
-                            {
-                                out << ": ";
-                            }
-                            break;
-                        }
-                        case CWP_ITEM_ARRAY:
-                        {
-                            out << "[ ";
-                            break;
-                        }
-                        case CWP_ITEM_BIN:
-                        {
-                            OutputBinary(reinterpret_cast<const uint8_t*>(pItem->as.bin.start),
-                                0,
-                                pItem->as.bin.length,
-                                out);
-                            break;
-                        }
-                        case CWP_ITEM_BOOLEAN:
-                        {
-                            out << pItem->as.boolean << " ";
-                            break;
-                        }
-                        case CWP_ITEM_POSITIVE_INTEGER:
-                        case CWP_ITEM_NEGATIVE_INTEGER:
-                        {
-                            if (msgIterStatus == MsgPackIteratorMapKey)
-                            {
-                                LLPC_ASSERT(pItem->as.u64 < UINT32_MAX);
-                                const char* pRegName = nullptr;
-                                uint32_t regId = static_cast<uint32_t>(pItem->as.u64 * 4);
-                                if (gfxIp.major <= 8)
+                                if (msgIterStatus == MsgPackIteratorMapKey)
                                 {
-                                    pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
+                                    const char* pRegName = nullptr;
+                                    uint32_t regId = static_cast<uint32_t>(pNode->getUInt() * 4);
+                                    if (gfxIp.major <= 8)
+                                    {
+                                        pRegName = Gfx6::GetRegisterNameString(gfxIp, regId);
+                                    }
+                                    else
+                                    {
+                                        pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
+                                    }
+
+                                    auto length = snprintf(formatBuf,
+                                        sizeof(formatBuf),
+                                        "%-45s ",
+                                        pRegName);
+                                    LLPC_UNUSED(length);
+                                    out << formatBuf;
                                 }
                                 else
                                 {
-                                    pRegName = Gfx9::GetRegisterNameString(gfxIp, regId);
+                                    auto length = snprintf(formatBuf,
+                                        sizeof(formatBuf),
+                                        "0x%016" PRIX64 " ",
+                                        pNode->getUInt());
+                                    LLPC_UNUSED(length);
+                                    out << formatBuf;
                                 }
-                                auto length = snprintf(formatBuf,
-                                    sizeof(formatBuf),
-                                    "%-45s ",
-                                    pRegName);
-                                LLPC_UNUSED(length);
-                                out << formatBuf;
+                                break;
                             }
-                            else
+                        case msgpack::Type::String:
                             {
-                                auto length = snprintf(formatBuf,
-                                    sizeof(formatBuf),
-                                    "0x%016" PRIX64 " ",
-                                    pItem->as.u64);
-                                LLPC_UNUSED(length);
-                                out << formatBuf;
+                                OutputText((const uint8_t*)(pNode->getString().data()),
+                                    0,
+                                    pNode->getString().size(),
+                                    out);
+                                if (msgIterStatus == MsgPackIteratorMapKey)
+                                {
+                                    out << ": ";
+                                }
+                                break;
                             }
-                            break;
-                        }
-                        case CWP_ITEM_FLOAT:
-                        {
-                            out << pItem->as.real << " ";
-                            break;
-                        }
-                        case CWP_ITEM_DOUBLE:
-                        {
-                            out << pItem->as.long_real << " ";
-                            break;
-                        }
+                        case msgpack::Type::Array:
+                            {
+                                if (msgIterStatus == MsgPackIteratorArray)
+                                {
+                                    out << "[ ";
+                                }
+                                else
+                                {
+                                    out << "]";
+                                }
+                                break;
+                            }
+                        case msgpack::Type::Map:
+                            {
+                                if (msgIterStatus == MsgPackIteratorMapPair)
+                                {
+                                    out << "\n";
+                                        for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
+                                        {
+                                            out << "    ";
+                                        }
+                                }
+                                else if (msgIterStatus == MsgPackIteratorMapBegin)
+                                {
+                                    out << "{";
+                                }
+                                else
+                                {
+                                    out << "}";
+                                }
+                                break;
+                            }
+                        case msgpack::Type::Float:
+                            {
+                                out << pNode->getFloat() << " ";
+                                break;
+                            }
+                        case msgpack::Type::Nil:
+                            {
+                                break;
+                            }
+                        case msgpack::Type::Binary:
+                        case msgpack::Type::Boolean:
                         default:
-                        {
-                            LLPC_NEVER_CALLED();
-                            break;
-                        }
+                            {
+                                LLPC_NEVER_CALLED();
+                                break;
+                            }
                         }
 
-                        reader.UpdateMsgPackStatus(
-                            [&](MsgPackIteratorStatus status)
-                        {
-                            if (status == MsgPackIteratorMapValue)
-                                out << "}";
-                            else
-                                out << "]";
-                        }
-                        );
-                    }
+                    } while (reader.GetNextMsgNode());
+                    out << "\n";
                     break;
                 }
 #endif

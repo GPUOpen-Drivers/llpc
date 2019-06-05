@@ -42,15 +42,12 @@ void main(void)
 ; SHADERTEST: call i64 @llpc.input.import.builtin.SubgroupEqMaskKHR.i64.i32
 ; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32
 ; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32
-; SHADERTEST: call i64 @llpc.subgroup.ballot
-; SHADERTEST: call i32 @_Z25SubgroupReadInvocationKHRii
-; SHADERTEST: call i32 @_Z26SubgroupFirstInvocationKHRi
-; SHADERTEST: call void @llpc.output.export.generic{{.*}}f32
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 asm sideeffect "; %{{[0-9]*}}", "=v,0"(i32 1)
-; SHADERTEST: call i64 @llvm.amdgcn.icmp
-; SHADERTEST: call i32 @llvm.amdgcn.readlane
-; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane
+; SHADERTEST: call <4 x i32> (...) @llpc.call.subgroup.ballot.v4i32(
+; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
+; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.first.i32(
+; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.f32(
+; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.first.f32(
+
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
