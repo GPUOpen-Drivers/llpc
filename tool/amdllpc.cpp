@@ -624,11 +624,13 @@ static Result CompileGlsl(
         void* pProgram = nullptr;
         const char* pLog = nullptr;
         int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+        compileOption |= isHlsl ? SpvGenOptionReadHlsl : 0;
+        const char* entryPoints[] = { EntryTarget.c_str() };
         bool compileResult = spvCompileAndLinkProgramEx(1,
                                                         &lang,
                                                         &sourceStringCount,
                                                         sourceList,
-                                                        nullptr,
+                                                        isHlsl ? entryPoints : nullptr,
                                                         &pProgram,
                                                         &pLog,
                                                         compileOption);
