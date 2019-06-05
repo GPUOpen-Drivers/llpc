@@ -223,15 +223,15 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
             }
         }
 
-        Value* const pAtomicCall = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_atomic_cmpswap,
-                                                               {},
+        Value* const pAtomicCall = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_atomic_cmpswap,
+                                                               atomicCmpXchgInst.getNewValOperand()->getType(),
                                                                {
                                                                    atomicCmpXchgInst.getNewValOperand(),
                                                                    atomicCmpXchgInst.getCompareOperand(),
                                                                    pBufferDesc,
-                                                                   m_pBuilder->getInt32(0),
                                                                    pBaseIndex,
-                                                                   m_pBuilder->getInt1(isSlc)
+                                                                   m_pBuilder->getInt32(0),
+                                                                   m_pBuilder->getInt32(isSlc ? 1 : 0)
                                                                });
 
         switch (atomicCmpXchgInst.getSuccessOrdering())
@@ -702,7 +702,7 @@ void PatchBufferOp::visitMemCpyInst(
         // Handling memcpy requires us to modify the CFG, so we need to do it after the initial visit pass.
         m_postVisitInsts.push_back(&memCpyInst);
     }
-};
+}
 
 // =====================================================================================================================
 // Visits "memmove" instruction.
@@ -1451,19 +1451,37 @@ Value* PatchBufferOp::ReplaceLoad(
     const bool isSlc = pLoadInst->getMetadata(LLVMContext::MD_nontemporal);
     const bool isGlc = pLoadInst->getOrdering() != AtomicOrdering::NotAtomic;
 
-    Value* pBufferDesc = m_replacementMap[pPointer].first;
+    Value* const pBufferDesc = m_replacementMap[pPointer].first;
     Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
 
-    // If our buffer descriptor is divergent, we need to put the load in a waterfall loop.
-    Value* pWaterfall = nullptr;
+    // If our buffer descriptor is divergent, need to handle that differently.
     if (m_divergenceSet.count(pBufferDesc) > 0)
     {
-        pWaterfall = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin,
-                                                 pBufferDesc->getType(),
-                                                 pBufferDesc);
-        pBufferDesc = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane,
-                                                  { pBufferDesc->getType(), pBufferDesc->getType() },
-                                                  { pWaterfall, pBufferDesc });
+        Value* const pBaseAddr = GetBaseAddressFromBufferDesc(pBufferDesc);
+
+        // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
+        Value* const pBound = m_pBuilder->CreateExtractElement(pBufferDesc, 2);
+        Value* const pInBound = m_pBuilder->CreateICmpULT(pBaseIndex, pBound);
+        Value* const pNewBaseIndex = m_pBuilder->CreateSelect(pInBound, pBaseIndex, m_pBuilder->getInt32(0));
+
+        // Add on the index to the address.
+        Value* pLoadPointer = m_pBuilder->CreateGEP(pBaseAddr, pNewBaseIndex);
+
+        pLoadPointer = m_pBuilder->CreateBitCast(pLoadPointer, pLoadType->getPointerTo(ADDR_SPACE_GLOBAL));
+
+        LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pLoadPointer);
+        pNewLoad->setVolatile(pLoadInst->isVolatile());
+        pNewLoad->setAlignment(pLoadInst->getAlignment());
+        pNewLoad->setOrdering(pLoadInst->getOrdering());
+        pNewLoad->setSyncScopeID(pLoadInst->getSyncScopeID());
+        CopyMetadata(pNewLoad, pLoadInst);
+
+        if (isInvariant)
+        {
+            pNewLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_pContext, None));
+        }
+
+        return pNewLoad;
     }
 
     switch (pLoadInst->getOrdering())
@@ -1660,14 +1678,6 @@ Value* PatchBufferOp::ReplaceLoad(
         break;
     default:
         break;
-    }
-
-    // For the divergent descriptor case, finish the waterfall loop.
-    if (pWaterfall != nullptr)
-    {
-        pNewLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_waterfall_end,
-                                               pNewLoad->getType(),
-                                               { pWaterfall, pNewLoad });
     }
 
     return pNewLoad;

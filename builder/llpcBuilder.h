@@ -137,7 +137,7 @@ public:
     // NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
     enum GroupArithOp
     {
-        IAdd,
+        IAdd = 0,
         FAdd,
         IMul,
         FMul,
@@ -418,6 +418,30 @@ public:
     // Create a subgroup quad swap diagonal.
     virtual llvm::Value* CreateSubgroupQuadSwapDiagonal(
         llvm::Value* const pValue,             // [in] The value to swap
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup swizzle quad.
+    virtual llvm::Value* CreateSubgroupSwizzleQuad(
+        llvm::Value* const pValue,             // [in] The value to swizzle.
+        llvm::Value* const pOffset,            // [in] The value to specify the swizzle offsets.
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup swizzle masked.
+    virtual llvm::Value* CreateSubgroupSwizzleMask(
+        llvm::Value* const pValue,             // [in] The value to swizzle.
+        llvm::Value* const pMask,              // [in] The value to specify the swizzle masks.
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup write invocation.
+    virtual llvm::Value* CreateSubgroupWriteInvocation(
+        llvm::Value* const pInputValue,        // [in] The value to return for all but one invocations.
+        llvm::Value* const pWriteValue,        // [in] The value to return for one invocation.
+        llvm::Value* const pIndex,             // [in] The index of the invocation that gets the write value.
+        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a subgroup mbcnt.
+    virtual llvm::Value* CreateSubgroupMbcnt(
+        llvm::Value* const pMask,              // [in] The mask to mbcnt with.
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
 protected:

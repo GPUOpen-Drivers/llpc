@@ -30,7 +30,6 @@ import subprocess
 import sys
 
 import genGlslArithOpEmuCode
-import genGlslGroupOpEmuCode
 import genGlslImageOpEmuCode
 
 def bin2hex(libFile, hFile):
@@ -116,13 +115,6 @@ genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCode
                            OUTPUT_DIR, "int16")
 genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI64.txt"),
                            OUTPUT_DIR, "int64")
-
-print("*******************************************************************************")
-print("                 Generate LLVM Emulation IR (GLSL Group)                       ")
-print("*******************************************************************************")
-genGlslGroupOpEmuCode.main(16, 64, OUTPUT_DIR)
-genGlslGroupOpEmuCode.main(32, 64, OUTPUT_DIR)
-genGlslGroupOpEmuCode.main(64, 64, OUTPUT_DIR)
 
 print("*******************************************************************************")
 print("                   Generate LLVM Emulation IR (GLSL Image) for %s             "%("GFX6"))

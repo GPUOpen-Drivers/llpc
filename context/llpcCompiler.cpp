@@ -2445,6 +2445,7 @@ void Compiler::BuildShaderCacheHash(
         {
             PipelineDumper::UpdateHashForVertexInputState(pPipelineInfo->pVertexInput, &hasher);
         }
+
         MetroHash::Hash  hash = {};
         hasher.Finalize(hash.bytes);
 
@@ -2586,6 +2587,10 @@ void Compiler::MergeElfBinary(
                 (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
                 (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
+    LLPC_UNUSED(FragmentIntrlTblSymbolName);
+    LLPC_UNUSED(FragmentDisassemblySymbolName);
+    LLPC_UNUSED(FragmentIntrlDataSymbolName);
+    LLPC_UNUSED(FragmentAmdIlSymbolName);
 
     // Merge ISA disassemble
     auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);

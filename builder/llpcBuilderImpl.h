@@ -49,6 +49,9 @@ protected:
     // Get whether the context we are building in supports DPP operations.
     bool SupportDpp() const;
 
+    // Get whether the context we are building in support the bpermute operation.
+    bool SupportBPermute() const;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
@@ -273,6 +276,26 @@ public:
     llvm::Value* CreateSubgroupQuadSwapDiagonal(llvm::Value* const pValue,
                                                 const llvm::Twine& instName) override final;
 
+    // Create a subgroup swizzle quad.
+    llvm::Value* CreateSubgroupSwizzleQuad(llvm::Value* const pValue,
+                                           llvm::Value* const pOffset,
+                                           const llvm::Twine& instName) override final;
+
+    // Create a subgroup swizzle masked.
+    llvm::Value* CreateSubgroupSwizzleMask(llvm::Value* const pValue,
+                                           llvm::Value* const pMask,
+                                           const llvm::Twine& instName) override final;
+
+    // Create a subgroup write invocation.
+    llvm::Value* CreateSubgroupWriteInvocation(llvm::Value* const pInputValue,
+                                               llvm::Value* const pWriteValue,
+                                               llvm::Value* const pIndex,
+                                               const llvm::Twine& instName) override final;
+
+    // Create a subgroup mbcnt.
+    llvm::Value* CreateSubgroupMbcnt(llvm::Value* const pMask,
+                                     const llvm::Twine& instName) override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplSubgroup)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplSubgroup)
@@ -299,6 +322,7 @@ private:
         DppRowBcast31     = 0x143,
     };
 
+    uint32_t GetShaderSubgroupSize();
     llvm::Value* CreateGroupArithmeticIdentity(GroupArithOp      groupArithOp,
                                                llvm::Type* const pType);
     llvm::Value* CreateGroupArithmeticOperation(GroupArithOp       groupArithOp,
@@ -310,18 +334,18 @@ private:
                               uint32_t           rowMask,
                               uint32_t           bankMask,
                               bool               boundCtrl);
-    llvm::Value* CreateDppUpdate(llvm::Value* const pOriginal,
-                                 llvm::Value* const pValue,
+    llvm::Value* CreateDppUpdate(llvm::Value* const pOrigValue,
+                                 llvm::Value* const pUpdateValue,
                                  DppCtrl            dppCtrl,
                                  uint32_t           rowMask,
                                  uint32_t           bankMask,
                                  bool               boundCtrl);
+
     llvm::Value* CreateDsSwizzle(llvm::Value* const pValue,
                                  uint16_t           dsPattern);
     llvm::Value* CreateWwm(llvm::Value* const pValue);
     llvm::Value* CreateSetInactive(llvm::Value* const pActive,
                                    llvm::Value* const pInactive);
-    llvm::Value* CreateMbcnt(llvm::Value* const pValue);
     llvm::Value* CreateThreadMask();
     llvm::Value* CreateThreadMaskedSelect(
         llvm::Value* const pThreadMask,

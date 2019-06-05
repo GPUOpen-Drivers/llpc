@@ -336,10 +336,6 @@ target_sources(llpc PRIVATE
 add_subdirectory(imported/metrohash)
 target_link_libraries(llpc PRIVATE llpc_metrohash)
 
-# llpc/imported/cwpack
-add_subdirectory(imported/cwpack)
-target_link_libraries(llpc PRIVATE llpc_cwpack)
-
 ### LLPC Auto-generated Files ##########################################################################################
 set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)
 set(GEN_GLSL_OP_EMU_LIB_SCRIPT ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py)
@@ -359,9 +355,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD16.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmu.ll
@@ -372,9 +365,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
     ${OP_EMU_LIB_GEN_DIR}/llvmIntrinsicEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD16.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslGroupOpEmuD64.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/wa/treat1dImagesAs2d/glslImageOpEmu.ll
@@ -386,7 +376,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF16.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslGroupOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
@@ -494,6 +483,9 @@ target_compile_definitions(amdllpc PRIVATE _SPIRV_LLVM_API)
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(amdllpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
     target_compile_definitions(amdllpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+endif()
+if(ICD_BUILD_LLPC)
+    target_compile_definitions(amdllpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
 target_include_directories(amdllpc

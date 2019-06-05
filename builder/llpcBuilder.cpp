@@ -212,6 +212,18 @@ Value* Builder::CreateMapToInt32(
 
         return pResult;
     }
+    else if (pType->isIntegerTy() && pType->getIntegerBitWidth() == 1)
+    {
+        SmallVector<Value*, 4> newMappedArgs;
+
+        for (Value* const pMappedArg : mappedArgs)
+        {
+            newMappedArgs.push_back(CreateZExt(pMappedArg, getInt32Ty()));
+        }
+
+        Value* const pResult = CreateMapToInt32(pfnMapFunc, newMappedArgs, passthroughArgs);
+        return CreateTrunc(pResult, getInt1Ty());
+    }
     else if (pType->isIntegerTy() && pType->getIntegerBitWidth() < 32)
     {
         SmallVector<Value*, 4> newMappedArgs;

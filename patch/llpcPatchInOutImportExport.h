@@ -294,6 +294,8 @@ private:
 
     llvm::Value* AdjustCentroidIJ(llvm::Value* pCentroidIJ, llvm::Value* pCenterIJ, llvm::Instruction* pInsertPos);
 
+    llvm::Value* GetSubgroupLocalInvocationId(llvm::Instruction* pInsertPos);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     GfxIpVersion            m_gfxIp;                    // Graphics IP version info
@@ -325,7 +327,6 @@ private:
     llvm::Value*            m_pThreadId;                // Thread ID
 
     std::vector<Value*>     m_expFragColors[MaxColorTargets]; // Exported fragment colors
-
     std::vector<llvm::CallInst*> m_importCalls; // List of "call" instructions to import inputs
     std::vector<llvm::CallInst*> m_exportCalls; // List of "call" instructions to export outputs
 };

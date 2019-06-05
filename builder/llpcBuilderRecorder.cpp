@@ -123,6 +123,14 @@ StringRef BuilderRecorder::GetCallName(
         return "subgroup.quad.swap.vertical";
     case SubgroupQuadSwapDiagonal:
         return "subgroup.quad.swap.diagonal";
+    case SubgroupSwizzleQuad:
+        return "subgroup.swizzle.quad";
+    case SubgroupSwizzleMask:
+        return "subgroup.swizzle.mask";
+    case SubgroupWriteInvocation:
+        return "subgroup.write.invocation";
+    case SubgroupMbcnt:
+        return "subgroup.mbcnt";
     }
     LLPC_NEVER_CALLED();
     return "";
@@ -627,6 +635,53 @@ Value* BuilderRecorder::CreateSubgroupQuadSwapDiagonal(
     const Twine& instName) // [in] Name to give instruction(s)
 {
     return Record(Opcode::SubgroupQuadSwapDiagonal, pValue->getType(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup swizzle quad.
+Value* BuilderRecorder::CreateSubgroupSwizzleQuad(
+    Value* const pValue,   // [in] The value to swizzle.
+    Value* const pOffset,  // [in] The value to specify the swizzle offsets.
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupSwizzleQuad, pValue->getType(), { pValue, pOffset }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup swizzle mask.
+Value* BuilderRecorder::CreateSubgroupSwizzleMask(
+    Value* const pValue,   // [in] The value to swizzle.
+    Value* const pMask,    // [in] The value to specify the swizzle masks.
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupSwizzleMask, pValue->getType(), { pValue, pMask }, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup write invocation.
+Value* BuilderRecorder::CreateSubgroupWriteInvocation(
+        Value* const pInputValue, // [in] The value to return for all but one invocations.
+        Value* const pWriteValue, // [in] The value to return for one invocation.
+        Value* const pIndex,      // [in] The index of the invocation that gets the write value.
+        const Twine& instName)    // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupWriteInvocation,
+                  pInputValue->getType(),
+                  {
+                        pInputValue,
+                        pWriteValue,
+                        pIndex
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup mbcnt.
+Value* BuilderRecorder::CreateSubgroupMbcnt(
+        Value* const pMask,    // [in] The mask to mbcnt with.
+        const Twine& instName) // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SubgroupMbcnt, getInt32Ty(), pMask, instName);
 }
 
 // =====================================================================================================================

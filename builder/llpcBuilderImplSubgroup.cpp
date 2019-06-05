@@ -45,7 +45,14 @@ using namespace llvm;
 Value* BuilderImplSubgroup::CreateGetSubgroupSize(
     const Twine& instName) // [in] Name to give final instruction.
 {
-    return getInt32(getContext().GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent())));
+    return getInt32(GetShaderSubgroupSize());
+}
+
+// =====================================================================================================================
+// Get the shader subgroup size for the current insertion block.
+uint32_t BuilderImplSubgroup::GetShaderSubgroupSize()
+{
+    return getContext().GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
 }
 
 // =====================================================================================================================
@@ -53,7 +60,7 @@ Value* BuilderImplSubgroup::CreateGetSubgroupSize(
 Value* BuilderImplSubgroup::CreateSubgroupElect(
     const Twine& instName) // [in] Name to give final instruction.
 {
-    return CreateICmpEQ(CreateMbcnt(CreateGroupBallot(getTrue())), getInt32(0));
+    return CreateICmpEQ(CreateSubgroupMbcnt(CreateGroupBallot(getTrue()), ""), getInt32(0));
 }
 
 // =====================================================================================================================
@@ -98,7 +105,7 @@ Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
 
     if (pType->isVectorTy())
     {
-        Value* pResult = CreateExtractElement(pCompare, static_cast<uint64_t>(0));
+        Value* pResult = CreateExtractElement(pCompare, getInt32(0));
 
         for (uint32_t i = 1, compCount = pType->getVectorNumElements(); i < compCount; i++)
         {
@@ -170,7 +177,7 @@ Value* BuilderImplSubgroup::CreateSubgroupInverseBallot(
     Value* const pValue,   // [in] The value to inverseballot across the subgroup. Must be a <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    return CreateSubgroupBallotBitExtract(pValue, CreateMbcnt(getInt64(UINT64_MAX)), instName);
+    return CreateSubgroupBallotBitExtract(pValue, CreateSubgroupMbcnt(getInt64(UINT64_MAX), ""), instName);
 }
 
 // =====================================================================================================================
@@ -180,12 +187,14 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitExtract(
     Value* const pIndex,   // [in] The bit index to extract. Must be an i32 type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pIndexMask = CreateZExtOrTrunc(pIndex, getInt64Ty());
-    pIndexMask = CreateShl(getInt64(1), pIndexMask);
-    Value* pValueAsInt64 = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
-    pValueAsInt64 = CreateBitCast(pValueAsInt64, getInt64Ty());
-    Value* const pResult = CreateAnd(pIndexMask, pValueAsInt64);
-    return CreateICmpNE(pResult, getInt64(0));
+    {
+        Value* pIndexMask = CreateZExtOrTrunc(pIndex, getInt64Ty());
+        pIndexMask = CreateShl(getInt64(1), pIndexMask);
+        Value* pValueAsInt64 = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
+        pValueAsInt64 = CreateBitCast(pValueAsInt64, getInt64Ty());
+        Value* const pResult = CreateAnd(pIndexMask, pValueAsInt64);
+        return CreateICmpNE(pResult, getInt64(0));
+    }
 }
 
 // =====================================================================================================================
@@ -194,10 +203,12 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitCount(
     Value* const pValue,   // [in] The ballot value to bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
-    pResult = CreateBitCast(pResult, getInt64Ty());
-    pResult = CreateUnaryIntrinsic(Intrinsic::ctpop, pResult);
-    return CreateZExtOrTrunc(pResult, getInt32Ty());
+    {
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
+        pResult = CreateBitCast(pResult, getInt64Ty());
+        pResult = CreateUnaryIntrinsic(Intrinsic::ctpop, pResult);
+        return CreateZExtOrTrunc(pResult, getInt32Ty());
+    }
 }
 
 // =====================================================================================================================
@@ -218,10 +229,11 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotExclusiveBitCount(
     Value* const pValue,   // [in] The ballot value to exclusively bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
-    pResult = CreateBitCast(pResult, getInt64Ty());
-    pResult = CreateMbcnt(pResult);
-    return CreateZExtOrTrunc(pResult, getInt32Ty());
+    {
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
+        pResult = CreateBitCast(pResult, getInt64Ty());
+        return CreateSubgroupMbcnt(pResult, "");
+    }
 }
 
 // =====================================================================================================================
@@ -230,10 +242,12 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindLsb(
     Value* const pValue, // [in] The ballot value to find the least significant bit of. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
-    pResult = CreateBitCast(pResult, getInt64Ty());
-    pResult = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), { pResult, getTrue() });
-    return CreateZExtOrTrunc(pResult, getInt32Ty());
+    {
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
+        pResult = CreateBitCast(pResult, getInt64Ty());
+        pResult = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), { pResult, getTrue() });
+        return CreateZExtOrTrunc(pResult, getInt32Ty());
+    }
 }
 
 // =====================================================================================================================
@@ -242,10 +256,13 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindMsb(
     Value* const pValue,   // [in] The ballot value to find the most significant bit of. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), {0, 1});
-    pResult = CreateBitCast(pResult, getInt64Ty());
-    pResult = CreateIntrinsic(Intrinsic::ctlz, getInt64Ty(), { pResult, getTrue() });
-    return CreateZExtOrTrunc(pResult, getInt32Ty());
+    {
+        Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
+        pResult = CreateBitCast(pResult, getInt64Ty());
+        pResult = CreateIntrinsic(Intrinsic::ctlz, getInt64Ty(), { pResult, getTrue() });
+        pResult = CreateZExtOrTrunc(pResult, getInt32Ty());
+        return CreateSub(getInt32(63), pResult);
+    }
 }
 
 // =====================================================================================================================
@@ -255,7 +272,7 @@ Value* BuilderImplSubgroup::CreateSubgroupShuffle(
     Value* const pIndex,   // [in] The index to shuffle from.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    if (SupportDpp())
+    if (SupportBPermute())
     {
         auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
         {
@@ -293,7 +310,7 @@ Value* BuilderImplSubgroup::CreateSubgroupShuffleXor(
     Value* const pMask,    // [in] The mask to shuffle with.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pIndex = CreateMbcnt(getInt64(UINT64_MAX));
+    Value* pIndex = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
     pIndex = CreateXor(pIndex, pMask);
     return CreateSubgroupShuffle(pValue, pIndex, instName);
 }
@@ -305,7 +322,7 @@ Value* BuilderImplSubgroup::CreateSubgroupShuffleUp(
     Value* const pDelta,   // [in] The delta to shuffle from.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pIndex = CreateMbcnt(getInt64(UINT64_MAX));
+    Value* pIndex = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
     pIndex = CreateSub(pIndex, pDelta);
     return CreateSubgroupShuffle(pValue, pIndex, instName);
 }
@@ -317,7 +334,7 @@ Value* BuilderImplSubgroup::CreateSubgroupShuffleDown(
     Value* const pDelta,   // [in] The delta to shuffle from.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pIndex = CreateMbcnt(getInt64(UINT64_MAX));
+    Value* pIndex = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
     pIndex = CreateAdd(pIndex, pDelta);
     return CreateSubgroupShuffle(pValue, pIndex, instName);
 }
@@ -355,29 +372,33 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppMov(pResult, DppCtrl::DppRowMirror, 0xF, 0xF, 0)), pResult);
 
-        // Use a row broadcast to move the 15th element in each cluster of 16 to the next cluster. The row mask is set
-        // to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.
-        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppMov(pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
+        {
+            // Use a row broadcast to move the 15th element in each cluster of 16 to the next cluster. The row mask is
+            // set to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.
+            pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreateDppMov(pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
 
-        // Use a row broadcast to move the 31st element from the lower cluster of 32 to the upper cluster. The row mask
-        // is set to 0x8 (0b1000) so that only the upper cluster of 32 perform the calculation.
-        pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppMov(pResult, DppCtrl::DppRowBcast31, 0x8, 0xF, 0)), pResult);
+            // Use a row broadcast to move the 31st element from the lower cluster of 32 to the upper cluster. The row
+            // mask is set to 0x8 (0b1000) so that only the upper cluster of 32 perform the calculation.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreateDppMov(pResult, DppCtrl::DppRowBcast31, 0x8, 0xF, 0)), pResult);
 
-        Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
-        Value* const pBroadcast63 = CreateSubgroupBroadcast(pResult, getInt32(63), instName);
+            Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
+            Value* const pBroadcast63 = CreateSubgroupBroadcast(pResult, getInt32(63), instName);
 
-        // If the cluster size is 64 we always read the value from the last invocation in the subgroup.
-        pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)), pBroadcast63, pResult);
+            // If the cluster size is 64 we always read the value from the last invocation in the subgroup.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)), pBroadcast63, pResult);
 
-        // If the cluster size is 32 we need to check where our invocation is in the subgroup, and conditionally use
-        // invocation 31 or 63's value.
-        pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(32)),
-            CreateSelect(CreateICmpULT(CreateMbcnt(getInt64(UINT64_MAX)), getInt32(32)), pBroadcast31, pBroadcast63),
-                pResult);
+            Value* const pLaneIdLessThan32 = CreateICmpULT(CreateSubgroupMbcnt(getInt64(UINT64_MAX), ""), getInt32(32));
+
+            // If the cluster size is 32 we need to check where our invocation is in the subgroup, and conditionally use
+            // invocation 31 or 63's value.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(32)),
+                CreateSelect(pLaneIdLessThan32, pBroadcast31, pBroadcast63),
+                    pResult);
+        }
 
         // Finish the WWM section by calling the intrinsic.
         return CreateWwm(pResult);
@@ -424,10 +445,12 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
         pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
             CreateGroupArithmeticOperation(groupArithOp, pBroadcast31, pBroadcast63), pResult);
 
+        Value* const pThreadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+
         // If the cluster size is 32 we need to check where our invocation is in the subgroup, and conditionally use
         // invocation 31 or 63's value.
         pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(32)),
-            CreateSelect(CreateICmpULT(CreateMbcnt(getInt64(UINT64_MAX)), getInt32(32)), pBroadcast31, pBroadcast63),
+            CreateSelect(CreateICmpULT(pThreadId, getInt32(32)), pBroadcast31, pBroadcast63),
                 pResult);
 
         // Finish the WWM section by calling the intrinsic.
@@ -477,26 +500,80 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredInclusive(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowSr8, 0xF, 0xC, 0)), pResult);
 
-        // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the operation.
-        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
+        {
+            // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
+            // operation.
+            pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
 
-        // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the operation.
-        pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast31, 0xC, 0xF, 0)), pResult);
+            // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the
+            // operation.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast31, 0xC, 0xF, 0)), pResult);
+        }
 
         // Finish the WWM section by calling the intrinsic.
         return CreateWwm(pResult);
     }
     else
     {
-        Value* const pClusteredExclusive = CreateSubgroupClusteredExclusive(groupArithOp,
-                                                                            pValue,
-                                                                            pClusterSize,
-                                                                            instName);
-        return CreateGroupArithmeticOperation(groupArithOp, pValue, pClusteredExclusive);
+        Value* const pThreadMask = CreateThreadMask();
+
+        Value* const pIdentity = CreateGroupArithmeticIdentity(groupArithOp, pValue->getType());
+
+        // Start the WWM section by setting the inactive invocations.
+        Value* const pSetInactive = CreateSetInactive(pValue, pIdentity);
+        Value* pResult = pSetInactive;
+
+        // The DS swizzle is or'ing by 0x0 with an and mask of 0x1E, which swaps from N <-> N+1. We don't want the N's
+        // to perform the operation, only the N+1's, so we use a mask of 0xA (0b1010) to stop the N's doing anything.
+        Value* pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xAAAAAAAAAAAAAAAA,
+            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x00, 0x1E)), pIdentity);
+        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(2)),
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+
+        // The DS swizzle is or'ing by 0x1 with an and mask of 0x1C, which swaps from N <-> N+2. We don't want the N's
+        // to perform the operation, only the N+2's, so we use a mask of 0xC (0b1100) to stop the N's doing anything.
+        pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xCCCCCCCCCCCCCCCC,
+            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x01, 0x1C)), pIdentity);
+        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(4)),
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+
+        // The DS swizzle is or'ing by 0x3 with an and mask of 0x18, which swaps from N <-> N+4. We don't want the N's
+        // to perform the operation, only the N+4's, so we use a mask of 0xF0 (0b11110000) to stop the N's doing
+        // anything.
+        pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xF0F0F0F0F0F0F0F0,
+            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x03, 0x18)), pIdentity);
+        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(8)),
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+
+        // The DS swizzle is or'ing by 0x7 with an and mask of 0x10, which swaps from N <-> N+8. We don't want the N's
+        // to perform the operation, only the N+8's, so we use a mask of 0xFF00 (0b1111111100000000) to stop the N's
+        // doing anything.
+        pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xFF00FF00FF00FF00,
+            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x07, 0x10)), pIdentity);
+        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(16)),
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+
+        // The DS swizzle is or'ing by 0xF with an and mask of 0x0, which swaps from N <-> N+16. We don't want the N's
+        // to perform the operation, only the N+16's, so we use a mask of 0xFFFF0000
+        // (0b11111111111111110000000000000000) to stop the N's doing anything.
+        pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xFFFF0000FFFF0000,
+            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x0F, 0x00)), pIdentity);
+        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+
+        Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
+
+        // The mask here is enforcing that only the top 32 lanes of the wavefront perform the final scan operation.
+        pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xFFFFFFFF00000000, pBroadcast31, pIdentity);
+        pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+
+        // Finish the WWM section by calling the intrinsic.
+        return CreateWwm(pResult);
     }
 }
 
@@ -515,9 +592,13 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
         // Start the WWM section by setting the inactive invocations.
         Value* const pSetInactive = CreateSetInactive(pValue, pIdentity);
 
-        // Shift the whole subgroup right by one, using a DPP update operation. This will ensure that the identity
-        // value is in the 0th invocation and all other values are shifted up. All rows and banks are active (0xF).
-        Value* const pShiftRight = CreateDppUpdate(pIdentity, pSetInactive, DppCtrl::DppWfSr1, 0xF, 0xF, 0);
+        Value* pShiftRight = nullptr;
+
+        {
+            // Shift the whole subgroup right by one, using a DPP update operation. This will ensure that the identity
+            // value is in the 0th invocation and all other values are shifted up. All rows and banks are active (0xF).
+            pShiftRight = CreateDppUpdate(pIdentity, pSetInactive, DppCtrl::DppWfSr1, 0xF, 0xF, 0);
+        }
 
         // The DPP operation has all rows active and all banks in the rows active (0xF).
         Value* pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(2)),
@@ -546,15 +627,19 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowSr8, 0xF, 0xC, 0)), pResult);
 
-        // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the operation.
-        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
+        {
+            // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
+            // operation.
+            pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
 
-        // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the operation.
-        pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast31, 0xC, 0xF, 0)), pResult);
+            // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the
+            // operation.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast31, 0xC, 0xF, 0)), pResult);
+        }
 
         // Finish the WWM section by calling the intrinsic.
         return CreateWwm(pResult);
@@ -567,19 +652,19 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
 
         // Start the WWM section by setting the inactive invocations.
         Value* const pSetInactive = CreateSetInactive(pValue, pIdentity);
-        Value* pResult = pSetInactive;
+        Value* pResult = pIdentity;
 
-        // The DS swizzle is xor'ing by 0x1 with an and mask of 0x1f, which swaps from N <-> N+1. We don't want the N's
-        // to perform the operation, only the N+1's, so we use a mask of 0xa (0b1010) to stop the N's doing anything.
+        // The DS swizzle is or'ing by 0x0 with an and mask of 0x1E, which swaps from N <-> N+1. We don't want the N's
+        // to perform the operation, only the N+1's, so we use a mask of 0xA (0b1010) to stop the N's doing anything.
         Value* pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xAAAAAAAAAAAAAAAA,
-            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x01, 0x00, 0x1F)), pIdentity);
-        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(2)),
-            CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
+            CreateDsSwizzle(pSetInactive, GetDsSwizzleBitMode(0x00, 0x00, 0x1E)), pIdentity);
+        pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(2)), pMaskedSwizzle, pResult);
 
-        // The DS swizzle is or'ing by 0x1 with an and mask of 0x1c, which swaps from N <-> N+2. We don't want the N's
-        // to perform the operation, only the N+2's, so we use a mask of 0xc (0b1100) to stop the N's doing anything.
+        // The DS swizzle is or'ing by 0x1 with an and mask of 0x1C, which swaps from N <-> N+2. We don't want the N's
+        // to perform the operation, only the N+2's, so we use a mask of 0xC (0b1100) to stop the N's doing anything.
         pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xCCCCCCCCCCCCCCCC,
-            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x01, 0x1C)), pIdentity);
+            CreateDsSwizzle(CreateGroupArithmeticOperation(groupArithOp, pResult, pSetInactive),
+                GetDsSwizzleBitMode(0x00, 0x01, 0x1C)), pIdentity);
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(4)),
             CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
 
@@ -587,27 +672,31 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
         // to perform the operation, only the N+4's, so we use a mask of 0xF0 (0b11110000) to stop the N's doing
         // anything.
         pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xF0F0F0F0F0F0F0F0,
-            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x03, 0x18)), pIdentity);
+            CreateDsSwizzle(CreateGroupArithmeticOperation(groupArithOp, pResult, pSetInactive),
+                GetDsSwizzleBitMode(0x00, 0x03, 0x18)), pIdentity);
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(8)),
             CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
 
         // The DS swizzle is or'ing by 0x7 with an and mask of 0x10, which swaps from N <-> N+8. We don't want the N's
-        // to perform the operation, only the N+8's, so we use a mask of 0xFf00 (0b1111111100000000) to stop the N's
+        // to perform the operation, only the N+8's, so we use a mask of 0xFF00 (0b1111111100000000) to stop the N's
         // doing anything.
         pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xFF00FF00FF00FF00,
-            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x07, 0x10)), pIdentity);
+            CreateDsSwizzle(CreateGroupArithmeticOperation(groupArithOp, pResult, pSetInactive),
+                GetDsSwizzleBitMode(0x00, 0x07, 0x10)), pIdentity);
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(16)),
             CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
 
         // The DS swizzle is or'ing by 0xF with an and mask of 0x0, which swaps from N <-> N+16. We don't want the N's
-        // to perform the operation, only the N+16's, so we use a mask of 0xFfff0000
+        // to perform the operation, only the N+16's, so we use a mask of 0xFFFF0000
         // (0b11111111111111110000000000000000) to stop the N's doing anything.
         pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xFFFF0000FFFF0000,
-            CreateDsSwizzle(pResult, GetDsSwizzleBitMode(0x00, 0x0F, 0x00)), pIdentity);
+            CreateDsSwizzle(CreateGroupArithmeticOperation(groupArithOp, pResult, pSetInactive),
+                GetDsSwizzleBitMode(0x00, 0x0F, 0x00)), pIdentity);
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
             CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedSwizzle), pResult);
 
-        Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
+        Value* const pBroadcast31 = CreateSubgroupBroadcast(
+            CreateGroupArithmeticOperation(groupArithOp, pResult, pSetInactive), getInt32(31), instName);
 
         // The mask here is enforcing that only the top 32 lanes of the wavefront perform the final scan operation.
         pMaskedSwizzle = CreateThreadMaskedSelect(pThreadMask, 0xFFFFFFFF00000000, pBroadcast31, pIdentity);
@@ -626,37 +715,37 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadBroadcast(
     Value* const pIndex,   // [in] The index in the quad to broadcast the value from.
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* pResult = nullptr;
+    Value* pResult = UndefValue::get(pValue->getType());
 
     const uint32_t indexBits = pIndex->getType()->getPrimitiveSizeInBits();
 
     if (SupportDpp())
     {
         Value* pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 0));
-        pResult = CreateSelect(pCompare, CreateDppMov(pIndex, DppCtrl::DppQuadPerm0000, 0xF, 0xF, false), pResult);
+        pResult = CreateSelect(pCompare, CreateDppMov(pValue, DppCtrl::DppQuadPerm0000, 0xF, 0xF, false), pResult);
 
         pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 1));
-        pResult = CreateSelect(pCompare, CreateDppMov(pIndex, DppCtrl::DppQuadPerm1111, 0xF, 0xF, false), pResult);
+        pResult = CreateSelect(pCompare, CreateDppMov(pValue, DppCtrl::DppQuadPerm1111, 0xF, 0xF, false), pResult);
 
         pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 2));
-        pResult = CreateSelect(pCompare, CreateDppMov(pIndex, DppCtrl::DppQuadPerm2222, 0xF, 0xF, false), pResult);
+        pResult = CreateSelect(pCompare, CreateDppMov(pValue, DppCtrl::DppQuadPerm2222, 0xF, 0xF, false), pResult);
 
         pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 3));
-        pResult = CreateSelect(pCompare, CreateDppMov(pIndex, DppCtrl::DppQuadPerm3333, 0xF, 0xF, false), pResult);
+        pResult = CreateSelect(pCompare, CreateDppMov(pValue, DppCtrl::DppQuadPerm3333, 0xF, 0xF, false), pResult);
     }
     else
     {
         Value* pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 0));
-        pResult = CreateSelect(pCompare, CreateDsSwizzle(pIndex, GetDsSwizzleQuadMode(0, 0, 0, 0)), pResult);
+        pResult = CreateSelect(pCompare, CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(0, 0, 0, 0)), pResult);
 
         pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 1));
-        pResult = CreateSelect(pCompare, CreateDsSwizzle(pIndex, GetDsSwizzleQuadMode(1, 1, 1, 1)), pResult);
+        pResult = CreateSelect(pCompare, CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(1, 1, 1, 1)), pResult);
 
         pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 2));
-        pResult = CreateSelect(pCompare, CreateDsSwizzle(pIndex, GetDsSwizzleQuadMode(2, 2, 2, 2)), pResult);
+        pResult = CreateSelect(pCompare, CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(2, 2, 2, 2)), pResult);
 
         pCompare = CreateICmpEQ(pIndex, getIntN(indexBits, 3));
-        pResult = CreateSelect(pCompare, CreateDsSwizzle(pIndex, GetDsSwizzleQuadMode(3, 3, 3, 3)), pResult);
+        pResult = CreateSelect(pCompare, CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(3, 3, 3, 3)), pResult);
     }
 
     return pResult;
@@ -707,6 +796,80 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadSwapDiagonal(
     else
     {
         return CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(3, 2, 1, 0));
+    }
+}
+
+// =====================================================================================================================
+// Create a subgroup quad swap swizzle.
+Value* BuilderImplSubgroup::CreateSubgroupSwizzleQuad(
+    Value* const pValue,   // [in] The value to swizzle.
+    Value* const pOffset,  // [in] The value to specify the swizzle offsets.
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    Constant* const pConstOffset = cast<Constant>(pOffset);
+    uint8_t lane0 = static_cast<uint8_t>(cast<ConstantInt>(pConstOffset->getAggregateElement(0u))->getZExtValue());
+    uint8_t lane1 = static_cast<uint8_t>(cast<ConstantInt>(pConstOffset->getAggregateElement(1u))->getZExtValue());
+    uint8_t lane2 = static_cast<uint8_t>(cast<ConstantInt>(pConstOffset->getAggregateElement(2u))->getZExtValue());
+    uint8_t lane3 = static_cast<uint8_t>(cast<ConstantInt>(pConstOffset->getAggregateElement(3u))->getZExtValue());
+
+    return CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(lane0, lane1, lane2, lane3));
+}
+
+// =====================================================================================================================
+// Create a subgroup swizzle mask.
+Value* BuilderImplSubgroup::CreateSubgroupSwizzleMask(
+    Value* const pValue,   // [in] The value to swizzle.
+    Value* const pMask,    // [in] The value to specify the swizzle masks.
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    Constant* const pConstMask = cast<Constant>(pMask);
+    uint8_t andMask = static_cast<uint8_t>(cast<ConstantInt>(pConstMask->getAggregateElement(0u))->getZExtValue());
+    uint8_t orMask = static_cast<uint8_t>(cast<ConstantInt>(pConstMask->getAggregateElement(1u))->getZExtValue());
+    uint8_t xorMask = static_cast<uint8_t>(cast<ConstantInt>(pConstMask->getAggregateElement(2u))->getZExtValue());
+
+    LLPC_ASSERT((andMask <= 31) && (orMask <= 31) && (xorMask <= 31));
+
+    return CreateDsSwizzle(pValue, GetDsSwizzleBitMode(xorMask, orMask, andMask));
+}
+
+// =====================================================================================================================
+// Create a subgroup write invocation.
+Value* BuilderImplSubgroup::CreateSubgroupWriteInvocation(
+    Value* const pInputValue,      // [in] The value to return for all but one invocations.
+    Value* const pWriteValue,      // [in] The value to return for one invocation.
+    Value* const pInvocationIndex, // [in] The index of the invocation that gets the write value.
+    const Twine& instName)         // [in] Name to give instruction(s)
+{
+    auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
+    {
+        return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane,
+                                       {},
+                                       {
+                                            mappedArgs[1],
+                                            passthroughArgs[0],
+                                            mappedArgs[0],
+                                       });
+    };
+
+    return CreateMapToInt32(pfnMapFunc, { pInputValue, pWriteValue }, pInvocationIndex);
+}
+
+// =====================================================================================================================
+// Create a subgroup mbcnt.
+Value* BuilderImplSubgroup::CreateSubgroupMbcnt(
+    Value* const pMask,    // [in] The mask to mbcnt with.
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    // Check that the type is definitely an i64.
+    LLPC_ASSERT(pMask->getType()->isIntegerTy(64));
+
+    Value* const pMasks = CreateBitCast(pMask, VectorType::get(getInt32Ty(), 2));
+    Value* const pMaskLow = CreateExtractElement(pMasks, getInt32(0));
+    Value* const pMaskHigh = CreateExtractElement(pMasks, getInt32(1));
+    CallInst* const pMbcntLo = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, { pMaskLow, getInt32(0) });
+
+    {
+        return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, { pMaskHigh, pMbcntLo });
     }
 }
 
@@ -836,32 +999,16 @@ Value* BuilderImplSubgroup::CreateGroupArithmeticOperation(
 Value* BuilderImplSubgroup::CreateInlineAsmSideEffect(
     Value* const pValue) // [in] The value to ensure doesn't move in control flow.
 {
-    Type* const pType = pValue->getType();
-
-    // Some vector types don't play nice with inline assembly, so for those we just do the inline assembly trick on the
-    // 0th element of the vector.
-    if (pType->isVectorTy())
+    auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*>) -> Value*
     {
-        Value* pResult = CreateExtractElement(pValue, static_cast<uint64_t>(0));
-        pResult = CreateInlineAsmSideEffect(pResult);
-        return CreateInsertElement(pValue, pResult, static_cast<uint64_t>(0));
-    }
-    else if (pType->getPrimitiveSizeInBits() < 32)
-    {
-        Type* const pVectorType = VectorType::get(pType, (pType->getPrimitiveSizeInBits() == 16) ? 2 : 4);
-        Value* pResult = UndefValue::get(pVectorType);
-        pResult = CreateInsertElement(pResult, pValue, static_cast<uint64_t>(0));
-        pResult = CreateBitCast(pResult, getInt32Ty());
-        pResult = CreateInlineAsmSideEffect(pResult);
-        pResult = CreateBitCast(pResult, pVectorType);
-        return CreateExtractElement(pResult, static_cast<uint64_t>(0));
-    }
-    else
-    {
+        Value* const pValue = mappedArgs[0];
+        Type* const pType = pValue->getType();
         FunctionType* const pFuncType = FunctionType::get(pType, pType, false);
         InlineAsm* const pInlineAsm = InlineAsm::get(pFuncType, "; %1", "=v,0", true);
-        return CreateCall(pInlineAsm, pValue);
-    }
+        return builder.CreateCall(pInlineAsm, pValue);
+    };
+
+    return CreateMapToInt32(pfnMapFunc, pValue, {});
 }
 
 // =====================================================================================================================
@@ -971,63 +1118,14 @@ Value* BuilderImplSubgroup::CreateSetInactive(
     Value* pActive,   // [in] The value active invocations should take.
     Value* pInactive) // [in] The value inactive invocations should take.
 {
-    Type* const pType = pActive->getType();
-
-    LLPC_ASSERT(pType == pInactive->getType());
-
-    if (pType->isVectorTy())
+    auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*>) -> Value*
     {
-        Value* pResult = UndefValue::get(pType);
+        Value* const pActive = mappedArgs[0];
+        Value* const pInactive = mappedArgs[1];
+        return builder.CreateIntrinsic(Intrinsic::amdgcn_set_inactive, pActive->getType(), { pActive, pInactive });
+    };
 
-        for (uint32_t i = 0; i < pType->getVectorNumElements(); i++)
-        {
-            Value* const pActiveComp = CreateExtractElement(pActive, i);
-            Value* const pInactiveComp = CreateExtractElement(pInactive, i);
-            pResult = CreateInsertElement(pResult, CreateSetInactive(pActiveComp, pInactiveComp), i);
-        }
-
-        return pResult;
-    }
-    else if (pType->isFloatingPointTy())
-    {
-        pActive = CreateBitCast(pActive, getIntNTy(pType->getPrimitiveSizeInBits()));
-        pInactive = CreateBitCast(pInactive, getIntNTy(pType->getPrimitiveSizeInBits()));
-        return CreateBitCast(CreateSetInactive(pActive, pInactive), pType);
-    }
-    else if (pType->getPrimitiveSizeInBits() < 32)
-    {
-        Type* const pVectorType = VectorType::get(pType, (pType->getPrimitiveSizeInBits() == 16) ? 2 : 4);
-        Value* const pUndef = UndefValue::get(pVectorType);
-        pActive = CreateInsertElement(pUndef, pActive, static_cast<uint64_t>(0));
-        pActive = CreateBitCast(pActive, getInt32Ty());
-        pInactive = CreateInsertElement(pUndef, pInactive, static_cast<uint64_t>(0));
-        pInactive = CreateBitCast(pInactive, getInt32Ty());
-        Value* pResult = CreateSetInactive(pActive, pInactive);
-        pResult = CreateBitCast(pResult, pVectorType);
-        return CreateExtractElement(pResult, static_cast<uint64_t>(0));
-    }
-    else
-    {
-        // TODO: There is a longstanding bug with LLVM's convergent that forces us to use inline assembly with
-        // sideffects to stop any hoisting out of control flow.
-        pActive = CreateInlineAsmSideEffect(pActive);
-        return CreateIntrinsic(Intrinsic::amdgcn_set_inactive, pType, {pActive, pInactive});
-    }
-}
-
-// =====================================================================================================================
-// Create a call to mbcnt.
-Value* BuilderImplSubgroup::CreateMbcnt(
-    Value* const pMask) // [in] The mask to pass to the mbcnt call, must be an i64.
-{
-    // Check that the type is definitely an i64.
-    LLPC_ASSERT(pMask->getType()->isIntegerTy(64));
-
-    Value* const pMasks = CreateBitCast(pMask, VectorType::get(getInt32Ty(), 2));
-    Value* const pMaskLow = CreateExtractElement(pMasks, getInt32(0));
-    Value* const pMaskHigh = CreateExtractElement(pMasks, getInt32(1));
-    CallInst* const pMbcnt = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, { pMaskLow, getInt32(0) });
-    return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, { pMaskHigh, pMbcnt });
+    return CreateMapToInt32(pfnMapFunc, { CreateInlineAsmSideEffect(pActive), pInactive }, {});
 }
 
 // =====================================================================================================================
@@ -1054,25 +1152,30 @@ uint16_t BuilderImplSubgroup::GetDsSwizzleQuadMode(
 }
 
 // =====================================================================================================================
-// Create a thread mask for the current thread, a 64-bit integer with a single bit representing the ID of the thread
-// set to 1.
+// Create a thread mask for the current thread, an integer with a single bit representing the ID of the thread set to 1.
 Value* BuilderImplSubgroup::CreateThreadMask()
 {
-    Value* pThreadId = CreateMbcnt(getInt64(UINT64_MAX));
-    pThreadId = CreateZExtOrTrunc(pThreadId, getInt64Ty());
-    return CreateShl(getInt64(1), pThreadId);
+    Value* pThreadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+
+    {
+        pThreadId = CreateShl(getInt64(1), CreateZExtOrTrunc(pThreadId, getInt64Ty()));
+    }
+
+    return pThreadId;
 }
 
 // =====================================================================================================================
 // Create a masked operation - taking a thread mask and a mask to and it with, select between the first value and the
 // second value if the current thread is active.
 Value* BuilderImplSubgroup::CreateThreadMaskedSelect(
-    Value* const pThreadMask, // [in] The thread mask, must come from a call to CreateThreadMask. Must be an i64 type.
-    uint64_t     andMask,     // The mask to and with the thread mask, must be an i64 type.
+    Value* const pThreadMask, // [in] The thread mask, must come from a call to CreateThreadMask.
+    uint64_t     andMask,     // The mask to and with the thread mask.
     Value* const pValue1,     // [in] The first value to select.
     Value* const pValue2)     // [in] The second value to select.
 {
-    return CreateSelect(CreateICmpNE(CreateAnd(pThreadMask, getInt64(andMask)), getInt64(0)), pValue1, pValue2);
+    Value* const pAndMask = getIntN(GetShaderSubgroupSize(), andMask);
+    Value* const pZero = getIntN(GetShaderSubgroupSize(), 0);
+    return CreateSelect(CreateICmpNE(CreateAnd(pThreadMask, pAndMask), pZero), pValue1, pValue2);
 }
 
 // =====================================================================================================================
@@ -1093,5 +1196,17 @@ Value* BuilderImplSubgroup::CreateGroupBallot(
     // The not equal predicate for the icmp intrinsic is 33.
     Constant* const pPredicateNE = getInt32(33);
 
-    return CreateIntrinsic(Intrinsic::amdgcn_icmp, getInt32Ty(), { pValueAsInt32, getInt32(0), pPredicateNE });
+    SmallVector<Type*, 2> types;
+
+    types.push_back(getInt32Ty());
+
+    Value* pResult = CreateIntrinsic(Intrinsic::amdgcn_icmp,
+                                     types,
+                                     {
+                                          pValueAsInt32,
+                                          getInt32(0),
+                                          pPredicateNE
+                                     });
+
+    return pResult;
 }

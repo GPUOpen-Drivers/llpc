@@ -27,12 +27,12 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call i32 @_Z21SwizzleInvocationsAMDiDv4_i
-; SHADERTEST: call i32 @_Z27SwizzleInvocationsMaskedAMDiDv3_i
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 8272)
-; SHADERTEST: call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 8078)
-; SHADERTEST: call i32 @llvm.amdgcn.ds.swizzle(i32 %{{[0-9]*}}, i32 6627)
+; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.swizzle.quad.v2i32(<2 x i32> %{{[0-9]*}}, <4 x i32> <i32 0, i32 1, i32 2, i32 3>)
+; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.swizzle.quad.v3i32(<3 x i32> %{{[0-9]*}}, <4 x i32> <i32 3, i32 2, i32 1, i32 0>)
+; SHADERTEST: call <4 x float> (...) @llpc.call.subgroup.swizzle.quad.v4f32(<4 x float> %{{[0-9]*}}, <4 x i32> <i32 1, i32 0, i32 3, i32 2>)
+; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.swizzle.mask.v2i32(<2 x i32> %{{[0-9]*}}, <3 x i32> <i32 16, i32 2, i32 8>)
+; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.swizzle.mask.v3i32(<3 x i32> %{{[0-9]*}}, <3 x i32> <i32 14, i32 28, i32 7>)
+; SHADERTEST: call <4 x float> (...) @llpc.call.subgroup.swizzle.mask.v4f32(<4 x float> %{{[0-9]*}}, <3 x i32> <i32 3, i32 15, i32 6>)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

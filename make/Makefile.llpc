@@ -6,9 +6,6 @@ endif
 LCXXINCS += -I$(LLPC_VULKAN_INCLUDE)
 LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx6
 LCXXINCS += -I$(LLPC_DEPTH)/imported/chip/gfx9
-ifeq ($(ICD_BUILD_LLPCONLY),1)
-    LCXXINCS += -I$(LLPC_DEPTH)/imported/cwpack/src/util
-endif
 LCXXINCS += -I$(LLPC_DEPTH)/include
 LCXXINCS += -I$(LLPC_DEPTH)/patch
 LCXXINCS += -I$(LLPC_DEPTH)/patch/gfx9
@@ -303,9 +300,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI64.ll                \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslBufferOpEmu.ll                  \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslBuiltInVarEmu.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslGroupOpEmu.ll                   \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslGroupOpEmuD16.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslGroupOpEmuD64.ll                \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslInlineConstOpEmu.ll             \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmu.ll                  \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmuF16.ll               \
@@ -317,9 +311,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/glslImageOpEmu.ll                   \
                             $(GEN_GLSL_EMU_LIB_DIR)/llvmIntrinsicEmu.ll                 \
                             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslGroupOpEmu.ll              \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslGroupOpEmuD16.ll           \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslGroupOpEmuD64.ll           \
                             $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslSpecialOpEmu.ll            \
                             \
                             $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmu.ll              \
@@ -334,7 +325,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI16.txt \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI64.txt \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslGroupOpEmuCode.py     \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.py     \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.txt    \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
@@ -380,12 +370,6 @@ endif
 # MetroHash
 METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
 include $(METROHASH_DEPTH)/make/Makefile.metrohash
-
-ifeq ($(LLPC_PLATFORM), win)
-    # CwPack
-    CWPACK_DEPTH = $(LLPC_DEPTH)/imported/cwpack
-    include $(CWPACK_DEPTH)/make/Makefile.cwpack
-endif
 
 .FORCE:
 
