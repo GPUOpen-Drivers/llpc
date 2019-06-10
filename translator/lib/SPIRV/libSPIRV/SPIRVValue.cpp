@@ -68,4 +68,16 @@ void SPIRVValue::setVolatile(bool IsVolatile) {
                      << " for obj " << Id << "\n")
 }
 
+bool SPIRVValue::isCoherent() const { return hasDecorate(DecorationCoherent); }
+
+void SPIRVValue::setCoherent(bool IsCoherent) {
+  if (!IsCoherent) {
+    eraseDecorate(DecorationCoherent);
+    return;
+  }
+  addDecorate(new SPIRVDecorate(DecorationCoherent, this));
+  SPIRVDBG(spvdbgs() << "Set coherent "
+                     << " for obj " << Id << "\n")
+}
+
 } // namespace SPIRV

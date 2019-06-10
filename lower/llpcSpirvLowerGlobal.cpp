@@ -342,7 +342,7 @@ void SpirvLowerGlobal::visitLoadInst(
             pInOut = dyn_cast<GlobalVariable>(pCurrGetElemPtr->getPointerOperand());
         }
 
-        // The root of the gep should always be the global variable.
+        // The root of the GEP should always be the global variable.
         LLPC_ASSERT(pInOut != nullptr);
 
         uint32_t operandIdx = 0;
@@ -2414,7 +2414,7 @@ void SpirvLowerGlobal::LowerBufferBlock()
                             pGetElemPtr = dyn_cast<GetElementPtrInst>(pBitCast);
                         }
 
-                        // If even after we've stripped away all the bitcasts we did not find a gep, we need to modify
+                        // If even after we've stripped away all the bitcasts we did not find a GEP, we need to modify
                         // the bitcast instead.
                         if (pGetElemPtr == nullptr)
                         {
@@ -2514,7 +2514,7 @@ void SpirvLowerGlobal::LowerBufferBlock()
 
                     Value* const pBitCast = m_pBuilder->CreateBitCast(pBufferDesc, pBlockType);
 
-                    // We need to remove the block index from the original gep indices so that we can use them.
+                    // We need to remove the block index from the original GEP indices so that we can use them.
                     indices[1] = indices[0];
 
                     ArrayRef<Value*> newIndices(indices);

@@ -987,6 +987,28 @@ public:
     SPIRVInstruction::validate();
   }
 
+  void propagateMemoryDecorates() {
+    if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
+      auto StorageClass = Type->getPointerStorageClass();
+      if (StorageClass == StorageClassStorageBuffer ||
+        StorageClass == StorageClassUniform ||
+        StorageClass == StorageClassPushConstant ||
+        StorageClass == StorageClassPhysicalStorageBufferEXT) {
+        // Handle buffer block pointer
+        bool IsVolatile = false;
+        bool IsCoherent = false;
+
+        for (size_t I = 0, E = Pairs.size() / 2; I != E; ++I) {
+          IsVolatile |= getValue(Pairs[2 * I])->isVolatile();
+          IsCoherent |= getValue(Pairs[2 * I])->isCoherent();
+        }
+
+        setVolatile(IsVolatile);
+        setCoherent(IsCoherent);
+      }
+    }
+  }
+
 protected:
   std::vector<SPIRVId> Pairs;
 };
@@ -1076,6 +1098,22 @@ public:
   SPIRVValue *getCondition() { return getValue(Condition); }
   SPIRVValue *getTrueValue() { return getValue(Op1); }
   SPIRVValue *getFalseValue() { return getValue(Op2); }
+
+  void propagateMemoryDecorates() {
+    if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
+      auto StorageClass = Type->getPointerStorageClass();
+      if (StorageClass == StorageClassStorageBuffer ||
+          StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant ||
+          StorageClass == StorageClassPhysicalStorageBufferEXT) {
+        // Handle buffer block pointer
+        setVolatile(getTrueValue()->isVolatile() ||
+                    getFalseValue()->isVolatile());
+        setCoherent(getTrueValue()->isCoherent() ||
+                    getFalseValue()->isCoherent());
+      }
+    }
+  }
 
 protected:
   _SPIRV_DEF_ENCDEC5(Type, Id, Condition, Op1, Op2)
@@ -1430,6 +1468,57 @@ public:
   bool hasPtrIndex() {
     return OpCode == OpPtrAccessChain || OpCode == OpInBoundsPtrAccessChain;
   }
+
+  void propagateMemoryDecorates() {
+    SPIRVValue *Base = getBase();
+    SPIRVType *BaseTy = Base->getType();
+    assert(BaseTy->isTypePointer() || BaseTy->isTypeForwardPointer());
+
+    auto StorageClass = BaseTy->getPointerStorageClass();
+    if (StorageClass == StorageClassStorageBuffer ||
+      StorageClass == StorageClassUniform ||
+      StorageClass == StorageClassPushConstant ||
+      StorageClass == StorageClassPhysicalStorageBufferEXT) {
+      // Handle buffer block pointer
+      std::vector<SPIRVValue *> Indices = getIndices();
+
+      // Read memory decorations of base
+      bool IsVolatile = Base->isVolatile();
+      bool IsCoherent = Base->isCoherent();
+
+      SPIRVType *AccessTy = BaseTy->getPointerElementType();
+      for (unsigned I = hasPtrIndex() ? 1 : 0; I < Indices.size(); ++I) {
+        switch (AccessTy->getOpCode()) {
+        case OpTypeStruct: {
+          unsigned MemberIdx =
+            static_cast<SPIRVConstant *>(Indices[I])->getZExtIntValue();
+
+          // Memory decorations of members overwrite those of base
+          IsVolatile |=
+            AccessTy->hasMemberDecorate(MemberIdx, DecorationVolatile);
+          IsCoherent |=
+            AccessTy->hasMemberDecorate(MemberIdx, DecorationCoherent);
+
+          AccessTy = AccessTy->getStructMemberType(MemberIdx);
+          break;
+        }
+        case OpTypeArray:
+        case OpTypeRuntimeArray:
+          AccessTy = AccessTy->getArrayElementType();
+          break;
+        case OpTypePointer:
+          AccessTy = AccessTy->getPointerElementType();
+          break;
+        default:
+          // Non-aggregate types, stop here
+          break;
+        }
+      }
+
+      setVolatile(IsVolatile);
+      setCoherent(IsCoherent);
+    }
+  }
 };
 
 template <Op OC, unsigned FixedWC>
@@ -1771,6 +1860,20 @@ public:
   SPIRVCopyObject() : SPIRVInstruction(OC), Operand(SPIRVID_INVALID) {}
 
   SPIRVValue *getOperand() { return getValue(Operand); }
+
+  void propagateMemoryDecorates() {
+    if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
+      auto StorageClass = Type->getPointerStorageClass();
+      if (StorageClass == StorageClassStorageBuffer ||
+          StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant ||
+          StorageClass == StorageClassPhysicalStorageBufferEXT) {
+        // Handle buffer block pointer
+        setVolatile(getOperand()->isVolatile());
+        setCoherent(getOperand()->isCoherent());
+      }
+    }
+  }
 
 protected:
   _SPIRV_DEF_ENCDEC3(Type, Id, Operand)
