@@ -340,7 +340,6 @@ public:
                     bool CreatePlaceHolder = true);
   Value *transValueWithoutDecoration(SPIRVValue *, Function *F, BasicBlock *,
                                      bool CreatePlaceHolder = true);
-  Value *transAccessChain(SPIRVValue*, BasicBlock*);
   Value *transAtomicRMW(SPIRVValue*, const AtomicRMWInst::BinOp);
   Constant* transInitializer(SPIRVValue*, Type*);
   template<spv::Op> Value *transValueWithOpcode(SPIRVValue*);
@@ -1725,13 +1724,13 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     }
                     else
                     {
-                        // If we get here it means we are doing a subsequent gep on a matrix row.
+                        // If we get here it means we are doing a subsequent GEP on a matrix row.
                         LLPC_ASSERT(pRemappedValue->getType()->isVectorTy());
                         LLPC_ASSERT(pRemappedValue->getType()->getVectorElementType()->isPointerTy());
                         valueMap[pGetElemPtr] = m_pBuilder->CreateExtractElement(pRemappedValue, indices[1]);
                     }
 
-                    // Add all the users of this gep to the worklist for processing.
+                    // Add all the users of this GEP to the worklist for processing.
                     for (User* const pUser : pGetElemPtr->users())
                     {
                         workList.push_back(pUser);
@@ -3270,7 +3269,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
         break;
     }
 
-    bool isCoherent = false;
+    bool isCoherent = pSpvLoad->getSrc()->isCoherent();
 
     if (pSpvLoad->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
     {
@@ -3337,7 +3336,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
         break;
     }
 
-    bool isCoherent = false;
+    bool isCoherent = pSpvStore->getDst()->isCoherent();
 
     if (pSpvStore->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
     {
@@ -3425,6 +3424,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     SPIRVAccessChainBase* const pSpvAccessChain = static_cast<SPIRVAccessChainBase*>(pSpvValue);
+    pSpvAccessChain->propagateMemoryDecorates();
+
     Value* const pBase = transValue(pSpvAccessChain->getBase(),
                                     m_pBuilder->GetInsertBlock()->getParent(),
                                     m_pBuilder->GetInsertBlock());
@@ -4537,6 +4538,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     SPIRVVariable* const pSpvVar = static_cast<SPIRVVariable*>(pSpvValue);
+    const SPIRVStorageClassKind storageClass = pSpvVar->getStorageClass();
 
     SPIRVType* const pSpvVarType = pSpvVar->getType()->getPointerElementType();
     Type* const pVarType = transType(pSpvVar->getType())->getPointerElementType();
@@ -4550,12 +4552,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     {
         pInitializer = transInitializer(pSpvInitializer, pVarType);
     }
-    else if (pSpvVar->getStorageClass() == SPIRVStorageClassKind::StorageClassWorkgroup)
+    else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup)
     {
         pInitializer = UndefValue::get(pVarType);
     }
-
-    const SPIRVStorageClassKind storageClass = pSpvVar->getStorageClass();
 
     if (storageClass == StorageClassFunction)
     {
@@ -4570,8 +4570,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
         return pVar;
     }
-
-    const uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
 
     bool readOnly = false;
 
@@ -4629,6 +4627,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
             readOnly = true;
         }
     }
+
+    const uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
 
     GlobalVariable* const pGlobalVar = new GlobalVariable(*M,
                                                           pVarType,
@@ -4901,6 +4901,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpPhi: {
     auto Phi = static_cast<SPIRVPhi *>(BV);
+    Phi->propagateMemoryDecorates();
     PHINode* PhiNode = nullptr;
     if (BB->getFirstInsertionPt() != BB->end())
       PhiNode = PHINode::Create(transType(Phi->getType()),
@@ -4961,6 +4962,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpSelect: {
     SPIRVSelect *BS = static_cast<SPIRVSelect *>(BV);
+    BS->propagateMemoryDecorates();
     return mapValue(BV,
                     SelectInst::Create(transValue(BS->getCondition(), F, BB),
                                        transValue(BS->getTrueValue(), F, BB),
@@ -5014,6 +5016,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpCopyObject: {
     SPIRVCopyObject *CO = static_cast<SPIRVCopyObject *>(BV);
+    CO->propagateMemoryDecorates();
     AllocaInst* AI = nullptr;
     // NOTE: Alloc instructions not in the entry block will prevent LLVM from doing function
     // inlining. Try to move those alloc instructions to the entry block.
@@ -7453,7 +7456,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
         assert(Desc.Sampled <= 2); // 0 - runtime, 1 - sampled, 2 - non sampled
 
         if (Desc.Sampled == 2) {
-          // For a storage image, build the metadata
+          // For a storage image, build the memory metadata
           ShaderImageMemoryMetadata ImageMemoryMD = {};
           if (BV->hasDecorate(DecorationRestrict))
             ImageMemoryMD.Restrict = true;
@@ -8273,11 +8276,28 @@ CallInst *SPIRVToLLVM::transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
         MemorySemanticsMakeVisibleKHRMask))
         Ordering = AtomicOrdering::SequentiallyConsistent;
 
-      const bool SystemScope = (MemScope <= ScopeDevice) ||
-        (MemScope == ScopeQueueFamilyKHR);
+      SyncScope::ID Scope = SyncScope::System;
 
-      new FenceInst(*Context, Ordering, SystemScope ?
-          SyncScope::System : SyncScope::SingleThread, BB);
+      switch (MemScope) {
+      case ScopeCrossDevice:
+      case ScopeDevice:
+      case ScopeQueueFamilyKHR:
+        Scope = SyncScope::System;
+        break;
+      case ScopeInvocation:
+        Scope = SyncScope::SingleThread;
+        break;
+      case ScopeWorkgroup:
+        Scope = Context->getOrInsertSyncScopeID("workgroup");
+        break;
+      case ScopeSubgroup:
+        Scope = Context->getOrInsertSyncScopeID("wavefront");
+        break;
+      default:
+        llvm_unreachable("Invalid scope");
+      }
+
+      new FenceInst(*Context, Ordering, Scope, BB);
     }
   }
 
@@ -8346,11 +8366,28 @@ Instruction *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
         Ordering = AtomicOrdering::SequentiallyConsistent;
     }
 
-    const bool SystemScope = (MemScope <= ScopeDevice) ||
-      (MemScope == ScopeQueueFamilyKHR);
+    SyncScope::ID Scope = SyncScope::System;
 
-    return new FenceInst(*Context, Ordering, SystemScope ?
-        SyncScope::System : SyncScope::SingleThread, BB);
+    switch (MemScope) {
+    case ScopeCrossDevice:
+    case ScopeDevice:
+    case ScopeQueueFamilyKHR:
+      Scope = SyncScope::System;
+      break;
+    case ScopeInvocation:
+      Scope = SyncScope::SingleThread;
+      break;
+    case ScopeWorkgroup:
+      Scope = Context->getOrInsertSyncScopeID("workgroup");
+      break;
+    case ScopeSubgroup:
+      Scope = Context->getOrInsertSyncScopeID("wavefront");
+      break;
+    default:
+      llvm_unreachable("Invalid scope");
+    }
+
+    return new FenceInst(*Context, Ordering, Scope, BB);
   } else if ((Ver > 0 && Ver <= kOCLVer::CL12)) {
     FuncName = kOCLBuiltinName::MemFence;
     ArgTy.push_back(Int32Ty);

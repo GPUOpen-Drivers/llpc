@@ -89,11 +89,15 @@ public:
     assert(hasType() && "value has no type");
     return Type;
   }
-  bool isVolatile() const;
-  bool hasAlignment(SPIRVWord *Result = 0) const;
 
+  bool isVolatile() const;
+  void setVolatile(bool IsVolatile = true);
+
+  bool isCoherent() const;
+  void setCoherent(bool IsCoherent = true);
+
+  bool hasAlignment(SPIRVWord *Result = 0) const;
   void setAlignment(SPIRVWord);
-  void setVolatile(bool IsVolatile);
 
   void validate() const override {
     SPIRVEntry::validate();

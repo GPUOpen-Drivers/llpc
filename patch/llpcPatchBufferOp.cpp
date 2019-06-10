@@ -516,7 +516,7 @@ void PatchBufferOp::visitExtractElementInst(
         return;
     }
 
-    // If the type we are geping into is not a fat pointer, bail.
+    // If the type we are GEPing into is not a fat pointer, bail.
     if (pPointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
@@ -538,7 +538,7 @@ void PatchBufferOp::visitExtractElementInst(
 void PatchBufferOp::visitGetElementPtrInst(
     GetElementPtrInst& getElemPtrInst) // [in] The instruction
 {
-    // If the type we are geping into is not a fat pointer, bail.
+    // If the type we are GEPing into is not a fat pointer, bail.
     if (getElemPtrInst.getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
@@ -587,7 +587,7 @@ void PatchBufferOp::visitInsertElementInst(
         return;
     }
 
-    // If the type we are geping into is not a fat pointer, bail.
+    // If the type we are GEPing into is not a fat pointer, bail.
     if (pPointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     {
         return;
@@ -1371,7 +1371,7 @@ void PatchBufferOp::CopyMetadata(
 
 // =====================================================================================================================
 // Get the remapped type for a fat pointer that is usable in indexing. We use the 32-bit wide constant address space for
-// this, as it means when we convert the gep to an integer, the gep can be converted losslessly to a 32-bit integer,
+// this, as it means when we convert the GEP to an integer, the GEP can be converted losslessly to a 32-bit integer,
 // which just happens to be what the MUBUF instructions expect.
 PointerType* PatchBufferOp::GetRemappedType(
     Type* const pType // [in] The type to remap.
@@ -1539,25 +1539,30 @@ Value* PatchBufferOp::ReplaceLoad(
 
             if (isInvariant)
             {
-                Value* const pCachePolicy = m_pBuilder->getInt32(isGlc ? 0x1 : 0x0);
+                CoherentFlag coherent = {};
+                coherent.bits.glc = isGlc;
+
                 pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
                                                         pIntLoadType,
                                                         {
                                                             pBufferDesc,
                                                             pOffset,
-                                                            pCachePolicy
+                                                            m_pBuilder->getInt32(coherent.u32All)
                                                         });
             }
             else
             {
-                Value* const pCachePolicy = m_pBuilder->getInt32((isSlc ? 0x2 : 0x0) | (isGlc ? 0x1 : 0x0));
+                CoherentFlag coherent = {};
+                coherent.bits.glc = isGlc;
+                coherent.bits.slc = isSlc;
+
                 pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
                                                         pFloatLoadType,
                                                         {
                                                             pBufferDesc,
                                                             pOffset,
                                                             m_pBuilder->getInt32(0),
-                                                            pCachePolicy
+                                                            m_pBuilder->getInt32(coherent.u32All)
                                                         });
                 pPartLoad = m_pBuilder->CreateBitCast(pPartLoad, pIntLoadType);
             }
@@ -1911,7 +1916,9 @@ void PatchBufferOp::ReplaceStore(
                 pPartStore = m_pBuilder->CreateBitCast(pPartStore, pCastType);
                 CopyMetadata(pPartStore, pStoreInst);
 
-                Value* const pCachePolicy = m_pBuilder->getInt32((isSlc ? 0x2 : 0x0) | (isGlc ? 0x1 : 0x0));
+                CoherentFlag coherent = {};
+                coherent.bits.glc = isGlc;
+                coherent.bits.slc = isSlc;
 
                 Value* const pNewStore = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store,
                                                                      pCastType,
@@ -1920,7 +1927,7 @@ void PatchBufferOp::ReplaceStore(
                                                                          pBufferDesc,
                                                                          pOffset,
                                                                          m_pBuilder->getInt32(0),
-                                                                         pCachePolicy
+                                                                         m_pBuilder->getInt32(coherent.u32All)
                                                                      });
                 CopyMetadata(pNewStore, pStoreInst);
             }

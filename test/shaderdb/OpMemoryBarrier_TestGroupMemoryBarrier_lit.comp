@@ -19,7 +19,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: fence syncscope("singlethread") acq_rel
+; SHADERTEST: fence syncscope("workgroup") acq_rel
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
