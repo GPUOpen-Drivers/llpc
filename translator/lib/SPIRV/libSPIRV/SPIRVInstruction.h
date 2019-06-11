@@ -987,13 +987,29 @@ public:
     SPIRVInstruction::validate();
   }
 
+  virtual bool isVolatile() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isVolatile();
+  }
+
+  virtual bool isCoherent() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isCoherent();
+  }
+
+protected:
+  std::vector<SPIRVId> Pairs;
+
+private:
   void propagateMemoryDecorates() {
     if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
       auto StorageClass = Type->getPointerStorageClass();
       if (StorageClass == StorageClassStorageBuffer ||
-        StorageClass == StorageClassUniform ||
-        StorageClass == StorageClassPushConstant ||
-        StorageClass == StorageClassPhysicalStorageBufferEXT) {
+          StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant ||
+          StorageClass == StorageClassPhysicalStorageBufferEXT) {
         // Handle buffer block pointer
         bool IsVolatile = false;
         bool IsCoherent = false;
@@ -1007,10 +1023,11 @@ public:
         setCoherent(IsCoherent);
       }
     }
+
+    checkMemoryDecorates = false;
   }
 
-protected:
-  std::vector<SPIRVId> Pairs;
+  bool checkMemoryDecorates = true;
 };
 
 class SPIRVCompare : public SPIRVInstTemplateBase {
@@ -1099,20 +1116,16 @@ public:
   SPIRVValue *getTrueValue() { return getValue(Op1); }
   SPIRVValue *getFalseValue() { return getValue(Op2); }
 
-  void propagateMemoryDecorates() {
-    if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
-      auto StorageClass = Type->getPointerStorageClass();
-      if (StorageClass == StorageClassStorageBuffer ||
-          StorageClass == StorageClassUniform ||
-          StorageClass == StorageClassPushConstant ||
-          StorageClass == StorageClassPhysicalStorageBufferEXT) {
-        // Handle buffer block pointer
-        setVolatile(getTrueValue()->isVolatile() ||
-                    getFalseValue()->isVolatile());
-        setCoherent(getTrueValue()->isCoherent() ||
-                    getFalseValue()->isCoherent());
-      }
-    }
+  virtual bool isVolatile() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isVolatile();
+  }
+
+  virtual bool isCoherent() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isCoherent();
   }
 
 protected:
@@ -1134,6 +1147,27 @@ protected:
   SPIRVId Condition;
   SPIRVId Op1;
   SPIRVId Op2;
+
+private:
+  void propagateMemoryDecorates() {
+    if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
+      auto StorageClass = Type->getPointerStorageClass();
+      if (StorageClass == StorageClassStorageBuffer ||
+          StorageClass == StorageClassUniform ||
+          StorageClass == StorageClassPushConstant ||
+          StorageClass == StorageClassPhysicalStorageBufferEXT) {
+        // Handle buffer block pointer
+        setVolatile(getTrueValue()->isVolatile() ||
+          getFalseValue()->isVolatile());
+        setCoherent(getTrueValue()->isCoherent() ||
+          getFalseValue()->isCoherent());
+      }
+    }
+
+    checkMemoryDecorates = false;
+  }
+
+  bool checkMemoryDecorates = true;
 };
 
 class SPIRVSelectionMerge : public SPIRVInstruction {
@@ -1469,6 +1503,19 @@ public:
     return OpCode == OpPtrAccessChain || OpCode == OpInBoundsPtrAccessChain;
   }
 
+  virtual bool isVolatile() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isVolatile();
+  }
+
+  virtual bool isCoherent() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isCoherent();
+  }
+
+private:
   void propagateMemoryDecorates() {
     SPIRVValue *Base = getBase();
     SPIRVType *BaseTy = Base->getType();
@@ -1476,9 +1523,9 @@ public:
 
     auto StorageClass = BaseTy->getPointerStorageClass();
     if (StorageClass == StorageClassStorageBuffer ||
-      StorageClass == StorageClassUniform ||
-      StorageClass == StorageClassPushConstant ||
-      StorageClass == StorageClassPhysicalStorageBufferEXT) {
+        StorageClass == StorageClassUniform ||
+        StorageClass == StorageClassPushConstant ||
+        StorageClass == StorageClassPhysicalStorageBufferEXT) {
       // Handle buffer block pointer
       std::vector<SPIRVValue *> Indices = getIndices();
 
@@ -1518,7 +1565,11 @@ public:
       setVolatile(IsVolatile);
       setCoherent(IsCoherent);
     }
+
+    checkMemoryDecorates = false;
   }
+
+  bool checkMemoryDecorates = true;
 };
 
 template <Op OC, unsigned FixedWC>
@@ -1861,6 +1912,25 @@ public:
 
   SPIRVValue *getOperand() { return getValue(Operand); }
 
+  virtual bool isVolatile() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isVolatile();
+  }
+
+  virtual bool isCoherent() override {
+    if (checkMemoryDecorates)
+      propagateMemoryDecorates();
+    return SPIRVValue::isCoherent();
+  }
+
+protected:
+  _SPIRV_DEF_ENCDEC3(Type, Id, Operand)
+
+  void validate() const override { SPIRVInstruction::validate(); }
+  SPIRVId Operand;
+
+private:
   void propagateMemoryDecorates() {
     if (Type->isTypePointer() || Type->isTypeForwardPointer()) {
       auto StorageClass = Type->getPointerStorageClass();
@@ -1873,13 +1943,11 @@ public:
         setCoherent(getOperand()->isCoherent());
       }
     }
+
+    checkMemoryDecorates = false;
   }
 
-protected:
-  _SPIRV_DEF_ENCDEC3(Type, Id, Operand)
-
-  void validate() const override { SPIRVInstruction::validate(); }
-  SPIRVId Operand;
+  bool checkMemoryDecorates = true;
 };
 
 class SPIRVCopyMemory : public SPIRVInstruction, public SPIRVMemoryAccess {
@@ -2557,6 +2625,9 @@ _SPIRV_OP(SubgroupReadInvocationKHR, true, 5, false)
 _SPIRV_OP(SubgroupAllKHR, true, 4, false)
 _SPIRV_OP(SubgroupAnyKHR, true, 4, false)
 _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
+#if VKI_KHR_SHADER_CLOCK
+_SPIRV_OP(ReadClockKHR, true, 4)
+#endif
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase:public SPIRVInstTemplateBase {
 protected:

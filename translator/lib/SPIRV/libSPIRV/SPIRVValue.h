@@ -90,10 +90,10 @@ public:
     return Type;
   }
 
-  bool isVolatile() const;
+  virtual bool isVolatile();
   void setVolatile(bool IsVolatile = true);
 
-  bool isCoherent() const;
+  virtual bool isCoherent();
   void setCoherent(bool IsCoherent = true);
 
   bool hasAlignment(SPIRVWord *Result = 0) const;

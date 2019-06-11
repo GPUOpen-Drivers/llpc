@@ -56,7 +56,7 @@ bool SPIRVValue::hasAlignment(SPIRVWord *Result) const {
   return hasDecorate(DecorationAlignment, 0, Result);
 }
 
-bool SPIRVValue::isVolatile() const { return hasDecorate(DecorationVolatile); }
+bool SPIRVValue::isVolatile() { return hasDecorate(DecorationVolatile); }
 
 void SPIRVValue::setVolatile(bool IsVolatile) {
   if (!IsVolatile) {
@@ -68,7 +68,7 @@ void SPIRVValue::setVolatile(bool IsVolatile) {
                      << " for obj " << Id << "\n")
 }
 
-bool SPIRVValue::isCoherent() const { return hasDecorate(DecorationCoherent); }
+bool SPIRVValue::isCoherent() { return hasDecorate(DecorationCoherent); }
 
 void SPIRVValue::setCoherent(bool IsCoherent) {
   if (!IsCoherent) {
