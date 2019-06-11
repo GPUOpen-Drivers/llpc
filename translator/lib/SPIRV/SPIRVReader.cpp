@@ -3424,7 +3424,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     SPIRVAccessChainBase* const pSpvAccessChain = static_cast<SPIRVAccessChainBase*>(pSpvValue);
-    pSpvAccessChain->propagateMemoryDecorates();
 
     Value* const pBase = transValue(pSpvAccessChain->getBase(),
                                     m_pBuilder->GetInsertBlock()->getParent(),
@@ -4901,7 +4900,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpPhi: {
     auto Phi = static_cast<SPIRVPhi *>(BV);
-    Phi->propagateMemoryDecorates();
     PHINode* PhiNode = nullptr;
     if (BB->getFirstInsertionPt() != BB->end())
       PhiNode = PHINode::Create(transType(Phi->getType()),
@@ -4962,7 +4960,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpSelect: {
     SPIRVSelect *BS = static_cast<SPIRVSelect *>(BV);
-    BS->propagateMemoryDecorates();
     return mapValue(BV,
                     SelectInst::Create(transValue(BS->getCondition(), F, BB),
                                        transValue(BS->getTrueValue(), F, BB),
@@ -5016,7 +5013,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
 
   case OpCopyObject: {
     SPIRVCopyObject *CO = static_cast<SPIRVCopyObject *>(BV);
-    CO->propagateMemoryDecorates();
     AllocaInst* AI = nullptr;
     // NOTE: Alloc instructions not in the entry block will prevent LLVM from doing function
     // inlining. Try to move those alloc instructions to the entry block.
