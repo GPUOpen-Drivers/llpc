@@ -109,7 +109,15 @@ void Patch::AddPrePatchPasses(
     }
 
     // Build null fragment shader if necessary
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 30
+    if (pContext->GetTargetMachinePipelineOptions()->disableNullFragShader == false)
+    {
+        passMgr.add(CreatePatchNullFragShader());
+    }
+#else
     passMgr.add(CreatePatchNullFragShader());
+#endif
+
 
     // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
     passMgr.add(CreatePatchResourceCollect());

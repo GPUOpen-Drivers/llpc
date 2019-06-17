@@ -712,6 +712,9 @@ void PipelineDumper::DumpPipelineOptions(
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
     dumpFile << "options.includeIrBinary = " << pOptions->includeIrBinary << "\n";
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 30
+    dumpFile << "options.disableNullFragShader = " << pOptions->disableNullFragShader << "\n";
+#endif
 }
 
 // =====================================================================================================================
@@ -968,6 +971,9 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 #endif
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
         pHasher->Update(pPipeline->options.includeIrBinary);
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 30
+        pHasher->Update(pPipeline->options.disableNullFragShader);
 #endif
     }
 }

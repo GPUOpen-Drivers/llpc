@@ -866,6 +866,9 @@ static Result BuildPipeline(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
         pGraphicsPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 30
+        pGraphicsPipelineInfo->options.disableNullFragShader = true;
+#endif
 
         void* pPipelineDumpHandle = nullptr;
         if (llvm::cl::EnablePipelineDump)

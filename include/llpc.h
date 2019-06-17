@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 27
+#define LLPC_INTERFACE_MAJOR_VERSION 30
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     30.0 | Add disableNullFragShader to PipelineOptions to test only one shader stage without in/out matching    |
 //* |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
 //* |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
 //* |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions.                                           |
@@ -232,6 +233,9 @@ struct PipelineOptions
 #endif
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
     bool includeIrBinary;     ///< If set, the IR binary for all compiled shaders will be included in the pipeline ELF.
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 30
+    bool disableNullFragShader;    ///< if set, the pass with a PatchNullFragShader will not be created and added
 #endif
 };
 
