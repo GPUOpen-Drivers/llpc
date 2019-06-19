@@ -203,12 +203,16 @@ void CodeGenManager::SetupTargetFeatures(
             }
 
 #if LLPC_BUILD_GFX10
-            // Setup wavefront size per shader stage
             if (gfxIp.major >= 10)
             {
+                // Setup wavefront size per shader stage
                 uint32_t waveSize = pContext->GetShaderWaveSize(shaderStage);
 
                 targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+
+                // Allow driver setting for WGP by forcing backend to set 0
+                // which is then OR'ed with the driver set value
+                targetFeatures += ",+cumode";
             }
 #endif
 
