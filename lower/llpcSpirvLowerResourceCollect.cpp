@@ -132,6 +132,7 @@ bool SpirvLowerResourceCollect::runOnModule(
     }
 
     bool useViewIndex = false;
+    bool useImages = false;
 
     // Collect resource usages from globals
     for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
@@ -152,6 +153,8 @@ bool SpirvLowerResourceCollect::runOnModule(
                 }
                 else
                 {
+                    useImages = true;
+
                     MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
 
                     auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
@@ -198,7 +201,6 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Global:
         case SPIRAS_Local:
             {
-                // TODO: Will be implemented.
                 break;
             }
         case SPIRAS_Input:
@@ -314,6 +316,54 @@ bool SpirvLowerResourceCollect::runOnModule(
         auto pViewIndexMetaNode = MDNode::get(*m_pContext, viewIndexMeta);
         pViewIndex->addMetadata(gSPIRVMD::InOut, *pViewIndexMetaNode);
         CollectInOutUsage(m_pContext->Int32Ty(), pViewIndexMetaValue, SPIRAS_Input);
+    }
+
+    if (m_shaderStage == ShaderStageCompute)
+    {
+        auto& builtInUsage = m_pResUsage->builtInUsage.cs;
+
+        bool reconfig = false;
+
+        switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout))
+        {
+        case WorkgroupLayout::Unknown:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+            // If no configuration has been specified, apply a reconfigure if the compute shader uses images and the
+            // pipeline option was enabled.
+            reconfig = useImages && m_pContext->GetTargetMachinePipelineOptions()->reconfigWorkgroupLayout;
+#endif
+            break;
+        case WorkgroupLayout::Linear:
+            // The hardware by default applies the linear rules, so just ban reconfigure and we're done.
+            reconfig = false;
+            break;
+        case WorkgroupLayout::Quads:
+            // 2x2 requested.
+            reconfig = true;
+            break;
+        case WorkgroupLayout::SexagintiQuads:
+            // 8x8 requested.
+            reconfig = true;
+            break;
+        }
+
+        if (reconfig)
+        {
+            if (((builtInUsage.workgroupSizeX % 2) == 0) && ((builtInUsage.workgroupSizeY % 2) == 0))
+            {
+                if (((builtInUsage.workgroupSizeX > 8) && (builtInUsage.workgroupSizeY >= 8)) ||
+                    ((builtInUsage.workgroupSizeX >= 8) && (builtInUsage.workgroupSizeY > 8)))
+                {
+                    // If our local size in the X & Y dimensions are greater than 8, we can reconfigure.
+                    builtInUsage.workgroupLayout = static_cast<uint32_t>(WorkgroupLayout::SexagintiQuads);
+                }
+                else
+                {
+                    // If our local size in the X & Y dimensions are multiples of 2, we can reconfigure.
+                    builtInUsage.workgroupLayout = static_cast<uint32_t>(WorkgroupLayout::Quads);
+                }
+            }
+        }
     }
 
     return true;

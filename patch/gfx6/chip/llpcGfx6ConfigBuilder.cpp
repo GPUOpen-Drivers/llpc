@@ -1416,7 +1416,23 @@ Result ConfigBuilder::BuildCsRegConfig(
     const auto pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
+    uint32_t workgroupSizes[3];
 
+    switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout))
+    {
+    case WorkgroupLayout::Unknown:
+    case WorkgroupLayout::Linear:
+        workgroupSizes[0] = builtInUsage.workgroupSizeX;
+        workgroupSizes[1] = builtInUsage.workgroupSizeY;
+        workgroupSizes[2] = builtInUsage.workgroupSizeZ;
+        break;
+    case WorkgroupLayout::Quads:
+    case WorkgroupLayout::SexagintiQuads:
+        workgroupSizes[0] = builtInUsage.workgroupSizeX * builtInUsage.workgroupSizeY;
+        workgroupSizes[1] = builtInUsage.workgroupSizeZ;
+        workgroupSizes[2] = 1;
+        break;
+    }
     uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC1, DX10_CLAMP, true);  // Follow PAL setting
@@ -1432,19 +1448,19 @@ Result ConfigBuilder::BuildCsRegConfig(
 
     // 0 = X, 1 = XY, 2 = XYZ
     uint32_t tidigCompCnt = 0;
-    if (builtInUsage.workgroupSizeZ > 1)
+    if (workgroupSizes[2] > 1)
     {
         tidigCompCnt = 2;
     }
-    else if (builtInUsage.workgroupSizeY > 1)
+    else if (workgroupSizes[1] > 1)
     {
         tidigCompCnt = 1;
     }
     SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
-    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, builtInUsage.workgroupSizeX);
-    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, builtInUsage.workgroupSizeY);
-    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_Z, NUM_THREAD_FULL, builtInUsage.workgroupSizeZ);
+    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_X, NUM_THREAD_FULL, workgroupSizes[0]);
+    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_Y, NUM_THREAD_FULL, workgroupSizes[1]);
+    SET_REG_FIELD(&pConfig->m_csRegs, COMPUTE_NUM_THREAD_Z, NUM_THREAD_FULL, workgroupSizes[2]);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Cs, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Cs, pResUsage->numVgprsAvailable);

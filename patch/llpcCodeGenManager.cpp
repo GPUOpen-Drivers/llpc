@@ -159,11 +159,6 @@ void CodeGenManager::SetupTargetFeatures(
         globalFeatures += ",+DumpCode";
     }
 
-    if (cl::EnableSiScheduler)
-    {
-        globalFeatures += ",+si-scheduler";
-    }
-
     if (cl::DisableFp32Denormals)
     {
         globalFeatures += ",-fp32-denormals";
@@ -174,9 +169,26 @@ void CodeGenManager::SetupTargetFeatures(
         if ((pFunc->empty() == false) && (pFunc->getLinkage() == GlobalValue::ExternalLinkage))
         {
              std::string targetFeatures(globalFeatures);
+             AttrBuilder builder;
 
              ShaderStage shaderStage = GetShaderStageFromCallingConv(pContext->GetShaderStageMask(),
                                                                      pFunc->getCallingConv());
+
+            bool useSiScheduler = cl::EnableSiScheduler;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+            if (shaderStage != ShaderStageCopyShader)
+            {
+                auto pShaderOptions = pContext->GetPipelineShaderInfo(shaderStage)->options;
+                useSiScheduler |= pShaderOptions.useSiScheduler;
+            }
+#endif
+            if (useSiScheduler)
+            {
+                // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
+                // game. So we disable the latter here. That only affects XNACK targets.
+                targetFeatures += ",+si-scheduler";
+                builder.addAttribute("amdgpu-max-memory-clause", "1");
+            }
 
             auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
             auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
@@ -200,7 +212,6 @@ void CodeGenManager::SetupTargetFeatures(
                 targetFeatures += ",-fp32-denormals";
             }
 
-            AttrBuilder builder;
             builder.addAttribute("target-features", targetFeatures);
             AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
             pFunc->addAttributes(attribIdx, builder);
