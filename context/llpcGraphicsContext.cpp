@@ -260,6 +260,7 @@ void GraphicsContext::InitShaderInfoForNullFs()
 
     // Add usage info for dummy output
     pResUsage->inOutUsage.fs.cbShaderMask = 0;
+    pResUsage->inOutUsage.fs.dummyExport = true;
     pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 }
 

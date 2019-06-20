@@ -423,8 +423,7 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageTessControl:
                 {
                     // Builtin Call has different number of operands
-                    Value* pElemIdx = nullptr;
-                    Value* pVertexIdx = nullptr;
+                    Value* pElemIdx = nullptr; Value* pVertexIdx = nullptr;
                     if (callInst.getNumArgOperands() > 1)
                     {
                         pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
@@ -441,8 +440,7 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageTessEval:
                 {
                     // Builtin Call has different number of operands
-                    Value *pElemIdx = nullptr;
-                    Value* pVertexIdx = nullptr;
+                    Value *pElemIdx = nullptr; Value* pVertexIdx = nullptr;
                     if (callInst.getNumArgOperands() > 1)
                     {
                         pElemIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
@@ -452,7 +450,6 @@ void PatchInOutImportExport::visitCallInst(
                     {
                         pVertexIdx = IsDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
                     }
-
                     pInput = PatchTesBuiltInInputImport(pInputTy, builtInId, pElemIdx, pVertexIdx, &callInst);
                     break;
                 }
@@ -464,6 +461,7 @@ void PatchInOutImportExport::visitCallInst(
                     {
                         pVertexIdx = IsDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
                     }
+
                     pInput = PatchGsBuiltInInputImport(pInputTy, builtInId, pVertexIdx, &callInst);
                     break;
                 }
@@ -1643,7 +1641,10 @@ void PatchInOutImportExport::visitReturnInst(
         }
 
         // NOTE: If outputs are present in fragment shader, we have to export a dummy one
-        if (m_pLastExport == nullptr)
+        auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+
+        pResUsage->inOutUsage.fs.dummyExport = true;
+        if ((m_pLastExport == nullptr) && pResUsage->inOutUsage.fs.dummyExport)
         {
             args.clear();
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0)); // tgt
@@ -3183,33 +3184,45 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         {
             pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
 
-            if (builtInUsage.workgroupSizeZ > 1)
+            auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
+
+            // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
+            // do the reconfiguration for this workgroup.
+            if ((workgroupLayout != WorkgroupLayout::Unknown) &&
+                (workgroupLayout != WorkgroupLayout::Linear))
             {
-                // XYZ, do nothing
-            }
-            else if (builtInUsage.workgroupSizeY > 1)
-            {
-                // XY
-                pInput = InsertElementInst::Create(pInput,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
-                                                   "",
-                                                   pInsertPos);
+                pInput = ReconfigWorkgroup(pInput, pInsertPos);
             }
             else
             {
-                // X
-                pInput = InsertElementInst::Create(pInput,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                   "",
-                                                   pInsertPos);
+                if (builtInUsage.workgroupSizeZ > 1)
+                {
+                    // XYZ, do nothing
+                }
+                else if (builtInUsage.workgroupSizeY > 1)
+                {
+                    // XY
+                    pInput = InsertElementInst::Create(pInput,
+                                                       ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                       ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                       "",
+                                                       pInsertPos);
+                }
+                else
+                {
+                    // X
+                    pInput = InsertElementInst::Create(pInput,
+                                                       ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                       ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                       "",
+                                                       pInsertPos);
 
-                pInput = InsertElementInst::Create(pInput,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 2),
-                                                   "",
-                                                   pInsertPos);
+                    pInput = InsertElementInst::Create(pInput,
+                                                       ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                       ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                       "",
+                                                       pInsertPos);
+                }
             }
 
             break;
@@ -6720,6 +6733,316 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
     }
 
     return pSubgroupLocalInvocationId;
+}
+
+// =====================================================================================================================
+// Reconfigure the workgroup for optimization purposes.
+Value* PatchInOutImportExport::ReconfigWorkgroup(
+    Value*       pLocalInvocationId, // [in] The original workgroup ID.
+    Instruction* pInsertPos)         // [in] Where to insert instructions.
+{
+    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+    auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
+
+    // NOTE: Here, we implement "GDC 2018 Engine Optimization Hot Lap Workgroup Optimization " (slides 40-45, by
+    // Timothy Lottes).
+    // uvec2 Remap(uint a) {
+    //   uint y = bitfieldExtract(a,3,4); // v_bfe_u32 ---> {...0,y3,y2,y1,x2}
+    //   y = bitfieldInsert(y,a,0,1);     // v_bfi_b32 ---> {...0,y3,y2,y1,y0}
+    //   uint x = bitfieldExtract(a,1,3); // v_bfe_u32 ---> {...0,x2,x1,x0}
+    //   a = bitfieldExtract(a,4,5);      // v_bfe_u32 ---> {...0,x4,x3,y3,y2,y1}
+    //   x = bitfieldInsert(a,x,0,3);     // v_bfi_b32 ---> {...0,x4,x3,x2,x1,x0}
+    //   return uvec2(x, y);
+    // }
+    // usage in shader
+    //   uvec2 xy = Remap(gl_LocalInvocationID.x);
+    //   xy.x += gl_WorkGroupID.x << 5; // v_lshl_add_u32
+    //   xy.y += gl_WorkGroupID.y << 4; // v_lshl_add_u32
+
+    Type* const pInt16Ty = m_pContext->Int16Ty();
+    Type* const pInt32Ty = m_pContext->Int32Ty();
+
+    Value* pRemappedId = pLocalInvocationId;
+
+    // For a reconfigured workgroup, we map Y -> Z
+    if (builtInUsage.workgroupSizeZ > 1)
+    {
+        const std::array<Constant*, 3> shuffleMask =
+        {
+            ConstantInt::get(pInt32Ty, 0),
+            UndefValue::get(pInt32Ty),
+            ConstantInt::get(pInt32Ty, 1)
+        };
+
+        pRemappedId = new ShuffleVectorInst(pRemappedId,
+                                            UndefValue::get(pRemappedId->getType()),
+                                            ConstantVector::get(shuffleMask),
+                                            "",
+                                            pInsertPos);
+    }
+    else
+    {
+        pRemappedId = InsertElementInst::Create(pRemappedId,
+                                                ConstantInt::get(pInt32Ty, 0),
+                                                ConstantInt::get(pInt32Ty, 2),
+                                                "",
+                                                pInsertPos);
+    }
+
+    Instruction* const pX = ExtractElementInst::Create(pRemappedId,
+                                                       ConstantInt::get(pInt32Ty, 0),
+                                                       "",
+                                                       pInsertPos);
+
+    Instruction* const pBit0 = BinaryOperator::CreateAnd(pX,
+                                                         ConstantInt::get(pInt32Ty, 0x1),
+                                                         "",
+                                                         pInsertPos);
+
+    Instruction* pBit1 = BinaryOperator::CreateAnd(pX,
+                                                   ConstantInt::get(pInt32Ty, 0x2),
+                                                   "",
+                                                   pInsertPos);
+    pBit1 = BinaryOperator::CreateLShr(pBit1,
+                                       ConstantInt::get(pInt32Ty, 1),
+                                       "",
+                                       pInsertPos);
+
+    Instruction* pOffset = nullptr;
+    Instruction* pMaskedX = pX;
+
+    // Check if we are doing 8x8, as we need to calculate an offset and mask out the top bits of X if so.
+    if (workgroupLayout == WorkgroupLayout::SexagintiQuads)
+    {
+        const uint32_t workgroupSizeYMul8 = builtInUsage.workgroupSizeY * 8;
+        Constant* const pWorkgroupSizeYMul8 = ConstantInt::get(pInt32Ty, workgroupSizeYMul8);
+
+        if (IsPowerOfTwo(workgroupSizeYMul8))
+        {
+            // If we have a power of two, we can use a right shift to compute the division more efficiently.
+            pOffset = BinaryOperator::CreateLShr(pX,
+                                                 ConstantInt::get(pInt32Ty, Log2(workgroupSizeYMul8)),
+                                                 "",
+                                                 pInsertPos);
+        }
+        else
+        {
+            // Otherwise we truncate down to a 16-bit integer, do the division, and zero extend. This will
+            // result in significantly less instructions to do the divide.
+            pOffset = CastInst::CreateIntegerCast(pX,
+                                                  pInt16Ty,
+                                                  false,
+                                                  "",
+                                                  pInsertPos);
+
+            pOffset = BinaryOperator::CreateUDiv(pOffset,
+                                                 ConstantInt::get(pInt16Ty, workgroupSizeYMul8),
+                                                 "",
+                                                 pInsertPos);
+
+            pOffset = CastInst::CreateIntegerCast(pOffset,
+                                                  pInt32Ty,
+                                                  false,
+                                                  "",
+                                                  pInsertPos);
+        }
+
+        Instruction* const pMulOffset = BinaryOperator::CreateMul(pOffset,
+                                                                  pWorkgroupSizeYMul8,
+                                                                  "",
+                                                                  pInsertPos);
+
+        pMaskedX = BinaryOperator::CreateSub(pX,
+                                             pMulOffset,
+                                             "",
+                                             pInsertPos);
+    }
+
+    Instruction* const pRemainingBits = BinaryOperator::CreateAnd(pMaskedX,
+                                                                  ConstantInt::get(pInt32Ty, ~0x3),
+                                                                  "",
+                                                                  pInsertPos);
+
+    Instruction* pDiv = nullptr;
+    Instruction* pRem = nullptr;
+
+    if (pOffset != nullptr)
+    {
+        if (((builtInUsage.workgroupSizeX % 8) == 0) && ((builtInUsage.workgroupSizeY % 8) == 0))
+        {
+            // Divide by 16.
+            pDiv = BinaryOperator::CreateLShr(pRemainingBits,
+                                              ConstantInt::get(pInt32Ty, 4),
+                                              "",
+                                              pInsertPos);
+
+            // Multiply by 16.
+            pRem = BinaryOperator::CreateShl(pDiv,
+                                             ConstantInt::get(pInt32Ty, 4),
+                                             "",
+                                             pInsertPos);
+
+            // Subtract to get remainder.
+            pRem = BinaryOperator::CreateSub(pRemainingBits,
+                                             pRem,
+                                             "",
+                                             pInsertPos);
+        }
+        else
+        {
+            // Multiply by 8.
+            Instruction* pDivideBy = BinaryOperator::CreateShl(pOffset,
+                                                               ConstantInt::get(pInt32Ty, 3),
+                                                               "",
+                                                               pInsertPos);
+
+            pDivideBy = BinaryOperator::CreateSub(ConstantInt::get(pInt32Ty, builtInUsage.workgroupSizeX),
+                                                  pDivideBy,
+                                                  "",
+                                                  pInsertPos);
+
+            Instruction* const pCond = new ICmpInst(pInsertPos,
+                                                    ICmpInst::ICMP_ULT,
+                                                    pDivideBy,
+                                                    ConstantInt::get(pInt32Ty, 8),
+                                                    "");
+
+            // We do a minimum operation to ensure that we never divide by more than 8, which forces our
+            // workgroup layout into 8x8 tiles.
+            pDivideBy = SelectInst::Create(pCond,
+                                           pDivideBy,
+                                           ConstantInt::get(pInt32Ty, 8),
+                                           "",
+                                           pInsertPos);
+
+            // Multiply by 2.
+            pDivideBy = BinaryOperator::CreateShl(pDivideBy,
+                                                  ConstantInt::get(pInt32Ty, 1),
+                                                  "",
+                                                  pInsertPos);
+
+            Instruction* const pDivideByTrunc = CastInst::CreateIntegerCast(pDivideBy,
+                                                                            pInt16Ty,
+                                                                            false,
+                                                                            "",
+                                                                            pInsertPos);
+
+            // Truncate down to a 16-bit integer, do the division, and zero extend.
+            pDiv = CastInst::CreateIntegerCast(pMaskedX,
+                                               pInt16Ty,
+                                               false,
+                                               "",
+                                               pInsertPos);
+
+            pDiv = BinaryOperator::CreateUDiv(pDiv,
+                                              pDivideByTrunc,
+                                              "",
+                                              pInsertPos);
+
+            pDiv = CastInst::CreateIntegerCast(pDiv,
+                                               pInt32Ty,
+                                               false,
+                                               "",
+                                               pInsertPos);
+
+            Instruction* const pMulDiv = BinaryOperator::CreateMul(pDiv,
+                                                                   pDivideBy,
+                                                                   "",
+                                                                   pInsertPos);
+
+            pRem = BinaryOperator::CreateSub(pRemainingBits,
+                                             pMulDiv,
+                                             "",
+                                             pInsertPos);
+        }
+    }
+    else
+    {
+        const uint32_t workgroupSizeXMul2 = builtInUsage.workgroupSizeX * 2;
+        Constant* const pWorkgroupSizeXMul2 = ConstantInt::get(pInt32Ty, workgroupSizeXMul2);
+
+        if (IsPowerOfTwo(workgroupSizeXMul2))
+        {
+            // If we have a power of two, we can use a right shift to compute the division more efficiently.
+            pDiv = BinaryOperator::CreateLShr(pMaskedX,
+                                              ConstantInt::get(pInt32Ty, Log2(workgroupSizeXMul2)),
+                                              "",
+                                              pInsertPos);
+        }
+        else
+        {
+            // Otherwise we truncate down to a 16-bit integer, do the division, and zero extend. This will
+            // result in significantly less instructions to do the divide.
+            pDiv = CastInst::CreateIntegerCast(pMaskedX,
+                                               pInt16Ty,
+                                               false,
+                                               "",
+                                               pInsertPos);
+
+            pDiv = BinaryOperator::CreateUDiv(pDiv,
+                                              ConstantInt::get(pInt16Ty, workgroupSizeXMul2),
+                                              "",
+                                              pInsertPos);
+
+            pDiv = CastInst::CreateIntegerCast(pDiv,
+                                               pInt32Ty,
+                                               false,
+                                               "",
+                                               pInsertPos);
+        }
+
+        Instruction* const pMulDiv = BinaryOperator::CreateMul(pDiv,
+                                                               pWorkgroupSizeXMul2,
+                                                               "",
+                                                               pInsertPos);
+
+        pRem = BinaryOperator::CreateSub(pRemainingBits,
+                                         pMulDiv,
+                                         "",
+                                         pInsertPos);
+    }
+
+    // Now we have all the components to reconstruct X & Y!
+    Instruction* pNewX = BinaryOperator::CreateLShr(pRem,
+                                                    ConstantInt::get(pInt32Ty, 1),
+                                                    "",
+                                                    pInsertPos);
+
+    pNewX = BinaryOperator::CreateAdd(pNewX, pBit0, "", pInsertPos);
+
+    // If we have an offset, we need to incorporate this into X.
+    if (pOffset != nullptr)
+    {
+        const uint32_t workgroupSizeYMin8 = std::min(builtInUsage.workgroupSizeY, 8u);
+        Constant* const pWorkgroupSizeYMin8 = ConstantInt::get(pInt32Ty, workgroupSizeYMin8);
+        Instruction* const pMul = BinaryOperator::CreateMul(pOffset,
+                                                            pWorkgroupSizeYMin8,
+                                                            "",
+                                                            pInsertPos);
+
+        pNewX = BinaryOperator::CreateAdd(pNewX, pMul, "", pInsertPos);
+    }
+
+    pRemappedId = InsertElementInst::Create(pRemappedId,
+                                            pNewX,
+                                            ConstantInt::get(pInt32Ty, 0),
+                                            "",
+                                            pInsertPos);
+
+    Instruction* pNewY = BinaryOperator::CreateShl(pDiv,
+                                                   ConstantInt::get(pInt32Ty, 1),
+                                                   "",
+                                                   pInsertPos);
+
+    pNewY = BinaryOperator::CreateAdd(pNewY, pBit1, "", pInsertPos);
+
+    pRemappedId = InsertElementInst::Create(pRemappedId,
+                                            pNewY,
+                                            ConstantInt::get(pInt32Ty, 1),
+                                            "",
+                                            pInsertPos);
+
+    return pRemappedId;
 }
 
 } // Llpc

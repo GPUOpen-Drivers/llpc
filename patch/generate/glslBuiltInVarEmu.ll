@@ -46,30 +46,52 @@ define i64 @llpc.input.import.builtin.SubgroupEqMaskKHR.i64.i32(i32 %builtInId) 
 define i64 @llpc.input.import.builtin.SubgroupGeMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32(i32 41)
-    %2 = zext i32 %1 to i64
-
+    %2 = call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32(i32 36)
+    %3 = icmp eq i32 %2, 64
+    br i1 %3, label %.wave64, label %.wave32
+.wave64:
+    %4 = zext i32 %1 to i64
     ; 0xFFFFFFFF'FFFFFFFF << threadId
-    %3 = shl i64 -1, %2
-
-    ret i64 %3
+    %5 = shl i64 -1, %4
+    br label %.end
+.wave32:
+    ; 0xFFFFFFFF << threadId
+    %6 = shl i32 -1, %1
+    %7 = zext i32 %6 to i64
+    br label %.end
+.end:
+    %8 = phi i64 [ %5, %.wave64 ], [ %7, %.wave32]
+    ret i64 %8
 }
 
 ; GLSL: in uint64_t gl_SubGroupGtMask
 define i64 @llpc.input.import.builtin.SubgroupGtMaskKHR.i64.i32(i32 %builtInId) #0
 {
     %1 = call i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32(i32 41)
-    %2 = zext i32 %1 to i64
-
+    %2 = call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32(i32 36)
+    %3 = icmp eq i32 %2, 64
+    br i1 %3, label %.wave64, label %.wave32
+.wave64:
+    %4 = zext i32 %1 to i64
     ; 0xFFFFFFFF'FFFFFFFF << threadId
-    %3 = shl i64 -1, %2
-
-    ; 1 << threadId
-    %4 = shl i64 1, %2
-
+    %5 = shl i64 -1, %4
+    %6 = shl i64 1, %4
     ; (0xFFFFFFFF'FFFFFFFF << threadId) ^ (1 << threadId)
-    %5 = xor i64 %3, %4
+    %7 = xor i64 %5, %6
+    br label %.end
+.wave32:
+    ; (FFFFFFFF << threadId)
+    %8 = shl i32 -1, %1
+    ; 1 << threadId
+    %9 = shl i32 1, %1
+    ; (FFFFFFFF << threadId) ^ (1 << threadId)
+    %10 = xor i32 %8, %9
 
-    ret i64 %5
+    %11 = zext i32 %10 to i64
+    br label %.end
+.end:
+    %12 = phi i64 [ %7, %.wave64 ], [ %11, %.wave32]
+    ret i64 %12
 }
 
 ; GLSL: in uint64_t gl_SubGroupLeMask

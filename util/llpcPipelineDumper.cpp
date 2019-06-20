@@ -618,6 +618,9 @@ void PipelineDumper::DumpPipelineShaderInfo(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    dumpFile << "options.useSiScheduler = " << pShaderInfo->options.useSiScheduler << "\n";
+#endif
     dumpFile << "\n";
 }
 
@@ -711,6 +714,9 @@ void PipelineDumper::DumpPipelineOptions(
 #endif
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
     dumpFile << "options.includeIrBinary = " << pOptions->includeIrBinary << "\n";
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
 #endif
 }
 
@@ -969,6 +975,9 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
         pHasher->Update(pPipeline->options.includeIrBinary);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+        pHasher->Update(pPipeline->options.reconfigWorkgroupLayout);
+#endif
     }
 }
 
@@ -1088,6 +1097,9 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.maxThreadGroupsPerComputeUnit);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
             pHasher->Update(options.forceLoopUnrollCount);
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+            pHasher->Update(options.useSiScheduler);
 #endif
         }
     }
@@ -1385,6 +1397,7 @@ OStream& operator<<(
                                 break;
                             }
                         case msgpack::Type::String:
+                        case msgpack::Type::Binary:
                             {
                                 OutputText((const uint8_t*)(pNode->getString().data()),
                                     0,
@@ -1437,8 +1450,11 @@ OStream& operator<<(
                             {
                                 break;
                             }
-                        case msgpack::Type::Binary:
                         case msgpack::Type::Boolean:
+                            {
+                                out << pNode->getBool() << " ";
+                                break;
+                            }
                         default:
                             {
                                 LLPC_NEVER_CALLED();

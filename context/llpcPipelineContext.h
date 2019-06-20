@@ -91,6 +91,15 @@ struct FloatControl
     bool    roundingModeRTZ;            // Rounding mode: to zero
 };
 
+// Enumerate the workgroup layout options.
+enum class WorkgroupLayout : uint32_t
+{
+    Unknown = 0,   // ?x?
+    Linear,        // 4x1
+    Quads,         // 2x2
+    SexagintiQuads // 8x8
+};
+
 // Represents the info of a descriptor binding
 struct DescriptorBinding
 {
@@ -335,18 +344,20 @@ struct ResourceUsage
             // Compute shader
             struct
             {
-                // Input
-                uint32_t numWorkgroups        : 1;      // Whether gl_NumWorkGroups is used
-                uint32_t localInvocationId    : 1;      // Whether gl_LocalInvocationID is used
-                uint32_t workgroupId          : 1;      // Whether gl_WorkGroupID is used
-                uint32_t numSubgroups         : 1;      // Whether gl_NumSubgroups is used
-                uint32_t subgroupId           : 1;      // Whether gl_SubgroupID is used
                 // Execution mode
-                uint32_t workgroupSizeX       : 16;     // X value of gl_WorkGroupSize
-                uint32_t workgroupSizeY       : 16;     // Y value of gl_WorkGroupSize
-                uint32_t workgroupSizeZ       : 16;     // Z value of gl_WorkGroupSize
+                uint32_t workgroupSizeX         : 16;     // X value of gl_WorkGroupSize
+                uint32_t workgroupSizeY         : 16;     // Y value of gl_WorkGroupSize
+                uint32_t workgroupSizeZ         : 16;     // Z value of gl_WorkGroupSize
+                // Workgroup layout
+                uint32_t workgroupLayout        : 2;      // The layout of the workgroup
+                // Input
+                uint32_t numWorkgroups          : 1;      // Whether gl_NumWorkGroups is used
+                uint32_t localInvocationId      : 1;      // Whether gl_LocalInvocationID is used
+                uint32_t workgroupId            : 1;      // Whether gl_WorkGroupID is used
+                uint32_t numSubgroups           : 1;      // Whether gl_NumSubgroups is used
+                uint32_t subgroupId             : 1;      // Whether gl_SubgroupID is used
 
-                uint64_t unused               : 43;
+                uint64_t unused                 : 9;
             } cs;
 
             struct
@@ -503,6 +514,7 @@ struct ResourceUsage
             ExportFormat expFmts[MaxColorTargets];      // Shader export formats
             BasicType    outputTypes[MaxColorTargets];  // Array of basic types of fragment outputs
             uint32_t     cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
+            bool         dummyExport;                   // Control to generate fragment shader dummy export
         } fs;
     } inOutUsage;
 };

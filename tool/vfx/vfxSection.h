@@ -1125,13 +1125,20 @@ public:
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIrBinary, MemberTypeBool, false);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
+#endif
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    static const uint32_t  MemberCount = 7;
+#else
     static const uint32_t  MemberCount = 6;
+#endif
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1164,6 +1171,9 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
+#endif
 
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
@@ -1171,7 +1181,9 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+        static const uint32_t  MemberCount = 9;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         static const uint32_t  MemberCount = 8;
     #else
         static const uint32_t  MemberCount = 7;
