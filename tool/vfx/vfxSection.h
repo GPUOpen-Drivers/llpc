@@ -1125,9 +1125,6 @@ public:
 #if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIrBinary, MemberTypeBool, false);
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 30
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableNullFragShader, MemberTypeBool, true);
-#endif
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 

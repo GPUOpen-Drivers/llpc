@@ -45,6 +45,20 @@
 using namespace Llpc;
 using namespace llvm;
 
+namespace llvm
+{
+
+namespace cl
+{
+
+// -disable-null-frag-shader: disable to generate null fragment shader
+opt<bool> DisableNullFragShader("disable-null-frag-shader",
+                                cl::desc("Disable to add a null fragment shader"), cl::init(false));
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
@@ -84,6 +98,13 @@ bool PatchNullFragShader::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Null-Frag-Shader\n");
 
     Patch::Init(&module);
+
+    if (cl::DisableNullFragShader)
+    {
+        // NOTE: If the option -disable-null-frag-shader is set to TRUE, we skip this pass. This is done by
+        // standalone compiler.
+        return false;
+    }
 
     const bool hasCs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageCompute)) != 0);
     const bool hasVs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
