@@ -1941,6 +1941,15 @@ Result Compiler::CollectInfoFromSpirvBinary(
                 capabilities.insert(capability);
                 break;
             }
+        case spv::OpExtension:
+            {
+                if ((strncmp(reinterpret_cast<const char*>(&pCodePos[1]), "SPV_AMD_shader_ballot",
+                    strlen("SPV_AMD_shader_ballot")) == 0) && (pShaderModuleInfo->useSubgroupSize == false))
+                {
+                    pShaderModuleInfo->useSubgroupSize = true;
+                }
+                break;
+            }
         case spv::OpString:
         case spv::OpSource:
         case spv::OpSourceContinued:
@@ -1973,7 +1982,8 @@ Result Compiler::CollectInfoFromSpirvBinary(
         pShaderModuleInfo->enableVarPtr = true;
     }
 
-    if ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
+    if ((pShaderModuleInfo->useSubgroupSize == false) &&
+        ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
         (capabilities.find(spv::CapabilityGroupNonUniformVote) != capabilities.end()) ||
         (capabilities.find(spv::CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
         (capabilities.find(spv::CapabilityGroupNonUniformBallot) != capabilities.end()) ||
@@ -1983,7 +1993,7 @@ Result Compiler::CollectInfoFromSpirvBinary(
         (capabilities.find(spv::CapabilityGroupNonUniformQuad) != capabilities.end()) ||
         (capabilities.find(spv::CapabilitySubgroupBallotKHR) != capabilities.end()) ||
         (capabilities.find(spv::CapabilitySubgroupVoteKHR) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroups) != capabilities.end()))
+        (capabilities.find(spv::CapabilityGroups) != capabilities.end())))
     {
         pShaderModuleInfo->useSubgroupSize = true;
     }
