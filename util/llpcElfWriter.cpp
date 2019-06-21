@@ -567,7 +567,7 @@ size_t ElfWriter<Elf>::GetRequiredBufferSizeBytes()
     // Iterate through the section list
     for (auto& section : m_sections)
     {
-        totalBytes += section.secHead.sh_size;
+        totalBytes += Pow2Align(section.secHead.sh_size, sizeof(uint32_t));
     }
 
     totalBytes += m_header.e_shentsize * m_header.e_shnum;
@@ -703,7 +703,7 @@ void ElfWriter<Elf>::CalcSectionHeaderOffset()
 
     for (auto& section : m_sections)
     {
-        const uint32_t secSzBytes = section.secHead.sh_size;
+        const uint32_t secSzBytes = Pow2Align(section.secHead.sh_size, sizeof(uint32_t));
         sharedHdrOffset += secSzBytes;
     }
 
@@ -744,7 +744,7 @@ void ElfWriter<Elf>::WriteToBuffer(
         section.secHead.sh_offset = static_cast<uint32_t>(pBuffer - pData);
         const uint32_t sizeBytes = section.secHead.sh_size;
         memcpy(pBuffer, section.pData, sizeBytes);
-        pBuffer += sizeBytes;
+        pBuffer += Pow2Align(sizeBytes, sizeof(uint32_t));
     }
 
     LLPC_ASSERT(m_header.e_shoff == static_cast<uint32_t>(pBuffer - pData));
