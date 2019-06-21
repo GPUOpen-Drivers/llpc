@@ -148,6 +148,7 @@ namespace cl
 
 extern opt<bool> EnablePipelineDump;
 extern opt<std::string> PipelineDumpDir;
+extern opt<bool> DisableNullFragShader;
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -363,6 +364,10 @@ static Result Init(
             strncpy(shaderCacheFileDirOption, "-shader-cache-file-dir=.", sizeof(shaderCacheFileDirOption));
         }
         newArgs.push_back(shaderCacheFileDirOption);
+
+        // NOTE: We set the option -disable-null-frag-shader to TRUE for standalone compiler as the default.
+        // Subsequent command option parse will correct its value if this option is specified externally.
+        cl::DisableNullFragShader.setValue(true);
 
         result = ICompiler::Create(ParsedGfxIp, newArgs.size(), &newArgs[0], ppCompiler);
     }
@@ -1200,6 +1205,10 @@ static Result ProcessPipeline(
         }
         else if (IsPipelineInfoFile(inFile))
         {
+            // NOTE: If the input file is pipeline file, we set the option -disable-null-frag-shader to FALSE
+            // unconditionally.
+            cl::DisableNullFragShader.setValue(false);
+
             const char* pLog = nullptr;
             bool vfxResult = Vfx::vfxParseFile(inFile.c_str(),
                                                0,
