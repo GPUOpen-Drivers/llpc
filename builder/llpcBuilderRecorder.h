@@ -132,9 +132,11 @@ public:
     llvm::Module* Link(llvm::ArrayRef<llvm::Module*> modules) override final;
 #endif
 
-    //
-    // Builder methods implemented in BuilderImplDesc
-    //
+    // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
+    llvm::ModulePass* CreateBuilderReplayer() override;
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Descriptor operations
 
     llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
                                            llvm::ArrayRef<uint32_t> operandIdxs,
@@ -176,9 +178,8 @@ public:
     llvm::Value* CreateGetBufferDescLength(llvm::Value* const pBufferDesc,
                                            const llvm::Twine& instName = "") override final;
 
-    //
-    // Builder methods implemented in BuilderImplMisc
-    //
+    // -----------------------------------------------------------------------------------------------------------------
+    // Miscellaneous operations
 
     llvm::Instruction* CreateKill(const llvm::Twine& instName = "") override final;
     llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName = "") override final;
@@ -186,9 +187,8 @@ public:
     // Builder methods implemented in BuilderImplMatrix
     llvm::Value* CreateTransposeMatrix(llvm::Value* const pMatrix, const llvm::Twine& instName = "") override final;
 
-    //
-    // Builder methods implemented in BuilderImplSubgroup
-    //
+    // -----------------------------------------------------------------------------------------------------------------
+    // Subgroup operations
 
     llvm::Value* CreateGetSubgroupSize(const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupElect(const llvm::Twine& instName) override final;
@@ -265,9 +265,6 @@ public:
                                                const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupMbcnt(llvm::Value* const pMask,
                                      const llvm::Twine& instName ) override final;
-
-    // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
-    llvm::ModulePass* CreateBuilderReplayer() override;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderRecorder)

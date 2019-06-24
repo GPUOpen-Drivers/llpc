@@ -67,7 +67,7 @@ public:
     // Create a waterfall loop containing the specified instruction.
     llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
                                            llvm::ArrayRef<uint32_t> operandIdxs,
-                                           const llvm::Twine&       instName) override final;
+                                           const llvm::Twine&       instName = "") override final;
 
     // Create a load of a buffer descriptor.
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
@@ -365,7 +365,10 @@ private:
 
 // =====================================================================================================================
 // The Builder implementation, encompassing all the individual builder implementation subclasses
-class BuilderImpl final : public BuilderImplDesc, public BuilderImplMatrix, public BuilderImplMisc, BuilderImplSubgroup
+class BuilderImpl final : public BuilderImplDesc,
+                                 BuilderImplMatrix,
+                                 BuilderImplMisc,
+                                 BuilderImplSubgroup
 {
 public:
     BuilderImpl(llvm::LLVMContext& context) : BuilderImplBase(context),
