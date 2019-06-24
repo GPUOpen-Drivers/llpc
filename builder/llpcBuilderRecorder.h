@@ -81,6 +81,19 @@ public:
         LoadPushConstantsPtr,
         GetBufferDescLength,
 
+        // Image
+        ImageLoad,
+        ImageLoadWithFmask,
+        ImageStore,
+        ImageSample,
+        ImageGather,
+        ImageAtomic,
+        ImageAtomicCompareSwap,
+        ImageQueryLevels,
+        ImageQuerySamples,
+        ImageQuerySize,
+        ImageGetLod,
+
         // Matrix
         TransposeMatrix,
 
@@ -182,6 +195,103 @@ public:
 
     llvm::Value* CreateGetBufferDescLength(llvm::Value* const pBufferDesc,
                                            const llvm::Twine& instName = "") override final;
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Image operations
+
+    // Create an image load.
+    llvm::Value* CreateImageLoad(llvm::Type*               pResultTy,
+                                 uint32_t                  dim,
+                                 uint32_t                  flags,
+                                 llvm::Value*              pImageDesc,
+                                 llvm::Value*              pCoord,
+                                 llvm::Value*              pMipLevel,
+                                 const llvm::Twine&        instName = "") override final;
+
+    // Create an image load with F-mask.
+    llvm::Value* CreateImageLoadWithFmask(llvm::Type*                   pResultTy,
+                                          uint32_t                      dim,
+                                          uint32_t                      flags,
+                                          llvm::Value*                  pImageDesc,
+                                          llvm::Value*                  pFmaskDesc,
+                                          llvm::Value*                  pCoord,
+                                          llvm::Value*                  pSampleNum,
+                                          const llvm::Twine&            instName) override final;
+
+    // Create an image store.
+    llvm::Value* CreateImageStore(uint32_t               dim,
+                                  uint32_t               flags,
+                                  llvm::Value*           pImageDesc,
+                                  llvm::Value*           pCoord,
+                                  llvm::Value*           pMipLevel,
+                                  llvm::Value*           pTexel,
+                                  const llvm::Twine&     instName = "") override final;
+
+    // Create an image sample.
+    llvm::Value* CreateImageSample(llvm::Type*                   pResultTy,
+                                   uint32_t                      dim,
+                                   uint32_t                      flags,
+                                   llvm::Value*                  pImageDesc,
+                                   llvm::Value*                  pSamplerDesc,
+                                   llvm::ArrayRef<llvm::Value*>  address,
+                                   const llvm::Twine&            instName = "") override final;
+
+    // Create an image gather.
+    llvm::Value* CreateImageGather(llvm::Type*                   pResultTy,
+                                   uint32_t                      dim,
+                                   uint32_t                      flags,
+                                   llvm::Value*                  pImageDesc,
+                                   llvm::Value*                  pSamplerDesc,
+                                   llvm::ArrayRef<llvm::Value*>  address,
+                                   const llvm::Twine&            instName = "") override final;
+
+    // Create an image atomic operation other than compare-and-swap.
+    llvm::Value* CreateImageAtomic(uint32_t               atomicOp,
+                                   uint32_t               dim,
+                                   uint32_t               flags,
+                                   llvm::AtomicOrdering   ordering,
+                                   llvm::Value*           pImageDesc,
+                                   llvm::Value*           pCoord,
+                                   llvm::Value*           pInputValue,
+                                   const llvm::Twine&     instName = "") override final;
+
+    // Create an image atomic compare-and-swap.
+    llvm::Value* CreateImageAtomicCompareSwap(uint32_t              dim,
+                                              uint32_t              flags,
+                                              llvm::AtomicOrdering  ordering,
+                                              llvm::Value*          pImageDesc,
+                                              llvm::Value*          pCoord,
+                                              llvm::Value*          pInputValue,
+                                              llvm::Value*          pComparatorValue,
+                                              const llvm::Twine&    instName = "") override final;
+
+    // Create a query of the number of mipmap levels in an image. Returns an i32 value.
+    llvm::Value* CreateImageQueryLevels(uint32_t                      dim,
+                                        uint32_t                      flags,
+                                        llvm::Value*                  pImageDesc,
+                                        const llvm::Twine&            instName = "") override final;
+
+    // Create a query of the number of samples in an image. Returns an i32 value.
+    llvm::Value* CreateImageQuerySamples(uint32_t                      dim,
+                                         uint32_t                      flags,
+                                         llvm::Value*                  pImageDesc,
+                                         const llvm::Twine&            instName = "") override final;
+
+    // Create a query of size of an image at the specified LOD
+    llvm::Value* CreateImageQuerySize(uint32_t                dim,
+                                      uint32_t                flags,
+                                      llvm::Value*            pImageDesc,
+                                      llvm::Value*            pLod,
+                                      const llvm::Twine&      instName = "") override final;
+
+    // Create a get of the LOD that would be used for an image sample with the given coordinates
+    // and implicit LOD.
+    llvm::Value* CreateImageGetLod(uint32_t                dim,
+                                   uint32_t                flags,
+                                   llvm::Value*            pImageDesc,
+                                   llvm::Value*            pSamplerDesc,
+                                   llvm::Value*            pCoord,
+                                   const llvm::Twine&      instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations

@@ -34,6 +34,7 @@
 #include "llpcDebug.h"
 
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/AtomicOrdering.h"
 
 namespace llvm
 {
@@ -203,6 +204,7 @@ public:
 
     // Create a waterfall loop containing the specified instruction.
     // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
+    // TODO: This will be removed as soon as the image rework is committed.
     virtual llvm::Instruction* CreateWaterfallLoop(
         llvm::Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
         llvm::ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to
@@ -221,7 +223,7 @@ public:
         llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
-    // Add index onto pointer to image/sampler/texelbuffer/fmask array of descriptors.
+    // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
     virtual llvm::Value* CreateIndexDescPtr(
         llvm::Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
                                                 //    the CreateGet*DescPtr methods
@@ -229,8 +231,8 @@ public:
         bool                isNonUniform,       // Whether the descriptor index is non-uniform
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
-    // Load image/sampler/texelbuffer/fmask descriptor from pointer.
-    // Returns <8 x i32> descriptor for image or fmask, or <4 x i32> descriptor for sampler or texel buffer.
+    // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
+    // Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
     virtual llvm::Value* CreateLoadDescFromPtr(
         llvm::Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDesc or one of
                                                 //    the CreateGet*DescPtr methods
@@ -239,7 +241,7 @@ public:
     // Get the type of an image descriptor.
     llvm::VectorType* GetImageDescTy();
 
-    // Get the type of an fmask descriptor.
+    // Get the type of an F-mask descriptor.
     llvm::VectorType* GetFmaskDescTy();
 
     // Get the type of a sampler descriptor.
@@ -248,13 +250,13 @@ public:
     // Get the type of a texel buffer descriptor.
     llvm::VectorType* GetTexelBufferDescTy();
 
-    // Get the type of pointer to image or fmask descriptor, as returned by CreateGetImageDescPtr.
+    // Get the type of pointer to image or F-mask descriptor, as returned by CreateGetImageDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
     // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
     // set up the stride, and CreateIndexDescPtr will use it.
     llvm::Type* GetImageDescPtrTy();
 
-    // Get the type of pointer to fmask descriptor, as returned by CreateGetFmaskDescPtr.
+    // Get the type of pointer to F-mask descriptor, as returned by CreateGetFmaskDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
     // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
     // set up the stride, and CreateIndexDescPtr will use it.
@@ -310,6 +312,254 @@ public:
     virtual llvm::Value* CreateGetBufferDescLength(
         llvm::Value* const  pBufferDesc,        // [in] The buffer descriptor to query.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Image operations
+
+    // Possible values for dimension argument for image methods.
+    enum
+    {
+        Dim1D = 0,            // Coordinate: x
+        Dim2D = 1,            // Coordinate: x, y
+        Dim3D = 2,            // Coordinate: x, y, z
+        DimCube = 3,          // Coordinate: x, y, face
+        Dim1DArray = 4,       // Coordinate: x, slice
+        Dim2DArray = 5,       // Coordinate: x, y, slice
+        Dim2DMsaa = 6,        // Coordinate: x, y, fragid
+        Dim2DArrayMsaa = 7,   // Coordinate: x, y, slice, fragid
+        DimCubeArray = 8,     // Coordinate: x, y, face, slice (despite both SPIR-V and ISA
+                              //    combining face and slice into one component)
+    };
+
+    // Get the number of coordinates for the specified dimension argument.
+    static uint32_t GetImageNumCoords(
+        uint32_t dim)   // Image dimension
+    {
+        switch (dim)
+        {
+        case Dim1D: return 1;
+        case Dim2D: return 2;
+        case Dim3D: return 3;
+        case DimCube: return 3;
+        case Dim1DArray: return 2;
+        case Dim2DArray: return 3;
+        case Dim2DMsaa: return 3;
+        case Dim2DArrayMsaa: return 4;
+        case DimCubeArray: return 4;
+        }
+        LLPC_NEVER_CALLED();
+        return 0;
+    }
+
+    // Get the number of components of a size query for the specified dimension argument.
+    static uint32_t GetImageQuerySizeComponentCount(
+        uint32_t dim)   // Image dimension
+    {
+        switch (dim)
+        {
+        case Dim1D: return 1;
+        case Dim2D: return 2;
+        case Dim3D: return 3;
+        case DimCube: return 2;
+        case Dim1DArray: return 2;
+        case Dim2DArray: return 3;
+        case Dim2DMsaa: return 2;
+        case Dim2DArrayMsaa: return 3;
+        case DimCubeArray: return 3;
+        }
+        LLPC_NEVER_CALLED();
+        return 0;
+    }
+
+    // Bit settings in flags argument for image methods.
+    enum
+    {
+        ImageFlagCoherent = 1,              // Coherent memory access
+        ImageFlagVolatile = 2,              // Volatile memory access
+        ImageFlagSignedResult = 4,          // For a gather with integer result, whether it is signed
+        ImageFlagNonUniformImage = 8,       // Whether the image descriptor is non-uniform
+        ImageFlagNonUniformSampler = 0x10,  // Whether the sampler descriptor is non-uniform
+        ImageFlagAddFragCoord = 0x20,       // Add FragCoord (converted to signed int) on to coordinate x,y.
+                                            // Image load, store and atomic only.
+        ImageFlagUseViewIndex = 0x40,       // Use ViewIndex as coordinate z. Image load, store and atomic only.
+    };
+
+    // Address array indices for image sample and gather methods. Where an optional entry is missing (either
+    // nullptr, or the array is not long enough for it), then it assumes a default value.
+    enum
+    {
+        ImageAddressIdxCoordinate = 0,    // Coordinate - a scalar or vector of float or half exactly as wide as
+                                          //    returned by GetImageNumCoords(dim)
+        ImageAddressIdxProjective = 1,    // Projective coordinate - divided into each coordinate (image sample only)
+                                          //  (optional; default no projective divide)
+        ImageAddressIdxComponent = 2,     // Component - constant i32 component for gather
+        ImageAddressIdxDerivativeX = 3,   // X derivative - vector of float or half with number of coordinates
+                                          //  excluding array slice (optional; default is to use
+                                          //  implicit derivatives).
+        ImageAddressIdxDerivativeY = 4,   // Y derivative - vector of float or half with number of coordinates
+                                          //  excluding array slice (optional; default is to use
+                                          //  implicit derivatives).
+        ImageAddressIdxLod = 5,           // float level of detail (optional; default is to use
+                                          //  implicit computed LOD)
+        ImageAddressIdxLodBias = 6,       // float bias to add to the computed LOD (optional;
+                                          //  default 0.0)
+        ImageAddressIdxLodClamp = 7,      // float value to clamp LOD to (optional; default
+                                          //  no clamping)
+        ImageAddressIdxOffset = 8,        // Offset to add to coordinates - scalar or vector of i32, padded with 0s
+                                          //  if not wide enough (optional; default all 0s). Alternatively, for
+                                          //  independent offsets in a gather, a 4-array of the same, which is
+                                          //  implemented as four separate gather instructions
+        ImageAddressIdxZCompare = 9,      // float Z-compare value (optional; default no Z-compare)
+        ImageAddressCount = 10            // All image address indices are less than this
+    };
+
+    // Atomic operation, for use in CreateImageAtomic.
+    enum
+    {
+        ImageAtomicSwap = 0,    // Atomic operation: swap
+        ImageAtomicAdd = 2,     // Atomic operation: add
+        ImageAtomicSub = 3,     // Atomic operation: subtract
+        ImageAtomicSMin = 4,    // Atomic operation: signed minimum
+        ImageAtomicUMin = 5,    // Atomic operation: unsigned minimum
+        ImageAtomicSMax = 6,    // Atomic operation: signed maximum
+        ImageAtomicUMax = 7,    // Atomic operation: unsigned maximum
+        ImageAtomicAnd = 8,     // Atomic operation: and
+        ImageAtomicOr = 9,      // Atomic operation: or
+        ImageAtomicXor = 10     // Atomic operation: xor
+    };
+
+    // Create an image load.
+    virtual llvm::Value* CreateImageLoad(
+        llvm::Type*                   pResultTy,          // [in] Result type
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor.
+        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        llvm::Value*                  pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create an image load with fmask. Dim must be 2DMsaa or 2DArrayMsaa. If the F-mask descriptor has a valid
+    // format field, then it reads "fmask_texel_R", the R component of the texel read from the given coordinates
+    // in the F-mask image, and calculates the sample number to use as the sample'th nibble (where sample=0 means
+    // the least significant nibble) of fmask_texel_R. If the F-mask descriptor has an invalid format, then it
+    // just uses the supplied sample number. The calculated sample is then appended to the supplied coordinates
+    // for a normal image load.
+    virtual llvm::Value* CreateImageLoadWithFmask(
+        llvm::Type*                   pResultTy,          // [in] Result type
+        uint32_t                      dim,                // Image dimension, 2DMsaa or 2DArrayMsaa
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor
+        llvm::Value*                  pFmaskDesc,         // [in] Fmask descriptor
+        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
+                                                          //    width for given dimension excluding sample
+        llvm::Value*                  pSampleNum,         // [in] Sample number, i32
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create an image store.
+    virtual llvm::Value* CreateImageStore(
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        llvm::Value*                  pMipLevel,          // [in] Mipmap level if doing store_mip, otherwise nullptr
+        llvm::Value*                  pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create an image sample.
+    // The return type is specified by pResultTy as follows:
+    // * If it is a struct, then the method generates a TFE (texel fail enable) operation. The first field is the
+    //   texel type, and the second field is i32, where bit 0 is the TFE bit. Otherwise, the return type is the texel
+    //   type.
+    // * If the ZCompare address component is supplied, then the texel type is the scalar texel component
+    //   type. Otherwise the texel type is a 4-vector of the texel component type.
+    // * The texel component type is i32, f16 or f32.
+    virtual llvm::Value* CreateImageSample(
+        llvm::Type*                   pResultTy,          // [in] Result type
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor
+        llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
+        llvm::ArrayRef<llvm::Value*>  address,            // Address and other arguments
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create an image gather.
+    // The return type is specified by pResultTy as follows:
+    // * If it is a struct, then the method generates a TFE (texel fail enable) operation. The first field is the
+    //   texel type, and the second field is i32, where bit 0 is the TFE bit. Otherwise, the return type is the texel
+    //   type.
+    // * The texel type is a 4-vector of the texel component type, which is i32, f16 or f32.
+    virtual llvm::Value* CreateImageGather(
+        llvm::Type*                   pResultTy,          // [in] Result type
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor
+        llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
+        llvm::ArrayRef<llvm::Value*>  address,            // Address and other arguments
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create an image atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
+    // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
+    // Normally pImageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
+    // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
+    // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
+    virtual llvm::Value* CreateImageAtomic(
+        uint32_t                      atomicOp,           // Atomic op to create
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::AtomicOrdering          ordering,           // Atomic ordering
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        llvm::Value*                  pInputValue,        // [in] Input value: i32
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create an image atomic compare-and-swap.
+    // Normally pImageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
+    // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
+    // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
+    virtual llvm::Value* CreateImageAtomicCompareSwap(
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::AtomicOrdering          ordering,           // Atomic ordering
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        llvm::Value*                  pInputValue,        // [in] Input value: i32
+        llvm::Value*                  pComparatorValue,   // [in] Value to compare against: i32
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a query of the number of mipmap levels in an image. Returns an i32 value.
+    virtual llvm::Value* CreateImageQueryLevels(
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a query of the number of samples in an image. Returns an i32 value.
+    virtual llvm::Value* CreateImageQuerySamples(
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a query of size of an image at the specified LOD.
+    // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
+    virtual llvm::Value* CreateImageQuerySize(
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        llvm::Value*                  pLod,               // [in] LOD
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a get of the LOD that would be used for an image sample with the given coordinates
+    // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
+    // detail relative to the base level.
+    virtual llvm::Value* CreateImageGetLod(
+        uint32_t                      dim,                // Image dimension
+        uint32_t                      flags,              // ImageFlag* flags
+        llvm::Value*                  pImageDesc,         // [in] Image descriptor
+        llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
+        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector f32, exactly right
+                                                          //    width without array layer
+        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Matrix operations

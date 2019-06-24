@@ -69,3 +69,71 @@ bool BuilderImplBase::SupportPermLaneDpp() const
     return getContext().GetGfxIpVersion().major >= 10;
 }
 #endif
+
+// =====================================================================================================================
+// Create an "if..endif" or "if..else..endif" structure. The current basic block becomes the "endif" block, and all
+// instructions in that block before the insert point are moved to the "if" block. The insert point is moved to
+// the start of the "then" block; the caller can save the insert point before calling this method then restore it
+// afterwards to restore the insert point to where it was just after the endif, and still keep its debug location.
+// The method returns the branch instruction, whose first branch target is the "then" block and second branch
+// target is the "else" block, or "endif" block if no "else" block.
+BranchInst* BuilderImplBase::CreateIf(
+    Value*        pCondition,   // [in] The "if" condition
+    bool          wantElse,     // Whether to generate an "else" block
+    const Twine&  instName)     // Base of name for new basic blocks
+{
+    // Create "if" block and move instructions in current block to it.
+    BasicBlock* pEndIfBlock = GetInsertBlock();
+    BasicBlock* pIfBlock = BasicBlock::Create(getContext(), "", pEndIfBlock->getParent(), pEndIfBlock);
+    pIfBlock->takeName(pEndIfBlock);
+    pEndIfBlock->setName(instName + ".endif");
+    pIfBlock->getInstList().splice(pIfBlock->end(),
+                                   pEndIfBlock->getInstList(),
+                                   pEndIfBlock->begin(),
+                                   GetInsertPoint());
+
+    // Replace non-phi uses of the original block with the new "if" block.
+    SmallVector<Use*, 4> nonPhiUses;
+    for (auto& use : pEndIfBlock->uses())
+    {
+        if (isa<PHINode>(use.getUser()) == false)
+        {
+            nonPhiUses.push_back(&use);
+        }
+    }
+    for (auto pUse : nonPhiUses)
+    {
+        pUse->set(pIfBlock);
+    }
+
+    // Create "then" and "else" blocks.
+    BasicBlock* pThenBlock = BasicBlock::Create(getContext(),
+                                                instName + ".then",
+                                                pEndIfBlock->getParent(),
+                                                pEndIfBlock);
+    BasicBlock* pElseBlock = nullptr;
+    if (wantElse)
+    {
+        pElseBlock = BasicBlock::Create(getContext(),
+                                        instName + ".else",
+                                        pEndIfBlock->getParent(),
+                                        pEndIfBlock);
+    }
+
+    // Create the branches.
+    BranchInst* pBranch = BranchInst::Create(pThenBlock,
+                                             pElseBlock != nullptr ? pElseBlock : pEndIfBlock,
+                                             pCondition,
+                                             pIfBlock);
+    pBranch->setDebugLoc(getCurrentDebugLocation());
+    BranchInst::Create(pEndIfBlock, pThenBlock)->setDebugLoc(getCurrentDebugLocation());
+    if (pElseBlock != nullptr)
+    {
+        BranchInst::Create(pEndIfBlock, pElseBlock)->setDebugLoc(getCurrentDebugLocation());
+    }
+
+    // Set Builder's insert point to the branch at the end of the "then" block.
+    SetInsertPoint(pThenBlock->getTerminator());
+    return pBranch;
+}
+
