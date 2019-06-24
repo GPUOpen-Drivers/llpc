@@ -29,16 +29,15 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.1D{{.*}}({{.*}}, i32 1, i32 0,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.Rect{{.*}}({{.*}}, <2 x i32> <i32 2, i32 3>, i32 0,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.texel.buffer.desc.ptr{{.*}}(i32 1, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.Buffer({{.*}}, i32 4, i32 0,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 2, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.CubeArray{{.*}}({{.*}}, <3 x i32> <i32 5, i32 6, i32 7>, i32 0,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.2D.sample{{.*}}({{.*}}, <2 x i32> <i32 8, i32 9>, i32 2, i32 0,{{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 1) 
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1) 
+; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 2, i32 3>) 
+; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 0, i32 0, {{.*}}, i32 4) 
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 8, i32 0, {{.*}}, <4 x i32> <i32 5, i32 6, i32 1, i32 1>) 
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 2) 
+; SHADERTEST: call {{.*}} @llpc.call.image.load.v4f32(i32 6, i32 0, {{.*}}, <3 x i32> <i32 8, i32 9, i32 2>) 
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i32(i32 15, i32 1,{{.*}}, i32 0, i32 0)

@@ -23,16 +23,16 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: <4 x float> @spirv.image.sample.f32.1D.bias({{.*}}, float 1.000000e+00, float 0x3FD99999A0000000, {{.*}})
-; SHADERTEST: <4 x float> @spirv.image.sample.f32.2D({{.*}}, <2 x float> <float 5.000000e-01, float 5.000000e-01>, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+; SHADERTEST: call {{.*}} @llpc.call.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 65, float 1.000000e+00, float 0x3FD99999A0000000)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0)
+; SHADERTEST: call {{.*}} @llpc.call.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 1, <2 x float> <float 5.000000e-01, float 5.000000e-01>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr
-; SHADERTEST: call <4 x float> @llpc.image.sample.f32.1D.bias{{.*}}({{.*}}, float 1.000000e+00, float 0x3FD99999A0000000, {{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr
-; SHADERTEST: call <4 x float> @llpc.image.sample.f32.2D{{.*}}({{.*}}, <2 x float> <float 5.000000e-01, float 5.000000e-01>, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.sample.v4f32(i32 0, i32 0, {{.*}}, {{.*}}, i32 65, float 1.000000e+00, float 0x3FD99999A0000000) 
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 1, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 1, <2 x float> <float 5.000000e-01, float 5.000000e-01>) 
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}

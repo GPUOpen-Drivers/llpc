@@ -94,7 +94,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcSpirvLowerAlgebraTransform.cpp      \
         llpcSpirvLowerConstImmediateStore.cpp   \
         llpcSpirvLowerGlobal.cpp                \
-        llpcSpirvLowerImageOp.cpp               \
         llpcSpirvLowerInstMetaRemove.cpp        \
         llpcSpirvLowerLoopUnrollControl.cpp     \
         llpcSpirvLowerMemoryOp.cpp              \
@@ -118,7 +117,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcPatchDescriptorLoad.cpp         \
         llpcPatchEntryPointMutate.cpp       \
         llpcPatchGroupOp.cpp                \
-        llpcPatchImageOp.cpp                \
         llpcPatchInOutImportExport.cpp      \
         llpcPatchLlvmIrInclusion.cpp        \
         llpcPatchLoopUnrollInfoRectify.cpp  \
@@ -341,8 +339,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI16.txt \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI64.txt \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.py     \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.txt    \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
 
     #if LLPC_BUILD_GFX10

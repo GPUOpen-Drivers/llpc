@@ -577,7 +577,7 @@ public:
   }
   SPIRVTypeSampledImage() : SPIRVType(OC), ImgTy(nullptr) {}
 
-  const SPIRVTypeImage *getImageType() const { return ImgTy; }
+  SPIRVTypeImage *getImageType() const { return ImgTy; }
 
   void setImageType(SPIRVTypeImage *TheImgTy) { ImgTy = TheImgTy; }
 

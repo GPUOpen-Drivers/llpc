@@ -252,7 +252,6 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerAlgebraTransform.cpp
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerGlobal.cpp
-    lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
     lower/llpcSpirvLowerMemoryOp.cpp
@@ -276,7 +275,6 @@ target_sources(llpc PRIVATE
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
     patch/llpcPatchGroupOp.cpp
-    patch/llpcPatchImageOp.cpp
     patch/llpcPatchInOutImportExport.cpp
     patch/llpcPatchLlvmIrInclusion.cpp
     patch/llpcPatchLoopUnrollInfoRectify.cpp
@@ -405,8 +403,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF16.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
 )
 

@@ -18,10 +18,9 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.fmask.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.fetch.f32.2D.sample.fmaskbased{{.*}}({{.*}},{{.*}},{{.*}}, i32 2,{{.*}})
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.with.fmask.v4f32(i32 6, i32 0, {{.*}}, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call float @llvm.amdgcn.image.load.2d.f32.i32(i32 1,{{.*}},{{.*}},{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32(i32 15,{{.*}},{{.*}},{{.*}},{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */

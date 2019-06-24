@@ -140,8 +140,6 @@ namespace LlpcName
     const static char LateLaunderFatPointer[]         = "llpc.late.launder.fat.pointer";
     const static char LateBufferLength[]              = "llpc.late.buffer.desc.length";
 
-    const static char ImageCallPrefix[]               = "llpc.image";
-
     const static char GlobalProxyPrefix[]             = "__llpc_global_proxy_";
     const static char InputProxyPrefix[]              = "__llpc_input_proxy_";
     const static char OutputProxyPrefix[]             = "__llpc_output_proxy_";
