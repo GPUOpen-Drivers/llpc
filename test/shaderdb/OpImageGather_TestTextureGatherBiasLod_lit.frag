@@ -53,54 +53,54 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2D.bias{{.*}}({{.*}},{{.*}},{{.*}}, i32 0,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <2 x {{.*}}, i32 0, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2DArray.bias{{.*}}({{.*}},{{.*}},{{.*}}, i32 1,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 2
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <3 x {{.*}}, i32 1, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.Cube.bias{{.*}}({{.*}},{{.*}},{{.*}}, i32 2,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 3
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 3
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.CubeArray.bias{{.*}}({{.*}},{{.*}},{{.*}}, i32 3,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2D.bias.constoffset{{.*}}({{.*}},{{.*}},{{.*}}, i32 0,{{.*}}, <2 x i32> zeroinitializer,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2DArray.bias.constoffset{{.*}}({{.*}},{{.*}},{{.*}}, i32 1,{{.*}}, <2 x i32> <i32 0, i32 1>,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2D.bias.constoffsets{{.*}}({{.*}},{{.*}},{{.*}}, i32 0,{{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>],{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2DArray.bias.constoffsets{{.*}}({{.*}},{{.*}},{{.*}}, i32 1,{{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>],{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2D.lod{{.*}}({{.*}},{{.*}},{{.*}}, i32 0,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2DArray.lod{{.*}}({{.*}},{{.*}},{{.*}}, i32 1,{{.*}},{{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 2
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.Cube.lod{{.*}}({{.*}},{{.*}},{{.*}}, i32 2,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 3
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 3, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <3 x {{.*}}, i32 2, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 3
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.CubeArray.lod{{.*}}({{.*}},{{.*}},{{.*}}, i32 3,{{.*}},{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 3
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 8, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 69, <4 x {{.*}}, i32 3, {{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2D.lod.constoffset{{.*}}({{.*}},{{.*}},{{.*}}, i32 0,{{.*}}, <2 x i32> zeroinitializer,{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2DArray.lod.constoffset{{.*}}({{.*}},{{.*}},{{.*}}, i32 1,{{.*}}, <2 x i32> <i32 0, i32 1>,{{.*}})
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2D.lod.constoffsets{{.*}}({{.*}},{{.*}},{{.*}}, i32 0,{{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>],{{.*}})
-; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <2 x {{.*}}, i32 0, {{.*}}, <2 x i32> zeroinitializer)
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
-; SHADERTEST: call <4 x float> @llpc.image.gather.f32.2DArray.lod.constoffsets{{.*}}({{.*}},{{.*}},{{.*}}, i32 1,{{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>],{{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <3 x {{.*}}, i32 1, {{.*}}, <2 x i32> <i32 0, i32 1>)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <2 x {{.*}}, i32 0, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 325, <3 x {{.*}}, i32 1, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <2 x {{.*}}, i32 0, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <3 x {{.*}}, i32 1, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 2
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 3, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <3 x {{.*}}, i32 2, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 3
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 3
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 8, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 37, <4 x {{.*}}, i32 3, {{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <2 x {{.*}}, i32 0, {{.*}}, <2 x i32> zeroinitializer)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <3 x {{.*}}, i32 1, {{.*}}, <2 x i32> <i32 0, i32 1>)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <2 x {{.*}}, i32 0, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 5, i32 0, <8 x {{.*}}, <4 x {{.*}}, i32 293, <3 x {{.*}}, i32 1, {{.*}}, [4 x <2 x i32>] [<2 x i32> zeroinitializer, <2 x i32> <i32 0, i32 1>, <2 x i32> <i32 1, i32 0>, <2 x i32> <i32 1, i32 1>])
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.gather4.b.2d.v4f32.f32.f32(i32 1,{{.*}},{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)

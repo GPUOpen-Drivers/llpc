@@ -343,33 +343,6 @@ const static char SampledImage[] = "SampledImage";
 const static char TempSampledImage[] = "TempSampledImage";
 } // namespace kSPIRVName
 
-namespace gSPIRVName {
-  const static char ImageCallPrefix[]                     = "spirv.image";
-  const static char ImageCallModSparse[]                  = "sparse";
-  const static char ImageCallModDref[]                    = ".dref";
-  const static char ImageCallModProj[]                    = ".proj";
-  const static char ImageCallModBias[]                    = ".bias";
-  const static char ImageCallModLod[]                     = ".lod";
-  const static char ImageCallModLodNz[]                   = ".lodnz";
-  const static char ImageCallModGrad[]                    = ".grad";
-  const static char ImageCallModConstOffset[]             = ".constoffset";
-  const static char ImageCallModOffset[]                  = ".offset";
-  const static char ImageCallModConstOffsets[]            = ".constoffsets";
-  const static char ImageCallModSample[]                  = ".sample";
-  const static char ImageCallModMinLod[]                  = ".minlod";
-  const static char ImageCallModFmaskBased[]              = ".fmaskbased";
-  const static char ImageCallModFmaskId[]                 = ".fmaskid";
-  const static char ImageCallModFmaskValue[]              = ".fmaskvalue";
-  const static char ImageCallModPatchFmaskUsage[]         = ".patchfmaskusage";
-  const static char ImageCallQueryNonLodPrefix[]          = ".querynonlod";
-  const static char ImageCallQueryLodPrefix[]             = ".querylod";
-  const static char ImageCallDimAwareSuffix[]             = ".dimaware";
-  const static char ImageCallMakeTexelAvailable[]         = ".maketexelavailable";
-  const static char ImageCallMakeTexelVisible[]           = ".maketexelvisible";
-  const static char ImageCallNonPrivateTexel[]            = ".nonprivatetexel";
-  const static char ImageCallVolatileTexel[]              = ".volatiletexel";
-}
-
 namespace kSPIRVPostfix {
 const static char Sat[] = "sat";
 const static char Rtz[] = "rtz";

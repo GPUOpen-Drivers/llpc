@@ -218,22 +218,6 @@ void PatchResourceCollect::visitCallInst(
             m_deadCalls.insert(&callInst);
         }
     }
-    else if (mangledName.startswith(LlpcName::ImageCallPrefix))
-    {
-        // Image operations
-        ShaderImageCallMetadata imageCallMeta = {};
-        LLPC_ASSERT(callInst.getNumArgOperands() >= 2);
-        uint32_t metaOperandIndex = callInst.getNumArgOperands() - 1;
-        imageCallMeta.U32All =  cast<ConstantInt>(callInst.getArgOperand(metaOperandIndex))->getZExtValue();
-
-        SPIRVImageOpKind imageOp = imageCallMeta.OpKind;
-
-        // NOTE: All "readonly" image operations are expected to be less than the numeric value of "ImageOpWrite".
-        if (isDeadCall && isImageOpReadOnly(imageOp))
-        {
-            m_deadCalls.insert(&callInst);
-        }
-    }
     else if (mangledName.startswith(LlpcName::InputImportGeneric))
     {
         // Generic input import

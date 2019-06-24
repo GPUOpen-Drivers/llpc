@@ -39,14 +39,18 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @spirv.image.sample.f32.2D
-; SHADERTEST-COUNT-2: call {{.*}} <4 x float> @spirv.image.read.f32.2D
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.sample.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.sample.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} {{.*}}@llpc.call.load.buffer.desc.{{[0-9a-z.]*}}{{.*}}(i32 0, i32 1,{{.*}}
 ; SHADERTEST-COUNT-2: load <4 x float>
-; SHADERTEST-COUNT-2: call <4 x float> @llpc.image.sample.f32.2D.dimaware
-; SHADERTEST-COUNT-2: call <4 x float> @llpc.image.read.f32.2D.dimaware
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.sample.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.sample.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
 
 
 ; SHADERTEST: AMDLLPC SUCCESS

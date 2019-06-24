@@ -142,9 +142,6 @@ void Patch::AddPasses(
     // Patch entry-point mutation (should be done before external library link)
     passMgr.add(CreatePatchEntryPointMutate());
 
-    // Patch image operations (should be done before external library link)
-    passMgr.add(CreatePatchImageOp());
-
     // Patch push constant loading (should be done before external library link)
     passMgr.add(CreatePatchPushConstOp());
 

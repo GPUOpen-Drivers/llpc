@@ -51,7 +51,6 @@ void initializeSpirvLowerAlgebraTransformPass(PassRegistry&);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
 void initializeSpirvLowerMemoryOpPass(PassRegistry&);
 void initializeSpirvLowerGlobalPass(PassRegistry&);
-void initializeSpirvLowerImageOpPass(PassRegistry&);
 void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
@@ -70,7 +69,6 @@ inline static void InitializeLowerPasses(
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
   initializeSpirvLowerMemoryOpPass(passRegistry);
   initializeSpirvLowerGlobalPass(passRegistry);
-  initializeSpirvLowerImageOpPass(passRegistry);
   initializeSpirvLowerInstMetaRemovePass(passRegistry);
   initializeSpirvLowerLoopUnrollControlPass(passRegistry);
   initializeSpirvLowerResourceCollectPass(passRegistry);
@@ -83,7 +81,6 @@ llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding, bool
 llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
 llvm::ModulePass* CreateSpirvLowerMemoryOp();
 llvm::ModulePass* CreateSpirvLowerGlobal();
-llvm::ModulePass* CreateSpirvLowerImageOp();
 llvm::ModulePass* CreateSpirvLowerInstMetaRemove();
 llvm::ModulePass* CreateSpirvLowerLoopUnrollControl(uint32_t forceLoopUnrollCount);
 llvm::ModulePass* CreateSpirvLowerResourceCollect();
