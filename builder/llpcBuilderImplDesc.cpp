@@ -42,7 +42,7 @@ using namespace llvm;
 // =====================================================================================================================
 // Create a waterfall loop containing the specified instruction.
 // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
-Instruction* BuilderImplDesc::CreateWaterfallLoop(
+Instruction* BuilderImplBase::CreateWaterfallLoop(
     Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
     ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
     const Twine&        instName)           // [in] Name to give instruction(s)
@@ -217,7 +217,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
 }
 
 // =====================================================================================================================
-// Add index onto pointer to image/sampler/texelbuffer/fmask array of descriptors.
+// Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
 Value* BuilderImplDesc::CreateIndexDescPtr(
     Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
                                       //    the CreateGet*DescPtr methods
@@ -245,8 +245,8 @@ Value* BuilderImplDesc::CreateIndexDescPtr(
 }
 
 // =====================================================================================================================
-// Load image/sampler/texelbuffer/fmask descriptor from pointer.
-// Returns <8 x i32> descriptor for image or fmask, or <4 x i32> descriptor for sampler or texel buffer.
+// Load image/sampler/texelbuffer/F-mask descriptor from pointer.
+// Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
 Value* BuilderImplDesc::CreateLoadDescFromPtr(
     Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
                                       //    the CreateGet*DescPtr methods
