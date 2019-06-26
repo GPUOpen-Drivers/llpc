@@ -624,6 +624,8 @@ static Result CompileGlsl(
 
         int32_t sourceStringCount = 1;
         const char*const* sourceList[1] = {};
+        const char* pFileName = inFile.c_str();
+        const char* const* fileList[1] = { &pFileName };
         sourceList[0] = &pGlslText;
 
         void* pProgram = nullptr;
@@ -635,6 +637,7 @@ static Result CompileGlsl(
                                                         &lang,
                                                         &sourceStringCount,
                                                         sourceList,
+                                                        fileList,
                                                         isHlsl ? entryPoints : nullptr,
                                                         &pProgram,
                                                         &pLog,
