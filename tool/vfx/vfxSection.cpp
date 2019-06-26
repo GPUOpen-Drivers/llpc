@@ -782,10 +782,12 @@ bool SectionShader::CompileGlsl(
     std::string*   pErrorMsg)   // [out] Error message
 {
     int32_t           sourceStringCount = 1;
-    const char*const* sourceList[1]        = {};
+    const char*const* sourceList[1]     = {};
+    const char*const* fileList[1]       = {};
 
     bool        result    = true;
     const char* pGlslText = shaderSource.c_str();
+    const char* pFileName = fileName.c_str();
     SpvGenStage stage     = static_cast<SpvGenStage>(m_sectionType - SectionTypeVertexShader);
     void*       pProgram  = nullptr;
     const char* pLog      = nullptr;
@@ -797,6 +799,7 @@ bool SectionShader::CompileGlsl(
     }
 
     sourceList[0] = &pGlslText;
+    fileList[0] = &pFileName;
     int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
     if ((m_shaderType == Hlsl) || (m_shaderType == HlslFile))
     {
@@ -811,6 +814,7 @@ bool SectionShader::CompileGlsl(
                                                    &stage,
                                                    &sourceStringCount,
                                                    sourceList,
+                                                   fileList,
                                                    &pEntryPoint,
                                                    &pProgram,
                                                    &pLog,
