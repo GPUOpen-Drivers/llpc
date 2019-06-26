@@ -191,6 +191,16 @@ static const uint32_t SI_STREAMOUT_TABLE_OFFS           = 0;
 // No attribute
 static const std::vector<llvm::Attribute::AttrKind>   NoAttrib;
 
+// Represents the special header of SPIR-V token stream (the first DWORD).
+struct SpirvHeader
+{
+    uint32_t    magicNumber;        // Magic number of SPIR-V module
+    uint32_t    spvVersion;         // SPIR-V version number
+    uint32_t    genMagicNumber;     // Generator's magic number
+    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
+    uint32_t    reserved;           // Reserved word
+};
+
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
 llvm::Function* GetEntryPoint(llvm::Module* pModule);
 
@@ -260,16 +270,5 @@ bool IsElfBinary(const void* pData, size_t dataSize);
 
 // Checks whether the output data is actually ISA assembler text
 bool IsIsaText(const void* pData, size_t dataSize);
-
-// =====================================================================================================================
-// Represents the special header of SPIR-V token stream (the first DWORD).
-struct SpirvHeader
-{
-    uint32_t    magicNumber;        // Magic number of SPIR-V module
-    uint32_t    spvVersion;         // SPIR-V version number
-    uint32_t    genMagicNumber;     // Generator's magic number
-    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
-    uint32_t    reserved;           // Reserved word
-};
 
 } // Llpc

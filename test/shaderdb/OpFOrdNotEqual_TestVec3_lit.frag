@@ -17,7 +17,6 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: fcmp one <3 x float>
-; SHADERTEST: icmp ne
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST-COUNT-3: fcmp one float
 ; SHADERTEST: AMDLLPC SUCCESS
