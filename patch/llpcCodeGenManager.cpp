@@ -190,6 +190,12 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-max-memory-clause", "1");
             }
 
+            auto gfxIp = pContext->GetGfxIpVersion();
+            if (gfxIp.major >= 9)
+            {
+                targetFeatures += ",+enable-scratch-bounds-checks";
+            }
+
             auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
             auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
             auto fp64Control = pContext->GetShaderFloatControl(shaderStage, 64);

@@ -1541,7 +1541,6 @@ Value* PatchBufferOp::ReplaceLoad(
             {
                 CoherentFlag coherent = {};
                 coherent.bits.glc = isGlc;
-
                 pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load,
                                                         pIntLoadType,
                                                         {
@@ -1555,7 +1554,6 @@ Value* PatchBufferOp::ReplaceLoad(
                 CoherentFlag coherent = {};
                 coherent.bits.glc = isGlc;
                 coherent.bits.slc = isSlc;
-
                 pPartLoad = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
                                                         pFloatLoadType,
                                                         {
