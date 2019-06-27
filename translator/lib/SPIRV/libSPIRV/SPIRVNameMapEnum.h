@@ -120,6 +120,7 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeOutputTriangleStrip, "OutputTriangleStrip");
   add(ExecutionModeVecTypeHint, "VecTypeHint");
   add(ExecutionModeContractionOff, "ContractionOff");
+  add(ExecutionModePostDepthCoverage, "PostDepthCoverage");
   add(ExecutionModeDenormPreserve, "DenormPreserve");
   add(ExecutionModeDenormFlushToZero, "DenormFlushToZero");
   add(ExecutionModeSignedZeroInfNanPreserve, "SignedZeroInfNanPreserve");
@@ -511,6 +512,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityGroupNonUniformShuffleRelative, "GroupNonUniformShuffleRelative");
   add(CapabilityGroupNonUniformClustered, "GroupNonUniformClustered");
   add(CapabilityGroupNonUniformQuad, "GroupNonUniformQuad");
+  add(CapabilitySampleMaskPostDepthCoverage, "SampleMaskPostDepthCoverage");
   add(CapabilityStorageBuffer8BitAccess, "StorageBuffer8BitAccess");
   add(CapabilityUniformAndStorageBuffer8BitAccess, "UniformAndStorageBuffer8BitAccess");
   add(CapabilityStoragePushConstant8, "StoragePushConstant8");

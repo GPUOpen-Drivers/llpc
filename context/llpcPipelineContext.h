@@ -334,11 +334,12 @@ struct ResourceUsage
                 uint32_t pixelCenterInteger   : 1;      // Whether "pixel_center_integer" qualifier is used
                 uint32_t earlyFragmentTests   : 1;      // Whether "early_fragment_tests" qualifier is used
                 uint32_t depthMode            : 2;      // Mode of gl_FragDepth
+                uint32_t postDepthCoverage    : 1;      // Whether "post_depth_coverage" qualifier is used
                 // Statements
                 uint32_t discard              : 1;      // Whether "discard" statement is used
                 uint32_t runAtSampleRate      : 1;      // Whether fragment shader run at sample rate
 
-                uint64_t unused               : 27;
+                uint64_t unused               : 26;
             } fs;
 
             // Compute shader

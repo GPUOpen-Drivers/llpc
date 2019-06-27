@@ -205,6 +205,7 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityGroupNonUniformShuffleRelative, { CapabilityGroupNonUniform });
   ADD_VEC_INIT(CapabilityGroupNonUniformClustered, { CapabilityGroupNonUniform });
   ADD_VEC_INIT(CapabilityGroupNonUniformQuad, { CapabilityGroupNonUniform });
+  ADD_VEC_INIT(CapabilitySampleMaskPostDepthCoverage, { CapabilityShader });
   ADD_VEC_INIT(CapabilityStorageBuffer8BitAccess, { CapabilityShader });
   ADD_VEC_INIT(CapabilityUniformAndStorageBuffer8BitAccess, { CapabilityStorageBuffer8BitAccess });
   ADD_VEC_INIT(CapabilityStoragePushConstant8, { CapabilityShader });
@@ -270,6 +271,7 @@ template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModeOutputTriangleStrip, {CapabilityGeometry});
   ADD_VEC_INIT(ExecutionModeVecTypeHint, {CapabilityKernel});
   ADD_VEC_INIT(ExecutionModeContractionOff, {CapabilityKernel});
+  ADD_VEC_INIT(ExecutionModePostDepthCoverage, {CapabilitySampleMaskPostDepthCoverage});
   ADD_VEC_INIT(ExecutionModeDenormPreserve, {CapabilityDenormPreserve});
   ADD_VEC_INIT(ExecutionModeDenormFlushToZero, {CapabilityDenormFlushToZero});
   ADD_VEC_INIT(ExecutionModeSignedZeroInfNanPreserve, {CapabilitySignedZeroInfNanPreserve});
