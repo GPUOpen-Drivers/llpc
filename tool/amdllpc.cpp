@@ -245,13 +245,16 @@ static Result Init(
         // which arguments are not option names.
         static const char* defaultOptions[] =
         {
-            // Name                     Option
-            "-gfxip",                   "-gfxip=8.0.0",
-            "-pragma-unroll-threshold", "-pragma-unroll-threshold=4096",
-            "-unroll-allow-partial",    "-unroll-allow-partial",
-            "-simplifycfg-sink-common", "-simplifycfg-sink-common=false",
-            "-amdgpu-vgpr-index-mode",  "-amdgpu-vgpr-index-mode",         // force VGPR indexing on GFX8
-            "-filetype",                "-filetype=obj",   // target = obj, ELF binary; target = asm, ISA assembly text
+            // Name                                Option
+            "-gfxip",                              "-gfxip=8.0.0",
+            "-unroll-max-percent-threshold-boost", "-unroll-max-percent-threshold-boost=1000",
+            "-unroll-threshold",                   "-unroll-threshold=700",
+            "-unroll-partial-threshold",           "-unroll-partial-threshold=700",
+            "-pragma-unroll-threshold",            "-pragma-unroll-threshold=1000",
+            "-unroll-allow-partial",               "-unroll-allow-partial",
+            "-simplifycfg-sink-common",            "-simplifycfg-sink-common=false",
+            "-amdgpu-vgpr-index-mode",             "-amdgpu-vgpr-index-mode",         // force VGPR indexing on GFX8
+            "-filetype",                           "-filetype=obj",   // target = obj, ELF binary; target = asm, ISA assembly text
         };
 
         // Build new arguments, starting with those supplied in command line
