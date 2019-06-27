@@ -270,7 +270,6 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createInstructionCombiningPass(expensiveCombines));
         passMgr.add(createIndVarSimplifyPass());
         passMgr.add(createLoopIdiomPass());
-        passMgr.add(CreatePatchLoopUnrollInfoRectify());
         passMgr.add(createLoopDeletionPass());
         passMgr.add(createSimpleLoopUnrollPass(optLevel));
         passMgr.add(CreatePatchPeepholeOpt());
@@ -333,11 +332,6 @@ void Patch::AddOptimizationPasses(
                 // running the scalarizer can be folded away before instruction combining tries to re-create them.
                 passMgr.add(createInstSimplifyLegacyPass());
             });
-        passBuilder.addExtension(PassManagerBuilder::EP_LateLoopOptimizations,
-                                 [](const PassManagerBuilder&, legacy::PassManagerBase& passMgr)
-                                 {
-                                     passMgr.add(CreatePatchLoopUnrollInfoRectify());
-                                 });
 
         passBuilder.populateModulePassManager(passMgr);
     }
