@@ -603,6 +603,7 @@ void SpirvLowerResourceCollect::CollectExecutionModeUsage()
                     m_pResUsage->builtInUsage.fs.originUpperLeft    = execModeMeta.fs.OriginUpperLeft;
                     m_pResUsage->builtInUsage.fs.pixelCenterInteger = execModeMeta.fs.PixelCenterInteger;
                     m_pResUsage->builtInUsage.fs.earlyFragmentTests = execModeMeta.fs.EarlyFragmentTests;
+                    m_pResUsage->builtInUsage.fs.postDepthCoverage  = execModeMeta.fs.PostDepthCoverage;
 
                     m_pResUsage->builtInUsage.fs.depthMode = DepthReplacing;
                     if (execModeMeta.fs.DepthReplacing)

@@ -7014,6 +7014,9 @@ bool SPIRVToLLVM::transKernelMetadata() {
         if (BF->getExecutionMode(ExecutionModeDepthReplacing))
           ExecModeMD.fs.DepthReplacing = true;
 
+        if (BF->getExecutionMode(ExecutionModePostDepthCoverage))
+          ExecModeMD.fs.PostDepthCoverage = true;
+
       } else if (ExecModel == ExecutionModelGLCompute) {
         // Set values of local sizes from execution model
         if (auto EM = BF->getExecutionMode(ExecutionModeLocalSize)) {

@@ -1380,7 +1380,8 @@ union ShaderExecModeMetadata {
         uint32_t DepthGreater             : 1;  // Layout "depth_greater"
         uint32_t DepthLess                : 1;  // Layout "depth_less"
         uint32_t DepthReplacing           : 1;  // Layout "depth_any"
-        uint32_t Unused                   : 25;
+        uint32_t PostDepthCoverage        : 1;  // Layout "post_depth_coverage"
+        uint32_t Unused                   : 24;
       } fs;
 
       struct {

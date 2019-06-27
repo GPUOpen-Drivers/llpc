@@ -142,6 +142,7 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeFinalizer:
   case ExecutionModeSubgroupSize:
   case ExecutionModeSubgroupsPerWorkgroup:
+  case ExecutionModePostDepthCoverage:
   case ExecutionModeDenormPreserve:
   case ExecutionModeDenormFlushToZero:
   case ExecutionModeSignedZeroInfNanPreserve:
@@ -601,6 +602,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityStorageInputOutput16:
   case CapabilityDeviceGroup:
   case CapabilityMultiView:
+  case CapabilitySampleMaskPostDepthCoverage:
   case CapabilityStorageBuffer8BitAccess:
   case CapabilityUniformAndStorageBuffer8BitAccess:
   case CapabilityStoragePushConstant8:
