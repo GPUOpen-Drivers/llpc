@@ -899,7 +899,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
 // explicitly laid out and may contain manually placed padding bytes after the column elements.
 template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    uint32_t         matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -930,6 +930,11 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 
         pColumnType = ArrayType::get(pElementType, columnCount);
         columnCount = pSpvColumnType->getVectorComponentCount();
+
+        if ((isColumnMajor == false) && (matrixStride == 0))
+        {
+            matrixStride = columnCount * (pElementType->getPrimitiveSizeInBits()/ 8);
+        }
     }
 
     const bool isPaddedMatrix = matrixStride > 0;
