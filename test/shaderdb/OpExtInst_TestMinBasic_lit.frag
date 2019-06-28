@@ -21,10 +21,10 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x i32> @_Z4sminDv4_iDv4_i(<4 x i32> %{{.*}}, <4 x i32> %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x i32> @_Z4uminDv4_iDv4_i(<4 x i32> %{{.*}}, <4 x i32> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, %{{.*}}
