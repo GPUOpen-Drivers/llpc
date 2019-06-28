@@ -30,8 +30,8 @@ void main()
 ; SHADERTEST: <3 x half> @_Z8FMax3AMDDv3_DhDv3_DhDv3_Dh(<3 x half> %{{[0-9]*}}, <3 x half> %{{[0-9]*}}, <3 x half> %{{[0-9]*}})
 ; SHADERTEST: <3 x half> @_Z8FMid3AMDDv3_DhDv3_DhDv3_Dh(<3 x half> %{{[0-9]*}}, <3 x half> %{{[0-9]*}}, <3 x half> %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-6: call half @llvm.minnum.f16(half %{{[0-9]*}}, half %{{[0-9]*}})
-; SHADERTEST-COUNT-6: call half @llvm.maxnum.f16(half %{{[0-9]*}}, half %{{[0-9]*}})
+; SHADERTEST-COUNT-6: call nnan half @llvm.minnum.f16(half %{{[0-9]*}}, half %{{[0-9]*}})
+; SHADERTEST-COUNT-6: call nnan half @llvm.maxnum.f16(half %{{[0-9]*}}, half %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

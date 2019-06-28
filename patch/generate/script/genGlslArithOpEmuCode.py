@@ -112,6 +112,15 @@ def genLlvmArithFunc(compCount, retType, funcName, genTypedArgs, intrinsic):
     compType = ret.getCompTyeStr()
     mangledName = getMangledName(funcName, argTypes)
 
+    fastMathFlags = ""
+    if intrinsic.startswith("llvm.maxnum.") or intrinsic.startswith("llvm.minnum."):
+        # GLSL FMax and FMin say it's undefined which operand is returned if
+        # either operand is a NaN. Adding the nnan flag allows the AMDGPU
+        # backend not to emit some canonicalization code, which would otherwise
+        # be required to ensure that llvm.maxnum and llvm.minnum behave
+        # correctly when one operand is a signalling NaN.
+        fastMathFlags = "nnan "
+
     func = "; " + operandType + " " + funcName + "()  =>  " + intrinsic + "\n"
     func += constructFuncHeader(ret, mangledName, args)
     func += "{" + LINE_END
@@ -127,7 +136,7 @@ def genLlvmArithFunc(compCount, retType, funcName, genTypedArgs, intrinsic):
         # Call LLVM instrinsic, do component-wise computation
         func += "    ; Call LLVM/LLPC instrinsic, do component-wise computation\n"
         for i in range(compCount):
-            func += "    %" + str(tmpVar) + " = call " + compType + " @" + intrinsic + "("
+            func += "    %" + str(tmpVar) + " = call " + fastMathFlags + compType + " @" + intrinsic + "("
             for j, arg in enumerate(zip(args, argTypes)):
                 if j > 0:
                     func += ", "
@@ -149,7 +158,7 @@ def genLlvmArithFunc(compCount, retType, funcName, genTypedArgs, intrinsic):
                         " %" + str(tmpVar) + ", " + compType + " %" + str(i + 1) + ", i32 " + str(i) + "\n"
                 tmpVar += 1
     else:
-        func += "    %" + str(tmpVar) + " = call " + compType + " @" + intrinsic + "("
+        func += "    %" + str(tmpVar) + " = call " + fastMathFlags + compType + " @" + intrinsic + "("
         for j, arg in enumerate(args):
             if j > 0:
                 func += ", "
