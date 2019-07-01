@@ -26,20 +26,20 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 0, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.SubpassData{{.*}}({{.*}},{{.*}}, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 1, i32 0, i1 false)
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.fmask.desc.v8i32(i32 0, i32 1, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
+; SHADERTEST: call {{.*}} @"llpc.call.get.fmask.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call <4 x float> @llpc.image.read.f32.SubpassData.sample.fmaskbased{{.*}}({{.*}},{{.*}},{{.*}}, i32 7, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 2, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 2
 ; SHADERTEST: call <4 x i32> @llpc.image.read.i32.SubpassData{{.*}}({{.*}},{{.*}}, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 3, i32 0, i1 false)
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.fmask.desc.v8i32(i32 0, i32 3, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 3
+; SHADERTEST: call {{.*}} @"llpc.call.get.fmask.desc.ptr{{.*}}(i32 0, i32 3
 ; SHADERTEST: call <4 x i32> @llpc.image.read.i32.SubpassData.sample.fmaskbased{{.*}}({{.*}},{{.*}},{{.*}}, i32 7, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 4, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 4
 ; SHADERTEST: call <4 x i32> @llpc.image.read.u32.SubpassData{{.*}}({{.*}},{{.*}}, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 5, i32 0, i1 false)
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.fmask.desc.v8i32(i32 0, i32 5, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 5
+; SHADERTEST: call {{.*}} @"llpc.call.get.fmask.desc.ptr{{.*}}(i32 0, i32 5
 ; SHADERTEST: call <4 x i32> @llpc.image.read.u32.SubpassData.sample.fmaskbased{{.*}}({{.*}},{{.*}},{{.*}}, i32 7, i32 0,{{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

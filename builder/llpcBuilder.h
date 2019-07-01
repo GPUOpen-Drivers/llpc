@@ -221,48 +221,82 @@ public:
         llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
-    // Get the type of pointer returned by CreateLoadSamplerDesc.
+    // Add index onto pointer to image/sampler/texelbuffer/fmask array of descriptors.
+    virtual llvm::Value* CreateIndexDescPtr(
+        llvm::Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
+                                                //    the CreateGet*DescPtr methods
+        llvm::Value*        pIndex,             // [in] Index value
+        bool                isNonUniform,       // Whether the descriptor index is non-uniform
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Load image/sampler/texelbuffer/fmask descriptor from pointer.
+    // Returns <8 x i32> descriptor for image or fmask, or <4 x i32> descriptor for sampler or texel buffer.
+    virtual llvm::Value* CreateLoadDescFromPtr(
+        llvm::Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDesc or one of
+                                                //    the CreateGet*DescPtr methods
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Get the type of an image descriptor.
+    llvm::VectorType* GetImageDescTy();
+
+    // Get the type of an fmask descriptor.
+    llvm::VectorType* GetFmaskDescTy();
+
+    // Get the type of a sampler descriptor.
     llvm::VectorType* GetSamplerDescTy();
 
-    // Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
-    virtual llvm::Value* CreateLoadSamplerDesc(
-        uint32_t            descSet,          // Descriptor set
-        uint32_t            binding,          // Descriptor binding
-        llvm::Value*        pDescIndex,       // [in] Descriptor index
-        bool                isNonUniform,     // Whether the descriptor index is non-uniform
-        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
-    ) = 0;
-
-    // Get the type of pointer returned by CreateLoadResourceDesc and CreateLoadFmaskDesc.
-    llvm::VectorType* GetResourceDescTy();
-
-    // Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
-    virtual llvm::Value* CreateLoadResourceDesc(
-        uint32_t            descSet,          // Descriptor set
-        uint32_t            binding,          // Descriptor binding
-        llvm::Value*        pDescIndex,       // [in] Descriptor index
-        bool                isNonUniform,     // Whether the descriptor index is non-uniform
-        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
-    ) = 0;
-
-    // Get the type of pointer returned by CreateLoadTexelBufferDesc.
+    // Get the type of a texel buffer descriptor.
     llvm::VectorType* GetTexelBufferDescTy();
 
-    // Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
-    virtual llvm::Value* CreateLoadTexelBufferDesc(
+    // Get the type of pointer to image or fmask descriptor, as returned by CreateGetImageDescPtr.
+    // The type is in fact a struct containing the actual pointer plus a stride in dwords.
+    // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
+    // set up the stride, and CreateIndexDescPtr will use it.
+    llvm::Type* GetImageDescPtrTy();
+
+    // Get the type of pointer to fmask descriptor, as returned by CreateGetFmaskDescPtr.
+    // The type is in fact a struct containing the actual pointer plus a stride in dwords.
+    // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
+    // set up the stride, and CreateIndexDescPtr will use it.
+    llvm::Type* GetFmaskDescPtrTy();
+
+    // Get the type of pointer to texel buffer descriptor, as returned by CreateGetTexelBufferDescPtr.
+    // The type is in fact a struct containing the actual pointer plus a stride in dwords.
+    // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
+    // set up the stride, and CreateIndexDescPtr will use it.
+    llvm::Type* GetTexelBufferDescPtrTy();
+
+    // Get the type of pointer to sampler descriptor, as returned by CreateGetSamplerDescPtr.
+    // The type is in fact a struct containing the actual pointer plus a stride in dwords.
+    // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
+    // set up the stride, and CreateIndexDescPtr will use it.
+    llvm::Type* GetSamplerDescPtrTy();
+
+    // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+    virtual llvm::Value* CreateGetSamplerDescPtr(
         uint32_t            descSet,          // Descriptor set
         uint32_t            binding,          // Descriptor binding
-        llvm::Value*        pDescIndex,       // [in] Descriptor index
-        bool                isNonUniform,     // Whether the descriptor index is non-uniform
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
-    // Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
-    virtual llvm::Value* CreateLoadFmaskDesc(
+    // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+    virtual llvm::Value* CreateGetImageDescPtr(
         uint32_t            descSet,          // Descriptor set
         uint32_t            binding,          // Descriptor binding
-        llvm::Value*        pDescIndex,       // [in] Descriptor index
-        bool                isNonUniform,     // Whether the descriptor index is non-uniform
+        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    ) = 0;
+
+    // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+    virtual llvm::Value* CreateGetTexelBufferDescPtr(
+        uint32_t            descSet,          // Descriptor set
+        uint32_t            binding,          // Descriptor binding
+        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    ) = 0;
+
+    // Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+    virtual llvm::Value* CreateGetFmaskDescPtr(
+        uint32_t            descSet,          // Descriptor set
+        uint32_t            binding,          // Descriptor binding
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 

@@ -17,8 +17,8 @@ void main()
 ; SHADERTEST: <4 x float> @spirv.image.sample.f32.1DArray({{.*}}, <2 x float> <float 1.000000e+00, float 2.000000e+00>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <4 x i32>{{.*}}@llpc.call.load.sampler.desc.v4i32
-; SHADERTEST: call <8 x i32>{{.*}}@llpc.call.load.resource.desc.v8i32
+; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr
 ; SHADERTEST: call <4 x float> @llpc.image.sample.f32.1DArray{{.*}}({{.*}}, <2 x float> <float 1.000000e+00, float 2.000000e+00>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results

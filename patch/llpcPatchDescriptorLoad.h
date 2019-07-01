@@ -67,6 +67,14 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchDescriptorLoad);
 
+    void ProcessLoadDescFromPtr(llvm::CallInst* pLoadFromPtr);
+
+    llvm::Value* LoadDescriptor(llvm::CallInst&     callInst,
+                                uint32_t            descSet,
+                                uint32_t            binding,
+                                llvm::Value*        pArrayOffset,
+                                llvm::Instruction*  pInsertPoint);
+
     ResourceMappingNodeType CalcDescriptorOffsetAndSize(ResourceMappingNodeType   nodeType1,
                                                         ResourceMappingNodeType   nodeType2,
                                                         uint32_t                  descSet,
@@ -91,7 +99,7 @@ private:
 
     bool                                m_changed;            // Whether the pass has modified the code
     PipelineSystemValues                m_pipelineSysValues;  // Cache of ShaderValues object per shader
-    std::vector<llvm::CallInst*>        m_descLoadCalls;      // List of "call" instructions to load descriptors
+    std::vector<llvm::CallInst*>        m_descLoadCalls;      // List of instructions to load descriptors
     std::unordered_set<llvm::Function*> m_descLoadFuncs;      // Set of descriptor load functions
 
     // Map from descriptor range value to global variables modeling related descriptors (act as immediate constants)
