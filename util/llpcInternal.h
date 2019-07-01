@@ -124,13 +124,16 @@ namespace LlpcName
     const static char StreamOutBufferStore[]          = "llpc.streamoutbuffer.store";
 
     const static char DescriptorCallPrefix[]          = "llpc.descriptor.";
+    const static char DescriptorIndex[]               = "llpc.descriptor.index";
+    const static char DescriptorLoadFromPtr[]         = "llpc.descriptor.load.from.ptr";
     const static char DescriptorLoadPrefix[]          = "llpc.descriptor.load.";
-    const static char DescriptorLoadResource[]        = "llpc.descriptor.load.resource";
-    const static char DescriptorLoadSampler[]         = "llpc.descriptor.load.sampler";
-    const static char DescriptorLoadFmask[]           = "llpc.descriptor.load.fmask";
+    const static char DescriptorGetPtrPrefix[]        = "llpc.descriptor.get.";
+    const static char DescriptorGetResourcePtr[]      = "llpc.descriptor.get.resource.ptr";
+    const static char DescriptorGetSamplerPtr[]       = "llpc.descriptor.get.sampler.ptr";
+    const static char DescriptorGetFmaskPtr[]         = "llpc.descriptor.get.fmask.ptr";
     const static char DescriptorLoadBuffer[]          = "llpc.descriptor.load.buffer";
     const static char DescriptorLoadAddress[]         = "llpc.descriptor.load.address";
-    const static char DescriptorLoadTexelBuffer[]     = "llpc.descriptor.load.texelbuffer";
+    const static char DescriptorGetTexelBufferPtr[]   = "llpc.descriptor.get.texelbuffer.ptr";
     const static char DescriptorLoadSpillTable[]      = "llpc.descriptor.load.spilltable";
 
     const static char LaterCallPrefix[]               = "llpc.late.";

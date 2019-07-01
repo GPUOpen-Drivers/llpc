@@ -49,14 +49,18 @@ StringRef BuilderRecorder::GetCallName(
         return "nop";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
-    case Opcode::LoadSamplerDesc:
-        return "load.sampler.desc";
-    case Opcode::LoadResourceDesc:
-        return "load.resource.desc";
-    case Opcode::LoadTexelBufferDesc:
-        return "load.texel.buffer.desc";
-    case Opcode::LoadFmaskDesc:
-        return "load.fmask.desc";
+    case Opcode::IndexDescPtr:
+        return "index.desc.ptr";
+    case Opcode::LoadDescFromPtr:
+        return "load.desc.from.ptr";
+    case Opcode::GetSamplerDescPtr:
+        return "get.sampler.desc.ptr";
+    case Opcode::GetImageDescPtr:
+        return "get.image.desc.ptr";
+    case Opcode::GetTexelBufferDescPtr:
+        return "get.texel.buffer.desc.ptr";
+    case Opcode::GetFmaskDescPtr:
+        return "get.fmask.desc.ptr";
     case Opcode::LoadPushConstantsPtr:
         return "load.push.constants.ptr";
     case Opcode::GetBufferDescLength:
@@ -286,83 +290,72 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
 }
 
 // =====================================================================================================================
-// Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadSamplerDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    const Twine&  instName)         // [in] Name to give instruction(s)
+// Add index onto pointer to image/sampler/texelbuffer/fmask array of descriptors.
+Value* BuilderRecorder::CreateIndexDescPtr(
+    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
+                                      //    the CreateGet*DescPtr methods
+    Value*        pIndex,             // [in] Index value
+    bool          isNonUniform,       // Whether the descriptor index is non-uniform
+    const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    return Record(Opcode::LoadSamplerDesc,
-                  GetSamplerDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
+    return Record(Opcode::IndexDescPtr, pDescPtr->getType(), { pDescPtr, pIndex, getInt1(isNonUniform) }, instName);
+}
+
+// =====================================================================================================================
+// Load image/sampler/texelbuffer/fmask descriptor from pointer.
+// Returns <8 x i32> descriptor for image or fmask, or <4 x i32> descriptor for sampler or texel buffer. 
+Value* BuilderRecorder::CreateLoadDescFromPtr(
+    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
+                                      //    the CreateGet*DescPtr methods
+    const Twine&  instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::LoadDescFromPtr,
+                  cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
+                  pDescPtr,
                   instName);
 }
 
 // =====================================================================================================================
-// Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadResourceDesc(
+// Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+Value* BuilderRecorder::CreateGetSamplerDescPtr(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::LoadResourceDesc,
-                  GetResourceDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
+    return Record(Opcode::GetSamplerDescPtr, GetSamplerDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
+}
+
+// =====================================================================================================================
+// Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+Value* BuilderRecorder::CreateGetImageDescPtr(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::GetImageDescPtr, GetImageDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
+}
+
+// =====================================================================================================================
+// Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+Value* BuilderRecorder::CreateGetTexelBufferDescPtr(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::GetTexelBufferDescPtr,
+                  GetTexelBufferDescPtrTy(),
+                  { getInt32(descSet), getInt32(binding) },
                   instName);
 }
 
 // =====================================================================================================================
-// Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadTexelBufferDesc(
+// Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+Value* BuilderRecorder::CreateGetFmaskDescPtr(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::LoadTexelBufferDesc,
-                  GetTexelBufferDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
-                  instName);
-}
-
-// =====================================================================================================================
-// Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadFmaskDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    const Twine&  instName)         // [in] Name to give instruction(s)
-{
-    return Record(Opcode::LoadFmaskDesc,
-                  GetResourceDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
-                  instName);
+    return Record(Opcode::GetFmaskDescPtr, GetFmaskDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
 }
 
 // =====================================================================================================================

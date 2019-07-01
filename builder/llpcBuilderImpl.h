@@ -82,33 +82,36 @@ public:
                                       llvm::Type*         pPointeeTy,
                                       const llvm::Twine&  instName) override final;
 
-    // Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
-    llvm::Value* CreateLoadSamplerDesc(uint32_t            descSet,
-                                       uint32_t            binding,
-                                       llvm::Value*        pDescIndex,
-                                       bool                isNonUniform,
+    // Add index onto pointer to image/sampler/texelbuffer/fmask array of descriptors.
+    llvm::Value* CreateIndexDescPtr(llvm::Value*        pDescPtr,
+                                    llvm::Value*        pIndex,
+                                    bool                isNonUniform,
+                                    const llvm::Twine&  instName) override final;
+
+    // Load image/sampler/texelbuffer/fmask descriptor from pointer.
+    llvm::Value* CreateLoadDescFromPtr(llvm::Value*        pDescPtr,
                                        const llvm::Twine&  instName) override final;
 
-    // Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
-    llvm::Value* CreateLoadResourceDesc(uint32_t            descSet,
-                                        uint32_t            binding,
-                                        llvm::Value*        pDescIndex,
-                                        bool                isNonUniform,
-                                        const llvm::Twine&  instName) override final;
 
-    // Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
-    llvm::Value* CreateLoadTexelBufferDesc(uint32_t            descSet,
-                                           uint32_t            binding,
-                                           llvm::Value*        pDescIndex,
-                                           bool                isNonUniform,
-                                           const llvm::Twine&  instName) override final;
+    // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+    llvm::Value* CreateGetSamplerDescPtr(uint32_t            descSet,
+                                         uint32_t            binding,
+                                         const llvm::Twine&  instName) override final;
 
-    // Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
-    llvm::Value* CreateLoadFmaskDesc(uint32_t            descSet,
-                                     uint32_t            binding,
-                                     llvm::Value*        pDescIndex,
-                                     bool                isNonUniform,
-                                     const llvm::Twine&  instName) override final;
+    // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+    llvm::Value* CreateGetImageDescPtr(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       const llvm::Twine&  instName) override final;
+
+    // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+    llvm::Value* CreateGetTexelBufferDescPtr(uint32_t            descSet,
+                                             uint32_t            binding,
+                                             const llvm::Twine&  instName) override final;
+
+    // Create a pointer to fmask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+    llvm::Value* CreateGetFmaskDescPtr(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       const llvm::Twine&  instName) override final;
 
     // Create a load of the push constants pointer.
     llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,

@@ -793,47 +793,33 @@ llvm::Value* SpirvLowerImageOp::LoadImageDescriptor(
         bool isNonUniform = IsNonUniformValue(pArrayIndex, checkedValues);
 
         m_pBuilder->SetInsertPoint(cast<Instruction>(pLoadInst));
+        uint32_t descSet = pDescSet->getZExtValue();
+        uint32_t binding = pBinding->getZExtValue();
 
         switch (descType)
         {
         case ResourceMappingNodeType::DescriptorSampler:
             {
                 pImageCallMeta->NonUniformSampler = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadSamplerDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
+                pDesc = m_pBuilder->CreateGetSamplerDescPtr(descSet, binding);
                 break;
             }
         case ResourceMappingNodeType::DescriptorResource:
             {
                 pImageCallMeta->NonUniformResource = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadResourceDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
+                pDesc = m_pBuilder->CreateGetImageDescPtr(descSet, binding);
                 break;
             }
         case ResourceMappingNodeType::DescriptorTexelBuffer:
             {
                 pImageCallMeta->NonUniformResource = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadTexelBufferDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
+                pDesc = m_pBuilder->CreateGetTexelBufferDescPtr(descSet, binding);
                 break;
             }
         case ResourceMappingNodeType::DescriptorFmask:
             {
                 pImageCallMeta->NonUniformResource = isNonUniform ? 1 : 0;
-                pDesc = m_pBuilder->CreateLoadFmaskDesc(
-                    pDescSet->getZExtValue(),
-                    pBinding->getZExtValue(),
-                    pArrayIndex,
-                    isNonUniform);
+                pDesc = m_pBuilder->CreateGetFmaskDescPtr(descSet, binding);
                 break;
             }
         default:
@@ -841,6 +827,9 @@ llvm::Value* SpirvLowerImageOp::LoadImageDescriptor(
                 break;
             }
         }
+
+        pDesc = m_pBuilder->CreateIndexDescPtr(pDesc, pArrayIndex, isNonUniform);
+        pDesc = m_pBuilder->CreateLoadDescFromPtr(pDesc);
     }
     else
     {

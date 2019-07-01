@@ -201,10 +201,10 @@ void PatchResourceCollect::visitCallInst(
         }
     }
     else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer) ||
-             mangledName.startswith(LlpcName::DescriptorLoadTexelBuffer) ||
-             mangledName.startswith(LlpcName::DescriptorLoadResource) ||
-             mangledName.startswith(LlpcName::DescriptorLoadFmask) ||
-             mangledName.startswith(LlpcName::DescriptorLoadSampler))
+             mangledName.startswith(LlpcName::DescriptorGetTexelBufferPtr) ||
+             mangledName.startswith(LlpcName::DescriptorGetResourcePtr) ||
+             mangledName.startswith(LlpcName::DescriptorGetFmaskPtr) ||
+             mangledName.startswith(LlpcName::DescriptorGetSamplerPtr))
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();

@@ -55,27 +55,20 @@ Instruction* BuilderImplDesc::CreateWaterfallLoop(
     for (uint32_t operandIdx : operandIdxs)
     {
         Value* pNonUniformVal = pNonUniformInst->getOperand(operandIdx);
-        for (;;)
+        if (auto pCall = dyn_cast<CallInst>(pNonUniformVal))
         {
-            if (auto pGetElemPtr = dyn_cast<GetElementPtrInst>(pNonUniformVal))
+            if (auto pCalledFunc = pCall->getCalledFunction())
             {
-                pNonUniformVal = pGetElemPtr->getPointerOperand();
-                continue;
-            }
-
-            if (auto pCall = dyn_cast<CallInst>(pNonUniformVal))
-            {
-                if (auto pCalledFunc = pCall->getCalledFunction())
+                if (pCalledFunc->getName().startswith(LlpcName::DescriptorLoadFromPtr))
                 {
-                    if (pCalledFunc->getName().startswith(LlpcName::DescriptorLoadPrefix))
+                    pCall = dyn_cast<CallInst>(pCall->getArgOperand(0)); // The descriptor pointer
+                    if ((pCall != nullptr) &&
+                        pCall->getCalledFunction()->getName().startswith(LlpcName::DescriptorIndex))
                     {
-                        pNonUniformVal = pCall->getArgOperand(2); // The index operand.
-                        break;
+                        pNonUniformVal = pCall->getArgOperand(1); // The index operand
                     }
                 }
             }
-
-            break;
         }
         nonUniformIndices.push_back(pNonUniformVal);
     }
@@ -200,9 +193,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
     pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
 
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
-    // look up the descSet/binding and generate the code directly. Note that we always set isNonUniform here
-    // to false because nothing now uses it in patching. Waterfall code is now added by lowering calling
-    // Builder::CreateWaterfallLoop.
+    // look up the descSet/binding and generate the code directly.
     auto pBufDescLoadCall = EmitCall(pInsertPos->getModule(),
                                      LlpcName::DescriptorLoadBuffer,
                                      VectorType::get(getInt32Ty(), 4),
@@ -210,7 +201,6 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
                                          getInt32(descSet),
                                          getInt32(binding),
                                          pDescIndex,
-                                         getInt1(false), // isNonUniform
                                      },
                                      NoAttrib,
                                      pInsertPos);
@@ -227,119 +217,139 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
 }
 
 // =====================================================================================================================
-// Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
-Value* BuilderImplDesc::CreateLoadSamplerDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    const Twine&  instName)         // [in] Name to give instruction(s)
+// Add index onto pointer to image/sampler/texelbuffer/fmask array of descriptors.
+Value* BuilderImplDesc::CreateIndexDescPtr(
+    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
+                                      //    the CreateGet*DescPtr methods
+    Value*        pIndex,             // [in] Index value
+    bool          isNonUniform,       // Whether the descriptor index is non-uniform
+    const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    Instruction* pInsertPos = &*GetInsertPoint();
-    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
-
-    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
-    // look up the descSet/binding and generate the code directly.
-    auto pSamplerDescLoadCall = EmitCall(pInsertPos->getModule(),
-                                         LlpcName::DescriptorLoadSampler,
-                                         GetSamplerDescTy(),
-                                         {
-                                             getInt32(descSet),
-                                             getInt32(binding),
-                                             pDescIndex,
-                                             getInt1(false), // isNonUniform
-                                         },
-                                         NoAttrib,
-                                         pInsertPos);
-    pSamplerDescLoadCall->setName(instName);
-    return pSamplerDescLoadCall;
+    if (pIndex != getInt32(0))
+    {
+        pIndex = ScalarizeIfUniform(pIndex, isNonUniform);
+        std::string name = LlpcName::DescriptorIndex;
+        AddTypeMangling(pDescPtr->getType(), {}, name);
+        pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
+                            name,
+                            pDescPtr->getType(),
+                            {
+                                pDescPtr,
+                                pIndex,
+                            },
+                            NoAttrib,
+                            &*GetInsertPoint());
+        pDescPtr->setName(instName);
+    }
+    return pDescPtr;
 }
 
 // =====================================================================================================================
-// Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
-Value* BuilderImplDesc::CreateLoadResourceDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    const Twine&  instName)         // [in] Name to give instruction(s)
+// Load image/sampler/texelbuffer/fmask descriptor from pointer.
+// Returns <8 x i32> descriptor for image or fmask, or <4 x i32> descriptor for sampler or texel buffer.
+Value* BuilderImplDesc::CreateLoadDescFromPtr(
+    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
+                                      //    the CreateGet*DescPtr methods
+    const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    Instruction* pInsertPos = &*GetInsertPoint();
-    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
-
-    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
-    // look up the descSet/binding and generate the code directly.
-    auto pResDescLoadCall = EmitCall(pInsertPos->getModule(),
-                                     LlpcName::DescriptorLoadResource,
-                                     GetResourceDescTy(),
-                                     {
-                                         getInt32(descSet),
-                                         getInt32(binding),
-                                         pDescIndex,
-                                         getInt1(false), // isNonUniform
-                                     },
-                                     NoAttrib,
-                                     pInsertPos);
-    pResDescLoadCall->setName(instName);
-    return pResDescLoadCall;
+    std::string name = LlpcName::DescriptorLoadFromPtr;
+    AddTypeMangling(pDescPtr->getType(), {}, name);
+    auto pDesc = EmitCall(GetInsertBlock()->getParent()->getParent(),
+                          name,
+                          cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
+                          pDescPtr,
+                          NoAttrib,
+                          &*GetInsertPoint());
+    pDesc->setName(instName);
+    return pDesc;
 }
 
 // =====================================================================================================================
-// Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
-Value* BuilderImplDesc::CreateLoadTexelBufferDesc(
+// Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+Value* BuilderImplDesc::CreateGetSamplerDescPtr(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    Instruction* pInsertPos = &*GetInsertPoint();
-    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
-
-    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
+    // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pTexelBufDescLoadCall = EmitCall(pInsertPos->getModule(),
-                                          LlpcName::DescriptorLoadTexelBuffer,
-                                          VectorType::get(getInt32Ty(), 4),
-                                          {
-                                              getInt32(descSet),
-                                              getInt32(binding),
-                                              pDescIndex,
-                                              getInt1(false), // isNonUniform
-                                          },
-                                          NoAttrib,
-                                          pInsertPos);
-    pTexelBufDescLoadCall->setName(instName);
-    return pTexelBufDescLoadCall;
+    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
+                             LlpcName::DescriptorGetSamplerPtr,
+                             GetSamplerDescPtrTy(),
+                             {
+                                 getInt32(descSet),
+                                 getInt32(binding),
+                             },
+                             NoAttrib,
+                             &*GetInsertPoint());
+    pDescPtr->setName(instName);
+    return pDescPtr;
 }
 
 // =====================================================================================================================
-// Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
-Value* BuilderImplDesc::CreateLoadFmaskDesc(
+// Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+Value* BuilderImplDesc::CreateGetImageDescPtr(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    Instruction* pInsertPos = &*GetInsertPoint();
-    pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
-
-    // This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
+    // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pFmaskDescLoadCall = EmitCall(pInsertPos->getModule(),
-                                       LlpcName::DescriptorLoadFmask,
-                                       VectorType::get(getInt32Ty(), 8),
-                                       {
-                                           getInt32(descSet),
-                                           getInt32(binding),
-                                           pDescIndex,
-                                           getInt1(false), // isNonUniform
-                                       },
-                                       NoAttrib,
-                                       pInsertPos);
-    pFmaskDescLoadCall->setName(instName);
-    return pFmaskDescLoadCall;
+    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
+                             LlpcName::DescriptorGetResourcePtr,
+                             GetImageDescPtrTy(),
+                             {
+                                 getInt32(descSet),
+                                 getInt32(binding),
+                             },
+                             NoAttrib,
+                             &*GetInsertPoint());
+    pDescPtr->setName(instName);
+    return pDescPtr;
+}
+
+// =====================================================================================================================
+// Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
+    // look up the descSet/binding and generate the code directly.
+    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
+                             LlpcName::DescriptorGetTexelBufferPtr,
+                             GetTexelBufferDescPtrTy(),
+                             {
+                                 getInt32(descSet),
+                                 getInt32(binding),
+                             },
+                             NoAttrib,
+                             &*GetInsertPoint());
+    pDescPtr->setName(instName);
+    return pDescPtr;
+}
+
+// =====================================================================================================================
+// Create a pointer to F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+Value* BuilderImplDesc::CreateGetFmaskDescPtr(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
+    // look up the descSet/binding and generate the code directly.
+    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
+                             LlpcName::DescriptorGetFmaskPtr,
+                             GetFmaskDescPtrTy(),
+                             {
+                                 getInt32(descSet),
+                                 getInt32(binding),
+                             },
+                             NoAttrib,
+                             &*GetInsertPoint());
+    pDescPtr->setName(instName);
+    return pDescPtr;
 }
 
 // =====================================================================================================================
@@ -398,3 +408,4 @@ Value* BuilderImplDesc::CreateGetBufferDescLength(
                     Attribute::ReadNone,
                     pInsertPos);
 }
+

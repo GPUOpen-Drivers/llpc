@@ -357,23 +357,62 @@ PointerType* Builder::GetBufferDescTy(
 }
 
 // =====================================================================================================================
-// Get the type returned by CreateLoadResourceDesc.
-VectorType* Builder::GetResourceDescTy()
+// Get the type of an image descriptor
+VectorType* Builder::GetImageDescTy()
 {
     return VectorType::get(getInt32Ty(), 8);
 }
 
 // =====================================================================================================================
-// Get the type returned by CreateLoadTexelBufferDesc.
+// Get the type of an fmask descriptor
+VectorType* Builder::GetFmaskDescTy()
+{
+    return VectorType::get(getInt32Ty(), 8);
+}
+
+// =====================================================================================================================
+// Get the type of a texel buffer descriptor
 VectorType* Builder::GetTexelBufferDescTy()
 {
     return VectorType::get(getInt32Ty(), 4);
 }
 
 // =====================================================================================================================
-// Get the type returned by CreateLoadSamplerDesc.
+// Get the type of a sampler descriptor
 VectorType* Builder::GetSamplerDescTy()
 {
     return VectorType::get(getInt32Ty(), 4);
+}
+
+// =====================================================================================================================
+// Get the type of pointer to image descriptor.
+// This is in fact a struct containing the pointer itself plus the stride in dwords.
+Type* Builder::GetImageDescPtrTy()
+{
+    return StructType::get(getContext(), { PointerType::get(GetImageDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+}
+
+// =====================================================================================================================
+// Get the type of pointer to fmask descriptor.
+// This is in fact a struct containing the pointer itself plus the stride in dwords.
+Type* Builder::GetFmaskDescPtrTy()
+{
+    return StructType::get(getContext(), { PointerType::get(GetFmaskDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+}
+
+// =====================================================================================================================
+// Get the type of pointer to texel buffer descriptor.
+// This is in fact a struct containing the pointer itself plus the stride in dwords.
+Type* Builder::GetTexelBufferDescPtrTy()
+{
+    return StructType::get(getContext(), { PointerType::get(GetTexelBufferDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
+}
+
+// =====================================================================================================================
+// Get the type of pointer to sampler descriptor.
+// This is in fact a struct containing the pointer itself plus the stride in dwords.
+Type* Builder::GetSamplerDescPtrTy()
+{
+    return StructType::get(getContext(), { PointerType::get(GetSamplerDescTy(), ADDR_SPACE_CONST), getInt32Ty() });
 }
 

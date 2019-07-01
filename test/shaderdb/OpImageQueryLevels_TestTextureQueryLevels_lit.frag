@@ -26,13 +26,13 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 0, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call i32 @llpc.image.querynonlod.levels.1D{{.*}}({{.*}},{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 1, i32 0,{{.*}}, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 1, i32 0
 ; SHADERTEST: call i32 @llpc.image.querynonlod.levels.2D{{.*}}({{.*}},{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 1, i32 0, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call i32 @llpc.image.querynonlod.levels.2D{{.*}}({{.*}},{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 2, i32 0,{{.*}}, i1 false)
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 2, i32 0
 ; SHADERTEST: call i32 @llpc.image.querynonlod.levels.CubeArray{{.*}}({{.*}},{{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

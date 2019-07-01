@@ -69,10 +69,12 @@ public:
         WaterfallLoop,
         WaterfallStoreLoop,
         LoadBufferDesc,
-        LoadSamplerDesc,
-        LoadResourceDesc,
-        LoadTexelBufferDesc,
-        LoadFmaskDesc,
+        IndexDescPtr,
+        LoadDescFromPtr,
+        GetSamplerDescPtr,
+        GetImageDescPtr,
+        GetTexelBufferDescPtr,
+        GetFmaskDescPtr,
         LoadPushConstantsPtr,
         GetBufferDescLength,
 
@@ -148,29 +150,29 @@ public:
                                       llvm::Type*         pPointeeTy,
                                       const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadSamplerDesc(uint32_t            descSet,
-                                       uint32_t            binding,
-                                       llvm::Value*        pDescIndex,
-                                       bool                isNonUniform,
+    llvm::Value* CreateIndexDescPtr(llvm::Value*        pDescPtr,
+                                    llvm::Value*        pIndex,
+                                    bool                isNonUniform,
+                                    const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadDescFromPtr(llvm::Value*        pDescPtr,
                                        const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadResourceDesc(uint32_t            descSet,
-                                        uint32_t            binding,
-                                        llvm::Value*        pDescIndex,
-                                        bool                isNonUniform,
-                                        const llvm::Twine&  instName) override final;
+    llvm::Value* CreateGetSamplerDescPtr(uint32_t            descSet,
+                                         uint32_t            binding,
+                                         const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadTexelBufferDesc(uint32_t            descSet,
-                                           uint32_t            binding,
-                                           llvm::Value*        pDescIndex,
-                                           bool                isNonUniform,
-                                           const llvm::Twine&  instName) override final;
+    llvm::Value* CreateGetImageDescPtr(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadFmaskDesc(uint32_t            descSet,
-                                     uint32_t            binding,
-                                     llvm::Value*        pDescIndex,
-                                     bool                isNonUniform,
-                                     const llvm::Twine&  instName) override final;
+    llvm::Value* CreateGetTexelBufferDescPtr(uint32_t            descSet,
+                                             uint32_t            binding,
+                                             const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateGetFmaskDescPtr(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       const llvm::Twine&  instName) override final;
 
     llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,
                                             const llvm::Twine&  instName) override final;

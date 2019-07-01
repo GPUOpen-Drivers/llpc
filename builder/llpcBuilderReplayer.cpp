@@ -318,40 +318,40 @@ Value* BuilderReplayer::ProcessCall(
                       nullptr);                                // pPointeeTy
         }
 
-    case BuilderRecorder::Opcode::LoadSamplerDesc:
+    case BuilderRecorder::Opcode::IndexDescPtr:
         {
-            return m_pBuilder->CreateLoadSamplerDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateIndexDescPtr(args[0],                                      // pDescPtr
+                                                  args[1],                                      // pIndex
+                                                  cast<ConstantInt>(args[2])->getZExtValue());  // isNonUniform
         }
 
-    case BuilderRecorder::Opcode::LoadResourceDesc:
+    case BuilderRecorder::Opcode::LoadDescFromPtr:
         {
-            return m_pBuilder->CreateLoadResourceDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateLoadDescFromPtr(args[0]);
         }
 
-    case BuilderRecorder::Opcode::LoadTexelBufferDesc:
+    case BuilderRecorder::Opcode::GetSamplerDescPtr:
         {
-            return m_pBuilder->CreateLoadTexelBufferDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateGetSamplerDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                       cast<ConstantInt>(args[1])->getZExtValue());  // binding
         }
 
-    case BuilderRecorder::Opcode::LoadFmaskDesc:
+    case BuilderRecorder::Opcode::GetImageDescPtr:
         {
-            return m_pBuilder->CreateLoadFmaskDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateGetImageDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                     cast<ConstantInt>(args[1])->getZExtValue());  // binding
+        }
+
+    case BuilderRecorder::Opcode::GetFmaskDescPtr:
+        {
+            return m_pBuilder->CreateGetFmaskDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                     cast<ConstantInt>(args[1])->getZExtValue());  // binding
+        }
+
+    case BuilderRecorder::Opcode::GetTexelBufferDescPtr:
+        {
+            return m_pBuilder->CreateGetTexelBufferDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                           cast<ConstantInt>(args[1])->getZExtValue());  // binding
         }
 
     case BuilderRecorder::Opcode::LoadPushConstantsPtr:
