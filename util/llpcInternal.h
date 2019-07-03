@@ -253,6 +253,9 @@ bool IsLlvmBitcode(const BinaryData*  pShaderBin);
 // Gets the shader stage mask from the SPIR-V binary according to the specified entry-point.
 uint32_t GetStageMaskFromSpirvBinary(const BinaryData* pSpvBin, const char* pEntryName);
 
+// Gets the entry-point name from the SPIR-V binary
+const char* GetEntryPointNameFromSpirvBinary(const BinaryData* pSpvBin);
+
 // Verifies if the SPIR-V binary is valid and is supported
 Result VerifySpirvBinary(const BinaryData* pSpvBin);
 
