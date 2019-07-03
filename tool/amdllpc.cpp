@@ -128,7 +128,7 @@ static cl::opt<bool>        Validate("val", cl::desc("Validate input SPIR-V bina
 static cl::opt<std::string> EntryTarget("entry-target",
                                         cl::desc("Name string of entry target"),
                                         cl::value_desc("entryname"),
-                                        cl::init("main"));
+                                        cl::init(""));
 
 // -ignore-color-attachment-formats: ignore color attachment formats
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
@@ -1185,7 +1185,14 @@ static Result ProcessPipeline(
 
             if (result == Result::Success)
             {
+                // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
+                if (EntryTarget.empty())
+                {
+                    EntryTarget.setValue(GetEntryPointNameFromSpirvBinary(&spvBin));
+                }
+
                 uint32_t stageMask = GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
+
                 if ((stageMask & compileInfo.stageMask) != 0)
                 {
                     break;
@@ -1204,6 +1211,7 @@ static Result ProcessPipeline(
                 }
                 else
                 {
+                    LLPC_ERRS(format("Fails to identify shader stages by entry-point \"%s\"\n", EntryTarget.c_str()));
                     result = Result::ErrorUnavailable;
                 }
             }
@@ -1361,6 +1369,13 @@ static Result ProcessPipeline(
         else
         {
             // GLSL source text
+
+            // NOTE: If the entry target is not specified, we set it to GLSL default ("main").
+            if (EntryTarget.empty())
+            {
+                EntryTarget.setValue("main");
+            }
+
             ShaderStage stage = ShaderStageInvalid;
             result = CompileGlsl(inFile, &stage, spvBinFile);
             if (result == Result::Success)

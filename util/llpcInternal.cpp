@@ -499,6 +499,68 @@ uint32_t GetStageMaskFromSpirvBinary(
 }
 
 // =====================================================================================================================
+// Gets the entry-point name from the SPIR-V binary
+//
+// NOTE: This function is for single entry-point. If the SPIR-V binary contains multiple entry-points, we get the name
+// of the first entry-point and ignore others.
+const char* GetEntryPointNameFromSpirvBinary(
+    const BinaryData* pSpvBin) // [in] SPIR-V binary
+{
+    const char* pEntryName = nullptr;
+
+    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pSpvBin->pCode);
+    const uint32_t* pEnd = pCode + pSpvBin->codeSize / sizeof(uint32_t);
+
+    if (IsSpirvBinary(pSpvBin))
+    {
+        // Skip SPIR-V header
+        const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
+
+        while (pCodePos < pEnd)
+        {
+            uint32_t opCode = (pCodePos[0] & OpCodeMask);
+            uint32_t wordCount = (pCodePos[0] >> WordCountShift);
+
+            if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
+            {
+                LLPC_ERRS("Invalid SPIR-V binary\n");
+                break;
+            }
+
+            if (opCode == OpEntryPoint)
+            {
+                LLPC_ASSERT(wordCount >= 4);
+
+                // The fourth word is start of the name string of the entry-point
+                pEntryName = reinterpret_cast<const char*>(&pCodePos[3]);
+                break;
+            }
+
+            // All "OpEntryPoint" are before "OpFunction"
+            if (opCode == OpFunction)
+            {
+                break;
+            }
+
+            pCodePos += wordCount;
+        }
+
+        if (pEntryName == nullptr)
+        {
+            LLPC_ERRS("Entry-point not found\n");
+            pEntryName = "";
+        }
+    }
+    else
+    {
+        LLPC_ERRS("Invalid SPIR-V binary\n");
+        pEntryName = "";
+    }
+
+    return pEntryName;
+}
+
+// =====================================================================================================================
 // Verifies if the SPIR-V binary is valid and is supported
 Result VerifySpirvBinary(
     const BinaryData* pSpvBin)  // [in] SPIR-V binary
