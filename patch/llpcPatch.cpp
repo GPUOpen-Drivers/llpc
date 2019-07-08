@@ -288,7 +288,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createFloat2IntPass());
         passMgr.add(createLoopRotatePass());
         passMgr.add(createCFGSimplificationPass(1, true, true, false, true));
-        passMgr.add(CreatePatchPeepholeOpt());
+        passMgr.add(CreatePatchPeepholeOpt(true));
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createLoopUnrollPass(optLevel));
         passMgr.add(createInstructionCombiningPass(expensiveCombines));
@@ -321,7 +321,7 @@ void Patch::AddOptimizationPasses(
                 // are performed before the scalarizer. One important case this helps with is when you have bit casts
                 // whose source is a PHI - we want to make sure that the PHI does not have an i8 type before the
                 // scalarizer is called, otherwise a different kind of PHI mess is generated.
-                passMgr.add(CreatePatchPeepholeOpt());
+                passMgr.add(CreatePatchPeepholeOpt(true));
 
                 // Run the scalarizer as it helps our register pressure in the backend significantly. The scalarizer
                 // allows us to much more easily identify dead parts of vectors that we do not need to do any
