@@ -100,7 +100,7 @@ llvm::ModulePass* CreatePatchInOutImportExport();
 llvm::ModulePass* CreatePatchLlvmIrInclusion();
 llvm::FunctionPass* CreatePatchLoopUnrollInfoRectify();
 llvm::ModulePass* CreatePatchNullFragShader();
-llvm::FunctionPass* CreatePatchPeepholeOpt();
+llvm::FunctionPass* CreatePatchPeepholeOpt(bool enableDiscardOpt = false);
 llvm::ModulePass* CreatePatchPreparePipelineAbi(bool onlySetCallingConvs, uint32_t skipStageMask);
 llvm::ModulePass* CreatePatchPushConstOp();
 llvm::ModulePass* CreatePatchResourceCollect();
