@@ -15,15 +15,15 @@ void main()
     texel.xy += buf.f2;
     buf.f1 = texel.w;
 }
+
 // BEGIN_SHADERTEST
 /*
-; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 0, i1 true, i32 1, i1 false)
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 16, i1 false, i32 1, i1 false)
-; SHADERTEST: call void @llpc.buffer.store.v4i8(<4 x i32> %{{[0-9]*}}, i32 24, <4 x i8> %{{[0-9]*}}, i32 3, i1 false)
+; SHADERTEST: %{{[0-9]*}} = call i8 addrspace(7)* (...) @llpc.call.load.buffer.desc.{{[0-9a-z]*}}(i32 1, i32 0, i32 0, i1 false)
+; SHADERTEST: %{{[0-9]*}} = load atomic <4 x float>, <4 x float> addrspace(7)* %{{[0-9]*}} unordered, align 16
+; SHADERTEST: store atomic float %{{[0-9a-z.]*}}, float addrspace(7)* %{{[0-9]*}} unordered, align 4
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
