@@ -1208,7 +1208,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                      pContext,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage1 : shaderStage2,
                      (shaderStage1 != ShaderStageInvalid) ? shaderStage2 : ShaderStageInvalid,
-                     mmSPI_SHADER_USER_DATA_ES_0,
+                     Gfx09::mmSPI_SHADER_USER_DATA_ES_0,
                      pConfig);
     }
     else

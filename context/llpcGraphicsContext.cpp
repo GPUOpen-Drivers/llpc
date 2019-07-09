@@ -611,6 +611,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
             pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsOnChip ?
                                                                          gsVsRingItemSizeOnChip :
                                                                          gsVsRingItemSize;
+
         }
     }
 

@@ -1198,6 +1198,8 @@ Value* BuilderImplSubgroup::CreateGroupBallot(
 
     SmallVector<Type*, 2> types;
 
+    // icmp has a new signature (requiring the return type as the first type).
+    types.push_back(getIntNTy(GetShaderSubgroupSize()));
     types.push_back(getInt32Ty());
 
     Value* pResult = CreateIntrinsic(Intrinsic::amdgcn_icmp,

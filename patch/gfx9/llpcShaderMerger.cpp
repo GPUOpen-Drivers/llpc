@@ -153,7 +153,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     auto pModule = pHsEntryPoint->getParent();
     pModule->getFunctionList().insert(pHsEntryPoint->getIterator(), pEntryPoint);
 
-    pEntryPoint->addFnAttr("amdgpu-max-work-group-size", "128"); // Force s_barrier to be present (ignore optimization)
+    pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
 
     for (auto& arg : pEntryPoint->args())
     {
@@ -622,7 +622,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                                              LlpcName::EsGsEntryPoint);
     pModule->getFunctionList().insert(pGsEntryPoint->getIterator(), pEntryPoint);
 
-    pEntryPoint->addFnAttr("amdgpu-max-work-group-size", "128"); // Force s_barrier to be present (ignore optimization)
+    pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
 
     for (auto& arg : pEntryPoint->args())
     {

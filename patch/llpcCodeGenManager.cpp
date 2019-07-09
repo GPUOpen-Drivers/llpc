@@ -190,6 +190,12 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-max-memory-clause", "1");
             }
 
+            if (pFunc->getCallingConv() == CallingConv::AMDGPU_HS)
+            {
+                // Force s_barrier to be present (ignore optimization)
+                builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
+            }
+
             auto gfxIp = pContext->GetGfxIpVersion();
             if (gfxIp.major >= 9)
             {
