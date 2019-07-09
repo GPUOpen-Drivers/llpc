@@ -14,22 +14,20 @@ void main()
     m4[i][i] = vec4(2.0);
     gl_Position = m4[i][i];
 }
+
 // BEGIN_SHADERTEST
 /*
-; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 16, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 32, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 48, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 64, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 80, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 96, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 112, i1 true, i32 0, i1 false)
-; SHADERTEST: call <16 x i8> @llpc.buffer.load.v16i8(<4 x i32> %{{[0-9]*}}, i32 128, i1 true, i32 0, i1 false)
-; SHADERTEST: store <4 x float> <float 3.000000e+00, float 3.000000e+00, float 3.000000e+00, float 3.000000e+00>, <4 x float> addrspace({{.*}})* %{{[0-9]*}}
-; SHADERTEST: store <4 x float> <float 2.000000e+00, float 2.000000e+00, float 2.000000e+00, float 2.000000e+00>, <4 x float> addrspace({{.*}})* %{{[0-9]*}}
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 0, i32 0, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 0, i32 1, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 0, i32 2, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 0, i32 3, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 1, i32 0, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 1, i32 1, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 1, i32 2, i32 0) to <4 x float> addrspace(7)*), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(7)* bitcast ([4 x float] addrspace(7)* getelementptr inbounds (<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, <{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }> addrspace(7)* @{{[0-9]}}, i32 0, i32 2, i32 1, i32 3, i32 0) to <4 x float> addrspace(7)*), align 16
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -17,16 +17,14 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: @{{.*}} = internal addrspace(3) global [16 x i32] undef
-; SHADERTEST: getelementptr [16 x i32], [16 x i32] addrspace(3)* @{{.*}}, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: load i32, i32 addrspace(3)* %{{[0-9]*}}
-; SHADERTEST: getelementptr [16 x i32], [16 x i32] addrspace(3)* @{{.*}}, i32 0, i32 3
+; SHADERTEST: @{{[0-9]}} = addrspace(3) global [16 x i32] undef
+; SHADERTEST: %{{[0-9]*}} = getelementptr [16 x i32], [16 x i32] addrspace(3)* @{{[0-9]}}, i32 0, i32 %{{[0-9]*}}
 ; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(3)* %{{[0-9]*}}
-; SHADERTEST: getelementptr [16 x i32], [16 x i32] addrspace(3)* @{{.*}}, i32 0, i32 4
-; SHADERTEST: load i32, i32 addrspace(3)* %{{[0-9]*}}
+; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(3)* getelementptr inbounds ([16 x i32], [16 x i32] addrspace(3)* @{{[0-9]}}, i32 0, i32 3)
+; SHADERTEST: %{{[0-9]*}} = load i32, i32 addrspace(3)* getelementptr inbounds ([16 x i32], [16 x i32] addrspace(3)* @{{[0-9]}}, i32 0, i32 4)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
