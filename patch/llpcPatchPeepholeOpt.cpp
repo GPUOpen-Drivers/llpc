@@ -907,7 +907,6 @@ void PatchPeepholeOpt::visitCallInst(
             {
                 auto pCond = pBranch->getCondition();
                 auto pTrueBlock = dyn_cast<BasicBlock>(pBranch->getSuccessor(0));
-                auto pFalseBlock = dyn_cast<BasicBlock>(pBranch->getSuccessor(1));
                 auto pNewKill = dyn_cast<CallInst>(callInst.clone());
                 Context* pContext = static_cast<Context*>(&callInst.getContext());
 
