@@ -121,6 +121,10 @@ private:
 
     void ReplaceConstWithInsts(Constant* const pConst);
 
+    void InterpolateInputElement(uint32_t           interpLoc,
+                                 llvm::Value*       pInterpInfo,
+                                 llvm::CallInst&    callInst);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     std::unordered_map<llvm::Value*, llvm::Value*>  m_globalVarProxyMap;    // Proxy map for lowering global variables
