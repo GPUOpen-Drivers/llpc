@@ -305,8 +305,8 @@ define double @llpc.nmax.f64(double %x, double %y) #0
 ; GLSL: double clamp(double, double ,double)
 define double @llpc.fclamp.f64(double %x, double %minVal, double %maxVal) #0
 {
-    %1 = call nnan double @llvm.maxnum.f64(double %x, double %minVal)
-    %2 = call nnan double @llvm.minnum.f64(double %1, double %maxVal)
+    %1 = call double @llvm.maxnum.f64(double %x, double %minVal)
+    %2 = call double @llvm.minnum.f64(double %1, double %maxVal)
     ret double %2
 }
 

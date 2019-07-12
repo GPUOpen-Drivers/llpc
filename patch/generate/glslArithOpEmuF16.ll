@@ -1070,8 +1070,8 @@ define half @llpc.nmax.f16(half %x, half %y) #0
 ; GLSL: float16_t clamp(float16_t, float16_t ,float16_t)
 define half @llpc.fclamp.f16(half %x, half %minVal, half %maxVal) #0
 {
-    %1 = call nnan half @llvm.maxnum.f16(half %x, half %minVal)
-    %2 = call nnan half @llvm.minnum.f16(half %1, half %maxVal)
+    %1 = call half @llvm.maxnum.f16(half %x, half %minVal)
+    %2 = call half @llvm.minnum.f16(half %1, half %maxVal)
 
     ret half %2
 }
@@ -2027,10 +2027,10 @@ define spir_func { <4 x half>, <4 x i32> } @_Z11frexpStructDv4_DhDv4_i(
 define half @llpc.fmin3.f16(half %x, half %y, half %z)
 {
     ; min(x, y)
-    %1 = call nnan half @llvm.minnum.f16(half %x, half %y)
+    %1 = call half @llvm.minnum.f16(half %x, half %y)
 
     ; min(min(x, y), z)
-    %2 = call nnan half @llvm.minnum.f16(half %1, half %z)
+    %2 = call half @llvm.minnum.f16(half %1, half %z)
 
     ret half %2
 }
@@ -2039,10 +2039,10 @@ define half @llpc.fmin3.f16(half %x, half %y, half %z)
 define half @llpc.fmax3.f16(half %x, half %y, half %z)
 {
     ; max(x, y)
-    %1 = call nnan half @llvm.maxnum.f16(half %x, half %y)
+    %1 = call half @llvm.maxnum.f16(half %x, half %y)
 
     ; max(max(x, y), z)
-    %2 = call nnan half @llvm.maxnum.f16(half %1, half %z)
+    %2 = call half @llvm.maxnum.f16(half %1, half %z)
 
     ret half %2
 }
@@ -2051,16 +2051,16 @@ define half @llpc.fmax3.f16(half %x, half %y, half %z)
 define half @llpc.fmid3.f16(half %x, half %y, half %z)
 {
     ; min(x, y)
-    %1 = call nnan half @llvm.minnum.f16(half %x, half %y)
+    %1 = call half @llvm.minnum.f16(half %x, half %y)
 
     ; max(x, y)
-    %2 = call nnan half @llvm.maxnum.f16(half %x, half %y)
+    %2 = call half @llvm.maxnum.f16(half %x, half %y)
 
     ; min(max(x, y), z)
-    %3 = call nnan half @llvm.minnum.f16(half %2, half %z)
+    %3 = call half @llvm.minnum.f16(half %2, half %z)
 
     ; max(min(x, y), min(max(x, y), z))
-    %4 = call nnan half @llvm.maxnum.f16(half %1, half %3)
+    %4 = call half @llvm.maxnum.f16(half %1, half %3)
 
     ret half %4
 }
