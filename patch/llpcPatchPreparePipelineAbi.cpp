@@ -215,6 +215,9 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
     if (m_pContext->IsGraphics())
     {
         ShaderMerger shaderMerger(m_pContext, m_pPipelineShaders);
+#if LLPC_BUILD_GFX10
+        const bool enableNgg = m_pContext->GetNggControl()->enableNgg;
+#endif
 
         if (hasTs && m_hasGs)
         {
@@ -234,6 +237,17 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
             auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
 
+#if LLPC_BUILD_GFX10
+            if (enableNgg)
+            {
+                if (pEsEntryPoint != nullptr)
+                {
+                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint);
+                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                }
+            }
+            else
+#endif
             {
                 if (pGsEntryPoint != nullptr)
                 {
@@ -259,6 +273,20 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 }
             }
 
+#if LLPC_BUILD_GFX10
+            if (enableNgg)
+            {
+                // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
+                auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageTessEval);
+
+                if (pEsEntryPoint != nullptr)
+                {
+                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr);
+                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                }
+            }
+            else
+#endif
             {
                 SetCallingConv(ShaderStageTessEval, CallingConv::AMDGPU_VS);
             }
@@ -269,6 +297,17 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
             auto pGsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
 
+#if LLPC_BUILD_GFX10
+            if (enableNgg)
+            {
+                if (pEsEntryPoint != nullptr)
+                {
+                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint);
+                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                }
+            }
+            else
+#endif
             {
                 if (pGsEntryPoint != nullptr)
                 {
@@ -282,6 +321,19 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
         else if (m_hasVs)
         {
             // VS_FS pipeline
+#if LLPC_BUILD_GFX10
+            if (enableNgg)
+            {
+                // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
+                auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
+                if (pEsEntryPoint != nullptr)
+                {
+                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr);
+                    pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
+                }
+            }
+            else
+#endif
             {
                 SetCallingConv(ShaderStageVertex, CallingConv::AMDGPU_VS);
             }

@@ -338,6 +338,9 @@ _SPIRV_OP(GroupNonUniformLogicalOr, 363)
 _SPIRV_OP(GroupNonUniformLogicalXor, 364)
 _SPIRV_OP(GroupNonUniformQuadBroadcast, 365)
 _SPIRV_OP(GroupNonUniformQuadSwap, 366)
+#if SPV_VERSION >= 0x10400
+_SPIRV_OP(CopyLogical, 400)
+#endif
 _SPIRV_OP(Forward, 1024)
 _SPIRV_OP(SubgroupBallotKHR, 4421)
 _SPIRV_OP(SubgroupFirstInvocationKHR, 4422)

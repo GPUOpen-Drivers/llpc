@@ -583,6 +583,10 @@ struct GraphicsPipelineState
     uint32_t    enableMultiView;              // Whether to enable multi-view support
     Llpc::PipelineOptions options;            // Pipeline options
 
+#if VKI_BUILD_GFX10
+    Llpc::NggState nggState;                    // NGG state
+#endif
+
     ColorBuffer colorBuffer[MaxColorTargets]; // Color target state.
 };
 

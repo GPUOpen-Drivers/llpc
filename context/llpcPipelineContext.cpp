@@ -98,6 +98,11 @@ const char* PipelineContext::GetGpuNameString() const
         { { 9, 0, 4 }, "gfx904"   },  // [9.0.4] gfx904, vega12
         { { 9, 0, 6 }, "gfx906"   },  // [9.0.6] gfx906, vega20
         { { 9, 0, 9 }, "gfx909"   },  // [9.0.9] gfx909, raven2
+#if LLPC_BUILD_GFX10
+        { { 10, 1, 0xFFFF }, "gfx101F" },
+        { { 10, 1, 0xFFFE }, "gfx101E" },
+        { { 10, 1, 0 }, "gfx1010" },  // [10.1.0] gfx1010
+#endif
     };
 
     const GpuNameStringMap* pNameMap = nullptr;

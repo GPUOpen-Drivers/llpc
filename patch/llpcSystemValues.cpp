@@ -866,6 +866,9 @@ Value* ShaderSystemValues::SetRingBufferDataFormat(
 
     SqBufRsrcWord3 dataFormatClearMask;
     dataFormatClearMask.u32All = UINT32_MAX;
+#if LLPC_BUILD_GFX10
+    // TODO: This code needs to be fixed for gfx10; buffer format is handled differently.
+#endif
     dataFormatClearMask.gfx6.DATA_FORMAT = 0;
     pElem3 = BinaryOperator::CreateAnd(pElem3,
                                        ConstantInt::get(m_pContext->Int32Ty(), dataFormatClearMask.u32All),

@@ -1508,6 +1508,10 @@ void PatchInOutImportExport::visitReturnInst(
             }
         }
 
+#if LLPC_BUILD_GFX10
+        // NOTE: For GFX10+, dummy generic output is no longer needed. Field NO_PC_EXPORT of SPI_VS_OUT_CONFIG
+        // will control the behavior.
+#endif
         if (m_gfxIp.major <= 9)
         {
             // NOTE: If no generic outputs is present in this shader, we have to export a dummy one
@@ -1530,6 +1534,14 @@ void PatchInOutImportExport::visitReturnInst(
     }
     else if (m_shaderStage == ShaderStageGeometry)
     {
+#if LLPC_BUILD_GFX10
+        if ((m_pContext->IsGsOnChip() == false) && (m_gfxIp.major >= 10))
+        {
+            // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
+            // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
+            new FenceInst(*m_pContext, AtomicOrdering::Release, SyncScope::System, pInsertPos);
+        }
+#endif
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), GS_DONE));
 
@@ -1643,7 +1655,13 @@ void PatchInOutImportExport::visitReturnInst(
         // NOTE: If outputs are present in fragment shader, we have to export a dummy one
         auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
 
+#if LLPC_BUILD_GFX10
+        // NOTE: GFX10 can allow no dummy export when the fragment shader does not have discard operation
+        // or ROV (Raster-ordered views)
+        pResUsage->inOutUsage.fs.dummyExport = ((m_gfxIp.major < 10) || pResUsage->builtInUsage.fs.discard);
+#else
         pResUsage->inOutUsage.fs.dummyExport = true;
+#endif
         if ((m_pLastExport == nullptr) && pResUsage->inOutUsage.fs.dummyExport)
         {
             args.clear();
@@ -4582,6 +4600,28 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
 
     format = formatOprd.u32All;
 
+#if LLPC_BUILD_GFX10
+    if (m_gfxIp.major >= 10)
+    {
+        if (compCount == 4)
+        {
+            format = (bitWidth == 32) ? BUF_FORMAT_32_32_32_32_FLOAT : BUF_FORMAT_16_16_16_16_FLOAT;
+        }
+        else if (compCount == 2)
+        {
+            format = (bitWidth == 32) ? BUF_FORMAT_32_32_FLOAT : BUF_FORMAT_16_16_FLOAT;
+        }
+        else if (compCount == 1)
+        {
+            format = (bitWidth == 32) ? BUF_FORMAT_32_FLOAT : BUF_FORMAT_16_FLOAT;
+        }
+        else
+        {
+            LLPC_NEVER_CALLED();
+        }
+    }
+#endif
+
     // byteOffset = streamOffsets[xfbBuffer] * 4 +
     //              (writeIndex + threadId) * bufferStride[bufferId] +
     //              xfbOffset
@@ -4627,6 +4667,18 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
         };
     }
 
+ #if LLPC_BUILD_GFX10
+    else if (m_gfxIp.major == 10)
+    {
+        formats =
+        {
+            BUF_FORMAT_32_FLOAT,
+            BUF_FORMAT_32_32_FLOAT,
+            BUF_FORMAT_32_32_32_FLOAT,
+            BUF_FORMAT_32_32_32_32_FLOAT
+        };
+    }
+#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -4720,6 +4772,18 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
         };
     }
 
+ #if LLPC_BUILD_GFX10
+    else if (m_gfxIp.major == 10)
+    {
+        formats =
+        {
+            BUF_FORMAT_32_FLOAT,
+            BUF_FORMAT_32_32_FLOAT,
+            BUF_FORMAT_32_32_32_FLOAT,
+            BUF_FORMAT_32_32_32_32_FLOAT
+        };
+    }
+#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -5191,6 +5255,19 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
             EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
+#if LLPC_BUILD_GFX10
+        else if (m_gfxIp.major == 10)
+        {
+            args.push_back(pRingOffset);                                                    // voffset
+            args.push_back(pGsVsOffset);                                                    // soffset
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_FORMAT_32_UINT));    // format
+            CoherentFlag coherent = {};
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc, slc
+            EmitCall(m_pModule, "llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        }
+#endif
         else
         {
             LLPC_NOT_IMPLEMENTED();
@@ -5416,6 +5493,13 @@ Value* PatchInOutImportExport::ReadValueFromLds(
             coherent.bits.glc = true;
         }
 
+    #if LLPC_BUILD_GFX10
+        else if (m_gfxIp.major == 10)
+        {
+            coherent.bits.glc = true;
+            coherent.bits.dlc = true;
+        }
+    #endif
         else
         {
             LLPC_NOT_IMPLEMENTED();
@@ -6250,6 +6334,13 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     const uint32_t tfBufferSizeInBytes = sizeof(uint32_t) * m_pContext->GetGpuProperty()->tessFactorBufferSizePerSe;
     uint32_t       tfBufferPatchCountLimit = tfBufferSizeInBytes / (tessFactorStride * sizeof(uint32_t));
 
+#if LLPC_BUILD_GFX10
+    const auto pWorkarounds = m_pContext->GetGpuWorkarounds();
+    if (pWorkarounds->gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow)
+    {
+        tfBufferPatchCountLimit /= 2;
+    }
+#endif
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
 
     if (m_pContext->IsTessOffChip())
@@ -6720,6 +6811,10 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
                                                 NoAttrib,
                                                 &*pInsertPos);
 
+#if LLPC_BUILD_GFX10
+    uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    if (waveSize == 64)
+#endif
     {
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));

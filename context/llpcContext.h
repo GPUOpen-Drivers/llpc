@@ -227,6 +227,26 @@ public:
         m_pPipelineContext->DoUserDataNodeMerge();
     }
 
+#if LLPC_BUILD_GFX10
+    // Sets NGG control settings
+    void SetNggControl()
+    {
+        return m_pPipelineContext->SetNggControl();
+    }
+
+    // Gets NGG control settings
+    const NggControl* GetNggControl() const
+    {
+        return m_pPipelineContext->GetNggControl();
+    }
+
+    // Gets WGP mode enablement for the specified shader stage
+    bool GetShaderWgpMode(ShaderStage shaderStage) const
+    {
+        return m_pPipelineContext->GetShaderWgpMode(shaderStage);
+    }
+#endif
+
     // Gets float control settings of the specified shader stage for the provide floating-point type.
     FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const
     {
@@ -325,6 +345,10 @@ private:
     static const uint8_t GlslEmuLibGfx9[];
     static const uint8_t GlslEmuLibWaTreat1dImagesAs2d[];
 
+#if LLPC_BUILD_GFX10
+    static const uint8_t GlslEmuLibWaDisableI32ModToI16Mod[];
+    static const uint8_t GlslEmuLibGfx10[];
+#endif
 };
 
 } // Llpc

@@ -492,6 +492,10 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             ->iaState.enableMultiView;
     }
 
+#if LLPC_BUILD_GFX10
+    const bool enableNgg = m_pContext->IsGraphics() ? m_pContext->GetNggControl()->enableNgg : false;
+#endif
+
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
@@ -527,6 +531,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
             const auto gfxIp = m_pContext->GetGfxIpVersion();
             if (((gfxIp.major >= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+#if LLPC_BUILD_GFX10
+                || (enableNgg && (m_hasTs == false))
+#endif
                 )
             {
                 availUserDataCount -= 1;
@@ -547,6 +554,15 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
             }
 
+#if LLPC_BUILD_GFX10
+            // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
+            // with PAL's GS on-chip behavior (TES is in NGG primitive shader).
+            if (enableNgg)
+            {
+                availUserDataCount -= 1;
+                reserveEsGsLdsSize = true;
+            }
+#endif
             break;
         }
     case ShaderStageGeometry:
@@ -559,6 +575,9 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior. i.e. GS is GFX8
             if ((m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
+#if LLPC_BUILD_GFX10
+                || enableNgg
+#endif
                 )
             {
                 // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
@@ -840,6 +859,15 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 ++userDataIdx;
             }
 
+#if LLPC_BUILD_GFX10
+            if (reserveEsGsLdsSize)
+            {
+                argTys.push_back(m_pContext->Int32Ty());
+                *pInRegMask |= (1ull << (argIdx++));
+                pIntfData->userDataUsage.tes.esGsLdsSize = userDataIdx;
+                ++userDataIdx;
+            }
+#endif
             break;
         }
     case ShaderStageGeometry:

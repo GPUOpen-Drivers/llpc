@@ -61,6 +61,15 @@ void VsRegConfig::Init(
     INIT_REG(VGT_STRMOUT_VTX_STRIDE_1);
     INIT_REG(VGT_STRMOUT_VTX_STRIDE_2);
     INIT_REG(VGT_STRMOUT_VTX_STRIDE_3);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_VS);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_0);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_1);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_2);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_3);
+
+#endif
 }
 
 // =====================================================================================================================
@@ -74,6 +83,15 @@ void LsHsRegConfig::Init(
     INIT_REG(VGT_HOS_MIN_TESS_LEVEL);
     INIT_REG(VGT_HOS_MAX_TESS_LEVEL);
     INIT_REG(VGT_TF_PARAM);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_HS);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_0);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_1);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_2);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_3);
+
+#endif
 }
 
 // =====================================================================================================================
@@ -100,7 +118,67 @@ void EsGsRegConfig::Init(
     INIT_REG(VGT_GS_MODE);
     INIT_REG(VGT_ESGS_RING_ITEMSIZE);
     INIT_REG_GFX9(gfxIp.major, VGT_GS_MAX_PRIMS_PER_SUBGROUP);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_0);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_1);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_2);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_3);
+
+#endif
 }
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Initializer
+void PrimShaderRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
+{
+    INIT_REG(SPI_SHADER_PGM_RSRC1_GS);
+    INIT_REG(SPI_SHADER_PGM_RSRC2_GS);
+    INIT_REG(SPI_SHADER_PGM_RSRC4_GS);
+    INIT_REG(VGT_GS_MAX_VERT_OUT);
+    INIT_REG(VGT_GS_ONCHIP_CNTL);
+    INIT_REG(VGT_GS_VERT_ITEMSIZE);
+    INIT_REG(VGT_GS_INSTANCE_CNT);
+    INIT_REG(VGT_GS_PER_VS);
+    INIT_REG(VGT_GS_OUT_PRIM_TYPE);
+    INIT_REG(VGT_GSVS_RING_ITEMSIZE);
+    INIT_REG(VGT_GS_VERT_ITEMSIZE_1);
+    INIT_REG(VGT_GS_VERT_ITEMSIZE_2);
+    INIT_REG(VGT_GS_VERT_ITEMSIZE_3);
+    INIT_REG(VGT_GSVS_RING_OFFSET_1);
+    INIT_REG(VGT_GSVS_RING_OFFSET_2);
+    INIT_REG(VGT_GSVS_RING_OFFSET_3);
+    INIT_REG(VGT_GS_MODE);
+    INIT_REG(VGT_ESGS_RING_ITEMSIZE);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, GE_MAX_OUTPUT_PER_SUBGROUP);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_GS);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_0);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_1);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_2);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_3);
+
+    INIT_REG(SPI_SHADER_POS_FORMAT);
+    INIT_REG(SPI_VS_OUT_CONFIG);
+    INIT_REG(PA_CL_VS_OUT_CNTL);
+    INIT_REG(PA_CL_CLIP_CNTL);
+    INIT_REG(PA_CL_VTE_CNTL);
+    INIT_REG(PA_SU_VTX_CNTL);
+    INIT_REG(VGT_PRIMITIVEID_EN);
+    INIT_REG(VGT_REUSE_OFF);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
+}
+#endif
 
 // =====================================================================================================================
 // Initializer
@@ -124,6 +202,19 @@ void PsRegConfig::Init(
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
     INIT_REG(PA_SC_CONSERVATIVE_RASTERIZATION_CNTL);
 #endif
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, PA_STEREO_CNTL);
+    INIT_REG_GFX10_PLUS(gfxIp.major, GE_STEREO_CNTL);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_PGM_CHKSUM_PS);
+
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_0);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_1);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_2);
+    INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_3);
+
+    INIT_REG_GFX10_1_PLUS(gfxIp.major, gfxIp.minor, GE_USER_VGPR_EN);
+
+#endif
 }
 
 // =====================================================================================================================
@@ -144,6 +235,9 @@ void PipelineVsFsRegConfig::Init(
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(VGT_GS_ONCHIP_CNTL);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+#endif
 
     m_dynRegCount = 0;
 }
@@ -160,6 +254,10 @@ void PipelineVsTsFsRegConfig::Init(
 
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+    INIT_REG(VGT_GS_ONCHIP_CNTL);
+#endif
 
     m_dynRegCount = 0;
 }
@@ -176,6 +274,9 @@ void PipelineVsGsFsRegConfig::Init(
 
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+#endif
 
     m_dynRegCount = 0;
 }
@@ -192,9 +293,76 @@ void PipelineVsTsGsFsRegConfig::Init(GfxIpVersion gfxIp)
 
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+#endif
 
     m_dynRegCount = 0;
 }
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Initializer
+void PipelineNggVsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
+{
+    m_primShaderRegs.Init(gfxIp);
+    m_psRegs.Init(gfxIp);
+    PipelineRegConfig::Init();
+
+    INIT_REG(VGT_SHADER_STAGES_EN);
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+
+    m_dynRegCount = 0;
+}
+
+// =====================================================================================================================
+// Initializer
+void PipelineNggVsTsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
+{
+    m_lsHsRegs.Init(gfxIp);
+    m_primShaderRegs.Init(gfxIp);
+    m_psRegs.Init(gfxIp);
+    PipelineRegConfig::Init();
+
+    INIT_REG(VGT_SHADER_STAGES_EN);
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+
+    m_dynRegCount = 0;
+}
+
+// =====================================================================================================================
+// Initializer
+void PipelineNggVsGsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
+{
+    m_primShaderRegs.Init(gfxIp);
+    m_psRegs.Init(gfxIp);
+    PipelineRegConfig::Init();
+
+    INIT_REG(VGT_SHADER_STAGES_EN);
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+
+    m_dynRegCount = 0;
+}
+
+// =====================================================================================================================
+// Initializer
+void PipelineNggVsTsGsFsRegConfig::Init(
+    GfxIpVersion gfxIp) // Graphics IP version info
+{
+    m_lsHsRegs.Init(gfxIp);
+    m_primShaderRegs.Init(gfxIp);
+    m_psRegs.Init(gfxIp);
+    PipelineRegConfig::Init();
+
+    INIT_REG(VGT_SHADER_STAGES_EN);
+    INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
+
+    m_dynRegCount = 0;
+}
+#endif
 
 // =====================================================================================================================
 // Initializer
@@ -206,7 +374,25 @@ void CsRegConfig::Init(
     INIT_REG(COMPUTE_NUM_THREAD_X);
     INIT_REG(COMPUTE_NUM_THREAD_Y);
     INIT_REG(COMPUTE_NUM_THREAD_Z);
+#if LLPC_BUILD_GFX10
+    INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_SHADER_CHKSUM);
+    INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_PGM_RSRC3);
 
+    INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_0);
+    INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_1);
+    INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_2);
+    INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_3);
+
+#endif
+
+#if LLPC_BUILD_GFX10
+    if (gfxIp.major >= 10)
+    {
+        // COMPUTE_DISPATCH_INITIATOR is only required for GFX10 pipeline
+        INIT_REG(COMPUTE_DISPATCH_INITIATOR);
+    }
+    else
+#endif
     {
         INIT_REG_TO_INVALID(COMPUTE_DISPATCH_INITIATOR);
     }
@@ -353,23 +539,6 @@ void InitRegisterNameMap(
     ADD_REG_MAP(SPI_SHADER_USER_DATA_VS_30);
     ADD_REG_MAP(SPI_SHADER_USER_DATA_VS_31);
 
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_0);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_1);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_2);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_3);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_4);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_5);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_6);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_7);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_8);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_9);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_10);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_11);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_12);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_13);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_14);
-    ADD_REG_MAP(SPI_SHADER_USER_DATA_ES_15);
-
     ADD_REG_MAP(SPI_SHADER_USER_DATA_PS_0);
     ADD_REG_MAP(SPI_SHADER_USER_DATA_PS_1);
     ADD_REG_MAP(SPI_SHADER_USER_DATA_PS_2);
@@ -438,6 +607,22 @@ void InitRegisterNameMap(
     if (gfxIp.major == 9)
     {
         // GFX9 specific
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_0);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_1);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_2);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_3);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_4);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_5);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_6);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_7);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_8);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_9);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_10);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_11);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_12);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_13);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_14);
+        ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_15);
         ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_16);
         ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_17);
         ADD_REG_MAP_GFX9(SPI_SHADER_USER_DATA_ES_18);
@@ -493,6 +678,122 @@ void InitRegisterNameMap(
     }
     else
     {
+#if LLPC_BUILD_GFX10
+        // GFX10 specific
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_0);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_1);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_2);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_3);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_4);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_5);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_6);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_7);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_8);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_9);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_10);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_11);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_12);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_13);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_14);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_15);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_16);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_17);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_18);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_19);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_20);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_21);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_22);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_23);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_24);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_25);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_26);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_27);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_28);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_29);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_30);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_HS_31);
+
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_0);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_1);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_2);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_3);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_4);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_5);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_6);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_7);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_8);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_9);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_10);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_11);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_12);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_13);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_14);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_15);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_16);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_17);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_18);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_19);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_20);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_21);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_22);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_23);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_24);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_25);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_26);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_27);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_28);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_29);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_30);
+        ADD_REG_MAP_GFX10(SPI_SHADER_USER_DATA_GS_31);
+
+        ADD_REG_MAP_GFX10(SPI_SHADER_PGM_CHKSUM_VS);
+        ADD_REG_MAP_GFX10(SPI_SHADER_PGM_CHKSUM_HS);
+        ADD_REG_MAP_GFX10(SPI_SHADER_PGM_CHKSUM_GS);
+        ADD_REG_MAP_GFX10(SPI_SHADER_PGM_CHKSUM_PS);
+        ADD_REG_MAP_GFX10(COMPUTE_SHADER_CHKSUM);
+
+        ADD_REG_MAP_GFX10(IA_MULTI_VGT_PARAM_PIPED);
+
+        ADD_REG_MAP_GFX10(GE_MAX_OUTPUT_PER_SUBGROUP);
+        ADD_REG_MAP_GFX10(GE_STEREO_CNTL);
+        ADD_REG_MAP_GFX10(PA_STEREO_CNTL);
+
+        ADD_REG_MAP_GFX10(GE_NGG_SUBGRP_CNTL);
+        ADD_REG_MAP_GFX10(SPI_SHADER_IDX_FORMAT);
+
+        ADD_REG_MAP_GFX10(COMPUTE_PGM_RSRC3);
+
+        if (((gfxIp.major == 10) && (gfxIp.minor == 0)) == false)
+        {
+            // For GFX10.1+
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_VS_0);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_VS_1);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_VS_2);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_VS_3);
+
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_LSHS_0);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_LSHS_1);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_LSHS_2);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_LSHS_3);
+
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_ESGS_0);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_ESGS_1);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_ESGS_2);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_ESGS_3);
+
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_PS_0);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_PS_1);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_PS_2);
+            ADD_REG_MAP_GFX10(SPI_SHADER_USER_ACCUM_PS_3);
+
+            ADD_REG_MAP_GFX10(COMPUTE_USER_ACCUM_0);
+            ADD_REG_MAP_GFX10(COMPUTE_USER_ACCUM_1);
+            ADD_REG_MAP_GFX10(COMPUTE_USER_ACCUM_2);
+            ADD_REG_MAP_GFX10(COMPUTE_USER_ACCUM_3);
+
+            ADD_REG_MAP_GFX10_1_PLUS(GE_USER_VGPR_EN);
+        }
+#endif
     }
 }
 
@@ -526,6 +827,15 @@ const char* GetRegisterNameString(
                 pNameString = RegNameMapGfx9[regId];
             }
         }
+#if LLPC_BUILD_GFX10
+        else if (gfxIp.major == 10)
+        {
+            if (RegNameMapGfx10.find(regId) != RegNameMapGfx10.end())
+            {
+                pNameString = RegNameMapGfx10[regId];
+            }
+        }
+#endif
         else
         {
             LLPC_NOT_IMPLEMENTED();

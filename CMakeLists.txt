@@ -33,6 +33,9 @@ add_dependencies(llpc LLVMCore)
 option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
 option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
+#if VKI_BUILD_GFX10
+option(LLPC_BUILD_GFX10   "LLPC support for GFX10?"   OFF)
+#endif
 # None
 
 set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
@@ -161,6 +164,17 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
 endif()
 
+#if VKI_BUILD_GFX10
+if(LLPC_BUILD_GFX10)
+  target_compile_definitions(llpc PRIVATE
+      LLPC_BUILD_GFX10=1
+      CHIP_HDR_GFX10=1
+      PAL_BUILD_GFX9=1
+      PAL_BUILD_GFX10=1
+  )
+endif()
+#endif
+
 if(XGL_LLVM_UPSTREAM)
     target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
 endif()
@@ -273,6 +287,14 @@ target_sources(llpc PRIVATE
     patch/llpcSystemValues.cpp
     patch/llpcVertexFetch.cpp
 )
+#if VKI_BUILD_GFX10
+if(LLPC_BUILD_GFX10)
+    target_sources(llpc PRIVATE
+        patch/gfx9/llpcNggLdsManager.cpp
+        patch/gfx9/llpcNggPrimShader.cpp
+    )
+endif()
+#endif
 
 # llpc/translator
 target_sources(llpc PRIVATE
@@ -388,6 +410,14 @@ set(GEN_GLSL_EMU_LIB_OUTPUTS
     ${OP_EMU_LIB_GEN_DIR}/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h
 )
 
+#if VKI_BUILD_GFX10
+if(LLPC_BUILD_GFX10)
+    set(GEN_GLSL_EMU_LIB_OUTPUTS ${GEN_GLSL_EMU_LIB_OUTPUTS}
+        ${OP_EMU_LIB_GEN_DIR}/gfx10/g_llpcGlslEmuLibGfx10.h
+    )
+endif()
+#endif
+
 if(UNIX)
     set(LLVM_BIN_DIR ${XGL_LLVM_BUILD_PATH}/bin/)
 elseif(WIN32)
@@ -434,6 +464,15 @@ target_sources(vfx PRIVATE
     tool/vfx/vfxSection.cpp
     tool/vfx/vfxEnumsConverter.cpp
 )
+
+#if VKI_BUILD_GFX10
+if(LLPC_BUILD_GFX10)
+  target_compile_definitions(vfx PRIVATE
+      VKI_BUILD_GFX10=1
+      LLPC_BUILD_GFX10=1
+  )
+endif()
+#endif
 
 target_include_directories(vfx
 PUBLIC
@@ -511,6 +550,17 @@ PRIVATE
     ${XGL_PAL_PATH}/inc/util
     ${LLVM_INCLUDE_DIRS}
 )
+
+#if VKI_BUILD_GFX10
+if(LLPC_BUILD_GFX10)
+  target_compile_definitions(amdllpc PRIVATE
+      LLPC_BUILD_GFX10=1
+      CHIP_HDR_GFX10=1
+      PAL_BUILD_GFX9=1
+      PAL_BUILD_GFX10=1
+  )
+endif()
+#endif
 
 set(VULKAN_HEADER_PATH ${XGL_ICD_PATH}/api/include/khronos)
 target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})

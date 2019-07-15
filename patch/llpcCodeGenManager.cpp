@@ -190,11 +190,27 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-max-memory-clause", "1");
             }
 
+            if (pFunc->getCallingConv() == CallingConv::AMDGPU_HS)
+            {
+                // Force s_barrier to be present (ignore optimization)
+                builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
+            }
+
             auto gfxIp = pContext->GetGfxIpVersion();
             if (gfxIp.major >= 9)
             {
                 targetFeatures += ",+enable-scratch-bounds-checks";
             }
+
+#if LLPC_BUILD_GFX10
+            // Setup wavefront size per shader stage
+            if (gfxIp.major >= 10)
+            {
+                uint32_t waveSize = pContext->GetShaderWaveSize(shaderStage);
+
+                targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+            }
+#endif
 
             auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
             auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);

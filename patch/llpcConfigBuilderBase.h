@@ -67,6 +67,12 @@ protected:
     void SetPsWritesUavs(uint32_t value);
     void SetPsWritesDepth(uint32_t value);
     void SetEsGsLdsByteSize(uint32_t value);
+#if LLPC_BUILD_GFX10
+    void SetCalcWaveBreakSizeAtDrawTime(uint32_t value);
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
+    void SetWaveFrontSize(Util::Abi::HardwareStage hwStage, uint32_t value);
+#endif
+#endif
 
     // -----------------------------------------------------------------------------------------------------------------
 

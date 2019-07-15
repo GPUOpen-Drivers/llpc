@@ -183,6 +183,10 @@ print("")
 # Assemble .ll files to .bc files and add emulation .bc files to archives
 GFX_EMUS = ["gfx8", "gfx9"]
 
+#if LLPC_BUILD_GFX10
+GFX_EMUS.append("gfx10")
+#endif
+
 for gfx in GFX_EMUS:
     print("*******************************************************************************")
     print("                    Generate LLVM Emulation Library (%s)                     "%(gfx.upper()))

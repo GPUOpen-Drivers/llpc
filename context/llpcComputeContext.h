@@ -79,6 +79,21 @@ public:
     // Does user data node merging for all shader stages
     virtual void DoUserDataNodeMerge() { }
 
+#if LLPC_BUILD_GFX10
+    // Sets NGG control settings
+    virtual void SetNggControl() { LLPC_NEVER_CALLED(); }
+
+    // Gets NGG control settings
+    virtual const NggControl* GetNggControl() const { LLPC_NEVER_CALLED(); return nullptr; }
+
+    // Gets WGP mode enablement for the specified shader stage
+    virtual bool GetShaderWgpMode(ShaderStage shaderStage) const
+    {
+        LLPC_ASSERT(shaderStage == ShaderStageCompute);
+        return m_pPipelineInfo->cs.options.wgpMode;
+    }
+#endif
+
     // Gets float control settings of the specified shader stage for the provide floating-point type.
     virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const;
 

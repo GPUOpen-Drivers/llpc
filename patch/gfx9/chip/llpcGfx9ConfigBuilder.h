@@ -68,6 +68,24 @@ public:
                                           uint8_t**           ppConfig,
                                           size_t*             pConfigSize);
 
+#if LLPC_BUILD_GFX10
+    Result BuildPipelineNggVsFsRegConfig(Context*            pContext,
+                                         uint8_t**           ppConfig,
+                                         size_t*             pConfigSize);
+
+    Result BuildPipelineNggVsTsFsRegConfig(Context*            pContext,
+                                           uint8_t**           ppConfig,
+                                           size_t*             pConfigSize);
+
+    Result BuildPipelineNggVsGsFsRegConfig(Context*            pContext,
+                                           uint8_t**           ppConfig,
+                                           size_t*             pConfigSize);
+
+    Result BuildPipelineNggVsTsGsFsRegConfig(Context*            pContext,
+                                             uint8_t**           ppConfig,
+                                             size_t*             pConfigSize);
+#endif
+
     Result BuildPipelineCsRegConfig(Context*            pContext,
                                     uint8_t**           ppConfig,
                                     size_t*             pConfigSize);
@@ -92,6 +110,14 @@ private:
                               ShaderStage         shaderStage1,
                               ShaderStage         shaderStage2,
                               T*                  pConfig);
+
+#if LLPC_BUILD_GFX10
+    template <typename T>
+    Result BuildPrimShaderRegConfig(Context*            pContext,
+                                    ShaderStage         shaderStage1,
+                                    ShaderStage         shaderStage2,
+                                    T*                  pConfig);
+#endif
 
     template <typename T>
     Result BuildPsRegConfig(Context*            pContext,

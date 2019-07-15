@@ -86,6 +86,17 @@ public:
 
     virtual void DoUserDataNodeMerge();
 
+#if LLPC_BUILD_GFX10
+    // Sets NGG control settings
+    virtual void SetNggControl();
+
+    // Gets NGG control settings
+    virtual const NggControl* GetNggControl() const { return &m_nggControl; }
+
+    // Gets WGP mode enablement for the specified shader stage
+    virtual bool GetShaderWgpMode(ShaderStage shaderStage) const;
+#endif
+
     // Gets float control settings of the specified shader stage for the provide floating-point type.
     virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const;
 
@@ -106,6 +117,10 @@ private:
 
     llvm::ArrayRef<ResourceMappingNode> MergeUserDataNodeTable(llvm::SmallVectorImpl<ResourceMappingNode>& allNodes);
 
+#if LLPC_BUILD_GFX10
+    void BuildNggCullingControlRegister();
+#endif
+
     const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
 
     uint32_t m_stageMask; // Mask of active shader stages bound to this graphics pipeline
@@ -116,6 +131,10 @@ private:
 
     bool            m_tessOffchip; // Whether to enable tessellation off-chip mode
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode
+
+#if LLPC_BUILD_GFX10
+    NggControl      m_nggControl;   // NGG control settings
+#endif
 
     llvm::SmallVector<std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingNode>>, 4>
                     m_allocUserDataNodes;               // Allocated merged user data nodes
