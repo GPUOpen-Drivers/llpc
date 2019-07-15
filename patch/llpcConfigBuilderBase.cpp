@@ -366,6 +366,36 @@ void ConfigBuilderBase::SetEsGsLdsByteSize(
     }
 }
 
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Set CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME
+void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
+    uint32_t value)   // Value to set
+{
+    if (GeneratingMsgPack())
+    {
+        m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
+    }
+    else
+    {
+        SetPseudoRegister(mmCALC_WAVE_BREAK_SIZE_AT_DRAW_TIME, value);
+    }
+}
+
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
+// =====================================================================================================================
+// Set Hardware stage wavefront
+
+void Llpc::ConfigBuilderBase::SetWaveFrontSize(Util::Abi::HardwareStage hwStage, uint32_t value)
+{
+    LLPC_ASSERT(GeneratingMsgPack());
+    auto hwShaderNode = GetHwShaderNode(hwStage);
+    hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
+}
+
+#endif
+#endif
+
 // =====================================================================================================================
 // Set USER_DATA_LIMIT (called once for the whole pipeline)
 void ConfigBuilderBase::SetUserDataLimit()

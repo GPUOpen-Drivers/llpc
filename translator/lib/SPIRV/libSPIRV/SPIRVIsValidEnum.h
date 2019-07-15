@@ -977,7 +977,9 @@ inline bool isValid(spv::Op V) {
   case OpGroupNonUniformLogicalXor:
   case OpGroupNonUniformQuadBroadcast:
   case OpGroupNonUniformQuadSwap:
+#if SPV_VERSION >= 0x10400
   case OpCopyLogical:
+#endif
   case OpForward:
   case OpSubgroupBallotKHR:
   case OpSubgroupFirstInvocationKHR:

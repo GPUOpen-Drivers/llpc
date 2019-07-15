@@ -24,6 +24,13 @@ ifeq ($(ICD_PLATFORM), win)
                 -D_UNICODE
 endif
 
+#if VKI_BUILD_GFX10
+ifeq ($(VKI_BUILD_GFX10),1)
+    LCXXDEFS += -DVKI_BUILD_GFX10=1
+    LCXXDEFS += -DLLPC_BUILD_GFX10=1
+endif
+#endif
+
 ifeq ($(ICD_PLATFORM), win)
     LCXXOPTS += /wd4267 \
                 /wd4312

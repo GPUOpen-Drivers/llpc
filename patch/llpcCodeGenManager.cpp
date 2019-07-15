@@ -202,6 +202,16 @@ void CodeGenManager::SetupTargetFeatures(
                 targetFeatures += ",+enable-scratch-bounds-checks";
             }
 
+#if LLPC_BUILD_GFX10
+            // Setup wavefront size per shader stage
+            if (gfxIp.major >= 10)
+            {
+                uint32_t waveSize = pContext->GetShaderWaveSize(shaderStage);
+
+                targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+            }
+#endif
+
             auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
             auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
             auto fp64Control = pContext->GetShaderFloatControl(shaderStage, 64);

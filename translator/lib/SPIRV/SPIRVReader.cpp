@@ -5018,8 +5018,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, Scale);
   }
 
+#if SPV_VERSION >= 0x10400
   case OpCopyObject:
   case OpCopyLogical: {
+#else
+  case OpCopyObject: {
+#endif
     SPIRVCopyBase *Copy = static_cast<SPIRVCopyBase *>(BV);
     AllocaInst* AI = nullptr;
     // NOTE: Alloc instructions not in the entry block will prevent LLVM from doing function

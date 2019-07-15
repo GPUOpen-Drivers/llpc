@@ -52,6 +52,11 @@ protected:
     // Get whether the context we are building in support the bpermute operation.
     bool SupportBPermute() const;
 
+#if LLPC_BUILD_GFX10
+    // Get whether the context we are building in supports permute lane DPP operations.
+    bool SupportPermLaneDpp() const;
+#endif
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
@@ -340,6 +345,21 @@ private:
                                  uint32_t           rowMask,
                                  uint32_t           bankMask,
                                  bool               boundCtrl);
+
+#if LLPC_BUILD_GFX10
+    llvm::Value* CreatePermLane16(llvm::Value* const pOrigValue,
+                                  llvm::Value* const pUpdateValue,
+                                  uint32_t           selectBitsLow,
+                                  uint32_t           selectBitsHigh,
+                                  bool               fetchInactive,
+                                  bool               boundCtrl);
+    llvm::Value* CreatePermLaneX16(llvm::Value* const pOrigValue,
+                                   llvm::Value* const pUpdateValue,
+                                   uint32_t           selectBitsLow,
+                                   uint32_t           selectBitsHigh,
+                                   bool               fetchInactive,
+                                   bool               boundCtrl);
+#endif
 
     llvm::Value* CreateDsSwizzle(llvm::Value* const pValue,
                                  uint16_t           dsPattern);

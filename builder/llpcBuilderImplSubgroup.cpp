@@ -187,6 +187,16 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitExtract(
     Value* const pIndex,   // [in] The bit index to extract. Must be an i32 type.
     const Twine& instName) // [in] Name to give final instruction.
 {
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        Value* const pIndexMask = CreateShl(getInt32(1), pIndex);
+        Value* const pValueAsInt32 = CreateExtractElement(pValue, getInt32(0));
+        Value* const pResult = CreateAnd(pIndexMask, pValueAsInt32);
+        return CreateICmpNE(pResult, getInt32(0));
+    }
+    else
+#endif
     {
         Value* pIndexMask = CreateZExtOrTrunc(pIndex, getInt64Ty());
         pIndexMask = CreateShl(getInt64(1), pIndexMask);
@@ -203,6 +213,13 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotBitCount(
     Value* const pValue,   // [in] The ballot value to bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        return CreateUnaryIntrinsic(Intrinsic::ctpop, CreateExtractElement(pValue, getInt32(0)));
+    }
+    else
+#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -229,6 +246,13 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotExclusiveBitCount(
     Value* const pValue,   // [in] The ballot value to exclusively bit count. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        return CreateSubgroupMbcnt(CreateExtractElement(pValue, getInt32(0)), "");
+    }
+    else
+#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -242,6 +266,14 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindLsb(
     Value* const pValue, // [in] The ballot value to find the least significant bit of. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        Value* const pResult = CreateExtractElement(pValue, getInt32(0));
+        return CreateIntrinsic(Intrinsic::cttz, getInt32Ty(), { pResult, getTrue() });
+    }
+    else
+#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -256,6 +288,15 @@ Value* BuilderImplSubgroup::CreateSubgroupBallotFindMsb(
     Value* const pValue,   // [in] The ballot value to find the most significant bit of. Must be an <4 x i32> type.
     const Twine& instName) // [in] Name to give final instruction.
 {
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        Value* pResult = CreateExtractElement(pValue, getInt32(0));
+        pResult = CreateIntrinsic(Intrinsic::ctlz, getInt32Ty(), { pResult, getTrue() });
+        return CreateSub(getInt32(31), pResult);
+    }
+    else
+#endif
     {
         Value* pResult = CreateShuffleVector(pValue, UndefValue::get(pValue->getType()), { 0, 1 });
         pResult = CreateBitCast(pResult, getInt64Ty());
@@ -372,6 +413,23 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppMov(pResult, DppCtrl::DppRowMirror, 0xF, 0xF, 0)), pResult);
 
+#if LLPC_BUILD_GFX10
+        if (SupportPermLaneDpp())
+        {
+            // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+            pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult,
+                    CreatePermLaneX16(pResult, pResult, UINT32_MAX, UINT32_MAX, true, false)), pResult);
+
+            Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
+            Value* const pBroadcast63 = CreateSubgroupBroadcast(pResult, getInt32(63), instName);
+
+            // Combine broadcast from the 31st and 63rd for the final result.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+                CreateGroupArithmeticOperation(groupArithOp, pBroadcast31, pBroadcast63), pResult);
+        }
+        else
+#endif
         {
             // Use a row broadcast to move the 15th element in each cluster of 16 to the next cluster. The row mask is
             // set to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.
@@ -500,6 +558,29 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredInclusive(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowSr8, 0xF, 0xC, 0)), pResult);
 
+#if LLPC_BUILD_GFX10
+        if (SupportPermLaneDpp())
+        {
+            Value* const pThreadMask = CreateThreadMask();
+
+            Value* const pMaskedPermLane = CreateThreadMaskedSelect(pThreadMask, 0xFFFF0000FFFF0000,
+                CreatePermLaneX16(pResult, pResult, UINT32_MAX, UINT32_MAX, true, false), pIdentity);
+
+            // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+            pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedPermLane), pResult);
+
+            Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
+
+            Value* const pMaskedBroadcast = CreateThreadMaskedSelect(pThreadMask, 0xFFFFFFFF00000000,
+                pBroadcast31, pIdentity);
+
+            // Combine broadcast of 31 with the top two rows only.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedBroadcast), pResult);
+        }
+        else
+#endif
         {
             // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
             // operation.
@@ -594,6 +675,40 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
 
         Value* pShiftRight = nullptr;
 
+#if LLPC_BUILD_GFX10
+        if (SupportPermLaneDpp())
+        {
+            Value* const pThreadMask = CreateThreadMask();
+
+            // Shift right within each row:
+            // ‭0b0110,0101,0100,0011,0010,0001,0000,1111‬ = 0x‭‭6543210F‬
+            // ‭0b1110,1101,1100,1011,1010,1001,1000,0111‬ = 0xEDCBA987
+            pShiftRight = CreatePermLane16(pSetInactive,
+                                           pSetInactive,
+                                           0x6543210F,
+                                           0xEDCBA987,
+                                           true,
+                                           false);
+
+            // Only needed for wave size 64.
+            if (GetShaderSubgroupSize() == 64)
+            {
+                // Need to write the value from the 16th invocation into the 48th.
+                pShiftRight = CreateSubgroupWriteInvocation(pShiftRight,
+                                                            CreateSubgroupBroadcast(pShiftRight, getInt32(16), ""),
+                                                            getInt32(48),
+                                                            "");
+            }
+
+            pShiftRight = CreateSubgroupWriteInvocation(pShiftRight, pIdentity, getInt32(16), "");
+
+            // Exchange first column value cross rows(row 1<--> row 0, row 3<-->row2)
+            // Only first column value from each row join permlanex
+            pShiftRight = CreateThreadMaskedSelect(pThreadMask, 0x0001000100010001,
+                CreatePermLaneX16(pShiftRight, pShiftRight, 0, UINT32_MAX, true, false), pShiftRight);
+        }
+        else
+#endif
         {
             // Shift the whole subgroup right by one, using a DPP update operation. This will ensure that the identity
             // value is in the 0th invocation and all other values are shifted up. All rows and banks are active (0xF).
@@ -627,6 +742,29 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredExclusive(
             CreateGroupArithmeticOperation(groupArithOp, pResult,
                 CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowSr8, 0xF, 0xC, 0)), pResult);
 
+#if LLPC_BUILD_GFX10
+        if (SupportPermLaneDpp())
+        {
+            Value* const pThreadMask = CreateThreadMask();
+
+            Value* const pMaskedPermLane = CreateThreadMaskedSelect(pThreadMask, 0xFFFF0000FFFF0000,
+                CreatePermLaneX16(pResult, pResult, UINT32_MAX, UINT32_MAX, true, false), pIdentity);
+
+            // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+            pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedPermLane), pResult);
+
+            Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
+
+            Value* const pMaskedBroadcast = CreateThreadMaskedSelect(pThreadMask, 0xFFFFFFFF00000000,
+                pBroadcast31, pIdentity);
+
+            // Combine broadcast of 31 with the top two rows only.
+            pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
+                CreateGroupArithmeticOperation(groupArithOp, pResult, pMaskedBroadcast), pResult);
+        }
+        else
+#endif
         {
             // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
             // operation.
@@ -868,6 +1006,13 @@ Value* BuilderImplSubgroup::CreateSubgroupMbcnt(
     Value* const pMaskHigh = CreateExtractElement(pMasks, getInt32(1));
     CallInst* const pMbcntLo = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, { pMaskLow, getInt32(0) });
 
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        return pMbcntLo;
+    }
+    else
+#endif
     {
         return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, { pMaskHigh, pMbcntLo });
     }
@@ -1080,6 +1225,110 @@ Value* BuilderImplSubgroup::CreateDppUpdate(
                           });
 }
 
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Create a call to permute lane.
+Value* BuilderImplSubgroup::CreatePermLane16(
+    Value* const pOrigValue,     // [in] The original value we are going to update.
+    Value* const pUpdateValue,   // [in] The value to update with.
+    uint32_t     selectBitsLow,  // Select bits low.
+    uint32_t     selectBitsHigh, // Select bits high.
+    bool         fetchInactive,  // FI mode, whether to fetch inactive lane.
+    bool         boundCtrl)      // Whether bound_ctrl is used or not.
+{
+    auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
+    {
+        Module* const pModule = builder.GetInsertBlock()->getModule();
+
+        Type* const pInt1Ty = builder.getInt1Ty();
+        Type* const pInt32Ty = builder.getInt32Ty();
+
+        FunctionCallee function = pModule->getOrInsertFunction("llvm.amdgcn.permlane16",
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt1Ty,
+                                                               pInt1Ty);
+
+        // TODO: Once GFX10 intrinsic amdgcn_permlane16 has been upstreamed, used CreateIntrinsic here.
+        return builder.CreateCall(function.getCallee(),
+                                  {
+                                       mappedArgs[0],
+                                       mappedArgs[1],
+                                       passthroughArgs[0],
+                                       passthroughArgs[1],
+                                       passthroughArgs[2],
+                                       passthroughArgs[3]
+                                  });
+    };
+
+    return CreateMapToInt32(pfnMapFunc,
+                          {
+                                pOrigValue,
+                                pUpdateValue,
+                          },
+                          {
+                                getInt32(selectBitsLow),
+                                getInt32(selectBitsHigh),
+                                getInt1(fetchInactive),
+                                getInt1(boundCtrl)
+                          });
+}
+
+// =====================================================================================================================
+// Create a call to permute lane.
+Value* BuilderImplSubgroup::CreatePermLaneX16(
+    Value* const pOrigValue,     // [in] The original value we are going to update.
+    Value* const pUpdateValue,   // [in] The value to update with.
+    uint32_t     selectBitsLow,  // Select bits low.
+    uint32_t     selectBitsHigh, // Select bits high.
+    bool         fetchInactive,  // FI mode, whether to fetch inactive lane.
+    bool         boundCtrl)      // Whether bound_ctrl is used or not.
+{
+    auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
+    {
+        Module* const pModule = builder.GetInsertBlock()->getModule();
+
+        Type* const pInt1Ty = builder.getInt1Ty();
+        Type* const pInt32Ty = builder.getInt32Ty();
+
+        FunctionCallee function = pModule->getOrInsertFunction("llvm.amdgcn.permlanex16",
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt32Ty,
+                                                               pInt1Ty,
+                                                               pInt1Ty);
+
+        // TODO: Once GFX10 intrinsic amdgcn_permlanex16 has been upstreamed, used CreateIntrinsic here.
+        return builder.CreateCall(function.getCallee(),
+                                  {
+                                       mappedArgs[0],
+                                       mappedArgs[1],
+                                       passthroughArgs[0],
+                                       passthroughArgs[1],
+                                       passthroughArgs[2],
+                                       passthroughArgs[3]
+                                  });
+    };
+
+    return CreateMapToInt32(pfnMapFunc,
+                          {
+                                pOrigValue,
+                                pUpdateValue,
+                          },
+                          {
+                                getInt32(selectBitsLow),
+                                getInt32(selectBitsHigh),
+                                getInt1(fetchInactive),
+                                getInt1(boundCtrl)
+                          });
+}
+#endif
+
 // =====================================================================================================================
 // Create a call to ds swizzle.
 Value* BuilderImplSubgroup::CreateDsSwizzle(
@@ -1157,6 +1406,13 @@ Value* BuilderImplSubgroup::CreateThreadMask()
 {
     Value* pThreadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
 
+#if LLPC_BUILD_GFX10
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        pThreadId = CreateShl(getInt32(1), pThreadId);
+    }
+    else
+#endif
     {
         pThreadId = CreateShl(getInt64(1), CreateZExtOrTrunc(pThreadId, getInt64Ty()));
     }
@@ -1210,5 +1466,12 @@ Value* BuilderImplSubgroup::CreateGroupBallot(
                                           pPredicateNE
                                      });
 
+#if LLPC_BUILD_GFX10
+    // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
+    if (GetShaderSubgroupSize() <= 32)
+    {
+        pResult = CreateZExt(pResult, getInt64Ty(), "");
+    }
+#endif
     return pResult;
 }

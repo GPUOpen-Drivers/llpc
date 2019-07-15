@@ -1003,6 +1003,25 @@ void InitEnumMap()
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorBufferCompact)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, StreamOutTableVaPtr)
 
+#if VKI_BUILD_GFX10
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+    ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
+#endif
+    ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)
+    ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, HalfSize)
+    ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForVerts)
+    ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForPrims)
+    ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Explicit)
+
+    ADD_ENUM_MAP(NggCompactMode, NggCompactSubgroup)
+    ADD_ENUM_MAP(NggCompactMode, NggCompactVertices)
+
+    ADD_CLASS_ENUM_MAP(WaveBreakSize, None)
+    ADD_CLASS_ENUM_MAP(WaveBreakSize, _8x8)
+    ADD_CLASS_ENUM_MAP(WaveBreakSize, _16x16)
+    ADD_CLASS_ENUM_MAP(WaveBreakSize, _32x32)
+    ADD_CLASS_ENUM_MAP(WaveBreakSize, DrawTime)
+#endif
 };
 
 }

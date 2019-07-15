@@ -78,6 +78,18 @@ const uint8_t Context::GlslEmuLibWaTreat1dImagesAs2d[] =
     #include "./generate/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h"
 };
 
+#if LLPC_BUILD_GFX10
+const uint8_t Context::GlslEmuLibGfx10[]=
+{
+    #include "./generate/gfx10/g_llpcGlslEmuLibGfx10.h"
+};
+
+const uint8_t Context::GlslEmuLibWaDisableI32ModToI16Mod[] =
+{
+    #include "./generate/wa/g_llpcGlslEmuLibDisableI32ModToI16Mod.h"
+};
+#endif
+
 // =====================================================================================================================
 Context::Context(
     GfxIpVersion gfxIp,                     // Graphics IP version info
@@ -126,6 +138,22 @@ Context::Context(
                 sizeof(GlslEmuLibWaTreat1dImagesAs2d)), "GlslEmuLibWaTreat1dImagesAs2d"));
     }
 
+#if LLPC_BUILD_GFX10
+    if (pGpuWorkarounds->gfx10.disableI32ModToI16Mod)
+    {
+        // Add library for "disable Int32Mod to Int16Mod workaround".
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibWaDisableI32ModToI16Mod),
+                sizeof(GlslEmuLibWaDisableI32ModToI16Mod)), "GlslEmuLibWaDisableI32ModToI16Mod"));
+    }
+#endif
+
+#if LLPC_BUILD_GFX10
+    if (gfxIp.major >= 10)
+    {
+        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx10),
+                sizeof(GlslEmuLibGfx10)), "GlslEmuLibGfx10"));
+    }
+#endif
     if (gfxIp.major >= 9)
     {
         m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),

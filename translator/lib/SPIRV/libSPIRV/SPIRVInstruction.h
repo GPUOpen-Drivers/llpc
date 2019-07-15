@@ -1961,6 +1961,7 @@ private:
   bool checkMemoryDecorates = true;
 };
 
+#if SPV_VERSION >= 0x10400
 class SPIRVCopyLogical : public SPIRVCopyBase {
 public:
   const static Op OC = OpCopyLogical;
@@ -2009,6 +2010,7 @@ private:
     return Match;
   }
 };
+#endif
 
 class SPIRVCopyMemory : public SPIRVInstruction, public SPIRVMemoryAccess {
 public:

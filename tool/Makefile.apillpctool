@@ -29,6 +29,19 @@ CPPFILES +=             \
     amdllpc.cpp         \
     llpcAutoLayout.cpp
 
+#if VKI_BUILD_GFX10
+# GFX10 specific settings
+ifeq ($(VKI_BUILD_GFX10), 1)
+    LLPC_BUILD_GFX10 = 1
+endif
+#endif
+
+#if LLPC_BUILD_GFX10
+ifeq ($(LLPC_BUILD_GFX10), 1)
+    LCXXDEFS += -DLLPC_BUILD_GFX10
+endif
+#endif
+
 EXE_TARGET = amdllpc
 
 ifeq ($(ICD_PLATFORM), win)
