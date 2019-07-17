@@ -70,6 +70,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcBuilder.cpp                     \
         llpcBuilderImpl.cpp                 \
         llpcBuilderImplDesc.cpp             \
+        llpcBuilderImplImage.cpp            \
         llpcBuilderImplMatrix.cpp           \
         llpcBuilderImplMisc.cpp             \
         llpcBuilderImplSubgroup.cpp         \
