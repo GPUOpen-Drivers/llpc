@@ -756,17 +756,21 @@ void BuilderRecorder::CheckFuncShaderStage(
     LLPC_ASSERT(shaderStage < ShaderStageCount);
     if (pFunc != m_pEnclosingFunc)
     {
-        auto mapIt = m_funcShaderStageMap.find(pFunc);
-        if (mapIt != m_funcShaderStageMap.end())
+        // The "function shader stage map" is in fact a vector of pairs of WeakVH (giving the function)
+        // and shader stage. It is done that way because a function can disappear through inlining during the
+        // lifetime of the BuilderRecorder, and then another function could potentially be allocated at the
+        // same address.
+        m_pEnclosingFunc = pFunc;
+        for (const auto& mapEntry : m_funcShaderStageMap)
         {
-            LLPC_ASSERT((mapIt->second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
+            if (mapEntry.first == pFunc)
+            {
+                LLPC_ASSERT((mapEntry.second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
+                return;
+            }
         }
-        else
-        {
-            m_funcShaderStageMap[pFunc] = shaderStage;
-        }
+        m_funcShaderStageMap.push_back({ pFunc, shaderStage });
     }
-    m_pEnclosingFunc = pFunc;
 }
 #endif
 

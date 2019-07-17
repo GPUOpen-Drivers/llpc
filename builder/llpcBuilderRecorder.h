@@ -31,6 +31,9 @@
 #pragma once
 
 #include "llpcBuilder.h"
+#ifndef NDEBUG
+#include "llvm/IR/ValueHandle.h"
+#endif
 
 namespace Llpc
 {
@@ -287,9 +290,9 @@ private:
                                                               //   pass
 #ifndef NDEBUG
     // Only used in a debug build to ensure SetShaderStage is being used consistently.
-    std::map<llvm::Function*, ShaderStage>  m_funcShaderStageMap;           // Map from function to shader stage
-    llvm::Function*                         m_pEnclosingFunc = nullptr;     // Last function written with current
-                                                                            //   shader stage
+    std::vector<std::pair<llvm::WeakVH, ShaderStage>> m_funcShaderStageMap;       // Map from function to shader stage
+    llvm::Function*                                   m_pEnclosingFunc = nullptr; // Last function written with current
+                                                                                  //   shader stage
 #endif
 };
 
