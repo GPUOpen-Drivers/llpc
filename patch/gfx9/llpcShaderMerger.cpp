@@ -35,6 +35,9 @@
 
 #include "llpcCodeGenManager.h"
 #include "llpcContext.h"
+#if LLPC_BUILD_GFX10
+#include "llpcNggPrimShader.h"
+#endif
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPassExternalLibLink.h"
 #include "llpcPatch.h"
@@ -54,6 +57,9 @@ ShaderMerger::ShaderMerger(
     m_pContext(pContext),
     m_gfxIp(m_pContext->GetGfxIpVersion()),
     m_pPipelineShaders(pPipelineShaders)
+#if LLPC_BUILD_GFX10
+    , m_primShader(pContext)
+#endif
 {
     LLPC_ASSERT(m_gfxIp.major >= 9);
     LLPC_ASSERT(m_pContext->IsGraphics());
@@ -64,6 +70,18 @@ ShaderMerger::ShaderMerger(
     m_hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
     m_hasGs  = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 }
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Builds LLVM function for hardware primitive shader (NGG).
+Function* ShaderMerger::BuildPrimShader(
+    Function*  pEsEntryPoint,     // [in] Entry-point of hardware export shader (ES)
+    Function*  pGsEntryPoint)     // [in] Entry-point of hardware geometry shader (GS) (could be null)
+{
+    NggPrimShader primShader(m_pContext);
+    return primShader.Generate(pEsEntryPoint, pGsEntryPoint);
+}
+#endif
 
 // =====================================================================================================================
 // Generates the type for the new entry-point of LS-HS merged shader.
@@ -153,7 +171,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     auto pModule = pHsEntryPoint->getParent();
     pModule->getFunctionList().insert(pHsEntryPoint->getIterator(), pEntryPoint);
 
-    pEntryPoint->addFnAttr("amdgpu-max-work-group-size", "128"); // Force s_barrier to be present (ignore optimization)
+    pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
 
     for (auto& arg : pEntryPoint->args())
     {
@@ -245,6 +263,10 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
 
     auto pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
+#if LLPC_BUILD_GFX10
+    uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageTessControl);
+    if (waveSize == 64)
+#endif
     {
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
@@ -622,7 +644,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                                              LlpcName::EsGsEntryPoint);
     pModule->getFunctionList().insert(pGsEntryPoint->getIterator(), pEntryPoint);
 
-    pEntryPoint->addFnAttr("amdgpu-max-work-group-size", "128"); // Force s_barrier to be present (ignore optimization)
+    pEntryPoint->addFnAttr("amdgpu-flat-work-group-size", "128,128"); // Force s_barrier to be present (ignore optimization)
 
     for (auto& arg : pEntryPoint->args())
     {
@@ -710,6 +732,10 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 
     auto pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
+#if LLPC_BUILD_GFX10
+    uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    if (waveSize == 64)
+#endif
     {
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));

@@ -1895,22 +1895,36 @@ protected:
   std::vector<SPIRVWord> Indices;
 };
 
-class SPIRVCopyObject : public SPIRVInstruction {
+class SPIRVCopyBase : public SPIRVInstruction {
+public:
+  // Complete constructor
+  SPIRVCopyBase(Op OC, SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand,
+    SPIRVBasicBlock *TheBB)
+    : SPIRVInstruction(4, OC, TheType, TheId, TheBB),
+    Operand(TheOperand->getId()) {
+    validate();
+    assert(TheBB && "Invalid BB");
+  }
+  // Incomplete constructor
+  SPIRVCopyBase(Op OC) : SPIRVInstruction(OC), Operand(SPIRVID_INVALID) {}
+
+  SPIRVValue *getOperand() { return getValue(Operand); }
+
+protected:
+  _SPIRV_DEF_ENCDEC3(Type, Id, Operand)
+  SPIRVId Operand;
+};
+
+class SPIRVCopyObject : public SPIRVCopyBase {
 public:
   const static Op OC = OpCopyObject;
 
   // Complete constructor
   SPIRVCopyObject(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand,
                   SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(4, OC, TheType, TheId, TheBB),
-        Operand(TheOperand->getId()) {
-    validate();
-    assert(TheBB && "Invalid BB");
-  }
+      : SPIRVCopyBase(OC, TheType, TheId, TheOperand, TheBB) {}
   // Incomplete constructor
-  SPIRVCopyObject() : SPIRVInstruction(OC), Operand(SPIRVID_INVALID) {}
-
-  SPIRVValue *getOperand() { return getValue(Operand); }
+  SPIRVCopyObject() : SPIRVCopyBase(OC) {}
 
   virtual bool isVolatile() override {
     if (checkMemoryDecorates)
@@ -1925,10 +1939,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Type, Id, Operand)
-
   void validate() const override { SPIRVInstruction::validate(); }
-  SPIRVId Operand;
 
 private:
   void propagateMemoryDecorates() {
@@ -1949,6 +1960,57 @@ private:
 
   bool checkMemoryDecorates = true;
 };
+
+#if SPV_VERSION >= 0x10400
+class SPIRVCopyLogical : public SPIRVCopyBase {
+public:
+  const static Op OC = OpCopyLogical;
+
+  // Complete constructor
+  SPIRVCopyLogical(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheOperand,
+                   SPIRVBasicBlock *TheBB)
+    : SPIRVCopyBase(OC, TheType, TheId, TheOperand, TheBB) {}
+  // Incomplete constructor
+  SPIRVCopyLogical() : SPIRVCopyBase(OC) {}
+
+protected:
+  void validate() const override {
+    assert((Type->isTypeArray() || Type->isTypeStruct()) &&
+      "Must be array or structure");
+    assert(logicallyMatch(Type, getValue(Operand)->getType()) &&
+      "Logically mismatch");
+    SPIRVInstruction::validate();
+  }
+
+private:
+  bool logicallyMatch(SPIRVType *Type, SPIRVType *CopyType) const {
+    bool Match = true;
+    if (Type->isTypeArray() && CopyType->isTypeArray()) {
+      // If array:
+      //  1. The array length must be the same;
+      //  2. Element types must be either the same or must logically match.
+      if (Type->getArrayLength() != CopyType->getArrayLength())
+        return false;
+
+      Match = logicallyMatch(Type->getArrayElementType(),
+                             CopyType->getArrayElementType());
+    } else if (Type->isTypeStruct() && CopyType->isTypeStruct()) {
+      // If structure:
+      //  1. Must have the same number of members;
+      //  2. Member types must be either the same or must logically match.
+      if (Type->getStructMemberCount() != CopyType->getStructMemberCount())
+        return false;
+
+      const unsigned MemberCount = Type->getStructMemberCount();
+      for (unsigned I = 0; (I < MemberCount) && Match; ++I)
+        Match = logicallyMatch(Type->getStructMemberType(I),
+                               CopyType->getStructMemberType(I));
+    } else
+      Match = (Type == CopyType);
+    return Match;
+  }
+};
+#endif
 
 class SPIRVCopyMemory : public SPIRVInstruction, public SPIRVMemoryAccess {
 public:

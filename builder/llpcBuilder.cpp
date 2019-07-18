@@ -347,3 +347,33 @@ Context& Builder::getContext() const
 {
     return *static_cast<Llpc::Context*>(&IRBuilder<>::getContext());
 }
+
+// =====================================================================================================================
+// Get the type of pointer returned by CreateLoadBufferDesc.
+PointerType* Builder::GetBufferDescTy(
+    Type*         pPointeeTy)         // [in] Type that the returned pointer should point to.
+{
+    return PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER);
+}
+
+// =====================================================================================================================
+// Get the type returned by CreateLoadResourceDesc.
+VectorType* Builder::GetResourceDescTy()
+{
+    return VectorType::get(getInt32Ty(), 8);
+}
+
+// =====================================================================================================================
+// Get the type returned by CreateLoadTexelBufferDesc.
+VectorType* Builder::GetTexelBufferDescTy()
+{
+    return VectorType::get(getInt32Ty(), 4);
+}
+
+// =====================================================================================================================
+// Get the type returned by CreateLoadSamplerDesc.
+VectorType* Builder::GetSamplerDescTy()
+{
+    return VectorType::get(getInt32Ty(), 4);
+}
+

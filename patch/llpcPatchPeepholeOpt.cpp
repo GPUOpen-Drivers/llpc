@@ -30,15 +30,30 @@
  */
 #define DEBUG_TYPE "llpc-patch-peephole-opt"
 
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llpcContext.h"
 #include "llpcPatchPeepholeOpt.h"
 
 using namespace Llpc;
 using namespace llvm;
+
+namespace llvm
+{
+
+namespace cl
+{
+// -enable-discard-opt: Enable the optimization for "kill" intrinsic.
+static opt<bool> EnableDiscardOpt("enable-discard-opt",
+                                  desc("Enable the optimization for \"kill\" intrinsic."),
+                                  init(false));
+} // cl
+
+} // llvm
 
 namespace Llpc
 {
@@ -49,17 +64,20 @@ char PatchPeepholeOpt::ID;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of LLVM patching operations for peephole optimizations.
-FunctionPass* CreatePatchPeepholeOpt()
+FunctionPass* CreatePatchPeepholeOpt(
+    bool enableDiscardOpt) // Enable the optimization for "kill" intrinsic
 {
-    return new PatchPeepholeOpt();
+    return new PatchPeepholeOpt(enableDiscardOpt);
 }
 
 // =====================================================================================================================
-PatchPeepholeOpt::PatchPeepholeOpt()
+PatchPeepholeOpt::PatchPeepholeOpt(
+    bool enableDiscardOpt) // Enable the optimization for "kill" intrinsic
     :
     FunctionPass(ID)
 {
     initializePatchPeepholeOptPass(*PassRegistry::getPassRegistry());
+    m_enableDiscardOpt = enableDiscardOpt;
 }
 
 // =====================================================================================================================
@@ -841,6 +859,73 @@ void PatchPeepholeOpt::visitPHINode(
 
                 // We've optimized the PHI, so we're done!
                 return;
+            }
+        }
+    }
+}
+
+// =====================================================================================================================
+// Visits "call" instruction.
+void PatchPeepholeOpt::visitCallInst(
+    CallInst& callInst) // [in] "Call" instruction
+{
+    auto pCallee = callInst.getCalledFunction();
+    if (pCallee == nullptr)
+    {
+        return;
+    }
+
+    // Optimization for call @llvm.amdgcn.kill(). Pattern:
+    //   %29 = fcmp olt float %28, 0.000000e+00
+    //   br i1 % 29, label %30, label %31
+    // 30:; preds = %.entry
+    //   call void @llvm.amdgcn.kill(i1 false)
+    //   br label %73
+    //
+    // Move the kill call outside and remove the kill call block
+    //   %29 = fcmp olt float %28, 0.000000e+00
+    //   %nonkill = xor i1 %29, true
+    //   call void @llvm.amdgcn.kill(i1 %nonkill)
+    //   br i1 false, label %30, label %31
+    // 30:; preds = %.entry
+    //   call void @llvm.amdgcn.kill(i1 false)
+    //   br label %73
+    if (cl::EnableDiscardOpt && m_enableDiscardOpt && (pCallee->getIntrinsicID() == Intrinsic::amdgcn_kill))
+    {
+        auto pBlock = callInst.getParent();
+        if (pBlock->size() > 2)
+        {
+            // Apply the optimization to blocks that contains single kill call instruction.
+            return;
+        }
+
+        for (BasicBlock *pPredBlock : predecessors(pBlock))
+        {
+            auto pTerminator = pPredBlock->getTerminator();
+            BranchInst* pBranch = dyn_cast<BranchInst>(pTerminator);
+            if (pBranch && pBranch->isConditional())
+            {
+                auto pCond = pBranch->getCondition();
+                auto pTrueBlock = dyn_cast<BasicBlock>(pBranch->getSuccessor(0));
+                auto pNewKill = dyn_cast<CallInst>(callInst.clone());
+                Context* pContext = static_cast<Context*>(&callInst.getContext());
+
+                if (pTrueBlock == pBlock)
+                {
+                    // the kill block is the true condition block
+                    // insert a bitwise not instruction.
+                    auto pNotCond = BinaryOperator::CreateNot(pCond, "", pTerminator);
+                    pNewKill->setArgOperand(0, pNotCond);
+                    // Make the kill block unreachable
+                    pBranch->setCondition(ConstantInt::get(pContext->BoolTy(), false));
+                }
+                else
+                {
+                    pNewKill->setArgOperand(0, pCond);
+                    // make the kill block unreachable
+                    pBranch->setCondition(ConstantInt::get(pContext->BoolTy(), true));
+                }
+                pNewKill->insertBefore(pTerminator);
             }
         }
     }

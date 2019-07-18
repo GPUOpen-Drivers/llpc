@@ -52,6 +52,11 @@ protected:
     // Get whether the context we are building in support the bpermute operation.
     bool SupportBPermute() const;
 
+#if LLPC_BUILD_GFX10
+    // Get whether the context we are building in supports permute lane DPP operations.
+    bool SupportPermLaneDpp() const;
+#endif
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
@@ -67,7 +72,7 @@ public:
     // Create a waterfall loop containing the specified instruction.
     llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
                                            llvm::ArrayRef<uint32_t> operandIdxs,
-                                           const llvm::Twine&       instName) override final;
+                                           const llvm::Twine&       instName = "") override final;
 
     // Create a load of a buffer descriptor.
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
@@ -341,6 +346,21 @@ private:
                                  uint32_t           bankMask,
                                  bool               boundCtrl);
 
+#if LLPC_BUILD_GFX10
+    llvm::Value* CreatePermLane16(llvm::Value* const pOrigValue,
+                                  llvm::Value* const pUpdateValue,
+                                  uint32_t           selectBitsLow,
+                                  uint32_t           selectBitsHigh,
+                                  bool               fetchInactive,
+                                  bool               boundCtrl);
+    llvm::Value* CreatePermLaneX16(llvm::Value* const pOrigValue,
+                                   llvm::Value* const pUpdateValue,
+                                   uint32_t           selectBitsLow,
+                                   uint32_t           selectBitsHigh,
+                                   bool               fetchInactive,
+                                   bool               boundCtrl);
+#endif
+
     llvm::Value* CreateDsSwizzle(llvm::Value* const pValue,
                                  uint16_t           dsPattern);
     llvm::Value* CreateWwm(llvm::Value* const pValue);
@@ -365,7 +385,10 @@ private:
 
 // =====================================================================================================================
 // The Builder implementation, encompassing all the individual builder implementation subclasses
-class BuilderImpl final : public BuilderImplDesc, public BuilderImplMatrix, public BuilderImplMisc, BuilderImplSubgroup
+class BuilderImpl final : public BuilderImplDesc,
+                                 BuilderImplMatrix,
+                                 BuilderImplMisc,
+                                 BuilderImplSubgroup
 {
 public:
     BuilderImpl(llvm::LLVMContext& context) : BuilderImplBase(context),

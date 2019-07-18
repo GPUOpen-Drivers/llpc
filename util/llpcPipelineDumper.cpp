@@ -69,6 +69,11 @@ std::ostream& operator<<(std::ostream& out, VkPolygonMode           polygonMode)
 std::ostream& operator<<(std::ostream& out, VkCullModeFlagBits      cullMode);
 std::ostream& operator<<(std::ostream& out, VkFrontFace             frontFace);
 std::ostream& operator<<(std::ostream& out, ResourceMappingNodeType type);
+#if LLPC_BUILD_GFX10
+std::ostream& operator<<(std::ostream& out, NggSubgroupSizingType   subgroupSizing);
+std::ostream& operator<<(std::ostream& out, NggCompactMode          compactMode);
+std::ostream& operator<<(std::ostream& out, WaveBreakSize           waveBreakSize);
+#endif
 
 template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
 template raw_ostream& operator<<(raw_ostream& out, ElfReader<Elf64>& reader);
@@ -615,6 +620,11 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
     dumpFile << "options.sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
     dumpFile << "options.maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
+#if LLPC_BUILD_GFX10
+    dumpFile << "options.waveSize = " << pShaderInfo->options.waveSize << "\n";
+    dumpFile << "options.wgpMode = " << pShaderInfo->options.wgpMode << "\n";
+    dumpFile << "options.waveBreakSize = " << pShaderInfo->options.waveBreakSize << "\n";
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
     dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
 #endif
@@ -776,6 +786,25 @@ void PipelineDumper::DumpGraphicsStateInfo(
         }
     }
 
+#if LLPC_BUILD_GFX10
+    dumpFile << "nggState.enableNgg = " << pPipelineInfo->nggState.enableNgg << "\n";
+    dumpFile << "nggState.enableGsUse = " << pPipelineInfo->nggState.enableGsUse << "\n";
+    dumpFile << "nggState.forceNonPassthrough = " << pPipelineInfo->nggState.forceNonPassthrough << "\n";
+    dumpFile << "nggState.alwaysUsePrimShaderTable = " << pPipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
+    dumpFile << "nggState.compactMode = " << pPipelineInfo->nggState.compactMode << "\n";
+    dumpFile << "nggState.enableFastLaunch = " << pPipelineInfo->nggState.enableFastLaunch << "\n";
+    dumpFile << "nggState.enableVertexReuse = " << pPipelineInfo->nggState.enableVertexReuse << "\n";
+    dumpFile << "nggState.enableBackfaceCulling = " << pPipelineInfo->nggState.enableBackfaceCulling << "\n";
+    dumpFile << "nggState.enableFrustumCulling = " << pPipelineInfo->nggState.enableFrustumCulling << "\n";
+    dumpFile << "nggState.enableBoxFilterCulling = " << pPipelineInfo->nggState.enableBoxFilterCulling << "\n";
+    dumpFile << "nggState.enableSphereCulling = " << pPipelineInfo->nggState.enableSphereCulling << "\n";
+    dumpFile << "nggState.enableSmallPrimFilter = " << pPipelineInfo->nggState.enableSmallPrimFilter << "\n";
+    dumpFile << "nggState.enableCullDistanceCulling = " << pPipelineInfo->nggState.enableCullDistanceCulling << "\n";
+    dumpFile << "nggState.backfaceExponent = " << pPipelineInfo->nggState.backfaceExponent << "\n";
+    dumpFile << "nggState.subgroupSizing = " << pPipelineInfo->nggState.subgroupSizing << "\n";
+    dumpFile << "nggState.primsPerSubgroup = " << pPipelineInfo->nggState.primsPerSubgroup << "\n";
+    dumpFile << "nggState.vertsPerSubgroup = " << pPipelineInfo->nggState.vertsPerSubgroup << "\n";
+#endif
     DumpPipelineOptions(&pPipelineInfo->options, dumpFile);
     dumpFile << "\n\n";
 
@@ -951,7 +980,23 @@ void PipelineDumper::UpdateHashForNonFragmentState(
     auto pRsState = &pPipeline->rsState;
     pHasher->Update(pRsState->rasterizerDiscardEnable);
 
+#if LLPC_BUILD_GFX10
+    auto pNggState = &pPipeline->nggState;
+    bool enableNgg = pNggState->enableNgg;
+    bool passthroughMode =
+        (pNggState->enableVertexReuse == false) &&
+        (pNggState->enableBackfaceCulling == false) &&
+        (pNggState->enableFrustumCulling == false) &&
+        (pNggState->enableBoxFilterCulling == false) &&
+        (pNggState->enableSphereCulling == false) &&
+        (pNggState->enableSmallPrimFilter == false) &&
+        (pNggState->enableCullDistanceCulling == false);
+#endif
+
     bool updateHashFromRs = (isCacheHash == false);
+#if LLPC_BUILD_GFX10
+    updateHashFromRs |= (enableNgg && (passthroughMode == false));
+#endif
 
     if (updateHashFromRs)
     {
@@ -964,6 +1009,25 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 
     if (isCacheHash)
     {
+#if LLPC_BUILD_GFX10
+        pHasher->Update(pNggState->enableNgg);
+        pHasher->Update(pNggState->enableGsUse);
+        pHasher->Update(pNggState->forceNonPassthrough);
+        pHasher->Update(pNggState->alwaysUsePrimShaderTable);
+        pHasher->Update(pNggState->compactMode);
+        pHasher->Update(pNggState->enableFastLaunch);
+        pHasher->Update(pNggState->enableVertexReuse);
+        pHasher->Update(pNggState->enableBackfaceCulling);
+        pHasher->Update(pNggState->enableFrustumCulling);
+        pHasher->Update(pNggState->enableBoxFilterCulling);
+        pHasher->Update(pNggState->enableSphereCulling);
+        pHasher->Update(pNggState->enableSmallPrimFilter);
+        pHasher->Update(pNggState->enableCullDistanceCulling);
+        pHasher->Update(pNggState->backfaceExponent);
+        pHasher->Update(pNggState->subgroupSizing);
+        pHasher->Update(pNggState->primsPerSubgroup);
+        pHasher->Update(pNggState->vertsPerSubgroup);
+#endif
 
         pHasher->Update(pPipeline->options.includeDisassembly);
         pHasher->Update(pPipeline->options.autoLayoutDesc);
@@ -1095,6 +1159,11 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.sgprLimit);
             pHasher->Update(options.vgprLimit);
             pHasher->Update(options.maxThreadGroupsPerComputeUnit);
+#if LLPC_BUILD_GFX10
+            pHasher->Update(options.waveSize);
+            pHasher->Update(options.wgpMode);
+            pHasher->Update(options.waveBreakSize);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
             pHasher->Update(options.forceLoopUnrollCount);
 #endif
@@ -1692,6 +1761,77 @@ std::ostream& operator<<(
 {
     return out << GetResourceMappingNodeTypeName(type);
 }
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Translates enum "NggSubgroupSizingType" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&           out,            // [out] Output stream
+    NggSubgroupSizingType   subgroupSizing) // NGG sub-group sizing type
+{
+    const char* pString = nullptr;
+    switch (subgroupSizing)
+    {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+    CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Auto)
+#endif
+    CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, MaximumSize)
+    CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, HalfSize)
+    CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, OptimizeForVerts)
+    CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, OptimizeForPrims)
+    CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Explicit)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return out << pString;
+}
+
+// =====================================================================================================================
+// Translates enum "NggCompactMode" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&   out,         // [out] Output stream
+    NggCompactMode  compactMode) // NGG compaction mode
+{
+    const char* pString = nullptr;
+    switch (compactMode)
+    {
+    CASE_ENUM_TO_STRING(NggCompactSubgroup)
+    CASE_ENUM_TO_STRING(NggCompactVertices)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return out << pString;
+}
+
+// =====================================================================================================================
+// Translates enum "WaveBreakSize" to string and output to ostream.
+std::ostream& operator<<(
+    std::ostream&   out,            // [out] Output stream
+    WaveBreakSize   waveBreakSize)  // Wave break size
+{
+    const char* pString = nullptr;
+    switch (waveBreakSize)
+    {
+    CASE_CLASSENUM_TO_STRING(WaveBreakSize, None)
+    CASE_CLASSENUM_TO_STRING(WaveBreakSize, _8x8)
+    CASE_CLASSENUM_TO_STRING(WaveBreakSize, _16x16)
+    CASE_CLASSENUM_TO_STRING(WaveBreakSize, _32x32)
+    CASE_CLASSENUM_TO_STRING(WaveBreakSize, DrawTime)
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return out << pString;
+}
+#endif
 
 // =====================================================================================================================
 // Translates enum "VkPrimitiveTopology" to string and output to ostream.

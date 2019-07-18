@@ -364,6 +364,10 @@ void PatchDescriptorLoad::visitCallInst(
                             &callInst);
 
                         // DWORD3
+#if LLPC_BUILD_GFX10
+                        const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+                        if (gfxIp.major < 10)
+#endif
                         {
                             SqBufRsrcWord3 sqBufRsrcWord3 = {};
                             sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
@@ -380,6 +384,30 @@ void PatchDescriptorLoad::visitCallInst(
                                 "",
                                 &callInst);
                         }
+#if LLPC_BUILD_GFX10
+                        else if (gfxIp.major == 10)
+                        {
+                            SqBufRsrcWord3 sqBufRsrcWord3 = {};
+                            sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+                            sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+                            sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+                            sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+                            sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
+                            sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
+                            sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
+                            LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
+
+                            pBufDesc = InsertElementInst::Create(pBufDesc,
+                                ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                                ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                "",
+                                &callInst);
+                        }
+                        else
+                        {
+                            LLPC_NOT_IMPLEMENTED();
+                        }
+#endif
 
                         pDesc = pBufDesc;
                     }

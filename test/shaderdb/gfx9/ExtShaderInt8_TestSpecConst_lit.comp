@@ -130,25 +130,51 @@ void main()
     buf.b = buf.b || i8_le;
     buf.b = buf.b || i8_lt;
 }
+
 // BEGIN_SHADERTEST
 /*
-; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: add i8 %{{[0-9]*}}, 16
 ; SHADERTEST: add i8 %{{[0-9]*}}, 32
 ; SHADERTEST: add i8 %{{[0-9]*}}, 64
 ; SHADERTEST: add i8 %{{[0-9]*}}, -16
 ; SHADERTEST: add i8 %{{[0-9]*}}, -32
 ; SHADERTEST: add i8 %{{[0-9]*}}, -64
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: add i16 %{{[0-9]*}}, 8
+; SHADERTEST: add i16 %{{[0-9]*}}, -8
+; SHADERTEST: add i32 %{{[0-9]*}}, 8
+; SHADERTEST: add i32 %{{[0-9]*}}, -8
+; SHADERTEST: add i64 %{{[0-9]*}}, 8
+; SHADERTEST: add i64 %{{[0-9]*}}, -8
 ; SHADERTEST: add i8 %{{[0-9]*}}, 16
-; SHADERTEST: add i8 %{{[0-9]*}}, 32
+; SHADERTEST: add i8 %{{[0-9]*}}, 0
 ; SHADERTEST: add i8 %{{[0-9]*}}, 64
+; SHADERTEST: add i8 %{{[0-9]*}}, 1
+; SHADERTEST: add i8 %{{[0-9]*}}, 0
 ; SHADERTEST: add i8 %{{[0-9]*}}, -16
-; SHADERTEST: add i8 %{{[0-9]*}}, -32
-; SHADERTEST: add i8 %{{[0-9]*}}, -64
+; SHADERTEST: add i8 %{{[0-9]*}}, 0
+; SHADERTEST: add i8 %{{[0-9]*}}, 64
+; SHADERTEST: add i8 %{{[0-9]*}}, 1
+; SHADERTEST: add i8 %{{[0-9]*}}, 0
+; SHADERTEST: add i8 %{{[0-9]*}}, -9
+; SHADERTEST: add i8 %{{[0-9]*}}, 8
+; SHADERTEST: add i8 %{{[0-9]*}}, 8
+; SHADERTEST: add i8 %{{[0-9]*}}, 0
+; SHADERTEST: add i8 %{{[0-9]*}}, 64
+; SHADERTEST: add i8 %{{[0-9]*}}, -1
+; SHADERTEST: add i8 %{{[0-9]*}}, 1
+; SHADERTEST: or i1 %{{[0-9]*}}, false
+; SHADERTEST: or i1 %{{[0-9]*}}, true
+; SHADERTEST: or i1 %{{[0-9]*}}, true
+; SHADERTEST: or i1 %{{[0-9]*}}, false
+; SHADERTEST: or i1 %{{[0-9]*}}, true
+; SHADERTEST: or i1 %{{[0-9]*}}, false
+; SHADERTEST: or i1 %{{[0-9]*}}, true
+; SHADERTEST: or i1 %{{[0-9]*}}, false
+; SHADERTEST: or i1 %{{[0-9]*}}, true
+; SHADERTEST: or i1 %{{[0-9]*}}, false
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

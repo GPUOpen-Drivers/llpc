@@ -34,6 +34,9 @@
 
 #include "llpc.h"
 #include "llpcInternal.h"
+#if LLPC_BUILD_GFX10
+#include "llpcNggPrimShader.h"
+#endif
 #include "llpcPipelineShaders.h"
 
 namespace Llpc
@@ -64,11 +67,18 @@ enum EsGsSpecialSysValue
     EsGsSysValueUserDataAddrLow         = 0,
     EsGsSysValueUserDataAddrHigh        = 1,
     EsGsSysValueGsVsOffset              = 2,
+#if LLPC_BUILD_GFX10
+    EsGsSysValueMergedGroupInfo         = 2,
+#endif
     EsGsSysValueMergedWaveInfo          = 3,
     EsGsSysValueOffChipLdsBase          = 4,
     EsGsSysValueSharedScratchOffset     = 5,
     EsGsSysValueGsShaderAddrLow         = 6,
     EsGsSysValueGsShaderAddrHigh        = 7,
+#if LLPC_BUILD_GFX10
+    EsGsSysValuePrimShaderTableAddrLow  = 6,
+    EsGsSysValuePrimShaderTableAddrHigh = 7,
+#endif
 
     EsGsSpecialSysValueCount,
 };
@@ -82,6 +92,9 @@ public:
 
     llvm::Function* GenerateLsHsEntryPoint(llvm::Function* pLsEntryPoint, llvm::Function* pHsEntryPoint);
     llvm::Function* GenerateEsGsEntryPoint(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
+#if LLPC_BUILD_GFX10
+    llvm::Function* BuildPrimShader(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
+#endif
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ShaderMerger);
@@ -95,6 +108,10 @@ private:
     Context*          m_pContext;           // LLPC context
     GfxIpVersion      m_gfxIp;              // Graphics IP version info
     PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline
+
+#if LLPC_BUILD_GFX10
+    NggPrimShader     m_primShader; // Manager of NGG primitive shader
+#endif
 
     bool        m_hasVs;        // Whether the pipeline has vertex shader
     bool        m_hasTcs;       // Whether the pipeline has tessellation control shader

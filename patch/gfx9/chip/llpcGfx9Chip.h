@@ -63,6 +63,54 @@ namespace Llpc
 #define INIT_REG_TO_INVALID(_reg) { _reg##_ID = InvalidMetadataKey; _reg##_VAL.u32All = InvalidMetadataValue; }
 
 // Initializes GFX-dependent register ID and its value
+#if LLPC_BUILD_GFX10
+// GFX9 plus
+#define INIT_REG_GFX9_PLUS(_gfx, _reg) \
+{ \
+    if (_gfx == 9) \
+    { \
+        _reg##_ID         = Gfx09::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else if (_gfx == 10) \
+    { \
+        _reg##_ID         = Gfx10::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else \
+    { \
+        INIT_REG_TO_INVALID(_reg); \
+    } \
+}
+
+// GFX10 plus
+#define INIT_REG_GFX10_PLUS(_gfx, _reg) \
+{ \
+    if (_gfx == 10) \
+    { \
+        _reg##_ID         = Gfx10::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else \
+    { \
+        INIT_REG_TO_INVALID(_reg); \
+    } \
+}
+
+// GFX10.1 plus
+#define INIT_REG_GFX10_1_PLUS(_gfxMajor, _gfxMinor, _reg) \
+{ \
+    if ((_gfxMajor == 10) && (_gfxMinor > 0)) \
+    { \
+        _reg##_ID         = Gfx101Plus::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else \
+    { \
+        INIT_REG_TO_INVALID(_reg); \
+    } \
+}
+#else
 #define INIT_REG_GFX9_PLUS(_gfx, _reg) \
 { \
     if (_gfx == 9) \
@@ -75,6 +123,7 @@ namespace Llpc
         INIT_REG_TO_INVALID(_reg); \
     } \
 }
+#endif
 
 // GFX9 only
 #define INIT_REG_GFX9(_gfx, _reg) \
@@ -90,6 +139,22 @@ namespace Llpc
     } \
 }
 
+#if LLPC_BUILD_GFX10
+// GFX10 only
+#define INIT_REG_GFX10(_gfx, _reg) \
+{ \
+    if (_gfx == 10) \
+    { \
+        _reg##_ID         = Gfx10::mm##_reg; \
+        _reg##_VAL.u32All = 0; \
+    } \
+    else \
+    { \
+        INIT_REG_TO_INVALID(_reg); \
+    } \
+}
+#endif
+
 // Case label for switch, set register value
 #define CASE_SET_REG(_stage, _reg, _val)   case (mm##_reg * 4): { (_stage)->_reg##_VAL.u32All = (_val); break; }
 
@@ -97,6 +162,10 @@ namespace Llpc
 #define ADD_REG_MAP(_reg)               RegNameMap[mm##_reg * 4] = #_reg;
 
 #define ADD_REG_MAP_GFX9(_reg)          RegNameMapGfx9[Gfx09::mm##_reg * 4] = #_reg;
+#if LLPC_BUILD_GFX10
+#define ADD_REG_MAP_GFX10(_reg)         RegNameMapGfx10[Gfx10::mm##_reg * 4] = #_reg;
+#define ADD_REG_MAP_GFX10_1_PLUS(_reg)  RegNameMapGfx10[Gfx101Plus::mm##_reg * 4] = #_reg;
+#endif
 
 // Gets register value
 #define GET_REG(_stage, _reg)                      ((_stage)->_reg##_VAL.u32All)
@@ -118,9 +187,16 @@ namespace Llpc
 
 // Gets GFX-dependent register field value
 #define GET_REG_GFX9_FIELD(_stage, _reg, _field)    ((_stage)->_reg##_VAL.gfx09._field)
+#if LLPC_BUILD_GFX10
+#define GET_REG_GFX10_FIELD(_stage, _reg, _field)   ((_stage)->_reg##_VAL.gfx10._field)
+#endif
 
 // Sets GFX-dependent register field value
 #define SET_REG_GFX9_FIELD(_stage, _reg, _field, _val)      (_stage)->_reg##_VAL.gfx09._field = (_val);
+#if LLPC_BUILD_GFX10
+#define SET_REG_GFX10_FIELD(_stage, _reg, _field, _val)     (_stage)->_reg##_VAL.gfx10._field = (_val);
+#define SET_REG_GFX10_1_FIELD(_stage, _reg, _field, _val)   (_stage)->_reg##_VAL.gfx101._field = (_val);
+#endif
 
 // Preferred number of GS primitives per ES thread.
 constexpr uint32_t GsPrimsPerEsThread = 256;
@@ -164,6 +240,16 @@ enum StereoMode : uint32_t
     SHADER_STEREO_XYZW             = 2,
 };
 
+#if LLPC_BUILD_GFX10
+namespace Gfx10
+{
+    constexpr unsigned int mmSPI_SHADER_PGM_CHKSUM_GS               = Apu09_1xPlus::mmSPI_SHADER_PGM_CHKSUM_GS;
+    constexpr unsigned int mmSPI_SHADER_PGM_CHKSUM_HS               = Apu09_1xPlus::mmSPI_SHADER_PGM_CHKSUM_HS;
+    constexpr unsigned int mmSPI_SHADER_PGM_CHKSUM_PS               = Apu09_1xPlus::mmSPI_SHADER_PGM_CHKSUM_PS;
+    constexpr unsigned int mmSPI_SHADER_PGM_CHKSUM_VS               = Apu09_1xPlus::mmSPI_SHADER_PGM_CHKSUM_VS;
+};
+#endif
+
 // =====================================================================================================================
 // Represents configuration of static registers relevant to hardware vertex shader.
 struct VsRegConfig
@@ -184,6 +270,13 @@ struct VsRegConfig
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_1);
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_2);
     DEF_REG(VGT_STRMOUT_VTX_STRIDE_3);
+#if LLPC_BUILD_GFX10
+    DEF_REG(SPI_SHADER_PGM_CHKSUM_VS);
+    DEF_REG(SPI_SHADER_USER_ACCUM_VS_0);
+    DEF_REG(SPI_SHADER_USER_ACCUM_VS_1);
+    DEF_REG(SPI_SHADER_USER_ACCUM_VS_2);
+    DEF_REG(SPI_SHADER_USER_ACCUM_VS_3);
+#endif
 
     void Init(GfxIpVersion gfxIp);
 };
@@ -198,6 +291,13 @@ struct LsHsRegConfig
     DEF_REG(VGT_HOS_MIN_TESS_LEVEL);
     DEF_REG(VGT_HOS_MAX_TESS_LEVEL);
     DEF_REG(VGT_TF_PARAM);
+#if LLPC_BUILD_GFX10
+    DEF_REG(SPI_SHADER_PGM_CHKSUM_HS);
+    DEF_REG(SPI_SHADER_USER_ACCUM_LSHS_0);
+    DEF_REG(SPI_SHADER_USER_ACCUM_LSHS_1);
+    DEF_REG(SPI_SHADER_USER_ACCUM_LSHS_2);
+    DEF_REG(SPI_SHADER_USER_ACCUM_LSHS_3);
+#endif
 
     void Init(GfxIpVersion gfxIp);
 };
@@ -225,9 +325,66 @@ struct EsGsRegConfig
     DEF_REG(VGT_GS_MODE);
     DEF_REG(VGT_ESGS_RING_ITEMSIZE);
     DEF_REG(VGT_GS_MAX_PRIMS_PER_SUBGROUP);
+#if LLPC_BUILD_GFX10
+    DEF_REG(GE_MAX_OUTPUT_PER_SUBGROUP);
+    DEF_REG(SPI_SHADER_PGM_CHKSUM_GS);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_0);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_1);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_2);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_3);
+
+    DEF_REG(GE_NGG_SUBGRP_CNTL);
+    DEF_REG(SPI_SHADER_IDX_FORMAT);
+#endif
 
     void Init(GfxIpVersion gfxIp);
 };
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Represents configuration of static registers relevant to hardware primitive shader (NGG).
+struct PrimShaderRegConfig
+{
+    DEF_REG(SPI_SHADER_PGM_RSRC1_GS);
+    DEF_REG(SPI_SHADER_PGM_RSRC2_GS);
+    DEF_REG(SPI_SHADER_PGM_RSRC4_GS);
+    DEF_REG(VGT_GS_MAX_VERT_OUT);
+    DEF_REG(VGT_GS_ONCHIP_CNTL);
+    DEF_REG(VGT_GS_VERT_ITEMSIZE);
+    DEF_REG(VGT_GS_INSTANCE_CNT);
+    DEF_REG(VGT_GS_PER_VS);
+    DEF_REG(VGT_GS_OUT_PRIM_TYPE);
+    DEF_REG(VGT_GSVS_RING_ITEMSIZE);
+    DEF_REG(VGT_GS_VERT_ITEMSIZE_1);
+    DEF_REG(VGT_GS_VERT_ITEMSIZE_2);
+    DEF_REG(VGT_GS_VERT_ITEMSIZE_3);
+    DEF_REG(VGT_GSVS_RING_OFFSET_1);
+    DEF_REG(VGT_GSVS_RING_OFFSET_2);
+    DEF_REG(VGT_GSVS_RING_OFFSET_3);
+    DEF_REG(VGT_GS_MODE);
+    DEF_REG(VGT_ESGS_RING_ITEMSIZE);
+    DEF_REG(GE_MAX_OUTPUT_PER_SUBGROUP);
+    DEF_REG(SPI_SHADER_PGM_CHKSUM_GS);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_0);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_1);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_2);
+    DEF_REG(SPI_SHADER_USER_ACCUM_ESGS_3);
+
+    DEF_REG(SPI_SHADER_POS_FORMAT);
+    DEF_REG(SPI_VS_OUT_CONFIG);
+    DEF_REG(PA_CL_VS_OUT_CNTL);
+    DEF_REG(PA_CL_CLIP_CNTL);
+    DEF_REG(PA_CL_VTE_CNTL);
+    DEF_REG(PA_SU_VTX_CNTL);
+    DEF_REG(VGT_PRIMITIVEID_EN);
+    DEF_REG(VGT_REUSE_OFF);
+
+    DEF_REG(GE_NGG_SUBGRP_CNTL);
+    DEF_REG(SPI_SHADER_IDX_FORMAT);
+
+    void Init(GfxIpVersion gfxIp);
+};
+#endif
 
 // =====================================================================================================================
 // Represents configuration of static registers relevant to hardware pixel shader.
@@ -249,6 +406,16 @@ struct PsRegConfig
     DEF_REG(PA_SC_SHADER_CONTROL);
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
     DEF_REG(PA_SC_CONSERVATIVE_RASTERIZATION_CNTL);
+#endif
+#if LLPC_BUILD_GFX10
+    DEF_REG(PA_STEREO_CNTL);
+    DEF_REG(GE_STEREO_CNTL);
+    DEF_REG(GE_USER_VGPR_EN);
+    DEF_REG(SPI_SHADER_PGM_CHKSUM_PS);
+    DEF_REG(SPI_SHADER_USER_ACCUM_PS_0);
+    DEF_REG(SPI_SHADER_USER_ACCUM_PS_1);
+    DEF_REG(SPI_SHADER_USER_ACCUM_PS_2);
+    DEF_REG(SPI_SHADER_USER_ACCUM_PS_3);
 #endif
 
     void Init(GfxIpVersion gfxIp);
@@ -274,6 +441,9 @@ struct PipelineVsFsRegConfig: public PipelineRegConfig
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(VGT_GS_ONCHIP_CNTL);
     DEF_REG(IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+#endif
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
@@ -303,6 +473,10 @@ struct PipelineVsTsFsRegConfig: public PipelineRegConfig
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+    DEF_REG(VGT_GS_ONCHIP_CNTL);
+#endif
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
@@ -332,6 +506,9 @@ struct PipelineVsGsFsRegConfig: public PipelineRegConfig
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+#endif
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
@@ -363,6 +540,9 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
+#if LLPC_BUILD_GFX10
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+#endif
 
     Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
     uint32_t m_dynRegCount;                                     // Count of dynamic registers
@@ -377,6 +557,119 @@ struct PipelineVsTsGsFsRegConfig: public PipelineRegConfig
     }
 };
 
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Represents configuration of registers relevant to graphics pipeline (NGG, VS-FS).
+struct PipelineNggVsFsRegConfig: public PipelineRegConfig
+{
+    static const uint32_t MaxDynamicRegs = 32 + // mmSPI_SHADER_USER_DATA_GS_0~31
+                                           32 + // mmSPI_SHADER_USER_DATA_PS_0~31
+                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+
+    PrimShaderRegConfig m_primShaderRegs; // VS -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         m_psRegs;         // FS -> hardware PS
+    DEF_REG(VGT_SHADER_STAGES_EN);
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+
+    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
+    uint32_t m_dynRegCount;                                     // Count of dynamic registers
+
+    void Init(GfxIpVersion gfxIp);
+
+    // Get total register's count of this pipeline
+    uint32_t GetRegCount() const
+    {
+        return  offsetof(PipelineNggVsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
+                m_dynRegCount;
+    }
+};
+
+// =====================================================================================================================
+// Represents configuration of registers relevant to graphics pipeline (NGG, VS-TS-FS).
+struct PipelineNggVsTsFsRegConfig: public PipelineRegConfig
+{
+    static const uint32_t MaxDynamicRegs = 32 + // mmSPI_SHADER_USER_DATA_HS_0~31
+                                           32 + // mmSPI_SHADER_USER_DATA_GS_0~31
+                                           32 + // mmSPI_SHADER_USER_DATA_PS_0~31
+                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+
+    LsHsRegConfig       m_lsHsRegs;       // VS-TCS -> hardware LS-HS
+    PrimShaderRegConfig m_primShaderRegs; // TES    -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         m_psRegs;         // FS     -> hardware PS
+
+    DEF_REG(VGT_SHADER_STAGES_EN);
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+
+    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
+    uint32_t m_dynRegCount;                                     // Count of dynamic registers
+
+    void Init(GfxIpVersion gfxIp);
+
+    // Get total register's count of this pipeline
+    uint32_t GetRegCount() const
+    {
+        return  offsetof(PipelineNggVsTsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
+                m_dynRegCount;
+    }
+};
+
+// =====================================================================================================================
+// Represents configuration of registers relevant to graphics pipeline (NGG, VS-GS-FS).
+struct PipelineNggVsGsFsRegConfig: public PipelineRegConfig
+{
+    static const uint32_t MaxDynamicRegs = 32 + // mmSPI_SHADER_USER_DATA_GS_0~31
+                                           32 + // mmSPI_SHADER_USER_DATA_PS_0~31
+                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+
+    PrimShaderRegConfig m_primShaderRegs; // VS-GS -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         m_psRegs;         // FS    -> hardware PS
+
+    DEF_REG(VGT_SHADER_STAGES_EN);
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+
+    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
+    uint32_t m_dynRegCount;                                     // Count of dynamic registers
+
+    void Init(GfxIpVersion gfxIp);
+
+    // Get total register's count of this pipeline
+    uint32_t GetRegCount() const
+    {
+        return  offsetof(PipelineNggVsGsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
+                m_dynRegCount;
+    }
+};
+
+// =====================================================================================================================
+// Represents configuration of registers relevant to graphics pipeline (NGG, VS-TS-GS-FS).
+struct PipelineNggVsTsGsFsRegConfig: public PipelineRegConfig
+{
+    static const uint32_t MaxDynamicRegs = 32 + // mmSPI_SHADER_USER_DATA_HS_0~32
+                                           32 + // mmSPI_SHADER_USER_DATA_GS_0~32
+                                           32 + // mmSPI_SHADER_USER_DATA_PS_0~32
+                                           32;  // mmSPI_PS_INPUT_CNTL_0~31
+
+    LsHsRegConfig       m_lsHsRegs;       // VS-TCS -> hardware LS-HS
+    PrimShaderRegConfig m_primShaderRegs; // TES-GS -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         m_psRegs;         // FS     -> hardware PS
+
+    DEF_REG(VGT_SHADER_STAGES_EN);
+    DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
+
+    Util::Abi::PalMetadataNoteEntry m_dynRegs[MaxDynamicRegs];  // Dynamic registers configuration
+    uint32_t m_dynRegCount;                                     // Count of dynamic registers
+
+    void Init(GfxIpVersion gfxIp);
+
+    // Get total register's count of this pipeline
+    uint32_t GetRegCount() const
+    {
+        return  offsetof(PipelineNggVsTsGsFsRegConfig, m_dynRegs) / sizeof(Util::Abi::PalMetadataNoteEntry) +
+                m_dynRegCount;
+    }
+};
+#endif
+
 // =====================================================================================================================
 // Represents configuration of registers relevant to compute shader.
 struct CsRegConfig
@@ -387,6 +680,14 @@ struct CsRegConfig
     DEF_REG(COMPUTE_NUM_THREAD_Y);
     DEF_REG(COMPUTE_NUM_THREAD_Z);
     DEF_REG(COMPUTE_DISPATCH_INITIATOR);
+#if LLPC_BUILD_GFX10
+    DEF_REG(COMPUTE_PGM_RSRC3);
+    DEF_REG(COMPUTE_SHADER_CHKSUM);
+    DEF_REG(COMPUTE_USER_ACCUM_0);
+    DEF_REG(COMPUTE_USER_ACCUM_1);
+    DEF_REG(COMPUTE_USER_ACCUM_2);
+    DEF_REG(COMPUTE_USER_ACCUM_3);
+#endif
 
     void Init(GfxIpVersion gfxIp);
 };
@@ -414,6 +715,9 @@ struct PipelineCsRegConfig: public PipelineRegConfig
 // Map from register ID to its name string
 static std::unordered_map<uint32_t, const char*>    RegNameMap;
 static std::unordered_map<uint32_t, const char*>    RegNameMapGfx9;  // GFX9 specific
+#if LLPC_BUILD_GFX10
+static std::unordered_map<uint32_t, const char*>    RegNameMapGfx10; // GFX10 specific
+#endif
 
 // Adds entries to register name map.
 void InitRegisterNameMap(GfxIpVersion gfxIp);

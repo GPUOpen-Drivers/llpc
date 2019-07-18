@@ -41,6 +41,10 @@ namespace llvm
 namespace cl
 {
 
+#if LLPC_BUILD_GFX10
+extern opt<int> SubgroupSize;
+#endif
+
 } // cl
 
 } // llvm
@@ -100,6 +104,42 @@ uint32_t ComputeContext::GetShaderWaveSize(
     ShaderStage stage)  // Shader stage
 {
     uint32_t waveSize = m_pGpuProperty->waveSize;
+#if LLPC_BUILD_GFX10
+    LLPC_ASSERT(stage == ShaderStageCompute);
+
+    if (m_gfxIp.major == 10)
+    {
+        // NOTE: GPU property wave size is used in shader, unless:
+        //  1) If specified by tuning option, use the specified wave size.
+        //  2) If gl_SubgroupSize is used in shader, use the specified subgroup size.
+
+        if (m_pPipelineInfo->cs.options.waveSize != 0)
+        {
+            waveSize = m_pPipelineInfo->cs.options.waveSize;
+        }
+
+        // Check is subgroup size used in shader. If it's used, use the specified subgroup size as wave size.
+        const PipelineShaderInfo* pShaderInfo = GetPipelineShaderInfo(ShaderStageCompute);
+        const ShaderModuleData* pModuleData =
+            reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+
+        if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize)
+        {
+#if VKI_EXT_SUBGROUP_SIZE_CONTROL
+            if (pShaderInfo->options.allowVaryWaveSize == false)
+#endif
+            {
+                waveSize = cl::SubgroupSize;
+            }
+        }
+
+        LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    }
+    else if (m_gfxIp.major > 10)
+    {
+        LLPC_NOT_IMPLEMENTED();
+    }
+#endif
     return waveSize;
 
 }

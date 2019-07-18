@@ -899,7 +899,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(
 // explicitly laid out and may contain manually placed padding bytes after the column elements.
 template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
     SPIRVType* const pSpvType,            // [in] The type.
-    const uint32_t   matrixStride,        // The matrix stride (can be 0).
+    uint32_t         matrixStride,        // The matrix stride (can be 0).
     const bool       isColumnMajor,       // Whether the matrix is column major.
     const bool       isParentPointer,     // If the parent is a pointer type.
     const bool       isExplicitlyLaidOut) // If the type is one which is explicitly laid out.
@@ -930,6 +930,13 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 
         pColumnType = ArrayType::get(pElementType, columnCount);
         columnCount = pSpvColumnType->getVectorComponentCount();
+
+        if ((isColumnMajor == false) && (matrixStride == 0))
+        {
+            // Targeted for std430 layout
+            LLPC_ASSERT(columnCount == 4);
+            matrixStride = columnCount * (pElementType->getPrimitiveSizeInBits()/ 8);
+        }
     }
 
     const bool isPaddedMatrix = matrixStride > 0;
@@ -5011,24 +5018,29 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, Scale);
   }
 
+#if SPV_VERSION >= 0x10400
+  case OpCopyObject:
+  case OpCopyLogical: {
+#else
   case OpCopyObject: {
-    SPIRVCopyObject *CO = static_cast<SPIRVCopyObject *>(BV);
+#endif
+    SPIRVCopyBase *Copy = static_cast<SPIRVCopyBase *>(BV);
     AllocaInst* AI = nullptr;
     // NOTE: Alloc instructions not in the entry block will prevent LLVM from doing function
     // inlining. Try to move those alloc instructions to the entry block.
     auto FirstInst = BB->getParent()->getEntryBlock().getFirstInsertionPt();
     if (FirstInst != BB->getParent()->getEntryBlock().end())
-      AI = new AllocaInst(transType(CO->getOperand()->getType()),
+      AI = new AllocaInst(transType(Copy->getOperand()->getType()),
                           M->getDataLayout().getAllocaAddrSpace(),
                           "",
                           &*FirstInst);
     else
-      AI = new AllocaInst(transType(CO->getOperand()->getType()),
+      AI = new AllocaInst(transType(Copy->getOperand()->getType()),
                           M->getDataLayout().getAllocaAddrSpace(),
                           "",
                           BB);
 
-    new StoreInst(transValue(CO->getOperand(), F, BB), AI, BB);
+    new StoreInst(transValue(Copy->getOperand(), F, BB), AI, BB);
     LoadInst *LI = new LoadInst(AI, "", BB);
     return mapValue(BV, LI);
   }

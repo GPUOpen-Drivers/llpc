@@ -130,6 +130,15 @@ opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dyn
 // -force-loop-unroll-count: Force to set the loop unroll count; this option will ignore dynamic loop unroll.
 opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
 
+#if LLPC_BUILD_GFX10
+// -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
+// final wave size base on it. Used in pre-silicon verification.
+opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardware native wave size"), init(0));
+
+// -subgroup-size: sub-group size exposed via Vulkan API.
+opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), init(64));
+#endif
+
 // -trim-debug-info: Trim debug information in SPIR-V binary
 opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
 
@@ -849,6 +858,11 @@ Result Compiler::BuildPipelineInternal(
             bool success = RunPasses(&patchPassMgr, pPipelineModule);
             if (success)
             {
+#if LLPC_BUILD_GFX10
+                // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
+                // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
+                // we do target feature setup here.
+#endif
                 CodeGenManager::SetupTargetFeatures(pPipelineModule);
             }
             else
@@ -1683,6 +1697,31 @@ void Compiler::InitGpuProperty()
     memset(&m_gpuProperty, 0, sizeof(m_gpuProperty));
     m_gpuProperty.waveSize = 64;
 
+#if LLPC_BUILD_GFX10
+    if (m_gfxIp.major == 10)
+    {
+        // Compiler is free to choose wave mode if forced wave size is not specified.
+        if (cl::NativeWaveSize != 0)
+        {
+            LLPC_ASSERT((cl::NativeWaveSize == 32) || (cl::NativeWaveSize == 64));
+            m_gpuProperty.waveSize = cl::NativeWaveSize;
+        }
+        else if ((m_gfxIp.major == 10) && (m_gfxIp.minor == 0))
+        {
+            // Due to hardware issue, wave32 is not enabled in LLVM backend for gfx1000
+            m_gpuProperty.waveSize = 64;
+        }
+        else
+        {
+            m_gpuProperty.waveSize = 32;
+        }
+    }
+    else if (m_gfxIp.major > 10)
+    {
+        LLPC_NOT_IMPLEMENTED();
+    }
+#endif
+
     m_gpuProperty.ldsSizePerCu = (m_gfxIp.major > 6) ? 65536 : 32768;
     m_gpuProperty.ldsSizePerThreadGroup = 32 * 1024;
     m_gpuProperty.numShaderEngines = 4;
@@ -1750,6 +1789,25 @@ void Compiler::InitGpuProperty()
             m_gpuProperty.numShaderEngines = 4;
         }
     }
+#if LLPC_BUILD_GFX10
+    else if (m_gfxIp.major == 10)
+    {
+        m_gpuProperty.numShaderEngines = 2;
+        m_gpuProperty.supportShaderPowerProfiling = true;
+        m_gpuProperty.tessFactorBufferSizePerSe = 8192;
+
+        if (m_gfxIp.minor != 0)
+        {
+            m_gpuProperty.supportSpiPrefPriority = true; // For GFX10.1+
+        }
+
+        if ((m_gfxIp.minor == 0) ||
+            ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF)))
+        {
+            m_gpuProperty.tessFactorBufferSizePerSe = 0x80;
+        }
+    }
+#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
@@ -1832,6 +1890,47 @@ void Compiler::InitGpuWorkaround()
             m_gpuWorkarounds.gfx9.fixLsVgprInput = 1;
         }
     }
+#if LLPC_BUILD_GFX10
+    else if (m_gfxIp.major == 10)
+    {
+        // Hardware workarounds for GFX10 based GPU's:
+        m_gpuWorkarounds.gfx10.disableI32ModToI16Mod = 1;
+
+        if ((m_gfxIp.minor == 0) ||
+            ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF)))
+        {
+            m_gpuWorkarounds.gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow = 1;
+        }
+
+        if (m_gfxIp.minor == 1)
+        {
+            switch (m_gfxIp.stepping)
+            {
+            case 0:
+            case 0xFFFE:
+            case 0xFFFF:
+                m_gpuWorkarounds.gfx10.waShaderInstPrefetch0 = 1;
+                m_gpuWorkarounds.gfx10.waDidtThrottleVmem = 1;
+                m_gpuWorkarounds.gfx10.waLdsVmemNotWaitingVmVsrc = 1;
+                m_gpuWorkarounds.gfx10.waNsaAndClauseCanHang = 1;
+                m_gpuWorkarounds.gfx10.waNsaCannotFollowWritelane = 1;
+                m_gpuWorkarounds.gfx10.waTessIncorrectRelativeIndex = 1;
+                m_gpuWorkarounds.gfx10.waSmemFollowedByVopc = 1;
+
+                if (m_gfxIp.stepping == 0xFFFF)
+                {
+                    m_gpuWorkarounds.gfx10.waShaderInstPrefetch123   = 1;
+                    m_gpuWorkarounds.gfx10.nggTessDegeneratePrims    = 1;
+                    m_gpuWorkarounds.gfx10.waThrottleInMultiDwordNsa = 1;
+                }
+                break;
+            default:
+                LLPC_NEVER_CALLED();
+                break;
+            }
+        }
+    }
+#endif
 
 }
 // =====================================================================================================================

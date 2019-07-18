@@ -131,6 +131,14 @@ bool PatchCopyShader::runOnModule(
         return false;
     }
 
+#if LLPC_BUILD_GFX10
+    if (m_pContext->GetNggControl()->enableNgg)
+    {
+        // No copy shader for NGG.
+        return false;
+    }
+#endif
+
     // Gather GS generic export details.
     CollectGsGenericOutputInfo(pGsEntryPoint);
 

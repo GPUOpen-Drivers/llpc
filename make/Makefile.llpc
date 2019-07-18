@@ -21,6 +21,12 @@ ifeq ($(LLPC_BUILD_RAVEN2), 1)
     LCXXDEFS += -DLLPC_BUILD_RAVEN2=1 -DCHIP_HDR_RAVEN2=1
 endif
 
+#if LLPC_BUILD_GFX10
+ifeq ($(LLPC_BUILD_GFX10), 1)
+    LCXXDEFS += -DLLPC_BUILD_GFX10=1 -DCHIP_HDR_GFX10=1
+endif
+#endif
+
 ifeq ($(ICD_BUILD_LLPC), 1)
     LCXXINCS += -I$(LLVM_DEPTH)/include
     LCXXINCS += -I$(LLVM_BUILD_DIR)/include
@@ -176,6 +182,15 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcStartStopTimer.cpp              \
         llpcUtil.cpp
 
+    #if LLPC_BUILD_GFX10
+    ifeq ($(LLPC_BUILD_GFX10), 1)
+        # llpc/patch/gfx9
+        CPPFILES +=                         \
+            llpcNggLdsManager.cpp           \
+            llpcNggPrimShader.cpp
+    endif
+    #endif
+
     ifeq ($(LLPC_PLATFORM), win)
         LCXXDEFS += -D_SCL_SECURE_NO_WARNINGS       \
                     -DNOMINMAX                      \
@@ -329,8 +344,19 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslImageOpEmuCode.txt    \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
 
+    #if LLPC_BUILD_GFX10
+    ifeq ($(LLPC_BUILD_GFX10), 1)
+        GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/gfx10/glslNggCullingOpEmu.ll
+    endif
+    #endif
+
     # workaround
     GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/wa/treat1dImagesAs2d/glslImageOpEmu.ll
+    #if LLPC_BUILD_GFX10
+    ifeq ($(LLPC_BUILD_GFX10), 1)
+        GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/wa/disableI32ModToI16Mod/glslArithOpEmu.ll
+    endif
+    #endif
 
     PRE_TARGETS = $(GEN_GLSL_EMU_LIB_DIR)/g_llpcGlslEmuLib.h
 

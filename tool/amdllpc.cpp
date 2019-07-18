@@ -134,6 +134,127 @@ static cl::opt<std::string> EntryTarget("entry-target",
 static cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                                   cl::desc("Ignore color attachment formats"), cl::init(false));
 
+#if LLPC_BUILD_GFX10
+// -enable-ngg: enable NGG mode
+static cl::opt<bool> EnableNgg(
+    "enable-ngg",
+    cl::desc("Enable implicit primitive shader (NGG) mode"),
+    cl::init(true));
+
+// -enable-gs-use: enable NGG use on geometry shader
+static cl::opt<bool> NggEnableGsUse(
+    "ngg-enable-gs_use",
+    cl::desc("Enable NGG use on geometry shader"),
+    cl::init(false));
+
+// -ngg-force-non-passthrough: force NGG to run in non pass-through mode
+static cl::opt<bool> NggForceNonPassThrough(
+    "ngg-force-non-passthrough",
+    cl::desc("Force NGG to run in non pass-through mode"),
+    cl::init(false));
+
+// -ngg-always-use-prim-shader-table: always use primitive shader table to fetch culling-control registers
+static cl::opt<bool> NggAlwaysUsePrimShaderTable(
+    "ngg-always-use-prim-shader-table",
+    cl::desc("Always use primitive shader table to fetch culling-control registers (NGG)"),
+    cl::init(true));
+
+// -ngg-compact-mode: NGG compaction mode (NGG)
+static cl::opt<uint32_t> NggCompactionMode(
+    "ngg-compaction-mode",
+    cl::desc("Compaction mode after culling operations (NGG):\n"
+             "0: Compaction is based on the whole sub-group\n"
+             "1: Compaction is based on vertices"),
+    cl::value_desc("mode"),
+    cl::init(static_cast<uint32_t>(NggCompactSubgroup)));
+
+// -ngg-enable-fast-launch-rate: enable the hardware to launch subgroups of work at a faster rate (NGG)
+static cl::opt<bool> NggEnableFastLaunchRate(
+    "ngg-enable-fast-launch-rate",
+    cl::desc("Enable the hardware to launch subgroups of work at a faster rate (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
+static cl::opt<bool> NggEnableVertexReuse(
+    "ngg-enable-vertex-reuse",
+    cl::desc("Enable optimization to cull duplicate vertices (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-backface-culling: enable culling of primitives that don't meet facing criteria (NGG)
+static cl::opt<bool> NggEnableBackfaceCulling(
+    "ngg-enable-backface-culling",
+    cl::desc("Enable culling of primitives that don't meet facing criteria (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-frustum-culling: enable discarding of primitives outside of view frustum (NGG)
+static cl::opt<bool> NggEnableFrustumCulling(
+    "ngg-enable-frustum-culling",
+    cl::desc("Enable discarding of primitives outside of view frustum (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-box-filter-culling: enable simpler frustum culler that is less accurate (NGG)
+static cl::opt<bool> NggEnableBoxFilterCulling(
+    "ngg-enable-box-filter-culling",
+    cl::desc("Enable simpler frustum culler that is less accurate (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-sphere-culling: enable frustum culling based on a sphere (NGG)
+static cl::opt<bool> NggEnableSphereCulling(
+    "ngg-enable-sphere-culling",
+    cl::desc("Enable frustum culling based on a sphere (NGG)"),
+    cl::init(false));
+
+// -ngg-enable-small-prim-filter: enable trivial sub-sample primitive culling (NGG)
+static cl::opt<bool> NggEnableSmallPrimFilter(
+    "ngg-enable-small-prim-filter",
+    cl::desc("Enable trivial sub-sample primitive culling (NGG)"),
+    cl::init(false));
+
+// -ngg-cull-distance-culling: enable culling when "cull distance" exports are present (NGG)
+static cl::opt<bool> NggEnableCullDistanceCulling(
+    "ngg-enable-cull-distance-culling",
+    cl::desc("Enable culling when \"cull distance\" exports are present (NGG)"),
+    cl::init(false));
+
+// -ngg-backface-exponent: control backface culling algorithm (NGG, 1 ~ UINT32_MAX, 0 disables it)
+static cl::opt<uint32_t> NggBackfaceExponent(
+    "ngg-backface-exponent",
+    cl::desc("Control backface culling algorithm (NGG)"),
+    cl::value_desc("exp"),
+    cl::init(0));
+
+// -ngg-subgroup-sizing: NGG sub-group sizing type (NGG)
+static cl::opt<uint32_t> NggSubgroupSizing(
+    "ngg-subgroup-sizing",
+    cl::desc("NGG sub-group sizing type (NGG):\n"
+             "0: Sub-group size is allocated as optimally determined\n"
+             "1: Sub-group size is allocated to the maximum allowable size\n"
+             "2: Sub-group size is allocated as to allow half of the maximum allowable size\n"
+             "3: Sub-group size is optimized for vertex thread utilization\n"
+             "4: Sub-group size is optimized for primitive thread utilization\n"
+             "5: Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
+    cl::value_desc("sizing"),
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+    cl::init(static_cast<uint32_t>(NggSubgroupSizingType::Auto)));
+#else
+    cl::init(static_cast<uint32_t>(NggSubgroupSizingType::OptimizeForPrims)));
+#endif
+
+// -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)
+static cl::opt<uint32_t> NggPrimsPerSubgroup(
+    "ngg-prims-per-subgroup",
+    cl::desc("Preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)"),
+    cl::value_desc("prims"),
+    cl::init(256));
+
+// -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader sub-group (NGG)
+static cl::opt<uint32_t> NggVertsPerSubgroup(
+    "ngg-verts-per-subgroup",
+    cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
+    cl::value_desc("verts"),
+    cl::init(256));
+#endif
+
 // -spvgen-dir: load SPVGEN from specified directory
 static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load SPVGEN library from"));
 
@@ -315,6 +436,9 @@ static Result Init(
             }
         }
 
+#if VKI_BUILD_GFX10
+        if (ParsedGfxIp.major < 10)
+#endif
         {
             newArgs.push_back("-amdgpu-atomic-optimizations");
         }
@@ -393,6 +517,34 @@ static Result Init(
 static Result InitCompileInfo(
     CompileInfo* pCompileInfo)  // [out] Compilation info of LLPC standalone tool
 {
+#if LLPC_BUILD_GFX10
+    pCompileInfo->gfxIp = ParsedGfxIp;
+
+    // Set NGG control settings
+    if (ParsedGfxIp.major >= 10)
+    {
+        auto& nggState = pCompileInfo->gfxPipelineInfo.nggState;
+
+        nggState.enableNgg                  = EnableNgg;
+        nggState.enableGsUse                = NggEnableGsUse;
+        nggState.forceNonPassthrough        = NggForceNonPassThrough;
+        nggState.alwaysUsePrimShaderTable   = NggAlwaysUsePrimShaderTable;
+        nggState.compactMode                = static_cast<NggCompactMode>(NggCompactionMode.getValue());
+        nggState.enableFastLaunch           = NggEnableFastLaunchRate;
+        nggState.enableVertexReuse          = NggEnableVertexReuse;
+        nggState.enableBackfaceCulling      = NggEnableBackfaceCulling;
+        nggState.enableFrustumCulling       = NggEnableFrustumCulling;
+        nggState.enableBoxFilterCulling     = NggEnableBoxFilterCulling;
+        nggState.enableSphereCulling        = NggEnableSphereCulling;
+        nggState.enableSmallPrimFilter      = NggEnableSmallPrimFilter;
+        nggState.enableCullDistanceCulling  = NggEnableCullDistanceCulling;
+
+        nggState.backfaceExponent           = NggBackfaceExponent;
+        nggState.subgroupSizing             = static_cast<NggSubgroupSizingType>(NggSubgroupSizing.getValue());
+        nggState.primsPerSubgroup           = NggPrimsPerSubgroup;
+        nggState.vertsPerSubgroup           = NggVertsPerSubgroup;
+    }
+#endif
 
     return Result::Success;
 }

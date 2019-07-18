@@ -179,6 +179,18 @@ Module* BuilderRecorder::Link(
 #endif
 
 // =====================================================================================================================
+// This is a BuilderRecorder. If it was created with wantReplay=true, create the BuilderReplayer pass.
+ModulePass* BuilderRecorder::CreateBuilderReplayer()
+{
+    if (m_wantReplay)
+    {
+        // Create a new BuilderImpl to replay the recorded Builder calls in.
+        return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(getContext()));
+    }
+    return nullptr;
+}
+
+// =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 Instruction* BuilderRecorder::CreateKill(
     const Twine& instName)  // [in] Name to give final instruction
@@ -263,7 +275,7 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::LoadBufferDesc,
-                  PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER),
+                  GetBufferDescTy(pPointeeTy),
                   {
                       getInt32(descSet),
                       getInt32(binding),
@@ -283,7 +295,7 @@ Value* BuilderRecorder::CreateLoadSamplerDesc(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::LoadSamplerDesc,
-                  VectorType::get(getInt32Ty(), 4),
+                  GetSamplerDescTy(),
                   {
                       getInt32(descSet),
                       getInt32(binding),
@@ -303,7 +315,7 @@ Value* BuilderRecorder::CreateLoadResourceDesc(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::LoadResourceDesc,
-                  VectorType::get(getInt32Ty(), 8),
+                  GetResourceDescTy(),
                   {
                       getInt32(descSet),
                       getInt32(binding),
@@ -323,7 +335,7 @@ Value* BuilderRecorder::CreateLoadTexelBufferDesc(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::LoadTexelBufferDesc,
-                  VectorType::get(getInt32Ty(), 4),
+                  GetTexelBufferDescTy(),
                   {
                       getInt32(descSet),
                       getInt32(binding),
@@ -343,7 +355,7 @@ Value* BuilderRecorder::CreateLoadFmaskDesc(
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
     return Record(Opcode::LoadFmaskDesc,
-                  VectorType::get(getInt32Ty(), 8),
+                  GetResourceDescTy(),
                   {
                       getInt32(descSet),
                       getInt32(binding),
@@ -682,18 +694,6 @@ Value* BuilderRecorder::CreateSubgroupMbcnt(
         const Twine& instName) // [in] Name to give instruction(s)
 {
     return Record(Opcode::SubgroupMbcnt, getInt32Ty(), pMask, instName);
-}
-
-// =====================================================================================================================
-// This is a BuilderRecorder. If it was created with wantReplay=true, create the BuilderReplayer pass.
-ModulePass* BuilderRecorder::CreateBuilderReplayer()
-{
-    if (m_wantReplay)
-    {
-        // Create a new BuilderImpl to replay the recorded Builder calls in.
-        return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(getContext()));
-    }
-    return nullptr;
 }
 
 // =====================================================================================================================

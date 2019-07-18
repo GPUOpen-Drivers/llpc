@@ -223,7 +223,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
                                 Attribute::ReadNone,
                                 pInsertPos);
 
-    return CreateBitCast(pBufDescLoadCall, PointerType::get(pPointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER));
+    return CreateBitCast(pBufDescLoadCall, GetBufferDescTy(pPointeeTy));
 }
 
 // =====================================================================================================================
@@ -242,7 +242,7 @@ Value* BuilderImplDesc::CreateLoadSamplerDesc(
     // look up the descSet/binding and generate the code directly.
     auto pSamplerDescLoadCall = EmitCall(pInsertPos->getModule(),
                                          LlpcName::DescriptorLoadSampler,
-                                         VectorType::get(getInt32Ty(), 4),
+                                         GetSamplerDescTy(),
                                          {
                                              getInt32(descSet),
                                              getInt32(binding),
@@ -271,7 +271,7 @@ Value* BuilderImplDesc::CreateLoadResourceDesc(
     // look up the descSet/binding and generate the code directly.
     auto pResDescLoadCall = EmitCall(pInsertPos->getModule(),
                                      LlpcName::DescriptorLoadResource,
-                                     VectorType::get(getInt32Ty(), 8),
+                                     GetResourceDescTy(),
                                      {
                                          getInt32(descSet),
                                          getInt32(binding),

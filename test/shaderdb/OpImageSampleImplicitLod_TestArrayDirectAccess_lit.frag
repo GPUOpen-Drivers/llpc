@@ -22,7 +22,6 @@ void main()
 ; SHADERTEST: call <4 x float> @llpc.image.sample.f32.2D{{.*}}({{.*}}, <2 x float> <float 1.000000e+00, float 1.000000e+00>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane(i32 2)
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32({{.*}}, float 1.000000e+00, float 1.000000e+00, {{.*}})

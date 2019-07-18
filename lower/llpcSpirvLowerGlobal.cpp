@@ -227,35 +227,7 @@ void SpirvLowerGlobal::visitCallInst(
             if (isa<GetElementPtrInst>(pLoadSrc))
             {
                 // The interpolant is an element of the input
-                GetElementPtrInst* pGetElemPtr = cast<GetElementPtrInst>(pLoadSrc);
-
-                std::vector<Value*> indexOperands;
-                for (uint32_t i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
-                {
-                    indexOperands.push_back(ToInt32Value(m_pContext, pGetElemPtr->getOperand(1 + i), &callInst));
-                }
-                uint32_t operandIdx = 0;
-
-                auto pInput = cast<GlobalVariable>(pGetElemPtr->getPointerOperand());
-                auto pInputTy = pInput->getType()->getContainedType(0);
-
-                MDNode* pMetaNode = pInput->getMetadata(gSPIRVMD::InOut);
-                LLPC_ASSERT(pMetaNode != nullptr);
-                auto pInputMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
-
-                auto pLoadValue = LoadInOutMember(pInputTy,
-                                                  SPIRAS_Input,
-                                                  indexOperands,
-                                                  operandIdx,
-                                                  pInputMeta,
-                                                  nullptr,
-                                                  nullptr,
-                                                  interpLoc,
-                                                  pAuxInterpValue,
-                                                  &callInst);
-
-                m_interpCalls.insert(&callInst);
-                callInst.replaceAllUsesWith(pLoadValue);
+                InterpolateInputElement(interpLoc, pAuxInterpValue, callInst);
             }
             else
             {
@@ -2684,6 +2656,131 @@ void SpirvLowerGlobal::LowerPushConsts()
     {
         pGlobal->dropAllReferences();
         pGlobal->eraseFromParent();
+    }
+}
+
+// =====================================================================================================================
+// Interpolates an element of the input.
+void SpirvLowerGlobal::InterpolateInputElement(
+    uint32_t        interpLoc,          // [in] Interpolation location, valid for fragment shader
+                                        // (use "InterpLocUnknown" as don't-care value)
+    Value* pAuxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
+                                        //   - Sample ID for "InterpLocSample"
+                                        //   - Offset from the center of the pixel for "InterpLocCenter"
+                                        //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
+    CallInst& callInst)           // [in] "Call" instruction
+{
+    GetElementPtrInst* pGetElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
+
+    std::vector<Value*> indexOperands;
+    for (uint32_t i = 0, indexOperandCount = pGetElemPtr->getNumIndices(); i < indexOperandCount; ++i)
+    {
+        indexOperands.push_back(ToInt32Value(m_pContext, pGetElemPtr->getOperand(1 + i), &callInst));
+    }
+    uint32_t operandIdx = 0;
+
+    auto pInput = cast<GlobalVariable>(pGetElemPtr->getPointerOperand());
+    auto pInputTy = pInput->getType()->getContainedType(0);
+
+    MDNode* pMetaNode = pInput->getMetadata(gSPIRVMD::InOut);
+    LLPC_ASSERT(pMetaNode != nullptr);
+    auto pInputMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+
+    if (pGetElemPtr->hasAllConstantIndices())
+    {
+        auto pLoadValue = LoadInOutMember(pInputTy,
+                                          SPIRAS_Input,
+                                          indexOperands,
+                                          operandIdx,
+                                          pInputMeta,
+                                          nullptr,
+                                          nullptr,
+                                          interpLoc,
+                                          pAuxInterpValue,
+                                          &callInst);
+
+        m_interpCalls.insert(&callInst);
+        callInst.replaceAllUsesWith(pLoadValue);
+    }
+    else  // Interpolant an element via dynamic index by extending interpolant to each element
+    {
+        auto pInterpValueTy = pInputTy;
+        auto pInterpPtr = new AllocaInst(pInterpValueTy,
+                                         m_pModule->getDataLayout().getAllocaAddrSpace(),
+                                         "",
+                                         &*(m_pEntryPoint->begin()->getFirstInsertionPt()));
+
+        std::vector<uint32_t> arraySizes;
+        std::vector<uint32_t> indexOperandIdxs;
+        uint32_t flattenElemCount = 1;
+        auto pElemTy = pInputTy;
+        for (uint32_t i = 1, indexOperandCount = indexOperands.size(); i < indexOperandCount; ++i)
+        {
+            if (isa<ConstantInt>(indexOperands[i]))
+            {
+                uint32_t index = (cast<ConstantInt>(indexOperands[i]))->getZExtValue();
+                pElemTy = pElemTy->getContainedType(index);
+            }
+            else
+            {
+                arraySizes.push_back(cast<ArrayType>(pElemTy)->getNumElements());
+                pElemTy = pElemTy->getArrayElementType();
+                flattenElemCount *= arraySizes.back();
+                indexOperandIdxs.push_back(i);
+            }
+        }
+
+        const uint32_t arraySizeCount = arraySizes.size();
+        SmallVector<uint32_t, 4> elemStrides;
+        elemStrides.resize(arraySizeCount, 1);
+        for (uint32_t i = arraySizeCount - 1; i > 0; --i)
+        {
+            elemStrides[i - 1] = arraySizes[i] * elemStrides[i];
+        }
+
+        std::vector<Value*> newIndexOperands = indexOperands;
+        Value* pInterpValue = UndefValue::get(pInterpValueTy);
+
+        for (uint32_t elemIdx = 0; elemIdx < flattenElemCount; ++elemIdx)
+        {
+            uint32_t flattenElemIdx = elemIdx;
+            for (uint32_t arraySizeIdx = 0; arraySizeIdx < arraySizeCount; ++arraySizeIdx)
+            {
+                uint32_t index = flattenElemIdx / elemStrides[arraySizeIdx];
+                flattenElemIdx = flattenElemIdx - index * elemStrides[arraySizeIdx];
+                newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(m_pContext->Int32Ty(), index, true);
+            }
+
+            auto pLoadValue = LoadInOutMember(pInputTy,
+                                              SPIRAS_Input,
+                                              newIndexOperands,
+                                              operandIdx,
+                                              pInputMeta,
+                                              nullptr,
+                                              nullptr,
+                                              interpLoc,
+                                              pAuxInterpValue,
+                                              &callInst);
+
+            std::vector<uint32_t> idxs;
+            for (auto indexIt = newIndexOperands.begin() + 1; indexIt != newIndexOperands.end(); ++indexIt)
+            {
+                idxs.push_back((cast<ConstantInt>(*indexIt))->getZExtValue());
+            }
+            pInterpValue = InsertValueInst::Create(pInterpValue, pLoadValue, idxs, "", &callInst);
+        }
+        new StoreInst(pInterpValue, pInterpPtr, &callInst);
+
+        auto pInterpElemPtr = GetElementPtrInst::Create(nullptr, pInterpPtr, indexOperands, "", &callInst);
+
+        auto pInterpElemValue = new LoadInst(pInterpElemPtr, "", &callInst);
+        callInst.replaceAllUsesWith(pInterpElemValue);
+
+        if (callInst.user_empty())
+        {
+            callInst.dropAllReferences();
+            callInst.eraseFromParent();
+        }
     }
 }
 

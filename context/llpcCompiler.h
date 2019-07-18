@@ -95,6 +95,10 @@ struct GpuProperty
     uint32_t maxSgprsAvailable;                 // Number of max available SGPRs
     uint32_t maxVgprsAvailable;                 // Number of max available VGPRs
     uint32_t tessFactorBufferSizePerSe;         // Size of the tessellation-factor buffer per SE, in DWORDs.
+#if LLPC_BUILD_GFX10
+    bool     supportShaderPowerProfiling;       // Hardware supports Shader Profiling for Power
+    bool     supportSpiPrefPriority;            // Hardware supports SPI shader preference priority
+#endif
 };
 
 // Contains flags for all of the hardware workarounds which affect pipeline compilation.
@@ -142,6 +146,31 @@ struct WorkaroundFlags
         uint32_t  u32All;
     } gfx9;
 
+#if LLPC_BUILD_GFX10
+    union
+    {
+        struct
+        {
+            uint32_t  disableI32ModToI16Mod        :  1;
+
+            uint32_t  waTessFactorBufferSizeLimitGeUtcl1Underflow : 1;
+            uint32_t  waTessIncorrectRelativeIndex : 1;
+            uint32_t  waShaderInstPrefetch123 : 1;
+            uint32_t  waShaderInstPrefetch0 : 1;
+            uint32_t  nggTessDegeneratePrims : 1;
+            uint32_t  waDidtThrottleVmem : 1;
+            uint32_t  waLdsVmemNotWaitingVmVsrc : 1;
+            uint32_t  waNsaCannotBeLastInClause : 1;
+            uint32_t  waNsaAndClauseCanHang : 1;
+            uint32_t  waNsaCannotFollowWritelane : 1;
+            uint32_t  waThrottleInMultiDwordNsa : 1;
+            uint32_t  waSmemFollowedByVopc : 1;
+            uint32_t  placeholder1 : 2;
+            uint32_t  reserved : 17;
+        };
+        uint32_t u32All;
+    } gfx10;
+#endif
 };
 
 // Represents statistics info for pipeline module

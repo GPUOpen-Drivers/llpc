@@ -198,9 +198,8 @@ public:
         llvm::ArrayRef<llvm::Module*> modules);     // Array of modules indexed by shader stage, with nullptr entry
                                                     //  for any stage not present in the pipeline
 
-    //
-    // Methods implemented in BuilderImplDesc:
-    //
+    // -----------------------------------------------------------------------------------------------------------------
+    // Descriptor operations
 
     // Create a waterfall loop containing the specified instruction.
     // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
@@ -209,6 +208,9 @@ public:
         llvm::ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to
                                                       //  be uniform
         const llvm::Twine&        instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Get the type of pointer returned by CreateLoadBufferDesc.
+    llvm::PointerType* GetBufferDescTy(llvm::Type* pPointeeTy);
 
     // Create a load of a buffer descriptor.
     virtual llvm::Value* CreateLoadBufferDesc(
@@ -219,6 +221,9 @@ public:
         llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    // Get the type of pointer returned by CreateLoadSamplerDesc.
+    llvm::VectorType* GetSamplerDescTy();
+
     // Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
     virtual llvm::Value* CreateLoadSamplerDesc(
         uint32_t            descSet,          // Descriptor set
@@ -228,6 +233,9 @@ public:
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
+    // Get the type of pointer returned by CreateLoadResourceDesc and CreateLoadFmaskDesc.
+    llvm::VectorType* GetResourceDescTy();
+
     // Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
     virtual llvm::Value* CreateLoadResourceDesc(
         uint32_t            descSet,          // Descriptor set
@@ -236,6 +244,9 @@ public:
         bool                isNonUniform,     // Whether the descriptor index is non-uniform
         const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
+
+    // Get the type of pointer returned by CreateLoadTexelBufferDesc.
+    llvm::VectorType* GetTexelBufferDescTy();
 
     // Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
     virtual llvm::Value* CreateLoadTexelBufferDesc(
@@ -266,18 +277,16 @@ public:
         llvm::Value* const  pBufferDesc,        // [in] The buffer descriptor to query.
         const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
-    //
-    // Methods implemented in BuilderImplMatrix:
-    //
+    // -----------------------------------------------------------------------------------------------------------------
+    // Matrix operations
 
     // Create a matrix transpose.
     virtual llvm::Value* CreateTransposeMatrix(
         llvm::Value* const pMatrix,            // [in] The matrix to transpose
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
-    //
-    // Methods implemented in BuilderImplMisc:
-    //
+    // -----------------------------------------------------------------------------------------------------------------
+    // Miscellaneous operations
 
     // Create a "kill". Only allowed in a fragment shader.
     virtual llvm::Instruction* CreateKill(
@@ -291,9 +300,8 @@ public:
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
-    //
-    // Methods implemented in BuilderImplSubgroup:
-    //
+    // -----------------------------------------------------------------------------------------------------------------
+    // Subgroup operations
 
     // Create a get subgroup size query.
     virtual llvm::Value* CreateGetSubgroupSize(
@@ -459,6 +467,8 @@ public:
     virtual llvm::Value* CreateSubgroupMbcnt(
         llvm::Value* const pMask,              // [in] The mask to mbcnt with.
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // -----------------------------------------------------------------------------------------------------------------
 
 protected:
     Builder(llvm::LLVMContext& context);

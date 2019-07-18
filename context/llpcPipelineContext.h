@@ -496,6 +496,9 @@ struct ResourceUsage
                 uint32_t esGsLdsSize;               // ES -> GS ring LDS size (GS in)
                 uint32_t gsOnChipLdsSize;           // Total LDS size for GS on-chip mode.
                 uint32_t inputVertices;             // Number of GS input vertices
+#if LLPC_BUILD_GFX10
+                uint32_t primAmpFactor;             // GS primitive amplification factor
+#endif
             } calcFactor;
 
             uint32_t    outLocCount[MaxGsStreams];
@@ -591,6 +594,9 @@ struct InterfaceData
             {
                 uint32_t viewIndex;                 // View Index
                 uint32_t streamOutTablePtr;         // Pointer of stream-out buffer table
+#if LLPC_BUILD_GFX10
+                uint32_t esGsLdsSize;               // ES -> GS ring LDS size for GS on-chip mode (for NGG)
+#endif
             } tes;
 
             // Geometry shader
@@ -720,6 +726,15 @@ struct InterfaceData
     } entryArgIdxs;
 };
 
+#if LLPC_BUILD_GFX10
+// Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
+struct NggControl : NggState
+{
+    bool                            passthroughMode; // Whether NGG passthrough mode is enabled
+    Util::Abi::PrimShaderCbLayout   primShaderTable; // Primitive shader table (only some registers are used)
+};
+#endif
+
 // =====================================================================================================================
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext
@@ -773,6 +788,17 @@ public:
 
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
+
+#if LLPC_BUILD_GFX10
+    // Sets NGG control settings
+    virtual void SetNggControl() = 0;
+
+    // Gets NGG control settings
+    virtual const NggControl* GetNggControl() const = 0;
+
+    // Gets WGP mode enablement for the specified shader stage
+    virtual bool GetShaderWgpMode(ShaderStage shaderStage) const = 0;
+#endif
 
     // Gets float control settings of the specified shader stage for the provide floating-point type.
     virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const = 0;

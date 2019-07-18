@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z4fmaxff(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x float> @_Z4fmaxDv3_fDv3_f(<3 x float> %{{.*}}, <3 x float> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.maxnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.maxnum.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.maxnum.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.maxnum.f32(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

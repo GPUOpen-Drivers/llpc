@@ -37,6 +37,9 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
+#if LLPC_BUILD_GFX10
+#include "llpcNggLdsManager.h"
+#endif
 
 #include "llpcInternal.h"
 
@@ -58,6 +61,10 @@ opt<bool> EnableTessOffChip("enable-tess-offchip",
 opt<bool> DisableGsOnChip("disable-gs-onchip",
                           desc("Disable geometry shader on-chip mode"),
                           init(false));
+
+#if LLPC_BUILD_GFX10
+extern opt<int> SubgroupSize;
+#endif
 
 } // cl
 
@@ -87,6 +94,14 @@ GraphicsContext::GraphicsContext(
         // For GFX9+, always enable tessellation off-chip mode
         m_tessOffchip = true;
     }
+
+#if LLPC_BUILD_GFX10
+    memset(&m_nggControl, 0, sizeof(m_nggControl));
+    // NOTE: All fields of NGG controls are determined by the pass of resource collecting in patching. Here, we still
+    // set NGG enablement early. The field is used when deciding if we need extra optimizations after NGG primitive
+    // shader creation. At that time, the pass of resource collecting has not been run.
+    m_nggControl.enableNgg = pPipelineInfo->nggState.enableNgg;
+#endif
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
     {
@@ -273,6 +288,9 @@ bool GraphicsContext::CheckGsOnChipValidity()
     uint32_t stageMask = GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
+#if LLPC_BUILD_GFX10
+    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+#endif
 
     auto pEsResUsage = GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     auto pGsResUsage = GetShaderResourceUsage(ShaderStageGeometry);
@@ -447,6 +465,165 @@ bool GraphicsContext::CheckGsOnChipValidity()
     }
     else
     {
+#if LLPC_BUILD_GFX10
+        const auto pNggControl = GetNggControl();
+
+        if (pNggControl->enableNgg)
+        {
+            const uint32_t esGsRingItemSize = 4; // Always 4 components for NGG
+            const uint32_t gsVsRingItemSize = hasGs ? std::max(1u,
+                                                               4 * pGsResUsage->inOutUsage.outputMapLocCount
+                                                                 * pGsResUsage->builtInUsage.gs.outputVertices) : 0;
+
+            const uint32_t esExtraLdsSize = NggLdsManager::CalcLdsRegionTotalSize(this) / 4; // In DWORDs
+
+            const uint32_t gsExtraLdsSize = hasGs ? Gfx9::NggMaxThreadsPerSubgroup : 0;
+
+            // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
+            const uint32_t primAmpFactor =
+                hasGs ? pGsResUsage->builtInUsage.gs.outputVertices - (outVertsPerPrim - 1) : 0;
+
+            const uint32_t vertsPerPrimitive = GetVerticesPerPrimitive();
+
+            const bool needsLds = (hasGs ||
+                                   (pNggControl->passthroughMode == false) ||
+                                   (esExtraLdsSize > 0) || (gsExtraLdsSize > 0));
+
+            uint32_t esVertsPerSubgroup = 0;
+            uint32_t gsPrimsPerSubgroup = 0;
+
+            // It is expected that regular launch NGG will be the most prevalent, so handle its logic first.
+            if (pNggControl->enableFastLaunch == false)
+            {
+                // The numbers below come from hardware guidance and most likely require further tuning.
+                switch (pNggControl->subgroupSizing)
+                {
+                case NggSubgroupSizingType::HalfSize:
+                    esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+                    gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+                    break;
+                case NggSubgroupSizingType::OptimizeForVerts:
+                    esVertsPerSubgroup = (hasTs)             ? 128 : 126;
+                    gsPrimsPerSubgroup = (hasTs || needsLds) ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
+                    break;
+                case NggSubgroupSizingType::OptimizeForPrims:
+                    esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+                    gsPrimsPerSubgroup = 128;
+                    break;
+                case NggSubgroupSizingType::Explicit:
+                    esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
+                    gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
+                    break;
+                default:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+                case NggSubgroupSizingType::Auto:
+                    esVertsPerSubgroup = 126;
+                    gsPrimsPerSubgroup = 128;
+                    break;
+#endif
+                case NggSubgroupSizingType::MaximumSize:
+                    esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+                    gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+                    break;
+                }
+            }
+            else
+            {
+                // Fast launch NGG launches like a compute shader and bypasses most of the fixed function hardware.
+                // As such, the values of esVerts and gsPrims have to be accurate for the primitive type
+                // (and vertsPerPrimitive) to avoid hanging.
+                switch (pNggControl->subgroupSizing)
+                {
+                case NggSubgroupSizingType::HalfSize:
+                    esVertsPerSubgroup = RoundDownToMultiple((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
+                    gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
+                    break;
+                case NggSubgroupSizingType::OptimizeForVerts:
+                    // Currently the programming of OptimizeForVerts is an inverse of MaximumSize. OptimizeForVerts is
+                    // not expected to be a performant choice for fast launch, and as such MaximumSize, HalfSize, or
+                    // Explicit should be chosen, with Explicit being optimal for non-point topologies.
+                    gsPrimsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
+                    esVertsPerSubgroup = gsPrimsPerSubgroup / vertsPerPrimitive;
+                    break;
+                case NggSubgroupSizingType::Explicit:
+                    esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
+                    gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
+                    break;
+                case NggSubgroupSizingType::OptimizeForPrims:
+                    // Currently the programming of OptimizeForPrims is the same as MaximumSize, it is possible that
+                    // this might change in the future. OptimizeForPrims is not expected to be a performant choice for
+                    // fast launch, and as such MaximumSize, HalfSize, or Explicit should be chosen, with Explicit
+                    // being optimal for non-point topologies.
+                    // Fallthrough intentional.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+                case NggSubgroupSizingType::Auto:
+#endif
+                case NggSubgroupSizingType::MaximumSize:
+                default:
+                    esVertsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
+                    gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
+                    break;
+                }
+            }
+
+            if (hasGs)
+            {
+                // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multipled
+                // by the amplification factor is larger than the supported number of primitives within a subgroup, we
+                // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
+                // over-allocating LDS.
+                uint32_t maxVertOut = hasGs ? pGsResUsage->builtInUsage.gs.outputVertices : 1;
+                LLPC_ASSERT(maxVertOut >= primAmpFactor);
+
+                if ((gsPrimsPerSubgroup * maxVertOut) > Gfx9::NggMaxThreadsPerSubgroup)
+                {
+                    gsPrimsPerSubgroup = std::min(RoundDownToMultiple(gsPrimsPerSubgroup,             maxVertOut),
+                                                  RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, maxVertOut));
+                }
+
+                // Let's take into consideration instancing:
+                const uint32_t gsInstanceCount = pGsResUsage->builtInUsage.gs.invocations;
+                LLPC_ASSERT(gsInstanceCount >= 1);
+                gsPrimsPerSubgroup /= gsInstanceCount;
+            }
+
+            // Make sure that we have at least one primitive
+            gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
+
+            uint32_t       expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
+            const uint32_t expectedGsLdsSize = gsPrimsPerSubgroup * gsVsRingItemSize + gsExtraLdsSize;
+
+            if (expectedGsLdsSize == 0)
+            {
+                LLPC_ASSERT(hasGs == false);
+
+                expectedEsLdsSize = (Gfx9::NggMaxThreadsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
+            }
+
+            const uint32_t ldsSizeDwords =
+                Pow2Align(expectedEsLdsSize + expectedGsLdsSize,
+                          static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift));
+
+            // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
+            LLPC_ASSERT(ldsSizeDwords <= 16384);
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+
+            // EsGsLdsSize is passed in a user data SGPR to the merged shader so that the API GS knows where to start
+            // reading out of LDS. EsGsLdsSize is unnecessary when there is no API GS.
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = hasGs ? expectedEsLdsSize : 0;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = needsLds ? ldsSizeDwords : 0;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor        = primAmpFactor;
+
+            gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
+        }
+        else
+#endif
         {
             uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift);
 
@@ -611,6 +788,38 @@ bool GraphicsContext::CheckGsOnChipValidity()
             pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsOnChip ?
                                                                          gsVsRingItemSizeOnChip :
                                                                          gsVsRingItemSize;
+
+#if LLPC_BUILD_GFX10
+            if ((m_gfxIp.major == 10) && hasTs && (gsOnChip == false)
+                )
+            {
+                uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
+                uint32_t onChipGsLdsMagicSize = Pow2Align((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
+                                                          static_cast<uint32_t>((1 << m_pGpuProperty->ldsSizeDwordGranularityShift)));
+
+                // If the new size is greater than the size we previously set
+                // then we need to either increase the size or decrease the verts
+                if (onChipGsLdsMagicSize > gsOnChipLdsSize)
+                {
+                    if (onChipGsLdsMagicSize > maxLdsSize)
+                    {
+                        // Decrease the verts
+                        esVertsNum = (maxLdsSize - esGsExtraLdsDwords) / esGsRingItemSize;
+                        pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
+                    }
+                    else
+                    {
+                        // Increase the size
+                        pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
+                    }
+                }
+                // Support multiple GS instances
+                uint32_t gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
+
+                pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
+                pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
+            }
+#endif
         }
     }
 
@@ -655,6 +864,18 @@ bool GraphicsContext::CheckGsOnChipValidity()
 
     if (gsOnChip || (m_gfxIp.major >= 9))
     {
+#if LLPC_BUILD_GFX10
+        if (GetNggControl()->enableNgg)
+        {
+            LLPC_OUTS("GS primitive amplification factor: "
+                      << pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor
+                      << "\n");
+            LLPC_OUTS("\n");
+
+            LLPC_OUTS("GS is on-chip (NGG)\n");
+        }
+        else
+#endif
         {
             LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
         }
@@ -851,6 +1072,230 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
     return mergedNodes;
 }
 
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Sets NGG control settings
+//
+// NOTE: Need to be called before after LLVM preliminary patch work and LLVM main patch work.
+void GraphicsContext::SetNggControl()
+{
+    // For GFX10+, initialize NGG control settings
+    if (m_gfxIp.major < 10)
+    {
+        return;
+    }
+
+    const bool hasTs = ((m_stageMask & (ShaderStageToMask(ShaderStageTessControl) |
+                                        ShaderStageToMask(ShaderStageTessEval))) != 0);
+    const bool hasGs = ((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+
+    // Check the use of cull distance for NGG primitive shader
+    bool useCullDistance = false;
+    bool enableXfb = false;
+    if (hasGs)
+    {
+        // TODO: Support GS in primitive shader.
+        const auto pResUsage = GetShaderResourceUsage(ShaderStageGeometry);
+        enableXfb = pResUsage->inOutUsage.enableXfb;
+    }
+    else
+    {
+        if (hasTs)
+        {
+            const auto pResUsage = GetShaderResourceUsage(ShaderStageTessEval);
+            const auto& builtInUsage = pResUsage->builtInUsage.tes;
+            useCullDistance = (builtInUsage.cullDistance > 0);
+            enableXfb = pResUsage->inOutUsage.enableXfb;
+        }
+        else
+        {
+            const auto pResUsage = GetShaderResourceUsage(ShaderStageVertex);
+            const auto& builtInUsage = pResUsage->builtInUsage.vs;
+            useCullDistance = (builtInUsage.cullDistance > 0);
+            enableXfb = pResUsage->inOutUsage.enableXfb;
+        }
+    }
+
+    const auto& nggState = m_pPipelineInfo->nggState;
+
+    // TODO: If transform feedback is enabled, disable NGG.
+    m_nggControl.enableNgg                  = (nggState.enableNgg && (enableXfb == false) &&
+                                              ((hasGs == false) || nggState.enableGsUse));
+    m_nggControl.alwaysUsePrimShaderTable   = nggState.alwaysUsePrimShaderTable;
+    m_nggControl.compactMode                = nggState.compactMode;
+
+    m_nggControl.enableFastLaunch           = nggState.enableFastLaunch;
+    m_nggControl.enableVertexReuse          = nggState.enableVertexReuse;
+    m_nggControl.enableBackfaceCulling      = nggState.enableBackfaceCulling;
+    m_nggControl.enableFrustumCulling       = nggState.enableFrustumCulling;
+    m_nggControl.enableBoxFilterCulling     = nggState.enableBoxFilterCulling;
+    m_nggControl.enableSphereCulling        = nggState.enableSphereCulling;
+    m_nggControl.enableSmallPrimFilter      = nggState.enableSmallPrimFilter;
+    m_nggControl.enableCullDistanceCulling  = (nggState.enableCullDistanceCulling && useCullDistance);
+
+    m_nggControl.backfaceExponent           = nggState.backfaceExponent;
+    m_nggControl.subgroupSizing             = nggState.subgroupSizing;
+    m_nggControl.primsPerSubgroup           = std::min(nggState.primsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+    m_nggControl.vertsPerSubgroup           = std::min(nggState.vertsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+
+    if (nggState.enableNgg)
+    {
+        if (nggState.forceNonPassthrough)
+        {
+            m_nggControl.passthroughMode = false;
+        }
+        else
+        {
+            m_nggControl.passthroughMode = (m_nggControl.enableVertexReuse == false) &&
+                                           (m_nggControl.enableBackfaceCulling == false) &&
+                                           (m_nggControl.enableFrustumCulling == false) &&
+                                           (m_nggControl.enableBoxFilterCulling == false) &&
+                                           (m_nggControl.enableSphereCulling == false) &&
+                                           (m_nggControl.enableSmallPrimFilter == false) &&
+                                           (m_nggControl.enableCullDistanceCulling == false);
+        }
+
+        // NOTE: Further check if we have to turn on pass-through mode forcibly.
+        if (m_nggControl.passthroughMode == false)
+        {
+            // NOTE: Further check if pass-through mode should be enabled
+            const auto topology = m_pPipelineInfo->iaState.topology;
+            if ((topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST)  ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP) ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY) ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY))
+            {
+                // NGG runs in pass-through mode for non-triangle primitives
+                m_nggControl.passthroughMode = true;
+            }
+            else if (topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST)
+            {
+                // NGG runs in pass-through mode for non-triangle tessellation output
+                LLPC_ASSERT(hasTs);
+
+                const auto& builtInUsage = GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+                if (builtInUsage.pointMode || (builtInUsage.primitiveMode == Isolines))
+                {
+                    m_nggControl.passthroughMode = true;
+                }
+            }
+
+            const auto polygonMode = m_pPipelineInfo->rsState.polygonMode;
+            if ((polygonMode == VK_POLYGON_MODE_LINE) || (polygonMode == VK_POLYGON_MODE_POINT))
+            {
+                // NGG runs in pass-through mode for non-fill polygon mode
+                m_nggControl.passthroughMode = true;
+            }
+        }
+
+        // Build NGG culling-control registers
+        BuildNggCullingControlRegister();
+
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC NGG control settings results\n\n");
+
+        // Control option
+        LLPC_OUTS("EnableNgg                    = " << m_nggControl.enableNgg << "\n");
+        LLPC_OUTS("EnableGsUse                  = " << m_nggControl.enableGsUse << "\n");
+        LLPC_OUTS("AlwaysUsePrimShaderTable     = " << m_nggControl.alwaysUsePrimShaderTable << "\n");
+        LLPC_OUTS("PassthroughMode              = " << m_nggControl.passthroughMode << "\n");
+        LLPC_OUTS("CompactMode                  = ");
+        switch (m_nggControl.compactMode)
+        {
+        case NggCompactSubgroup:
+            LLPC_OUTS("Subgroup\n");
+            break;
+        case NggCompactVertices:
+            LLPC_OUTS("Vertices\n");
+            break;
+        default:
+            break;
+        }
+        LLPC_OUTS("EnableFastLaunch             = " << m_nggControl.enableFastLaunch << "\n");
+        LLPC_OUTS("EnableVertexReuse            = " << m_nggControl.enableVertexReuse << "\n");
+        LLPC_OUTS("EnableBackfaceCulling        = " << m_nggControl.enableBackfaceCulling << "\n");
+        LLPC_OUTS("EnableFrustumCulling         = " << m_nggControl.enableFrustumCulling << "\n");
+        LLPC_OUTS("EnableBoxFilterCulling       = " << m_nggControl.enableBoxFilterCulling << "\n");
+        LLPC_OUTS("EnableSphereCulling          = " << m_nggControl.enableSphereCulling << "\n");
+        LLPC_OUTS("EnableSmallPrimFilter        = " << m_nggControl.enableSmallPrimFilter << "\n");
+        LLPC_OUTS("EnableCullDistanceCulling    = " << m_nggControl.enableCullDistanceCulling << "\n");
+        LLPC_OUTS("BackfaceExponent             = " << m_nggControl.backfaceExponent << "\n");
+        LLPC_OUTS("SubgroupSizing               = ");
+        switch (m_nggControl.subgroupSizing)
+        {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+        case NggSubgroupSizingType::Auto:
+            LLPC_OUTS("Auto\n");
+            break;
+#endif
+        case NggSubgroupSizingType::MaximumSize:
+            LLPC_OUTS("MaximumSize\n");
+            break;
+        case NggSubgroupSizingType::HalfSize:
+            LLPC_OUTS("HalfSize\n");
+            break;
+        case NggSubgroupSizingType::OptimizeForVerts:
+            LLPC_OUTS("OptimizeForVerts\n");
+            break;
+        case NggSubgroupSizingType::OptimizeForPrims:
+            LLPC_OUTS("OptimizeForPrims\n");
+            break;
+        case NggSubgroupSizingType::Explicit:
+            LLPC_OUTS("Explicit\n");
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+        }
+        LLPC_OUTS("PrimsPerSubgroup             = " << m_nggControl.primsPerSubgroup << "\n");
+        LLPC_OUTS("VertsPerSubgroup             = " << m_nggControl.vertsPerSubgroup << "\n");
+        LLPC_OUTS("\n");
+    }
+}
+
+// =====================================================================================================================
+// Gets WGP mode enablement for the specified shader stage
+bool GraphicsContext::GetShaderWgpMode(
+    ShaderStage shaderStage // Shader stage
+    ) const
+{
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        // Treat copy shader as part of geometry shader
+        shaderStage = ShaderStageGeometry;
+    }
+
+    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
+
+    bool wgpMode = false;
+
+    switch (shaderStage)
+    {
+    case ShaderStageVertex:
+        wgpMode = m_pPipelineInfo->vs.options.wgpMode;
+        break;
+    case ShaderStageTessControl:
+        wgpMode = m_pPipelineInfo->tcs.options.wgpMode;
+        break;
+    case ShaderStageTessEval:
+        wgpMode = m_pPipelineInfo->tes.options.wgpMode;
+        break;
+    case ShaderStageGeometry:
+        wgpMode = m_pPipelineInfo->gs.options.wgpMode;
+        break;
+    case ShaderStageFragment:
+        wgpMode = m_pPipelineInfo->fs.options.wgpMode;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return wgpMode;
+}
+#endif
+
 // =====================================================================================================================
 // Gets float control settings of the specified shader stage for the provide floating-point type.
 FloatControl GraphicsContext::GetShaderFloatControl(
@@ -966,7 +1411,194 @@ uint32_t GraphicsContext::GetShaderWaveSize(
 
     uint32_t waveSize = m_pGpuProperty->waveSize;
 
+#if LLPC_BUILD_GFX10
+    if (m_gfxIp.major == 10)
+    {
+        // NOTE: GPU property wave size is used in shader, unless:
+        //  1) A stage-specific default is preferred.
+        //  2) If specified by tuning option, use the specified wave size.
+        //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size.
+
+        if (stage == ShaderStageFragment)
+        {
+            // Per programming guide, it's recommended to use wave64 for fragment shader.
+            waveSize = 64;
+        }
+        else if((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0)
+        {
+            // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
+            waveSize = 64;
+        }
+
+        switch (stage)
+        {
+        case ShaderStageVertex:
+            if (m_pPipelineInfo->vs.options.waveSize != 0)
+            {
+                waveSize = m_pPipelineInfo->vs.options.waveSize;
+            }
+            break;
+        case ShaderStageTessControl:
+            if (m_pPipelineInfo->tcs.options.waveSize != 0)
+            {
+                waveSize = m_pPipelineInfo->tcs.options.waveSize;
+            }
+            break;
+        case ShaderStageTessEval:
+            if (m_pPipelineInfo->tes.options.waveSize != 0)
+            {
+                waveSize = m_pPipelineInfo->tes.options.waveSize;
+            }
+            break;
+        case ShaderStageGeometry:
+            // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
+            // In such cases, we check the property of VS or TES.
+            if ((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0)
+            {
+                if (m_pPipelineInfo->gs.options.waveSize != 0)
+                {
+                    waveSize = m_pPipelineInfo->gs.options.waveSize;
+                }
+            }
+            else if ((m_stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0)
+            {
+                waveSize = GetShaderWaveSize(ShaderStageTessEval);
+            }
+            else
+            {
+                waveSize = GetShaderWaveSize(ShaderStageVertex);
+            }
+            break;
+        case ShaderStageFragment:
+            if (m_pPipelineInfo->fs.options.waveSize != 0)
+            {
+                waveSize = m_pPipelineInfo->fs.options.waveSize;
+            }
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+        }
+
+        // Check is subgroup size used in shader. If it's used, use the specified subgroup size as wave size.
+        for (uint32_t i = ShaderStageVertex; i < ShaderStageGfxCount; ++i)
+        {
+            const PipelineShaderInfo* pShaderInfo = GetPipelineShaderInfo(static_cast<ShaderStage>(i));
+            const ShaderModuleData* pModuleData =
+                reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+
+            if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize)
+            {
+#if VKI_EXT_SUBGROUP_SIZE_CONTROL
+                if (pShaderInfo->options.allowVaryWaveSize == false)
+#endif
+                {
+                    waveSize = cl::SubgroupSize;
+                }
+                break;
+            }
+        }
+
+        LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    }
+    else if (m_gfxIp.major > 10)
+    {
+        LLPC_NOT_IMPLEMENTED();
+    }
+#endif
     return waveSize;
 }
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Builds NGG culling-control registers (fill part of compile-time primitive shader table).
+void GraphicsContext::BuildNggCullingControlRegister()
+{
+    const auto& vpState = m_pPipelineInfo->vpState;
+    const auto& rsState = m_pPipelineInfo->rsState;
+
+    auto& pipelineState = m_nggControl.primShaderTable.pipelineStateCb;
+
+    //
+    // Program register PA_SU_SC_MODE_CNTL
+    //
+    PaSuScModeCntl paSuScModeCntl;
+    paSuScModeCntl.u32All = 0;
+
+    paSuScModeCntl.bits.POLY_OFFSET_FRONT_ENABLE = rsState.depthBiasEnable;
+    paSuScModeCntl.bits.POLY_OFFSET_BACK_ENABLE  = rsState.depthBiasEnable;
+    paSuScModeCntl.bits.MULTI_PRIM_IB_ENA        = true;
+
+    paSuScModeCntl.bits.POLY_MODE            = (rsState.polygonMode != VK_POLYGON_MODE_FILL);
+
+    if (rsState.polygonMode == VK_POLYGON_MODE_FILL)
+    {
+        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_TRIANGLES;
+        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_TRIANGLES;
+    }
+    else if (rsState.polygonMode == VK_POLYGON_MODE_LINE)
+    {
+        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_LINES;
+        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_LINES;
+    }
+    else if (rsState.polygonMode == VK_POLYGON_MODE_POINT)
+    {
+        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_POINTS;
+        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_POINTS;
+    }
+    else
+    {
+        LLPC_NEVER_CALLED();
+    }
+
+    paSuScModeCntl.bits.CULL_FRONT = ((rsState.cullMode == VK_CULL_MODE_FRONT_BIT) ||
+                                      (rsState.cullMode == VK_CULL_MODE_FRONT_AND_BACK));
+    paSuScModeCntl.bits.CULL_BACK  = ((rsState.cullMode == VK_CULL_MODE_BACK_BIT) ||
+                                      (rsState.cullMode == VK_CULL_MODE_FRONT_AND_BACK));
+
+    paSuScModeCntl.bits.FACE = rsState.frontFace;
+
+    pipelineState.paSuScModeCntl = paSuScModeCntl.u32All;
+
+    //
+    // Program register PA_CL_CLIP_CNTL
+    //
+    PaClClipCntl paClClipCntl;
+    LLPC_ASSERT((rsState.usrClipPlaneMask & ~0x3F) == 0);
+    paClClipCntl.u32All = rsState.usrClipPlaneMask;
+
+    paClClipCntl.bits.DX_CLIP_SPACE_DEF = true;
+    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+
+    if (vpState.depthClipEnable == false)
+    {
+        paClClipCntl.bits.ZCLIP_NEAR_DISABLE = true;
+        paClClipCntl.bits.ZCLIP_FAR_DISABLE  = true;
+    }
+
+    if (rsState.rasterizerDiscardEnable)
+    {
+        paClClipCntl.bits.DX_RASTERIZATION_KILL = true;
+    }
+
+    pipelineState.paClClipCntl = paClClipCntl.u32All;
+
+    //
+    // Program register PA_CL_VTE_CNTL
+    //
+    PaClVteCntl paClVteCntl;
+    paClVteCntl.u32All = 0;
+
+    paClVteCntl.bits.VPORT_X_SCALE_ENA  = true;
+    paClVteCntl.bits.VPORT_X_OFFSET_ENA = true;
+    paClVteCntl.bits.VPORT_Y_SCALE_ENA  = true;
+    paClVteCntl.bits.VPORT_Y_OFFSET_ENA = true;
+    paClVteCntl.bits.VPORT_Z_SCALE_ENA  = true;
+    paClVteCntl.bits.VPORT_Z_OFFSET_ENA = true;
+    paClVteCntl.bits.VTX_W0_FMT         = true;
+
+    pipelineState.paClVteCntl = paClVteCntl.u32All;
+}
+#endif
 
 } // Llpc

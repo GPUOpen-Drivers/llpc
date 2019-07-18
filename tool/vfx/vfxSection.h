@@ -112,6 +112,9 @@ enum MemberType : uint32_t
     MemberTypeDescriptorRangeValue,          // VFX member type: SectionDescriptorRangeValueItem
     MemberTypePipelineOption,                // VFX member type: SectionPipelineOption
     MemberTypeShaderOption,                  // VFX member type: SectionShaderOption
+#if VKI_BUILD_GFX10
+    MemberTypeNggState,                      // VFX member type: SectionNggState
+#endif
 };
 
 // =====================================================================================================================
@@ -1167,6 +1170,11 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
+#if VKI_BUILD_GFX10
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveSize, MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
+#endif
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
@@ -1181,6 +1189,15 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
+#if VKI_BUILD_GFX10
+    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+        static const uint32_t  MemberCount = 12;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
+        static const uint32_t  MemberCount = 11;
+    #else
+        static const uint32_t  MemberCount = 10;
+    #endif
+#else
     #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         static const uint32_t  MemberCount = 9;
     #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
@@ -1188,10 +1205,59 @@ private:
     #else
         static const uint32_t  MemberCount = 7;
     #endif
+#endif
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
 };
+
+#if VKI_BUILD_GFX10
+// =====================================================================================================================
+// Represents the sub section NGG state
+class SectionNggState : public Section
+{
+public:
+    typedef Llpc::NggState SubState;
+
+    SectionNggState() :
+        Section(m_addrTable, MemberCount, SectionTypeUnset, "nggState")
+    {
+        memset(&m_state, 0, sizeof(m_state));
+    }
+
+    static void InitialAddrTable()
+    {
+        StrToMemberAddr* pTableItem = m_addrTable;
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableNgg, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableGsUse, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, forceNonPassthrough, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, alwaysUsePrimShaderTable, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, compactMode, MemberTypeEnum, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFastLaunch, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableVertexReuse, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBackfaceCulling, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFrustumCulling, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBoxFilterCulling, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSphereCulling, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSmallPrimFilter, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableCullDistanceCulling, MemberTypeBool, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, backfaceExponent, MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, subgroupSizing, MemberTypeEnum, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, primsPerSubgroup, MemberTypeInt, false);
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, vertsPerSubgroup, MemberTypeInt, false);
+
+        VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
+    }
+
+    void GetSubState(SubState& state) { state = m_state; };
+
+private:
+    static const uint32_t  MemberCount = 17;
+    static StrToMemberAddr m_addrTable[MemberCount];
+
+    SubState               m_state;
+};
+#endif
 
 // =====================================================================================================================
 // Represents the section graphics state
@@ -1228,6 +1294,9 @@ public:
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding,           MemberTypeInt, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView,         MemberTypeInt, false);
         INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, options, MemberTypePipelineOption, true);
+#if VKI_BUILD_GFX10
+        INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, nggState, MemberTypeNggState, true);
+#endif
         INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState,
                                        colorBuffer,
                                        MemberTypeColorBufferItem,
@@ -1243,11 +1312,19 @@ public:
             colorBuffer[i].GetSubState(m_state.colorBuffer[i]);
         }
         options.GetSubState(m_state.options);
+#if VKI_BUILD_GFX10
+        nggState.GetSubState(m_state.nggState);
+#endif
         state = m_state;
     };
 
 private:
+#if VKI_BUILD_GFX10
+    static const uint32_t  MemberCount = 21;
+    SectionNggState        nggState;
+#else
     static const uint32_t  MemberCount = 20;
+#endif
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
     SectionColorBuffer     colorBuffer[MaxColorTargets]; // Color buffer
