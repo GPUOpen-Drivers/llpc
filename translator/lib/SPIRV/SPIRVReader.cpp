@@ -592,6 +592,7 @@ private:
 
   void setAttrByCalledFunc(CallInst *Call);
   Type *transFPType(SPIRVType *T);
+  void setFastMathFlags(Value *Inst, SPIRVValue *BV);
   BinaryOperator *transShiftLogicalBitwiseInst(SPIRVValue *BV, BasicBlock *BB,
                                                Function *F);
   Instruction *transCmpInst(SPIRVValue *BV, BasicBlock *BB, Function *F);
@@ -1528,6 +1529,32 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *BV, Function *F,
   }
 }
 
+// Decide whether to set fast math flags on Val, which is usually a newly create
+// instruction. Decorations on BV may prevent us from setting some flags.
+void SPIRVToLLVM::setFastMathFlags(Value *Val, SPIRVValue *BV) {
+  // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
+  // flags on the handled instruction
+  if (!SPIRVGenFastMath)
+    return;
+  if (!isa<FPMathOperator>(Val))
+    return;
+  if (Instruction *Inst = dyn_cast<Instruction>(Val)) {
+    llvm::FastMathFlags FMF;
+    FMF.setAllowReciprocal();
+    // Enable contraction when "NoContraction" decoration is not specified
+    bool AllowContract = !BV || !BV->hasDecorate(DecorationNoContraction);
+    FMF.setAllowContract(AllowContract);
+    // AllowRessociation should be same with AllowContract
+    FMF.setAllowReassoc(AllowContract);
+    // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
+    if (FpControlFlags.U32All == 0) {
+      FMF.setNoNaNs();
+      FMF.setNoSignedZeros(AllowContract);
+    }
+    Inst->setFastMathFlags(FMF);
+  }
+}
+
 BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
                                                           BasicBlock *BB,
                                                           Function *F) {
@@ -1555,24 +1582,8 @@ BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
   }
 
   auto Inst = BinaryOperator::Create(BO, Base, Shift, BV->getName(), BB);
+  setFastMathFlags(Inst, BV);
 
-  // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
-  // flags on the handled instruction
-  if (SPIRVGenFastMath && isa<FPMathOperator>(Inst)) {
-    llvm::FastMathFlags FMF;
-    FMF.setAllowReciprocal();
-    // Enable contraction when "NoContraction" decoration is not specified
-    bool AllowContract = !BV->hasDecorate(DecorationNoContraction);
-    FMF.setAllowContract(AllowContract);
-    // AllowRessociation should be same with AllowContract
-    FMF.setAllowReassoc(AllowContract);
-    // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
-    if (FpControlFlags.U32All == 0) {
-      FMF.setNoNaNs();
-      FMF.setNoSignedZeros(AllowContract);
-    }
-    Inst->setFastMathFlags(FMF);
-  }
   return Inst;
 }
 
@@ -5015,6 +5026,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto NewVec = Builder.CreateVectorSplat(VecSize, Scalar, Scalar->getName());
     NewVec->takeName(Scalar);
     auto Scale = Builder.CreateFMul(Vector, NewVec, "scale");
+    setFastMathFlags(Scale, BV);
     return mapValue(BV, Scale);
   }
 
@@ -5274,6 +5286,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto Dividend = transValue(FMod->getDividend(), F, BB);
     auto Divisor = transValue(FMod->getDivisor(), F, BB);
     auto FRem = BinaryOperator::CreateFRem(Dividend, Divisor, "frem.res", BB);
+    setFastMathFlags(FRem, BV);
 
     std::string UnmangledName = OCLExtOpMap::map(OpenCLLIB::Copysign);
     std::string MangledName = "copysign";
@@ -5301,9 +5314,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
   case OpFNegate: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
-    return mapValue(
-        BV, BinaryOperator::CreateFNeg(transValue(BC->getOperand(0), F, BB),
-                                       BV->getName(), BB));
+    auto FNeg = BinaryOperator::CreateFNeg(transValue(BC->getOperand(0), F, BB),
+                                           BV->getName(), BB);
+    setFastMathFlags(FNeg, BV);
+    return mapValue(BV, FNeg);
   }
   case OpQuantizeToF16: {
     return mapValue(BV, transBuiltinFromInst(
