@@ -248,64 +248,6 @@ Value* BuilderReplayer::ProcessCall(
         }
 
     // Replayer implementations of BuilderImplDesc methods
-    case BuilderRecorder::Opcode::WaterfallLoop:
-    case BuilderRecorder::Opcode::WaterfallStoreLoop:
-        {
-            SmallVector<uint32_t, 2> operandIdxs;
-            for (Value* pOperand : args)
-            {
-                if (auto pConstOperand = dyn_cast<ConstantInt>(pOperand))
-                {
-                    operandIdxs.push_back(pConstOperand->getZExtValue());
-                }
-            }
-
-            Instruction* pNonUniformInst = nullptr;
-            if (opcode == BuilderRecorder::Opcode::WaterfallLoop)
-            {
-                pNonUniformInst = cast<Instruction>(args[0]);
-            }
-            else
-            {
-                // This is the special case that we want to waterfall a store op with no result.
-                // The llpc.call.waterfall.store.loop intercepts (one of) the non-uniform descriptor
-                // input(s) to the store. Use that interception to find the store, and remove the
-                // interception.
-                Use& useInNonUniformInst = *pCall->use_begin();
-                pNonUniformInst = cast<Instruction>(useInNonUniformInst.getUser());
-                useInNonUniformInst = args[0];
-            }
-
-            // BuilderImpl::CreateWaterfallLoop looks back at each descriptor input to the op to find
-            // the non-uniform index. It does not know about BuilderRecorder/BuilderReplayer, so here
-            // we must work around the unknown order of replaying by finding any recorded descriptor
-            // load and replay it first.
-            for (uint32_t operandIdx : operandIdxs)
-            {
-                Value* pInput = cast<Instruction>(args[0])->getOperand(operandIdx);
-                while (auto pGep = dyn_cast<GetElementPtrInst>(pInput))
-                {
-                    pInput = pGep->getOperand(0);
-                }
-                CheckCallAndReplay(pInput);
-            }
-
-            // Create the waterfall loop.
-            auto pWaterfallLoop = m_pBuilder->CreateWaterfallLoop(pNonUniformInst, operandIdxs);
-
-            if (opcode == BuilderRecorder::Opcode::WaterfallLoop)
-            {
-                return pWaterfallLoop;
-            }
-
-            // For the store op case, avoid using the replaceAllUsesWith in the caller.
-            if (pCall->getName() != "")
-            {
-                pWaterfallLoop->takeName(pCall);
-            }
-            return nullptr;
-        }
-
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {
             return m_pBuilder->CreateLoadBufferDesc(

@@ -71,10 +71,6 @@ StringRef BuilderRecorder::GetCallName(
         return "kill";
     case Opcode::ReadClock:
         return "read.clock";
-    case Opcode::WaterfallLoop:
-        return "waterfall.loop";
-    case Opcode::WaterfallStoreLoop:
-        return "waterfall.store.loop";
     case Opcode::ImageLoad:
         return "image.load";
     case Opcode::ImageLoadWithFmask:
@@ -240,54 +236,6 @@ Instruction* BuilderRecorder::CreateReadClock(
     const Twine& instName)   // [in] Name to give final instruction
 {
     return Record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
-}
-
-// =====================================================================================================================
-// Create a waterfall loop containing the specified instruction.
-Instruction* BuilderRecorder::CreateWaterfallLoop(
-    Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
-    ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
-    const Twine&        instName)           // [in] Name to give instruction(s)
-{
-    LLPC_ASSERT(operandIdxs.empty() == false);
-    LLPC_ASSERT(pNonUniformInst->use_empty());
-
-    // This method is specified to ignore the insert point, and to put the waterfall loop around pNonUniformInst.
-    // For this recording implementation, put the call after pNonUniformInst, unless it is a store.
-    //auto savedInsertPoint = saveIP();
-    SetInsertPoint(pNonUniformInst->getNextNode());
-    SetCurrentDebugLocation(pNonUniformInst->getDebugLoc());
-
-    SmallVector<Value*, 3> args;
-    args.push_back(pNonUniformInst);
-    for (uint32_t operandIdx : operandIdxs)
-    {
-        args.push_back(getInt32(operandIdx));
-    }
-
-    Instruction *pWaterfallLoop = nullptr;
-    if (pNonUniformInst->getType()->isVoidTy() == false)
-    {
-        // Normal case that pNonUniformInst is not a store so has a return type.
-        pWaterfallLoop = Record(Opcode::WaterfallLoop, pNonUniformInst->getType(), args, instName);
-    }
-    else
-    {
-        // pNonUniformInst is a store with void return type, so we cannot pass its result through
-        // llpc.call.waterfall.loop. Instead we pass one of its non-uniform inputs through
-        // llpc.call.waterfall.store.loop. This situation needs to be specially handled in llpcBuilderReplayer.
-        SetInsertPoint(pNonUniformInst);
-        args[0] = pNonUniformInst->getOperand(operandIdxs[0]);
-        auto pWaterfallStoreLoop = Record(Opcode::WaterfallStoreLoop, args[0]->getType(), args, instName);
-        pNonUniformInst->setOperand(operandIdxs[0], pWaterfallStoreLoop);
-    }
-
-    // TODO: While almost nothing uses the Builder, we run the risk of the saved insertion
-    // point being invalid and this restoreIP crashing. So, for now, we just clear the insertion point.
-    //restoreIP(savedInsertPoint);
-    ClearInsertionPoint();
-
-    return pWaterfallLoop;
 }
 
 // =====================================================================================================================

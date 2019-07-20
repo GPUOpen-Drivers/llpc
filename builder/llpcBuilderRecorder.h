@@ -69,8 +69,6 @@ public:
         Nop = 0,
 
         // Descriptor
-        WaterfallLoop,
-        WaterfallStoreLoop,
         LoadBufferDesc,
         IndexDescPtr,
         LoadDescFromPtr,
@@ -156,9 +154,6 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
-    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
-                                           llvm::ArrayRef<uint32_t> operandIdxs,
-                                           const llvm::Twine&       instName) override final;
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
                                       uint32_t            binding,
                                       llvm::Value*        pDescIndex,
