@@ -202,15 +202,6 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
-    // Create a waterfall loop containing the specified instruction.
-    // This does not use the current insert point; new code is inserted before and after pNonUniformInst.
-    // TODO: This will be removed as soon as the image rework is committed.
-    virtual llvm::Instruction* CreateWaterfallLoop(
-        llvm::Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
-        llvm::ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to
-                                                      //  be uniform
-        const llvm::Twine&        instName = "") = 0; // [in] Name to give instruction(s)
-
     // Get the type of pointer returned by CreateLoadBufferDesc.
     llvm::PointerType* GetBufferDescTy(llvm::Type* pPointeeTy);
 

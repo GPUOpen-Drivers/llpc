@@ -45,13 +45,6 @@ public:
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
-    // Create a waterfall loop containing the specified instruction.
-    // TODO: This will become a protected method once the image rework is complete, as it will
-    // no longer be part of the public Builder interface.
-    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
-                                           llvm::ArrayRef<uint32_t> operandIdxs,
-                                           const llvm::Twine&       instName = "") override final;
-
 protected:
     // Get whether the context we are building in supports DPP operations.
     bool SupportDpp() const;
@@ -66,6 +59,11 @@ protected:
 
     // Create an "if..endif" or "if..else..endif" structure.
     llvm::BranchInst* CreateIf(llvm::Value* pCondition, bool wantElse, const llvm::Twine& instName);
+
+    // Create a waterfall loop containing the specified instruction.
+    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
+                                           llvm::ArrayRef<uint32_t> operandIdxs,
+                                           const llvm::Twine&       instName = "");
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)

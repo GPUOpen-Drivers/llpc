@@ -137,3 +137,141 @@ BranchInst* BuilderImplBase::CreateIf(
     return pBranch;
 }
 
+// =====================================================================================================================
+// Create a waterfall loop containing the specified instruction.
+// This does not use the current insert point; new code is inserted before and after pNonUniformInst.
+Instruction* BuilderImplBase::CreateWaterfallLoop(
+    Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
+    ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
+    const Twine&        instName)           // [in] Name to give instruction(s)
+{
+    LLPC_ASSERT(operandIdxs.empty() == false);
+
+    // For each non-uniform input, try and trace back through a descriptor load to find the non-uniform index
+    // used in it. If that fails, we just use the operand value as the index.
+    SmallVector<Value*, 2> nonUniformIndices;
+    for (uint32_t operandIdx : operandIdxs)
+    {
+        Value* pNonUniformVal = pNonUniformInst->getOperand(operandIdx);
+        if (auto pCall = dyn_cast<CallInst>(pNonUniformVal))
+        {
+            if (auto pCalledFunc = pCall->getCalledFunction())
+            {
+                if (pCalledFunc->getName().startswith(LlpcName::DescriptorLoadFromPtr))
+                {
+                    pCall = dyn_cast<CallInst>(pCall->getArgOperand(0)); // The descriptor pointer
+                    if ((pCall != nullptr) &&
+                        pCall->getCalledFunction()->getName().startswith(LlpcName::DescriptorIndex))
+                    {
+                        pNonUniformVal = pCall->getArgOperand(1); // The index operand
+                    }
+                }
+            }
+        }
+        nonUniformIndices.push_back(pNonUniformVal);
+    }
+
+    // Save Builder's insert point, and set it to insert new code just before pNonUniformInst.
+    auto savedInsertPoint = saveIP();
+    SetInsertPoint(pNonUniformInst);
+
+    // Get the waterfall index. If there are two indices (image resource+sampler case), join them into
+    // a single struct.
+    Value* pWaterfallIndex = nonUniformIndices[0];
+    if (nonUniformIndices.size() > 1)
+    {
+        LLPC_ASSERT(nonUniformIndices.size() == 2);
+        SmallVector<Type*, 2> indexTys;
+        for (Value* pNonUniformIndex : nonUniformIndices)
+        {
+            indexTys.push_back(pNonUniformIndex->getType());
+        }
+        auto pWaterfallIndexTy = StructType::get(getContext(), indexTys);
+        pWaterfallIndex = UndefValue::get(pWaterfallIndexTy);
+        for (uint32_t structIndex = 0; structIndex < nonUniformIndices.size(); ++structIndex)
+        {
+            pWaterfallIndex = CreateInsertValue(pWaterfallIndex, nonUniformIndices[structIndex], structIndex);
+        }
+    }
+
+    // Start the waterfall loop using the waterfall index.
+    Value* pWaterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin,
+                                             pWaterfallIndex->getType(),
+                                             pWaterfallIndex,
+                                             nullptr,
+                                             instName);
+
+    // Scalarize each non-uniform operand of the instruction.
+    for (uint32_t operandIdx : operandIdxs)
+    {
+        Value* pDesc = pNonUniformInst->getOperand(operandIdx);
+        auto pDescTy = pDesc->getType();
+        pDesc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane,
+                                { pDescTy, pDescTy },
+                                { pWaterfallBegin, pDesc },
+                                nullptr,
+                                instName);
+        if (pNonUniformInst->getType()->isVoidTy())
+        {
+            // The buffer/image operation we are waterfalling is a store with no return value. Use
+            // llvm.amdgcn.waterfall.last.use on the descriptor.
+            pDesc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use,
+                                    pDescTy,
+                                    { pWaterfallBegin, pDesc },
+                                    nullptr,
+                                    instName);
+        }
+        // Replace the descriptor operand in the buffer/image operation.
+        pNonUniformInst->setOperand(operandIdx, pDesc);
+    }
+
+    Instruction* pResultValue = pNonUniformInst;
+
+    // End the waterfall loop (as long as pNonUniformInst is not a store with no result).
+    if (pNonUniformInst->getType()->isVoidTy() == false)
+    {
+        SetInsertPoint(pNonUniformInst->getNextNode());
+        SetCurrentDebugLocation(pNonUniformInst->getDebugLoc());
+
+        Use* pUseOfNonUniformInst = nullptr;
+        Type* pWaterfallEndTy = pResultValue->getType();
+        if (auto pVecTy = dyn_cast<VectorType>(pWaterfallEndTy))
+        {
+            if (pVecTy->getElementType()->isIntegerTy(8))
+            {
+                // ISel does not like waterfall.end with vector of i8 type, so cast if necessary.
+                LLPC_ASSERT((pVecTy->getNumElements() % 4) == 0);
+                pWaterfallEndTy = getInt32Ty();
+                if (pVecTy->getNumElements() != 4)
+                {
+                    pWaterfallEndTy = VectorType::get(getInt32Ty(), pVecTy->getNumElements() / 4);
+                }
+                pResultValue = cast<Instruction>(CreateBitCast(pResultValue, pWaterfallEndTy, instName));
+                pUseOfNonUniformInst = &pResultValue->getOperandUse(0);
+            }
+        }
+        pResultValue = CreateIntrinsic(Intrinsic::amdgcn_waterfall_end,
+                                  pWaterfallEndTy,
+                                  { pWaterfallBegin, pResultValue },
+                                  nullptr,
+                                  instName);
+        if (pUseOfNonUniformInst == nullptr)
+        {
+            pUseOfNonUniformInst = &pResultValue->getOperandUse(1);
+        }
+        if (pWaterfallEndTy != pNonUniformInst->getType())
+        {
+            pResultValue = cast<Instruction>(CreateBitCast(pResultValue, pNonUniformInst->getType(), instName));
+        }
+
+        // Replace all uses of pNonUniformInst with the result of this code.
+        *pUseOfNonUniformInst = UndefValue::get(pNonUniformInst->getType());
+        pNonUniformInst->replaceAllUsesWith(pResultValue);
+        *pUseOfNonUniformInst = pNonUniformInst;
+    }
+
+    // Restore Builder's insert point.
+    restoreIP(savedInsertPoint);
+    return pResultValue;
+}
+
