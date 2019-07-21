@@ -1105,7 +1105,9 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+        }
 #endif
 #endif
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
