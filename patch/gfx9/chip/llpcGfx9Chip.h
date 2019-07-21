@@ -189,6 +189,10 @@ namespace Llpc
 // Sets register field value
 #define SET_REG_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.bits._field = (_val);
 
+// Invalidate register, set it to invalid ID and value
+#define INVALIDATE_REG(_stage, _reg) \
+    { (_stage)->_reg##_ID = InvalidMetadataKey; (_stage)->_reg##_VAL.u32All = InvalidMetadataValue; }
+
 // Gets GFX-dependent register field value
 #define GET_REG_GFX9_FIELD(_stage, _reg, _field)    ((_stage)->_reg##_VAL.gfx09._field)
 #if LLPC_BUILD_GFX10
