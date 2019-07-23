@@ -353,14 +353,17 @@ public:
 
     // Create a subgroup all.
     llvm::Value* CreateSubgroupAll(llvm::Value* const pValue,
+                                   bool               wqm,
                                    const llvm::Twine& instName) override final;
 
     // Create a subgroup any
     llvm::Value* CreateSubgroupAny(llvm::Value* const pValue,
+                                   bool               wqm,
                                    const llvm::Twine& instName) override final;
 
     // Create a subgroup all equal.
     llvm::Value* CreateSubgroupAllEqual(llvm::Value* const pValue,
+                                        bool               wqm,
                                         const llvm::Twine& instName) override final;
 
     // Create a subgroup broadcast.

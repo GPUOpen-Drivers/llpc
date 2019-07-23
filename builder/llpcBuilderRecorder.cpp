@@ -678,27 +678,30 @@ Value* BuilderRecorder::CreateSubgroupElect(
 // Create a subgroup all.
 Value* BuilderRecorder::CreateSubgroupAll(
     Value* const pValue,   // [in] The value to compare
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupAll, getInt1Ty(), pValue, instName);
+    return Record(Opcode::SubgroupAll, getInt1Ty(), { pValue,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup any
 Value* BuilderRecorder::CreateSubgroupAny(
     Value* const pValue,   // [in] The value to compare
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupAny, getInt1Ty(), pValue, instName);
+    return Record(Opcode::SubgroupAny, getInt1Ty(), { pValue,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup all equal.
 Value* BuilderRecorder::CreateSubgroupAllEqual(
     Value* const pValue,   // [in] The value to compare
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupAllEqual, getInt1Ty(), pValue, instName);
+    return Record(Opcode::SubgroupAllEqual, getInt1Ty(), { pValue,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================

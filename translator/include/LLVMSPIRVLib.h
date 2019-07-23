@@ -127,6 +127,7 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 /// \brief Load SPIRV from istream and translate to LLVM module.
 /// \returns true if succeeds.
 bool readSpirv(Llpc::Builder *Builder,
+               const void* ModuleData,
                std::istream &IS,
                spv::ExecutionModel EntryExecModel,
                const char *EntryName,

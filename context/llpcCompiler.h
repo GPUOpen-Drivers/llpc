@@ -64,6 +64,7 @@ struct ShaderModuleInfo
     bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
     bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
     bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
+    bool            useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
 };
 
 // Represents output data of building a shader module.
