@@ -633,10 +633,8 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", pInsertPoint);
 
             // Load descriptor
-            MDNode *MD = m_pContext->GetEmptyMetadataNode();
-            pCastedDescPtr->setMetadata(m_pContext->MetaIdUniform(), MD);
-            pCastedDescPtr->setMetadata(m_pContext->MetaIdInvariantLoad(), MD);
-
+            pCastedDescPtr->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+            pCastedDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
             pDesc = new LoadInst(pCastedDescPtr, "", pInsertPoint);
             cast<LoadInst>(pDesc)->setAlignment(16);
         }
