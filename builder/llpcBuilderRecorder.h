@@ -308,10 +308,13 @@ public:
     llvm::Value* CreateGetSubgroupSize(const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupElect(const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupAll(llvm::Value* const pValue,
+                                   bool               wqm,
                                    const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupAny(llvm::Value* const pValue,
+                                   bool               wqm,
                                    const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupAllEqual(llvm::Value* const pValue,
+                                        bool               wqm,
                                         const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupBroadcast(llvm::Value* const pValue,
                                          llvm::Value* const pIndex,

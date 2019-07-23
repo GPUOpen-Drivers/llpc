@@ -598,16 +598,19 @@ public:
     // Create a subgroup all.
     virtual llvm::Value* CreateSubgroupAll(
         llvm::Value* const pValue,             // [in] The value to compare
+        bool               wqm = false,        // Executed in WQM (whole quad mode)
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup any
     virtual llvm::Value* CreateSubgroupAny(
         llvm::Value* const pValue,             // [in] The value to compare
+        bool               wqm = false,        // Executed in WQM (whole quad mode)
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup all equal.
     virtual llvm::Value* CreateSubgroupAllEqual(
         llvm::Value* const pValue,             // [in] The value to compare
+        bool               wqm = false,        // Executed in WQM (whole quad mode)
         const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup broadcast.

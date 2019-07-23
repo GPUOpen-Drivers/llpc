@@ -49,6 +49,7 @@
 #include "SPIRVValue.h"
 
 #include "llpcBuilder.h"
+#include "llpcCompiler.h"
 #include "llpcContext.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -309,10 +310,11 @@ private:
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
-    const SPIRVSpecConstMap &TheSpecConstMap, Builder *pBuilder)
+    const SPIRVSpecConstMap &TheSpecConstMap, Builder *pBuilder, const void* pModuleData)
     :M(LLVMModule), m_pBuilder(pBuilder), BM(TheSPIRVModule), IsKernel(true),
     EnableXfb(false), EntryTarget(nullptr),
-    SpecConstMap(TheSpecConstMap), DbgTran(BM, M) {
+    SpecConstMap(TheSpecConstMap), DbgTran(BM, M),
+    ModuleData(reinterpret_cast<const ShaderModuleInfo*>(pModuleData)) {
     assert(M);
     Context = &M->getContext();
   }
@@ -488,6 +490,7 @@ private:
   RemappedTypeElementsMap RemappedTypeElements;
   DenseMap<Type *, bool> TypesWithPadMap;
   DenseMap<std::pair<SPIRVType*, uint32_t>, Type *> OverlappingStructTypeWorkaroundMap;
+  const ShaderModuleInfo* ModuleData;
 
   Type *mapType(SPIRVType *BT, Type *T) {
     SPIRVDBG(dbgs() << *T << '\n';)
@@ -3826,7 +3829,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate);
+    return m_pBuilder->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -3841,7 +3844,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate);
+    return m_pBuilder->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -3856,7 +3859,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAllEqual(pValue);
+    return m_pBuilder->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4300,7 +4303,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate);
+    return m_pBuilder->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4314,7 +4317,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate);
+    return m_pBuilder->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4328,7 +4331,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAllEqual(pValue);
+    return m_pBuilder->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -8662,7 +8665,7 @@ Instruction *SPIRVToLLVM::transOCLRelational(SPIRVInstruction *I,
 
 } // namespace SPIRV
 
-bool llvm::readSpirv(Builder *Builder, std::istream &IS,
+bool llvm::readSpirv(Builder *Builder, const void *shaderInfo, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
                      const SPIRVSpecConstMap &SpecConstMap, Module *M,
                      std::string &ErrMsg) {
@@ -8670,7 +8673,7 @@ bool llvm::readSpirv(Builder *Builder, std::istream &IS,
 
   IS >> *BM;
 
-  SPIRVToLLVM BTL(M, BM.get(), SpecConstMap, Builder);
+  SPIRVToLLVM BTL(M, BM.get(), SpecConstMap, Builder, shaderInfo);
   bool Succeed = true;
   if (!BTL.translate(EntryExecModel, EntryName)) {
     BM->getError(ErrMsg);

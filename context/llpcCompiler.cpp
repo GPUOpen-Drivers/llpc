@@ -1442,7 +1442,10 @@ void Compiler::TranslateSpirvToLlvm(
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     pContext->SetModuleTargetMachine(pModule);
 
+    const PipelineShaderInfo* pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
+
     if (readSpirv(pContext->GetBuilder(),
+                  pShaderInfo->pModuleData,
                   spirvStream,
                   static_cast<spv::ExecutionModel>(shaderStage),
                   pEntryTarget,
@@ -2047,6 +2050,23 @@ Result Compiler::CollectInfoFromSpirvBinary(
                 {
                     pShaderModuleInfo->useSubgroupSize = true;
                 }
+                break;
+            }
+        case spv::OpDPdx:
+        case spv::OpDPdy:
+        case spv::OpDPdxCoarse:
+        case spv::OpDPdyCoarse:
+        case spv::OpDPdxFine:
+        case spv::OpDPdyFine:
+        case spv::OpImageSampleImplicitLod:
+        case spv::OpImageSampleDrefImplicitLod:
+        case spv::OpImageSampleProjImplicitLod:
+        case spv::OpImageSampleProjDrefImplicitLod:
+        case spv::OpImageSparseSampleImplicitLod:
+        case spv::OpImageSparseSampleProjDrefImplicitLod:
+        case spv::OpImageSparseSampleProjImplicitLod:
+            {
+                pShaderModuleInfo->useHelpInvocation = true;
                 break;
             }
         case spv::OpString:

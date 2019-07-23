@@ -542,15 +542,15 @@ Value* BuilderReplayer::ProcessCall(
         }
     case BuilderRecorder::Opcode::SubgroupAll:
         {
-            return m_pBuilder->CreateSubgroupAll(args[0]);
+            return m_pBuilder->CreateSubgroupAll(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
         }
     case BuilderRecorder::Opcode::SubgroupAny:
         {
-            return m_pBuilder->CreateSubgroupAny(args[0]);
+            return m_pBuilder->CreateSubgroupAny(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
         }
     case BuilderRecorder::Opcode::SubgroupAllEqual:
         {
-            return m_pBuilder->CreateSubgroupAllEqual(args[0]);
+            return m_pBuilder->CreateSubgroupAllEqual(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
         }
     case BuilderRecorder::Opcode::SubgroupBroadcast:
         {
