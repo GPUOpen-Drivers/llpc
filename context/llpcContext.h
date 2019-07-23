@@ -123,6 +123,7 @@ public:
     uint32_t MetaIdInvariantLoad() const { return m_metaIds.invariantLoad; }
     uint32_t MetaIdRange() const { return m_metaIds.range; }
     uint32_t MetaIdUniform() const { return m_metaIds.uniform; }
+    uint32_t MetaIdDereferenceable() const { return m_metaIds.dereferenceable; }
 
     std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
 
@@ -337,6 +338,7 @@ private:
         uint32_t invariantLoad;   // "invariant.load"
         uint32_t range;           // "range"
         uint32_t uniform;         // "amdgpu.uniform"
+        uint32_t dereferenceable; // "dereferecenable"
     } m_metaIds;
 
     // GLSL emulation libraries

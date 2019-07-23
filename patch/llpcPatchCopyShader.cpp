@@ -711,6 +711,7 @@ Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
                                            "",
                                            pInsertPos);
     pGsVsRingBufDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+    pGsVsRingBufDescPtr->setMetadata(m_pContext->MetaIdDereferenceable(), m_pContext->GetEmptyMetadataNode());
 
     auto pGsVsRingBufDesc = new LoadInst(pGsVsRingBufDescPtr, "", pInsertPos);
     pGsVsRingBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());

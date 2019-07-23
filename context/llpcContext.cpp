@@ -129,6 +129,7 @@ Context::Context(
     m_metaIds.invariantLoad = getMDKindID("invariant.load");
     m_metaIds.range         = getMDKindID("range");
     m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
+    m_metaIds.dereferenceable = getMDKindID("dereferenceable");
 
     // Load external LLVM libraries, in search order.
     if (pGpuWorkarounds->gfx9.treat1dImagesAs2d)
