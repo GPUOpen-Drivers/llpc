@@ -108,6 +108,13 @@ void Patch::AddPrePatchPasses(
         passMgr.add(pBuilderReplayer);
     }
 
+    if (EnableOuts())
+    {
+        passMgr.add(createPrintModulePass(outs(),
+                    "===============================================================================\n"
+                    "// LLPC pipeline before-patching results\n"));
+    }
+
     // Build null fragment shader if necessary
     passMgr.add(CreatePatchNullFragShader());
 
