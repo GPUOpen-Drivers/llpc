@@ -92,7 +92,6 @@ public:
     llvm::Value* CreateLoadDescFromPtr(llvm::Value*        pDescPtr,
                                        const llvm::Twine&  instName) override final;
 
-
     // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
     llvm::Value* CreateGetSamplerDescPtr(uint32_t            descSet,
                                          uint32_t            binding,

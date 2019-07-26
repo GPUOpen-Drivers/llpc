@@ -91,7 +91,9 @@ Result CodeGenManager::CreateTargetMachine(
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
     if ((pContext->GetTargetMachine() != nullptr) &&
         (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
         (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc) &&
+#endif
         (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout) &&
         (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr)
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23

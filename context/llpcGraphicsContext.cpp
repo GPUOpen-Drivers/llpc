@@ -903,7 +903,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Collect user data nodes from all shader stages into one big table.
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -921,7 +921,7 @@ void GraphicsContext::DoUserDataNodeMerge()
 
     // Collect descriptor range values (immutable descriptors) from all shader stages into one big table.
     SmallVector<DescriptorRangeValue, 8> allRangeValues;
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -981,7 +981,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Point each shader stage at the merged user data nodes and descriptor range values.
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {

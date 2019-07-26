@@ -109,7 +109,7 @@ Module* Builder::Link(
     // Add IR metadata for the shader stage to each function in each shader, and rename the entrypoint to
     // ensure there is no clash on linking.
     uint32_t metaKindId = getContext().getMDKindID(LlpcName::ShaderStageMetadata);
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         Module* pModule = modules[stage];
         if (pModule == nullptr)
@@ -174,7 +174,7 @@ Module* Builder::Link(
             m_pPipelineState->RecordState(pPipelineModule);
         }
 
-        for (int32_t stage = 0; stage < ShaderStageCount; ++stage)
+        for (int32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
         {
             if (modules[stage] != nullptr)
             {

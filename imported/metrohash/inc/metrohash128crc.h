@@ -1,4 +1,4 @@
-// metrohash.h
+// metrohash128crc.h
 //
 // Copyright 2015-2018 J. Andrew Rogers
 //
@@ -16,11 +16,18 @@
 //
 // Modifications Copyright© 2019 Advanced Micro Devices, Inc. All rights reserved.
 
-#ifndef METROHASH_METROHASH_H
-#define METROHASH_METROHASH_H
+#ifndef METROHASH_METROHASH_128_CRC_H
+#define METROHASH_METROHASH_128_CRC_H
 
-#include "metrohash64.h"
-#include "metrohash128.h"
-#include "metrohash128crc.h"
+#include <stdint.h>
 
-#endif // #ifndef METROHASH_METROHASH_H
+namespace MetroHash
+{
+
+// Legacy 128-bit hash functions
+void metrohash128crc_1(const uint8_t * key, uint64_t len, uint32_t seed, uint8_t * out);
+void metrohash128crc_2(const uint8_t * key, uint64_t len, uint32_t seed, uint8_t * out);
+
+} // MetroHash
+
+#endif // #ifndef METROHASH_METROHASH_128_CRC_H

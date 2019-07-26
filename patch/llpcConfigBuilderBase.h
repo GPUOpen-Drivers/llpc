@@ -62,17 +62,20 @@ protected:
     void SetShaderHash(ShaderStage apiStage, uint64_t hash64);
     void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
-    void SetUsesViewportArrayIndex(uint32_t useViewportIndex);
-    void SetPsUsesUavs(uint32_t value);
-    void SetPsWritesUavs(uint32_t value);
-    void SetPsWritesDepth(uint32_t value);
+    void SetUsesViewportArrayIndex(bool useViewportIndex);
+    void SetPsUsesUavs(bool value);
+    void SetPsWritesUavs(bool value);
+    void SetPsWritesDepth(bool value);
     void SetEsGsLdsByteSize(uint32_t value);
 #if LLPC_BUILD_GFX10
-    void SetCalcWaveBreakSizeAtDrawTime(uint32_t value);
+    void SetCalcWaveBreakSizeAtDrawTime(bool value);
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
     void SetWaveFrontSize(Util::Abi::HardwareStage hwStage, uint32_t value);
 #endif
 #endif
+    void SetApiName(const char* pValue);
+    void SetPipelineType(Util::Abi::PipelineType value);
+    void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uint32_t value);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -111,7 +114,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
     std::unique_ptr<llvm::msgpack::Document>  m_document;       // The MsgPack document
     llvm::msgpack::MapDocNode                 m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
-    llvm::msgpack::MapDocNode                 m_apiShaderNodes[ShaderStageCount];
+    llvm::msgpack::MapDocNode                 m_apiShaderNodes[ShaderStageNativeStageCount];
                                                                 // MsgPack map node for each API shader's node in
                                                                 //  ".shaders"
     llvm::msgpack::MapDocNode                 m_hwShaderNodes[uint32_t(Util::Abi::HardwareStage::Count)];

@@ -116,7 +116,7 @@ bool PatchEntryPointMutate::runOnModule(
 
     // Process each shader in turn, but not the copy shader.
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageCount; ++shaderStage)
+    for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage)
     {
         m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)

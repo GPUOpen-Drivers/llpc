@@ -1119,7 +1119,9 @@ public:
     {
         StrToMemberAddr* pTableItem = m_addrTable;
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, autoLayoutDesc, MemberTypeBool, false);
+#endif
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23

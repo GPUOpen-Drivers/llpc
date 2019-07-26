@@ -2664,11 +2664,11 @@ void SpirvLowerGlobal::LowerPushConsts()
 void SpirvLowerGlobal::InterpolateInputElement(
     uint32_t        interpLoc,          // [in] Interpolation location, valid for fragment shader
                                         // (use "InterpLocUnknown" as don't-care value)
-    Value* pAuxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
+    Value*          pAuxInterpValue,    // [in] Auxiliary value of interpolation (valid for fragment shader):
                                         //   - Sample ID for "InterpLocSample"
                                         //   - Offset from the center of the pixel for "InterpLocCenter"
                                         //   - Vertex no. (0 ~ 2) for "InterpLocCustom"
-    CallInst& callInst)           // [in] "Call" instruction
+    CallInst&       callInst)           // [in] "Call" instruction
 {
     GetElementPtrInst* pGetElemPtr = cast<GetElementPtrInst>(callInst.getArgOperand(0));
 

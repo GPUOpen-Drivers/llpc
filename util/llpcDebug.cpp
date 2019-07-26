@@ -30,8 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-debug"
 
-#include <metrohash.h>
-
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -45,6 +43,7 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcInternal.h"
+#include "llpcMetroHash.h"
 
 namespace llvm
 {

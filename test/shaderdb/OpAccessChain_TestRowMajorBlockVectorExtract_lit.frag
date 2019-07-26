@@ -37,30 +37,19 @@ void main()
 
     fragColor = vec4(float(d1), f1, f1, f1);
 }
+
 // BEGIN_SHADERTEST
 /*
-; XFAIL: *
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: getelementptr { <3 x double>, [2 x <3 x double>] }, { <3 x double>, [2 x <3 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr { <3 x double>, [2 x <3 x double>] }, { <3 x double>, [2 x <3 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 1, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr { <3 x double>, [2 x <3 x double>] }, { <3 x double>, [2 x <3 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 1
-; SHADERTEST: getelementptr { <3 x double>, [2 x <3 x double>] }, { <3 x double>, [2 x <3 x double>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr { <4 x float>, [4 x <4 x float>] }, { <4 x float>, [4 x <4 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 0, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr { <4 x float>, [4 x <4 x float>] }, { <4 x float>, [4 x <4 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 2
-; SHADERTEST: getelementptr { <4 x float>, [4 x <4 x float>] }, { <4 x float>, [4 x <4 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 3, i32 %{{[0-9]*}}
-; SHADERTEST: getelementptr { <4 x float>, [4 x <4 x float>] }, { <4 x float>, [4 x <4 x float>] } addrspace({{.*}})* @{{.*}}, i32 0, i32 1, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
-
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false)
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false)
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false)
-; SHADERTEST: call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 true, i32 0, i1 false)
-; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 false, i32 0, i1 false)
-; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 false, i32 0, i1 false)
-; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 false, i32 0, i1 false)
-; SHADERTEST: call <4 x i8> @llpc.buffer.load.v4i8(<4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i1 false, i32 0, i1 false)
+; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> undef, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i32 0
+; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> %{{[0-9]*}}, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i32 1
+; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> %{{[0-9]*}}, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i32 2
+; SHADERTEST: insertelement <4 x [4 x %{{[a-z0-9.]*}}] addrspace(7)*> %{{[0-9]*}}, [4 x %{{[a-z0-9.]*}}] addrspace(7)* %{{[0-9]*}}, i32 3
+; SHADERTEST: insertelement <3 x [3 x %{{[a-z.]*}}] addrspace(7)*> undef, [3 x %{{[a-z.]*}}] addrspace(7)* %{{[0-9]*}}, i32 0
+; SHADERTEST: insertelement <3 x [3 x %{{[a-z.]*}}] addrspace(7)*> %{{[0-9]*}}, [3 x %{{[a-z.]*}}] addrspace(7)* %{{[0-9]*}}, i32 1
+; SHADERTEST: insertelement <3 x [3 x %{{[a-z.]*}}] addrspace(7)*> %{{[0-9]*}}, [3 x %{{[a-z.]*}}] addrspace(7)* %{{[0-9]*}}, i32 2
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -103,12 +103,16 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
 
 // =====================================================================================================================
 NggLdsManager::NggLdsManager(
-    Module*  pModule,    // [in] LLVM module
-    Context* pContext)   // [in] LLPC context
+    Module*      pModule,    // [in] LLVM module
+    Context*     pContext,   // [in] LLPC context
+    IRBuilder<>* pBuilder)   // [in] LLVM IR builder
     :
     m_pContext(pContext),
-    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / pContext->GetGpuProperty()->waveSize)
+    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / pContext->GetGpuProperty()->waveSize),
+    m_pBuilder(pBuilder)
 {
+    LLPC_ASSERT(pBuilder != nullptr);
+
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
@@ -283,8 +287,7 @@ uint32_t NggLdsManager::CalcLdsRegionTotalSize(
 // Reads value from LDS.
 Value* NggLdsManager::ReadValueFromLds(
     Type*        pReadTy,       // [in] Type of value read from LDS
-    Value*       pLdsOffset,    // [in] Start offset to do LDS read operations
-    BasicBlock*  pInsertAtEnd)  // [in] Where to insert read instructions
+    Value*       pLdsOffset)    // [in] Start offset to do LDS read operations
 {
     LLPC_ASSERT(m_pLds != nullptr);
     LLPC_ASSERT(pReadTy->isIntOrIntVectorTy() || pReadTy->isFPOrFPVectorTy());
@@ -322,33 +325,26 @@ Value* NggLdsManager::ReadValueFromLds(
     }
 
     Type* pCompTy = IntegerType::get(*m_pContext, bitWidth);
-    Value* pReadValue = UndefValue::get((compCount > 1) ? VectorType::get(pCompTy, compCount) : pCompTy);
+    Value* pReadValue =  UndefValue::get((compCount > 1) ? VectorType::get(pCompTy, compCount) : pCompTy);
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
     auto pLds = ConstantExpr::getBitCast(m_pLds,
-                  PointerType::get(m_pContext->Int8Ty(), m_pLds->getType()->getPointerAddressSpace()));
+                    PointerType::get(m_pContext->Int8Ty(), m_pLds->getType()->getPointerAddressSpace()));
 
     for (uint32_t i = 0; i < compCount; ++i)
     {
-        Value* pLoadPtr = GetElementPtrInst::Create(nullptr, pLds, pLdsOffset, "", pInsertAtEnd);
+        Value* pLoadPtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
         if (bitWidth != 8)
         {
-            pLoadPtr = new BitCastInst(pLoadPtr,
-                                       PointerType::get(pCompTy, ADDR_SPACE_LOCAL),
-                                       "",
-                                       pInsertAtEnd);
+            pLoadPtr = m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
         }
 
         // NOTE: Use "volatile" for load to prevent optimization.
-        Value* pLoadValue = new LoadInst(pLoadPtr, "", true, m_pLds->getAlignment(), pInsertAtEnd);
+        Value* pLoadValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, m_pLds->getAlignment(), true);
 
         if (compCount > 1)
         {
-            pReadValue = InsertElementInst::Create(pReadValue,
-                                                   pLoadValue,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                   "",
-                                                   pInsertAtEnd);
+            pReadValue = m_pBuilder->CreateInsertElement(pReadValue, pLoadValue, i);
         }
         else
         {
@@ -357,16 +353,13 @@ Value* NggLdsManager::ReadValueFromLds(
 
         if (compCount > 1)
         {
-            pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), bitWidth / 8),
-                                                   "",
-                                                   pInsertAtEnd);
+            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(bitWidth / 8));
         }
     }
 
     if (pReadValue->getType() != pReadTy)
     {
-        pReadValue = new BitCastInst(pReadValue, pReadTy, "", pInsertAtEnd);
+        pReadValue = m_pBuilder->CreateBitCast(pReadValue, pReadTy);
     }
 
     return pReadValue;
@@ -376,8 +369,7 @@ Value* NggLdsManager::ReadValueFromLds(
 // Writes value to LDS.
 void NggLdsManager::WriteValueToLds(
     Value*        pWriteValue,      // [in] Value written to LDS
-    Value*        pLdsOffset,       // [in] Start offset to do LDS write operations
-    BasicBlock*   pInsertAtEnd)     // [in] Where to insert write instructions
+    Value*        pLdsOffset)       // [in] Start offset to do LDS write operations
 {
     LLPC_ASSERT(m_pLds != nullptr);
 
@@ -421,7 +413,7 @@ void NggLdsManager::WriteValueToLds(
 
     if (pWriteValue->getType() != pWriteTy)
     {
-        pWriteValue = new BitCastInst(pWriteValue, pWriteTy, "", pInsertAtEnd);
+        pWriteValue = m_pBuilder->CreateBitCast(pWriteValue, pWriteTy);
     }
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
@@ -430,22 +422,16 @@ void NggLdsManager::WriteValueToLds(
 
     for (uint32_t i = 0; i < compCount; ++i)
     {
-        Value* pStorePtr = GetElementPtrInst::Create(nullptr, pLds, pLdsOffset, "", pInsertAtEnd);
+        Value* pStorePtr = m_pBuilder->CreateGEP(pLds, pLdsOffset);
         if (bitWidth != 8)
         {
-            pStorePtr = new BitCastInst(pStorePtr,
-                                        PointerType::get(pCompTy, ADDR_SPACE_LOCAL),
-                                        "",
-                                        pInsertAtEnd);
+            pStorePtr = m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(pCompTy, ADDR_SPACE_LOCAL));
         }
 
         Value* pStoreValue = nullptr;
         if (compCount > 1)
         {
-            pStoreValue = ExtractElementInst::Create(pWriteValue,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                     "",
-                                                     pInsertAtEnd);
+            pStoreValue = m_pBuilder->CreateExtractElement(pWriteValue, i);
         }
         else
         {
@@ -453,14 +439,11 @@ void NggLdsManager::WriteValueToLds(
         }
 
         // NOTE: Use "volatile" for store to prevent optimization.
-        new StoreInst(pStoreValue, pStorePtr, true, m_pLds->getAlignment(), pInsertAtEnd);
+        m_pBuilder->CreateAlignedStore(pStoreValue, pStorePtr, m_pLds->getAlignment(), true);
 
         if (compCount > 1)
         {
-            pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), bitWidth / 8),
-                                                   "",
-                                                   pInsertAtEnd);
+            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(bitWidth / 8));
         }
     }
 }
@@ -470,29 +453,21 @@ void NggLdsManager::WriteValueToLds(
 void NggLdsManager::AtomicOpWithLds(
     AtomicRMWInst::BinOp atomicOp,      // Atomic binary operation
     Value*               pAtomicValue,  // [in] Value to do atomic operation
-    Value*               pLdsOffset,    // [in] Start offset to do LDS atomic operations
-    BasicBlock*          pInsertAtEnd)  // [in] Where to insert write instructions
+    Value*               pLdsOffset)    // [in] Start offset to do LDS atomic operations
 {
     LLPC_ASSERT(pAtomicValue->getType()->isIntegerTy(32));
 
     // NOTE: LDS variable is defined as a pointer to i32 array. The LDS offset here has to be casted to DWORD offset
     // from BYTE offset.
-    pLdsOffset = BinaryOperator::CreateLShr(pLdsOffset,
-                                            ConstantInt::get(m_pContext->Int32Ty(), 2),
-                                            "",
-                                            pInsertAtEnd);
+    pLdsOffset = m_pBuilder->CreateLShr(pLdsOffset, m_pBuilder->getInt32(2));
 
-    std::vector<Value*> idxs;
-    idxs.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-    idxs.push_back(pLdsOffset);
-    Value* pAtomicPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertAtEnd);
+    Value* pAtomicPtr = m_pBuilder->CreateGEP(m_pLds, { m_pBuilder->getInt32(0), pLdsOffset });
 
-    auto pAtomicInst = new AtomicRMWInst(atomicOp,
-                                         pAtomicPtr,
-                                         pAtomicValue,
-                                         AtomicOrdering::SequentiallyConsistent,
-                                         SyncScope::System,
-                                         pInsertAtEnd);
+    auto pAtomicInst = m_pBuilder->CreateAtomicRMW(atomicOp,
+                                                   pAtomicPtr,
+                                                   pAtomicValue,
+                                                   AtomicOrdering::SequentiallyConsistent,
+                                                   SyncScope::System);
     pAtomicInst->setVolatile(true);
 }
 

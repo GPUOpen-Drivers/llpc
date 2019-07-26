@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 28
+#define LLPC_INTERFACE_MAJOR_VERSION 30
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     30.0 | Removed PipelineOptions::autoLayoutDesc
 //* |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
 //* |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
 //* |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
@@ -130,6 +131,12 @@ enum class ResourceMappingNodeType : uint32_t
     PushConst,                      ///< Push constant
     DescriptorBufferCompact,        ///< Compact buffer descriptor, only contains the buffer address
     StreamOutTableVaPtr,            ///< Stream-out buffer table VA pointer
+#if VKI_IMAGE_BVH_INTERSECT_RAY
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 29
+    DescriptorCombinedBvhBuffer,    ///< Generic descriptor: combined bvh buffer srd with normal buffer srd,
+                                    ///  starting with normal buffer srd
+#endif
+#endif
     Count,                          ///< Count of resource mapping node types.
 };
 
@@ -272,8 +279,10 @@ struct PipelineOptions
 {
     bool includeDisassembly;       ///< If set, the disassembly for all compiled shaders will be included in
                                    ///  the pipeline ELF.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
     bool autoLayoutDesc;           ///< If set, the LLPC standalone compiler is compiling individual shader(s)
                                    ///  without pipeline info, so LLPC needs to do auto descriptor layout.
+#endif
     bool scalarBlockLayout;        ///< If set, allows scalar block layout of types.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     bool reconfigWorkgroupLayout;  ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.

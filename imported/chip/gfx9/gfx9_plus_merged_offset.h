@@ -2565,7 +2565,6 @@ namespace Gfx09_1xPlus
     constexpr unsigned int mmPA_CL_PROG_NEAR_CLIP_Z                 = 0xA187;
 } // namespace Gfx09_1xPlus
 
-#if CHIP_HDR_GFX10
 namespace Gfx10
 {
     constexpr unsigned int mmATC_ATS_DEFAULT_PAGE_LOW               = 0x0C07;
@@ -3682,9 +3681,7 @@ namespace Gfx10
     constexpr unsigned int mmVGT_TF_MEMORY_BASE_UMD                 = 0xC250;
     constexpr unsigned int mmVGT_TF_RING_SIZE_UMD                   = 0xC24E;
 } // namespace Gfx10
-#endif // CHIP_HDR_GFX10
 
-#if CHIP_HDR_GFX10
 namespace Gfx101
 {
     constexpr unsigned int mmATC_ATS_CNTL                           = 0x0C00;
@@ -3885,9 +3882,7 @@ namespace Gfx101
     constexpr unsigned int mmVGT_CNTL_STATUS                        = 0x223C;
     constexpr unsigned int mmVGT_DISPATCH_DRAW_INDEX                = 0xA2DD;
 } // namespace Gfx101
-#endif // CHIP_HDR_GFX10
 
-#if CHIP_HDR_GFX10
 namespace Gfx101Plus
 {
     constexpr unsigned int mmCOMPUTE_RELAUNCH2                      = 0x2E2E;
@@ -3966,9 +3961,7 @@ namespace Gfx101Plus
     constexpr unsigned int mmRLC_SPM_VIRT_STATUS                    = 0xDCA3;
     constexpr unsigned int mmSPI_USER_ACCUM_VMID_CNTL               = 0x243F;
 } // namespace Gfx101Plus
-#endif // CHIP_HDR_GFX10
 
-#if CHIP_HDR_GFX10
 namespace Nv10
 {
     constexpr unsigned int mmCP_CE_CS_PARTITION_INDEX               = 0x30B9;
@@ -4179,9 +4172,7 @@ namespace Nv10
     constexpr unsigned int mmVGT_TF_MEMORY_BASE_HI                  = 0x2278;
     constexpr unsigned int mmVGT_TF_RING_SIZE                       = 0x2262;
 } // namespace Nv10
-#endif // CHIP_HDR_GFX10
 
-#if CHIP_HDR_GFX10
 namespace Oss50
 {
     constexpr unsigned int mmSDMA0_PERFCOUNTER0_HI                  = 0x12CB;
@@ -4213,7 +4204,6 @@ namespace Oss50
     constexpr unsigned int mmSDMA_PGFSM_WRITE                       = 0x1290;
     constexpr unsigned int mmSDMA_POWER_GATING                      = 0x128E;
 } // namespace Oss50
-#endif // CHIP_HDR_GFX10
 
 namespace Raven
 {

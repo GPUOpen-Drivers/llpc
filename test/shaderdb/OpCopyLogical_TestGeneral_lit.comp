@@ -1,0 +1,34 @@
+#version 450 core
+
+struct MyStruct
+{
+    vec2 foo[2];
+    int sb;
+};
+
+layout(binding = 0, std140) buffer SSBO0
+{
+    MyStruct a;
+} inBuf;
+
+layout(binding = 1, std140) buffer SSBO1
+{
+    MyStruct b;
+    MyStruct c;
+} outBuf;
+
+
+void main()
+{
+    MyStruct t = inBuf.a;
+    outBuf.b = t;
+    outBuf.c = inBuf.a;
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

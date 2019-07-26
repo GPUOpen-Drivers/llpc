@@ -75,8 +75,10 @@
 #endif
 
 using namespace llvm;
+using namespace MetroHash;
 using namespace SPIRV;
 using namespace spv;
+using namespace Util;
 
 namespace llvm
 {
@@ -519,7 +521,7 @@ Result Compiler::BuildShaderModule(
         pModuleData->binType = binType;
         pModuleData->binCode.codeSize = codeSize;
         MetroHash::Hash hash = {};
-        MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
+        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
                           pShaderInfo->shaderBin.codeSize,
                           hash.bytes);
         static_assert(sizeof(pModuleData->hash) == sizeof(hash), "Unexpected value!");
@@ -549,7 +551,7 @@ Result Compiler::BuildShaderModule(
 
         // Calculate SPIR-V cache hash
         MetroHash::Hash cacheHash = {};
-        MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pModuleData->binCode.pCode),
+        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pModuleData->binCode.pCode),
             pModuleData->binCode.codeSize,
             cacheHash.bytes);
         static_assert(sizeof(pModuleData->moduleInfo.cacheHash) == sizeof(cacheHash), "Unexpected value!");
@@ -649,7 +651,7 @@ Result Compiler::BuildPipelineInternal(
     if (pPipelineModule == nullptr)
     {
         // Create empty modules and set target machine in each.
-        Module* modules[ShaderStageCount] = {};
+        Module* modules[ShaderStageNativeStageCount] = {};
         for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
@@ -1210,7 +1212,7 @@ Result Compiler::BuildComputePipelineInternal(
     pContext->AttachPipelineContext(pComputeContext);
     pContext->SetBuilder(Builder::Create(*pContext));
 
-    const PipelineShaderInfo* shaderInfo[ShaderStageCount] =
+    const PipelineShaderInfo* shaderInfo[ShaderStageNativeStageCount] =
     {
         nullptr,
         nullptr,
@@ -1588,7 +1590,7 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
         }
     }
 
-    MetroHash::MetroHash64 hasher;
+    MetroHash64 hasher;
 
     // Build hash code from effecting options
     for (auto option : effectingOptions)
@@ -2524,8 +2526,8 @@ void Compiler::BuildShaderCacheHash(
     MetroHash::Hash* pFragmentHash,      // [out] Hash code of fragment shader
     MetroHash::Hash* pNonFragmentHash)   // [out] Hash code of all non-fragment shader
 {
-    MetroHash::MetroHash64 fragmentHasher;
-    MetroHash::MetroHash64 nonFragmentHasher;
+    MetroHash64 fragmentHasher;
+    MetroHash64 nonFragmentHasher;
     auto stageMask = pContext->GetShaderStageMask();
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
 
@@ -2539,7 +2541,7 @@ void Compiler::BuildShaderCacheHash(
 
         auto pShaderInfo = pContext->GetPipelineShaderInfo(stage);
         auto pResUsage = pContext->GetShaderResourceUsage(stage);
-        MetroHash::MetroHash64 hasher;
+        MetroHash64 hasher;
 
         // Update common shader info
         PipelineDumper::UpdateHashForPipelineShaderInfo(stage, pShaderInfo, true, &hasher);
