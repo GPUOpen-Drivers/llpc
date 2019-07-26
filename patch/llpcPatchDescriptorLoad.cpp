@@ -635,6 +635,8 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             // Load descriptor
             pCastedDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
             pDesc = new LoadInst(pCastedDescPtr, "", pInsertPoint);
+            if (LoadInst *LI = dyn_cast<LoadInst>(pDesc))
+              LI->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
             cast<LoadInst>(pDesc)->setAlignment(16);
         }
     }
