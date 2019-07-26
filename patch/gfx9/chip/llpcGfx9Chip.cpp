@@ -177,6 +177,8 @@ void PrimShaderRegConfig::Init(
 
     INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
+
+    INIT_REG(SPI_SHADER_PGM_LO_GS);
 }
 #endif
 
@@ -603,6 +605,7 @@ void InitRegisterNameMap(
     ADD_REG_MAP(PA_SC_CONSERVATIVE_RASTERIZATION_CNTL);
 #endif
     ADD_REG_MAP(COMPUTE_DISPATCH_INITIATOR);
+    ADD_REG_MAP(SPI_SHADER_PGM_LO_GS);
 
     if (gfxIp.major == 9)
     {

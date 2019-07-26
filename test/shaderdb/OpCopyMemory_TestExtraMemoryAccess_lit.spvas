@@ -1,0 +1,53 @@
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 24
+; Schema: 0
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %2
+               OpExecutionMode %1 LocalSize 1 1 1
+               OpDecorate %_struct_3 Block
+               OpMemberDecorate %_struct_3 0 Offset 0
+               OpMemberDecorate %_struct_3 1 Offset 16
+               OpMemberDecorate %_struct_3 2 Offset 32
+               OpMemberDecorate %_struct_3 3 Offset 48
+               OpMemberDecorate %_struct_3 4 Offset 64
+               OpDecorate %2 DescriptorSet 0
+               OpDecorate %2 Binding 0
+       %void = OpTypeVoid
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+     %uint_2 = OpConstant %uint 2
+     %uint_3 = OpConstant %uint 3
+     %uint_4 = OpConstant %uint 4
+     %v4uint = OpTypeVector %uint 4
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+  %_struct_3 = OpTypeStruct %v4uint %uint %uint %uint %uint
+%_ptr_StorageBuffer__struct_3 = OpTypePointer StorageBuffer %_struct_3
+          %2 = OpVariable %_ptr_StorageBuffer__struct_3 StorageBuffer
+         %14 = OpTypeFunction %void
+          %1 = OpFunction %void None %14
+         %15 = OpLabel
+         %16 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_0 %uint_0
+         %17 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_1
+               OpCopyMemory %17 %16 Aligned 16 Aligned 4
+         %18 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_0 %uint_1
+         %19 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_2
+               OpCopyMemory %19 %18 Aligned 16 Aligned 4
+         %20 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_0 %uint_2
+         %21 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_3
+               OpCopyMemory %21 %20 Aligned 16 Aligned 4
+         %22 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_0 %uint_3
+         %23 = OpAccessChain %_ptr_StorageBuffer_uint %2 %uint_4
+               OpCopyMemory %23 %22 Aligned 16 Aligned 4
+               OpReturn
+               OpFunctionEnd

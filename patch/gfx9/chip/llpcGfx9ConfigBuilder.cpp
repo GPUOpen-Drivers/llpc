@@ -161,6 +161,8 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::VsPs);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
@@ -177,7 +179,9 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -277,6 +281,8 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::Tess);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 #if LLPC_BUILD_GFX10
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
@@ -320,7 +326,9 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+        }
 #endif
 #endif
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
@@ -346,7 +354,9 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -445,6 +455,8 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::Gs);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     if (stageMask & (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageGeometry)))
@@ -482,7 +494,9 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -531,7 +545,9 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+        }
 #endif
 #endif
     }
@@ -583,6 +599,8 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::GsTess);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     if (stageMask & (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageTessControl)))
@@ -619,7 +637,9 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+        }
 #endif
 
         //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
@@ -680,7 +700,9 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+        }
 #endif
 
 #endif
@@ -716,7 +738,9 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+        }
 #endif
 #endif
     }
@@ -782,6 +806,8 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::Ngg);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
@@ -805,7 +831,9 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -889,6 +917,8 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::NggTess);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
@@ -919,7 +949,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
-#if LLPC_BUILD_GFX_10
+#if LLPC_BUILD_GFX10
         auto waveFrontSize = pContext->GetShaderWaveSize(ShaderStageTessControl);
         if (waveFrontSize == 32)
         {
@@ -927,7 +957,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -949,7 +981,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
 
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
-#if LLPC_BUILD_GFX_10
+#if LLPC_BUILD_GFX10
         auto waveFrontSize = pContext->GetShaderWaveSize(ShaderStageTessEval);
         if (waveFrontSize == 32)
         {
@@ -957,7 +989,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
-            SetWaveFrontSize(Util::Abi::HwShaderGs, waveFrontSize);
+        {
+            SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -1030,6 +1064,8 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig(
                             Util::Abi::HwShaderGs,
                             Util::Abi::HwShaderPs,
                             0);
+
+    SetPipelineType(Util::Abi::PipelineType::Ngg);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
@@ -1138,6 +1174,8 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::NggTess);
+
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
@@ -1175,7 +1213,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+        }
 #endif
 #endif
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
@@ -1221,7 +1261,9 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
         }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
         if (gfxIp.major >= 10)
+        {
             SetWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+        }
 #endif
 #endif
 
@@ -1290,6 +1332,9 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
                             0,
                             0,
                             Util::Abi::HwShaderCs);
+
+    SetPipelineType(Util::Abi::PipelineType::Cs);
+
     result = BuildCsRegConfig(pContext, ShaderStageCompute, pConfig);
 
     hash64 = pContext->GetShaderHashCode(ShaderStageCompute);
@@ -1758,6 +1803,8 @@ Result ConfigBuilder::BuildLsHsRegConfig(
         LLPC_NOT_IMPLEMENTED();
     }
 
+    SetLdsSizeByteSize(Util::Abi::HardwareStage::Hs, ldsSizeInDwords * 4);
+
     // Minimum and maximum tessellation factors supported by the hardware.
     constexpr float MinTessFactor = 1.0f;
     constexpr float MaxTessFactor = 64.0f;
@@ -1932,6 +1979,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                   SPI_SHADER_PGM_RSRC2_GS,
                   LDS_SIZE,
                   calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
+    SetLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
 
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(gsBuiltInUsage.outputVertices));
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -2124,6 +2172,9 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     const auto gfxIp = pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
+    const auto pNggControl = pContext->GetNggControl();
+    LLPC_ASSERT(pNggControl->enableNgg);
+
     const uint32_t stageMask = pContext->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
@@ -2229,6 +2280,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
                   SPI_SHADER_PGM_RSRC2_GS,
                   LDS_SIZE,
                   calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
+    SetLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
 
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(gsBuiltInUsage.outputVertices));
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -2558,6 +2610,22 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     // TODO: Support PIPELINE_PRIM_ID.
     SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_IDX_FORMAT, IDX0_EXPORT_FORMAT, SPI_SHADER_1COMP);
 
+    if (pNggControl->passthroughMode)
+    {
+        INVALIDATE_REG(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_LO_GS);
+    }
+    else
+    {
+        // NOTE: For NGG culling mode, the primitive shader table that contains culling data might be accessed by
+        // shader. PAL expects 64-bit address of that table and will program it into SPI_SHADER_PGM_LO_GS and
+        // SPI_SHADER_PGM_HI_GS if we do not provide one. By setting SPI_SHADER_PGM_LO_GS to NggCullingData, we tell
+        // PAL that we will not provide it and it is fine to use SPI_SHADER_PGM_LO_GS and SPI_SHADER_PGM_HI_GS as
+        // the address of that table.
+        SET_REG(&pConfig->m_primShaderRegs,
+                SPI_SHADER_PGM_LO_GS,
+                static_cast<uint32_t>(Util::Abi::UserDataMapping::NggCullingData));
+    }
+
     //
     // Build use data configuration
     //
@@ -2685,6 +2753,13 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                   (builtInUsage.earlyFragmentTests && pResUsage->resourceWrite));
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
+#if LLPC_BUILD_GFX10
+    if (gfxIp.major == 10)
+    {
+        SET_REG_GFX10_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, PRE_SHADER_DEPTH_COVERAGE_ENABLE,
+                            builtInUsage.postDepthCoverage);
+    }
+#endif
 
     uint32_t depthExpFmt = EXP_FORMAT_ZERO;
     if (builtInUsage.sampleMask)
@@ -2732,7 +2807,9 @@ Result ConfigBuilder::BuildPsRegConfig(
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
     if (gfxIp.major >= 10)
+    {
         SetWaveFrontSize(Util::Abi::HardwareStage::Ps, waveFrontSize);
+    }
 #endif
 #endif
 
@@ -2801,9 +2878,9 @@ Result ConfigBuilder::BuildPsRegConfig(
     }
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
-    SetPsUsesUavs(static_cast<uint32_t>((pResUsage->resourceWrite || pResUsage->resourceRead)));
-    SetPsWritesUavs(static_cast<uint32_t>(pResUsage->resourceWrite));
-    SetPsWritesDepth(static_cast<uint32_t>(builtInUsage.fragDepth));
+    SetPsUsesUavs(pResUsage->resourceWrite || pResUsage->resourceRead);
+    SetPsWritesUavs(pResUsage->resourceWrite);
+    SetPsWritesDepth(builtInUsage.fragDepth);
 #else
     SetPsUsesUavs(static_cast<uint32_t>(pResUsage->resourceWrite));
 #endif
@@ -2996,6 +3073,16 @@ Result ConfigBuilder::BuildUserDataConfig(
             pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
     }
 
+    bool enableXfb = false;
+    if (pContext->IsGraphics())
+    {
+        if (((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval)) &&
+            (shaderStage2 == ShaderStageInvalid))
+        {
+            enableXfb = pContext->GetShaderResourceUsage(shaderStage1)->inOutUsage.enableXfb;
+        }
+    }
+
 #if LLPC_BUILD_GFX10
     const bool enableNgg = pContext->IsGraphics() ? pContext->GetNggControl()->enableNgg : false;
     LLPC_UNUSED(enableNgg);
@@ -3047,7 +3134,7 @@ Result ConfigBuilder::BuildUserDataConfig(
                 static_cast<uint32_t>(Util::Abi::UserDataMapping::VertexBufferTable));
         }
 
-        if ((pIntfData1->userDataUsage.vs.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
+        if (enableXfb && (pIntfData1->userDataUsage.vs.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
         {
             LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.vs.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);
@@ -3111,7 +3198,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     else if (shaderStage1 == ShaderStageTessEval)
     {
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 473
-        if ((pIntfData1->userDataUsage.tes.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
+        if (enableXfb && (pIntfData1->userDataUsage.tes.streamOutTablePtr > 0) && (shaderStage2 == ShaderStageInvalid))
         {
             LLPC_ASSERT(pIntfData1->userDataMap[pIntfData1->userDataUsage.tes.streamOutTablePtr] ==
                 InterfaceData::UserDataUnmapped);

@@ -69,8 +69,8 @@ private:
     llvm::Function* GeneratePrimShaderEntryPoint(llvm::Module* pModule);
 
     llvm::Value* DoCulling(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
-    void DoParamCacheAllocRequest(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
-    void DoPrimitiveExport(llvm::Module* pModule, llvm::Value* pCullFlag, llvm::BasicBlock* pInsertAtEnd);
+    void DoParamCacheAllocRequest();
+    void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
 
     llvm::BasicBlock* ConstructDummyExport(llvm::Module* pModule, llvm::Function* pEntryPoint);
 
@@ -87,13 +87,11 @@ private:
 
     llvm::Value* ReadCompactDataFromLds(llvm::Type*       pReadDataTy,
                                         llvm::Value*      pThreadId,
-                                        NggLdsRegionType  region,
-                                        llvm::BasicBlock* pInsertAtEnd);
+                                        NggLdsRegionType  region);
 
     void WriteCompactDataToLds(llvm::Value*      pWriteData,
                                llvm::Value*      pThreadId,
-                               NggLdsRegionType  region,
-                               llvm::BasicBlock* pInsertAtEnd);
+                               NggLdsRegionType  region);
 
     llvm::Value* DoBackfaceCulling(llvm::Module*     pModule,
                                    llvm::Value*      pCullFlag,
@@ -141,9 +139,7 @@ private:
                                              uint32_t          regOffset,
                                              llvm::BasicBlock* pInsertAtEnd);
 
-    llvm::Value* DoSubgroupBallot(llvm::Module*     pModule,
-                                  llvm::Value*      pValue,
-                                  llvm::BasicBlock* pInsertAtEnd);
+    llvm::Value* DoSubgroupBallot(llvm::Value* pValue);
 
     // Checks if NGG culling operations are enabled
     bool EnableCulling() const
@@ -195,6 +191,8 @@ private:
     bool        m_hasTcs;       // Whether the pipeline has tessellation control shader
     bool        m_hasTes;       // Whether the pipeline has tessellation evaluation shader
     bool        m_hasGs;        // Whether the pipeline has geometry shader
+
+    std::unique_ptr<llvm::IRBuilder<>>  m_pBuilder; // LLVM IR builder
 };
 
 } // Llpc

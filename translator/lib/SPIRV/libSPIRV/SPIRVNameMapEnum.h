@@ -319,6 +319,9 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
   add(DecorationNonWritable, "NonWritable");
   add(DecorationNonReadable, "NonReadable");
   add(DecorationUniform, "Uniform");
+#if SPV_VERSION >= 0x10400
+  add(DecorationUniformId, "UniformId");
+#endif
   add(DecorationSaturatedConversion, "SaturatedConversion");
   add(DecorationStream, "Stream");
   add(DecorationLocation, "Location");
@@ -337,6 +340,10 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
   add(DecorationInputAttachmentIndex, "InputAttachmentIndex");
   add(DecorationAlignment, "Alignment");
   add(DecorationMaxByteOffset, "MaxByteOffset");
+#if SPV_VERSION >= 0x10400
+  add(DecorationNoSignedWrap, "NoSignedWrap");
+  add(DecorationNoUnsignedWrap, "NoUnsignedWrap");
+#endif
   add(DecorationExplicitInterpAMD, "ExplicitInterpAMD");
   add(DecorationNonUniformEXT, "NonUniformEXT");
   add(DecorationHlslCounterBufferGOOGLE, "HlslCounterBufferGOOGLE");
@@ -524,6 +531,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityImageGatherBiasLodAMD, "ImageGatherBiasLodAMD");
   add(CapabilityFragmentMaskAMD, "FragmentMaskAMD");
   add(CapabilityFloat16ImageAMD, "Float16ImageAMD");
+  add(CapabilityShaderClockKHR, "ShaderClockKHR");
   add(CapabilityVariablePointersStorageBuffer, "VariablePointersStorageBuffer");
   add(CapabilityVariablePointers, "VariablePointers");
   add(CapabilityShaderNonUniformEXT, "ShaderNonUniformEXT");

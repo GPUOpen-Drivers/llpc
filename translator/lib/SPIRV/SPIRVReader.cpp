@@ -1419,21 +1419,54 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   auto Temp = MDNode::getTemporary(*Context, None);
   auto Self = MDNode::get(*Context, Temp.get());
   Self->replaceOperandWith(0, Self);
-
+  std::vector<llvm::Metadata*> MDs;
   if (LM->getLoopControl() == LoopControlMaskNone) {
     BI->setMetadata("llvm.loop", Self);
     return;
-  } else if (LM->getLoopControl() == LoopControlUnrollMask)
+  } else if (LM->getLoopControl() == LoopControlUnrollMask) {
     Name = llvm::MDString::get(*Context, "llvm.loop.unroll.full");
-  else if (LM->getLoopControl() == LoopControlDontUnrollMask)
+    MDs.push_back(Name);
+  } else if (LM->getLoopControl() == LoopControlDontUnrollMask) {
     Name = llvm::MDString::get(*Context, "llvm.loop.unroll.disable");
-  else
+    MDs.push_back(Name);
+  }
+#if SPV_VERSION >= 0x10400
+  else if (LM->getLoopControl() & LoopControlPartialCountMask) {
+    Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
+    MDs.push_back(Name);
+
+    std::string partialCount = std::to_string(LM->getLoopControlParameters().at(0));
+    Name = llvm::MDString::get(*Context, partialCount.c_str());
+    MDs.push_back(Name);
+  }
+#endif
+
+  if (LM->getLoopControl() & LoopControlDependencyInfiniteMask
+    || (LM->getLoopControl() & LoopControlDependencyLengthMask)) {
+    // TODO: DependencyInfinite probably mapped to llvm.loop.parallel_accesses with llvm.access.group
+    // DependencyLength potentially useful but without llvm mappings
+    return;
+  }
+
+#if  SPV_VERSION >= 0x10400
+  if (LM->getLoopControl() & LoopControlIterationMultipleMask) {
+    // TODO: Potentially useful but without llvm mappings
+    return;
+  }
+  if ((LM->getLoopControl() & LoopControlMaxIterationsMask)
+    || (LM->getLoopControl() & LoopControlMinIterationsMask)
+    || (LM->getLoopControl() & LoopControlPeelCountMask)) {
+    // No LLVM mapping and not too important
+    return;
+  }
+#endif
+
+  if (MDs.empty())
     return;
 
-  std::vector<llvm::Metadata *> OpValues(1, Name);
   SmallVector<llvm::Metadata *, 2> Metadata;
   Metadata.push_back(llvm::MDNode::get(*Context, Self));
-  Metadata.push_back(llvm::MDNode::get(*Context, OpValues));
+  Metadata.push_back(llvm::MDNode::get(*Context, MDs));
 
   llvm::MDNode *Node = llvm::MDNode::get(*Context, Metadata);
   Node->replaceOperandWith(0, Node);
@@ -3164,7 +3197,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
 {
     SPIRVCopyMemory* const pSpvCopyMemory = static_cast<SPIRVCopyMemory*>(pSpvValue);
 
-    bool isSrcVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile();
+    bool isSrcVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile(true);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvCopyMemory->getSource()->getType()->getPointerStorageClass())
@@ -3179,7 +3212,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         break;
     }
 
-    bool isDestVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile();
+    bool isDestVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile(false);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvCopyMemory->getTarget()->getType()->getPointerStorageClass())
@@ -3196,9 +3229,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
 
     bool isCoherent = false;
 
-    if (pSpvCopyMemory->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
+    if (pSpvCopyMemory->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask)
     {
-        SPIRVWord spvId = pSpvCopyMemory->getMakeVisisbleScope();
+        SPIRVWord spvId = pSpvCopyMemory->getMakeVisibleScope(true);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3210,9 +3243,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         }
     }
 
-    if (pSpvCopyMemory->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask)
+    if (pSpvCopyMemory->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask)
     {
-        SPIRVWord spvId = pSpvCopyMemory->getMakeAvailableScope();
+        SPIRVWord spvId = pSpvCopyMemory->getMakeAvailableScope(false);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3224,7 +3257,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         }
     }
 
-    const bool isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal();
+    bool isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
 
     Value* const pLoadPointer = transValue(pSpvCopyMemory->getSource(),
                                            m_pBuilder->GetInsertBlock()->getParent(),
@@ -3243,6 +3276,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
                                             m_pBuilder->GetInsertBlock());
 
     SPIRVType* const pSpvStoreType = pSpvCopyMemory->getTarget()->getType();
+    isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
 
     addStoreInstRecursively(pSpvStoreType->getPointerElementType(),
                             pStorePointer,
@@ -3250,7 +3284,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
                             isDestVolatile,
                             isCoherent,
                             isNonTemporal);
-
     return nullptr;
 }
 
@@ -3261,7 +3294,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 {
     SPIRVLoad* const pSpvLoad = static_cast<SPIRVLoad*>(pSpvValue);
 
-    bool isVolatile = pSpvLoad->SPIRVMemoryAccess::isVolatile();
+    bool isVolatile = pSpvLoad->SPIRVMemoryAccess::isVolatile(true);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvLoad->getSrc()->getType()->getPointerStorageClass())
@@ -3278,9 +3311,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 
     bool isCoherent = pSpvLoad->getSrc()->isCoherent();
 
-    if (pSpvLoad->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
+    // MakePointerVisibleKHR is valid with OpLoad
+    if (pSpvLoad->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask)
     {
-        SPIRVWord spvId = pSpvLoad->getMakeVisisbleScope();
+        SPIRVWord spvId = pSpvLoad->getMakeVisibleScope(true);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3292,21 +3326,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
         }
     }
 
-    if (pSpvLoad->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask)
-    {
-        SPIRVWord spvId = pSpvLoad->getMakeAvailableScope();
-        SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
-
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
-
-        if (isSystemScope)
-        {
-            isCoherent = true;
-        }
-    }
-
-    const bool isNonTemporal = pSpvLoad->SPIRVMemoryAccess::isNonTemporal();
+    const bool isNonTemporal = pSpvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
     Value* const pLoadPointer = transValue(pSpvLoad->getSrc(),
                                            m_pBuilder->GetInsertBlock()->getParent(),
@@ -3328,7 +3348,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
 {
     SPIRVStore* const pSpvStore = static_cast<SPIRVStore*>(pSpvValue);
 
-    bool isVolatile = pSpvStore->SPIRVMemoryAccess::isVolatile();
+    bool isVolatile = pSpvStore->SPIRVMemoryAccess::isVolatile(false);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvStore->getDst()->getType()->getPointerStorageClass())
@@ -3345,9 +3365,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
 
     bool isCoherent = pSpvStore->getDst()->isCoherent();
 
-    if (pSpvStore->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
+    // MakePointerAvailableKHR is valid with OpStore
+    if (pSpvStore->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask)
     {
-        SPIRVWord spvId = pSpvStore->getMakeVisisbleScope();
+        SPIRVWord spvId = pSpvStore->getMakeAvailableScope(false);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3359,21 +3380,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
         }
     }
 
-    if (pSpvStore->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask)
-    {
-        SPIRVWord spvId = pSpvStore->getMakeAvailableScope();
-        SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
-
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
-
-        if (isSystemScope)
-        {
-            isCoherent = true;
-        }
-    }
-
-    const bool isNonTemporal = pSpvStore->SPIRVMemoryAccess::isNonTemporal();
+    const bool isNonTemporal = pSpvStore->SPIRVMemoryAccess::isNonTemporal(false);
 
     Value* const pStorePointer = transValue(pSpvStore->getDst(),
                                             m_pBuilder->GetInsertBlock()->getParent(),
@@ -3694,6 +3701,31 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
     }
 
     return pKill;
+}
+
+// =====================================================================================================================
+// Handle OpReadClockKHR.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(pSpvInst->getOperands()[0]);
+    const spv::Scope scope = static_cast<spv::Scope>(pSpvScope->getZExtIntValue());
+    LLPC_ASSERT((scope == spv::ScopeDevice) || (scope == spv::ScopeWorkgroup));
+
+    Value* const pReadClock = m_pBuilder->CreateReadClock(scope == spv::ScopeDevice);
+
+    SPIRVType* const pSpvType = pSpvInst->getType();
+    if (pSpvType->isTypeVectorInt(32))
+    {
+        LLPC_ASSERT(pSpvType->getVectorComponentCount() == 2); // Must be uvec2
+        return m_pBuilder->CreateBitCast(pReadClock, transType(pSpvType)); // uint64 -> uvec2
+    }
+    else
+    {
+        LLPC_ASSERT(pSpvType->isTypeInt(64));
+        return pReadClock;
+    }
 }
 
 // =====================================================================================================================
@@ -5433,6 +5465,9 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpPtrAccessChain);
   HANDLE_OPCODE(OpInBoundsPtrAccessChain);
   HANDLE_OPCODE(OpKill);
+#if VKI_KHR_SHADER_CLOCK
+  HANDLE_OPCODE(OpReadClockKHR);
+#endif
   HANDLE_OPCODE(OpGroupAll);
   HANDLE_OPCODE(OpGroupAny);
   HANDLE_OPCODE(OpGroupBroadcast);

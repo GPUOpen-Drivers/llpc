@@ -39,18 +39,19 @@
 #include <sys/stat.h>
 #include <unordered_set>
 
-#include <metrohash.h>
-
 #include "llpc.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
-#include "llpcPipelineDumper.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
+#include "llpcMetroHash.h"
+#include "llpcPipelineDumper.h"
 #include "llpcUtil.h"
 
 using namespace llvm;
+using namespace MetroHash;
+using namespace Util;
 
 #if defined(_WIN32)
     #define FILE_STAT _stat
@@ -114,12 +115,15 @@ struct PipelineDumpFile
         const char* pBinaryFileName)
         :
         dumpFile(pDumpFileName),
-        binaryFile(pBinaryFileName, std::ios_base::binary | std::ios_base::out)
+        binaryIndex(0),
+        binaryFileName(pBinaryFileName)
     {
     }
 
-    std::ofstream dumpFile;     // File object for .pipe file
-    std::ofstream binaryFile;   // File object for ELF binary
+    std::ofstream dumpFile;       // File object for .pipe file
+    std::ofstream binaryFile;     // File object for ELF binary
+    uint32_t      binaryIndex;    // ELF Binary index
+    std::string   binaryFileName; // File name of binary file
 };
 
 // =====================================================================================================================
@@ -129,7 +133,7 @@ void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
     const BinaryData*               pSpirvBin)  // [in] SPIR-V binary
 {
     MetroHash::Hash hash = {};
-    MetroHash::MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
+    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pSpirvBin->pCode),
                       pSpirvBin->codeSize,
                       hash.bytes);
     PipelineDumper::DumpSpirvBinary(pDumpDir, pSpirvBin, &hash);
@@ -420,7 +424,7 @@ PipelineDumpFile* PipelineDumper::BeginPipelineDump(
         if (enableDump)
         {
             pDumpFile = new PipelineDumpFile(dumpPathName.c_str(), dumpBinaryName.c_str());
-            if (pDumpFile->dumpFile.bad() || pDumpFile->binaryFile.bad())
+            if (pDumpFile->dumpFile.bad())
             {
                 delete pDumpFile;
                 pDumpFile = nullptr;
@@ -671,7 +675,20 @@ void PipelineDumper::DumpPipelineBinary(
         pDumpFile->dumpFile << "\n[CompileLog]\n";
         pDumpFile->dumpFile << reader;
 
-        pDumpFile->binaryFile.write(reinterpret_cast<const char*>(pPipelineBin->pCode), pPipelineBin->codeSize);
+        std::string binaryFileName = pDumpFile->binaryFileName;
+        if (pDumpFile->binaryIndex > 0)
+        {
+            char suffixBuffer[32] = {};
+            snprintf(suffixBuffer, sizeof(suffixBuffer), ".%u", pDumpFile->binaryIndex);
+            binaryFileName += suffixBuffer;
+        }
+        pDumpFile->binaryIndex++;
+        pDumpFile->binaryFile.open(binaryFileName.c_str(), std::ostream::out | std::ostream::binary);
+        if (pDumpFile->binaryFile.bad() == false)
+        {
+            pDumpFile->binaryFile.write(reinterpret_cast<const char*>(pPipelineBin->pCode), pPipelineBin->codeSize);
+            pDumpFile->binaryFile.close();
+        }
     }
 }
 
@@ -716,7 +733,9 @@ void PipelineDumper::DumpPipelineOptions(
     std::ostream&            dumpFile)  // [out] dump file
 {
     dumpFile << "options.includeDisassembly = " << pOptions->includeDisassembly << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
     dumpFile << "options.autoLayoutDesc = " << pOptions->autoLayoutDesc << "\n";
+#endif
     dumpFile << "options.scalarBlockLayout = " << pOptions->scalarBlockLayout << "\n";
     dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
@@ -882,7 +901,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     bool                            isCacheHash   // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash::MetroHash64 hasher;
+    MetroHash64 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageVertex, &pPipeline->vs, isCacheHash, &hasher);
     UpdateHashForPipelineShaderInfo(ShaderStageTessControl, &pPipeline->tcs, isCacheHash, &hasher);
@@ -908,12 +927,14 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
     bool                            isCacheHash  // TRUE if the hash is used by shader cache
     )
 {
-    MetroHash::MetroHash64 hasher;
+    MetroHash64 hasher;
 
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
     hasher.Update(pPipeline->options.includeDisassembly);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
     hasher.Update(pPipeline->options.autoLayoutDesc);
+#endif
     hasher.Update(pPipeline->options.scalarBlockLayout);
     hasher.Update(pPipeline->options.includeIr);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
@@ -933,7 +954,7 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
 // Updates hash code context for vertex input state
 void PipelineDumper::UpdateHashForVertexInputState(
     const VkPipelineVertexInputStateCreateInfo* pVertexInput,  // [in] Vertex input state
-    MetroHash::MetroHash64*                     pHasher)       // [in,out] Haher to generate hash code
+    MetroHash64*                                pHasher)       // [in,out] Haher to generate hash code
 {
     if ((pVertexInput != nullptr) && (pVertexInput->vertexBindingDescriptionCount > 0))
     {
@@ -965,7 +986,7 @@ void PipelineDumper::UpdateHashForVertexInputState(
 void PipelineDumper::UpdateHashForNonFragmentState(
     const GraphicsPipelineBuildInfo* pPipeline,     // [in] Info to build a graphics pipeline
     bool                             isCacheHash,   // TRUE if the hash is used by shader cache
-    MetroHash::MetroHash64*          pHasher)       // [in,out] Hasher to generate hash code
+    MetroHash64*                     pHasher)       // [in,out] Hasher to generate hash code
 {
     auto pIaState = &pPipeline->iaState;
     pHasher->Update(pIaState->topology);
@@ -1030,7 +1051,9 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 #endif
 
         pHasher->Update(pPipeline->options.includeDisassembly);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
         pHasher->Update(pPipeline->options.autoLayoutDesc);
+#endif
         pHasher->Update(pPipeline->options.scalarBlockLayout);
         pHasher->Update(pPipeline->options.includeIr);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
@@ -1049,7 +1072,7 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 // Update hash code from fragment pipeline state
 void PipelineDumper::UpdateHashForFragmentState(
     const GraphicsPipelineBuildInfo* pPipeline,     // [in] Info to build a graphics pipeline
-    MetroHash::MetroHash64*          pHasher)       // [in,out] Hasher to generate hash code
+    MetroHash64*                     pHasher)       // [in,out] Hasher to generate hash code
 {
     auto pRsState = &pPipeline->rsState;
     pHasher->Update(pRsState->innerCoverage);
@@ -1078,7 +1101,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
     ShaderStage               stage,           // shader stage
     const PipelineShaderInfo* pShaderInfo,     // [in] Shader info in specified shader stage
     bool                      isCacheHash,     // TRUE if the hash is used by shader cache
-    MetroHash::MetroHash64*   pHasher          // [in,out] Haher to generate hash code
+    MetroHash64*              pHasher          // [in,out] Haher to generate hash code
     )
 {
     if (pShaderInfo->pModuleData)
@@ -1181,7 +1204,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 void PipelineDumper::UpdateHashForResourceMappingNode(
     const ResourceMappingNode* pUserDataNode,    // [in] Resource mapping node
     bool                       isRootNode,       // TRUE if the node is in root level
-    MetroHash::MetroHash64*    pHasher           // [in,out] Haher to generate hash code
+    MetroHash64*               pHasher           // [in,out] Haher to generate hash code
     )
 {
     pHasher->Update(pUserDataNode->type);

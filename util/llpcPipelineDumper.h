@@ -33,11 +33,15 @@
 #include <fstream>
 #include <llpc.h>
 
+#if defined(SINGLE_EXTERNAL_METROHASH)
+#include "llpcMetroHash.h"
+#else
 namespace MetroHash
 {
     class MetroHash64;
     struct Hash;
 };
+#endif
 
 namespace Llpc
 {
@@ -87,14 +91,26 @@ public:
     static void UpdateHashForPipelineShaderInfo(ShaderStage               stage,
                                                 const PipelineShaderInfo* pShaderInfo,
                                                 bool                      isCacheHash,
+#if defined(SINGLE_EXTERNAL_METROHASH)
+                                                Util::MetroHash64*        pHasher);
+#else
                                                 MetroHash::MetroHash64*   pHasher);
+#endif
 
     static void UpdateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo* pVertexInput,
+#if defined(SINGLE_EXTERNAL_METROHASH)
+                                              Util::MetroHash64*                          pHasher);
+#else
                                               MetroHash::MetroHash64*                     pHasher);
+#endif
 
     // Update hash for map object
     template <class MapType>
+#if defined(SINGLE_EXTERNAL_METROHASH)
+    static void UpdateHashForMap(MapType& m, Util::MetroHash64* pHasher)
+#else
     static void UpdateHashForMap(MapType& m, MetroHash::MetroHash64* pHasher)
+#endif
     {
         pHasher->Update(m.size());
         for (auto mapIt : m)
@@ -107,11 +123,19 @@ public:
     static void UpdateHashForNonFragmentState(
         const GraphicsPipelineBuildInfo* pPipeline,
         bool                             isCacheHash,
+#if defined(SINGLE_EXTERNAL_METROHASH)
+        Util::MetroHash64*               pHasher);
+#else
         MetroHash::MetroHash64*          pHasher);
+#endif
 
     static void UpdateHashForFragmentState(
         const GraphicsPipelineBuildInfo* pPipeline,
+#if defined(SINGLE_EXTERNAL_METROHASH)
+        Util::MetroHash64*               pHasher);
+#else
         MetroHash::MetroHash64*          pHasher);
+#endif
 
 private:
     static std::string GetSpirvBinaryFileName(const MetroHash::Hash* pHash);
@@ -137,7 +161,11 @@ private:
 
     static void UpdateHashForResourceMappingNode(const ResourceMappingNode* pUserDataNode,
                                                  bool                       isRootNode,
+#if defined(SINGLE_EXTERNAL_METROHASH)
+                                                 Util::MetroHash64*         pHasher);
+#else
                                                  MetroHash::MetroHash64*    pHasher);
+#endif
 };
 
 } // Llpc

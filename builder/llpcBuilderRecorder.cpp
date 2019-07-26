@@ -187,7 +187,7 @@ Builder* Builder::CreateBuilderRecorder(
 Module* BuilderRecorder::Link(
     ArrayRef<Module*> modules)    // Shader stage modules to link
 {
-    for (uint32_t stage = 0; stage != ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage != ShaderStageNativeStageCount; ++stage)
     {
         if (Module* pModule = modules[stage])
         {
@@ -329,7 +329,7 @@ Value* BuilderRecorder::CreateIndexDescPtr(
 
 // =====================================================================================================================
 // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
-// Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer. 
+// Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
 Value* BuilderRecorder::CreateLoadDescFromPtr(
     Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
                                       //    the CreateGet*DescPtr methods
@@ -1027,7 +1027,7 @@ void BuilderRecorder::CheckFuncShaderStage(
     Function*   pFunc,        // [in] Function to check
     ShaderStage shaderStage)  // Shader stage frontend says it is in
 {
-    LLPC_ASSERT(shaderStage < ShaderStageCount);
+    LLPC_ASSERT(shaderStage < ShaderStageNativeStageCount);
     if (pFunc != m_pEnclosingFunc)
     {
         // The "function shader stage map" is in fact a vector of pairs of WeakVH (giving the function)

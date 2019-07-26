@@ -36,6 +36,7 @@ option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
 #if VKI_BUILD_GFX10
 option(LLPC_BUILD_GFX10   "LLPC support for GFX10?"   OFF)
 #endif
+option(LLPC_BUILD_METROHASH   "LLPC build imported metrohash copy"   ON)
 # None
 
 set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
@@ -356,8 +357,13 @@ target_sources(llpc PRIVATE
 )
 
 # llpc/imported/metrohash
-add_subdirectory(imported/metrohash)
-target_link_libraries(llpc PRIVATE llpc_metrohash)
+if(LLPC_BUILD_METROHASH)
+    add_subdirectory(imported/metrohash)
+    target_link_libraries(llpc PRIVATE llpc_metrohash)
+else()
+    target_link_libraries(llpc PRIVATE metrohash)
+    target_compile_definitions(llpc PRIVATE SINGLE_EXTERNAL_METROHASH)
+endif()
 
 ### LLPC Auto-generated Files ##########################################################################################
 set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)

@@ -122,6 +122,8 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::VsPs);
+
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
         result = BuildVsRegConfig<PipelineVsFsRegConfig>(pContext, ShaderStageVertex, pConfig);
@@ -190,6 +192,8 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
                             0,
                             Util::Abi::HwShaderPs,
                             0);
+
+    SetPipelineType(Util::Abi::PipelineType::Tess);
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
@@ -297,6 +301,8 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
                             Util::Abi::HwShaderPs,
                             0);
 
+    SetPipelineType(Util::Abi::PipelineType::Gs);
+
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
         result = BuildEsRegConfig<PipelineVsGsFsRegConfig>(pContext, ShaderStageVertex, pConfig);
@@ -385,6 +391,8 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
                             Util::Abi::HwShaderGs | Util::Abi::HwShaderVs,
                             Util::Abi::HwShaderPs,
                             0);
+
+    SetPipelineType(Util::Abi::PipelineType::GsTess);
 
     if (stageMask & ShaderStageToMask(ShaderStageVertex))
     {
@@ -514,6 +522,8 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
                             0,
                             0,
                             Util::Abi::HwShaderCs);
+
+    SetPipelineType(Util::Abi::PipelineType::Cs);
 
     result = BuildCsRegConfig(pContext, ShaderStageCompute, pConfig);
 
@@ -1022,6 +1032,7 @@ Result ConfigBuilder::BuildLsRegConfig(
     ldsSize = Pow2Align(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
 
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, LDS_SIZE, ldsSize);
+    SetLdsSizeByteSize(Util::Abi::HardwareStage::Ls, ldsSizeInDwords * 4);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Ls, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Ls, pResUsage->numVgprsAvailable);
@@ -1382,9 +1393,9 @@ Result ConfigBuilder::BuildPsRegConfig(
     }
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
-    SetPsUsesUavs(static_cast<uint32_t>((pResUsage->resourceWrite || pResUsage->resourceRead)));
-    SetPsWritesUavs(static_cast<uint32_t>(pResUsage->resourceWrite));
-    SetPsWritesDepth(static_cast<uint32_t>(builtInUsage.fragDepth));
+    SetPsUsesUavs(pResUsage->resourceWrite || pResUsage->resourceRead);
+    SetPsWritesUavs(pResUsage->resourceWrite);
+    SetPsWritesDepth(builtInUsage.fragDepth);
 #else
     SetPsUsesUavs(static_cast<uint32_t>(pResUsage->resourceWrite));
 #endif

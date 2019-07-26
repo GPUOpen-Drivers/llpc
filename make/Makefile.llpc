@@ -395,8 +395,12 @@ else
 endif
 
 # MetroHash
-METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
-include $(METROHASH_DEPTH)/make/Makefile.metrohash
+# If define METROHASH_PATH, llpc use the external single Metrohash.
+# Otherwise build the imported Metrohash copy.
+ifndef METROHASH_PATH
+    METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
+    include $(METROHASH_DEPTH)/make/Makefile.metrohash
+endif
 
 .FORCE:
 

@@ -372,6 +372,9 @@ template <> inline void SPIRVMap<Decoration, SPIRVCapVec>::init() {
   ADD_VEC_INIT(DecorationInvariant, {CapabilityShader});
   ADD_VEC_INIT(DecorationConstant, {CapabilityKernel});
   ADD_VEC_INIT(DecorationUniform, {CapabilityShader});
+#if SPV_VERSION >= 0x10400
+  ADD_VEC_INIT(DecorationUniformId, { CapabilityShader });
+#endif
   ADD_VEC_INIT(DecorationSaturatedConversion, {CapabilityKernel});
   ADD_VEC_INIT(DecorationStream, {CapabilityGeometryStreams});
   ADD_VEC_INIT(DecorationLocation, {CapabilityShader});

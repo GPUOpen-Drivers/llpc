@@ -2372,4 +2372,3 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
 
     return pCoord;
 }
-
