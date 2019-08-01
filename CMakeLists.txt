@@ -274,7 +274,6 @@ target_sources(llpc PRIVATE
     patch/llpcPatchCopyShader.cpp
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
-    patch/llpcPatchGroupOp.cpp
     patch/llpcPatchInOutImportExport.cpp
     patch/llpcPatchLlvmIrInclusion.cpp
     patch/llpcPatchLoopUnrollInfoRectify.cpp

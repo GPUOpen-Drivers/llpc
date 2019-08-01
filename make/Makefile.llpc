@@ -116,7 +116,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcPatchCopyShader.cpp             \
         llpcPatchDescriptorLoad.cpp         \
         llpcPatchEntryPointMutate.cpp       \
-        llpcPatchGroupOp.cpp                \
         llpcPatchInOutImportExport.cpp      \
         llpcPatchLlvmIrInclusion.cpp        \
         llpcPatchLoopUnrollInfoRectify.cpp  \
