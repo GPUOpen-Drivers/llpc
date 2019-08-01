@@ -145,9 +145,6 @@ void Patch::AddPasses(
     // Patch push constant loading (should be done before external library link)
     passMgr.add(CreatePatchPushConstOp());
 
-    // Patch group operations (should be done before external library link)
-    passMgr.add(CreatePatchGroupOp());
-
     // Link external libraries and remove dead functions after it
     passMgr.add(CreatePassExternalLibLink(false)); // Not native only
     passMgr.add(CreatePassDeadFuncRemove());
