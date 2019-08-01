@@ -9350,26 +9350,27 @@ Instruction *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
         Ordering = AtomicOrdering::SequentiallyConsistent;
     }
 
-    SyncScope::ID Scope = SyncScope::System;
+    //SyncScope::ID Scope = SyncScope::System;
+    SyncScope::ID Scope = Context->getOrInsertSyncScopeID("wavefront");
 
-    switch (MemScope) {
-    case ScopeCrossDevice:
-    case ScopeDevice:
-    case ScopeQueueFamilyKHR:
-      Scope = SyncScope::System;
-      break;
-    case ScopeInvocation:
-      Scope = SyncScope::SingleThread;
-      break;
-    case ScopeWorkgroup:
-      Scope = Context->getOrInsertSyncScopeID("workgroup");
-      break;
-    case ScopeSubgroup:
-      Scope = Context->getOrInsertSyncScopeID("wavefront");
-      break;
-    default:
-      llvm_unreachable("Invalid scope");
-    }
+    // switch (MemScope) {
+    // case ScopeCrossDevice:
+    // case ScopeDevice:
+    // case ScopeQueueFamilyKHR:
+    //   Scope = SyncScope::System;
+    //   break;
+    // case ScopeInvocation:
+    //   Scope = SyncScope::SingleThread;
+    //   break;
+    // case ScopeWorkgroup:
+    //   Scope = Context->getOrInsertSyncScopeID("workgroup");
+    //   break;
+    // case ScopeSubgroup:
+    //   Scope = Context->getOrInsertSyncScopeID("wavefront");
+    //   break;
+    // default:
+    //   llvm_unreachable("Invalid scope");
+    // }
 
     return new FenceInst(*Context, Ordering, Scope, BB);
   } else if ((Ver > 0 && Ver <= kOCLVer::CL12)) {
