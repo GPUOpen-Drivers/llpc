@@ -1742,7 +1742,7 @@ void SpirvLowerResourceCollect::CollectXfbOutputInfo(
     m_pResUsage->inOutUsage.enableXfb = (m_pResUsage->inOutUsage.enableXfb || (outputMeta.XfbStride > 0));
 
     LLPC_ASSERT(outputMeta.StreamId < MaxGsStreams);
-    m_pResUsage->inOutUsage.streamXfbBuffers[outputMeta.StreamId] = 1 << (outputMeta.XfbBuffer);
+    m_pResUsage->inOutUsage.streamXfbBuffers[outputMeta.StreamId] |= 1 << (outputMeta.XfbBuffer);
 }
 
 } // Llpc
