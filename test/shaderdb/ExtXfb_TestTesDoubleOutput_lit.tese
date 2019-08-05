@@ -20,6 +20,7 @@ void main(void)
 ; SHADERTEST: call void @llpc.output.export.generic{{.*}}v3f64
 ; SHADERTEST: call void @llpc.output.export.xfb{{.*}}v2f64
 ; SHADERTEST: call void @llpc.output.export.generic{{.*}}v2f64
+; SHADERTEST: VGT_STRMOUT_BUFFER_CONFIG 0x{{0*}}3
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
