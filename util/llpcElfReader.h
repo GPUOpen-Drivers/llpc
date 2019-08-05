@@ -111,6 +111,24 @@ enum
     PF_R = 0x4,  // Read
 };
 
+// ELF Symbol Table Binding: st_info.binding
+enum
+{
+    STB_LOCAL  = 0,  // Not visible outside the object file.
+    STB_GLOBAL = 1,  // Global symbol, visible to all object files.
+    STB_WEAK   = 2   // Global scope, but with lower precedence than global symbols.
+};
+
+// ELF Symbol Table Type: st_info.type
+enum
+{
+    STT_NOTYPE  = 0,  // No type specified (e.g., an absolute symbol).
+    STT_OBJECT  = 1,  // Data object.
+    STT_FUNC    = 2,  // Function entry point.
+    STT_SECTION = 3,  // Symbol is associated with a section.
+    STT_FILE    = 4,  // Source file associated with the object file.
+};
+
 // ELF file type
 enum
 {
@@ -215,7 +233,16 @@ struct Elf32
         uint32_t  st_name;      // Symbol name (index into string table)
         uint32_t  st_value;     // Value or address associated with the symbol
         uint32_t  st_size;      // Size of the symbol
-        uint8_t   st_info;      // Symbol's type and binding attributes
+        union
+        {
+            struct
+            {
+                uint8_t type    : 4;   // Symbol Table Type
+                uint8_t binding : 4;   // Symbol Binding attributes
+            };
+            uint8_t all;
+        } st_info;              // This field contains the symbol type and its binding attributes (that is,
+                                //  its scope).
         uint8_t   st_other;     // Must be zero, reserved
         uint16_t  st_shndx;     // Which section (header table index) it's defined in
     };
@@ -294,7 +321,16 @@ struct Elf64
     struct Symbol
     {
         uint32_t  st_name;      // Symbol name (index into string table)
-        uint8_t	  st_info;      // Symbol's type and binding attributes
+        union
+        {
+            struct
+            {
+                uint8_t type    : 4;   // Symbol Table Type
+                uint8_t binding : 4;   // Symbol Binding attributes
+            };
+            uint8_t all;
+        } st_info;              // This field contains the symbol type and its binding attributes (that is,
+                                //  its scope).
         uint8_t   st_other;     // Must be zero, reserved
         uint16_t  st_shndx;     // Which section (header table index) it's defined in
         uint64_t  st_value;     // Value or address associated with the symbol
@@ -348,6 +384,16 @@ struct ElfSymbol
     uint32_t          nameOffset; // Symbol name offset in .strtab
     uint64_t          size;       // Size of this symbol
     uint64_t          value;      // Value associated with this symbol
+    union
+    {
+        struct
+        {
+            uint8_t type    : 4;   // Symbol Table Type
+            uint8_t binding : 4;   // Symbol Binding attributes
+        };
+        uint8_t all;
+    } info;                       // This field contains the symbol type and its binding attributes (that is,
+                                  //  its scope).
 };
 
 // Represents info of ELF relocation

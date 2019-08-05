@@ -496,6 +496,8 @@ ElfSymbol* ElfWriter<Elf>::GetSymbol(
     newSymbol.pSymName = pNewSymName;
     newSymbol.nameOffset = InvalidValue;
     newSymbol.secIdx = InvalidValue;
+    newSymbol.info.type = STT_FUNC;
+    newSymbol.info.binding = STB_LOCAL;
     m_symbols.push_back(newSymbol);
 
     return &m_symbols.back();
@@ -674,7 +676,7 @@ void ElfWriter<Elf>::AssembleSymbols()
         if (symbol.secIdx != InvalidValue)
         {
             pSymbol->st_name = symbol.nameOffset;
-            pSymbol->st_info = 0;
+            pSymbol->st_info.all = symbol.info.all;
             pSymbol->st_other = 0;
             pSymbol->st_shndx = symbol.secIdx;
             pSymbol->st_value = symbol.value;
@@ -830,6 +832,7 @@ Result ElfWriter<Elf>::ReadFromBuffer(
         symbol.pSymName = pStrTab + symbols[idx].st_name;
         symbol.size = symbols[idx].st_size;
         symbol.value = symbols[idx].st_value;
+        symbol.info.all = symbols[idx].st_info.all;
         symbol.nameOffset = symbols[idx].st_name;
         m_symbols.push_back(symbol);
     }

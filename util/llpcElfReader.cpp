@@ -208,6 +208,7 @@ void ElfReader<Elf>::GetSymbol(
     pSymbol->pSymName = pStrTab + symbols[idx].st_name;
     pSymbol->size     = symbols[idx].st_size;
     pSymbol->value    = symbols[idx].st_value;
+    pSymbol->info.all = symbols[idx].st_info.all;
 }
 
 // =====================================================================================================================
@@ -312,6 +313,7 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
                 symbol.pSymName = pStrTab + symbols[idx].st_name;
                 symbol.size     = symbols[idx].st_size;
                 symbol.value    = symbols[idx].st_value;
+                symbol.info.all = symbols[idx].st_info.all;
 
                 secSymbols.push_back(symbol);
             }
