@@ -21,7 +21,7 @@ void main ( )
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{[a-zA-Z_]+}} void @_Z10EmitVertexv()
-; SHADERTEST: call {{[a-zA-Z_]+}} void @_Z12EndPrimitivev()
+; SHADERTEST: call void (...) @llpc.call.end.primitive(i32 0)
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
 ; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %{{[0-9]+}})
 ; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %{{[0-9]+}})

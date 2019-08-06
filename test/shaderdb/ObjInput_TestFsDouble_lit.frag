@@ -24,9 +24,10 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-4: call <4 x double> @llpc.input.import.generic.v4f64{{.*}}
-; SHADERTEST-COUNT-2: call <3 x double> @llpc.input.import.generic.v3f64{{.*}}
-; SHADERTEST-COUNT-1: call <4 x double> @llpc.input.import.generic.v4f64{{.*}}
+; SHADERTEST-DAG: call <4 x double> @llpc.input.import.generic.v4f64.
+; SHADERTEST-DAG: call <4 x double> @llpc.input.import.generic.v4f64.
+; SHADERTEST-DAG: call <3 x double> @llpc.input.import.generic.v3f64.
+; SHADERTEST-DAG: call <3 x double> @llpc.input.import.generic.v3f64.
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-28: call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: AMDLLPC SUCCESS

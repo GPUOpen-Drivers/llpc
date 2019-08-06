@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call void @llpc.output.export.builtin.FragDepth{{.*}}f32
 ; SHADERTEST: call void @llpc.output.export.builtin.SampleMask.i32.a1i32
-; SHADERTEST: call void @llpc.output.export.builtin.FragStencilRefEXT{{.*}}
+; SHADERTEST: call void @llpc.output.export.builtin.FragStencilRef
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32
 ; SHADERTEST: AMDLLPC SUCCESS

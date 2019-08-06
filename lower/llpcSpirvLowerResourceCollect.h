@@ -64,9 +64,6 @@ private:
     const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
 
     void CollectExecutionModeUsage();
-    void CollectInOutUsage(const llvm::Type* pInOutTy, llvm::Constant* pInOutMeta, SPIRAddressSpace addrSpace);
-    void CollectGsOutputInfo(const Type* pOutputTy, uint32_t location, const ShaderInOutMetadata& outputMeta);
-    void CollectXfbOutputInfo(const llvm::Type* pOutputTy, const ShaderInOutMetadata& inOutMeta);
 
     // -----------------------------------------------------------------------------------------------------------------
 

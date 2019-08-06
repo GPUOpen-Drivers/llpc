@@ -35,6 +35,12 @@ void main(void)
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: call <4 x i32> (...) @llpc.call.subgroup.ballot.v4i32(
+; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
+; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.first.i32(
+; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.f32(
+; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.first.f32(
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLtMask.v4i32.i32
 ; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLeMask.v4i32.i32
 ; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupGtMask.v4i32.i32
@@ -42,11 +48,6 @@ void main(void)
 ; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupEqMask.v4i32.i32
 ; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32
 ; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32
-; SHADERTEST: call <4 x i32> (...) @llpc.call.subgroup.ballot.v4i32(
-; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
-; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.first.i32(
-; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.f32(
-; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.first.f32(
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

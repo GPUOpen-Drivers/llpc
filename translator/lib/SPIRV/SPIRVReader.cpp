@@ -3729,6 +3729,24 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
 }
 
 // =====================================================================================================================
+// Handle OpEndPrimitive
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndPrimitive>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    return m_pBuilder->CreateEndPrimitive(0);
+}
+
+// =====================================================================================================================
+// Handle OpEndStreamPrimitive
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndStreamPrimitive>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    uint32_t streamId = static_cast<SPIRVConstant*>(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0))->
+          getZExtIntValue();
+    return m_pBuilder->CreateEndPrimitive(streamId);
+}
+
+// =====================================================================================================================
 // Handle OpArrayLength.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
@@ -6086,6 +6104,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpCopyMemory);
   HANDLE_OPCODE(OpLoad);
   HANDLE_OPCODE(OpStore);
+  HANDLE_OPCODE(OpEndPrimitive);
+  HANDLE_OPCODE(OpEndStreamPrimitive);
   HANDLE_OPCODE(OpAccessChain);
   HANDLE_OPCODE(OpArrayLength);
   HANDLE_OPCODE(OpInBoundsAccessChain);
