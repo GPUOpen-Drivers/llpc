@@ -175,6 +175,9 @@ public:
     // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
     virtual ModulePass* CreateBuilderReplayer() { return nullptr; }
 
+    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
+    Llpc::Context& getContext() const;
+
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.
     // "immutableDescs" contains descriptors (currently limited to samplers), whose values are hard
@@ -566,6 +569,202 @@ public:
         const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
+    // Shader input/output methods
+
+    // Class that represents extra information on an input or output.
+    // For an FS input, if HasInterpAux(), then CreateReadInput's pVertexIndex is actually an auxiliary value
+    // for interpolation:
+    //  - InterpLocCenter: auxiliary value is v2f32 offset from center of pixel
+    //  - InterpLocSample: auxiliary value is i32 sample ID
+    //  - InterpLocExplicit: auxiliary value is i32 vertex number
+    class InOutInfo
+    {
+    public:
+        // Interpolation mode
+        enum
+        {
+            InterpModeSmooth   = 0,   // Smooth (perspective)
+            InterpModeFlat     = 1,   // Flat
+            InterpModeNoPersp  = 2,   // Linear (no perspective)
+            InterpModeCustom   = 3,   // Custom
+        };
+        enum
+        {
+            InterpLocUnknown   = 0,   // Unknown
+            InterpLocCenter    = 1,   // Center
+            InterpLocCentroid  = 2,   // Centroid
+            InterpLocSample    = 3,   // Sample
+            InterpLocExplicit  = 4,   // Mode must be InterpModeCustom
+        };
+
+        InOutInfo() { data.u32All = 0; }
+        InOutInfo(uint32_t data) { this->data.u32All = data; }
+        InOutInfo(const InOutInfo& inOutInfo) { data.u32All = inOutInfo.GetData(); }
+
+        uint32_t GetData() const { return data.u32All; }
+
+        uint32_t GetInterpMode() const { return data.bits.interpMode; }
+        void SetInterpMode(uint32_t mode) { data.bits.interpMode = mode; }
+
+        uint32_t GetInterpLoc() const { return data.bits.interpLoc; }
+        void SetInterpLoc(uint32_t loc) { data.bits.interpLoc = loc; }
+
+        bool HasInterpAux() const { return data.bits.hasInterpAux; }
+        void SetHasInterpAux(bool hasInterpAux = true) { data.bits.hasInterpAux = hasInterpAux; }
+
+        bool HasStreamId() const { return data.bits.hasStreamId; }
+        uint32_t GetStreamId() const { return data.bits.streamId; }
+        void SetStreamId(uint32_t streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
+
+        bool IsSigned() const { return data.bits.isSigned; }
+        void SetIsSigned(bool isSigned = true) { data.bits.isSigned = isSigned; }
+
+        uint32_t GetArraySize() const { return data.bits.arraySize; }
+        void SetArraySize(uint32_t arraySize) { data.bits.arraySize = arraySize; }
+
+    private:
+        union
+        {
+            struct
+            {
+                unsigned interpMode   : 4;  // FS input: interpolation mode
+                unsigned interpLoc    : 3;  // FS input: interpolation location
+                unsigned hasInterpAux : 1;  // FS input: there is an interpolation auxiliary value
+                unsigned streamId     : 2;  // GS output: vertex stream ID (0 if none)
+                unsigned hasStreamId  : 1;  // GS output: true if it has a stream ID
+                unsigned isSigned     : 1;  // FS output: is signed integer. Determines whether i16-component output
+                                            //    is zero- or sign-extended
+                unsigned arraySize    : 4;  // Built-in array input: shader-defined array size. Must be set for
+                                            //    a read or write of ClipDistance or CullDistance that is of the
+                                            //    whole array or of an element with a variable index.
+            }
+            bits;
+            uint32_t  u32All;
+        } data;
+    };
+
+    // Define built-in kind enum.
+    enum BuiltInKind
+    {
+#define BUILTIN(name, number, out, in, type) BuiltIn ## name = number,
+#include "llpcBuilderBuiltIns.h"
+#undef BUILTIN
+    };
+
+    // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
+    // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+    // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
+    // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
+    // A non-constant pLocationOffset is currently only supported for TCS and TES, and for an FS custom-interpolated
+    // input.
+    virtual Value* CreateReadGenericInput(
+        Type*         pResultTy,          // [in] Type of value to read
+        uint32_t      location,           // Base location (row) of input
+        Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
+        Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
+                                          //      that it is half the component for 64-bit elements.)
+        uint32_t      locationCount,      // Count of locations taken by the input. Ignored if pLocationOffset is const
+        InOutInfo     inputInfo,          // Extra input info (FS interp info)
+        Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index;
+                                          //      for FS custom interpolated input: auxiliary interpolation value;
+                                          //      else nullptr
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a read of (part of) a generic (user) output value, returning the value last written in this shader stage.
+    // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
+    // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
+    // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
+    // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
+    // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
+    virtual Value* CreateReadGenericOutput(
+        Type*         pResultTy,          // [in] Type of value to read
+        uint32_t      location,           // Base location (row) of output
+        Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
+        Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
+                                          //      that it is half the component for 64-bit elements.)
+        uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+        InOutInfo     outputInfo,         // Extra output info (GS stream ID)
+        Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index; else nullptr
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a write of (part of) a generic (user) output value, setting the value to pass to the next shader stage.
+    // The value to write must be a scalar or vector type with no more than four elements.
+    // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
+    // 64-bit components. Two consecutive locations together can contain up to a 4-vector of 64-bit components.
+    // A non-constant pLocationOffset is currently only supported for TCS.
+    virtual Instruction* CreateWriteGenericOutput(
+        Value*        pValueToWrite,      // [in] Value to write
+        uint32_t      location,           // Base location (row) of output
+        Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
+        Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
+                                          //      that it is half the component for 64-bit elements.)
+        uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+        InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
+        Value*        pVertexIndex) = 0;  // [in] For TCS per-vertex output: vertex index; else nullptr
+
+    // Create a write to an XFB (transform feedback / streamout) buffer.
+    // The value to write must be a scalar or vector type with no more than four elements.
+    // A non-constant pXfbOffset is not currently supported.
+    // The value is written to the XFB only if this is in the last-vertex-stage shader, i.e. VS (if no TCS/TES/GS),
+    // TES (if no GS) or GS.
+    //
+    // For GS, there is assumed to be an _output correspondence_, that is, for a particular stream ID, the
+    // value written to the XFB offset is the same value that is written to a particular
+    // built-in or user output location. CreateWriteOutput or CreateWriteBuiltIn (as applicable) must be used to
+    // actually write the same value to that location/built-in, then the value written to XFB for each affected
+    // vertex is undefined.
+    // If calls to CreateWriteXfbOutput for multiple vertices in a primitive, or in
+    // different primitives in the same stream, have different output correspondence, then it is undefined which
+    // of those correspondences is actually used when writing to XFB for each affected vertex.
+    virtual Instruction* CreateWriteXfbOutput(
+        Value*        pValueToWrite,      // [in] Value to write
+        bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
+        uint32_t      location,           // Location (row) or built-in kind of output (ignored if not GS)
+        uint32_t      xfbBuffer,          // XFB buffer number
+        uint32_t      xfbStride,          // XFB stride
+        Value*        pXfbOffset,         // [in] XFB byte offset
+        InOutInfo     outputInfo) = 0;    // Extra output info (GS stream ID)
+
+    // Get the type of a built-in. Where the built-in has a shader-defined array length (ClipDistance,
+    // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.
+    Type* GetBuiltInTy(
+        BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+        InOutInfo     inOutInfo);         // Extra input/output info (shader-defined array length)
+
+    // Create a read of (part of) a built-in input value.
+    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
+    // the array size is determined by inputInfo.GetArraySize().
+    virtual Value* CreateReadBuiltInInput(
+        BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+        InOutInfo     inputInfo,          // Extra input info (shader-defined array length)
+        Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
+        Value*        pIndex,             // [in] Array or vector index to access part of an input, else nullptr
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a read of (part of) a built-in output value.
+    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // or the element type if pIndex is not nullptr.
+    // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
+    // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
+    virtual Value* CreateReadBuiltInOutput(
+        BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+        InOutInfo     outputInfo,         // Extra output info (shader-defined array length)
+        Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
+        Value*        pIndex,             // [in] Array or vector index to access part of an input, else nullptr
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a write of (part of) a built-in output value.
+    // The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // or the element type if pIndex is not nullptr.
+    virtual Instruction* CreateWriteBuiltInOutput(
+        Value*        pValueToWrite,      // [in] Value to write
+        BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+        InOutInfo     outputInfo,         // Extra output info (shader-defined array length; GS stream id)
+        Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
+        Value*        pIndex) = 0;        // [in] Array or vector index to access part of an input, else nullptr
+
+    // -----------------------------------------------------------------------------------------------------------------
     // Matrix operations
 
     // Create a matrix transpose.
@@ -606,6 +805,15 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations
 
+    // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
+    // the current output primitive in the specified output-primitive stream.
+    virtual Instruction* CreateEmitVertex(
+        uint32_t                      streamId) = 0;      // Stream number, 0 if only one stream is present
+
+    // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+    virtual Instruction* CreateEndPrimitive(
+        uint32_t                      streamId) = 0;      // Stream number, 0 if only one stream is present
+
     // Create a "kill". Only allowed in a fragment shader.
     virtual Instruction* CreateKill(
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
@@ -614,9 +822,6 @@ public:
     virtual Instruction* CreateReadClock(
         bool          realtime,           // Whether to read real-time clock counter
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
-
-    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-    Llpc::Context& getContext() const;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Subgroup operations

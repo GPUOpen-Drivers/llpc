@@ -458,7 +458,101 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateImageGetLod(dim, flags, pImageDesc, pSamplerDesc, pCoord);
         }
 
+    // Replayer implementations of BuilderImplInOut methods
+    case BuilderRecorder::Opcode::ReadGenericInput:
+        {
+            Builder::InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
+            return m_pBuilder->CreateReadGenericInput(
+                                               pCall->getType(),                                // Result type
+                                               cast<ConstantInt>(args[0])->getZExtValue(),      // Location
+                                               args[1],                                         // Location offset
+                                               isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Element index
+                                               cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
+                                               inputInfo,                                       // Input info
+                                               isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
+        }
+
+    case BuilderRecorder::Opcode::ReadGenericOutput:
+        {
+            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[4])->getZExtValue());
+            return m_pBuilder->CreateReadGenericOutput(
+                                                pCall->getType(),                               // Result type
+                                                cast<ConstantInt>(args[0])->getZExtValue(),     // Location
+                                                args[1],                                        // Location offset
+                                                isa<UndefValue>(args[2]) ? nullptr : &*args[2], // Element index
+                                                cast<ConstantInt>(args[3])->getZExtValue(),     // Location count
+                                                outputInfo,                                     // Output info
+                                                isa<UndefValue>(args[5]) ? nullptr: &*args[5]); // Vertex index
+        }
+
+    case BuilderRecorder::Opcode::WriteGenericOutput:
+        {
+            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[5])->getZExtValue());
+            return m_pBuilder->CreateWriteGenericOutput(
+                                                 args[0],                                         // Value to write
+                                                 cast<ConstantInt>(args[1])->getZExtValue(),      // Location
+                                                 args[2],                                         // Location offset
+                                                 isa<UndefValue>(args[3]) ? nullptr : &*args[3],  // Element index
+                                                 cast<ConstantInt>(args[4])->getZExtValue(),      // Location count
+                                                 outputInfo,                                      // Output info
+                                                 isa<UndefValue>(args[6]) ? nullptr : &*args[6]); // Vertex index
+        }
+
+    case BuilderRecorder::Opcode::WriteXfbOutput:
+        {
+            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[6])->getZExtValue());
+            return m_pBuilder->CreateWriteXfbOutput(args[0],                                    // Value to write
+                                                    cast<ConstantInt>(args[1])->getZExtValue(), // IsBuiltIn
+                                                    cast<ConstantInt>(args[2])->getZExtValue(), // Location/builtIn
+                                                    cast<ConstantInt>(args[3])->getZExtValue(), // XFB buffer number
+                                                    cast<ConstantInt>(args[4])->getZExtValue(), // XFB stride
+                                                    args[5],                                    // XFB byte offset
+                                                    outputInfo);
+        }
+
+    case BuilderRecorder::Opcode::ReadBuiltInInput:
+        {
+            auto builtIn = static_cast<Builder::BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
+            Builder::InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
+            return m_pBuilder->CreateReadBuiltInInput(builtIn,                                         // BuiltIn
+                                                      inputInfo,                                       // Input info
+                                                      isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
+                                                      isa<UndefValue>(args[3]) ? nullptr : &*args[3]); // Index
+        }
+
+    case BuilderRecorder::Opcode::ReadBuiltInOutput:
+        {
+            auto builtIn = static_cast<Builder::BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
+            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[1])->getZExtValue());
+            return m_pBuilder->CreateReadBuiltInOutput(builtIn,                                         // BuiltIn
+                                                       outputInfo,                                      // Output info
+                                                       isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
+                                                       isa<UndefValue>(args[3]) ? nullptr : &*args[3]); // Index
+        }
+
+    case BuilderRecorder::Opcode::WriteBuiltInOutput:
+        {
+            auto builtIn = static_cast<Builder::BuiltInKind>(cast<ConstantInt>(args[1])->getZExtValue());
+            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[2])->getZExtValue());
+            return m_pBuilder->CreateWriteBuiltInOutput(
+                                                  args[0],                                          // Val to write
+                                                  builtIn,                                          // BuiltIn
+                                                  outputInfo,                                       // Output info
+                                                  isa<UndefValue>(args[3]) ? nullptr : &*args[3],   // Vertex index
+                                                  isa<UndefValue>(args[4]) ? nullptr : &*args[4]);  // Index
+        }
+
     // Replayer implementations of BuilderImplMisc methods
+    case BuilderRecorder::Opcode::EmitVertex:
+        {
+            return m_pBuilder->CreateEmitVertex(cast<ConstantInt>(args[0])->getZExtValue());
+        }
+
+    case BuilderRecorder::Opcode::EndPrimitive:
+        {
+            return m_pBuilder->CreateEndPrimitive(cast<ConstantInt>(args[0])->getZExtValue());
+        }
+
     case BuilderRecorder::Opcode::Kill:
         {
             return m_pBuilder->CreateKill();

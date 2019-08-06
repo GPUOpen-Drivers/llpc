@@ -67,6 +67,20 @@ StringRef BuilderRecorder::GetCallName(
         return "load.push.constants.ptr";
     case Opcode::GetBufferDescLength:
         return "get.buffer.desc.length";
+    case Opcode::ReadGenericInput:
+        return "read.generic.input";
+    case Opcode::ReadGenericOutput:
+        return "read.generic.output";
+    case Opcode::WriteGenericOutput:
+        return "write.generic.output";
+    case Opcode::WriteXfbOutput:
+        return "write.xfb.output";
+    case Opcode::ReadBuiltInInput:
+        return "read.builtin.input";
+    case Opcode::ReadBuiltInOutput:
+        return "read.builtin.output";
+    case Opcode::WriteBuiltInOutput:
+        return "write.builtin.output";
     case Opcode::TransposeMatrix:
         return "transpose.matrix";
     case Opcode::MatrixTimesScalar:
@@ -79,6 +93,10 @@ StringRef BuilderRecorder::GetCallName(
         return "matrix.times.matrix";
     case Opcode::OuterProduct:
         return "outer.product";
+    case Opcode::EmitVertex:
+        return "emit.vertex";
+    case Opcode::EndPrimitive:
+        return "end.primitive";
     case Opcode::Kill:
         return "kill";
     case Opcode::ReadClock:
@@ -233,6 +251,23 @@ Value* BuilderRecorder::CreateDotProduct(
 {
     Type* const pScalarType = pVector1->getType()->getVectorElementType();
     return Record(Opcode::DotProduct, pScalarType, { pVector1, pVector2 }, instName);
+}
+
+// =====================================================================================================================
+// In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
+// the current output primitive in the specified output-primitive stream number.
+Instruction* BuilderRecorder::CreateEmitVertex(
+    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+{
+    return Record(Opcode::EmitVertex, nullptr, getInt32(streamId), "");
+}
+
+// =====================================================================================================================
+// In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+Instruction* BuilderRecorder::CreateEndPrimitive(
+    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+{
+    return Record(Opcode::EndPrimitive, nullptr, getInt32(streamId), "");
 }
 
 // =====================================================================================================================
@@ -693,6 +728,205 @@ Value* BuilderRecorder::CreateImageGetLod(
 }
 
 // =====================================================================================================================
+// Create a read of (part of) a user input value, passed from the previous shader stage.
+Value* BuilderRecorder::CreateReadGenericInput(
+    Type*         pResultTy,          // [in] Type of value to read
+    uint32_t      location,           // Base location (row) of input
+    Value*        pLocationOffset,    // [in] Variable location offset; must be within locationCount
+    Value*        pElemIdx,           // [in] Vector index
+    uint32_t      locationCount,      // Count of locations taken by the input
+    InOutInfo     inputInfo,          // Extra input info (FS interp info)
+    Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
+    const Twine&  instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ReadGenericInput,
+                  pResultTy,
+                  {
+                      getInt32(location),
+                      pLocationOffset,
+                      pElemIdx,
+                      getInt32(locationCount),
+                      getInt32(inputInfo.GetData()),
+                      (pVertexIndex != nullptr) ? pVertexIndex : UndefValue::get(getInt32Ty()),
+                  },
+                  instName,
+                  Attribute::ReadOnly);
+}
+
+// =====================================================================================================================
+// Create a read of (part of) a user output value, the last written value in the same shader stage.
+Value* BuilderRecorder::CreateReadGenericOutput(
+    Type*         pResultTy,          // [in] Type of value to read
+    uint32_t      location,           // Base location (row) of input
+    Value*        pLocationOffset,    // [in] Variable location offset; must be within locationCount
+    Value*        pElemIdx,           // [in] Vector index
+    uint32_t      locationCount,      // Count of locations taken by the input
+    InOutInfo     outputInfo,         // Extra output info
+    Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
+    const Twine&  instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ReadGenericOutput,
+                  pResultTy,
+                  {
+                      getInt32(location),
+                      pLocationOffset,
+                      pElemIdx,
+                      getInt32(locationCount),
+                      getInt32(outputInfo.GetData()),
+                      (pVertexIndex != nullptr) ? pVertexIndex : UndefValue::get(getInt32Ty()),
+                  },
+                  instName,
+                  Attribute::ReadOnly);
+}
+
+// =====================================================================================================================
+// Create a write of (part of) a user output value, setting the value to pass to the next shader stage.
+// The value to write must be a scalar or vector type with no more than four elements.
+// A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
+// 64-bit components. Two locations together can contain up to a 4-vector of 64-bit components.
+// A non-constant pLocationOffset is currently only supported for TCS.
+Instruction* BuilderRecorder::CreateWriteGenericOutput(
+    Value*        pValueToWrite,      // [in] Value to write
+    uint32_t      location,           // Base location (row) of output
+    Value*        pLocationOffset,    // [in] Location offset; must be within locationCount if variable
+    Value*        pElemIdx,           // [in] Element index in vector. (This is the SPIR-V "component", except
+                                      //      that it is half the component for 64-bit elements.)
+    uint32_t      locationCount,      // Count of locations taken by the output. Ignored if pLocationOffset is const
+    InOutInfo     outputInfo,         // Extra output info (GS stream ID, FS integer signedness)
+    Value*        pVertexIndex)       // [in] For TCS per-vertex output: vertex index; else nullptr
+{
+    return Record(Opcode::WriteGenericOutput,
+                  nullptr,
+                  {
+                      pValueToWrite,
+                      getInt32(location),
+                      pLocationOffset,
+                      pElemIdx,
+                      getInt32(locationCount),
+                      getInt32(outputInfo.GetData()),
+                      (pVertexIndex != nullptr) ? pVertexIndex : UndefValue::get(getInt32Ty()),
+                  },
+                  "",
+                  {});
+}
+
+// =====================================================================================================================
+// Create a write to an XFB (transform feedback / streamout) buffer.
+Instruction* BuilderRecorder::CreateWriteXfbOutput(
+    Value*        pValueToWrite,      // [in] Value to write
+    bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
+    uint32_t      location,           // Location (row) or built-in kind of output (ignored if not GS)
+    uint32_t      xfbBuffer,          // XFB buffer number
+    uint32_t      xfbStride,          // XFB stride
+    Value*        pXfbOffset,         // [in] XFB byte offset
+    InOutInfo     outputInfo)         // Extra output info (GS stream ID)
+{
+    return Record(Opcode::WriteXfbOutput,
+                  nullptr,
+                  {
+                      pValueToWrite,
+                      getInt1(isBuiltIn),
+                      getInt32(location),
+                      getInt32(xfbBuffer),
+                      getInt32(xfbStride),
+                      pXfbOffset, getInt32(outputInfo.GetData())
+                  },
+                  "",
+                  {});
+}
+
+// =====================================================================================================================
+// Create a read of (part of) a built-in input value.
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// or the element type if pIndex is not nullptr.
+Value* BuilderRecorder::CreateReadBuiltInInput(
+    BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+    InOutInfo     inputInfo,          // Extra input info (shader-defined array length)
+    Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
+    Value*        pIndex,             // [in] Array or vector index to access part of an input, else nullptr
+    const Twine&  instName)           // [in] Name to give instruction(s)
+{
+    Type* pResultTy = GetBuiltInTy(builtIn, inputInfo);
+    if (pIndex != nullptr)
+    {
+        if (isa<ArrayType>(pResultTy))
+        {
+            pResultTy = pResultTy->getArrayElementType();
+        }
+        else
+        {
+            pResultTy = pResultTy->getVectorElementType();
+        }
+    }
+    return Record(Opcode::ReadBuiltInInput,
+                  pResultTy,
+                  {
+                      getInt32(builtIn),
+                      getInt32(inputInfo.GetData()),
+                      (pVertexIndex != nullptr) ? pVertexIndex : UndefValue::get(getInt32Ty()),
+                      (pIndex != nullptr) ? pIndex : UndefValue::get(getInt32Ty()),
+                  },
+                  instName,
+                  Attribute::ReadOnly);
+}
+
+// =====================================================================================================================
+// Create a read of (part of) a built-in output value.
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// or the element type if pIndex is not nullptr.
+Value* BuilderRecorder::CreateReadBuiltInOutput(
+    BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+    InOutInfo     outputInfo,         // Extra output info (shader-defined array length)
+    Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
+    Value*        pIndex,             // [in] Array or vector index to access part of an input, else nullptr
+    const Twine&  instName)           // [in] Name to give instruction(s)
+{
+    Type* pResultTy = GetBuiltInTy(builtIn, outputInfo);
+    if (pIndex != nullptr)
+    {
+        if (isa<ArrayType>(pResultTy))
+        {
+            pResultTy = pResultTy->getArrayElementType();
+        }
+        else
+        {
+            pResultTy = pResultTy->getVectorElementType();
+        }
+    }
+    return Record(Opcode::ReadBuiltInOutput,
+                  pResultTy,
+                  {
+                      getInt32(builtIn),
+                      getInt32(outputInfo.GetData()),
+                      (pVertexIndex != nullptr) ? pVertexIndex : UndefValue::get(getInt32Ty()),
+                      (pIndex != nullptr) ? pIndex : UndefValue::get(getInt32Ty()),
+                  },
+                  instName,
+                  Attribute::ReadOnly);
+}
+
+// =====================================================================================================================
+// Create a write of (part of) a built-in output value.
+Instruction* BuilderRecorder::CreateWriteBuiltInOutput(
+    Value*        pValueToWrite,      // [in] Value to write
+    BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
+    InOutInfo     outputInfo,         // Extra output info (shader-defined array length; GS stream id)
+    Value*        pVertexIndex,       // [in] For TCS per-vertex output: vertex index, else nullptr
+    Value*        pIndex)             // [in] Array or vector index to access part of an input, else nullptr
+{
+    return Record(Opcode::WriteBuiltInOutput,
+                  nullptr,
+                  {
+                      pValueToWrite,
+                      getInt32(builtIn),
+                      getInt32(outputInfo.GetData()),
+                      (pVertexIndex != nullptr) ? pVertexIndex : UndefValue::get(getInt32Ty()),
+                      (pIndex != nullptr) ? pIndex : UndefValue::get(getInt32Ty()),
+                  },
+                  "");
+}
+
+// =====================================================================================================================
 // Create a get subgroup size query.
 Value* BuilderRecorder::CreateGetSubgroupSize(
     const Twine& instName) // [in] Name to give instruction(s)
@@ -1010,10 +1244,11 @@ Value* BuilderRecorder::CreateSubgroupMbcnt(
 // =====================================================================================================================
 // Record one Builder call
 Instruction* BuilderRecorder::Record(
-    BuilderRecorder::Opcode opcode,       // Opcode of Builder method call being recorded
-    Type*                   pResultTy,    // [in] Return type (can be nullptr for void)
-    ArrayRef<Value*>        args,         // Arguments
-    const Twine&            instName)     // [in] Name to give instruction
+    BuilderRecorder::Opcode       opcode,       // Opcode of Builder method call being recorded
+    Type*                         pResultTy,    // [in] Return type (can be nullptr for void)
+    ArrayRef<Value*>              args,         // Arguments
+    const Twine&                  instName,     // [in] Name to give instruction
+    ArrayRef<Attribute::AttrKind> attribs)      // Attributes to give the function declaration
 {
 #ifndef NDEBUG
     // In a debug build, check that each enclosing function is consistently in the same shader stage.
@@ -1047,8 +1282,12 @@ Instruction* BuilderRecorder::Record(
         pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, mangledName, pModule);
 
         MDNode* const pFuncMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
-
         pFunc->setMetadata(m_opcodeMetaKindId, pFuncMeta);
+        pFunc->addFnAttr(Attribute::NoUnwind);
+        for (auto attrib : attribs)
+        {
+            pFunc->addFnAttr(attrib);
+        }
     }
 
     // Create the call.

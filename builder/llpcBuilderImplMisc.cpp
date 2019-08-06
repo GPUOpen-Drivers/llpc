@@ -40,6 +40,53 @@ using namespace Llpc;
 using namespace llvm;
 
 // =====================================================================================================================
+// In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
+// the current output primitive in the specified output-primitive stream number.
+Instruction* BuilderImplMisc::CreateEmitVertex(
+    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+
+    // Get GsWaveId
+    std::string callName = LlpcName::InputImportBuiltIn;
+    callName += "GsWaveId.i32.i32";
+    Value* pGsWaveId = EmitCall(GetInsertBlock()->getModule(),
+                                callName,
+                                getInt32Ty(),
+                                getInt32(spv::BuiltInWaveId),
+                                NoAttrib,
+                                &*GetInsertPoint());
+
+    // Do the sendmsg.
+    // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
+    uint32_t msg = (streamId << GS_EMIT_STREAM_ID_SHIFT) | GS_EMIT;
+    return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), pGsWaveId }, nullptr);
+}
+
+// =====================================================================================================================
+// In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+Instruction* BuilderImplMisc::CreateEndPrimitive(
+    uint32_t                streamId)           // Stream number, 0 if only one stream is present
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
+
+    // Get GsWaveId
+    std::string callName = LlpcName::InputImportBuiltIn;
+    callName += "GsWaveId.i32.i32";
+    Value* pGsWaveId = EmitCall(GetInsertBlock()->getModule(),
+                                callName,
+                                getInt32Ty(),
+                                getInt32(spv::BuiltInWaveId),
+                                NoAttrib,
+                                &*GetInsertPoint());
+
+    // Do the sendmsg.
+    // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
+    uint32_t msg = (streamId << GS_EMIT_STREAM_ID_SHIFT) | GS_CUT;
+    return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), pGsWaveId }, nullptr);
+}
+
+// =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 Instruction* BuilderImplMisc::CreateKill(
     const Twine& instName) // [in] Name to give instruction(s)

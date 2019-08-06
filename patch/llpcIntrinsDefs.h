@@ -46,6 +46,8 @@ static const uint32_t GS_DONE = 3;            // GS wave is done
 #if LLPC_BUILD_GFX10
 static const uint32_t GS_ALLOC_REQ = 9;       // GS requests that parameter cache space be allocated
 #endif
+static const uint32_t GS_CUT = 0x12;           // [3:0] = 2 (GS), [5:4] = 1 (cut)
+static const uint32_t GS_EMIT = 0x22;          // [3:0] = 2 (GS), [5:4] = 2 (emit)
 static const uint32_t GS_EMIT_STREAM0 = 0x22;  // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 0 (stream0)
 static const uint32_t GS_EMIT_STREAM1 = 0x122; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 1 (stream1)
 static const uint32_t GS_EMIT_STREAM2 = 0x222; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 2 (stream2)
