@@ -486,7 +486,7 @@ void PatchBufferOp::visitCallInst(
             m_divergenceSet.insert(callInst.getArgOperand(0));
         }
     }
-    else if (callName.equals(LlpcName::LateBufferLength))
+    else if (callName.startswith(LlpcName::LateBufferLength))
     {
         Instruction* const pPointer = GetPointerOperandAsInst(callInst.getArgOperand(0));
 

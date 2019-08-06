@@ -262,9 +262,10 @@ Value* BuilderImplDesc::CreateGetBufferDescLength(
     // In future this should become a full LLVM intrinsic, but for now we patch in a late intrinsic that is cleaned up
     // in patch buffer op.
     Instruction* const pInsertPos = &*GetInsertPoint();
-
+    std::string callName = LlpcName::LateBufferLength;
+    AddTypeMangling(nullptr, pBufferDesc, callName);
     return EmitCall(pInsertPos->getModule(),
-                    LlpcName::LateBufferLength,
+                    callName,
                     getInt32Ty(),
                     pBufferDesc,
                     Attribute::ReadNone,
