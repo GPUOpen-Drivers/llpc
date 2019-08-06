@@ -310,6 +310,133 @@ private:
 };
 
 // =====================================================================================================================
+// Builder implementation subclass for input/output operations
+class BuilderImplInOut : virtual public BuilderImplBase
+{
+public:
+    BuilderImplInOut(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+
+    // Create a read of (part of) a user input value.
+    Value* CreateReadGenericInput(Type*         pResultTy,
+                                  uint32_t      location,
+                                  Value*        pLocationOffset,
+                                  Value*        pElemIdx,
+                                  uint32_t      locationCount,
+                                  InOutInfo     inputInfo,
+                                  Value*        pVertexIndex,
+                                  const Twine&  instName = "") override final;
+
+    // Create a read of (part of) a user output value.
+    Value* CreateReadGenericOutput(Type*         pResultTy,
+                                   uint32_t      location,
+                                   Value*        pLocationOffset,
+                                   Value*        pElemIdx,
+                                   uint32_t      locationCount,
+                                   InOutInfo     outputInfo,
+                                   Value*        pVertexIndex,
+                                   const Twine&  instName = "") override final;
+
+    // Create a write of (part of) a user output value.
+    Instruction* CreateWriteGenericOutput(Value*        pValueToWrite,
+                                          uint32_t      location,
+                                          Value*        pLocationOffset,
+                                          Value*        pElemIdx,
+                                          uint32_t      locationCount,
+                                          InOutInfo     outputInfo,
+                                          Value*        pVertexIndex) override final;
+
+    // Create a write to an XFB (transform feedback / streamout) buffer.
+    Instruction* CreateWriteXfbOutput(Value*        pValueToWrite,
+                                      bool          isBuiltIn,
+                                      uint32_t      location,
+                                      uint32_t      xfbBuffer,
+                                      uint32_t      xfbStride,
+                                      Value*        pXfbOffset,
+                                      InOutInfo     outputInfo) override final;
+
+    // Create a read of (part of) a built-in input value.
+    Value* CreateReadBuiltInInput(BuiltInKind  builtIn,
+                                  InOutInfo    inputInfo,
+                                  Value*       pVertexIndex,
+                                  Value*       pIndex,
+                                  const Twine& instName = "") override final;
+
+    // Create a read of (part of) an output built-in value.
+    Value* CreateReadBuiltInOutput(BuiltInKind  builtIn,
+                                   InOutInfo    outputInfo,
+                                   Value*       pVertexIndex,
+                                   Value*       pIndex,
+                                   const Twine& instName = "") override final;
+
+    // Create a write of (part of) a built-in output value.
+    Instruction* CreateWriteBuiltInOutput(Value*        pValueToWrite,
+                                          BuiltInKind   builtIn,
+                                          InOutInfo     outputInfo,
+                                          Value*        pVertexIndex,
+                                          Value*        pIndex) override final;
+
+private:
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplInOut)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplInOut)
+
+    // Read (a part of) a generic (user) input/output value.
+    Value* ReadGenericInputOutput(bool          isOutput,
+                                  Type*         pResultTy,
+                                  uint32_t      location,
+                                  Value*        pLocationOffset,
+                                  Value*        pElemIdx,
+                                  uint32_t      locationCount,
+                                  InOutInfo     inOutInfo,
+                                  Value*        pVertexIndex,
+                                  const Twine&  instName);
+
+    // Mark usage for a generic (user) input or output
+    void MarkGenericInputOutputUsage(bool          isOutput,
+                                     uint32_t      location,
+                                     uint32_t      locationCount,
+                                     InOutInfo     inOutInfo,
+                                     Value*        pVertexIndex);
+
+    // Mark interpolation info for FS input.
+    void MarkInterpolationInfo(InOutInfo interpInfo);
+
+    // Mark fragment output type
+    void MarkFsOutputType(Type* pOutputTy, uint32_t location, InOutInfo outputInfo);
+
+    // Modify aux interp value according to custom interp mode
+    Value* ModifyAuxInterpValue(Value* pAuxInterpValue, InOutInfo inputInfo);
+
+    // Read (part of) a built-in value
+    Value* ReadBuiltIn(bool         isOutput,
+                       BuiltInKind  builtIn,
+                       InOutInfo    inOutInfo,
+                       Value*       pVertexIndex,
+                       Value*       pIndex,
+                       const Twine& instName);
+
+    // Get name of built-in
+    StringRef GetBuiltInName(BuiltInKind builtIn);
+
+    // Mark usage of a built-in input
+    void MarkBuiltInInputUsage(BuiltInKind builtIn, uint32_t arraySize);
+
+    // Mark usage of a built-in output
+    void MarkBuiltInOutputUsage(BuiltInKind builtIn, uint32_t arraySize, uint32_t streamId);
+
+#ifndef NDEBUG
+    // Get a bitmask of which shader stages are valid for a built-in to be an input or output of
+    uint32_t GetBuiltInValidMask(BuiltInKind builtIn, bool isOutput);
+
+    // Determine whether a built-in is an input for a particular shader stage.
+    bool IsBuiltInInput(BuiltInKind builtIn);
+
+    // Determine whether a built-in is an output for a particular shader stage.
+    bool IsBuiltInOutput(BuiltInKind builtIn);
+#endif // NDEBUG
+
+};
+
+// =====================================================================================================================
 // Builder implementation subclass for matrix operations
 class BuilderImplMatrix : virtual public BuilderImplBase
 {
@@ -356,6 +483,13 @@ class BuilderImplMisc : virtual public BuilderImplBase
 {
 public:
     BuilderImplMisc(LLVMContext& context) : BuilderImplBase(context) {}
+
+    // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
+    // the current output primitive in the specified output-primitive stream.
+    Instruction* CreateEmitVertex(uint32_t streamId) override final;
+
+    // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+    Instruction* CreateEndPrimitive(uint32_t streamId) override final;
 
     // Create a "kill". Only allowed in a fragment shader.
     Instruction* CreateKill(const Twine& instName) override final;
@@ -598,6 +732,7 @@ private:
 // The Builder implementation, encompassing all the individual builder implementation subclasses
 class BuilderImpl final : public BuilderImplDesc,
                                  BuilderImplImage,
+                                 BuilderImplInOut,
                                  BuilderImplMatrix,
                                  BuilderImplMisc,
                                  BuilderImplSubgroup
@@ -606,6 +741,7 @@ public:
     BuilderImpl(LLVMContext& context) : BuilderImplBase(context),
                                         BuilderImplDesc(context),
                                         BuilderImplImage(context),
+                                        BuilderImplInOut(context),
                                         BuilderImplMatrix(context),
                                         BuilderImplMisc(context),
                                         BuilderImplSubgroup(context)

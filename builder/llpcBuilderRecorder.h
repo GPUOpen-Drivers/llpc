@@ -97,6 +97,15 @@ public:
         ImageQuerySize,
         ImageGetLod,
 
+        // Input/output
+        ReadGenericInput,
+        ReadGenericOutput,
+        WriteGenericOutput,
+        WriteXfbOutput,
+        ReadBuiltInInput,
+        ReadBuiltInOutput,
+        WriteBuiltInOutput,
+
         // Matrix
         TransposeMatrix,
         MatrixTimesScalar,
@@ -106,6 +115,8 @@ public:
         OuterProduct,
 
         // Misc.
+        EmitVertex,
+        EndPrimitive,
         Kill,
         ReadClock,
 
@@ -306,7 +317,76 @@ public:
                              const Twine&      instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
+    // Shader input/output methods
+
+    // Create a read of (part of) a user input value.
+    Value* CreateReadGenericInput(Type*         pResultTy,
+                                  uint32_t      location,
+                                  Value*        pLocationOffset,
+                                  Value*        pElemIdx,
+                                  uint32_t      locationCount,
+                                  InOutInfo     inputInfo,
+                                  Value*        pVertexIndex,
+                                  const Twine&  instName = "") override final;
+
+    // Create a read of (part of) a user output value.
+    Value* CreateReadGenericOutput(Type*         pResultTy,
+                                   uint32_t      location,
+                                   Value*        pLocationOffset,
+                                   Value*        pElemIdx,
+                                   uint32_t      locationCount,
+                                   InOutInfo     outputInfo,
+                                   Value*        pVertexIndex,
+                                   const Twine&  instName = "") override final;
+
+    // Create a write of (part of) a user output value.
+    Instruction* CreateWriteGenericOutput(Value*        pValueToWrite,
+                                          uint32_t      location,
+                                          Value*        pLocationOffset,
+                                          Value*        pElemIdx,
+                                          uint32_t      locationCount,
+                                          InOutInfo     outputInfo,
+                                          Value*        pVertexIndex) override final;
+
+    // Create a write to an XFB (transform feedback / streamout) buffer.
+    Instruction* CreateWriteXfbOutput(Value*        pValueToWrite,
+                                      bool          isBuiltIn,
+                                      uint32_t      location,
+                                      uint32_t      xfbBuffer,
+                                      uint32_t      xfbStride,
+                                      Value*        pXfbOffset,
+                                      InOutInfo     outputInfo) override final;
+
+    // Create a read of (part of) a built-in input value.
+    Value* CreateReadBuiltInInput(BuiltInKind  builtIn,
+                                  InOutInfo    inputInfo,
+                                  Value*       pVertexIndex,
+                                  Value*       pIndex,
+                                  const Twine& instName = "") override final;
+
+    // Create a read of (part of) a built-in output value.
+    Value* CreateReadBuiltInOutput(BuiltInKind  builtIn,
+                                   InOutInfo    outputInfo,
+                                   Value*       pVertexIndex,
+                                   Value*       pIndex,
+                                   const Twine& instName = "") override final;
+
+    // Create a write of (part of) a built-in output value.
+    Instruction* CreateWriteBuiltInOutput(Value*        pValueToWrite,
+                                          BuiltInKind   builtIn,
+                                          InOutInfo     outputInfo,
+                                          Value*        pVertexIndex,
+                                          Value*        pIndex) override final;
+
+    // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations
+
+    // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
+    // the current output primitive in the specified output-primitive stream.
+    Instruction* CreateEmitVertex(uint32_t streamId) override final;
+
+    // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
+    Instruction* CreateEndPrimitive(uint32_t streamId) override final;
 
     Instruction* CreateKill(const Twine& instName = "") override final;
     Instruction* CreateReadClock(bool realtime, const Twine& instName = "") override final;
@@ -417,10 +497,11 @@ private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderRecorder)
 
     // Record one Builder call
-    Instruction* Record(Opcode            opcode,
-                        Type*             pReturnTy,
-                        ArrayRef<Value*>  args,
-                        const Twine&      instName);
+    Instruction* Record(Opcode                        opcode,
+                        Type*                         pReturnTy,
+                        ArrayRef<Value*>              args,
+                        const Twine&                  instName,
+                        ArrayRef<Attribute::AttrKind> attribs = {});
 
 #ifndef NDEBUG
     // Check that the frontend is consistently telling us which shader stage a function is in.

@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x i32> (...) @llpc.call.image.load.v4i32(i32 1, i32 4, {{.*}}, <2 x i32> <i32 0, i32 1>, i32 0) #0
+; SHADERTEST: call <4 x i32> (...) @llpc.call.image.load.v4i32(i32 1, i32 4, {{.*}}, <2 x i32> <i32 0, i32 1>, i32 0)
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 1
 ; SHADERTEST: call <4 x i32> (...) @llpc.call.image.load.v4i32(i32 1, i32 0, {{.*}}, <2 x i32> <i32 0, i32 1>, i32 0)
 

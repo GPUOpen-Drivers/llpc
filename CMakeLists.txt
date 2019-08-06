@@ -227,6 +227,7 @@ target_sources(llpc PRIVATE
     builder/llpcBuilderImpl.cpp
     builder/llpcBuilderImplDesc.cpp
     builder/llpcBuilderImplImage.cpp
+    builder/llpcBuilderImplInOut.cpp
     builder/llpcBuilderImplMatrix.cpp
     builder/llpcBuilderImplMisc.cpp
     builder/llpcBuilderImplSubgroup.cpp
