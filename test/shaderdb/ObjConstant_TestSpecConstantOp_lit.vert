@@ -29,7 +29,7 @@ void main()
 ; SHADERTEST: fadd reassoc nnan nsz arcp contract <4 x float> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: fadd reassoc nnan nsz arcp contract <2 x float> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call void @llpc.output.export.builtin.Position{{.*}}v4f32(i32 0, i32 0, <4 x float> <float 5.000000e+01, float 4.200000e+01, float -8.000000e+00, float -8.000000e+00>)
+; SHADERTEST: call void @llpc.output.export.builtin.Position{{.*}}v4f32(i32 0, <4 x float> <float 5.000000e+01, float 4.200000e+01, float -8.000000e+00, float -8.000000e+00>)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

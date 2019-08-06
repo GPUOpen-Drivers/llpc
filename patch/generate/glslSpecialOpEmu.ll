@@ -154,56 +154,6 @@ define float @llpc.fwidthCoarse.f32(float %p) #0
 }
 
 ; =====================================================================================================================
-; >>>  Geometry Shader Functions
-; =====================================================================================================================
-
-; GLSL: void EmitStreamVertex(int)
-define spir_func void @_Z16EmitStreamVertexi(i32 %stream) #0
-{
-    ; [9:8] = stream
-    %1 = shl i32 %stream, 8
-    ; 34 = 0x22, [3:0] = 2 (GS), [5:4] = 2 (emit)
-    %2 = or i32 %1, 34
-    ; BuiltInWaveId (268435466 = 0x1000000A)
-    %3 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
-    call void @llvm.amdgcn.s.sendmsg(i32 %2, i32 %3)
-    ret void
-}
-
-; GLSL: void EndStreamPrimitive(int)
-define spir_func void @_Z18EndStreamPrimitivei(i32 %stream) #0
-{
-    ; [9:8] = stream
-    %1 = shl i32 %stream, 8
-    ; 18 = 0x12, [3:0] = 2 (GS), [5:4] = 1 (cut)
-    %2 = or i32 %1, 18
-    ; BuiltInWaveId (268435466 = 0x1000000A)
-    %3 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
-    call void @llvm.amdgcn.s.sendmsg(i32 %2, i32 %3)
-    ret void
-}
-
-; GLSL: void EmitVertex()
-define spir_func void @_Z10EmitVertexv() #0
-{
-    ; BuiltInWaveId (268435466 = 0x1000000A)
-    %1 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
-    ; 34 = 0x22, [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 0 (stream = 0)
-    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %1)
-    ret void
-}
-
-; GLSL: void EndPrimitive()
-define spir_func void @_Z12EndPrimitivev() #0
-{
-    ; BuiltInWaveId (268435466 = 0x1000000A)
-    %1 = call i32 @llpc.input.import.builtin.GsWaveId.i32.i32(i32 268435466)
-    ; 18 = 0x12, [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 0 (stream = 0)
-    call void @llvm.amdgcn.s.sendmsg(i32 18, i32 %1)
-    ret void
-}
-
-; =====================================================================================================================
 ; >>>  Shader Invocation Control Functions
 ; =====================================================================================================================
 

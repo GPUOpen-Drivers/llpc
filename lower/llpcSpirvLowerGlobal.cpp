@@ -51,6 +51,58 @@ using namespace Llpc;
 namespace Llpc
 {
 
+// The code here relies on the SPIR-V built-in kind being the same as the Builder built-in kind.
+
+static_assert(Builder::BuiltInBaryCoordNoPersp          == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordNoPerspAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaryCoordNoPerspCentroid  == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordNoPerspCentroidAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaryCoordNoPerspSample    == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordNoPerspSampleAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaryCoordPullModel        == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordPullModelAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaryCoordSmooth           == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordSmoothAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaryCoordSmoothCentroid   == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordSmoothCentroidAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaryCoordSmoothSample     == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordSmoothSampleAMD), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaseInstance              == static_cast<Builder::BuiltInKind>(spv::BuiltInBaseInstance), "Built-in kind mismatch");
+static_assert(Builder::BuiltInBaseVertex                == static_cast<Builder::BuiltInKind>(spv::BuiltInBaseVertex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInClipDistance              == static_cast<Builder::BuiltInKind>(spv::BuiltInClipDistance), "Built-in kind mismatch");
+static_assert(Builder::BuiltInCullDistance              == static_cast<Builder::BuiltInKind>(spv::BuiltInCullDistance), "Built-in kind mismatch");
+static_assert(Builder::BuiltInDeviceIndex               == static_cast<Builder::BuiltInKind>(spv::BuiltInDeviceIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInDrawIndex                 == static_cast<Builder::BuiltInKind>(spv::BuiltInDrawIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInFragCoord                 == static_cast<Builder::BuiltInKind>(spv::BuiltInFragCoord), "Built-in kind mismatch");
+static_assert(Builder::BuiltInFragDepth                 == static_cast<Builder::BuiltInKind>(spv::BuiltInFragDepth), "Built-in kind mismatch");
+static_assert(Builder::BuiltInFragStencilRef            == static_cast<Builder::BuiltInKind>(spv::BuiltInFragStencilRefEXT), "Built-in kind mismatch");
+static_assert(Builder::BuiltInFrontFacing               == static_cast<Builder::BuiltInKind>(spv::BuiltInFrontFacing), "Built-in kind mismatch");
+static_assert(Builder::BuiltInGlobalInvocationId        == static_cast<Builder::BuiltInKind>(spv::BuiltInGlobalInvocationId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInHelperInvocation          == static_cast<Builder::BuiltInKind>(spv::BuiltInHelperInvocation), "Built-in kind mismatch");
+static_assert(Builder::BuiltInInstanceIndex             == static_cast<Builder::BuiltInKind>(spv::BuiltInInstanceIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInInvocationId              == static_cast<Builder::BuiltInKind>(spv::BuiltInInvocationId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInLayer                     == static_cast<Builder::BuiltInKind>(spv::BuiltInLayer), "Built-in kind mismatch");
+static_assert(Builder::BuiltInLocalInvocationId         == static_cast<Builder::BuiltInKind>(spv::BuiltInLocalInvocationId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInLocalInvocationIndex      == static_cast<Builder::BuiltInKind>(spv::BuiltInLocalInvocationIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInNumSubgroups              == static_cast<Builder::BuiltInKind>(spv::BuiltInNumSubgroups), "Built-in kind mismatch");
+static_assert(Builder::BuiltInNumWorkgroups             == static_cast<Builder::BuiltInKind>(spv::BuiltInNumWorkgroups), "Built-in kind mismatch");
+static_assert(Builder::BuiltInPatchVertices             == static_cast<Builder::BuiltInKind>(spv::BuiltInPatchVertices), "Built-in kind mismatch");
+static_assert(Builder::BuiltInPointCoord                == static_cast<Builder::BuiltInKind>(spv::BuiltInPointCoord), "Built-in kind mismatch");
+static_assert(Builder::BuiltInPointSize                 == static_cast<Builder::BuiltInKind>(spv::BuiltInPointSize), "Built-in kind mismatch");
+static_assert(Builder::BuiltInPosition                  == static_cast<Builder::BuiltInKind>(spv::BuiltInPosition), "Built-in kind mismatch");
+static_assert(Builder::BuiltInPrimitiveId               == static_cast<Builder::BuiltInKind>(spv::BuiltInPrimitiveId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSampleId                  == static_cast<Builder::BuiltInKind>(spv::BuiltInSampleId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSampleMask                == static_cast<Builder::BuiltInKind>(spv::BuiltInSampleMask), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSamplePosition            == static_cast<Builder::BuiltInKind>(spv::BuiltInSamplePosition), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupEqMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupEqMask), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupGeMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupGeMask), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupGtMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupGtMask), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupId                == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupLeMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupLeMask), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupLocalInvocationId == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupLocalInvocationId), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupLtMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupLtMask), "Built-in kind mismatch");
+static_assert(Builder::BuiltInSubgroupSize              == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupSize), "Built-in kind mismatch");
+static_assert(Builder::BuiltInTessCoord                 == static_cast<Builder::BuiltInKind>(spv::BuiltInTessCoord), "Built-in kind mismatch");
+static_assert(Builder::BuiltInTessLevelInner            == static_cast<Builder::BuiltInKind>(spv::BuiltInTessLevelInner), "Built-in kind mismatch");
+static_assert(Builder::BuiltInTessLevelOuter            == static_cast<Builder::BuiltInKind>(spv::BuiltInTessLevelOuter), "Built-in kind mismatch");
+static_assert(Builder::BuiltInVertexIndex               == static_cast<Builder::BuiltInKind>(spv::BuiltInVertexIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInViewIndex                 == static_cast<Builder::BuiltInKind>(spv::BuiltInViewIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInViewportIndex             == static_cast<Builder::BuiltInKind>(spv::BuiltInViewportIndex), "Built-in kind mismatch");
+static_assert(Builder::BuiltInWorkgroupId               == static_cast<Builder::BuiltInKind>(spv::BuiltInWorkgroupId), "Built-in kind mismatch");
+
 // =====================================================================================================================
 // Initializes static members.
 char SpirvLowerGlobal::ID = 0;
@@ -245,6 +297,7 @@ void SpirvLowerGlobal::visitCallInst(
                                                             SPIRAS_Input,
                                                             pInputMeta,
                                                             nullptr,
+                                                            0,
                                                             nullptr,
                                                             nullptr,
                                                             interpLoc,
@@ -340,7 +393,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
             if (inOutMeta.IsBuiltIn)
             {
-                BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
+                uint32_t builtInId = inOutMeta.Value;
                 isVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
                                (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
                                (builtInId == BuiltInPointSize)    ||
@@ -366,6 +419,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                           addrSpace,
                                           indexOperands,
                                           operandIdx,
+                                          0,
                                           pInOutMeta,
                                           nullptr,
                                           pVertexIdx,
@@ -401,7 +455,7 @@ void SpirvLowerGlobal::visitLoadInst(
             // If the input/output is arrayed, the outermost dimension might for vertex indexing
             if (inOutMeta.IsBuiltIn)
             {
-                BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
+                uint32_t builtInId = inOutMeta.Value;
                 hasVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
                                 (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
                                 (builtInId == BuiltInPointSize)    ||
@@ -429,6 +483,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                                             addrSpace,
                                                             pElemMeta,
                                                             nullptr,
+                                                            0,
                                                             nullptr,
                                                             pVertexIdx,
                                                             InterpLocUnknown,
@@ -446,6 +501,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                                    addrSpace,
                                                    pInOutMeta,
                                                    nullptr,
+                                                   0,
                                                    nullptr,
                                                    nullptr,
                                                    InterpLocUnknown,
@@ -534,7 +590,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
             if (outputMeta.IsBuiltIn)
             {
-                BuiltIn builtInId = static_cast<BuiltIn>(outputMeta.Value);
+                uint32_t builtInId = outputMeta.Value;
                 isVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
                                (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
                                (builtInId == BuiltInPointSize)    ||
@@ -560,6 +616,7 @@ void SpirvLowerGlobal::visitStoreInst(
                           pStoreValue,
                           indexOperands,
                           operandIdx,
+                          0,
                           pOutputMeta,
                           nullptr,
                           pVertexIdx,
@@ -590,7 +647,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
             if (outputMeta.IsBuiltIn)
             {
-                BuiltIn builtInId = static_cast<BuiltIn>(outputMeta.Value);
+                uint32_t builtInId = outputMeta.Value;
                 hasVertexIdx = ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
                                 (builtInId == BuiltInPosition)     || // HLSL style per-vertex data
                                 (builtInId == BuiltInPointSize)    ||
@@ -619,6 +676,7 @@ void SpirvLowerGlobal::visitStoreInst(
                 AddCallInstForOutputExport(pElemValue,
                                            pElemMeta,
                                            nullptr,
+                                           0,
                                            InvalidValue,
                                            nullptr,
                                            pVertexIdx,
@@ -631,6 +689,7 @@ void SpirvLowerGlobal::visitStoreInst(
             AddCallInstForOutputExport(pStoreValue,
                                        pOutputMeta,
                                        nullptr,
+                                       0,
                                        InvalidValue,
                                        nullptr,
                                        nullptr,
@@ -700,6 +759,7 @@ void SpirvLowerGlobal::MapInputToProxy(
                                                  SPIRAS_Input,
                                                  pMeta,
                                                  nullptr,
+                                                 0,
                                                  nullptr,
                                                  nullptr,
                                                  InterpLocUnknown,
@@ -928,7 +988,7 @@ void SpirvLowerGlobal::LowerOutput()
             (m_shaderStage == ShaderStageFragment))
         {
             Value* pOutputValue = new LoadInst(pProxy, "", pRetInst);
-            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, nullptr, nullptr, InvalidValue, pRetInst);
+            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, 0, nullptr, nullptr, InvalidValue, pRetInst);
         }
         else if (m_shaderStage == ShaderStageGeometry)
         {
@@ -947,9 +1007,27 @@ void SpirvLowerGlobal::LowerOutput()
                 }
 
                 Value* pOutputValue = new LoadInst(pProxy, "", pEmitCall);
-                AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, nullptr, nullptr, emitStreamId, pEmitCall);
+                AddCallInstForOutputExport(pOutputValue,
+                                           pMeta,
+                                           nullptr,
+                                           0,
+                                           0,
+                                           nullptr,
+                                           nullptr,
+                                           emitStreamId,
+                                           pEmitCall);
             }
         }
+    }
+
+    // Replace the Emit(Stream)Vertex calls with builder code.
+    for (auto pEmitCall : m_emitCalls)
+    {
+        uint32_t emitStreamId = (pEmitCall->getNumArgOperands() != 0) ?
+                                cast<ConstantInt>(pEmitCall->getArgOperand(0))->getZExtValue() : 0;
+        m_pBuilder->SetInsertPoint(pEmitCall);
+        m_pBuilder->CreateEmitVertex(emitStreamId);
+        pEmitCall->eraseFromParent();
     }
 
     for (auto outputMap : m_outputProxyMap)
@@ -1083,6 +1161,8 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     uint32_t     addrSpace,         // Address space
     Constant*    pInOutMeta,        // [in] Metadata of this input/output
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
+    uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
+                                    //    For an array built-in with a variable index, this is the array size.
     Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation shader
                                     // (usually, it is vector component index, for built-in input/output, it could be
                                     // element index of scalar array)
@@ -1117,7 +1197,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         {
             LLPC_ASSERT(pLocOffset == nullptr);
 
-            BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
+            uint32_t builtInId = inOutMeta.Value;
 
             if ((pVertexIdx == nullptr) && (m_shaderStage == ShaderStageGeometry) &&
                 ((builtInId == BuiltInPerVertex)    || // GLSL style per-vertex data
@@ -1146,6 +1226,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            addrSpace,
                                                            pElemMeta,
                                                            nullptr,
+                                                           maxLocOffset,
                                                            nullptr,
                                                            pVertexIdx,
                                                            interpLoc,
@@ -1159,44 +1240,26 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             }
             else
             {
-                // Normal built-ins without vertex indexing
-                std::string builtInName = getNameMap(builtInId).map(builtInId);
-                LLPC_ASSERT(builtInName.find("BuiltIn")  == 0);
-                std::string instName =
-                    (addrSpace == SPIRAS_Input) ? LlpcName::InputImportBuiltIn : LlpcName::OutputImportBuiltIn;
-                instName += builtInName.substr(strlen("BuiltIn"));
-
-                std::vector<Value*> args;
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
-
-                if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
+                // Array built-in without vertex indexing (ClipDistance/CullDistance).
+                Builder::InOutInfo inOutInfo;
+                inOutInfo.SetArraySize(pInOutTy->getArrayNumElements());
+                m_pBuilder->SetInsertPoint(pInsertPos);
+                if (addrSpace == SPIRAS_Input)
                 {
-                    // NOTE: For tessellation shader, we add element index as an addition parameter to do addressing for
-                    // the input/output. Here, this is invalid value.
-                    pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                    args.push_back(pElemIdx);
-                }
-
-                if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval) ||
-                    (m_shaderStage == ShaderStageGeometry))
-                {
-                    // NOTE: For gl_in[i].XXX/gl_out[i].XXX, we add vertex indexing as an additional parameter to do
-                    // addressing for the input/output.
-                    if (pVertexIdx == nullptr)
-                    {
-                        // When vertex indexing is not specified, we set it to don't-care value
-                        pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                    }
-                    args.push_back(pVertexIdx);
+                    pInOutValue =  m_pBuilder->CreateReadBuiltInInput(
+                                      static_cast<Builder::BuiltInKind>(inOutMeta.Value),
+                                      inOutInfo,
+                                      pVertexIdx,
+                                      nullptr);
                 }
                 else
                 {
-                    // Vertex indexing is not valid for other shader stages
-                    LLPC_ASSERT(pVertexIdx == nullptr);
+                    pInOutValue =  m_pBuilder->CreateReadBuiltInOutput(
+                                      static_cast<Builder::BuiltInKind>(inOutMeta.Value),
+                                      inOutInfo,
+                                      pVertexIdx,
+                                      nullptr);
                 }
-
-                AddTypeMangling(pInOutTy, args, instName);
-                pInOutValue = EmitCall(m_pModule, instName, pInOutTy, args, NoAttrib, pInsertPos);
             }
         }
         else
@@ -1217,6 +1280,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            addrSpace,
                                                            pElemMeta,
                                                            pLocOffset,
+                                                           maxLocOffset,
                                                            nullptr,
                                                            pVertexIdx,
                                                            InterpLocUnknown,
@@ -1251,6 +1315,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            addrSpace,
                                                            pElemMeta,
                                                            pElemLocOffset,
+                                                           maxLocOffset,
                                                            pElemIdx,
                                                            pVertexIdx,
                                                            InterpLocUnknown,
@@ -1280,6 +1345,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                      addrSpace,
                                                      pMemberMeta,
                                                      pLocOffset,
+                                                     maxLocOffset,
                                                      nullptr,
                                                      pVertexIdx,
                                                      InterpLocUnknown,
@@ -1300,288 +1366,99 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 
         LLPC_ASSERT(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
-        std::string instName;
-
-        if (interpLoc != InterpLocUnknown)
-        {
-            LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
-
-            if (interpLoc != InterpLocCustom)
-            {
-                // Add intrinsic to calculate I/J for interpolation function
-                std::string evalInstName;
-                std::vector<Value*> evalArgs;
-                auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
-
-                if (interpLoc == InterpLocCentroid)
-                {
-                    evalInstName = LlpcName::InputImportBuiltIn;
-                    if (inOutMeta.InterpMode == InterpModeNoPersp)
-                    {
-                        evalInstName += "InterpLinearCentroid";
-                        evalArgs.push_back(ConstantInt::get(m_pContext->Int32Ty(), BuiltInInterpLinearCentroid));
-                        pResUsage->builtInUsage.fs.noperspective = true;
-                        pResUsage->builtInUsage.fs.centroid = true;
-                    }
-                    else
-                    {
-                        evalInstName += "InterpPerspCentroid";
-                        evalArgs.push_back(ConstantInt::get(m_pContext->Int32Ty(), BuiltInInterpPerspCentroid));
-                        pResUsage->builtInUsage.fs.smooth = true;
-                        pResUsage->builtInUsage.fs.centroid = true;
-                    }
-                }
-                else
-                {
-                    evalInstName = LlpcName::InputInterpEval;
-                    std::string suffix;
-
-                    if (interpLoc == InterpLocCenter)
-                    {
-                        evalInstName += "offset";
-                        evalArgs.push_back(pAuxInterpValue);
-
-                        // NOTE: Here we add suffix to differentiate the type of "offset" (could be 16-bit or 32-bit
-                        // floating-point type)
-                        suffix = "." + GetTypeName(pAuxInterpValue->getType());
-                    }
-                    else
-                    {
-                        evalInstName += "sample";
-                        evalArgs.push_back(pAuxInterpValue);
-                        pResUsage->builtInUsage.fs.runAtSampleRate = true;
-                    }
-
-                    if (inOutMeta.InterpMode == InterpModeNoPersp)
-                    {
-                        evalInstName += ".noperspective";
-                        pResUsage->builtInUsage.fs.noperspective = true;
-                        pResUsage->builtInUsage.fs.center = true;
-                    }
-                    else
-                    {
-                        pResUsage->builtInUsage.fs.smooth = true;
-                        pResUsage->builtInUsage.fs.pullMode = true;
-                    }
-
-                    evalInstName += suffix;
-                }
-
-                auto pIJ = EmitCall(m_pModule, evalInstName, m_pContext->Floatx2Ty(), evalArgs, NoAttrib, pInsertPos);
-                pAuxInterpValue = pIJ;
-            }
-
-            // Prepare arguments for input import call
-            instName  = LlpcName::InputImportInterpolant;
-
-            auto pLoc = ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.Value);
-
-            // NOTE: If the relative location offset is not specified, initialize it to 0.
-            if (pLocOffset == nullptr)
-            {
-                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
-            }
-
-            args.push_back(pLoc);
-            args.push_back(pLocOffset);
-        }
-        else if (inOutMeta.IsBuiltIn)
-        {
-            instName = (addrSpace == SPIRAS_Input) ? LlpcName::InputImportBuiltIn : LlpcName::OutputImportBuiltIn;
-
-            BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
-            std::string builtInName = getNameMap(builtInId).map(builtInId);
-
-            LLPC_ASSERT(builtInName.find("BuiltIn") == 0);
-            instName += builtInName.substr(strlen("BuiltIn"));
-
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
-        }
-        else
-        {
-            instName = (addrSpace == SPIRAS_Input) ? LlpcName::InputImportGeneric : LlpcName::OutputImportGeneric;
-
-            auto pLoc = ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.Value);
-
-            // NOTE: If the relative location offset is not specified, initialize it to 0.
-            if (pLocOffset == nullptr)
-            {
-                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
-            }
-
-            if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
-            {
-                // NOTE: For tessellation shader, we treats the location to two parts:
-                // startLoc = loc + locOffset
-                args.push_back(pLoc);
-                args.push_back(pLocOffset);
-            }
-            else
-            {
-                auto pStartLoc = BinaryOperator::CreateAdd(pLoc, pLocOffset, "", pInsertPos);
-                args.push_back(pStartLoc);
-            }
-        }
-
-        if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval) ||
-            (interpLoc != InterpLocUnknown))
-        {
-            if (inOutMeta.IsBuiltIn)
-            {
-                if (pElemIdx == nullptr)
-                {
-                    // When element indexing is not specified, we set it to don't-care value
-                    pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                }
-            }
-            else
-            {
-                LLPC_ASSERT(pInOutTy->isSingleValueType());
-
-                uint32_t elemIdx = inOutMeta.Component;
-                LLPC_ASSERT(inOutMeta.Component <= 3);
-                if (pInOutTy->getScalarSizeInBits() == 64)
-                {
-                    LLPC_ASSERT(inOutMeta.Component % 2 == 0); // Must be even for 64-bit type
-                    elemIdx = inOutMeta.Component / 2;
-                }
-
-                if (pElemIdx != nullptr)
-                {
-                    pElemIdx = BinaryOperator::CreateAdd(pElemIdx,
-                                                         ConstantInt::get(m_pContext->Int32Ty(), elemIdx),
-                                                         "",
-                                                         pInsertPos);
-                }
-                else
-                {
-                    pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), elemIdx);
-                }
-            }
-
-            args.push_back(pElemIdx);
-        }
-        else
-        {
-            // Element indexing is not valid for other shader stages
-            LLPC_ASSERT(pElemIdx == nullptr);
-
-            if ((inOutMeta.IsBuiltIn == false) && (m_shaderStage != ShaderStageCompute))
-            {
-                LLPC_ASSERT(pInOutTy->isSingleValueType());
-
-                uint32_t elemIdx = inOutMeta.Component;
-                LLPC_ASSERT(inOutMeta.Component <= 3);
-                if (pInOutTy->getScalarSizeInBits() == 64)
-                {
-                    LLPC_ASSERT(inOutMeta.Component % 2 == 0); // Must be even for 64-bit type
-                    elemIdx = inOutMeta.Component / 2;
-                }
-
-                pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), elemIdx);
-                args.push_back(pElemIdx);
-            }
-        }
-
-        if ((m_shaderStage == ShaderStageTessControl) ||
-            (m_shaderStage == ShaderStageTessEval) ||
-            (m_shaderStage == ShaderStageGeometry))
-        {
-            // NOTE: For tessellation shader and geometry shader, we add vertex indexing as an addition parameter to
-            // do addressing for the input/output.
-            if (pVertexIdx == nullptr)
-            {
-                // When vertex indexing is not specified, we set it to don't-care value
-                pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-            }
-            args.push_back(pVertexIdx);
-        }
-        else
-        {
-            // Vertex indexing is not valid for other shader stages
-            LLPC_ASSERT(pVertexIdx == nullptr);
-        }
-
-        if (interpLoc != InterpLocUnknown)
-        {
-            // Add interpolation mode and auxiliary value of interpolation (calcuated I/J or vertex no.) for
-            // interpolant inputs of fragment shader
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.InterpMode));
-            args.push_back(pAuxInterpValue);
-        }
-        else if ((m_shaderStage == ShaderStageFragment) && (inOutMeta.IsBuiltIn == false))
-        {
-            // Add interpolation mode and location for generic inputs of fragment shader
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.InterpMode));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), inOutMeta.InterpLoc));
-        }
-
-        //
-        // VS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
-        //
-        // TCS: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
-        //
-        //      @llpc.output.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.output.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
-        //
-        //
-        // TES: @llpc.input.import.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx)
-
-        // GS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 vertexIdx)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 vertexIdx)
-        //
-        // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
-        //      @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
-        //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
-        //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
-        //
-        // CS:  @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
-        //
-        //
-        // Common: @llpc.input.import.builtin.%BuiltIn%.%Type%(i32 builtInId)
-        //
+        m_pBuilder->SetInsertPoint(pInsertPos);
         if (inOutMeta.IsBuiltIn)
         {
-            BuiltIn builtInId = static_cast<BuiltIn>(inOutMeta.Value);
-            if ((builtInId == BuiltInSubgroupLocalInvocationId) ||
-                (builtInId == BuiltInSubgroupEqMaskKHR)         ||
-                (builtInId == BuiltInSubgroupGeMaskKHR)         ||
-                (builtInId == BuiltInSubgroupGtMaskKHR)         ||
-                (builtInId == BuiltInSubgroupLeMaskKHR)         ||
-                (builtInId == BuiltInSubgroupLtMaskKHR))
+            auto builtIn = static_cast<Builder::BuiltInKind>(inOutMeta.Value);
+            pElemIdx = (pElemIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pElemIdx;
+            pVertexIdx = (pVertexIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pVertexIdx;
+
+            Builder::InOutInfo inOutInfo;
+            inOutInfo.SetArraySize(maxLocOffset);
+            if (addrSpace == SPIRAS_Input)
             {
-                // NOTE: For those common built-ins that are stage independent and the implementation body is in the
-                // external GLSL emulation libarary (.ll files), the import calls could be simplified.
-                args.clear();
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
+                pInOutValue = m_pBuilder->CreateReadBuiltInInput(builtIn, inOutInfo, pVertexIdx, pElemIdx);
+            }
+            else
+            {
+                pInOutValue = m_pBuilder->CreateReadBuiltInOutput(builtIn, inOutInfo, pVertexIdx, pElemIdx);
+            }
 
-                if ((builtInId == BuiltInSubgroupEqMaskKHR)     ||
-                    (builtInId == BuiltInSubgroupGeMaskKHR)     ||
-                    (builtInId == BuiltInSubgroupGtMaskKHR)     ||
-                    (builtInId == BuiltInSubgroupLeMaskKHR)     ||
-                    (builtInId == BuiltInSubgroupLtMaskKHR))
-                {
-                    // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
-                    // for gl_subgroupXXXMask they are "uvec4". And the SPIR-V enumerants "BuiltInSubgroupXXXMaskKHR"
-                    // and "BuiltInSubgroupXXXMask" share the same numeric values.
-                    if (pInOutTy->isIntegerTy(64) == false)
-                    {
-                        // Not uint64_t, must be uvec4
-                        LLPC_ASSERT(pInOutTy->isVectorTy() &&
-                                    pInOutTy->getVectorElementType()->isIntegerTy(32) &&
-                                    pInOutTy->getVectorNumElements() == 4);
-
-                        instName.replace(instName.find("KHR"), 3, ""); // Get rid of "KHR" suffix
-                    }
-                }
+            if (((builtIn == Builder::BuiltInSubgroupEqMask)     ||
+                 (builtIn == Builder::BuiltInSubgroupGeMask)     ||
+                 (builtIn == Builder::BuiltInSubgroupGtMask)     ||
+                 (builtIn == Builder::BuiltInSubgroupLeMask)     ||
+                 (builtIn == Builder::BuiltInSubgroupLtMask)) &&
+                pInOutTy->isIntegerTy(64))
+            {
+                // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
+                // for gl_subgroupXXXMask they are "uvec4". And the SPIR-V enumerants "BuiltInSubgroupXXXMaskKHR"
+                // and "BuiltInSubgroupXXXMask" share the same numeric values.
+                pInOutValue = m_pBuilder->CreateBitCast(pInOutValue, VectorType::get(pInOutTy, 2));
+                pInOutValue = m_pBuilder->CreateExtractElement(pInOutValue, uint64_t(0));
+            }
+            if (pInOutValue->getType()->isIntegerTy(1))
+            {
+                // Convert i1 to i32.
+                pInOutValue = m_pBuilder->CreateZExt(pInOutValue, m_pBuilder->getInt32Ty());
             }
         }
+        else
+        {
+            uint32_t elemIdx = inOutMeta.Component;
+            LLPC_ASSERT(inOutMeta.Component <= 3);
+            if (pInOutTy->getScalarSizeInBits() == 64)
+            {
+                LLPC_ASSERT(inOutMeta.Component % 2 == 0); // Must be even for 64-bit type
+                elemIdx = inOutMeta.Component / 2;
+            }
+            pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
+                                               m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
 
-        AddTypeMangling(pInOutTy, args, instName);
-        pInOutValue = EmitCall(m_pModule, instName, pInOutTy, args, NoAttrib, pInsertPos);
+
+            Builder::InOutInfo inOutInfo;
+            if (pLocOffset == nullptr)
+            {
+                pLocOffset = m_pBuilder->getInt32(0);
+            }
+
+            if (addrSpace == SPIRAS_Input)
+            {
+                if (m_shaderStage == ShaderStageFragment)
+                {
+                    if (interpLoc != InterpLocUnknown)
+                    {
+                        // Use auxiliary value of interpolation (calcuated I/J or vertex no.) for
+                        // interpolant inputs of fragment shader.
+                        pVertexIdx = pAuxInterpValue;
+                        inOutInfo.SetHasInterpAux();
+                    }
+                    else
+                    {
+                        interpLoc = inOutMeta.InterpLoc;
+                    }
+                    inOutInfo.SetInterpLoc(interpLoc);
+                    inOutInfo.SetInterpMode(inOutMeta.InterpMode);
+                }
+                pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
+                                                                 inOutMeta.Value,
+                                                                 pLocOffset,
+                                                                 pElemIdx,
+                                                                 maxLocOffset,
+                                                                 inOutInfo,
+                                                                 pVertexIdx);
+            }
+            else
+            {
+                pInOutValue = m_pBuilder->CreateReadGenericOutput(pInOutTy,
+                                                                  inOutMeta.Value,
+                                                                  pLocOffset,
+                                                                  pElemIdx,
+                                                                  maxLocOffset,
+                                                                  inOutInfo,
+                                                                  pVertexIdx);
+            }
+        }
     }
 
     return pInOutValue;
@@ -1593,6 +1470,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     Value*       pOutputValue, // [in] Value exported to output
     Constant*    pOutputMeta,  // [in] Metadata of this output
     Value*       pLocOffset,   // [in] Relative location offset, passed from aggregate type
+    uint32_t     maxLocOffset, // Max+1 location offset if variable index has been encountered.
+                               //    For an array built-in with a variable index, this is the array size.
     uint32_t     xfbLocOffset, // Transform feedback location offset (for array type)
     Value*       pElemIdx,     // [in] Element index used for element indexing, valid for tessellation control shader
                                // (usually, it is vector component index, for built-in input/output, it could be
@@ -1625,56 +1504,18 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
         if (outputMeta.IsBuiltIn)
         {
-            BuiltIn builtInId = static_cast<BuiltIn>(outputMeta.Value);
+            // NOTE: For geometry shader, we add stream ID for outputs.
+            LLPC_ASSERT((m_shaderStage != ShaderStageGeometry) || (emitStreamId == outputMeta.StreamId));
 
-            // NOTE: For tessellation shader, vertex indexing is handled by "load"/"store" instruction lowering.
-            std::string instName = LlpcName::OutputExportBuiltIn;
-            std::string builtInName = getNameMap(builtInId).map(builtInId);
-
-            LLPC_ASSERT(builtInName.find("BuiltIn")  == 0);
-            instName += builtInName.substr(strlen("BuiltIn"));
-
-            std::vector<Value*> args;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
-
-            if (m_shaderStage == ShaderStageTessControl)
+            auto builtInId = static_cast<Builder::BuiltInKind>(outputMeta.Value);
+            Builder::InOutInfo outputInfo;
+            if (emitStreamId != InvalidValue)
             {
-                // NOTE: For tessellation control shader, we add element index as an addition parameter to do
-                // addressing for the output. Here, this is invalid value.
-                pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                args.push_back(pElemIdx);
-
-                // NOTE: For gl_out[i].XXX, we add vertex indexing as an additional parameter to do addressing
-                // for the output.
-                if (pVertexIdx == nullptr)
-                {
-                    // When vertex indexing is not specified, we set it to don't-care value
-                    pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                }
-                args.push_back(pVertexIdx);
+                outputInfo.SetStreamId(emitStreamId);
             }
-            else
-            {
-                // Vertex indexing is not valid for other shader stages
-                LLPC_ASSERT(pVertexIdx == nullptr);
-            }
-
-            if (m_shaderStage == ShaderStageGeometry)
-            {
-                // NOTE: For geometry shader, we add stream ID for outputs.
-                LLPC_ASSERT(emitStreamId == outputMeta.StreamId);
-                args.push_back(ConstantInt::get(m_pContext->Int32Ty(), emitStreamId));
-            }
-            else
-            {
-                // ID of emitted vertex stream is not valid for other shader stages
-                LLPC_ASSERT(emitStreamId == InvalidValue);
-            }
-
-            args.push_back(pOutputValue);
-
-            AddTypeMangling(nullptr, args, instName);
-            EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            outputInfo.SetArraySize(pOutputTy->getArrayNumElements());
+            m_pBuilder->SetInsertPoint(pInsertPos);
+            m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, nullptr);
         }
         else
         {
@@ -1715,6 +1556,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 AddCallInstForOutputExport(pElem,
                                            pElemMeta,
                                            pElemLocOffset,
+                                           maxLocOffset,
                                            xfbLocOffset + outputMeta.XfbLocStride * elemIdx,
                                            nullptr,
                                            pVertexIdx,
@@ -1738,13 +1580,22 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             idxs.push_back(memberIdx);
             Value* pMember = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
 
-            AddCallInstForOutputExport(pMember, pMemberMeta, pLocOffset, xfbLocOffset, nullptr, pVertexIdx, emitStreamId, pInsertPos);
+            AddCallInstForOutputExport(pMember,
+                                       pMemberMeta,
+                                       pLocOffset,
+                                       maxLocOffset,
+                                       xfbLocOffset,
+                                       nullptr,
+                                       pVertexIdx,
+                                       emitStreamId,
+                                       pInsertPos);
         }
     }
     else
     {
         // Normal scalar or vector type
         std::vector<Value*> args;
+        m_pBuilder->SetInsertPoint(pInsertPos);
         Constant* pInOutMetaConst = cast<Constant>(pOutputMeta);
         outputMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
         outputMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
@@ -1755,189 +1606,71 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             return;
         }
 
-        LLPC_ASSERT(outputMeta.IsLoc || outputMeta.IsBuiltIn || outputMeta.IsXfb);
+        LLPC_ASSERT(outputMeta.IsLoc || outputMeta.IsBuiltIn);
 
-        std::string instName;
-
-        // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-        if (outputMeta.IsXfb)
+        Builder::InOutInfo outputInfo;
+        if (emitStreamId != InvalidValue)
         {
-            uint32_t locOffset = 0;
-            if (pLocOffset != nullptr)
-            {
-                locOffset = (dyn_cast<ConstantInt>(pLocOffset))->getZExtValue();
-            }
-
-            LLPC_ASSERT(xfbLocOffset != InvalidValue);
-            auto pXfbLocOffset = ConstantInt::get(m_pContext->Int32Ty(), xfbLocOffset + outputMeta.XfbLoc);
-
-            // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbLocOffset, %Type% outputValue)
-            instName = LlpcName::OutputExportXfb;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbBuffer));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), outputMeta.XfbOffset));
-            args.push_back(pXfbLocOffset);
-            args.push_back(pOutputValue);
-            AddTypeMangling(nullptr, args, instName);
-            EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
-
-            if ((m_shaderStage == ShaderStageGeometry) && (outputMeta.IsBuiltIn == false))
-            {
-                CollectGsXfbOutputInfo(pOutputValue->getType(),
-                                       locOffset,
-                                       xfbLocOffset + outputMeta.XfbLoc,
-                                       outputMeta);
-            }
+            outputInfo.SetStreamId(emitStreamId);
         }
+        outputInfo.SetIsSigned(outputMeta.Signedness);
 
-        args.clear();
         if (outputMeta.IsBuiltIn)
         {
-            instName = LlpcName::OutputExportBuiltIn;
-            BuiltIn builtInId = static_cast<BuiltIn>(outputMeta.Value);
-            std::string builtInName = getNameMap(builtInId).map(builtInId);
-
-            LLPC_ASSERT(builtInName.find("BuiltIn")  == 0);
-            instName += builtInName.substr(strlen("BuiltIn"));
-
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
-        }
-        else
-        {
-            instName = LlpcName::OutputExportGeneric;
-
-            LLPC_ASSERT(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
-            auto pLoc = ConstantInt::get(m_pContext->Int32Ty(), outputMeta.Value + outputMeta.Index);
-
-            // NOTE: If the relative location offset is not specified, initialize it to 0.
-            if (pLocOffset == nullptr)
+            auto builtInId = static_cast<Builder::BuiltInKind>(outputMeta.Value);
+            outputInfo.SetArraySize(maxLocOffset);
+            if (outputMeta.IsXfb)
             {
-                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
+                LLPC_ASSERT(xfbLocOffset != InvalidValue);
+                Value* pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + xfbLocOffset + outputMeta.XfbLoc);
+                m_pBuilder->CreateWriteXfbOutput(pOutputValue,
+                                                 /*isBuiltIn=*/true,
+                                                 builtInId,
+                                                 outputMeta.XfbBuffer,
+                                                 outputMeta.XfbStride,
+                                                 pXfbOffset, outputInfo);
             }
 
-            if (m_shaderStage == ShaderStageTessControl)
-            {
-                // NOTE: For tessellation control shader, we treat the location as two parts:
-                // startLoc = loc + locOffset
-                args.push_back(pLoc);
-                args.push_back(pLocOffset);
-            }
-            else
-            {
-                auto pStartLoc = BinaryOperator::CreateAdd(pLoc, pLocOffset, "", pInsertPos);
-                args.push_back(pStartLoc);
-            }
+            m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, pElemIdx);
+            return;
         }
 
-        if (m_shaderStage == ShaderStageTessControl)
+        uint32_t location = outputMeta.Value + outputMeta.Index;
+        LLPC_ASSERT(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
+        LLPC_ASSERT(pOutputTy->isSingleValueType());
+
+        uint32_t elemIdx = outputMeta.Component;
+        LLPC_ASSERT(outputMeta.Component <= 3);
+        if (pOutputTy->getScalarSizeInBits() == 64)
         {
-            if (outputMeta.IsBuiltIn)
-            {
-                if (pElemIdx == nullptr)
-                {
-                    // When element indexing is not specified, we set it to don't-care value
-                    pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-                }
-            }
-            else
-            {
-                LLPC_ASSERT(pOutputTy->isSingleValueType());
-
-                uint32_t elemIdx = outputMeta.Component;
-                LLPC_ASSERT(outputMeta.Component <= 3);
-                if (pOutputTy->getScalarSizeInBits() == 64)
-                {
-                    LLPC_ASSERT(outputMeta.Component % 2 == 0); // Must be even for 64-bit type
-                    elemIdx = outputMeta.Component / 2;
-                }
-
-                if (pElemIdx != nullptr)
-                {
-                    pElemIdx = BinaryOperator::CreateAdd(pElemIdx,
-                                                         ConstantInt::get(m_pContext->Int32Ty(), elemIdx),
-                                                         "",
-                                                         pInsertPos);
-                }
-                else
-                {
-                    pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), elemIdx);
-                }
-            }
-
-            args.push_back(pElemIdx);
+            LLPC_ASSERT(outputMeta.Component % 2 == 0); // Must be even for 64-bit type
+            elemIdx = outputMeta.Component / 2;
         }
-        else
+        pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
+                                           m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
+        pLocOffset = (pLocOffset == nullptr) ? m_pBuilder->getInt32(0) : pLocOffset;
+
+        if (outputMeta.IsXfb)
         {
-            // Element indexing is not valid for other shader stages
-            LLPC_ASSERT(pElemIdx == nullptr);
-
-            if (m_shaderStage != ShaderStageCompute)
-            {
-                LLPC_ASSERT(pOutputTy->isSingleValueType());
-
-                uint32_t elemIdx = outputMeta.Component;
-                LLPC_ASSERT(outputMeta.Component <= 3);
-                if (pOutputTy->getScalarSizeInBits() == 64)
-                {
-                    LLPC_ASSERT(outputMeta.Component % 2 == 0); // Must be even for 64-bit type
-                    elemIdx = outputMeta.Component / 2;
-                }
-
-                pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), elemIdx);
-                args.push_back(pElemIdx);
-            }
+            // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
+            LLPC_ASSERT(xfbLocOffset != InvalidValue);
+            Value* pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + xfbLocOffset + outputMeta.XfbLoc);
+            m_pBuilder->CreateWriteXfbOutput(pOutputValue,
+                                             /*isBuiltIn=*/false,
+                                             location + cast<ConstantInt>(pLocOffset)->getZExtValue(),
+                                             outputMeta.XfbBuffer,
+                                             outputMeta.XfbStride,
+                                             pXfbOffset, outputInfo);
         }
 
-        if (m_shaderStage == ShaderStageTessControl)
-        {
-            // NOTE: For tessellation control shader, we add vertex indexing as an addition parameter to do addressing
-            // for the output.
-            if (pVertexIdx == nullptr)
-            {
-                // When vertex indexing is not specified, we set it to don't-care value
-                pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
-            }
-            args.push_back(pVertexIdx);
-        }
-        else
-        {
-            // Vertex indexing is not valid for other shader stages
-            LLPC_ASSERT(pVertexIdx == nullptr);
-        }
-
-        if (m_shaderStage == ShaderStageGeometry)
-        {
-            // NOTE: For geometry shader, we add stream ID for outputs.
-            LLPC_ASSERT(emitStreamId == outputMeta.StreamId);
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), emitStreamId));
-        }
-        else
-        {
-            // ID of emitted vertex stream is not valid for other shader stages
-            LLPC_ASSERT(emitStreamId == InvalidValue);
-        }
-
-        args.push_back(pOutputValue);
-
-        //
-        // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-        //      @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
-        //
-        // TCS: @llpc.output.export.generic.%Type%(i32 location, i32 locOffset, i32 elemIdx, i32 vertexIdx,
-        //                                         %Type% outputValue)
-        //      @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, i32 elemIdx, i32 vertexIdx,
-        //                                                   %Type% outputValue)
-        //
-        // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-        //      @llpc.output.export.builtin.%BuiltIn%.%Type%(i32 builtInId, %Type% outputValue)
-
-        // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
-        //      @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, i32 streamId, %Type% outputValue)
-        //
-        // FS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
-        //      @llpc.output.export.builtin.%BuiltIn%(i32 builtInId, %Type% outputValue)
-        //
-        AddTypeMangling(nullptr, args, instName);
-        EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        m_pBuilder->CreateWriteGenericOutput(pOutputValue,
+                                             location,
+                                             pLocOffset,
+                                             pElemIdx,
+                                             maxLocOffset,
+                                             outputInfo,
+                                             pVertexIdx);
     }
 }
 
@@ -1948,6 +1681,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
     uint32_t                   addrSpace,       // Address space
     const std::vector<Value*>& indexOperands,   // [in] Index operands
     uint32_t                   operandIdx,      // Index of the index operand in processing
+    uint32_t                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
     Constant*                  pInOutMeta,      // [in] Metadata of this input/output member
     Value*                     pLocOffset,      // [in] Relative location offset of this input/output member
     Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
@@ -1985,6 +1719,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                                                  addrSpace,
                                                  pElemMeta,
                                                  pLocOffset,
+                                                 pInOutTy->getArrayNumElements(),
                                                  pElemIdx,
                                                  pVertexIdx,
                                                  interpLoc,
@@ -2008,10 +1743,19 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                                                                   pInsertPos);
                 pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
 
+                // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
+                // so it knows how many locations to mark as used by this access.
+                if ((maxLocOffset == 0) && (isa<ConstantInt>(pElemIdx) == false))
+                {
+                    maxLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue() +
+                                   stride * pInOutTy->getArrayNumElements();
+                }
+
                 return LoadInOutMember(pElemTy,
                                        addrSpace,
                                        indexOperands,
                                        operandIdx + 1,
+                                       maxLocOffset,
                                        pElemMeta,
                                        pElemLocOffset,
                                        pVertexIdx,
@@ -2032,6 +1776,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                                    addrSpace,
                                    indexOperands,
                                    operandIdx + 1,
+                                   maxLocOffset,
                                    pMemberMeta,
                                    pLocOffset,
                                    pVertexIdx,
@@ -2051,6 +1796,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                                              addrSpace,
                                              pInOutMeta,
                                              pLocOffset,
+                                             maxLocOffset,
                                              pCompIdx,
                                              pVertexIdx,
                                              interpLoc,
@@ -2066,6 +1812,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                                          addrSpace,
                                          pInOutMeta,
                                          pLocOffset,
+                                         maxLocOffset,
                                          nullptr,
                                          pVertexIdx,
                                          interpLoc,
@@ -2084,6 +1831,7 @@ void SpirvLowerGlobal::StoreOutputMember(
     Value*                     pStoreValue,     // [in] Value stored to output member
     const std::vector<Value*>& indexOperands,   // [in] Index operands
     uint32_t                   operandIdx,      // Index of the index operand in processing
+    uint32_t                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
     Constant*                  pOutputMeta,     // [in] Metadata of this output member
     Value*                     pLocOffset,      // [in] Relative location offset of this output member
     Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
@@ -2113,6 +1861,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                 return AddCallInstForOutputExport(pStoreValue,
                                                   pElemMeta,
                                                   nullptr,
+                                                  pOutputTy->getArrayNumElements(),
                                                   InvalidValue,
                                                   pElemIdx,
                                                   pVertexIdx,
@@ -2136,10 +1885,19 @@ void SpirvLowerGlobal::StoreOutputMember(
                                                                   pInsertPos);
                 pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
 
+                // Mark the end+1 possible location offset if the index is variable. The Builder call needs it
+                // so it knows how many locations to mark as used by this access.
+                if ((maxLocOffset == 0) && (isa<ConstantInt>(pElemIdx) == false))
+                {
+                    maxLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue() +
+                                   stride * pOutputTy->getArrayNumElements();
+                }
+
                 return StoreOutputMember(pElemTy,
                                          pStoreValue,
                                          indexOperands,
                                          operandIdx + 1,
+                                         maxLocOffset,
                                          pElemMeta,
                                          pElemLocOffset,
                                          pVertexIdx,
@@ -2158,6 +1916,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                                      pStoreValue,
                                      indexOperands,
                                      operandIdx + 1,
+                                     maxLocOffset,
                                      pMemberMeta,
                                      pLocOffset,
                                      pVertexIdx,
@@ -2172,6 +1931,7 @@ void SpirvLowerGlobal::StoreOutputMember(
             return AddCallInstForOutputExport(pStoreValue,
                                               pOutputMeta,
                                               pLocOffset,
+                                              maxLocOffset,
                                               InvalidValue,
                                               pCompIdx,
                                               pVertexIdx,
@@ -2187,6 +1947,7 @@ void SpirvLowerGlobal::StoreOutputMember(
         return AddCallInstForOutputExport(pStoreValue,
                                           pOutputMeta,
                                           pLocOffset,
+                                          maxLocOffset,
                                           InvalidValue,
                                           nullptr,
                                           pVertexIdx,
@@ -2692,6 +2453,7 @@ void SpirvLowerGlobal::InterpolateInputElement(
                                           SPIRAS_Input,
                                           indexOperands,
                                           operandIdx,
+                                          0,
                                           pInputMeta,
                                           nullptr,
                                           nullptr,
@@ -2755,6 +2517,7 @@ void SpirvLowerGlobal::InterpolateInputElement(
                                               SPIRAS_Input,
                                               newIndexOperands,
                                               operandIdx,
+                                              0,
                                               pInputMeta,
                                               nullptr,
                                               nullptr,

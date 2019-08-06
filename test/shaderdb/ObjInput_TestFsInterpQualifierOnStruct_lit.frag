@@ -22,24 +22,25 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-COUNT-5: call <4 x float> @llpc.input.import.generic.v4f32{{.*}}
+; SHADERTEST: call <4 x float> @llpc.input.import.generic.v4f32{{.*}}
+; SHADERTEST: call <4 x float> @llpc.input.import.generic.v4f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p1
+; SHADERTEST-DAG: call float @llvm.amdgcn.interp.p2
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
