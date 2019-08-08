@@ -1927,6 +1927,7 @@ void Compiler::InitGpuWorkaround()
                     m_gpuWorkarounds.gfx10.waShaderInstPrefetch123   = 1;
                     m_gpuWorkarounds.gfx10.nggTessDegeneratePrims    = 1;
                     m_gpuWorkarounds.gfx10.waThrottleInMultiDwordNsa = 1;
+                    m_gpuWorkarounds.gfx10.waNggCullingNoEmptySubgroups = 1;
                 }
                 break;
             default:

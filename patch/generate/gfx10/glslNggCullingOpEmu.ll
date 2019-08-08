@@ -922,25 +922,25 @@ define i1 @llpc.ngg.culling.smallprimfilter(
     %59 = fmul float %58, %3
     %60 = fmul float %59, 2.0
 
-    ; minX = floor(min(scaledX0', scaledX1', scaledX2') - 0.000001)
+    ; minX = floor(min(scaledX0', scaledX1', scaledX2') - 1/256.0)
     %61 = call float @llpc.fmin3.f32(float %30, float %36, float %42)
-    %62 = fadd float %61, 0xBEB0C6F7A0000000
-    %63 = call float @llvm.floor.f32(float %62)
+    %62 = fadd float %61, -0.00390625
+    %63 = call float @llvm.rint.f32(float %62)
 
-    ; maxX = floor(max(scaledX0', scaledX1', scaledX2') + 0.000001)
+    ; maxX = floor(max(scaledX0', scaledX1', scaledX2') + 1/256.0)
     %64 = call float @llpc.fmax3.f32(float %30, float %36, float %42)
-    %65 = fadd float %64, 0x3EB0C6F7A0000000
-    %66 = call float @llvm.floor.f32(float %65)
+    %65 = fadd float %64, 0.00390625
+    %66 = call float @llvm.rint.f32(float %65)
 
-    ; minY = floor(min(scaledY0', scaledY1', scaledY2') - 0.000001)
+    ; minY = floor(min(scaledY0', scaledY1', scaledY2') - 1/256.0)
     %67 = call float @llpc.fmin3.f32(float %48, float %54, float %60)
-    %68 = fadd float %67, 0xBEB0C6F7A0000000
-    %69 = call float @llvm.floor.f32(float %68)
+    %68 = fadd float %67, -0.00390625
+    %69 = call float @llvm.rint.f32(float %68)
 
-    ; maxX = floor(max(scaledY0', scaledY1', scaledY2') + 0.000001)
+    ; maxX = floor(max(scaledY0', scaledY1', scaledY2') + 1/256.0)
     %70 = call float @llpc.fmax3.f32(float %48, float %54, float %60)
-    %71 = fadd float %70, 0x3EB0C6F7A0000000
-    %72 = call float @llvm.floor.f32(float %71)
+    %71 = fadd float %70, 0.00390625
+    %72 = call float @llvm.rint.f32(float %71)
 
     ; minX == maxX
     %73 = fcmp oeq float %63, %66
@@ -999,7 +999,7 @@ declare float @llvm.maxnum.f32(float, float) #0
 declare float @llvm.minnum.f32(float, float) #0
 declare <2 x half> @llvm.maxnum.v2f16(<2 x half>, <2 x half>) #0
 declare <2 x half> @llvm.minnum.v2f16(<2 x half>, <2 x half>) #0
-declare float @llvm.floor.f32(float) #0
+declare float @llvm.rint.f32(float) #0
 declare <2 x half> @llvm.amdgcn.cvt.pkrtz(float, float) #1
 declare half @llvm.fma.f16(half, half, half) #0
 declare <2 x half> @llvm.fma.v2f16(<2 x half>, <2 x half>, <2 x half>) #0
