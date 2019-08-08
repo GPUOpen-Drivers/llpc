@@ -165,8 +165,11 @@ struct WorkaroundFlags
             uint32_t  waNsaCannotFollowWritelane : 1;
             uint32_t  waThrottleInMultiDwordNsa : 1;
             uint32_t  waSmemFollowedByVopc : 1;
+            uint32_t  waNggCullingNoEmptySubgroups : 1;
+            uint32_t  waShaderInstPrefetchFwd64 : 1;
+            uint32_t  waWarFpAtomicDenormHazard : 1;
             uint32_t  placeholder1 : 2;
-            uint32_t  reserved : 17;
+            uint32_t  reserved : 14;
         };
         uint32_t u32All;
     } gfx10;

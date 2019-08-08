@@ -92,8 +92,8 @@ public:
         return regionStart;
     }
 
-    llvm::Value* ReadValueFromLds(llvm::Type* pReadTy, llvm::Value* pLdsOffset);
-    void WriteValueToLds(llvm::Value* pWriteValue, llvm::Value* pLdsOffset);
+    llvm::Value* ReadValueFromLds(llvm::Type* pReadTy, llvm::Value* pLdsOffset, bool useDs128 = false);
+    void WriteValueToLds(llvm::Value* pWriteValue, llvm::Value* pLdsOffset, bool useDs128 = false);
 
     void AtomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value* pAtomicValue, llvm::Value* pLdsOffset);
 
