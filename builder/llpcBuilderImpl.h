@@ -35,12 +35,14 @@
 namespace Llpc
 {
 
+using namespace llvm;
+
 // =====================================================================================================================
 // Builder implementation base class
 class BuilderImplBase : public Builder
 {
 public:
-    BuilderImplBase(llvm::LLVMContext& context) : Builder(context) {}
+    BuilderImplBase(LLVMContext& context) : Builder(context) {}
 
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
@@ -58,12 +60,12 @@ protected:
 #endif
 
     // Create an "if..endif" or "if..else..endif" structure.
-    llvm::BranchInst* CreateIf(llvm::Value* pCondition, bool wantElse, const llvm::Twine& instName);
+    BranchInst* CreateIf(Value* pCondition, bool wantElse, const Twine& instName);
 
     // Create a waterfall loop containing the specified instruction.
-    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
-                                           llvm::ArrayRef<uint32_t> operandIdxs,
-                                           const llvm::Twine&       instName = "");
+    Instruction* CreateWaterfallLoop(Instruction*       pNonUniformInst,
+                                     ArrayRef<uint32_t> operandIdxs,
+                                     const Twine&       instName = "");
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
@@ -75,59 +77,59 @@ private:
 class BuilderImplDesc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplDesc(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplDesc(LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create a load of a buffer descriptor.
-    llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
-                                      uint32_t            binding,
-                                      llvm::Value*        pDescIndex,
-                                      bool                isNonUniform,
-                                      llvm::Type*         pPointeeTy,
-                                      const llvm::Twine&  instName) override final;
+    Value* CreateLoadBufferDesc(uint32_t      descSet,
+                                uint32_t      binding,
+                                Value*        pDescIndex,
+                                bool          isNonUniform,
+                                Type*         pPointeeTy,
+                                const Twine&  instName) override final;
 
     // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
-    llvm::Value* CreateIndexDescPtr(llvm::Value*        pDescPtr,
-                                    llvm::Value*        pIndex,
-                                    bool                isNonUniform,
-                                    const llvm::Twine&  instName) override final;
+    Value* CreateIndexDescPtr(Value*        pDescPtr,
+                              Value*        pIndex,
+                              bool          isNonUniform,
+                              const Twine&  instName) override final;
 
     // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
-    llvm::Value* CreateLoadDescFromPtr(llvm::Value*        pDescPtr,
-                                       const llvm::Twine&  instName) override final;
+    Value* CreateLoadDescFromPtr(Value*        pDescPtr,
+                                 const Twine&  instName) override final;
 
     // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
-    llvm::Value* CreateGetSamplerDescPtr(uint32_t            descSet,
-                                         uint32_t            binding,
-                                         const llvm::Twine&  instName) override final;
+    Value* CreateGetSamplerDescPtr(uint32_t      descSet,
+                                   uint32_t      binding,
+                                   const Twine&  instName) override final;
 
     // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
-    llvm::Value* CreateGetImageDescPtr(uint32_t            descSet,
-                                       uint32_t            binding,
-                                       const llvm::Twine&  instName) override final;
+    Value* CreateGetImageDescPtr(uint32_t      descSet,
+                                 uint32_t      binding,
+                                 const Twine&  instName) override final;
 
     // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
-    llvm::Value* CreateGetTexelBufferDescPtr(uint32_t            descSet,
-                                             uint32_t            binding,
-                                             const llvm::Twine&  instName) override final;
+    Value* CreateGetTexelBufferDescPtr(uint32_t      descSet,
+                                       uint32_t      binding,
+                                       const Twine&  instName) override final;
 
     // Create a pointer to F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
-    llvm::Value* CreateGetFmaskDescPtr(uint32_t            descSet,
-                                       uint32_t            binding,
-                                       const llvm::Twine&  instName) override final;
+    Value* CreateGetFmaskDescPtr(uint32_t      descSet,
+                                 uint32_t      binding,
+                                 const Twine&  instName) override final;
 
     // Create a load of the push constants pointer.
-    llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,
-                                            const llvm::Twine&  instName) override final;
+    Value* CreateLoadPushConstantsPtr(Type*         pPushConstantsTy,
+                                      const Twine&  instName) override final;
 
     // Create a buffer length query based on the specified descriptor.
-    llvm::Value* CreateGetBufferDescLength(llvm::Value* const pBufferDesc,
-                                           const llvm::Twine& instName = "") override final;
+    Value* CreateGetBufferDescLength(Value* const pBufferDesc,
+                                     const Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplDesc)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplDesc)
 
-    llvm::Value* ScalarizeIfUniform(llvm::Value* pValue, bool isNonUniform);
+    Value* ScalarizeIfUniform(Value* pValue, bool isNonUniform);
 };
 
 // =====================================================================================================================
@@ -135,137 +137,137 @@ private:
 class BuilderImplImage : virtual public BuilderImplBase
 {
 public:
-    BuilderImplImage(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplImage(LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create an image load.
-    llvm::Value* CreateImageLoad(llvm::Type*             pResultTy,
-                                 uint32_t                dim,
-                                 uint32_t                flags,
-                                 llvm::Value*            pImageDesc,
-                                 llvm::Value*            pCoord,
-                                 llvm::Value*            pMipLevel,
-                                 const llvm::Twine&      instName = "") override final;
+    Value* CreateImageLoad(Type*             pResultTy,
+                           uint32_t          dim,
+                           uint32_t          flags,
+                           Value*            pImageDesc,
+                           Value*            pCoord,
+                           Value*            pMipLevel,
+                           const Twine&      instName = "") override final;
 
     // Create an image load with F-mask.
-    llvm::Value* CreateImageLoadWithFmask(llvm::Type*             pResultTy,
-                                          uint32_t                dim,
-                                          uint32_t                flags,
-                                          llvm::Value*            pImageDesc,
-                                          llvm::Value*            pFmaskDesc,
-                                          llvm::Value*            pCoord,
-                                          llvm::Value*            pSampleNum,
-                                          const llvm::Twine&      instName = "") override final;
+    Value* CreateImageLoadWithFmask(Type*             pResultTy,
+                                    uint32_t          dim,
+                                    uint32_t          flags,
+                                    Value*            pImageDesc,
+                                    Value*            pFmaskDesc,
+                                    Value*            pCoord,
+                                    Value*            pSampleNum,
+                                    const Twine&      instName = "") override final;
 
     // Create an image store.
-    llvm::Value* CreateImageStore(uint32_t               dim,
-                                  uint32_t               flags,
-                                  llvm::Value*           pImageDesc,
-                                  llvm::Value*           pCoord,
-                                  llvm::Value*           pMipLevel,
-                                  llvm::Value*           pTexel,
-                                  const llvm::Twine&     instName = "") override final;
+    Value* CreateImageStore(uint32_t         dim,
+                            uint32_t         flags,
+                            Value*           pImageDesc,
+                            Value*           pCoord,
+                            Value*           pMipLevel,
+                            Value*           pTexel,
+                            const Twine&     instName = "") override final;
 
     // Create an image sample.
-    llvm::Value* CreateImageSample(llvm::Type*                   pResultTy,
-                                   uint32_t                      dim,
-                                   uint32_t                      flags,
-                                   llvm::Value*                  pImageDesc,
-                                   llvm::Value*                  pSamplerDesc,
-                                   llvm::ArrayRef<llvm::Value*>  address,
-                                   const llvm::Twine&            instName = "") override final;
+    Value* CreateImageSample(Type*             pResultTy,
+                             uint32_t          dim,
+                             uint32_t          flags,
+                             Value*            pImageDesc,
+                             Value*            pSamplerDesc,
+                             ArrayRef<Value*>  address,
+                             const Twine&      instName = "") override final;
 
     // Create an image gather
-    llvm::Value* CreateImageGather(llvm::Type*                   pResultTy,
-                                   uint32_t                      dim,
-                                   uint32_t                      flags,
-                                   llvm::Value*                  pImageDesc,
-                                   llvm::Value*                  pSamplerDesc,
-                                   llvm::ArrayRef<llvm::Value*>  address,
-                                   const llvm::Twine&            instName = "") override final;
+    Value* CreateImageGather(Type*             pResultTy,
+                             uint32_t          dim,
+                             uint32_t          flags,
+                             Value*            pImageDesc,
+                             Value*            pSamplerDesc,
+                             ArrayRef<Value*>  address,
+                             const Twine&      instName = "") override final;
 
     // Create an image atomic operation other than compare-and-swap.
-    llvm::Value* CreateImageAtomic(uint32_t               atomicOp,
-                                   uint32_t               dim,
-                                   uint32_t               flags,
-                                   llvm::AtomicOrdering   ordering,
-                                   llvm::Value*           pImageDesc,
-                                   llvm::Value*           pCoord,
-                                   llvm::Value*           pInputValue,
-                                   const llvm::Twine&     instName = "") override final;
+    Value* CreateImageAtomic(uint32_t         atomicOp,
+                             uint32_t         dim,
+                             uint32_t         flags,
+                             AtomicOrdering   ordering,
+                             Value*           pImageDesc,
+                             Value*           pCoord,
+                             Value*           pInputValue,
+                             const Twine&     instName = "") override final;
 
     // Create an image atomic compare-and-swap.
-    llvm::Value* CreateImageAtomicCompareSwap(uint32_t              dim,
-                                              uint32_t              flags,
-                                              llvm::AtomicOrdering  ordering,
-                                              llvm::Value*          pImageDesc,
-                                              llvm::Value*          pCoord,
-                                              llvm::Value*          pInputValue,
-                                              llvm::Value*          pComparatorValue,
-                                              const llvm::Twine&    instName = "") override final;
+    Value* CreateImageAtomicCompareSwap(uint32_t        dim,
+                                        uint32_t        flags,
+                                        AtomicOrdering  ordering,
+                                        Value*          pImageDesc,
+                                        Value*          pCoord,
+                                        Value*          pInputValue,
+                                        Value*          pComparatorValue,
+                                        const Twine&    instName = "") override final;
 
     // Create a query of the number of mipmap levels in an image. Returns an i32 value.
-    llvm::Value* CreateImageQueryLevels(uint32_t                      dim,
-                                        uint32_t                      flags,
-                                        llvm::Value*                  pImageDesc,
-                                        const llvm::Twine&            instName = "") override final;
+    Value* CreateImageQueryLevels(uint32_t                dim,
+                                  uint32_t                flags,
+                                  Value*                  pImageDesc,
+                                  const Twine&            instName = "") override final;
 
     // Create a query of the number of samples in an image. Returns an i32 value.
-    llvm::Value* CreateImageQuerySamples(uint32_t                      dim,
-                                         uint32_t                      flags,
-                                         llvm::Value*                  pImageDesc,
-                                         const llvm::Twine&            instName = "") override final;
+    Value* CreateImageQuerySamples(uint32_t                dim,
+                                   uint32_t                flags,
+                                   Value*                  pImageDesc,
+                                   const Twine&            instName = "") override final;
 
     // Create a query of size of an image at the specified LOD
-    llvm::Value* CreateImageQuerySize(uint32_t                dim,
-                                      uint32_t                flags,
-                                      llvm::Value*            pImageDesc,
-                                      llvm::Value*            pLod,
-                                      const llvm::Twine&      instName = "") override final;
+    Value* CreateImageQuerySize(uint32_t          dim,
+                                uint32_t          flags,
+                                Value*            pImageDesc,
+                                Value*            pLod,
+                                const Twine&      instName = "") override final;
 
     // Create a get of the LOD that would be used for an image sample with the given coordinates
     // and implicit LOD.
-    llvm::Value* CreateImageGetLod(uint32_t                dim,
-                                   uint32_t                flags,
-                                   llvm::Value*            pImageDesc,
-                                   llvm::Value*            pSamplerDesc,
-                                   llvm::Value*            pCoord,
-                                   const llvm::Twine&      instName = "") override final;
+    Value* CreateImageGetLod(uint32_t          dim,
+                             uint32_t          flags,
+                             Value*            pImageDesc,
+                             Value*            pSamplerDesc,
+                             Value*            pCoord,
+                             const Twine&      instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplImage)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplImage)
 
     // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
-    llvm::Value* PreprocessIntegerImageGather(uint32_t dim, llvm::Value*& pImageDesc, llvm::Value*& pCoord);
+    Value* PreprocessIntegerImageGather(uint32_t dim, Value*& pImageDesc, Value*& pCoord);
 
     // Implement pre-GFX9 integer gather workaround to modify result.
-    llvm::Value* PostprocessIntegerImageGather(llvm::Value*  pNeedDescPatch,
-                                               uint32_t      flags,
-                                               llvm::Value*  pImageDesc,
-                                               llvm::Type*   pTexelTy,
-                                               llvm::Value*  pResult);
+    Value* PostprocessIntegerImageGather(Value*   pNeedDescPatch,
+                                         uint32_t flags,
+                                         Value*   pImageDesc,
+                                         Type*    pTexelTy,
+                                         Value*   pResult);
 
     // Common code to create an image sample or gather.
-    llvm::Value* CreateImageSampleGather(llvm::Type*                  pResultTy,
-                                         uint32_t                     dim,
-                                         uint32_t                     flags,
-                                         llvm::Value*                 pCoord,
-                                         llvm::Value*                 pImageDesc,
-                                         llvm::Value*                 pSamplerDesc,
-                                         llvm::ArrayRef<llvm::Value*> address,
-                                         const llvm::Twine&           instName,
-                                         bool                         isSample);
+    Value* CreateImageSampleGather(Type*            pResultTy,
+                                   uint32_t         dim,
+                                   uint32_t         flags,
+                                   Value*           pCoord,
+                                   Value*           pImageDesc,
+                                   Value*           pSamplerDesc,
+                                   ArrayRef<Value*> address,
+                                   const Twine&     instName,
+                                   bool             isSample);
 
     // Common code for CreateImageAtomic and CreateImageAtomicCompareSwap
-    llvm::Value* CreateImageAtomicCommon(uint32_t                atomicOp,
-                                         uint32_t                dim,
-                                         uint32_t                flags,
-                                         llvm::AtomicOrdering    ordering,
-                                         llvm::Value*            pImageDesc,
-                                         llvm::Value*            pCoord,
-                                         llvm::Value*            pInputValue,
-                                         llvm::Value*            pComparatorValue,
-                                         const llvm::Twine&      instName);
+    Value* CreateImageAtomicCommon(uint32_t          atomicOp,
+                                   uint32_t          dim,
+                                   uint32_t          flags,
+                                   AtomicOrdering    ordering,
+                                   Value*            pImageDesc,
+                                   Value*            pCoord,
+                                   Value*            pInputValue,
+                                   Value*            pComparatorValue,
+                                   const Twine&      instName);
 
     // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
     uint32_t Change1DTo2DIfNeeded(uint32_t dim);
@@ -273,22 +275,22 @@ private:
     // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
     // modifying if necessary.
     // Returns possibly modified image dimension.
-    uint32_t PrepareCoordinate(uint32_t                              dim,
-                               llvm::Value*                          pCoord,
-                               llvm::Value*                          pProjective,
-                               llvm::Value*                          pDerivativeX,
-                               llvm::Value*                          pDerivativeY,
-                               llvm::SmallVectorImpl<llvm::Value*>&  outCoords,
-                               llvm::SmallVectorImpl<llvm::Value*>&  outDerivatives);
+    uint32_t PrepareCoordinate(uint32_t                  dim,
+                               Value*                    pCoord,
+                               Value*                    pProjective,
+                               Value*                    pDerivativeX,
+                               Value*                    pDerivativeY,
+                               SmallVectorImpl<Value*>&  outCoords,
+                               SmallVectorImpl<Value*>&  outDerivatives);
 
     // For a cubearray with integer coordinates, combine the face and slice into a single component.
-    void CombineCubeArrayFaceAndSlice(llvm::Value* pCoord, llvm::SmallVectorImpl<llvm::Value*>& coords);
+    void CombineCubeArrayFaceAndSlice(Value* pCoord, SmallVectorImpl<Value*>& coords);
 
     // Patch descriptor with cube dimension for image call
-    llvm::Value* PatchCubeDescriptor(llvm::Value* pDesc, uint32_t dim);
+    Value* PatchCubeDescriptor(Value* pDesc, uint32_t dim);
 
     // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
-    llvm::Value* HandleFragCoordViewIndex(llvm::Value* pCoord, uint32_t flags);
+    Value* HandleFragCoordViewIndex(Value* pCoord, uint32_t flags);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -307,11 +309,11 @@ private:
 class BuilderImplMatrix : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMatrix(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplMatrix(LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create a matrix transpose.
-    llvm::Value* CreateTransposeMatrix(llvm::Value* const pMatrix,
-                                       const llvm::Twine& instName = "") override final;
+    Value* CreateTransposeMatrix(Value* const pMatrix,
+                                 const Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMatrix)
@@ -323,13 +325,13 @@ private:
 class BuilderImplMisc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMisc(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplMisc(LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create a "kill". Only allowed in a fragment shader.
-    llvm::Instruction* CreateKill(const llvm::Twine& instName) override final;
+    Instruction* CreateKill(const Twine& instName) override final;
 
     // Create a "readclock".
-    llvm::Instruction* CreateReadClock(bool realtime, const llvm::Twine& instName) override final;
+    Instruction* CreateReadClock(bool realtime, const Twine& instName) override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMisc)
@@ -341,145 +343,145 @@ private:
 class BuilderImplSubgroup : virtual public BuilderImplBase
 {
 public:
-    BuilderImplSubgroup(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplSubgroup(LLVMContext& context) : BuilderImplBase(context) {}
 
     // Create a get subgroup size query.
-    llvm::Value* CreateGetSubgroupSize(const llvm::Twine& instName) override final;
+    Value* CreateGetSubgroupSize(const Twine& instName) override final;
 
     // Create a subgroup elect.
-    llvm::Value* CreateSubgroupElect(const llvm::Twine& instName) override final;
+    Value* CreateSubgroupElect(const Twine& instName) override final;
 
     // Create a subgroup all.
-    llvm::Value* CreateSubgroupAll(llvm::Value* const pValue,
-                                   bool               wqm,
-                                   const llvm::Twine& instName) override final;
+    Value* CreateSubgroupAll(Value* const pValue,
+                             bool         wqm,
+                             const Twine& instName) override final;
 
     // Create a subgroup any
-    llvm::Value* CreateSubgroupAny(llvm::Value* const pValue,
-                                   bool               wqm,
-                                   const llvm::Twine& instName) override final;
+    Value* CreateSubgroupAny(Value* const pValue,
+                             bool         wqm,
+                             const Twine& instName) override final;
 
     // Create a subgroup all equal.
-    llvm::Value* CreateSubgroupAllEqual(llvm::Value* const pValue,
-                                        bool               wqm,
-                                        const llvm::Twine& instName) override final;
+    Value* CreateSubgroupAllEqual(Value* const pValue,
+                                  bool         wqm,
+                                  const Twine& instName) override final;
 
     // Create a subgroup broadcast.
-    llvm::Value* CreateSubgroupBroadcast(llvm::Value* const pValue,
-                                         llvm::Value* const pIndex,
-                                         const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBroadcast(Value* const pValue,
+                                   Value* const pIndex,
+                                   const Twine& instName) override final;
 
     // Create a subgroup broadcast first.
-    llvm::Value* CreateSubgroupBroadcastFirst(llvm::Value* const pValue,
-                                              const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBroadcastFirst(Value* const pValue,
+                                        const Twine& instName) override final;
 
     // Create a subgroup ballot.
-    llvm::Value* CreateSubgroupBallot(llvm::Value* const pValue,
-                                      const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallot(Value* const pValue,
+                                const Twine& instName) override final;
 
     // Create a subgroup inverse ballot.
-    llvm::Value* CreateSubgroupInverseBallot(llvm::Value* const pValue,
-                                             const llvm::Twine& instName) override final;
+    Value* CreateSubgroupInverseBallot(Value* const pValue,
+                                       const Twine& instName) override final;
 
     // Create a subgroup ballot bit extract.
-    llvm::Value* CreateSubgroupBallotBitExtract(llvm::Value* const pValue,
-                                                llvm::Value* const pIndex,
-                                                const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallotBitExtract(Value* const pValue,
+                                          Value* const pIndex,
+                                          const Twine& instName) override final;
 
     // Create a subgroup ballot bit count.
-    llvm::Value* CreateSubgroupBallotBitCount(llvm::Value* const pValue,
-                                              const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallotBitCount(Value* const pValue,
+                                        const Twine& instName) override final;
 
     // Create a subgroup ballot inclusive bit count.
-    llvm::Value* CreateSubgroupBallotInclusiveBitCount(llvm::Value* const pValue,
-                                                       const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallotInclusiveBitCount(Value* const pValue,
+                                                 const Twine& instName) override final;
 
     // Create a subgroup ballot exclusive bit count.
-    llvm::Value* CreateSubgroupBallotExclusiveBitCount(llvm::Value* const pValue,
-                                                       const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallotExclusiveBitCount(Value* const pValue,
+                                                 const Twine& instName) override final;
 
     // Create a subgroup ballot find least significant bit.
-    llvm::Value* CreateSubgroupBallotFindLsb(llvm::Value* const pValue,
-                                             const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallotFindLsb(Value* const pValue,
+                                       const Twine& instName) override final;
 
     // Create a subgroup ballot find most significant bit.
-    llvm::Value* CreateSubgroupBallotFindMsb(llvm::Value* const pValue,
-                                             const llvm::Twine& instName) override final;
+    Value* CreateSubgroupBallotFindMsb(Value* const pValue,
+                                       const Twine& instName) override final;
 
     // Create a subgroup shuffle.
-    llvm::Value* CreateSubgroupShuffle(llvm::Value* const pValue,
-                                       llvm::Value* const pIndex,
-                                       const llvm::Twine& instName) override final;
+    Value* CreateSubgroupShuffle(Value* const pValue,
+                                 Value* const pIndex,
+                                 const Twine& instName) override final;
 
     // Create a subgroup shuffle xor.
-    llvm::Value* CreateSubgroupShuffleXor(llvm::Value* const pValue,
-                                          llvm::Value* const pMask,
-                                          const llvm::Twine& instName) override final;
+    Value* CreateSubgroupShuffleXor(Value* const pValue,
+                                    Value* const pMask,
+                                    const Twine& instName) override final;
 
     // Create a subgroup shuffle up.
-    llvm::Value* CreateSubgroupShuffleUp(llvm::Value* const pValue,
-                                         llvm::Value* const pDelta,
-                                         const llvm::Twine& instName) override final;
+    Value* CreateSubgroupShuffleUp(Value* const pValue,
+                                   Value* const pDelta,
+                                   const Twine& instName) override final;
 
     // Create a subgroup shuffle down.
-    llvm::Value* CreateSubgroupShuffleDown(llvm::Value* const pValue,
-                                           llvm::Value* const pDelta,
-                                           const llvm::Twine& instName) override final;
+    Value* CreateSubgroupShuffleDown(Value* const pValue,
+                                     Value* const pDelta,
+                                     const Twine& instName) override final;
 
     // Create a subgroup clustered reduction.
-    llvm::Value* CreateSubgroupClusteredReduction(GroupArithOp       groupArithOp,
-                                                  llvm::Value* const pValue,
-                                                  llvm::Value* const pClusterSize,
-                                                  const llvm::Twine& instName) override final;
+    Value* CreateSubgroupClusteredReduction(GroupArithOp groupArithOp,
+                                            Value* const pValue,
+                                            Value* const pClusterSize,
+                                            const Twine& instName) override final;
 
     // Create a subgroup clustered inclusive scan.
-    llvm::Value* CreateSubgroupClusteredInclusive(GroupArithOp       groupArithOp,
-                                                  llvm::Value* const pValue,
-                                                  llvm::Value* const pClusterSize,
-                                                  const llvm::Twine& instName) override final;
+    Value* CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp,
+                                            Value* const pValue,
+                                            Value* const pClusterSize,
+                                            const Twine& instName) override final;
 
     // Create a subgroup clustered exclusive scan.
-    llvm::Value* CreateSubgroupClusteredExclusive(GroupArithOp       groupArithOp,
-                                                  llvm::Value* const pValue,
-                                                  llvm::Value* const pClusterSize,
-                                                  const llvm::Twine& instName) override final;
+    Value* CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp,
+                                            Value* const pValue,
+                                            Value* const pClusterSize,
+                                            const Twine& instName) override final;
 
     // Create a subgroup quad broadcast.
-    llvm::Value* CreateSubgroupQuadBroadcast(llvm::Value* const pValue,
-                                             llvm::Value* const pIndex,
-                                             const llvm::Twine& instName) override final;
+    Value* CreateSubgroupQuadBroadcast(Value* const pValue,
+                                       Value* const pIndex,
+                                       const Twine& instName) override final;
 
     // Create a subgroup quad swap horizontal.
-    llvm::Value* CreateSubgroupQuadSwapHorizontal(llvm::Value* const pValue,
-                                                  const llvm::Twine& instName) override final;
+    Value* CreateSubgroupQuadSwapHorizontal(Value* const pValue,
+                                            const Twine& instName) override final;
 
     // Create a subgroup quad swap vertical.
-    llvm::Value* CreateSubgroupQuadSwapVertical(llvm::Value* const pValue,
-                                                const llvm::Twine& instName) override final;
+    Value* CreateSubgroupQuadSwapVertical(Value* const pValue,
+                                          const Twine& instName) override final;
 
     // Create a subgroup quad swap diagonal.
-    llvm::Value* CreateSubgroupQuadSwapDiagonal(llvm::Value* const pValue,
-                                                const llvm::Twine& instName) override final;
+    Value* CreateSubgroupQuadSwapDiagonal(Value* const pValue,
+                                          const Twine& instName) override final;
 
     // Create a subgroup swizzle quad.
-    llvm::Value* CreateSubgroupSwizzleQuad(llvm::Value* const pValue,
-                                           llvm::Value* const pOffset,
-                                           const llvm::Twine& instName) override final;
+    Value* CreateSubgroupSwizzleQuad(Value* const pValue,
+                                     Value* const pOffset,
+                                     const Twine& instName) override final;
 
     // Create a subgroup swizzle masked.
-    llvm::Value* CreateSubgroupSwizzleMask(llvm::Value* const pValue,
-                                           llvm::Value* const pMask,
-                                           const llvm::Twine& instName) override final;
+    Value* CreateSubgroupSwizzleMask(Value* const pValue,
+                                     Value* const pMask,
+                                     const Twine& instName) override final;
 
     // Create a subgroup write invocation.
-    llvm::Value* CreateSubgroupWriteInvocation(llvm::Value* const pInputValue,
-                                               llvm::Value* const pWriteValue,
-                                               llvm::Value* const pIndex,
-                                               const llvm::Twine& instName) override final;
+    Value* CreateSubgroupWriteInvocation(Value* const pInputValue,
+                                         Value* const pWriteValue,
+                                         Value* const pIndex,
+                                         const Twine& instName) override final;
 
     // Create a subgroup mbcnt.
-    llvm::Value* CreateSubgroupMbcnt(llvm::Value* const pMask,
-                                     const llvm::Twine& instName) override final;
+    Value* CreateSubgroupMbcnt(Value* const pMask,
+                               const Twine& instName) override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplSubgroup)
@@ -508,50 +510,50 @@ private:
     };
 
     uint32_t GetShaderSubgroupSize();
-    llvm::Value* CreateGroupArithmeticIdentity(GroupArithOp      groupArithOp,
-                                               llvm::Type* const pType);
-    llvm::Value* CreateGroupArithmeticOperation(GroupArithOp       groupArithOp,
-                                                llvm::Value* const pX,
-                                                llvm::Value* const pY);
-    llvm::Value* CreateInlineAsmSideEffect(llvm::Value* const pValue);
-    llvm::Value* CreateDppMov(llvm::Value* const pValue,
-                              DppCtrl            dppCtrl,
-                              uint32_t           rowMask,
-                              uint32_t           bankMask,
-                              bool               boundCtrl);
-    llvm::Value* CreateDppUpdate(llvm::Value* const pOrigValue,
-                                 llvm::Value* const pUpdateValue,
-                                 DppCtrl            dppCtrl,
-                                 uint32_t           rowMask,
-                                 uint32_t           bankMask,
-                                 bool               boundCtrl);
+    Value* CreateGroupArithmeticIdentity(GroupArithOp   groupArithOp,
+                                         Type* const    pType);
+    Value* CreateGroupArithmeticOperation(GroupArithOp groupArithOp,
+                                          Value* const pX,
+                                          Value* const pY);
+    Value* CreateInlineAsmSideEffect(Value* const pValue);
+    Value* CreateDppMov(Value* const pValue,
+                        DppCtrl      dppCtrl,
+                        uint32_t     rowMask,
+                        uint32_t     bankMask,
+                        bool         boundCtrl);
+    Value* CreateDppUpdate(Value* const pOrigValue,
+                           Value* const pUpdateValue,
+                           DppCtrl      dppCtrl,
+                           uint32_t     rowMask,
+                           uint32_t     bankMask,
+                           bool         boundCtrl);
 
 #if LLPC_BUILD_GFX10
-    llvm::Value* CreatePermLane16(llvm::Value* const pOrigValue,
-                                  llvm::Value* const pUpdateValue,
-                                  uint32_t           selectBitsLow,
-                                  uint32_t           selectBitsHigh,
-                                  bool               fetchInactive,
-                                  bool               boundCtrl);
-    llvm::Value* CreatePermLaneX16(llvm::Value* const pOrigValue,
-                                   llvm::Value* const pUpdateValue,
-                                   uint32_t           selectBitsLow,
-                                   uint32_t           selectBitsHigh,
-                                   bool               fetchInactive,
-                                   bool               boundCtrl);
+    Value* CreatePermLane16(Value* const pOrigValue,
+                            Value* const pUpdateValue,
+                            uint32_t     selectBitsLow,
+                            uint32_t     selectBitsHigh,
+                            bool         fetchInactive,
+                            bool         boundCtrl);
+    Value* CreatePermLaneX16(Value* const pOrigValue,
+                             Value* const pUpdateValue,
+                             uint32_t     selectBitsLow,
+                             uint32_t     selectBitsHigh,
+                             bool         fetchInactive,
+                             bool         boundCtrl);
 #endif
 
-    llvm::Value* CreateDsSwizzle(llvm::Value* const pValue,
-                                 uint16_t           dsPattern);
-    llvm::Value* CreateWwm(llvm::Value* const pValue);
-    llvm::Value* CreateSetInactive(llvm::Value* const pActive,
-                                   llvm::Value* const pInactive);
-    llvm::Value* CreateThreadMask();
-    llvm::Value* CreateThreadMaskedSelect(
-        llvm::Value* const pThreadMask,
-        uint64_t           andMask,
-        llvm::Value* const pValue1,
-        llvm::Value* const pValue2);
+    Value* CreateDsSwizzle(Value* const pValue,
+                           uint16_t     dsPattern);
+    Value* CreateWwm(Value* const pValue);
+    Value* CreateSetInactive(Value* const pActive,
+                             Value* const pInactive);
+    Value* CreateThreadMask();
+    Value* CreateThreadMaskedSelect(
+        Value* const pThreadMask,
+        uint64_t     andMask,
+        Value* const pValue1,
+        Value* const pValue2);
     uint16_t GetDsSwizzleBitMode(uint8_t xorMask,
                                  uint8_t orMask,
                                  uint8_t andMask);
@@ -559,8 +561,7 @@ private:
                                   uint8_t lane1,
                                   uint8_t lane2,
                                   uint8_t lane3);
-    llvm::Value* CreateGroupBallot(
-        llvm::Value* const pValue);
+    Value* CreateGroupBallot(Value* const pValue);
 };
 
 // =====================================================================================================================
@@ -572,12 +573,12 @@ class BuilderImpl final : public BuilderImplDesc,
                                  BuilderImplSubgroup
 {
 public:
-    BuilderImpl(llvm::LLVMContext& context) : BuilderImplBase(context),
-                                              BuilderImplDesc(context),
-                                              BuilderImplImage(context),
-                                              BuilderImplMatrix(context),
-                                              BuilderImplMisc(context),
-                                              BuilderImplSubgroup(context)
+    BuilderImpl(LLVMContext& context) : BuilderImplBase(context),
+                                        BuilderImplDesc(context),
+                                        BuilderImplImage(context),
+                                        BuilderImplMatrix(context),
+                                        BuilderImplMisc(context),
+                                        BuilderImplSubgroup(context)
     {}
     ~BuilderImpl() {}
 
