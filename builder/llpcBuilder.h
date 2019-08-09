@@ -49,13 +49,15 @@ void initializeBuilderReplayerPass(PassRegistry&);
 namespace Llpc
 {
 
+using namespace llvm;
+
 class Context;
 class PipelineState;
 
 // =====================================================================================================================
 // Initialize the pass that gets created by a Builder
 inline static void InitializeBuilderPasses(
-    llvm::PassRegistry& passRegistry)   // Pass registry
+    PassRegistry& passRegistry)   // Pass registry
 {
     initializeBuilderReplayerPass(passRegistry);
 }
@@ -135,7 +137,7 @@ inline static void InitializeBuilderPasses(
 //      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
 //      module).
 //
-class Builder : public llvm::IRBuilder<>
+class Builder : public IRBuilder<>
 {
 public:
     // The group arithmetic operations the builder can consume.
@@ -160,18 +162,18 @@ public:
     virtual ~Builder();
 
     // Create the BuilderImpl. In this implementation, each Builder call writes its IR immediately.
-    static Builder* CreateBuilderImpl(llvm::LLVMContext& context);
+    static Builder* CreateBuilderImpl(LLVMContext& context);
 
     // Create the BuilderRecorder. In this implementation, each Builder call gets recorded (by inserting
     // an llpc.call.* call). The user then replays the Builder calls by running the pass created by
     // CreateBuilderReplayer. Setting wantReplay=false makes CreateBuilderReplayer return nullptr.
-    static Builder* CreateBuilderRecorder(llvm::LLVMContext& context, bool wantReplay);
+    static Builder* CreateBuilderRecorder(LLVMContext& context, bool wantReplay);
 
     // Create the BuilderImpl or BuilderRecorder, depending on -use-builder-recorder option
-    static Builder* Create(llvm::LLVMContext& context);
+    static Builder* Create(LLVMContext& context);
 
     // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
-    virtual llvm::ModulePass* CreateBuilderReplayer() { return nullptr; }
+    virtual ModulePass* CreateBuilderReplayer() { return nullptr; }
 
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.
@@ -182,8 +184,8 @@ public:
     // If using a BuilderImpl, this method must be called before any Create* methods.
     // If using a BuilderRecorder, it can be delayed until after linking.
     void SetUserDataNodes(
-        llvm::ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
-        llvm::ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
+        ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
+        ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
 
     // Set the current shader stage.
     void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
@@ -195,114 +197,114 @@ public:
     // Before calling this, each shader module needs to have one global function for the shader
     // entrypoint, then all other functions with internal linkage.
     // Returns the pipeline module, or nullptr on link failure.
-    virtual llvm::Module* Link(
-        llvm::ArrayRef<llvm::Module*> modules);     // Array of modules indexed by shader stage, with nullptr entry
+    virtual Module* Link(
+        ArrayRef<Module*> modules);     // Array of modules indexed by shader stage, with nullptr entry
                                                     //  for any stage not present in the pipeline
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
     // Get the type of pointer returned by CreateLoadBufferDesc.
-    llvm::PointerType* GetBufferDescTy(llvm::Type* pPointeeTy);
+    PointerType* GetBufferDescTy(Type* pPointeeTy);
 
     // Create a load of a buffer descriptor.
-    virtual llvm::Value* CreateLoadBufferDesc(
-        uint32_t            descSet,            // Descriptor set
-        uint32_t            binding,            // Descriptor binding
-        llvm::Value*        pDescIndex,         // [in] Descriptor index
-        bool                isNonUniform,       // Whether the descriptor index is non-uniform
-        llvm::Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateLoadBufferDesc(
+        uint32_t      descSet,            // Descriptor set
+        uint32_t      binding,            // Descriptor binding
+        Value*        pDescIndex,         // [in] Descriptor index
+        bool          isNonUniform,       // Whether the descriptor index is non-uniform
+        Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
-    virtual llvm::Value* CreateIndexDescPtr(
-        llvm::Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
-                                                //    the CreateGet*DescPtr methods
-        llvm::Value*        pIndex,             // [in] Index value
-        bool                isNonUniform,       // Whether the descriptor index is non-uniform
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateIndexDescPtr(
+        Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
+                                          //    the CreateGet*DescPtr methods
+        Value*        pIndex,             // [in] Index value
+        bool          isNonUniform,       // Whether the descriptor index is non-uniform
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Load image/sampler/texelbuffer/F-mask descriptor from pointer.
     // Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
-    virtual llvm::Value* CreateLoadDescFromPtr(
-        llvm::Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDesc or one of
-                                                //    the CreateGet*DescPtr methods
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateLoadDescFromPtr(
+        Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDesc or one of
+                                          //    the CreateGet*DescPtr methods
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Get the type of an image descriptor.
-    llvm::VectorType* GetImageDescTy();
+    VectorType* GetImageDescTy();
 
     // Get the type of an F-mask descriptor.
-    llvm::VectorType* GetFmaskDescTy();
+    VectorType* GetFmaskDescTy();
 
     // Get the type of a sampler descriptor.
-    llvm::VectorType* GetSamplerDescTy();
+    VectorType* GetSamplerDescTy();
 
     // Get the type of a texel buffer descriptor.
-    llvm::VectorType* GetTexelBufferDescTy();
+    VectorType* GetTexelBufferDescTy();
 
     // Get the type of pointer to image or F-mask descriptor, as returned by CreateGetImageDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
     // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
     // set up the stride, and CreateIndexDescPtr will use it.
-    llvm::Type* GetImageDescPtrTy();
+    Type* GetImageDescPtrTy();
 
     // Get the type of pointer to F-mask descriptor, as returned by CreateGetFmaskDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
     // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
     // set up the stride, and CreateIndexDescPtr will use it.
-    llvm::Type* GetFmaskDescPtrTy();
+    Type* GetFmaskDescPtrTy();
 
     // Get the type of pointer to texel buffer descriptor, as returned by CreateGetTexelBufferDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
     // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
     // set up the stride, and CreateIndexDescPtr will use it.
-    llvm::Type* GetTexelBufferDescPtrTy();
+    Type* GetTexelBufferDescPtrTy();
 
     // Get the type of pointer to sampler descriptor, as returned by CreateGetSamplerDescPtr.
     // The type is in fact a struct containing the actual pointer plus a stride in dwords.
     // Currently the stride is not set up or used by anything; in the future, CreateGet*DescPtr calls will
     // set up the stride, and CreateIndexDescPtr will use it.
-    llvm::Type* GetSamplerDescPtrTy();
+    Type* GetSamplerDescPtrTy();
 
     // Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
-    virtual llvm::Value* CreateGetSamplerDescPtr(
-        uint32_t            descSet,          // Descriptor set
-        uint32_t            binding,          // Descriptor binding
-        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    virtual Value* CreateGetSamplerDescPtr(
+        uint32_t      descSet,          // Descriptor set
+        uint32_t      binding,          // Descriptor binding
+        const Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
-    virtual llvm::Value* CreateGetImageDescPtr(
-        uint32_t            descSet,          // Descriptor set
-        uint32_t            binding,          // Descriptor binding
-        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    virtual Value* CreateGetImageDescPtr(
+        uint32_t      descSet,          // Descriptor set
+        uint32_t      binding,          // Descriptor binding
+        const Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
-    virtual llvm::Value* CreateGetTexelBufferDescPtr(
-        uint32_t            descSet,          // Descriptor set
-        uint32_t            binding,          // Descriptor binding
-        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    virtual Value* CreateGetTexelBufferDescPtr(
+        uint32_t      descSet,          // Descriptor set
+        uint32_t      binding,          // Descriptor binding
+        const Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
-    virtual llvm::Value* CreateGetFmaskDescPtr(
-        uint32_t            descSet,          // Descriptor set
-        uint32_t            binding,          // Descriptor binding
-        const llvm::Twine&  instName = ""     // [in] Name to give instruction(s)
+    virtual Value* CreateGetFmaskDescPtr(
+        uint32_t      descSet,          // Descriptor set
+        uint32_t      binding,          // Descriptor binding
+        const Twine&  instName = ""     // [in] Name to give instruction(s)
     ) = 0;
 
     // Create a load of the push constants pointer.
     // This returns a pointer to the ResourceMappingNodeType::PushConst resource in the top-level user data table.
-    virtual llvm::Value* CreateLoadPushConstantsPtr(
-        llvm::Type*         pPushConstantsTy,   // [in] Type that the returned pointer will point to
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateLoadPushConstantsPtr(
+        Type*         pPushConstantsTy,   // [in] Type that the returned pointer will point to
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a buffer length query based on the specified descriptor.
-    virtual llvm::Value* CreateGetBufferDescLength(
-        llvm::Value* const  pBufferDesc,        // [in] The buffer descriptor to query.
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateGetBufferDescLength(
+        Value* const  pBufferDesc,        // [in] The buffer descriptor to query.
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Image operations
@@ -420,14 +422,14 @@ public:
     };
 
     // Create an image load.
-    virtual llvm::Value* CreateImageLoad(
-        llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor.
-        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
-        llvm::Value*                  pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageLoad(
+        Type*                   pResultTy,          // [in] Result type
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor.
+        Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        Value*                  pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image load with fmask. Dim must be 2DMsaa or 2DArrayMsaa. If the F-mask descriptor has a valid
     // format field, then it reads "fmask_texel_R", the R component of the texel read from the given coordinates
@@ -435,26 +437,26 @@ public:
     // the least significant nibble) of fmask_texel_R. If the F-mask descriptor has an invalid format, then it
     // just uses the supplied sample number. The calculated sample is then appended to the supplied coordinates
     // for a normal image load.
-    virtual llvm::Value* CreateImageLoadWithFmask(
-        llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                      dim,                // Image dimension, 2DMsaa or 2DArrayMsaa
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor
-        llvm::Value*                  pFmaskDesc,         // [in] Fmask descriptor
-        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
-                                                          //    width for given dimension excluding sample
-        llvm::Value*                  pSampleNum,         // [in] Sample number, i32
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageLoadWithFmask(
+        Type*                   pResultTy,          // [in] Result type
+        uint32_t                dim,                // Image dimension, 2DMsaa or 2DArrayMsaa
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor
+        Value*                  pFmaskDesc,         // [in] Fmask descriptor
+        Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
+                                                    //    width for given dimension excluding sample
+        Value*                  pSampleNum,         // [in] Sample number, i32
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image store.
-    virtual llvm::Value* CreateImageStore(
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
-        llvm::Value*                  pMipLevel,          // [in] Mipmap level if doing store_mip, otherwise nullptr
-        llvm::Value*                  pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageStore(
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        Value*                  pMipLevel,          // [in] Mipmap level if doing store_mip, otherwise nullptr
+        Value*                  pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image sample.
     // The return type is specified by pResultTy as follows:
@@ -464,14 +466,14 @@ public:
     // * If the ZCompare address component is supplied, then the texel type is the scalar texel component
     //   type. Otherwise the texel type is a 4-vector of the texel component type.
     // * The texel component type is i32, f16 or f32.
-    virtual llvm::Value* CreateImageSample(
-        llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor
-        llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
-        llvm::ArrayRef<llvm::Value*>  address,            // Address and other arguments
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageSample(
+        Type*                   pResultTy,          // [in] Result type
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor
+        Value*                  pSamplerDesc,       // [in] Sampler descriptor
+        ArrayRef<Value*>        address,            // Address and other arguments
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image gather.
     // The return type is specified by pResultTy as follows:
@@ -479,98 +481,98 @@ public:
     //   texel type, and the second field is i32, where bit 0 is the TFE bit. Otherwise, the return type is the texel
     //   type.
     // * The texel type is a 4-vector of the texel component type, which is i32, f16 or f32.
-    virtual llvm::Value* CreateImageGather(
-        llvm::Type*                   pResultTy,          // [in] Result type
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor
-        llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
-        llvm::ArrayRef<llvm::Value*>  address,            // Address and other arguments
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageGather(
+        Type*                   pResultTy,          // [in] Result type
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor
+        Value*                  pSamplerDesc,       // [in] Sampler descriptor
+        ArrayRef<Value*>        address,            // Address and other arguments
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
     // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
     // Normally pImageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
     // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
     // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
-    virtual llvm::Value* CreateImageAtomic(
-        uint32_t                      atomicOp,           // Atomic op to create
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::AtomicOrdering          ordering,           // Atomic ordering
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
-        llvm::Value*                  pInputValue,        // [in] Input value: i32
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageAtomic(
+        uint32_t                atomicOp,           // Atomic op to create
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        AtomicOrdering          ordering,           // Atomic ordering
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        Value*                  pInputValue,        // [in] Input value: i32
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image atomic compare-and-swap.
     // Normally pImageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
     // creates an image atomic instruction. But pImageDesc can instead be a texel buffer descriptor, as
     // returned by CreateLoadTexelBufferDesc, in which case the method creates a buffer atomic instruction.
-    virtual llvm::Value* CreateImageAtomicCompareSwap(
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::AtomicOrdering          ordering,           // Atomic ordering
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
-        llvm::Value*                  pInputValue,        // [in] Input value: i32
-        llvm::Value*                  pComparatorValue,   // [in] Value to compare against: i32
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageAtomicCompareSwap(
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        AtomicOrdering          ordering,           // Atomic ordering
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
+        Value*                  pInputValue,        // [in] Input value: i32
+        Value*                  pComparatorValue,   // [in] Value to compare against: i32
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a query of the number of mipmap levels in an image. Returns an i32 value.
-    virtual llvm::Value* CreateImageQueryLevels(
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageQueryLevels(
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a query of the number of samples in an image. Returns an i32 value.
-    virtual llvm::Value* CreateImageQuerySamples(
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageQuerySamples(
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a query of size of an image at the specified LOD.
     // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
-    virtual llvm::Value* CreateImageQuerySize(
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
-        llvm::Value*                  pLod,               // [in] LOD
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageQuerySize(
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+        Value*                  pLod,               // [in] LOD
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a get of the LOD that would be used for an image sample with the given coordinates
     // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
     // detail relative to the base level.
-    virtual llvm::Value* CreateImageGetLod(
-        uint32_t                      dim,                // Image dimension
-        uint32_t                      flags,              // ImageFlag* flags
-        llvm::Value*                  pImageDesc,         // [in] Image descriptor
-        llvm::Value*                  pSamplerDesc,       // [in] Sampler descriptor
-        llvm::Value*                  pCoord,             // [in] Coordinates: scalar or vector f32, exactly right
-                                                          //    width without array layer
-        const llvm::Twine&            instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateImageGetLod(
+        uint32_t                dim,                // Image dimension
+        uint32_t                flags,              // ImageFlag* flags
+        Value*                  pImageDesc,         // [in] Image descriptor
+        Value*                  pSamplerDesc,       // [in] Sampler descriptor
+        Value*                  pCoord,             // [in] Coordinates: scalar or vector f32, exactly right
+                                                    //    width without array layer
+        const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Matrix operations
 
     // Create a matrix transpose.
-    virtual llvm::Value* CreateTransposeMatrix(
-        llvm::Value* const pMatrix,            // [in] The matrix to transpose
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateTransposeMatrix(
+        Value* const pMatrix,            // [in] The matrix to transpose
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations
 
     // Create a "kill". Only allowed in a fragment shader.
-    virtual llvm::Instruction* CreateKill(
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Instruction* CreateKill(
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a "readclock".
-    virtual llvm::Instruction* CreateReadClock(
-        bool                realtime,           // Whether to read real-time clock counter
-        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Instruction* CreateReadClock(
+        bool          realtime,           // Whether to read real-time clock counter
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
@@ -579,201 +581,201 @@ public:
     // Subgroup operations
 
     // Create a get subgroup size query.
-    virtual llvm::Value* CreateGetSubgroupSize(
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateGetSubgroupSize(
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup elect.
-    virtual llvm::Value* CreateSubgroupElect(
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupElect(
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup all.
-    virtual llvm::Value* CreateSubgroupAll(
-        llvm::Value* const pValue,             // [in] The value to compare
-        bool               wqm = false,        // Executed in WQM (whole quad mode)
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupAll(
+        Value* const pValue,             // [in] The value to compare
+        bool         wqm = false,        // Executed in WQM (whole quad mode)
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup any
-    virtual llvm::Value* CreateSubgroupAny(
-        llvm::Value* const pValue,             // [in] The value to compare
-        bool               wqm = false,        // Executed in WQM (whole quad mode)
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupAny(
+        Value* const pValue,             // [in] The value to compare
+        bool         wqm = false,        // Executed in WQM (whole quad mode)
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup all equal.
-    virtual llvm::Value* CreateSubgroupAllEqual(
-        llvm::Value* const pValue,             // [in] The value to compare
-        bool               wqm = false,        // Executed in WQM (whole quad mode)
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupAllEqual(
+        Value* const pValue,             // [in] The value to compare
+        bool         wqm = false,        // Executed in WQM (whole quad mode)
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup broadcast.
-    virtual llvm::Value* CreateSubgroupBroadcast(
-        llvm::Value* const pValue,             // [in] The value to broadcast
-        llvm::Value* const pIndex,             // [in] The index to broadcast from
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBroadcast(
+        Value* const pValue,             // [in] The value to broadcast
+        Value* const pIndex,             // [in] The index to broadcast from
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup broadcast first.
-    virtual llvm::Value* CreateSubgroupBroadcastFirst(
-        llvm::Value* const pValue,             // [in] The value to broadcast
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBroadcastFirst(
+        Value* const pValue,             // [in] The value to broadcast
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot.
-    virtual llvm::Value* CreateSubgroupBallot(
-        llvm::Value* const pValue,             // [in] The value to contribute
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallot(
+        Value* const pValue,             // [in] The value to contribute
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup inverse ballot.
-    virtual llvm::Value* CreateSubgroupInverseBallot(
-        llvm::Value* const pValue,             // [in] The ballot value
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupInverseBallot(
+        Value* const pValue,             // [in] The ballot value
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot bit extract.
-    virtual llvm::Value* CreateSubgroupBallotBitExtract(
-        llvm::Value* const pValue,             // [in] The ballot value
-        llvm::Value* const pIndex,             // [in] The index to extract from the ballot
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallotBitExtract(
+        Value* const pValue,             // [in] The ballot value
+        Value* const pIndex,             // [in] The index to extract from the ballot
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot bit count.
-    virtual llvm::Value* CreateSubgroupBallotBitCount(
-        llvm::Value* const pValue,             // [in] The ballot value
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallotBitCount(
+        Value* const pValue,             // [in] The ballot value
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot inclusive bit count.
-    virtual llvm::Value* CreateSubgroupBallotInclusiveBitCount(
-        llvm::Value* const pValue,             // [in] The ballot value
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallotInclusiveBitCount(
+        Value* const pValue,             // [in] The ballot value
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot exclusive bit count.
-    virtual llvm::Value* CreateSubgroupBallotExclusiveBitCount(
-        llvm::Value* const pValue,             // [in] The ballot value
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallotExclusiveBitCount(
+        Value* const pValue,             // [in] The ballot value
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot find least significant bit.
-    virtual llvm::Value* CreateSubgroupBallotFindLsb(
-        llvm::Value* const pValue,             // [in] The ballot value
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallotFindLsb(
+        Value* const pValue,             // [in] The ballot value
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup ballot find most significant bit.
-    virtual llvm::Value* CreateSubgroupBallotFindMsb(
-        llvm::Value* const pValue,             // [in] The ballot value
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupBallotFindMsb(
+        Value* const pValue,             // [in] The ballot value
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup shuffle.
-    virtual llvm::Value* CreateSubgroupShuffle(
-        llvm::Value* const pValue,             // [in] The value to shuffle
-        llvm::Value* const pIndex,             // [in] The index to shuffle from
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupShuffle(
+        Value* const pValue,             // [in] The value to shuffle
+        Value* const pIndex,             // [in] The index to shuffle from
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup shuffle xor.
-    virtual llvm::Value* CreateSubgroupShuffleXor(
-        llvm::Value* const pValue,             // [in] The value to shuffle
-        llvm::Value* const pMask,              // [in] The mask to shuffle with
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupShuffleXor(
+        Value* const pValue,             // [in] The value to shuffle
+        Value* const pMask,              // [in] The mask to shuffle with
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup shuffle up.
-    virtual llvm::Value* CreateSubgroupShuffleUp(
-        llvm::Value* const pValue,             // [in] The value to shuffle
-        llvm::Value* const pDelta,             // [in] The delta to shuffle up to
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupShuffleUp(
+        Value* const pValue,             // [in] The value to shuffle
+        Value* const pDelta,             // [in] The delta to shuffle up to
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup shuffle down.
-    virtual llvm::Value* CreateSubgroupShuffleDown(
-        llvm::Value* const pValue,             // [in] The value to shuffle
-        llvm::Value* const pDelta,             // [in] The delta to shuffle down to
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupShuffleDown(
+        Value* const pValue,             // [in] The value to shuffle
+        Value* const pDelta,             // [in] The delta to shuffle down to
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup clustered reduction.
-    virtual llvm::Value* CreateSubgroupClusteredReduction(
-        GroupArithOp       groupArithOp,       // The group arithmetic operation to perform
-        llvm::Value* const pValue,             // [in] The value to perform on
-        llvm::Value* const pClusterSize,       // [in] The cluster size
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupClusteredReduction(
+        GroupArithOp groupArithOp,       // The group arithmetic operation to perform
+        Value* const pValue,             // [in] The value to perform on
+        Value* const pClusterSize,       // [in] The cluster size
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup clustered inclusive scan.
-    virtual llvm::Value* CreateSubgroupClusteredInclusive(
-        GroupArithOp       groupArithOp,       // The group arithmetic operation to perform
-        llvm::Value* const pValue,             // [in] The value to perform on
-        llvm::Value* const pClusterSize,       // [in] The cluster size
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupClusteredInclusive(
+        GroupArithOp groupArithOp,       // The group arithmetic operation to perform
+        Value* const pValue,             // [in] The value to perform on
+        Value* const pClusterSize,       // [in] The cluster size
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup clustered exclusive scan.
-    virtual llvm::Value* CreateSubgroupClusteredExclusive(
-        GroupArithOp       groupArithOp,       // The group arithmetic operation to perform
-        llvm::Value* const pValue,             // [in] The value to perform on
-        llvm::Value* const pClusterSize,       // [in] The cluster size
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupClusteredExclusive(
+        GroupArithOp groupArithOp,       // The group arithmetic operation to perform
+        Value* const pValue,             // [in] The value to perform on
+        Value* const pClusterSize,       // [in] The cluster size
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup quad broadcast.
-    virtual llvm::Value* CreateSubgroupQuadBroadcast(
-        llvm::Value* const pValue,             // [in] The value to broadcast
-        llvm::Value* const pIndex,             // [in] the index within the quad to broadcast from
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupQuadBroadcast(
+        Value* const pValue,             // [in] The value to broadcast
+        Value* const pIndex,             // [in] the index within the quad to broadcast from
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup quad swap horizontal.
-    virtual llvm::Value* CreateSubgroupQuadSwapHorizontal(
-        llvm::Value* const pValue,             // [in] The value to swap
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupQuadSwapHorizontal(
+        Value* const pValue,             // [in] The value to swap
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup quad swap vertical.
-    virtual llvm::Value* CreateSubgroupQuadSwapVertical(
-        llvm::Value* const pValue,             // [in] The value to swap
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupQuadSwapVertical(
+        Value* const pValue,             // [in] The value to swap
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup quad swap diagonal.
-    virtual llvm::Value* CreateSubgroupQuadSwapDiagonal(
-        llvm::Value* const pValue,             // [in] The value to swap
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupQuadSwapDiagonal(
+        Value* const pValue,             // [in] The value to swap
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup swizzle quad.
-    virtual llvm::Value* CreateSubgroupSwizzleQuad(
-        llvm::Value* const pValue,             // [in] The value to swizzle.
-        llvm::Value* const pOffset,            // [in] The value to specify the swizzle offsets.
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupSwizzleQuad(
+        Value* const pValue,             // [in] The value to swizzle.
+        Value* const pOffset,            // [in] The value to specify the swizzle offsets.
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup swizzle masked.
-    virtual llvm::Value* CreateSubgroupSwizzleMask(
-        llvm::Value* const pValue,             // [in] The value to swizzle.
-        llvm::Value* const pMask,              // [in] The value to specify the swizzle masks.
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupSwizzleMask(
+        Value* const pValue,             // [in] The value to swizzle.
+        Value* const pMask,              // [in] The value to specify the swizzle masks.
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup write invocation.
-    virtual llvm::Value* CreateSubgroupWriteInvocation(
-        llvm::Value* const pInputValue,        // [in] The value to return for all but one invocations.
-        llvm::Value* const pWriteValue,        // [in] The value to return for one invocation.
-        llvm::Value* const pIndex,             // [in] The index of the invocation that gets the write value.
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupWriteInvocation(
+        Value* const pInputValue,        // [in] The value to return for all but one invocations.
+        Value* const pWriteValue,        // [in] The value to return for one invocation.
+        Value* const pIndex,             // [in] The index of the invocation that gets the write value.
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a subgroup mbcnt.
-    virtual llvm::Value* CreateSubgroupMbcnt(
-        llvm::Value* const pMask,              // [in] The mask to mbcnt with.
-        const llvm::Twine& instName = "") = 0; // [in] Name to give instruction(s)
+    virtual Value* CreateSubgroupMbcnt(
+        Value* const pMask,              // [in] The mask to mbcnt with.
+        const Twine& instName = "") = 0; // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
 
 protected:
-    Builder(llvm::LLVMContext& context);
+    Builder(LLVMContext& context);
 
     // -----------------------------------------------------------------------------------------------------------------
 
     ShaderStage     m_shaderStage     = ShaderStageInvalid; // Current shader stage being built.
     PipelineState*  m_pPipelineState  = nullptr;            // Pipeline state
 
-    llvm::Type* GetTransposedMatrixTy(
-        llvm::Type* const pMatrixType) const; // [in] The matrix type to tranpose
+    Type* GetTransposedMatrixTy(
+        Type* const pMatrixType) const; // [in] The matrix type to tranpose
 
-    typedef llvm::Value* (*PFN_MapToInt32Func)(Builder&                     builder,
-                                               llvm::ArrayRef<llvm::Value*> mappedArgs,
-                                               llvm::ArrayRef<llvm::Value*> passthroughArgs);
+    typedef Value* (*PFN_MapToInt32Func)(Builder&                     builder,
+                                               ArrayRef<Value*> mappedArgs,
+                                               ArrayRef<Value*> passthroughArgs);
 
     // Create a call that'll map the massage arguments to an i32 type (for functions that only take i32).
-    llvm::Value* CreateMapToInt32(
-        PFN_MapToInt32Func           pfnMapFunc,       // [in] Pointer to the function to call on each i32.
-        llvm::ArrayRef<llvm::Value*> mappedArgs,       // The arguments to massage into an i32 type.
-        llvm::ArrayRef<llvm::Value*> passthroughArgs); // The arguments to pass-through without massaging.
+    Value* CreateMapToInt32(
+        PFN_MapToInt32Func  pfnMapFunc,       // [in] Pointer to the function to call on each i32.
+        ArrayRef<Value*>    mappedArgs,       // The arguments to massage into an i32 type.
+        ArrayRef<Value*>    passthroughArgs); // The arguments to pass-through without massaging.
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)
 };
 
 // Create BuilderReplayer pass
-llvm::ModulePass* CreateBuilderReplayer(Builder* pBuilder);
+ModulePass* CreateBuilderReplayer(Builder* pBuilder);
 
 } // Llpc
