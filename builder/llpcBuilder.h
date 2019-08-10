@@ -374,7 +374,8 @@ public:
         ImageFlagNonUniformSampler = 0x10,  // Whether the sampler descriptor is non-uniform
         ImageFlagAddFragCoord = 0x20,       // Add FragCoord (converted to signed int) on to coordinate x,y.
                                             // Image load, store and atomic only.
-        ImageFlagUseViewIndex = 0x40,       // Use ViewIndex as coordinate z. Image load, store and atomic only.
+        ImageFlagCheckMultiView = 0x40,     // If pipeline state enables multiview, use ViewIndex as coordinate z.
+                                            // Otherwise, acts the same as ImageFlagAddFragCoord
     };
 
     // Address array indices for image sample and gather methods. Where an optional entry is missing (either

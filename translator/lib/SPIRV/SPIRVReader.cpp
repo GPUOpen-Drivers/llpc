@@ -6908,9 +6908,6 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
 
   if (ImageInfo->Desc->Dim == DimSubpassData) {
     // Modify coordinate for subpass data.
-    EnableMultiView &= reinterpret_cast<const GraphicsPipelineBuildInfo *>(
-                           m_pBuilder->getContext().GetPipelineBuildInfo())
-                           ->iaState.enableMultiView;
     if (!EnableMultiView) {
       // Subpass data without multiview: Add the x,y dimensions (converted to
       // signed int) of the fragment coordinate on to the texel coordate.
@@ -6918,11 +6915,8 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
     } else {
       // Subpass data with multiview: Use the fragment coordinate as x,y, and
       // use ViewIndex as z. We need to pass in a (0,0,0) coordinate.
-      ImageInfo->Dim = Llpc::Builder::Dim2DArray;
       ImageInfo->Flags |= Llpc::Builder::ImageFlagAddFragCoord |
-                          Llpc::Builder::ImageFlagUseViewIndex;
-      Coord =
-          Constant::getNullValue(VectorType::get(m_pBuilder->getInt32Ty(), 3));
+                          Llpc::Builder::ImageFlagCheckMultiView;
     }
   }
 

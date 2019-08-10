@@ -878,7 +878,7 @@ Value* BuilderImplImage::CreateImageLoad(
     getContext().GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
-    pCoord = HandleFragCoordViewIndex(pCoord, flags);
+    pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
     uint32_t dmask = 1;
     VectorType* pVectorResultTy = nullptr;
@@ -1032,7 +1032,7 @@ Value* BuilderImplImage::CreateImageStore(
     getContext().GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
-    pCoord = HandleFragCoordViewIndex(pCoord, flags);
+    pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
@@ -1628,7 +1628,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
 {
     getContext().GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
-    pCoord = HandleFragCoordViewIndex(pCoord, flags);
+    pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
     switch (ordering)
     {
@@ -2298,8 +2298,27 @@ Value* BuilderImplImage::PatchCubeDescriptor(
 // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
 Value* BuilderImplImage::HandleFragCoordViewIndex(
     Value*    pCoord,   // [in] Coordinate, scalar or vector i32
-    uint32_t  flags)    // Image flags
+    uint32_t  flags,    // Image flags
+    uint32_t& dim)      // [in,out] Image dimension
 {
+    bool useViewIndex = false;
+    if (flags & ImageFlagCheckMultiView)
+    {
+        auto enableMultiView = reinterpret_cast<const GraphicsPipelineBuildInfo *>(
+                               getContext().GetPipelineBuildInfo())->iaState.enableMultiView;
+        if (enableMultiView)
+        {
+            useViewIndex = true;
+            dim = Dim2DArray;
+            uint32_t coordCount = pCoord->getType()->getVectorNumElements();
+            if (coordCount < 3)
+            {
+                const static uint32_t Indexes[] = { 0, 1, 1 };
+                pCoord = CreateShuffleVector(pCoord, Constant::getNullValue(pCoord->getType()), Indexes);
+            }
+        }
+    }
+
     if (flags & ImageFlagAddFragCoord)
     {
         // Get FragCoord, convert to signed i32, and add its x,y to the coordinate.
@@ -2320,18 +2339,18 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         pFragCoord->setName("FragCoord");
         pFragCoord = CreateShuffleVector(pFragCoord, pFragCoord, { 0, 1 });
         pFragCoord = CreateFPToSI(pFragCoord, VectorType::get(getInt32Ty(), 2));
-        uint32_t coordWidth = pCoord->getType()->getVectorNumElements();
-        if (coordWidth > 2)
+        uint32_t coordCount = pCoord->getType()->getVectorNumElements();
+        if (coordCount > 2)
         {
             const static uint32_t Indexes[] = { 0, 1, 2, 3 };
             pFragCoord = CreateShuffleVector(pFragCoord,
                                              Constant::getNullValue(pFragCoord->getType()),
-                                             ArrayRef<uint32_t>(Indexes).slice(0, coordWidth));
+                                             ArrayRef<uint32_t>(Indexes).slice(0, coordCount));
         }
         pCoord = CreateAdd(pCoord, pFragCoord);
     }
 
-    if (flags & ImageFlagUseViewIndex)
+    if (useViewIndex)
     {
         // Get ViewIndex and use it as the z coordinate.
         // For now, this just generates a call to llpc.input.import.builtin. A future commit will

@@ -290,7 +290,7 @@ private:
     Value* PatchCubeDescriptor(Value* pDesc, uint32_t dim);
 
     // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
-    Value* HandleFragCoordViewIndex(Value* pCoord, uint32_t flags);
+    Value* HandleFragCoordViewIndex(Value* pCoord, uint32_t flags, uint32_t& dim);
 
     // -----------------------------------------------------------------------------------------------------------------
 
