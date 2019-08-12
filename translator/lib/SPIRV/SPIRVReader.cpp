@@ -49,6 +49,7 @@
 #include "SPIRVValue.h"
 
 #include "llpcBuilder.h"
+#include "llpcCompiler.h"
 #include "llpcContext.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -309,10 +310,11 @@ private:
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
-    const SPIRVSpecConstMap &TheSpecConstMap, Builder *pBuilder)
+    const SPIRVSpecConstMap &TheSpecConstMap, Builder *pBuilder, const void* pModuleData)
     :M(LLVMModule), m_pBuilder(pBuilder), BM(TheSPIRVModule), IsKernel(true),
     EnableXfb(false), EntryTarget(nullptr),
-    SpecConstMap(TheSpecConstMap), DbgTran(BM, M) {
+    SpecConstMap(TheSpecConstMap), DbgTran(BM, M),
+    ModuleData(reinterpret_cast<const ShaderModuleInfo*>(pModuleData)) {
     assert(M);
     Context = &M->getContext();
   }
@@ -343,6 +345,11 @@ public:
   Value *transAtomicRMW(SPIRVValue*, const AtomicRMWInst::BinOp);
   Constant* transInitializer(SPIRVValue*, Type*);
   template<spv::Op> Value *transValueWithOpcode(SPIRVValue*);
+  Value *transLoadImage(SPIRVValue *SpvImageLoadPtr);
+  Value *transImagePointer(SPIRVValue* SpvImagePtr);
+  Value *transOpAccessChainForImage(SPIRVAccessChainBase* SpvAccessChain);
+  Value *indexDescPtr(Value *Base, Value *Index, bool IsNonUniform,
+                      SPIRVType *SpvElementType);
   Value* transGroupArithOp(Builder::GroupArithOp, SPIRVValue*);
   Value *transDeviceEvent(SPIRVValue *BV, Function *F, BasicBlock *BB);
   Value *transEnqueuedBlock(SPIRVValue *BF, SPIRVValue *BC, SPIRVValue *BCSize,
@@ -374,8 +381,68 @@ public:
   Instruction *transOCLBuiltinFromInst(SPIRVInstruction *BI, BasicBlock *BB);
   Instruction *transSPIRVBuiltinFromInst(SPIRVInstruction *BI, BasicBlock *BB);
   Instruction *transOCLBarrierFence(SPIRVInstruction *BI, BasicBlock *BB);
-  Value       *transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB);
-  Instruction *transSPIRVFragmentMaskOpFromInst(SPIRVInstruction *BI, BasicBlock*BB);
+
+  // Struct used to pass information in and out of getImageDesc.
+  struct ExtractedImageInfo {
+    BasicBlock *BB;
+    const SPIRVTypeImageDescriptor *Desc;
+    unsigned Dim;   // Llpc::Builder dimension
+    unsigned Flags; // Llpc::Builder image call flags
+    Value *ImageDesc;
+    Value *FmaskDesc;
+    Value *SamplerDesc;
+  };
+
+  // Load image and/or sampler descriptors, and get information from the image
+  // type.
+  void getImageDesc(SPIRVValue *BImageInst, ExtractedImageInfo *Info);
+
+  // Set up address operand array for image sample/gather builder call.
+  void setupImageAddressOperands(SPIRVInstruction *BI, unsigned MaskIdx,
+                                 bool HasProj, MutableArrayRef<Value *> Addr,
+                                 ExtractedImageInfo *ImageInfo, Value **SampleNum);
+
+  // Handle fetch/read/write/atomic aspects of coordinate.
+  void handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
+                                      ExtractedImageInfo *ImageInfo,
+                                      MutableArrayRef<Value *> Addr,
+                                      bool EnableMultiView = true);
+
+  // Translate SPIR-V image atomic operations to LLVM function calls
+  Value *transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
+  // Translates SPIR-V fragment mask operations to LLVM function calls
+  Value *transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *BI,
+                                             BasicBlock *BB);
+  Value *transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
+                                         BasicBlock *BB);
+
+  // Translate image sample to LLVM IR
+  Value *transSPIRVImageSampleFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
+  // Translate image gather to LLVM IR
+  Value *transSPIRVImageGatherFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
+  // Translate image fetch/read to LLVM IR
+  Value *transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
+  // Translate image write to LLVM IR
+  Value *transSPIRVImageWriteFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
+  // Translate OpImageQueryLevels to LLVM IR
+  Value *transSPIRVImageQueryLevelsFromInst(SPIRVInstruction *BI,
+                                            BasicBlock *BB);
+
+  // Translate OpImageQuerySamples to LLVM IR
+  Value *transSPIRVImageQuerySamplesFromInst(SPIRVInstruction *BI,
+                                             BasicBlock *BB);
+
+  // Translate OpImageQuerySize/OpImageQuerySizeLod to LLVM IR
+  Value *transSPIRVImageQuerySizeFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
+  // Translate OpImageQueryLod to LLVM IR
+  Value *transSPIRVImageQueryLodFromInst(SPIRVInstruction *BI, BasicBlock *BB);
+
   void transOCLVectorLoadStore(std::string &UnmangledName,
                                std::vector<SPIRVWord> &BArgs);
   Value* createLaunderRowMajorMatrix(Value* const);
@@ -488,6 +555,7 @@ private:
   RemappedTypeElementsMap RemappedTypeElements;
   DenseMap<Type *, bool> TypesWithPadMap;
   DenseMap<std::pair<SPIRVType*, uint32_t>, Type *> OverlappingStructTypeWorkaroundMap;
+  const ShaderModuleInfo* ModuleData;
 
   Type *mapType(SPIRVType *BT, Type *T) {
     SPIRVDBG(dbgs() << *T << '\n';)
@@ -592,6 +660,7 @@ private:
 
   void setAttrByCalledFunc(CallInst *Call);
   Type *transFPType(SPIRVType *T);
+  void setFastMathFlags(Value *Inst, SPIRVValue *BV);
   BinaryOperator *transShiftLogicalBitwiseInst(SPIRVValue *BV, BasicBlock *BB,
                                                Function *F);
   Instruction *transCmpInst(SPIRVValue *BV, BasicBlock *BB, Function *F);
@@ -970,7 +1039,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 
 // =====================================================================================================================
 // Translate an "OpTypePointer". This contains special handling for pointers to bool, which we need to map separately
-// because boolean values in memory are represented as i32.
+// because boolean values in memory are represented as i32, and special handling for images and samplers.
 template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
     SPIRVType* const pSpvType,            // [in] The type.
     const uint32_t   matrixStride,        // The matrix stride (can be 0).
@@ -980,6 +1049,58 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
 {
     const SPIRVStorageClassKind storageClass = pSpvType->getPointerStorageClass();
 
+    // Handle image etc types first, if in UniformConstant memory.
+    if (storageClass == StorageClassUniformConstant)
+    {
+        auto pSpvElementType = pSpvType->getPointerElementType();
+        while ((pSpvElementType->getOpCode() == OpTypeArray) || (pSpvElementType->getOpCode() == OpTypeRuntimeArray))
+        {
+            // Pointer to array (or runtime array) of image/sampler/sampledimage has the same representation as
+            // a simple pointer to same image/sampler/sampledimage.
+            pSpvElementType = pSpvElementType->getArrayElementType();
+        }
+
+        switch (pSpvElementType->getOpCode())
+        {
+        case OpTypeImage:
+            {
+                if (static_cast<SPIRVTypeImage*>(pSpvElementType)->getDescriptor().MS)
+                {
+                    // Pointer to multisampled image is represented by a struct containing pointer to
+                    // normal image descriptor and pointer to fmask descriptor.
+                    return StructType::get(*Context,
+                                           { m_pBuilder->GetImageDescPtrTy(), m_pBuilder->GetFmaskDescPtrTy() });
+                }
+                if (static_cast<SPIRVTypeImage*>(pSpvElementType)->getDescriptor().Dim == DimBuffer)
+                {
+                    return m_pBuilder->GetTexelBufferDescPtrTy();
+                }
+                return m_pBuilder->GetImageDescPtrTy();
+            }
+        case OpTypeSampler:
+            {
+                return m_pBuilder->GetSamplerDescPtrTy();
+            }
+        case OpTypeSampledImage:
+            {
+                // Pointer to sampled image is represented by a struct containing pointer to image and pointer to
+                // sampler. But if the image is multisampled, then it itself is another struct, as above.
+                Type* pImagePtrTy = m_pBuilder->GetImageDescPtrTy();
+                if (static_cast<SPIRVTypeSampledImage*>(pSpvElementType)->getImageType()->getDescriptor().MS)
+                {
+                    pImagePtrTy = StructType::get(*Context,
+                                                  { m_pBuilder->GetImageDescPtrTy(), m_pBuilder->GetFmaskDescPtrTy() });
+                }
+                return StructType::get(*Context, { pImagePtrTy, m_pBuilder->GetSamplerDescPtrTy() });
+            }
+        default:
+            {
+                break;
+            }
+        }
+    }
+
+    // Now non-image-related handling.
     const bool isBufferBlockPointer = (storageClass == StorageClassStorageBuffer) ||
                                       (storageClass == StorageClassUniform) ||
                                       (storageClass == StorageClassPushConstant) ||
@@ -1020,9 +1141,9 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
 
     bool paddedArray = false;
 
-    if (isExplicitlyLaidOut)
+    if (isExplicitlyLaidOut && hasArrayStride)
     {
-        LLPC_ASSERT(hasArrayStride && (arrayStride >= storeSize));
+        LLPC_ASSERT(arrayStride >= storeSize);
 
         const uint32_t padding = static_cast<uint32_t>(arrayStride - storeSize);
 
@@ -1253,17 +1374,30 @@ Type *SPIRVToLLVM::transType(
     auto ST = static_cast<SPIRVTypeImage *>(T);
     if (ST->isOCLImage())
       return mapType(T, getOrCreateOpaquePtrType(M, transOCLImageTypeName(ST)));
-    else
-      return mapType(T, getOrCreateOpaquePtrType(M,
-          transGLSLImageTypeName(ST)));
-    return nullptr;
+    if (ST->getDescriptor().MS) {
+      // A multisampled image is represented by a struct containing both the
+      // image descriptor and the fmask descriptor.
+      return mapType(T,
+                     StructType::get(*Context, {m_pBuilder->GetImageDescTy(),
+                                                m_pBuilder->GetFmaskDescTy()}));
+    }
+    if (ST->getDescriptor().Dim == DimBuffer)
+    {
+        // A buffer image is represented by a texel buffer descriptor.
+        return mapType(T, m_pBuilder->GetTexelBufferDescTy());
+    }
+    // Otherwise, an image is represented by an image descriptor.
+    return mapType(T, m_pBuilder->GetImageDescTy());
   }
   case OpTypeSampler:
-    return mapType(T, Type::getInt32Ty(*Context));
+    return mapType(T, m_pBuilder->GetSamplerDescTy());
   case OpTypeSampledImage: {
-    auto ST = static_cast<SPIRVTypeSampledImage *>(T);
-    return mapType(
-        T, getOrCreateOpaquePtrType(M, transOCLSampledImageTypeName(ST)));
+    // A sampledimage is represented by a struct containing the image descriptor
+    // and the sampler descriptor.
+    auto SIT = static_cast<SPIRVTypeSampledImage *>(T);
+    return mapType(T,
+                   StructType::get(*Context, {transType(SIT->getImageType()),
+                                              m_pBuilder->GetSamplerDescTy()}));
   }
 
 #define HANDLE_OPCODE(op) case (op): {                                         \
@@ -1419,21 +1553,54 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   auto Temp = MDNode::getTemporary(*Context, None);
   auto Self = MDNode::get(*Context, Temp.get());
   Self->replaceOperandWith(0, Self);
-
+  std::vector<llvm::Metadata*> MDs;
   if (LM->getLoopControl() == LoopControlMaskNone) {
     BI->setMetadata("llvm.loop", Self);
     return;
-  } else if (LM->getLoopControl() == LoopControlUnrollMask)
+  } else if (LM->getLoopControl() == LoopControlUnrollMask) {
     Name = llvm::MDString::get(*Context, "llvm.loop.unroll.full");
-  else if (LM->getLoopControl() == LoopControlDontUnrollMask)
+    MDs.push_back(Name);
+  } else if (LM->getLoopControl() == LoopControlDontUnrollMask) {
     Name = llvm::MDString::get(*Context, "llvm.loop.unroll.disable");
-  else
+    MDs.push_back(Name);
+  }
+#if SPV_VERSION >= 0x10400
+  else if (LM->getLoopControl() & LoopControlPartialCountMask) {
+    Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
+    MDs.push_back(Name);
+
+    std::string partialCount = std::to_string(LM->getLoopControlParameters().at(0));
+    Name = llvm::MDString::get(*Context, partialCount.c_str());
+    MDs.push_back(Name);
+  }
+#endif
+
+  if (LM->getLoopControl() & LoopControlDependencyInfiniteMask
+    || (LM->getLoopControl() & LoopControlDependencyLengthMask)) {
+    // TODO: DependencyInfinite probably mapped to llvm.loop.parallel_accesses with llvm.access.group
+    // DependencyLength potentially useful but without llvm mappings
+    return;
+  }
+
+#if  SPV_VERSION >= 0x10400
+  if (LM->getLoopControl() & LoopControlIterationMultipleMask) {
+    // TODO: Potentially useful but without llvm mappings
+    return;
+  }
+  if ((LM->getLoopControl() & LoopControlMaxIterationsMask)
+    || (LM->getLoopControl() & LoopControlMinIterationsMask)
+    || (LM->getLoopControl() & LoopControlPeelCountMask)) {
+    // No LLVM mapping and not too important
+    return;
+  }
+#endif
+
+  if (MDs.empty())
     return;
 
-  std::vector<llvm::Metadata *> OpValues(1, Name);
   SmallVector<llvm::Metadata *, 2> Metadata;
   Metadata.push_back(llvm::MDNode::get(*Context, Self));
-  Metadata.push_back(llvm::MDNode::get(*Context, OpValues));
+  Metadata.push_back(llvm::MDNode::get(*Context, MDs));
 
   llvm::MDNode *Node = llvm::MDNode::get(*Context, Metadata);
   Node->replaceOperandWith(0, Node);
@@ -1528,6 +1695,32 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *BV, Function *F,
   }
 }
 
+// Decide whether to set fast math flags on Val, which is usually a newly create
+// instruction. Decorations on BV may prevent us from setting some flags.
+void SPIRVToLLVM::setFastMathFlags(Value *Val, SPIRVValue *BV) {
+  // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
+  // flags on the handled instruction
+  if (!SPIRVGenFastMath)
+    return;
+  if (!isa<FPMathOperator>(Val))
+    return;
+  if (Instruction *Inst = dyn_cast<Instruction>(Val)) {
+    llvm::FastMathFlags FMF;
+    FMF.setAllowReciprocal();
+    // Enable contraction when "NoContraction" decoration is not specified
+    bool AllowContract = !BV || !BV->hasDecorate(DecorationNoContraction);
+    FMF.setAllowContract(AllowContract);
+    // AllowRessociation should be same with AllowContract
+    FMF.setAllowReassoc(AllowContract);
+    // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
+    if (FpControlFlags.U32All == 0) {
+      FMF.setNoNaNs();
+      FMF.setNoSignedZeros(AllowContract);
+    }
+    Inst->setFastMathFlags(FMF);
+  }
+}
+
 BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
                                                           BasicBlock *BB,
                                                           Function *F) {
@@ -1555,24 +1748,8 @@ BinaryOperator *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *BV,
   }
 
   auto Inst = BinaryOperator::Create(BO, Base, Shift, BV->getName(), BB);
+  setFastMathFlags(Inst, BV);
 
-  // For floating-point operations, if "FastMath" is enabled, set the "FastMath"
-  // flags on the handled instruction
-  if (SPIRVGenFastMath && isa<FPMathOperator>(Inst)) {
-    llvm::FastMathFlags FMF;
-    FMF.setAllowReciprocal();
-    // Enable contraction when "NoContraction" decoration is not specified
-    bool AllowContract = !BV->hasDecorate(DecorationNoContraction);
-    FMF.setAllowContract(AllowContract);
-    // AllowRessociation should be same with AllowContract
-    FMF.setAllowReassoc(AllowContract);
-    // Enable "no NaN" and "no signed zeros" only if there isn't any floating point control flags
-    if (FpControlFlags.U32All == 0) {
-      FMF.setNoNaNs();
-      FMF.setNoSignedZeros(AllowContract);
-    }
-    Inst->setFastMathFlags(FMF);
-  }
   return Inst;
 }
 
@@ -2380,7 +2557,8 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
     Constant* const pZero = m_pBuilder->getInt32(0);
 
-    if (pLoadType->isStructTy())
+    if (pLoadType->isStructTy() && (pSpvType->getOpCode() != OpTypeSampledImage) &&
+        (pSpvType->getOpCode() != OpTypeImage))
     {
         // For structs we lookup the mapping of the elements and use it to reverse map the values.
         const bool needsPad = isRemappedTypeElements(pSpvType);
@@ -2559,7 +2737,8 @@ void SPIRVToLLVM::addStoreInstRecursively(
 
     Constant* const pZero = m_pBuilder->getInt32(0);
 
-    if (pStoreType->isStructTy())
+    if (pStoreType->isStructTy() && (pSpvType->getOpCode() != OpTypeSampledImage) &&
+        (pSpvType->getOpCode() != OpTypeImage))
     {
         // For structs we lookup the mapping of the elements and use it to map the values.
         const bool needsPad = isRemappedTypeElements(pSpvType);
@@ -2672,7 +2851,8 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
     Constant* const pZero = m_pBuilder->getInt32(0);
 
-    if (pStoreType->isStructTy())
+    if (pStoreType->isStructTy() && (pSpvType->getOpCode() != OpTypeSampledImage) &&
+        (pSpvType->getOpCode() != OpTypeImage))
     {
         // For structs we lookup the mapping of the elements and use it to map the values.
         const bool needsPad = isRemappedTypeElements(pSpvType);
@@ -2855,7 +3035,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     SPIRVAtomicLoad* const pSpvAtomicLoad = static_cast<SPIRVAtomicLoad*>(pSpvValue);
@@ -2885,7 +3066,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     SPIRVAtomicStore* const pSpvAtomicStore = static_cast<SPIRVAtomicStore*>(pSpvValue);
@@ -2919,7 +3101,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicExchange>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Xchg);
@@ -2933,7 +3116,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIAdd>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Add);
@@ -2947,7 +3131,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicISub>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Sub);
@@ -2961,7 +3146,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMin>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Min);
@@ -2975,7 +3161,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMin>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::UMin);
@@ -2989,7 +3176,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMax>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Max);
@@ -3003,7 +3191,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMax>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::UMax);
@@ -3017,7 +3206,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicAnd>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::And);
@@ -3031,7 +3221,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicOr>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Or);
@@ -3045,7 +3236,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicXor>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Xor);
@@ -3059,7 +3251,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     SPIRVAtomicInstBase* const pSpvAtomicInst = static_cast<SPIRVAtomicInstBase*>(pSpvValue);
@@ -3085,7 +3278,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     SPIRVAtomicInstBase* const pSpvAtomicInst = static_cast<SPIRVAtomicInstBase*>(pSpvValue);
@@ -3111,7 +3305,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     SPIRVAtomicInstBase* const pSpvAtomicInst = static_cast<SPIRVAtomicInstBase*>(pSpvValue);
@@ -3151,7 +3346,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchangeWeak>
     // Image texel atomic operations use the older path for now.
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
-        return transSPIRVImageOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue), m_pBuilder->GetInsertBlock());
+        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
+                                               m_pBuilder->GetInsertBlock());
     }
 
     return transValueWithOpcode<OpAtomicCompareExchange>(pSpvValue);
@@ -3164,7 +3360,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
 {
     SPIRVCopyMemory* const pSpvCopyMemory = static_cast<SPIRVCopyMemory*>(pSpvValue);
 
-    bool isSrcVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile();
+    bool isSrcVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile(true);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvCopyMemory->getSource()->getType()->getPointerStorageClass())
@@ -3179,7 +3375,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         break;
     }
 
-    bool isDestVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile();
+    bool isDestVolatile = pSpvCopyMemory->SPIRVMemoryAccess::isVolatile(false);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvCopyMemory->getTarget()->getType()->getPointerStorageClass())
@@ -3196,9 +3392,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
 
     bool isCoherent = false;
 
-    if (pSpvCopyMemory->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
+    if (pSpvCopyMemory->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask)
     {
-        SPIRVWord spvId = pSpvCopyMemory->getMakeVisisbleScope();
+        SPIRVWord spvId = pSpvCopyMemory->getMakeVisibleScope(true);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3210,9 +3406,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         }
     }
 
-    if (pSpvCopyMemory->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask)
+    if (pSpvCopyMemory->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask)
     {
-        SPIRVWord spvId = pSpvCopyMemory->getMakeAvailableScope();
+        SPIRVWord spvId = pSpvCopyMemory->getMakeAvailableScope(false);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3224,7 +3420,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
         }
     }
 
-    const bool isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal();
+    bool isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
 
     Value* const pLoadPointer = transValue(pSpvCopyMemory->getSource(),
                                            m_pBuilder->GetInsertBlock()->getParent(),
@@ -3243,6 +3439,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
                                             m_pBuilder->GetInsertBlock());
 
     SPIRVType* const pSpvStoreType = pSpvCopyMemory->getTarget()->getType();
+    isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
 
     addStoreInstRecursively(pSpvStoreType->getPointerElementType(),
                             pStorePointer,
@@ -3250,7 +3447,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
                             isDestVolatile,
                             isCoherent,
                             isNonTemporal);
-
     return nullptr;
 }
 
@@ -3261,7 +3457,21 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 {
     SPIRVLoad* const pSpvLoad = static_cast<SPIRVLoad*>(pSpvValue);
 
-    bool isVolatile = pSpvLoad->SPIRVMemoryAccess::isVolatile();
+    // Handle UniformConstant image/sampler/sampledimage load.
+    if (static_cast<SPIRVTypePointer*>(pSpvLoad->getSrc()->getType())->getStorageClass() == StorageClassUniformConstant)
+    {
+        switch (pSpvLoad->getType()->getOpCode())
+        {
+        case OpTypeImage:
+        case OpTypeSampler:
+        case OpTypeSampledImage:
+            return transLoadImage(pSpvLoad->getSrc());
+        default:
+            break;
+        }
+    }
+
+    bool isVolatile = pSpvLoad->SPIRVMemoryAccess::isVolatile(true);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvLoad->getSrc()->getType()->getPointerStorageClass())
@@ -3278,9 +3488,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 
     bool isCoherent = pSpvLoad->getSrc()->isCoherent();
 
-    if (pSpvLoad->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
+    // MakePointerVisibleKHR is valid with OpLoad
+    if (pSpvLoad->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask)
     {
-        SPIRVWord spvId = pSpvLoad->getMakeVisisbleScope();
+        SPIRVWord spvId = pSpvLoad->getMakeVisibleScope(true);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3292,21 +3503,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
         }
     }
 
-    if (pSpvLoad->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask)
-    {
-        SPIRVWord spvId = pSpvLoad->getMakeAvailableScope();
-        SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
-
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
-
-        if (isSystemScope)
-        {
-            isCoherent = true;
-        }
-    }
-
-    const bool isNonTemporal = pSpvLoad->SPIRVMemoryAccess::isNonTemporal();
+    const bool isNonTemporal = pSpvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
     Value* const pLoadPointer = transValue(pSpvLoad->getSrc(),
                                            m_pBuilder->GetInsertBlock()->getParent(),
@@ -3322,13 +3519,161 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 }
 
 // =====================================================================================================================
+// Translate a load for UniformConstant that is image/sampler/sampledimage
+Value* SPIRVToLLVM::transLoadImage(
+    SPIRVValue* pSpvImageLoadPtr)  // [in] The image/sampler/sampledimage pointer
+{
+    SPIRVType* pSpvLoadedType = pSpvImageLoadPtr->getType()->getPointerElementType();
+    Value* pBase = transImagePointer(pSpvImageLoadPtr);
+
+    // Load the sampler.
+    Value* pSampler = nullptr;
+    auto typeOpcode = pSpvLoadedType->getOpCode();
+    if (typeOpcode != OpTypeImage)
+    {
+        Value* pSamplerPtr = pBase;
+        if (typeOpcode == OpTypeSampledImage)
+        {
+            pSamplerPtr = m_pBuilder->CreateExtractValue(pBase, 1);
+        }
+        pSampler = m_pBuilder->CreateLoadDescFromPtr(pSamplerPtr);
+    }
+
+    // Load the image.
+    Value* pImage = nullptr;
+    if (typeOpcode != OpTypeSampler)
+    {
+        bool multisampled = false;
+        Value* pImagePtr = pBase;
+        if (typeOpcode == OpTypeSampledImage)
+        {
+            pImagePtr = m_pBuilder->CreateExtractValue(pBase, uint64_t(0));
+            multisampled = static_cast<SPIRVTypeSampledImage*>(pSpvLoadedType)->getImageType()->getDescriptor().MS;
+        }
+        else
+        {
+            multisampled = static_cast<SPIRVTypeImage*>(pSpvLoadedType)->getDescriptor().MS;
+        }
+
+        if (multisampled)
+        {
+            // For a multisampled image, the pointer is in fact a struct containing a normal image descriptor
+            // pointer and an fmask descriptor pointer.
+            pImage = m_pBuilder->CreateLoadDescFromPtr(m_pBuilder->CreateExtractValue(pImagePtr, uint64_t(0)));
+            Value* pFmask = m_pBuilder->CreateLoadDescFromPtr(m_pBuilder->CreateExtractValue(pImagePtr, 1));
+            pImage = m_pBuilder->CreateInsertValue(
+                          UndefValue::get(StructType::get(*Context, { pImage->getType(), pFmask->getType() })),
+                          pImage,
+                          uint64_t(0));
+            pImage = m_pBuilder->CreateInsertValue(pImage, pFmask, 1);
+        }
+        else
+        {
+            pImage = m_pBuilder->CreateLoadDescFromPtr(pImagePtr);
+        }
+    }
+
+    // Return image or sampler, or join them together in a struct.
+    if (pImage == nullptr)
+    {
+        return pSampler;
+    }
+    if (pSampler == nullptr)
+    {
+        return pImage;
+    }
+
+    Value* pResult = UndefValue::get(StructType::get(*Context, { pImage->getType(), pSampler->getType() }));
+    pResult = m_pBuilder->CreateInsertValue(pResult, pImage, uint64_t(0));
+    pResult = m_pBuilder->CreateInsertValue(pResult, pSampler, 1);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Translate image/sampler/sampledimage pointer to IR value
+Value* SPIRVToLLVM::transImagePointer(
+    SPIRVValue* pSpvImagePtr)    // [in] The image/sampler/sampledimage pointer
+{
+    if ((pSpvImagePtr->getOpCode() != OpVariable) ||
+        (static_cast<SPIRVTypePointer*>(pSpvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant))
+    {
+        return transValue(pSpvImagePtr, m_pBuilder->GetInsertBlock()->getParent(), m_pBuilder->GetInsertBlock());
+    }
+
+    // For an image/sampler/sampledimage pointer that is a UniformConstant OpVariable, we need to materialize it by
+    // generating the code to get the descriptor pointer(s).
+    SPIRVWord descriptorSet = 0, binding = 0;
+    pSpvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+    pSpvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
+
+    Value* pDescPtr = nullptr;
+    SPIRVType* pSpvImageTy = pSpvImagePtr->getType()->getPointerElementType();
+    while ((pSpvImageTy->getOpCode() == OpTypeArray) || (pSpvImageTy->getOpCode() == OpTypeRuntimeArray))
+    {
+        pSpvImageTy = pSpvImageTy->getArrayElementType();
+    }
+
+    if (pSpvImageTy->getOpCode() == OpTypeSampler)
+    {
+        return m_pBuilder->CreateGetSamplerDescPtr(descriptorSet, binding);
+    }
+
+    bool isSampledImage = (pSpvImageTy->getOpCode() == OpTypeSampledImage);
+    if (isSampledImage)
+    {
+        pSpvImageTy = static_cast<SPIRVTypeSampledImage*>(pSpvImageTy)->getImageType();
+    }
+    LLPC_ASSERT(pSpvImageTy->getOpCode() == OpTypeImage);
+
+    auto pDesc = &static_cast<SPIRVTypeImage*>(pSpvImageTy)->getDescriptor();
+    if (pDesc->Dim == DimBuffer)
+    {
+        pDescPtr = m_pBuilder->CreateGetTexelBufferDescPtr(descriptorSet, binding);
+    }
+    else
+    {
+        pDescPtr = m_pBuilder->CreateGetImageDescPtr(descriptorSet, binding);
+    }
+
+    if (pDesc->MS)
+    {
+        // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
+        Value* pFmaskDescPtr = m_pBuilder->CreateGetFmaskDescPtr(descriptorSet, binding);
+        pDescPtr = m_pBuilder->CreateInsertValue(UndefValue::get(StructType::get(*Context,
+                                                                                 {
+                                                                                    pDescPtr->getType(),
+                                                                                    pFmaskDescPtr->getType()
+                                                                                 })),
+                                                 pDescPtr,
+                                                 uint64_t(0));
+        pDescPtr = m_pBuilder->CreateInsertValue(pDescPtr, pFmaskDescPtr, 1);
+    }
+
+    if (isSampledImage)
+    {
+        // A sampledimage pointer is a struct containing the image pointer and the sampler desc pointer.
+        Value* pSamplerDescPtr = m_pBuilder->CreateGetSamplerDescPtr(descriptorSet, binding);
+        pDescPtr = m_pBuilder->CreateInsertValue(UndefValue::get(StructType::get(*Context,
+                                                                                 {
+                                                                                    pDescPtr->getType(),
+                                                                                    pSamplerDescPtr->getType()
+                                                                                 })),
+                                                 pDescPtr,
+                                                 uint64_t(0));
+        pDescPtr = m_pBuilder->CreateInsertValue(pDescPtr, pSamplerDescPtr, 1);
+    }
+
+    return pDescPtr;
+}
+
+// =====================================================================================================================
 // Handle OpStore.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     SPIRVStore* const pSpvStore = static_cast<SPIRVStore*>(pSpvValue);
 
-    bool isVolatile = pSpvStore->SPIRVMemoryAccess::isVolatile();
+    bool isVolatile = pSpvStore->SPIRVMemoryAccess::isVolatile(false);
 
     // We don't require volatile on address spaces that become non-pointers.
     switch (pSpvStore->getDst()->getType()->getPointerStorageClass())
@@ -3345,9 +3690,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
 
     bool isCoherent = pSpvStore->getDst()->isCoherent();
 
-    if (pSpvStore->getMemoryAccessMask() & MemoryAccessMakePointerVisibleKHRMask)
+    // MakePointerAvailableKHR is valid with OpStore
+    if (pSpvStore->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask)
     {
-        SPIRVWord spvId = pSpvStore->getMakeVisisbleScope();
+        SPIRVWord spvId = pSpvStore->getMakeAvailableScope(false);
         SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
         const uint32_t scope = pSpvScope->getZExtIntValue();
 
@@ -3359,21 +3705,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
         }
     }
 
-    if (pSpvStore->getMemoryAccessMask() & MemoryAccessMakePointerAvailableKHRMask)
-    {
-        SPIRVWord spvId = pSpvStore->getMakeAvailableScope();
-        SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(BM->getValue(spvId));
-        const uint32_t scope = pSpvScope->getZExtIntValue();
-
-        const bool isSystemScope = ((scope <= ScopeDevice) || (scope == ScopeQueueFamilyKHR));
-
-        if (isSystemScope)
-        {
-            isCoherent = true;
-        }
-    }
-
-    const bool isNonTemporal = pSpvStore->SPIRVMemoryAccess::isNonTemporal();
+    const bool isNonTemporal = pSpvStore->SPIRVMemoryAccess::isNonTemporal(false);
 
     Value* const pStorePointer = transValue(pSpvStore->getDst(),
                                             m_pBuilder->GetInsertBlock()->getParent(),
@@ -3432,6 +3764,29 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 {
     SPIRVAccessChainBase* const pSpvAccessChain = static_cast<SPIRVAccessChainBase*>(pSpvValue);
 
+    // Special handling for UniformConstant if the ultimate element type is image/sampler/sampledimage.
+    if (static_cast<SPIRVTypePointer*>(pSpvAccessChain->getBase()->getType())->getStorageClass() ==
+          StorageClassUniformConstant)
+    {
+        SPIRVType* pSpvUltimateElementType = pSpvAccessChain->getBase()->getType()->getPointerElementType();
+        while ((pSpvUltimateElementType->getOpCode() == OpTypeArray) ||
+               (pSpvUltimateElementType->getOpCode() == OpTypeRuntimeArray))
+        {
+            pSpvUltimateElementType = pSpvUltimateElementType->getArrayElementType();
+        }
+
+        switch (pSpvUltimateElementType->getOpCode())
+        {
+        case OpTypeImage:
+        case OpTypeSampler:
+        case OpTypeSampledImage:
+            return transOpAccessChainForImage(pSpvAccessChain);
+        default:
+            break;
+        }
+    }
+
+    // Non-image-related handling.
     Value* const pBase = transValue(pSpvAccessChain->getBase(),
                                     m_pBuilder->GetInsertBlock()->getParent(),
                                     m_pBuilder->GetInsertBlock());
@@ -3650,6 +4005,88 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 }
 
 // =====================================================================================================================
+// Handle OpAccessChain for pointer to (array of) image/sampler/sampledimage
+Value* SPIRVToLLVM::transOpAccessChainForImage(
+    SPIRVAccessChainBase* pSpvAccessChain)          // [in] The OpAccessChain
+{
+    SPIRVType* pSpvElementType = pSpvAccessChain->getBase()->getType()->getPointerElementType();
+    std::vector<SPIRVValue*> spvIndicesVec = pSpvAccessChain->getIndices();
+    ArrayRef<SPIRVValue*> spvIndices = spvIndicesVec;
+    Value* pBase = transImagePointer(pSpvAccessChain->getBase());
+
+    if (spvIndices.empty())
+    {
+        return pBase;
+    }
+
+    bool isNonUniform = spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
+    Value* pIndex = transValue(spvIndices[0], m_pBuilder->GetInsertBlock()->getParent(), m_pBuilder->GetInsertBlock());
+    spvIndices = spvIndices.slice(1);
+    pSpvElementType = pSpvElementType->getArrayElementType();
+
+    while (pSpvElementType->getOpCode() == OpTypeArray)
+    {
+        pIndex = m_pBuilder->CreateMul(pIndex,
+                                       m_pBuilder->getInt32(static_cast<SPIRVTypeArray*>(pSpvElementType)
+                                                                ->getLength()->getZExtIntValue()));
+        if (spvIndices.empty() == false)
+        {
+            isNonUniform |= spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
+            pIndex = m_pBuilder->CreateAdd(pIndex,
+                                           transValue(spvIndices[0],
+                                                      m_pBuilder->GetInsertBlock()->getParent(),
+                                                      m_pBuilder->GetInsertBlock()));
+            spvIndices = spvIndices.slice(1);
+        }
+        pSpvElementType = pSpvElementType->getArrayElementType();
+    }
+
+    return indexDescPtr(pBase, pIndex, isNonUniform, pSpvElementType);
+}
+
+// =====================================================================================================================
+// Apply an array index to a pointer to array of image/sampler/sampledimage.
+// A pointer to sampledimage is in fact a structure containing pointer to image and pointer to sampler.
+// A pointer to image when the image is multisampled is in fact a structure containing pointer to image
+// and pointer to fmask descriptor.
+Value* SPIRVToLLVM::indexDescPtr(
+    Value*      pBase,              // [in] Base pointer to add index to
+    Value*      pIndex,             // [in] Index value
+    bool        isNonUniform,       // Whether the index is non-uniform
+    SPIRVType*  pSpvElementType)    // Ultimate non-array element type (nullptr means assume single pointer)
+{
+    if (pSpvElementType != nullptr)
+    {
+        auto typeOpcode = pSpvElementType->getOpCode();
+        if ((typeOpcode == OpTypeSampledImage) ||
+            ((typeOpcode == OpTypeImage) && static_cast<SPIRVTypeImage*>(pSpvElementType)->getDescriptor().MS))
+        {
+            // These are the two cases that the pointer is in fact a structure containing two pointers.
+            Value* pPtr0 = m_pBuilder->CreateExtractValue(pBase, uint64_t(0));
+            Value* pPtr1 = m_pBuilder->CreateExtractValue(pBase, 1);
+            SPIRVType* pSpvElementType0 = nullptr;
+            if (typeOpcode == OpTypeSampledImage)
+            {
+                pSpvElementType0 = static_cast<SPIRVTypeSampledImage*>(pSpvElementType)->getImageType();
+            }
+            pPtr0 = indexDescPtr(pPtr0,
+                                 pIndex,
+                                 isNonUniform,
+                                 pSpvElementType0);
+            pPtr1 = indexDescPtr(pPtr1,
+                                 pIndex,
+                                 isNonUniform,
+                                 nullptr);
+            pBase = m_pBuilder->CreateInsertValue(UndefValue::get(pBase->getType()), pPtr0, uint64_t(0));
+            pBase = m_pBuilder->CreateInsertValue(pBase, pPtr1, 1);
+            return pBase;
+        }
+    }
+
+    return m_pBuilder->CreateIndexDescPtr(pBase, pIndex, isNonUniform);
+}
+
+// =====================================================================================================================
 // Handle OpInBoundsAccessChain.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpInBoundsAccessChain>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
@@ -3674,6 +4111,35 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpInBoundsPtrAccessChain>(
 }
 
 // =====================================================================================================================
+// Handle OpImage (extract image from sampledimage)
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpImage>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    Value* pSampledImage = transValue(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0),
+                                      m_pBuilder->GetInsertBlock()->getParent(),
+                                      m_pBuilder->GetInsertBlock());
+    return m_pBuilder->CreateExtractValue(pSampledImage, uint64_t(0));
+}
+
+// =====================================================================================================================
+// Handle OpSampledImage (combine image and sampler to create sampledimage)
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    Value* pImage = transValue(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0),
+                               m_pBuilder->GetInsertBlock()->getParent(),
+                               m_pBuilder->GetInsertBlock());
+    Value* pSampler = transValue(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(1),
+                                 m_pBuilder->GetInsertBlock()->getParent(),
+                                 m_pBuilder->GetInsertBlock());
+
+    Value* pResult = UndefValue::get(StructType::get(*Context, { pImage->getType(), pSampler->getType() }));
+    pResult = m_pBuilder->CreateInsertValue(pResult, pImage, uint64_t(0));
+    pResult = m_pBuilder->CreateInsertValue(pResult, pSampler, 1);
+    return pResult;
+}
+
+// =====================================================================================================================
 // Handle OpKill.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
@@ -3694,6 +4160,31 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
     }
 
     return pKill;
+}
+
+// =====================================================================================================================
+// Handle OpReadClockKHR.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    SPIRVConstant* const pSpvScope = static_cast<SPIRVConstant*>(pSpvInst->getOperands()[0]);
+    const spv::Scope scope = static_cast<spv::Scope>(pSpvScope->getZExtIntValue());
+    LLPC_ASSERT((scope == spv::ScopeDevice) || (scope == spv::ScopeWorkgroup));
+
+    Value* const pReadClock = m_pBuilder->CreateReadClock(scope == spv::ScopeDevice);
+
+    SPIRVType* const pSpvType = pSpvInst->getType();
+    if (pSpvType->isTypeVectorInt(32))
+    {
+        LLPC_ASSERT(pSpvType->getVectorComponentCount() == 2); // Must be uvec2
+        return m_pBuilder->CreateBitCast(pReadClock, transType(pSpvType)); // uint64 -> uvec2
+    }
+    else
+    {
+        LLPC_ASSERT(pSpvType->isTypeInt(64));
+        return pReadClock;
+    }
 }
 
 // =====================================================================================================================
@@ -3826,7 +4317,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate);
+    return m_pBuilder->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -3841,7 +4332,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate);
+    return m_pBuilder->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -3856,7 +4347,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAllEqual(pValue);
+    return m_pBuilder->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4300,7 +4791,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate);
+    return m_pBuilder->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4314,7 +4805,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate);
+    return m_pBuilder->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4328,7 +4819,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(
     BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
     Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAllEqual(pValue);
+    return m_pBuilder->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4545,8 +5036,27 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 {
     SPIRVVariable* const pSpvVar = static_cast<SPIRVVariable*>(pSpvValue);
     const SPIRVStorageClassKind storageClass = pSpvVar->getStorageClass();
-
     SPIRVType* const pSpvVarType = pSpvVar->getType()->getPointerElementType();
+
+    if (storageClass == StorageClassUniformConstant)
+    {
+        SPIRVType* pSpvElementType = pSpvVarType;
+        while ((pSpvElementType->getOpCode() == OpTypeArray) || (pSpvElementType->getOpCode() == OpTypeRuntimeArray))
+        {
+            pSpvElementType = pSpvElementType->getArrayElementType();
+        }
+        switch (pSpvElementType->getOpCode())
+        {
+        case OpTypeImage:
+        case OpTypeSampler:
+        case OpTypeSampledImage:
+            // Do nothing for image/sampler/sampledimage.
+            return nullptr;
+        default:
+            break;
+        }
+    }
+
     Type* const pVarType = transType(pSpvVar->getType())->getPointerElementType();
 
     SPIRVValue* const pSpvInitializer = pSpvVar->getInitializer();
@@ -5015,6 +5525,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto NewVec = Builder.CreateVectorSplat(VecSize, Scalar, Scalar->getName());
     NewVec->takeName(Scalar);
     auto Scale = Builder.CreateFMul(Vector, NewVec, "scale");
+    setFastMathFlags(Scale, BV);
     return mapValue(BV, Scale);
   }
 
@@ -5240,10 +5751,22 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   case OpFunctionCall: {
+    m_pBuilder->SetInsertPoint(BB);
+    updateBuilderDebugLoc(BV, F);
     SPIRVFunctionCall *BC = static_cast<SPIRVFunctionCall *>(BV);
-    auto Call = CallInst::Create(transFunction(BC->getFunction()),
-                                 transValue(BC->getArgumentValues(), F, BB),
-                                 "", BB);
+    SmallVector<Value *, 8> Args;
+    for (SPIRVValue *BArg : BC->getArgumentValues()) {
+      Value *Arg = transValue(BArg, F, BB);
+      if (!Arg) {
+        // This arg is a variable that is (array of) image/sampler/sampledimage.
+        // Materialize it.
+        assert(BArg->getOpCode() == OpVariable);
+        Arg = transImagePointer(BArg);
+      }
+      Args.push_back(Arg);
+    }
+    auto Call =
+        CallInst::Create(transFunction(BC->getFunction()), Args, "", BB);
     setCallingConv(Call);
     setAttrByCalledFunc(Call);
     return mapValue(BV, Call);
@@ -5274,6 +5797,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto Dividend = transValue(FMod->getDividend(), F, BB);
     auto Divisor = transValue(FMod->getDivisor(), F, BB);
     auto FRem = BinaryOperator::CreateFRem(Dividend, Divisor, "frem.res", BB);
+    setFastMathFlags(FRem, BV);
 
     std::string UnmangledName = OCLExtOpMap::map(OpenCLLIB::Copysign);
     std::string MangledName = "copysign";
@@ -5301,9 +5825,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
   case OpFNegate: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
-    return mapValue(
-        BV, BinaryOperator::CreateFNeg(transValue(BC->getOperand(0), F, BB),
-                                       BV->getName(), BB));
+    auto FNeg = BinaryOperator::CreateFNeg(transValue(BC->getOperand(0), F, BB),
+                                           BV->getName(), BB);
+    setFastMathFlags(FNeg, BV);
+    return mapValue(BV, FNeg);
   }
   case OpQuantizeToF16: {
     return mapValue(BV, transBuiltinFromInst(
@@ -5339,16 +5864,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpImageSampleProjExplicitLod:
   case OpImageSampleProjDrefImplicitLod:
   case OpImageSampleProjDrefExplicitLod:
-  case OpImageFetch:
-  case OpImageGather:
-  case OpImageDrefGather:
-  case OpImageQuerySizeLod:
-  case OpImageQuerySize:
-  case OpImageQueryLod:
-  case OpImageQueryLevels:
-  case OpImageQuerySamples:
-  case OpImageRead:
-  case OpImageWrite:
   case OpImageSparseSampleImplicitLod:
   case OpImageSparseSampleExplicitLod:
   case OpImageSparseSampleDrefImplicitLod:
@@ -5357,51 +5872,81 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpImageSparseSampleProjExplicitLod:
   case OpImageSparseSampleProjDrefImplicitLod:
   case OpImageSparseSampleProjDrefExplicitLod:
+    return mapValue(BV,
+        transSPIRVImageSampleFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
+  case OpImageFetch:
   case OpImageSparseFetch:
+  case OpImageRead:
+  case OpImageSparseRead:
+    return mapValue(BV,
+        transSPIRVImageFetchReadFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
+  case OpImageGather:
+  case OpImageDrefGather:
   case OpImageSparseGather:
   case OpImageSparseDrefGather:
-  case OpImageSparseRead:
-  {
     return mapValue(BV,
-        transSPIRVImageOpFromInst(
+        transSPIRVImageGatherFromInst(
             static_cast<SPIRVInstruction *>(BV),
             BB));
-  }
+
+  case OpImageQuerySizeLod:
+  case OpImageQuerySize:
+    return mapValue(BV,
+        transSPIRVImageQuerySizeFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
+  case OpImageQueryLod:
+    return mapValue(BV,
+        transSPIRVImageQueryLodFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
+  case OpImageQueryLevels:
+    return mapValue(BV,
+        transSPIRVImageQueryLevelsFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
+  case OpImageQuerySamples:
+    return mapValue(BV,
+        transSPIRVImageQuerySamplesFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
+  case OpImageWrite:
+    return mapValue(BV,
+        transSPIRVImageWriteFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
   case OpFragmentMaskFetchAMD:
+    return mapValue(BV,
+        transSPIRVFragmentMaskFetchFromInst(
+            static_cast<SPIRVInstruction *>(BV),
+            BB));
+
   case OpFragmentFetchAMD:
     return mapValue(BV,
-        transSPIRVFragmentMaskOpFromInst(
+        transSPIRVFragmentFetchFromInst(
             static_cast<SPIRVInstruction *>(BV),
             BB));
-  case OpImageTexelPointer: {
-    auto ImagePointer = static_cast<SPIRVImageTexelPointer *>(BV)->getImage();
-    assert((ImagePointer->getOpCode() == OpAccessChain) ||
-            ImagePointer->getOpCode() == OpVariable);
-    LoadInst *LI = new LoadInst(transValue(ImagePointer, F, BB), BV->getName(),
-        false, 0, BB);
-    return mapValue(BV, LI);
-  }
+
   case OpImageSparseTexelsResident: {
+    m_pBuilder->SetInsertPoint(BB);
+    updateBuilderDebugLoc(BV, F);
     SPIRVImageSparseTexelsResident *BI = static_cast<SPIRVImageSparseTexelsResident *>(BV);
     auto ResidentCode = transValue(BI->getResidentCode(), F, BB);
-
-    std::string FuncName("llpc.imagesparse.texel.resident");
-    SmallVector<Value *, 1> Arg;
-    Arg.push_back(ResidentCode);
-
-    Function *Func = M->getFunction(FuncName);
-    if (!Func) {
-      SmallVector<Type *, 1> ArgTy;
-      ArgTy.push_back(Type::getInt32Ty(*Context));
-      FunctionType *FuncTy = FunctionType::get(Type::getInt1Ty(*Context), ArgTy, false);
-      Func = Function::Create(FuncTy, GlobalValue::ExternalLinkage, FuncName, M);
-      Func->setCallingConv(CallingConv::SPIR_FUNC);
-      if (isFuncNoUnwind())
-        Func->addFnAttr(Attribute::NoUnwind);
-    }
-
-    return mapValue(BV, CallInst::Create(Func, Arg, "", BB));
+    return mapValue(BV, m_pBuilder->CreateICmpEQ(ResidentCode, m_pBuilder->getInt32(0)));
   }
+  case OpImageTexelPointer:
+    return nullptr;
 
 #define HANDLE_OPCODE(op) case (op): \
   m_pBuilder->SetInsertPoint(BB); \
@@ -5432,7 +5977,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpInBoundsAccessChain);
   HANDLE_OPCODE(OpPtrAccessChain);
   HANDLE_OPCODE(OpInBoundsPtrAccessChain);
+  HANDLE_OPCODE(OpImage);
+  HANDLE_OPCODE(OpSampledImage);
   HANDLE_OPCODE(OpKill);
+#if VKI_KHR_SHADER_CLOCK
+  HANDLE_OPCODE(OpReadClockKHR);
+#endif
   HANDLE_OPCODE(OpGroupAll);
   HANDLE_OPCODE(OpGroupAny);
   HANDLE_OPCODE(OpGroupBroadcast);
@@ -6035,594 +6585,1001 @@ Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
   return Inst;
 }
 
-// Translates SPIR-V fragment mask operations to LLVM function calls
-Instruction *
-SPIRVToLLVM::transSPIRVFragmentMaskOpFromInst(SPIRVInstruction *BI,
-                                              BasicBlock*BB) {
-  Op OC = BI->getOpCode();
-
-  const SPIRVTypeImageDescriptor *Desc = nullptr;
-  std::vector<SPIRVValue *> Ops;
-  std::vector<Type *> ArgTys;
-  std::stringstream SS;
-
-  // Generate name strings for image calls:
-  // OpFragmentMaskFetchAMD:
-  //    prefix.image.fetch.u32.dim.fmaskvalue
-  // OpFragmentFetchAMD
-  //    prefix.image.fetch.[f32|i32|u32].dim[.sample]
-
-  // Add call prefix
-  SS << gSPIRVName::ImageCallPrefix;
-  SS << ".";
-
-  // Add image operation kind
-  std::string S;
-  SPIRVImageOpKindNameMap::find(ImageOpFetch, &S);
-  SS << S;
-
-  // Collect operands
-  Ops = BI->getOperands();
-  std::vector<SPIRVType *> BTys = SPIRVInstruction::getOperandTypes(Ops);
-  if (Ops[0]->getOpCode() == OpImageTexelPointer) {
-      // Get image type from "ImageTexelPointer"
-      BTys[0] = static_cast<SPIRVImageTexelPointer *>(Ops[0])->getImage()
-      ->getType()->getPointerElementType();
+// =============================================================================
+// Convert SPIR-V dimension and arrayed into Builder dimension.
+static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
+  if (Desc->MS) {
+    assert(Desc->Dim == Dim2D || Desc->Dim == DimSubpassData);
+    return !Desc->Arrayed ? Llpc::Builder::Dim2DMsaa
+                          : Llpc::Builder::Dim2DArrayMsaa;
   }
-  ArgTys = transTypeVector(BTys);
-
-  // Get image type info
-  SPIRVType *BTy = BTys[0]; // Image operand
-  if (BTy->isTypePointer())
-    BTy = BTy->getPointerElementType();
-  const SPIRVTypeImage *ImageTy = nullptr;
-
-  OC = BTy->getOpCode();
-  if (OC == OpTypeSampledImage) {
-    ImageTy = static_cast<SPIRVTypeSampledImage *>(BTy)->getImageType();
-    Desc    = &ImageTy->getDescriptor();
-  } else if (OC == OpTypeImage) {
-    ImageTy = static_cast<SPIRVTypeImage *>(BTy);
-    Desc    = &ImageTy->getDescriptor();
-  } else
-    llvm_unreachable("Invalid image type");
-
-  // Add sampled type
-  if (BI->getOpCode() == OpFragmentMaskFetchAMD)
-    SS << ".u32";
-  else {
-    SPIRVType *SampledTy = ImageTy->getSampledType();
-    OC = SampledTy->getOpCode();
-    if (OC == OpTypeFloat)
-      SS << ".f32";
-    else if (OC == OpTypeInt) {
-      if (static_cast<SPIRVTypeInt*>(SampledTy)->isSigned())
-        SS << ".i32";
-      else
-        SS << ".u32";
-    } else
-      llvm_unreachable("Invalid sampled type");
-  }
-
-  // Add image dimension
-  assert((Desc->Dim == Dim2D) || (Desc->Dim == DimSubpassData));
-  assert(Desc->MS);
-  SS << "." << SPIRVDimNameMap::map(Desc->Dim);
-  if (Desc->Arrayed)
-      SS << "Array";
-
-  if (BI->getOpCode() == OpFragmentMaskFetchAMD)
-    SS << gSPIRVName::ImageCallModFmaskValue;
-  else if (BI->getOpCode() == OpFragmentFetchAMD)
-    SS << gSPIRVName::ImageCallModSample;
-
-  std::vector<Value *> Args = transValue(Ops, BB->getParent(), BB);
-  auto Int32Ty = Type::getInt32Ty(*Context);
-
-  // Add image call metadata as argument
-  ShaderImageCallMetadata ImageCallMD = {};
-  ImageCallMD.OpKind        = ImageOpFetch;
-  ImageCallMD.Dim           = Desc->Dim;
-  ImageCallMD.Arrayed       = Desc->Arrayed;
-  ImageCallMD.Multisampled  = Desc->MS;
-
-  ArgTys.push_back(Int32Ty);
-  Args.push_back(ConstantInt::get(Int32Ty, ImageCallMD.U32All));
-
-  Function *F = M->getFunction(SS.str());
-  Type *RetTy = Type::getVoidTy(*Context);
-  assert(BI->hasType());
-  RetTy = transType(BI->getType());
-  FunctionType *FT = FunctionType::get(RetTy, ArgTys, false);
-
-  if (!F) {
-    F = Function::Create(FT, GlobalValue::ExternalLinkage, SS.str(), M);
-    F->setCallingConv(CallingConv::SPIR_FUNC);
-    if (isFuncNoUnwind())
-      F->addFnAttr(Attribute::NoUnwind);
-  }
-
-  assert(F->getFunctionType() == FT);
-
-  auto Call = CallInst::Create(F, Args, "", BB);
-  setName(Call, BI);
-  setAttrByCalledFunc(Call);
-
-  return Call;
-}
-
-// Translates SPIR-V image operations to LLVM function calls
-Value *
-SPIRVToLLVM::transSPIRVImageOpFromInst(SPIRVInstruction *BI, BasicBlock*BB)
-{
-  Op OC = BI->getOpCode();
-  SPIRVImageOpInfo Info;
-  if (SPIRVImageOpInfoMap::find(OC, &Info) == false) {
-    llvm_unreachable("Invalid image op code");
-    return nullptr;
-  }
-
-  const SPIRVTypeImageDescriptor *Desc = nullptr;
-  std::vector<SPIRVValue *> Ops;
-  std::vector<Type *> ArgTys;
-  std::stringstream SS;
-
-  AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
-
-  if (Info.OpKind != ImageOpQueryNonLod) {
-    // Generate name strings for image calls:
-    //    Format: prefix.image[sparse].op.[f32|i32|u32].dim[.proj][.dref][.lodnz][.bias][.lod][.grad]
-    //                                                      [.constoffset][.offset]
-    //                                                      [.constoffsets][.sample][.minlod]
-
-    // Add call prefix
-    SS << gSPIRVName::ImageCallPrefix;
-
-    // Add sparse modifier
-    if (Info.IsSparse)
-      SS << gSPIRVName::ImageCallModSparse;
-
-    SS << ".";
-
-    // Add image operation kind
-    std::string S;
-    SPIRVImageOpKindNameMap::find(Info.OpKind, &S);
-    SS << S;
-
-    // Collect operands
-    if (isImageAtomicOp(Info.OpKind)) {
-      // NOTE: For atomic operations, extract image related info
-      // from "ImageTexelPointer".
-      SPIRVValue *ImagePointerOp =
-        static_cast<SPIRVInstTemplateBase *>(BI)->getOperand(0);
-      assert(ImagePointerOp->getOpCode() == OpImageTexelPointer);
-
-      auto ImagePointer =
-        static_cast<SPIRVImageTexelPointer *>(ImagePointerOp);
-      SPIRVValue *Image = ImagePointer->getImage();
-      assert((Image->getOpCode() == OpVariable) ||
-          (Image->getOpCode() == OpAccessChain));
-      assert(Image->getType()->isTypePointer());
-      assert(Image->getType()->getPointerElementType()->isTypeImage());
-      auto ImageTy = static_cast<SPIRVTypeImage *>(
-          Image->getType()->getPointerElementType());
-      Ops.push_back(ImagePointer);
-      Ops.push_back(ImagePointer->getCoordinate());
-      // Extract "sample" operand only if image is multi-sampled
-      if (ImageTy->getDescriptor().MS != 0)
-        Ops.push_back(ImagePointer->getSample());
-
-      if (Info.OperAtomicData != InvalidOperIdx)
-        Ops.push_back(static_cast<SPIRVInstTemplateBase *>(BI)->getOperand(
-          Info.OperAtomicData));
-
-      if (Info.OperAtomicComparator != InvalidOperIdx)
-        Ops.push_back(static_cast<SPIRVInstTemplateBase *>(BI)->getOperand(
-          Info.OperAtomicComparator));
-
-      if (Info.OperScope != InvalidOperIdx) {
-        auto BA = static_cast<SPIRVInstTemplateBase *>(BI);
-
-        auto Scope = static_cast<SPIRVConstant *>(BA->getOperand(Info.OperScope));
-
-        if (Scope->getZExtIntValue() != ScopeInvocation) {
-          auto SemanticsConstant = static_cast<SPIRVConstant *>(BA->getOperand(
-            Info.OperScope + 1));
-          auto Semantics = SemanticsConstant->getZExtIntValue();
-
-          if (Semantics & MemorySemanticsSequentiallyConsistentMask)
-            Ordering = AtomicOrdering::SequentiallyConsistent;
-          else if (Semantics & MemorySemanticsAcquireReleaseMask)
-            Ordering = AtomicOrdering::AcquireRelease;
-          else if (Semantics & MemorySemanticsAcquireMask)
-            Ordering = AtomicOrdering::Acquire;
-          else if (Semantics & MemorySemanticsReleaseMask)
-            Ordering = AtomicOrdering::Release;
-
-          if (Ordering != AtomicOrdering::NotAtomic) {
-            // Upgrade the ordering if we need to make it avaiable or visible
-            if (Semantics & (MemorySemanticsMakeAvailableKHRMask |
-              MemorySemanticsMakeVisibleKHRMask))
-              Ordering = AtomicOrdering::SequentiallyConsistent;
-          }
-        }
-      }
-    } else {
-      // For other image operations, remove image operand mask and keep other operands
-      for (size_t I = 0, E = BI->getOperands().size(); I != E; ++I) {
-        if (I != Info.OperMask)
-            Ops.push_back(
-              static_cast<SPIRVInstTemplateBase *>(BI)->getOperand(I));
-      }
+  if (!Desc->Arrayed) {
+    switch (Desc->Dim) {
+    case Dim1D:
+      return Llpc::Builder::Dim1D;
+    case DimBuffer:
+      return Llpc::Builder::Dim1D;
+    case Dim2D:
+      return Llpc::Builder::Dim2D;
+    case DimRect:
+      return Llpc::Builder::Dim2D;
+    case DimCube:
+      return Llpc::Builder::DimCube;
+    case Dim3D:
+      return Llpc::Builder::Dim3D;
+    case DimSubpassData:
+      return Llpc::Builder::Dim2D;
+    default:
+      break;
     }
-
-    std::vector<SPIRVType *> BTys = SPIRVInstruction::getOperandTypes(Ops);
-    if (Ops[0]->getOpCode() == OpImageTexelPointer) {
-        // Get image type from "ImageTexelPointer"
-      BTys[0] = static_cast<SPIRVImageTexelPointer *>(Ops[0])->getImage()
-        ->getType()->getPointerElementType();
-    }
-    ArgTys = transTypeVector(BTys);
-
-    // Get image type info
-    SPIRVType *BTy = BTys[0]; // Image operand
-    if (BTy->isTypePointer())
-      BTy = BTy->getPointerElementType();
-    const SPIRVTypeImage *ImageTy = nullptr;
-
-    Op TyOC = BTy->getOpCode();
-    if (TyOC == OpTypeSampledImage) {
-      ImageTy = static_cast<SPIRVTypeSampledImage *>(BTy)->getImageType();
-      Desc    = &ImageTy->getDescriptor();
-    } else if (TyOC == OpTypeImage) {
-      ImageTy = static_cast<SPIRVTypeImage *>(BTy);
-      Desc    = &ImageTy->getDescriptor();
-    } else
-      llvm_unreachable("Invalid image type");
-
-    if (Info.OpKind == ImageOpQueryLod) {
-      // Return type of "OpImageQueryLod" is always vec2
-      SS << ".f32";
-    } else {
-      // Add sampled type
-      SPIRVType *SampledTy = ImageTy->getSampledType();
-      TyOC = SampledTy->getOpCode();
-      if (TyOC == OpTypeFloat) {
-        if (SampledTy->getBitWidth() == 16)
-          SS << ".f16";
-        else
-          SS << ".f32";
-      } else if (TyOC == OpTypeInt) {
-        if (static_cast<SPIRVTypeInt*>(SampledTy)->isSigned())
-          SS << ".i32";
-        else
-          SS << ".u32";
-      } else
-        llvm_unreachable("Invalid sampled type");
-    }
-
-    // Add image dimension
-    SS << "." << SPIRVDimNameMap::map(Desc->Dim);
-    if (Desc->Arrayed)
-      SS << "Array";
-
-    // NOTE: For "OpImageQueryLod", add "shadow" modifier to the call name.
-    // It is only to keep function uniqueness (avoid overloading) and
-    // will be removed in SPIR-V lowering.
-    if (Info.OpKind == ImageOpQueryLod && Desc->Depth)
-      SS << "Shadow";
-
-    if (isImageAtomicOp(Info.OpKind) && Desc->MS) {
-      assert(Desc->Dim == Dim2D);
-      SS << gSPIRVName::ImageCallModSample;
-    }
-
-    if (Info.HasProj)
-      SS << gSPIRVName::ImageCallModProj;
-
-    if (Info.OperDref != InvalidOperIdx) {
-      // Dref operand
-      SS << gSPIRVName::ImageCallModDref;
-    }
-
-    SPIRVWord Mask = 0;
-    auto &OpWords = static_cast<SPIRVInstTemplateBase *>(BI)->getOpWords();
-    if (Info.OperMask < OpWords.size())
-      // Optional image operands are present
-      Mask = OpWords[Info.OperMask];
-
-    // Lodnz for gather op
-    if ((Info.OpKind == ImageOpGather) && EnableGatherLodNz) {
-      if ((Mask & (ImageOperandsBiasMask |
-                  ImageOperandsLodMask |
-                  ImageOperandsGradMask |
-                  ImageOperandsMinLodMask)) == 0)
-          SS << gSPIRVName::ImageCallModLodNz;
-    }
-
-    // Bias operand
-    if (Mask & ImageOperandsBiasMask)
-      SS << gSPIRVName::ImageCallModBias;
-
-    // Lod operand
-    if (Mask & ImageOperandsLodMask)
-      SS << gSPIRVName::ImageCallModLod;
-
-    // Grad operands
-    if (Mask & ImageOperandsGradMask)
-      SS << gSPIRVName::ImageCallModGrad;
-
-    // ConstOffset operands
-    if (Mask & ImageOperandsConstOffsetMask)
-      SS << gSPIRVName::ImageCallModConstOffset;
-
-    // Offset operand
-    if (Mask & ImageOperandsOffsetMask)
-      SS << gSPIRVName::ImageCallModOffset;
-
-    // ConstOffsets operand
-    if (Mask & ImageOperandsConstOffsetsMask)
-      SS << gSPIRVName::ImageCallModConstOffsets;
-
-    // Sample operand
-    if (Mask & ImageOperandsSampleMask)
-      SS << gSPIRVName::ImageCallModSample;
-
-    // MinLod operand
-    if (Mask & ImageOperandsMinLodMask)
-      SS << gSPIRVName::ImageCallModMinLod;
-
-    // MakeTexelAvailableKHR operand
-    if (Mask & ImageOperandsMakeTexelAvailableKHRMask)
-      SS << gSPIRVName::ImageCallMakeTexelAvailable;
-
-    // MakeTexelVisibleKHR operand
-    if (Mask & ImageOperandsMakeTexelVisibleKHRMask)
-      SS << gSPIRVName::ImageCallMakeTexelVisible;
-
-    // NonPrivateTexelKHR operand (only add if texel available/visible was not specified)
-    if (!(Mask & (ImageOperandsMakeTexelAvailableKHRMask |
-      ImageOperandsMakeTexelVisibleKHRMask)) &&
-      (Mask & ImageOperandsNonPrivateTexelKHRMask))
-      SS << gSPIRVName::ImageCallNonPrivateTexel;
-
-    // VolatileTexelKHR operand
-    if (Mask & ImageOperandsVolatileTexelKHRMask)
-      SS << gSPIRVName::ImageCallVolatileTexel;
-
-    // Fmask usage is determined by resource node binding
-    if (Desc->MS)
-        SS << gSPIRVName::ImageCallModPatchFmaskUsage;
-
   } else {
-    // Generate name strings for image query calls other than querylod
-    Ops = BI->getOperands();
-    assert(BI->hasType());
-    std::vector<SPIRVType *> BTys = SPIRVInstruction::getOperandTypes(Ops);
-    ArgTys = transTypeVector(BTys);
-
-    // Get image type info
-    assert(BTys[0]->getOpCode() == OpTypeImage);
-    const SPIRVTypeImage *ImageBTy = static_cast<SPIRVTypeImage *>(BTys[0]);
-    Desc    = &ImageBTy->getDescriptor();
-
-    // Generate name strings for image query calls:
-    //      Format: llpc.image.querynonlod.op.[dim][Array][.sample][.rettype]
-
-    // Add call prefix
-    SS << gSPIRVName::ImageCallPrefix << ".";
-
-    // Add image operation kind: query
-    std::string S;
-    SPIRVImageOpKindNameMap::find(ImageOpQueryNonLod, &S);
-    SS << S;
-
-    // Add image query operation
-    SPIRVImageQueryOpKindNameMap::find(OC, &S);
-    SS << S;
-
-    // Add image signature string to avoid overloading when image operand
-    // have different type, it will be removed after image operand is lowered.
-    StructType *ImageTy =
-      dyn_cast<StructType>(dyn_cast<PointerType>(ArgTys[0])->getPointerElementType());
-    StringRef ImageTyName = ImageTy->getName();
-    StringRef DimName =
-      ImageTyName.substr(ImageTyName.find_last_of('.'));
-    SS << DimName.str();
-
-    if ((OC == OpImageQuerySize) ||
-        (OC == OpImageQuerySizeLod) ||
-        (OC == OpImageQueryLevels)) {
-      // Add image dimension info
-      SPIRVImageDimKind dim = Desc->Dim;
-      if (dim == DimRect)
-          dim = Dim2D;
-
-      SS << "." << SPIRVDimNameMap::map(dim);
-      if (Desc->Arrayed)
-        SS << "Array";
-      if (Desc->MS)
-        SS << gSPIRVName::ImageCallModSample;
-    }
-
-    if (OC == OpImageQuerySize || OC == OpImageQuerySizeLod) {
-      // Add image query return type
-      SPIRVType *RetBTy = BI->getType();
-      uint32_t CompCount =
-        RetBTy->isTypeVector() ? RetBTy->getVectorComponentCount() : 1;
-      switch (CompCount) {
-      case 1:
-        assert((Desc->Dim == Dim1D) ||
-               (Desc->Dim == DimBuffer));
-        SS << ".i32";
-        break;
-      case 2:
-        assert((Desc->Dim == Dim2D) ||
-               (Desc->Dim == DimRect) ||
-               (Desc->Dim == DimCube) ||
-               (Desc->Arrayed && Desc->Dim == Dim1D));
-        SS << ".v2i32";
-        break;
-      case 3:
-        assert((Desc->Dim == Dim3D) ||
-               (Desc->Arrayed && Desc->Dim == Dim2D) ||
-               (Desc->Arrayed && Desc->Dim == DimCube));
-        SS << ".v3i32";
-        break;
-      default:
-        llvm_unreachable("Invalid return type");
-        break;
-      }
-    }
-  }
-
-  std::vector<Value *> Args = transValue(Ops, BB->getParent(), BB);
-  auto Int32Ty = Type::getInt32Ty(*Context);
-  if (OC == OpImageQuerySize) {
-    // Set LOD to zero
-    ArgTys.push_back(Int32Ty);
-    Args.push_back(ConstantInt::get(Int32Ty, 0));
-  }
-
-  // Add image call metadata as argument
-  ShaderImageCallMetadata ImageCallMD = {};
-  ImageCallMD.OpKind        = Info.OpKind;
-  ImageCallMD.Dim           = Desc->Dim;
-  ImageCallMD.Arrayed       = Desc->Arrayed;
-  ImageCallMD.Multisampled  = Desc->MS;
-  ArgTys.push_back(Int32Ty);
-  Args.push_back(ConstantInt::get(Int32Ty, ImageCallMD.U32All));
-
-  Function *F = M->getFunction(SS.str());
-  Type *RetTy = Type::getVoidTy(*Context);
-  if ((Info.OpKind != ImageOpAtomicStore) && (Info.OpKind != ImageOpWrite)) {
-    assert(BI->hasType());
-    RetTy = transType(BI->getType());
-  }
-
-  // For image read and image write, handle such case in which data argument
-  // is not vec4.
-  // NOTE: Such case is valid and can come from hand written or HLSL generated
-  // SPIR-V shader
-  uint32_t  DataCompCnt   = 4;
-  if ((BI->getOpCode() == OpImageRead) ||
-      ((BI->getOpCode() == OpImageFetch) && SPIRVWorkaroundBadSPIRV)) {
-    DataCompCnt = (RetTy->isVectorTy() == false) ?
-                    1 : RetTy->getVectorNumElements();
-    assert(DataCompCnt <= 4);
-
-    // For image read, need to change return type to vec4, and after
-    // generating call to library function, need to change return
-    // value from vec4 to the original type specified in SPIR-V.
-    if (DataCompCnt != 4)
-      RetTy = VectorType::get(RetTy->getScalarType(), 4);
-
-  } else if (BI->getOpCode() == OpImageWrite) {
-    Type  *DataTy = ArgTys[2];
-    Value *Data   = Args[2];
-
-    DataCompCnt = (DataTy->isVectorTy() == false) ?
-                    1 : DataTy->getVectorNumElements();
-    assert(DataCompCnt <= 4);
-
-    if (DataCompCnt != 4) {
-      // For image write, need to change data type to vec4, and zero-fill
-      // the extra components.
-      Type  *DataVec4Ty = VectorType::get(DataTy->getScalarType(), 4);
-      Value *DataVec4 = nullptr;
-
-      if (DataCompCnt == 1) {
-        Value *DataZeroVec4 = ConstantAggregateZero::get(DataVec4Ty);
-        DataVec4 = InsertElementInst::Create(DataZeroVec4,
-                                             Data,
-                                             ConstantInt::get(Type::getInt32Ty(*Context), 0),
-                                             "",
-                                             BB);
-      } else {
-        Value *DataZero = ConstantAggregateZero::get(DataTy);
-
-        SmallVector<Constant*, 4> Idxs;
-        for (uint32_t i = 0; i < 4; ++i)
-          Idxs.push_back(ConstantInt::get(Type::getInt32Ty(*Context), i));
-
-        Value *ShuffleMask = ConstantVector::get(Idxs);
-        DataVec4 = new ShuffleVectorInst(Data, DataZero, ShuffleMask, "", BB);
-      }
-
-      ArgTys[2] = DataVec4Ty;
-      Args[2] = DataVec4;
-    }
-  }
-
-  FunctionType *FT = FunctionType::get(RetTy, ArgTys, false);
-
-  if (!F) {
-    F = Function::Create(FT, GlobalValue::ExternalLinkage, SS.str(), M);
-    F->setCallingConv(CallingConv::SPIR_FUNC);
-    if (isFuncNoUnwind())
-      F->addFnAttr(Attribute::NoUnwind);
-  }
-
-  if (Info.OpKind != ImageOpQueryNonLod) {
-    assert(F->getFunctionType() == FT);
-  }
-
-  switch (Ordering)
-  {
-    case AtomicOrdering::Release:
-    case AtomicOrdering::AcquireRelease:
-    case AtomicOrdering::SequentiallyConsistent:
-      new FenceInst(*Context, AtomicOrdering::Release, SyncScope::System, BB);
-      break;
+    switch (Desc->Dim) {
+    case Dim1D:
+      return Llpc::Builder::Dim1DArray;
+    case DimBuffer:
+      return Llpc::Builder::Dim1DArray;
+    case Dim2D:
+      return Llpc::Builder::Dim2DArray;
+    case DimRect:
+      return Llpc::Builder::Dim2DArray;
+    case DimCube:
+      return Llpc::Builder::DimCubeArray;
     default:
       break;
-  }
-
-  CallInst *Call = CallInst::Create(F, Args, "", BB);
-  setName(Call, BI);
-  setAttrByCalledFunc(Call);
-
-  switch (Ordering)
-  {
-    case AtomicOrdering::Acquire:
-    case AtomicOrdering::AcquireRelease:
-    case AtomicOrdering::SequentiallyConsistent:
-      new FenceInst(*Context, AtomicOrdering::Acquire, SyncScope::System, BB);
-      break;
-    default:
-      break;
-  }
-
-  // For image read, handle such case in which return value is not vec4
-  // NOTE: Such case is valid and can come from hand written or HLSL generated
-  // SPIR-V shader
-  Value *RetVal = Call;
-  if (((BI->getOpCode() == OpImageRead) ||
-       ((BI->getOpCode() == OpImageFetch) && SPIRVWorkaroundBadSPIRV)) &&
-      (DataCompCnt != 4)) {
-    // Need to change return value of library function call from vec4 to the
-    // original type specified in SPIR-V.
-    assert(DataCompCnt < 4);
-
-    if (DataCompCnt == 1)
-      RetVal = ExtractElementInst::Create(Call,
-                                          ConstantInt::get(
-                                            Type::getInt32Ty(*Context), 0),
-                                          "",
-                                          BB);
-    else {
-      SmallVector<Constant*, 4> Idxs;
-      for (uint32_t i = 0; i < DataCompCnt; ++i)
-        Idxs.push_back(ConstantInt::get(Type::getInt32Ty(*Context), i));
-
-      Value *ShuffleMask = ConstantVector::get(Idxs);
-      RetVal = new ShuffleVectorInst(Call, Call, ShuffleMask, "", BB);
     }
   }
-
-  return RetVal;
+  llvm_unreachable("Unhandled image dimension");
+  return 0;
 }
 
+// =============================================================================
+// Get image and/or sampler descriptors, and get information from the image
+// type.
+void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
+                               ExtractedImageInfo *Info) {
+  if (BImageInst->hasDecorate(DecorationNonUniformEXT))
+    Info->Flags |= Llpc::Builder::ImageFlagNonUniformImage;
+
+  if (BImageInst->getOpCode() == OpImageTexelPointer) {
+    // We are looking at the OpImageTexelPointer for an image atomic. Load the
+    // image descriptor from its image pointer.
+    SPIRVValue *BImagePtr =
+        static_cast<SPIRVImageTexelPointer *>(BImageInst)->getImage();
+    Info->Desc = &static_cast<SPIRVTypeImage *>(
+                      BImagePtr->getType()->getPointerElementType())
+                      ->getDescriptor();
+    Info->Dim = convertDimension(Info->Desc);
+    Info->ImageDesc = transLoadImage(BImagePtr);
+    if (isa<StructType>(Info->ImageDesc->getType())) {
+      // Extract image descriptor from struct containing image+fmask descs.
+      Info->ImageDesc =
+          m_pBuilder->CreateExtractValue(Info->ImageDesc, uint64_t(0));
+    }
+    // We also need to trace back to the OpVariable or OpFunctionParam to find
+    // the coherent and volatile decorations.
+    while (BImagePtr->getOpCode() == OpAccessChain ||
+           BImagePtr->getOpCode() == OpInBoundsAccessChain) {
+      std::vector<SPIRVValue *> Operands =
+          static_cast<SPIRVInstTemplateBase *>(BImagePtr)->getOperands();
+      for (SPIRVValue *Operand : Operands) {
+        if (Operand->hasDecorate(DecorationNonUniformEXT))
+          Info->Flags |= Llpc::Builder::ImageFlagNonUniformImage;
+      }
+      BImagePtr = Operands[0];
+    }
+    assert(BImagePtr->getOpCode() == OpVariable ||
+           BImagePtr->getOpCode() == OpFunctionParameter);
+    if (BImageInst->hasDecorate(DecorationCoherent))
+      Info->Flags |= Llpc::Builder::ImageFlagCoherent;
+    if (BImageInst->hasDecorate(DecorationVolatile))
+      Info->Flags |= Llpc::Builder::ImageFlagVolatile;
+    return;
+  }
+
+  // We need to scan back through OpImage/OpSampledImage just to find any
+  // NonUniform decoration.
+  SPIRVValue *ScanBackInst = BImageInst;
+  while (ScanBackInst->getOpCode() == OpImage ||
+         ScanBackInst->getOpCode() == OpSampledImage) {
+    if (ScanBackInst->getOpCode() == OpSampledImage) {
+      auto Sampler =
+          static_cast<SPIRVInstTemplateBase *>(ScanBackInst)->getOpValue(1);
+      if (Sampler->hasDecorate(DecorationNonUniformEXT))
+        Info->Flags |= Llpc::Builder::ImageFlagNonUniformSampler;
+    }
+    ScanBackInst =
+        static_cast<SPIRVInstTemplateBase *>(ScanBackInst)->getOpValue(0);
+    if (ScanBackInst->hasDecorate(DecorationNonUniformEXT))
+      Info->Flags |= Llpc::Builder::ImageFlagNonUniformImage;
+  }
+
+  // Get the IR value for the image/sampledimage.
+  Value *Desc =
+      transValue(BImageInst, m_pBuilder->GetInsertBlock()->getParent(),
+                 m_pBuilder->GetInsertBlock());
+
+  SPIRVType *BImageTy = BImageInst->getType();
+  if (BImageTy->getOpCode() == OpTypeSampledImage) {
+    // For a sampledimage, the IR value is a struct containing the image and the
+    // sampler.
+    Info->SamplerDesc = m_pBuilder->CreateExtractValue(Desc, 1);
+    Desc = m_pBuilder->CreateExtractValue(Desc, uint64_t(0));
+    BImageTy = static_cast<SPIRVTypeSampledImage *>(BImageTy)->getImageType();
+  }
+  assert(BImageTy->getOpCode() == OpTypeImage);
+  Info->Desc = &static_cast<const SPIRVTypeImage *>(BImageTy)->getDescriptor();
+  Info->Dim = convertDimension(Info->Desc);
+
+  if (Info->Desc->MS) {
+    // For a multisampled image, the IR value is a struct containing the image
+    // descriptor and the fmask descriptor.
+    Info->FmaskDesc = m_pBuilder->CreateExtractValue(Desc, 1);
+    Desc = m_pBuilder->CreateExtractValue(Desc, uint64_t(0));
+  }
+  Info->ImageDesc = Desc;
+}
+
+// =============================================================================
+// Set up address operand array for image sample/gather/fetch/read/write
+// builder call.
+//
+// \param BI The SPIR-V instruction
+// \param MaskIdx Operand number of mask operand
+// \param HasProj Whether there is an extra projective component in coordinate
+// \param Addr [in/out] image address array
+// \param ImageInfo [in/out] Decoded image type information; flags modified by
+//        memory model image operands
+// \param Sample [out] Where to store sample number for OpImageFetch; nullptr to
+//        ignore it
+void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
+                                            unsigned MaskIdx, bool HasProj,
+                                            MutableArrayRef<Value *> Addr,
+                                            ExtractedImageInfo *ImageInfo,
+                                            Value **SampleNum) {
+
+  // SPIR-V allows the coordinate vector to be too wide; chop it down here.
+  // Also handle the extra projective component if any.
+  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  if (auto CoordVecTy = dyn_cast<VectorType>(Coord->getType())) {
+    unsigned NumCoords = m_pBuilder->GetImageNumCoords(ImageInfo->Dim);
+    if (HasProj) {
+      Addr[Llpc::Builder::ImageAddressIdxProjective] =
+          m_pBuilder->CreateExtractElement(Coord, NumCoords);
+    }
+    if (NumCoords < CoordVecTy->getNumElements()) {
+      static const unsigned Indexes[] = {0, 1, 2, 3};
+      Coord = m_pBuilder->CreateShuffleVector(
+          Coord, Coord, ArrayRef<unsigned>(Indexes).slice(0, NumCoords));
+      Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+    }
+  }
+
+  // Extra image operands. These need to be in ascending order so they take
+  // their operands in the right order.
+  BasicBlock *BB = m_pBuilder->GetInsertBlock();
+  ArrayRef<SPIRVWord> ImageOpnds =
+      ArrayRef<SPIRVWord>(
+          static_cast<SPIRVInstTemplateBase *>(BI)->getOpWords())
+          .slice(MaskIdx);
+  if (!ImageOpnds.empty()) {
+    unsigned Mask = ImageOpnds[0];
+    ImageOpnds = ImageOpnds.slice(1);
+
+    // Bias (0x1)
+    if (Mask & ImageOperandsBiasMask) {
+      Mask &= ~ImageOperandsBiasMask;
+      Addr[Llpc::Builder::ImageAddressIdxLodBias] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // Lod (0x2)
+    if (Mask & ImageOperandsLodMask) {
+      Mask &= ~ImageOperandsLodMask;
+      Addr[Llpc::Builder::ImageAddressIdxLod] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // Grad (0x4)
+    if (Mask & ImageOperandsGradMask) {
+      Mask &= ~ImageOperandsGradMask;
+      Addr[Llpc::Builder::ImageAddressIdxDerivativeX] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      Addr[Llpc::Builder::ImageAddressIdxDerivativeY] =
+          transValue(BM->getValue(ImageOpnds[1]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(2);
+    }
+
+    // ConstOffset (0x8)
+    if (Mask & ImageOperandsConstOffsetMask) {
+      Mask &= ~ImageOperandsConstOffsetMask;
+      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // Offset (0x10)
+    if (Mask & ImageOperandsOffsetMask) {
+      Mask &= ~ImageOperandsOffsetMask;
+      assert(!Addr[Llpc::Builder::ImageAddressIdxOffset]);
+      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // ConstOffsets (0x20)
+    if (Mask & ImageOperandsConstOffsetsMask) {
+      Mask &= ~ImageOperandsConstOffsetsMask;
+      assert(!Addr[Llpc::Builder::ImageAddressIdxOffset]);
+      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // Sample (0x40) (only on OpImageFetch)
+    if (Mask & ImageOperandsSampleMask) {
+      Mask &= ~ImageOperandsSampleMask;
+      if (SampleNum) {
+        *SampleNum =
+            transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      }
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // MinLod (0x80)
+    if (Mask & ImageOperandsMinLodMask) {
+      Mask &= ~ImageOperandsMinLodMask;
+      Addr[Llpc::Builder::ImageAddressIdxLodClamp] =
+          transValue(BM->getValue(ImageOpnds[0]), BB->getParent(), BB);
+      ImageOpnds = ImageOpnds.slice(1);
+    }
+
+    // MakeTexelAvailableKHR (0x100)
+    if (Mask & ImageOperandsMakeTexelAvailableKHRMask) {
+      Mask &= ~ImageOperandsMakeTexelAvailableKHRMask;
+      ImageInfo->Flags |= Llpc::Builder::ImageFlagCoherent;
+    }
+
+    // MakeTexelVisibleKHR (0x200)
+    if (Mask & ImageOperandsMakeTexelVisibleKHRMask) {
+      Mask &= ~ImageOperandsMakeTexelVisibleKHRMask;
+      ImageInfo->Flags |= Llpc::Builder::ImageFlagCoherent;
+    }
+
+    // NonPrivateTexelKHR (0x400)
+    if (Mask & ImageOperandsNonPrivateTexelKHRMask) {
+      Mask &= ~ImageOperandsNonPrivateTexelKHRMask;
+    }
+
+    // VolatileTexelKHR (0x800)
+    if (Mask & ImageOperandsVolatileTexelKHRMask) {
+      Mask &= ~ImageOperandsVolatileTexelKHRMask;
+      ImageInfo->Flags |= Llpc::Builder::ImageFlagVolatile;
+    }
+
+#if SPV_VERSION >= 0x10400
+    // SignExtend (0x1000)
+    if (Mask & ImageOperandsSignExtendMask) {
+      Mask &= ~ImageOperandsSignExtendMask;
+      ImageInfo->Flags |= Llpc::Builder::ImageFlagSignedResult;
+    }
+
+    // ZeroExtend (0x2000)
+    if (Mask & ImageOperandsZeroExtendMask) {
+      Mask &= ~ImageOperandsZeroExtendMask;
+    }
+#endif
+
+    assert(!Mask && "Unknown image operand");
+  }
+}
+
+// =============================================================================
+// Handle fetch/read/write/atomic aspects of coordinate.
+// This handles:
+// 1. adding any offset onto the coordinate;
+// 2. modifying coordinate for subpass data;
+// 3. for a cube array, separating the layer and face, as expected by the
+//    Builder interface
+void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
+                                                 ExtractedImageInfo *ImageInfo,
+                                                 MutableArrayRef<Value *> Addr,
+                                                 bool EnableMultiView) {
+
+  // Add the offset (if any) onto the coordinate. The offset might be narrower
+  // than the coordinate.
+  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  if (auto Offset = Addr[Llpc::Builder::ImageAddressIdxOffset]) {
+    if (isa<VectorType>(Coord->getType())) {
+      if (!isa<VectorType>(Offset->getType())) {
+        Offset = m_pBuilder->CreateInsertElement(
+            Constant::getNullValue(Coord->getType()), Offset, uint64_t(0));
+      } else if (Coord->getType()->getVectorNumElements() !=
+                 Offset->getType()->getVectorNumElements()) {
+        Offset = m_pBuilder->CreateShuffleVector(
+            Offset, Constant::getNullValue(Offset->getType()),
+            ArrayRef<unsigned>({0, 1, 2, 3})
+                .slice(0, Coord->getType()->getVectorNumElements()));
+      }
+    }
+    Coord = m_pBuilder->CreateAdd(Coord, Offset);
+  }
+
+  if (ImageInfo->Desc->Dim == DimSubpassData) {
+    // Modify coordinate for subpass data.
+    EnableMultiView &= reinterpret_cast<const GraphicsPipelineBuildInfo *>(
+                           m_pBuilder->getContext().GetPipelineBuildInfo())
+                           ->iaState.enableMultiView;
+    if (!EnableMultiView) {
+      // Subpass data without multiview: Add the x,y dimensions (converted to
+      // signed int) of the fragment coordinate on to the texel coordate.
+      ImageInfo->Flags |= Llpc::Builder::ImageFlagAddFragCoord;
+    } else {
+      // Subpass data with multiview: Use the fragment coordinate as x,y, and
+      // use ViewIndex as z. We need to pass in a (0,0,0) coordinate.
+      ImageInfo->Dim = Llpc::Builder::Dim2DArray;
+      ImageInfo->Flags |= Llpc::Builder::ImageFlagAddFragCoord |
+                          Llpc::Builder::ImageFlagUseViewIndex;
+      Coord =
+          Constant::getNullValue(VectorType::get(m_pBuilder->getInt32Ty(), 3));
+    }
+  }
+
+  // For a cube array, separate the layer and face.
+  if (ImageInfo->Dim == Llpc::Builder::DimCubeArray) {
+    SmallVector<Value *, 4> Components;
+    for (unsigned I = 0; I != 3; ++I)
+      Components.push_back(m_pBuilder->CreateExtractElement(Coord, I));
+    Components.push_back(
+        m_pBuilder->CreateUDiv(Components[2], m_pBuilder->getInt32(6)));
+    Components[2] =
+        m_pBuilder->CreateURem(Components[2], m_pBuilder->getInt32(6));
+    Coord = UndefValue::get(VectorType::get(m_pBuilder->getInt32Ty(), 4));
+    for (unsigned I = 0; I != 4; ++I)
+      Coord = m_pBuilder->CreateInsertElement(Coord, Components[I], I);
+  }
+
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  return;
+}
+
+// =============================================================================
+// Translate OpFragmentFetchAMD to LLVM IR
+Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
+                                                    BasicBlock *BB) {
+
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVInstTemplateBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  assert(ImageInfo.Desc->Dim == Dim2D || ImageInfo.Desc->Dim == DimSubpassData);
+  ImageInfo.Dim = !ImageInfo.Desc->Arrayed ? Llpc::Builder::Dim2DMsaa
+                                           : Llpc::Builder::Dim2DArrayMsaa;
+
+  // Set up address arguments.
+  Value *Coord = transValue(BII->getOpValue(1), BB->getParent(), BB);
+
+  // Handle fetch/read/write/atomic aspects of coordinate. (This converts to
+  // signed i32 and adds on the FragCoord if DimSubpassData.)
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr,
+                                 /*EnableMultiView=*/false);
+  Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+
+  // For a fragment fetch, there is an extra operand for the fragment id, which
+  // we must supply as an extra coordinate.
+  Value *FragId = transValue(BII->getOpValue(2), BB->getParent(), BB);
+  Value *NewCoord = UndefValue::get(
+      VectorType::get(m_pBuilder->getInt32Ty(), 3 + ImageInfo.Desc->Arrayed));
+  for (unsigned i = 0; i != 2 + ImageInfo.Desc->Arrayed; ++i) {
+    NewCoord = m_pBuilder->CreateInsertElement(
+        NewCoord, m_pBuilder->CreateExtractElement(Coord, i), i);
+  }
+  Coord = m_pBuilder->CreateInsertElement(NewCoord, FragId,
+                                          2 + ImageInfo.Desc->Arrayed);
+
+  // Get the return type for the Builder method.
+  Type *ResultTy = transType(BII->getType());
+
+  // Create the image load.
+  return m_pBuilder->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
+                                     ImageInfo.ImageDesc, Coord, nullptr);
+}
+
+// =============================================================================
+// Translate OpFragmentMaskFetchAMD to LLVM IR
+Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *BI,
+                                                        BasicBlock *BB) {
+
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and fmask descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVInstTemplateBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  assert(ImageInfo.Desc->Dim == Dim2D || ImageInfo.Desc->Dim == DimSubpassData);
+  ImageInfo.Dim =
+      !ImageInfo.Desc->Arrayed ? Llpc::Builder::Dim2D : Llpc::Builder::Dim3D;
+
+  // Set up address arguments.
+  Value *Coord = transValue(BII->getOpValue(1), BB->getParent(), BB);
+
+  // Handle fetch/read/write/atomic aspects of coordinate. (This converts to
+  // signed i32 and adds on the FragCoord if DimSubpassData.)
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr,
+                                 /*EnableMultiView=*/false);
+  Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+
+  // Get the return type for the Builder method. It returns v4f32, then we
+  // extract just the R channel.
+  Type *ResultTy = VectorType::get(transType(BI->getType()), 4);
+
+  // Create the image load.
+  Value *Result =
+      m_pBuilder->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
+                                  ImageInfo.FmaskDesc, Coord, nullptr);
+  return m_pBuilder->CreateExtractElement(Result, uint64_t(0));
+}
+
+// =============================================================================
+// Translate SPIR-V image atomic operations to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
+                                                    BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Parse the operands.
+  unsigned OpndIdx = 0;
+  auto BIT = static_cast<SPIRVInstTemplateBase *>(BI);
+  auto PointerBI =
+      static_cast<SPIRVImageTexelPointer *>(BIT->getOpValue(OpndIdx++));
+  assert(PointerBI->getOpCode() == OpImageTexelPointer);
+  unsigned Scope = static_cast<SPIRVConstant *>(BIT->getOpValue(OpndIdx++))
+                       ->getZExtIntValue();
+  unsigned Semantics = static_cast<SPIRVConstant *>(BIT->getOpValue(OpndIdx++))
+                           ->getZExtIntValue();
+  if (BIT->getOpCode() == OpAtomicCompareExchange ||
+      BIT->getOpCode() == OpAtomicCompareExchangeWeak) {
+    // Ignore unequal memory semantics
+    ++OpndIdx;
+  }
+  Value *InputData = nullptr;
+  if (BIT->getOpCode() != OpAtomicLoad &&
+      BIT->getOpCode() != OpAtomicIIncrement &&
+      BIT->getOpCode() != OpAtomicIDecrement)
+    InputData = transValue(BIT->getOpValue(OpndIdx++), BB->getParent(), BB);
+  Value *Comparator = nullptr;
+  if (BIT->getOpCode() == OpAtomicCompareExchange ||
+      BIT->getOpCode() == OpAtomicCompareExchangeWeak)
+    Comparator = transValue(BIT->getOpValue(OpndIdx++), BB->getParent(), BB);
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  getImageDesc(PointerBI, &ImageInfo);
+
+  // Set up address arguments.
+  Value *Coord = transValue(PointerBI->getCoordinate(), BB->getParent(), BB);
+  Value *SampleNum = transValue(PointerBI->getSample(), BB->getParent(), BB);
+
+  // For a multi-sampled image, put the sample ID on the end.
+  if (ImageInfo.Desc->MS) {
+    SampleNum = m_pBuilder->CreateInsertElement(
+        UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
+    SmallVector<unsigned, 4> Idxs;
+    Idxs.push_back(0);
+    Idxs.push_back(1);
+    if (ImageInfo.Desc->Arrayed)
+      Idxs.push_back(2);
+    Idxs.push_back(Coord->getType()->getVectorNumElements());
+    Coord = m_pBuilder->CreateShuffleVector(Coord, SampleNum, Idxs);
+  }
+
+  // Handle fetch/read/write/atomic aspects of coordinate. (This separates the
+  // cube face and ID.)
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
+  handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr);
+  Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+
+  // Determine the atomic ordering.
+  AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
+  if (Scope != ScopeInvocation) {
+    if (Semantics & MemorySemanticsSequentiallyConsistentMask)
+      Ordering = AtomicOrdering::SequentiallyConsistent;
+    else if (Semantics & MemorySemanticsAcquireReleaseMask)
+      Ordering = AtomicOrdering::AcquireRelease;
+    else if (Semantics & MemorySemanticsAcquireMask)
+      Ordering = AtomicOrdering::Acquire;
+    else if (Semantics & MemorySemanticsReleaseMask)
+      Ordering = AtomicOrdering::Release;
+
+    if (Ordering != AtomicOrdering::NotAtomic) {
+      // Upgrade the ordering if we need to make it avaiable or visible
+      if (Semantics & (MemorySemanticsMakeAvailableKHRMask |
+                       MemorySemanticsMakeVisibleKHRMask))
+        Ordering = AtomicOrdering::SequentiallyConsistent;
+    }
+  }
+
+  // Create the image atomic op.
+  unsigned AtomicOp = 0;
+  Value *Result = nullptr;
+  switch (BI->getOpCode()) {
+  case OpAtomicCompareExchange:
+  case OpAtomicCompareExchangeWeak:
+    Result = m_pBuilder->CreateImageAtomicCompareSwap(
+        ImageInfo.Dim, ImageInfo.Flags, Ordering, ImageInfo.ImageDesc, Coord,
+        InputData, Comparator);
+    break;
+
+  case OpAtomicStore:
+  case OpAtomicExchange:
+    AtomicOp = Llpc::Builder::ImageAtomicSwap;
+    break;
+  case OpAtomicLoad:
+    AtomicOp = Llpc::Builder::ImageAtomicAdd;
+    InputData = m_pBuilder->getInt32(0);
+    break;
+  case OpAtomicIIncrement:
+    AtomicOp = Llpc::Builder::ImageAtomicAdd;
+    InputData = m_pBuilder->getInt32(1);
+    break;
+  case OpAtomicIDecrement:
+    AtomicOp = Llpc::Builder::ImageAtomicSub;
+    InputData = m_pBuilder->getInt32(1);
+    break;
+  case OpAtomicIAdd:
+    AtomicOp = Llpc::Builder::ImageAtomicAdd;
+    break;
+  case OpAtomicISub:
+    AtomicOp = Llpc::Builder::ImageAtomicSub;
+    break;
+  case OpAtomicSMin:
+    AtomicOp = Llpc::Builder::ImageAtomicSMin;
+    break;
+  case OpAtomicUMin:
+    AtomicOp = Llpc::Builder::ImageAtomicUMin;
+    break;
+  case OpAtomicSMax:
+    AtomicOp = Llpc::Builder::ImageAtomicSMax;
+    break;
+  case OpAtomicUMax:
+    AtomicOp = Llpc::Builder::ImageAtomicUMax;
+    break;
+  case OpAtomicAnd:
+    AtomicOp = Llpc::Builder::ImageAtomicAnd;
+    break;
+  case OpAtomicOr:
+    AtomicOp = Llpc::Builder::ImageAtomicOr;
+    break;
+  case OpAtomicXor:
+    AtomicOp = Llpc::Builder::ImageAtomicXor;
+    break;
+
+  default:
+    llvm_unreachable("Unknown image atomic op");
+    break;
+  }
+
+  if (!Result) {
+    Result = m_pBuilder->CreateImageAtomic(
+        AtomicOp, ImageInfo.Dim, ImageInfo.Flags, Ordering, ImageInfo.ImageDesc,
+        Coord, InputData);
+  }
+  return Result;
+}
+
+// =============================================================================
+// Translate image sample to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
+                                                  BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource and sampler descriptors.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Determine the return type we want from the builder call. For a sparse
+  // sample/gather, the struct is {texel,TFE} in the builder call (to reflect
+  // the hardware), but {TFE,texel} in SPIR-V.
+  Type *OrigResultTy = transType(BII->getType());
+  Type *ResultTy = OrigResultTy;
+  if (auto StructResultTy = dyn_cast<StructType>(ResultTy)) {
+    ResultTy = StructType::get(
+        m_pBuilder->getContext(),
+        {StructResultTy->getElementType(1), StructResultTy->getElementType(0)});
+  }
+
+  // Set up address arguments.
+  unsigned OpndIdx = 1;
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+      transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+
+  switch (unsigned(BII->getOpCode())) {
+  case OpImageSampleDrefImplicitLod:
+  case OpImageSampleDrefExplicitLod:
+  case OpImageSampleProjDrefImplicitLod:
+  case OpImageSampleProjDrefExplicitLod:
+  case OpImageSparseSampleDrefImplicitLod:
+  case OpImageSparseSampleDrefExplicitLod:
+  case OpImageSparseSampleProjDrefImplicitLod:
+  case OpImageSparseSampleProjDrefExplicitLod:
+    // This instruction has a dref operand.
+    Addr[Llpc::Builder::ImageAddressIdxZCompare] =
+        transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+    break;
+  default:
+    break;
+  }
+
+  bool HasProj = false;
+  switch (BII->getOpCode()) {
+  case OpImageSampleProjImplicitLod:
+  case OpImageSampleProjExplicitLod:
+  case OpImageSampleProjDrefImplicitLod:
+  case OpImageSampleProjDrefExplicitLod:
+  case OpImageSparseSampleProjImplicitLod:
+  case OpImageSparseSampleProjExplicitLod:
+  case OpImageSparseSampleProjDrefImplicitLod:
+  case OpImageSparseSampleProjDrefExplicitLod:
+    // This instruction has an extra projective coordinate component.
+    HasProj = true;
+    break;
+  default:
+    break;
+  }
+
+  setupImageAddressOperands(BII, OpndIdx, HasProj, Addr, &ImageInfo, nullptr);
+
+  // Create the image sample call.
+  Value *Result = m_pBuilder->CreateImageSample(
+      ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
+      ImageInfo.SamplerDesc, Addr);
+
+  // For a sparse sample, swap the struct elements back again.
+  if (ResultTy != OrigResultTy) {
+    Value *SwappedResult = m_pBuilder->CreateInsertValue(
+        UndefValue::get(OrigResultTy),
+        m_pBuilder->CreateExtractValue(Result, 1), unsigned(0));
+    SwappedResult = m_pBuilder->CreateInsertValue(
+        SwappedResult, m_pBuilder->CreateExtractValue(Result, unsigned(0)), 1);
+    Result = SwappedResult;
+  }
+  return Result;
+}
+
+// =============================================================================
+// Translate image gather to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
+                                                  BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource and sampler descriptors.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Determine whether the result type of the gather is signed int.
+  auto BIITy = BII->getType();
+  if (BIITy->isTypeStruct())
+    BIITy = static_cast<SPIRVTypeStruct *>(BIITy)->getMemberType(1);
+  if (BIITy->isTypeVector())
+    BIITy = static_cast<SPIRVTypeVector *>(BIITy)->getComponentType();
+  if (BIITy->isTypeInt() && static_cast<SPIRVTypeInt *>(BIITy)->isSigned())
+    ImageInfo.Flags |= Llpc::Builder::ImageFlagSignedResult;
+
+  // Determine the return type we want from the builder call. For a sparse
+  // sample/gather, the struct is {texel,TFE} in the builder call (to reflect
+  // the hardware), but {TFE,texel} in SPIR-V.
+  Type *OrigResultTy = transType(BII->getType());
+  Type *ResultTy = OrigResultTy;
+  if (auto StructResultTy = dyn_cast<StructType>(ResultTy)) {
+    ResultTy = StructType::get(
+        m_pBuilder->getContext(),
+        {StructResultTy->getElementType(1), StructResultTy->getElementType(0)});
+  }
+
+  // Set up address arguments.
+  unsigned OpndIdx = 1;
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+      transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+
+  switch (unsigned(BII->getOpCode())) {
+  case OpImageGather:
+  case OpImageSparseGather:
+    // Component for OpImageGather
+    Addr[Llpc::Builder::ImageAddressIdxComponent] =
+        transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+    break;
+  case OpImageDrefGather:
+  case OpImageSparseDrefGather:
+    // This instruction has a dref operand.
+    Addr[Llpc::Builder::ImageAddressIdxZCompare] =
+        transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+    break;
+  default:
+    break;
+  }
+
+  Value *ConstOffsets = nullptr;
+  setupImageAddressOperands(BII, OpndIdx, /*HasProj=*/false, Addr, &ImageInfo,
+                            nullptr);
+
+  if (!Addr[Llpc::Builder::ImageAddressIdxLod] &&
+      !Addr[Llpc::Builder::ImageAddressIdxLodBias] &&
+      !Addr[Llpc::Builder::ImageAddressIdxDerivativeX]) {
+    // A gather with no lod, bias or derivatives is done with lod 0, not
+    // implicit lod.
+    Addr[Llpc::Builder::ImageAddressIdxLod] =
+        Constant::getNullValue(m_pBuilder->getFloatTy());
+  }
+
+  Value *Result = nullptr;
+  if (ConstOffsets) {
+    // A gather with non-standard offsets is done as four separate gathers. If
+    // it is a sparse gather, we just use the residency code from the last one.
+    Result = UndefValue::get(ResultTy);
+    Value *Residency = nullptr;
+    if (ResultTy != OrigResultTy)
+      Result = UndefValue::get(cast<StructType>(ResultTy)->getElementType(0));
+    for (int Idx = 3; Idx >= 0; --Idx) {
+      Addr[Llpc::Builder::ImageAddressIdxOffset] =
+          m_pBuilder->CreateExtractValue(ConstOffsets, Idx);
+      Value *SingleResult = m_pBuilder->CreateImageGather(
+          ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
+          ImageInfo.SamplerDesc, Addr);
+      if (ResultTy != OrigResultTy) {
+        // Handle sparse.
+        Residency = m_pBuilder->CreateExtractValue(SingleResult, 1);
+        SingleResult = m_pBuilder->CreateExtractValue(SingleResult, 0);
+      }
+      Result = m_pBuilder->CreateInsertElement(
+          Result, m_pBuilder->CreateExtractElement(SingleResult, 3), Idx);
+    }
+    if (ResultTy != OrigResultTy) {
+      // Handle sparse.
+      Result = m_pBuilder->CreateInsertValue(UndefValue::get(OrigResultTy),
+                                             Result, 1);
+      Result = m_pBuilder->CreateInsertValue(Result, Residency, 0);
+    }
+    return Result;
+  }
+
+  // Create the image gather call.
+  Result = m_pBuilder->CreateImageGather(ResultTy, ImageInfo.Dim,
+                                         ImageInfo.Flags, ImageInfo.ImageDesc,
+                                         ImageInfo.SamplerDesc, Addr);
+
+  // For a sparse gather, swap the struct elements back again.
+  if (ResultTy != OrigResultTy) {
+    Value *SwappedResult = m_pBuilder->CreateInsertValue(
+        UndefValue::get(OrigResultTy),
+        m_pBuilder->CreateExtractValue(Result, 1), unsigned(0));
+    SwappedResult = m_pBuilder->CreateInsertValue(
+        SwappedResult, m_pBuilder->CreateExtractValue(Result, unsigned(0)), 1);
+    Result = SwappedResult;
+  }
+  return Result;
+}
+
+// =============================================================================
+// Translate image fetch/read to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
+                                                     BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Determine the return type we want from the builder call. For a sparse
+  // fetch, the struct is {texel,TFE} in the builder call (to reflect
+  // the hardware), but {TFE,texel} in SPIR-V.
+  Type *OrigResultTy = transType(BI->getType());
+  Type *ResultTy = OrigResultTy;
+  if (auto StructResultTy = dyn_cast<StructType>(ResultTy)) {
+    ResultTy = StructType::get(
+        m_pBuilder->getContext(),
+        {StructResultTy->getElementType(1), StructResultTy->getElementType(0)});
+  }
+
+  // Set up address arguments.
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  unsigned OpndIdx = 1;
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+      transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+
+  Value *SampleNum = nullptr;
+  setupImageAddressOperands(BII, OpndIdx, /*HasProj=*/false, Addr, &ImageInfo,
+                            &SampleNum);
+
+  // Handle fetch/read/write aspects of coordinate.
+  handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr);
+
+  Value *Result = nullptr;
+  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  if (SampleNum) {
+    if (BI->getOpCode() == OpImageFetch ||
+        BI->getOpCode() == OpImageSparseFetch ||
+        ImageInfo.Desc->Dim == DimSubpassData) {
+      // This is an OpImageFetch with sample, or an OpImageRead with sample and
+      // subpass data dimension. We need to use the fmask variant of the builder
+      // method. First we need to get the fmask descriptor.
+      Result = m_pBuilder->CreateImageLoadWithFmask(
+          ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
+          ImageInfo.FmaskDesc, Coord, SampleNum);
+    } else {
+      // This is an OpImageRead with sample but not subpass data dimension.
+      // Append the sample onto the coordinate.
+      assert(ImageInfo.Dim == Llpc::Builder::Dim2DMsaa ||
+             ImageInfo.Dim == Llpc::Builder::Dim2DArrayMsaa);
+      SampleNum = m_pBuilder->CreateInsertElement(
+          UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
+      Coord = m_pBuilder->CreateShuffleVector(
+          Coord, SampleNum,
+          ArrayRef<unsigned>({0, 1, 2, 3})
+              .slice(0,
+                     cast<VectorType>(Coord->getType())->getNumElements() + 1));
+    }
+  }
+
+  if (!Result) {
+    // We did not do the "load with fmask" above. Do the normal image load now.
+    Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
+    Result =
+        m_pBuilder->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
+                                    ImageInfo.ImageDesc, Coord, Lod);
+  }
+
+  // For a sparse read/fetch, swap the struct elements back again.
+  if (ResultTy != OrigResultTy) {
+    Value *SwappedResult = m_pBuilder->CreateInsertValue(
+        UndefValue::get(OrigResultTy),
+        m_pBuilder->CreateExtractValue(Result, 1), unsigned(0));
+    SwappedResult = m_pBuilder->CreateInsertValue(
+        SwappedResult, m_pBuilder->CreateExtractValue(Result, unsigned(0)), 1);
+    Result = SwappedResult;
+  }
+  return Result;
+}
+
+// =============================================================================
+// Translate image write to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
+                                                 BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Set up address arguments and get the texel.
+  Value *Addr[Llpc::Builder::ImageAddressCount] = {};
+  unsigned OpndIdx = 1;
+  Addr[Llpc::Builder::ImageAddressIdxCoordinate] =
+      transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+  Value *Texel = transValue(BII->getOpValue(OpndIdx++), BB->getParent(), BB);
+
+  Value *SampleNum = nullptr;
+  setupImageAddressOperands(BII, OpndIdx, /*HasProj=*/false, Addr, &ImageInfo,
+                            &SampleNum);
+
+  // Handle fetch/read/write aspects of coordinate.
+  handleImageFetchReadWriteCoord(BII, &ImageInfo, Addr);
+
+  Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
+  if (SampleNum) {
+    // Append the sample onto the coordinate.
+    assert(ImageInfo.Dim == Llpc::Builder::Dim2DMsaa ||
+           ImageInfo.Dim == Llpc::Builder::Dim2DArrayMsaa);
+    SampleNum = m_pBuilder->CreateInsertElement(
+        UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
+    Coord = m_pBuilder->CreateShuffleVector(
+        Coord, SampleNum,
+        ArrayRef<unsigned>({0, 1, 2, 3})
+            .slice(0,
+                   cast<VectorType>(Coord->getType())->getNumElements() + 1));
+  }
+
+  // Do the image store.
+  Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
+  return m_pBuilder->CreateImageStore(ImageInfo.Dim, ImageInfo.Flags,
+                                      ImageInfo.ImageDesc, Coord, Lod, Texel);
+}
+
+// =============================================================================
+// Translate OpImageQueryLevels to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageQueryLevelsFromInst(SPIRVInstruction *BI,
+                                                       BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Generate the operation.
+  return m_pBuilder->CreateImageQueryLevels(ImageInfo.Dim, ImageInfo.Flags,
+                                            ImageInfo.ImageDesc);
+}
+
+// =============================================================================
+// Translate OpImageQuerySamples to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageQuerySamplesFromInst(SPIRVInstruction *BI,
+                                                        BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Generate the operation.
+  return m_pBuilder->CreateImageQuerySamples(ImageInfo.Dim, ImageInfo.Flags,
+                                             ImageInfo.ImageDesc);
+}
+
+// =============================================================================
+// Translate OpImageQuerySize/OpImageQuerySizeLod to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageQuerySizeFromInst(SPIRVInstruction *BI,
+                                                     BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource descriptor.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Generate the operation.
+  Value *Lod = m_pBuilder->getInt32(0);
+  if (BII->getOpCode() == OpImageQuerySizeLod)
+    Lod = transValue(BII->getOpValue(1), BB->getParent(), BB);
+  return m_pBuilder->CreateImageQuerySize(ImageInfo.Dim, ImageInfo.Flags,
+                                          ImageInfo.ImageDesc, Lod);
+}
+
+// =============================================================================
+// Translate OpImageQueryLod to LLVM IR
+Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *BI,
+                                                    BasicBlock *BB) {
+  m_pBuilder->SetInsertPoint(BB);
+  updateBuilderDebugLoc(BI, BB->getParent());
+
+  // Get image type descriptor and load resource and sampler descriptors.
+  ExtractedImageInfo ImageInfo = {BB};
+  auto BII = static_cast<SPIRVImageInstBase *>(BI);
+  getImageDesc(BII->getOpValue(0), &ImageInfo);
+
+  // Generate the operation.
+  Value *Coord = transValue(BII->getOpValue(1), BB->getParent(), BB);
+  return m_pBuilder->CreateImageGetLod(ImageInfo.Dim, ImageInfo.Flags,
+                                       ImageInfo.ImageDesc,
+                                       ImageInfo.SamplerDesc, Coord);
+}
+
+// =============================================================================
 std::string SPIRVToLLVM::getOCLBuiltinName(SPIRVInstruction *BI) {
   auto OC = BI->getOpCode();
   if (OC == OpGenericCastToPtrExplicit)
@@ -8662,7 +9619,7 @@ Instruction *SPIRVToLLVM::transOCLRelational(SPIRVInstruction *I,
 
 } // namespace SPIRV
 
-bool llvm::readSpirv(Builder *Builder, std::istream &IS,
+bool llvm::readSpirv(Builder *Builder, const void *shaderInfo, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
                      const SPIRVSpecConstMap &SpecConstMap, Module *M,
                      std::string &ErrMsg) {
@@ -8670,7 +9627,7 @@ bool llvm::readSpirv(Builder *Builder, std::istream &IS,
 
   IS >> *BM;
 
-  SPIRVToLLVM BTL(M, BM.get(), SpecConstMap, Builder);
+  SPIRVToLLVM BTL(M, BM.get(), SpecConstMap, Builder, shaderInfo);
   bool Succeed = true;
   if (!BTL.translate(EntryExecModel, EntryName)) {
     BM->getError(ErrMsg);

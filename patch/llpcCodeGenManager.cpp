@@ -91,7 +91,9 @@ Result CodeGenManager::CreateTargetMachine(
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
     if ((pContext->GetTargetMachine() != nullptr) &&
         (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
         (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc) &&
+#endif
         (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout) &&
         (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr)
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
@@ -190,6 +192,18 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-max-memory-clause", "1");
             }
 
+#if LLPC_BUILD_GFX10
+            if (pFunc->getCallingConv() == CallingConv::AMDGPU_GS)
+            {
+                // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
+                // read/write. This usage must enable the feature of using CI+ additional instructions.
+                const auto pNggControl = pContext->GetNggControl();
+                if (pNggControl->enableNgg && (pNggControl->passthroughMode == false))
+                {
+                    targetFeatures += ",+ci-insts,+enable-ds128";
+                }
+            }
+#endif
             if (pFunc->getCallingConv() == CallingConv::AMDGPU_HS)
             {
                 // Force s_barrier to be present (ignore optimization)
@@ -203,12 +217,16 @@ void CodeGenManager::SetupTargetFeatures(
             }
 
 #if LLPC_BUILD_GFX10
-            // Setup wavefront size per shader stage
             if (gfxIp.major >= 10)
             {
+                // Setup wavefront size per shader stage
                 uint32_t waveSize = pContext->GetShaderWaveSize(shaderStage);
 
                 targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+
+                // Allow driver setting for WGP by forcing backend to set 0
+                // which is then OR'ed with the driver set value
+                targetFeatures += ",+cumode";
             }
 #endif
 

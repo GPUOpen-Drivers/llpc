@@ -49,14 +49,18 @@ StringRef BuilderRecorder::GetCallName(
         return "nop";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
-    case Opcode::LoadSamplerDesc:
-        return "load.sampler.desc";
-    case Opcode::LoadResourceDesc:
-        return "load.resource.desc";
-    case Opcode::LoadTexelBufferDesc:
-        return "load.texel.buffer.desc";
-    case Opcode::LoadFmaskDesc:
-        return "load.fmask.desc";
+    case Opcode::IndexDescPtr:
+        return "index.desc.ptr";
+    case Opcode::LoadDescFromPtr:
+        return "load.desc.from.ptr";
+    case Opcode::GetSamplerDescPtr:
+        return "get.sampler.desc.ptr";
+    case Opcode::GetImageDescPtr:
+        return "get.image.desc.ptr";
+    case Opcode::GetTexelBufferDescPtr:
+        return "get.texel.buffer.desc.ptr";
+    case Opcode::GetFmaskDescPtr:
+        return "get.fmask.desc.ptr";
     case Opcode::LoadPushConstantsPtr:
         return "load.push.constants.ptr";
     case Opcode::GetBufferDescLength:
@@ -67,10 +71,28 @@ StringRef BuilderRecorder::GetCallName(
         return "kill";
     case Opcode::ReadClock:
         return "read.clock";
-    case Opcode::WaterfallLoop:
-        return "waterfall.loop";
-    case Opcode::WaterfallStoreLoop:
-        return "waterfall.store.loop";
+    case Opcode::ImageLoad:
+        return "image.load";
+    case Opcode::ImageLoadWithFmask:
+        return "image.load.with.fmask";
+    case Opcode::ImageStore:
+        return "image.store";
+    case Opcode::ImageSample:
+        return "image.sample";
+    case Opcode::ImageGather:
+        return "image.gather";
+    case Opcode::ImageAtomic:
+        return "image.atomic";
+    case Opcode::ImageAtomicCompareSwap:
+        return "image.atomic.compare.swap";
+    case Opcode::ImageQueryLevels:
+        return "image.query.levels";
+    case Opcode::ImageQuerySamples:
+        return "image.query.samples";
+    case Opcode::ImageQuerySize:
+        return "image.query.size";
+    case Opcode::ImageGetLod:
+        return "image.get.lod";
     case GetSubgroupSize:
         return "get.subgroup.size";
     case SubgroupElect:
@@ -161,7 +183,7 @@ Builder* Builder::CreateBuilderRecorder(
 Module* BuilderRecorder::Link(
     ArrayRef<Module*> modules)    // Shader stage modules to link
 {
-    for (uint32_t stage = 0; stage != ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage != ShaderStageNativeStageCount; ++stage)
     {
         if (Module* pModule = modules[stage])
         {
@@ -217,54 +239,6 @@ Instruction* BuilderRecorder::CreateReadClock(
 }
 
 // =====================================================================================================================
-// Create a waterfall loop containing the specified instruction.
-Instruction* BuilderRecorder::CreateWaterfallLoop(
-    Instruction*        pNonUniformInst,    // [in] The instruction to put in a waterfall loop
-    ArrayRef<uint32_t>  operandIdxs,        // The operand index/indices for non-uniform inputs that need to be uniform
-    const Twine&        instName)           // [in] Name to give instruction(s)
-{
-    LLPC_ASSERT(operandIdxs.empty() == false);
-    LLPC_ASSERT(pNonUniformInst->use_empty());
-
-    // This method is specified to ignore the insert point, and to put the waterfall loop around pNonUniformInst.
-    // For this recording implementation, put the call after pNonUniformInst, unless it is a store.
-    //auto savedInsertPoint = saveIP();
-    SetInsertPoint(pNonUniformInst->getNextNode());
-    SetCurrentDebugLocation(pNonUniformInst->getDebugLoc());
-
-    SmallVector<Value*, 3> args;
-    args.push_back(pNonUniformInst);
-    for (uint32_t operandIdx : operandIdxs)
-    {
-        args.push_back(getInt32(operandIdx));
-    }
-
-    Instruction *pWaterfallLoop = nullptr;
-    if (pNonUniformInst->getType()->isVoidTy() == false)
-    {
-        // Normal case that pNonUniformInst is not a store so has a return type.
-        pWaterfallLoop = Record(Opcode::WaterfallLoop, pNonUniformInst->getType(), args, instName);
-    }
-    else
-    {
-        // pNonUniformInst is a store with void return type, so we cannot pass its result through
-        // llpc.call.waterfall.loop. Instead we pass one of its non-uniform inputs through
-        // llpc.call.waterfall.store.loop. This situation needs to be specially handled in llpcBuilderReplayer.
-        SetInsertPoint(pNonUniformInst);
-        args[0] = pNonUniformInst->getOperand(operandIdxs[0]);
-        auto pWaterfallStoreLoop = Record(Opcode::WaterfallStoreLoop, args[0]->getType(), args, instName);
-        pNonUniformInst->setOperand(operandIdxs[0], pWaterfallStoreLoop);
-    }
-
-    // TODO: While almost nothing uses the Builder, we run the risk of the saved insertion
-    // point being invalid and this restoreIP crashing. So, for now, we just clear the insertion point.
-    //restoreIP(savedInsertPoint);
-    ClearInsertionPoint();
-
-    return pWaterfallLoop;
-}
-
-// =====================================================================================================================
 // Create a load of a buffer descriptor.
 Value* BuilderRecorder::CreateLoadBufferDesc(
     uint32_t      descSet,          // Descriptor set
@@ -286,83 +260,80 @@ Value* BuilderRecorder::CreateLoadBufferDesc(
 }
 
 // =====================================================================================================================
-// Create a load of a sampler descriptor. Returns a <4 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadSamplerDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    const Twine&  instName)         // [in] Name to give instruction(s)
+// Add index onto pointer to image/sampler/texelbuffer/F-mask array of descriptors.
+Value* BuilderRecorder::CreateIndexDescPtr(
+    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by this function or one of
+                                      //    the CreateGet*DescPtr methods
+    Value*        pIndex,             // [in] Index value
+    bool          isNonUniform,       // Whether the descriptor index is non-uniform
+    const Twine&  instName)           // [in] Name to give instruction(s)
 {
-    return Record(Opcode::LoadSamplerDesc,
-                  GetSamplerDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
+    LLPC_ASSERT((pDescPtr->getType() == GetImageDescPtrTy()) ||
+                (pDescPtr->getType() == GetSamplerDescPtrTy()) ||
+                (pDescPtr->getType() == GetFmaskDescPtrTy()) ||
+                (pDescPtr->getType() == GetTexelBufferDescPtrTy()));
+    return Record(Opcode::IndexDescPtr, pDescPtr->getType(), { pDescPtr, pIndex, getInt1(isNonUniform) }, instName);
+}
+
+// =====================================================================================================================
+// Load image/sampler/texelbuffer/F-mask descriptor from pointer.
+// Returns <8 x i32> descriptor for image or F-mask, or <4 x i32> descriptor for sampler or texel buffer.
+Value* BuilderRecorder::CreateLoadDescFromPtr(
+    Value*        pDescPtr,           // [in] Descriptor pointer, as returned by CreateIndexDescPtr or one of
+                                      //    the CreateGet*DescPtr methods
+    const Twine&  instName)           // [in] Name to give instruction(s)
+{
+    LLPC_ASSERT((pDescPtr->getType() == GetImageDescPtrTy()) ||
+                (pDescPtr->getType() == GetSamplerDescPtrTy()) ||
+                (pDescPtr->getType() == GetFmaskDescPtrTy()) ||
+                (pDescPtr->getType() == GetTexelBufferDescPtrTy()));
+    return Record(Opcode::LoadDescFromPtr,
+                  cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
+                  pDescPtr,
                   instName);
 }
 
 // =====================================================================================================================
-// Create a load of a resource descriptor. Returns a <8 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadResourceDesc(
+// Create a pointer to sampler descriptor. Returns a value of the type returned by GetSamplerDescPtrTy.
+Value* BuilderRecorder::CreateGetSamplerDescPtr(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::LoadResourceDesc,
-                  GetResourceDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
+    return Record(Opcode::GetSamplerDescPtr, GetSamplerDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
+}
+
+// =====================================================================================================================
+// Create a pointer to image descriptor. Returns a value of the type returned by GetImageDescPtrTy.
+Value* BuilderRecorder::CreateGetImageDescPtr(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::GetImageDescPtr, GetImageDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
+}
+
+// =====================================================================================================================
+// Create a pointer to texel buffer descriptor. Returns a value of the type returned by GetTexelBufferDescPtrTy.
+Value* BuilderRecorder::CreateGetTexelBufferDescPtr(
+    uint32_t      descSet,          // Descriptor set
+    uint32_t      binding,          // Descriptor binding
+    const Twine&  instName)         // [in] Name to give instruction(s)
+{
+    return Record(Opcode::GetTexelBufferDescPtr,
+                  GetTexelBufferDescPtrTy(),
+                  { getInt32(descSet), getInt32(binding) },
                   instName);
 }
 
 // =====================================================================================================================
-// Create a load of a texel buffer descriptor. Returns a <4 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadTexelBufferDesc(
+// Create a load of a F-mask descriptor. Returns a value of the type returned by GetFmaskDescPtrTy.
+Value* BuilderRecorder::CreateGetFmaskDescPtr(
     uint32_t      descSet,          // Descriptor set
     uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    return Record(Opcode::LoadTexelBufferDesc,
-                  GetTexelBufferDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
-                  instName);
-}
-
-// =====================================================================================================================
-// Create a load of a F-mask descriptor. Returns a <8 x i32> descriptor.
-Value* BuilderRecorder::CreateLoadFmaskDesc(
-    uint32_t      descSet,          // Descriptor set
-    uint32_t      binding,          // Descriptor binding
-    Value*        pDescIndex,       // [in] Descriptor index
-    bool          isNonUniform,     // Whether the descriptor index is non-uniform
-    const Twine&  instName)         // [in] Name to give instruction(s)
-{
-    return Record(Opcode::LoadFmaskDesc,
-                  GetResourceDescTy(),
-                  {
-                      getInt32(descSet),
-                      getInt32(binding),
-                      pDescIndex,
-                      getInt1(isNonUniform),
-                  },
-                  instName);
+    return Record(Opcode::GetFmaskDescPtr, GetFmaskDescPtrTy(), { getInt32(descSet), getInt32(binding) }, instName);
 }
 
 // =====================================================================================================================
@@ -371,8 +342,8 @@ Value* BuilderRecorder::CreateLoadPushConstantsPtr(
     Type*         pPushConstantsTy, // [in] Type of the push constants table that the returned pointer will point to
     const Twine&  instName)         // [in] Name to give instruction(s)
 {
-    Type* pRetTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
-    return Record(Opcode::LoadPushConstantsPtr, pRetTy, {}, instName);
+    Type* pResultTy = PointerType::get(pPushConstantsTy, ADDR_SPACE_CONST);
+    return Record(Opcode::LoadPushConstantsPtr, pResultTy, {}, instName);
 }
 
 // =====================================================================================================================
@@ -382,6 +353,257 @@ Value* BuilderRecorder::CreateGetBufferDescLength(
     const Twine&  instName)         // [in] Name to give instruction(s).
 {
     return Record(Opcode::GetBufferDescLength, getInt32Ty(), { pBufferDesc }, instName);
+}
+
+// =====================================================================================================================
+// Create an image load.
+Value* BuilderRecorder::CreateImageLoad(
+    Type*                   pResultTy,          // [in] Result type
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    Value*                  pImageDesc,         // [in] Image descriptor
+    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
+    Value*                  pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    SmallVector<Value*, 5> args;
+    args.push_back(getInt32(dim));
+    args.push_back(getInt32(flags));
+    args.push_back(pImageDesc);
+    args.push_back(pCoord);
+    if (pMipLevel != nullptr)
+    {
+        args.push_back(pMipLevel);
+    }
+    return Record(Opcode::ImageLoad, pResultTy, args, instName);
+}
+
+// =====================================================================================================================
+// Create an image load with F-mask.
+Value* BuilderRecorder::CreateImageLoadWithFmask(
+    Type*                   pResultTy,          // [in] Result type
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    Value*                  pImageDesc,         // [in] Image descriptor
+    Value*                  pFmaskDesc,         // [in] Fmask descriptor
+    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right
+                                                //    width for given dimension excluding sample
+    Value*                  pSampleNum,         // [in] Sample number, i32
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ImageLoadWithFmask,
+                  pResultTy,
+                  { getInt32(dim), getInt32(flags), pImageDesc, pFmaskDesc, pCoord, pSampleNum },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create an image store.
+Value* BuilderRecorder::CreateImageStore(
+    uint32_t          dim,                // Image dimension
+    uint32_t          flags,              // ImageFlag* flags
+    Value*            pImageDesc,         // [in] Image descriptor
+    Value*            pCoord,             // [in] Coordinates: scalar or vector i32
+    Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
+    Value*            pTexel,             // [in] Texel value to store; v4f16 or v4f32
+    const Twine&      instName)           // [in] Name to give instruction(s)
+{
+    SmallVector<Value*, 6> args;
+    args.push_back(getInt32(dim));
+    args.push_back(getInt32(flags));
+    args.push_back(pImageDesc);
+    args.push_back(pCoord);
+    if (pMipLevel != nullptr)
+    {
+        args.push_back(pMipLevel);
+    }
+    args.push_back(pTexel);
+    return Record(Opcode::ImageStore, nullptr, args, instName);
+}
+
+// =====================================================================================================================
+// Create an image sample.
+Value* BuilderRecorder::CreateImageSample(
+    Type*               pResultTy,          // [in] Result type
+    uint32_t            dim,                // Image dimension
+    uint32_t            flags,              // ImageFlag* flags
+    Value*              pImageDesc,         // [in] Image descriptor
+    Value*              pSamplerDesc,       // [in] Sampler descriptor
+    ArrayRef<Value*>    address,            // Address and other arguments
+    const Twine&        instName)           // [in] Name to give instruction(s)
+{
+    // Gather a mask of address elements that are not nullptr.
+    uint32_t addressMask = 0;
+    for (uint32_t i = 0; i != address.size(); ++i)
+    {
+        if (address[i] != nullptr)
+        {
+            addressMask |= 1U << i;
+        }
+    }
+
+    SmallVector<Value*, 8> args;
+    args.push_back(getInt32(dim));
+    args.push_back(getInt32(flags));
+    args.push_back(pImageDesc);
+    args.push_back(pSamplerDesc);
+    args.push_back(getInt32(addressMask));
+    for (uint32_t i = 0; i != address.size(); ++i)
+    {
+        if (address[i] != nullptr)
+        {
+            args.push_back(address[i]);
+        }
+    }
+    return Record(Opcode::ImageSample, pResultTy, args, instName);
+}
+
+// =====================================================================================================================
+// Create an image gather.
+Value* BuilderRecorder::CreateImageGather(
+    Type*               pResultTy,          // [in] Result type
+    uint32_t            dim,                // Image dimension
+    uint32_t            flags,              // ImageFlag* flags
+    Value*              pImageDesc,         // [in] Image descriptor
+    Value*              pSamplerDesc,       // [in] Sampler descriptor
+    ArrayRef<Value*>    address,            // Address and other arguments
+    const Twine&        instName)           // [in] Name to give instruction(s)
+{
+    // Gather a mask of address elements that are not nullptr.
+    uint32_t addressMask = 0;
+    for (uint32_t i = 0; i != address.size(); ++i)
+    {
+        if (address[i] != nullptr)
+        {
+            addressMask |= 1U << i;
+        }
+    }
+
+    SmallVector<Value*, 8> args;
+    args.push_back(getInt32(dim));
+    args.push_back(getInt32(flags));
+    args.push_back(pImageDesc);
+    args.push_back(pSamplerDesc);
+    args.push_back(getInt32(addressMask));
+    for (uint32_t i = 0; i != address.size(); ++i)
+    {
+        if (address[i] != nullptr)
+        {
+            args.push_back(address[i]);
+        }
+    }
+    return Record(Opcode::ImageGather, pResultTy, args, instName);
+}
+
+// =====================================================================================================================
+// Create an image atomic operation other than compare-and-swap.
+Value* BuilderRecorder::CreateImageAtomic(
+    uint32_t                atomicOp,           // Atomic op to create
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    AtomicOrdering          ordering,           // Atomic ordering
+    Value*                  pImageDesc,         // [in] Image descriptor
+    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
+    Value*                  pInputValue,        // [in] Input value: i32
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ImageAtomic,
+                  pInputValue->getType(),
+                  {
+                      getInt32(atomicOp),
+                      getInt32(dim),
+                      getInt32(flags),
+                      getInt32(static_cast<uint32_t>(ordering)),
+                      pImageDesc,
+                      pCoord,
+                      pInputValue
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create an image atomic compare-and-swap.
+Value* BuilderRecorder::CreateImageAtomicCompareSwap(
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    AtomicOrdering          ordering,           // Atomic ordering
+    Value*                  pImageDesc,         // [in] Image descriptor
+    Value*                  pCoord,             // [in] Coordinates: scalar or vector i32
+    Value*                  pInputValue,        // [in] Input value: i32
+    Value*                  pComparatorValue,   // [in] Value to compare against: i32
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ImageAtomicCompareSwap,
+                  pInputValue->getType(),
+                  {
+                      getInt32(dim),
+                      getInt32(flags),
+                      getInt32(static_cast<uint32_t>(ordering)),
+                      pImageDesc,
+                      pCoord,
+                      pInputValue,
+                      pComparatorValue
+                  },
+                  instName);
+}
+
+// =====================================================================================================================
+// Create a query of the number of mipmap levels in an image. Returns an i32 value.
+Value* BuilderRecorder::CreateImageQueryLevels(
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ImageQueryLevels, getInt32Ty(), { getInt32(dim), getInt32(flags), pImageDesc }, instName);
+}
+
+// =====================================================================================================================
+// Create a query of the number of samples in an image. Returns an i32 value.
+Value* BuilderRecorder::CreateImageQuerySamples(
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ImageQuerySamples, getInt32Ty(), { getInt32(dim), getInt32(flags), pImageDesc }, instName);
+}
+
+// =====================================================================================================================
+// Create a query of size of an image.
+// Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
+Value* BuilderRecorder::CreateImageQuerySize(
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
+    Value*                  pLod,               // [in] LOD
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    uint32_t compCount = GetImageQuerySizeComponentCount(dim);
+    Type* pResultTy = getInt32Ty();
+    if (compCount > 1)
+    {
+        pResultTy = VectorType::get(pResultTy, compCount);
+    }
+    return Record(Opcode::ImageQuerySize, pResultTy, { getInt32(dim), getInt32(flags), pImageDesc, pLod }, instName);
+}
+
+// =====================================================================================================================
+// Create a get of the LOD that would be used for an image sample with the given coordinates
+// and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
+// detail relative to the base level.
+Value* BuilderRecorder::CreateImageGetLod(
+    uint32_t                dim,                // Image dimension
+    uint32_t                flags,              // ImageFlag* flags
+    Value*                  pImageDesc,         // [in] Image descriptor
+    Value*                  pSamplerDesc,       // [in] Sampler descriptor
+    Value*                  pCoord,             // [in] Coordinates
+    const Twine&            instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ImageGetLod,
+                  VectorType::get(getFloatTy(), 2),
+                  { getInt32(dim), getInt32(flags), pImageDesc, pSamplerDesc, pCoord },
+                  instName);
 }
 
 // =====================================================================================================================
@@ -404,27 +626,30 @@ Value* BuilderRecorder::CreateSubgroupElect(
 // Create a subgroup all.
 Value* BuilderRecorder::CreateSubgroupAll(
     Value* const pValue,   // [in] The value to compare
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupAll, getInt1Ty(), pValue, instName);
+    return Record(Opcode::SubgroupAll, getInt1Ty(), { pValue,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup any
 Value* BuilderRecorder::CreateSubgroupAny(
     Value* const pValue,   // [in] The value to compare
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupAny, getInt1Ty(), pValue, instName);
+    return Record(Opcode::SubgroupAny, getInt1Ty(), { pValue,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
 // Create a subgroup all equal.
 Value* BuilderRecorder::CreateSubgroupAllEqual(
     Value* const pValue,   // [in] The value to compare
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give instruction(s)
 {
-    return Record(Opcode::SubgroupAllEqual, getInt1Ty(), pValue, instName);
+    return Record(Opcode::SubgroupAllEqual, getInt1Ty(), { pValue,  getInt1(wqm) }, instName);
 }
 
 // =====================================================================================================================
@@ -700,7 +925,7 @@ Value* BuilderRecorder::CreateSubgroupMbcnt(
 // Record one Builder call
 Instruction* BuilderRecorder::Record(
     BuilderRecorder::Opcode opcode,       // Opcode of Builder method call being recorded
-    Type*                   pRetTy,       // [in] Return type (can be nullptr for void)
+    Type*                   pResultTy,    // [in] Return type (can be nullptr for void)
     ArrayRef<Value*>        args,         // Arguments
     const Twine&            instName)     // [in] Name to give instruction
 {
@@ -715,14 +940,14 @@ Instruction* BuilderRecorder::Record(
         raw_string_ostream mangledNameStream(mangledName);
         mangledNameStream << BuilderCallPrefix;
         mangledNameStream << GetCallName(opcode);
-        if (pRetTy != nullptr)
+        if (pResultTy != nullptr)
         {
             mangledNameStream << ".";
-            GetTypeName(pRetTy, mangledNameStream);
+            GetTypeName(pResultTy, mangledNameStream);
         }
         else
         {
-            pRetTy = Type::getVoidTy(getContext());
+            pResultTy = Type::getVoidTy(getContext());
         }
     }
 
@@ -732,7 +957,7 @@ Instruction* BuilderRecorder::Record(
     if (pFunc == nullptr)
     {
         // Does not exist. Create it as a varargs function.
-        auto pFuncTy = FunctionType::get(pRetTy, {}, true);
+        auto pFuncTy = FunctionType::get(pResultTy, {}, true);
         pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, mangledName, pModule);
 
         MDNode* const pFuncMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
@@ -753,20 +978,24 @@ void BuilderRecorder::CheckFuncShaderStage(
     Function*   pFunc,        // [in] Function to check
     ShaderStage shaderStage)  // Shader stage frontend says it is in
 {
-    LLPC_ASSERT(shaderStage < ShaderStageCount);
+    LLPC_ASSERT(shaderStage < ShaderStageNativeStageCount);
     if (pFunc != m_pEnclosingFunc)
     {
-        auto mapIt = m_funcShaderStageMap.find(pFunc);
-        if (mapIt != m_funcShaderStageMap.end())
+        // The "function shader stage map" is in fact a vector of pairs of WeakVH (giving the function)
+        // and shader stage. It is done that way because a function can disappear through inlining during the
+        // lifetime of the BuilderRecorder, and then another function could potentially be allocated at the
+        // same address.
+        m_pEnclosingFunc = pFunc;
+        for (const auto& mapEntry : m_funcShaderStageMap)
         {
-            LLPC_ASSERT((mapIt->second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
+            if (mapEntry.first == pFunc)
+            {
+                LLPC_ASSERT((mapEntry.second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
+                return;
+            }
         }
-        else
-        {
-            m_funcShaderStageMap[pFunc] = shaderStage;
-        }
+        m_funcShaderStageMap.push_back({ pFunc, shaderStage });
     }
-    m_pEnclosingFunc = pFunc;
 }
 #endif
 

@@ -116,7 +116,7 @@ bool PatchEntryPointMutate::runOnModule(
 
     // Process each shader in turn, but not the copy shader.
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
-    for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageCount; ++shaderStage)
+    for (uint32_t shaderStage = ShaderStageVertex; shaderStage < ShaderStageNativeStageCount; ++shaderStage)
     {
         m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
@@ -396,7 +396,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     // Estimated available user data count
     uint32_t maxUserDataCount = m_pContext->GetGpuProperty()->maxUserDataCount;
     uint32_t availUserDataCount = maxUserDataCount - userDataIdx;
-    uint32_t requiredUserDataCount = 0; // Maximum required user data
+    uint32_t requiredRemappedUserDataCount = 0; // Maximum required user data
+    uint32_t requiredUserDataCount = 0;         // Maximum required user data without remapping
     bool useFixedLayout = (m_shaderStage == ShaderStageCompute);
     bool reserveVbTable = false;
     bool reserveStreamOutTable = false;
@@ -473,14 +474,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 pIntfData->pushConst.resNodeIdx = i;
             }
 
-            if (useFixedLayout)
-            {
-                requiredUserDataCount = std::max(requiredUserDataCount, pNode->offsetInDwords + pNode->sizeInDwords);
-            }
-            else
-            {
-                requiredUserDataCount += pNode->sizeInDwords;
-            }
+            requiredUserDataCount = std::max(requiredUserDataCount, pNode->offsetInDwords + pNode->sizeInDwords);
+            requiredRemappedUserDataCount += pNode->sizeInDwords;
         }
     }
 
@@ -620,7 +615,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
     else
     {
-        needSpill = (requiredUserDataCount > availUserDataCount);
+        needSpill = (requiredRemappedUserDataCount > availUserDataCount);
         pIntfData->spillTable.offsetInDwords = InvalidValue;
         if (needSpill)
         {
@@ -776,7 +771,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         pIntfData->userDataUsage.spillTable = userDataIdx - 1;
         pIntfData->entryArgIdxs.spillTable = argIdx - 1;
 
-        pIntfData->spillTable.sizeInDwords = requiredUserDataCount - pIntfData->spillTable.offsetInDwords;
+        pIntfData->spillTable.sizeInDwords = requiredUserDataCount;
     }
 
     switch (m_shaderStage)

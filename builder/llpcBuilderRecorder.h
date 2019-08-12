@@ -31,6 +31,9 @@
 #pragma once
 
 #include "llpcBuilder.h"
+#ifndef NDEBUG
+#include "llvm/IR/ValueHandle.h"
+#endif
 
 namespace Llpc
 {
@@ -66,15 +69,28 @@ public:
         Nop = 0,
 
         // Descriptor
-        WaterfallLoop,
-        WaterfallStoreLoop,
         LoadBufferDesc,
-        LoadSamplerDesc,
-        LoadResourceDesc,
-        LoadTexelBufferDesc,
-        LoadFmaskDesc,
+        IndexDescPtr,
+        LoadDescFromPtr,
+        GetSamplerDescPtr,
+        GetImageDescPtr,
+        GetTexelBufferDescPtr,
+        GetFmaskDescPtr,
         LoadPushConstantsPtr,
         GetBufferDescLength,
+
+        // Image
+        ImageLoad,
+        ImageLoadWithFmask,
+        ImageStore,
+        ImageSample,
+        ImageGather,
+        ImageAtomic,
+        ImageAtomicCompareSwap,
+        ImageQueryLevels,
+        ImageQuerySamples,
+        ImageQuerySize,
+        ImageGetLod,
 
         // Matrix
         TransposeMatrix,
@@ -138,9 +154,6 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
-    llvm::Instruction* CreateWaterfallLoop(llvm::Instruction*       pNonUniformInst,
-                                           llvm::ArrayRef<uint32_t> operandIdxs,
-                                           const llvm::Twine&       instName) override final;
     llvm::Value* CreateLoadBufferDesc(uint32_t            descSet,
                                       uint32_t            binding,
                                       llvm::Value*        pDescIndex,
@@ -148,35 +161,132 @@ public:
                                       llvm::Type*         pPointeeTy,
                                       const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadSamplerDesc(uint32_t            descSet,
-                                       uint32_t            binding,
-                                       llvm::Value*        pDescIndex,
-                                       bool                isNonUniform,
+    llvm::Value* CreateIndexDescPtr(llvm::Value*        pDescPtr,
+                                    llvm::Value*        pIndex,
+                                    bool                isNonUniform,
+                                    const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateLoadDescFromPtr(llvm::Value*        pDescPtr,
                                        const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadResourceDesc(uint32_t            descSet,
-                                        uint32_t            binding,
-                                        llvm::Value*        pDescIndex,
-                                        bool                isNonUniform,
-                                        const llvm::Twine&  instName) override final;
+    llvm::Value* CreateGetSamplerDescPtr(uint32_t            descSet,
+                                         uint32_t            binding,
+                                         const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadTexelBufferDesc(uint32_t            descSet,
-                                           uint32_t            binding,
-                                           llvm::Value*        pDescIndex,
-                                           bool                isNonUniform,
-                                           const llvm::Twine&  instName) override final;
+    llvm::Value* CreateGetImageDescPtr(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       const llvm::Twine&  instName) override final;
 
-    llvm::Value* CreateLoadFmaskDesc(uint32_t            descSet,
-                                     uint32_t            binding,
-                                     llvm::Value*        pDescIndex,
-                                     bool                isNonUniform,
-                                     const llvm::Twine&  instName) override final;
+    llvm::Value* CreateGetTexelBufferDescPtr(uint32_t            descSet,
+                                             uint32_t            binding,
+                                             const llvm::Twine&  instName) override final;
+
+    llvm::Value* CreateGetFmaskDescPtr(uint32_t            descSet,
+                                       uint32_t            binding,
+                                       const llvm::Twine&  instName) override final;
 
     llvm::Value* CreateLoadPushConstantsPtr(llvm::Type*         pPushConstantsTy,
                                             const llvm::Twine&  instName) override final;
 
     llvm::Value* CreateGetBufferDescLength(llvm::Value* const pBufferDesc,
                                            const llvm::Twine& instName = "") override final;
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Image operations
+
+    // Create an image load.
+    llvm::Value* CreateImageLoad(llvm::Type*               pResultTy,
+                                 uint32_t                  dim,
+                                 uint32_t                  flags,
+                                 llvm::Value*              pImageDesc,
+                                 llvm::Value*              pCoord,
+                                 llvm::Value*              pMipLevel,
+                                 const llvm::Twine&        instName = "") override final;
+
+    // Create an image load with F-mask.
+    llvm::Value* CreateImageLoadWithFmask(llvm::Type*                   pResultTy,
+                                          uint32_t                      dim,
+                                          uint32_t                      flags,
+                                          llvm::Value*                  pImageDesc,
+                                          llvm::Value*                  pFmaskDesc,
+                                          llvm::Value*                  pCoord,
+                                          llvm::Value*                  pSampleNum,
+                                          const llvm::Twine&            instName) override final;
+
+    // Create an image store.
+    llvm::Value* CreateImageStore(uint32_t               dim,
+                                  uint32_t               flags,
+                                  llvm::Value*           pImageDesc,
+                                  llvm::Value*           pCoord,
+                                  llvm::Value*           pMipLevel,
+                                  llvm::Value*           pTexel,
+                                  const llvm::Twine&     instName = "") override final;
+
+    // Create an image sample.
+    llvm::Value* CreateImageSample(llvm::Type*                   pResultTy,
+                                   uint32_t                      dim,
+                                   uint32_t                      flags,
+                                   llvm::Value*                  pImageDesc,
+                                   llvm::Value*                  pSamplerDesc,
+                                   llvm::ArrayRef<llvm::Value*>  address,
+                                   const llvm::Twine&            instName = "") override final;
+
+    // Create an image gather.
+    llvm::Value* CreateImageGather(llvm::Type*                   pResultTy,
+                                   uint32_t                      dim,
+                                   uint32_t                      flags,
+                                   llvm::Value*                  pImageDesc,
+                                   llvm::Value*                  pSamplerDesc,
+                                   llvm::ArrayRef<llvm::Value*>  address,
+                                   const llvm::Twine&            instName = "") override final;
+
+    // Create an image atomic operation other than compare-and-swap.
+    llvm::Value* CreateImageAtomic(uint32_t               atomicOp,
+                                   uint32_t               dim,
+                                   uint32_t               flags,
+                                   llvm::AtomicOrdering   ordering,
+                                   llvm::Value*           pImageDesc,
+                                   llvm::Value*           pCoord,
+                                   llvm::Value*           pInputValue,
+                                   const llvm::Twine&     instName = "") override final;
+
+    // Create an image atomic compare-and-swap.
+    llvm::Value* CreateImageAtomicCompareSwap(uint32_t              dim,
+                                              uint32_t              flags,
+                                              llvm::AtomicOrdering  ordering,
+                                              llvm::Value*          pImageDesc,
+                                              llvm::Value*          pCoord,
+                                              llvm::Value*          pInputValue,
+                                              llvm::Value*          pComparatorValue,
+                                              const llvm::Twine&    instName = "") override final;
+
+    // Create a query of the number of mipmap levels in an image. Returns an i32 value.
+    llvm::Value* CreateImageQueryLevels(uint32_t                      dim,
+                                        uint32_t                      flags,
+                                        llvm::Value*                  pImageDesc,
+                                        const llvm::Twine&            instName = "") override final;
+
+    // Create a query of the number of samples in an image. Returns an i32 value.
+    llvm::Value* CreateImageQuerySamples(uint32_t                      dim,
+                                         uint32_t                      flags,
+                                         llvm::Value*                  pImageDesc,
+                                         const llvm::Twine&            instName = "") override final;
+
+    // Create a query of size of an image at the specified LOD
+    llvm::Value* CreateImageQuerySize(uint32_t                dim,
+                                      uint32_t                flags,
+                                      llvm::Value*            pImageDesc,
+                                      llvm::Value*            pLod,
+                                      const llvm::Twine&      instName = "") override final;
+
+    // Create a get of the LOD that would be used for an image sample with the given coordinates
+    // and implicit LOD.
+    llvm::Value* CreateImageGetLod(uint32_t                dim,
+                                   uint32_t                flags,
+                                   llvm::Value*            pImageDesc,
+                                   llvm::Value*            pSamplerDesc,
+                                   llvm::Value*            pCoord,
+                                   const llvm::Twine&      instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations
@@ -193,10 +303,13 @@ public:
     llvm::Value* CreateGetSubgroupSize(const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupElect(const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupAll(llvm::Value* const pValue,
+                                   bool               wqm,
                                    const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupAny(llvm::Value* const pValue,
+                                   bool               wqm,
                                    const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupAllEqual(llvm::Value* const pValue,
+                                        bool               wqm,
                                         const llvm::Twine& instName) override final;
     llvm::Value* CreateSubgroupBroadcast(llvm::Value* const pValue,
                                          llvm::Value* const pIndex,
@@ -287,9 +400,9 @@ private:
                                                               //   pass
 #ifndef NDEBUG
     // Only used in a debug build to ensure SetShaderStage is being used consistently.
-    std::map<llvm::Function*, ShaderStage>  m_funcShaderStageMap;           // Map from function to shader stage
-    llvm::Function*                         m_pEnclosingFunc = nullptr;     // Last function written with current
-                                                                            //   shader stage
+    std::vector<std::pair<llvm::WeakVH, ShaderStage>> m_funcShaderStageMap;       // Map from function to shader stage
+    llvm::Function*                                   m_pEnclosingFunc = nullptr; // Last function written with current
+                                                                                  //   shader stage
 #endif
 };
 

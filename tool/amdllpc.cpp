@@ -1425,7 +1425,7 @@ static Result ProcessPipeline(
                         LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
                     }
 
-                    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+                    for (uint32_t stage = 0; stage < pPipelineState->numStages; ++stage)
                     {
                         if (pPipelineState->stages[stage].dataSize > 0)
                         {

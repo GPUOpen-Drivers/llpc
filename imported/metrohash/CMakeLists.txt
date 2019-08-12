@@ -33,8 +33,7 @@ target_include_directories(llpc_metrohash PUBLIC inc)
 
 target_sources(llpc_metrohash PRIVATE inc/metrohash.h
                                       inc/metrohash64.h
-                                      inc/metrohash128.h
-                                      inc/utils.h)
+                                      inc/metrohash128.h)
 
 target_sources(llpc_metrohash PRIVATE src/platform.h
                                       src/metrohash64.cpp

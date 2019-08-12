@@ -121,8 +121,71 @@ bool PatchDescriptorLoad::runOnModule(
     }
     m_descLoadFuncs.clear();
 
+    // Remove dead llpc.descriptor.point* and llpc.descriptor.index calls that were not
+    // processed by the code above. That happens if they were never used in llpc.descriptor.load.from.ptr.
+    SmallVector<Function*, 4> deadDescFuncs;
+    for (Function& func : *m_pModule)
+    {
+        if (func.isDeclaration() && (func.getName().startswith(LlpcName::DescriptorGetPtrPrefix) ||
+                                     func.getName().startswith(LlpcName::DescriptorIndex)))
+        {
+            deadDescFuncs.push_back(&func);
+        }
+    }
+    for (Function* pFunc : deadDescFuncs)
+    {
+        while (pFunc->use_empty() == false)
+        {
+            pFunc->use_begin()->set(UndefValue::get(pFunc->getType()));
+        }
+        pFunc->eraseFromParent();
+    }
+
     m_pipelineSysValues.Clear();
     return m_changed;
+}
+
+// =====================================================================================================================
+// Process "llpc.descriptor.load.from.ptr" call.
+// Currently we assume that everything is inlined, so here we can trace the pointer back through any
+// "llpc.descriptor.index" calls back to an "llpc.descriptor.point.*" call.
+// In the future, we want to remove the assumption that everything is inlined. To do that, we will need to
+// do some internal rearrangement to the descriptor load code. That will probably happen at the same time
+// as moving descriptor load code up into the builder.
+void PatchDescriptorLoad::ProcessLoadDescFromPtr(
+    CallInst* pLoadFromPtr)   // [in] Call to llpc.descriptor.load.from.ptr
+{
+    m_pEntryPoint = pLoadFromPtr->getFunction();
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(pLoadFromPtr);
+    Value* pIndex = builder.getInt32(0);
+
+    auto pLoadPtr = cast<CallInst>(pLoadFromPtr->getOperand(0));
+    while (pLoadPtr->getCalledFunction()->getName().startswith(LlpcName::DescriptorIndex))
+    {
+        pIndex = builder.CreateAdd(pIndex, pLoadPtr->getOperand(1));
+        pLoadPtr = cast<CallInst>(pLoadPtr->getOperand(0));
+    }
+
+    LLPC_ASSERT(pLoadPtr->getCalledFunction()->getName().startswith(LlpcName::DescriptorGetPtrPrefix));
+
+    uint32_t descSet = cast<ConstantInt>(pLoadPtr->getOperand(0))->getZExtValue();
+    uint32_t binding = cast<ConstantInt>(pLoadPtr->getOperand(1))->getZExtValue();
+    Value* pDesc = LoadDescriptor(*pLoadPtr, descSet, binding, pIndex, pLoadFromPtr);
+
+    pLoadFromPtr->replaceAllUsesWith(pDesc);
+
+    Instruction* pDeadInst = pLoadFromPtr;
+    while ((pDeadInst != nullptr) && pDeadInst->use_empty())
+    {
+        Instruction* pNextDeadInst = nullptr;
+        if ((isa<PHINode>(pDeadInst) == false) && (pDeadInst->getNumOperands() >= 1))
+        {
+            pNextDeadInst = dyn_cast<Instruction>(pDeadInst->getOperand(0));
+        }
+        pDeadInst->eraseFromParent();
+        pDeadInst = pNextDeadInst;
+    }
 }
 
 // =====================================================================================================================
@@ -136,40 +199,86 @@ void PatchDescriptorLoad::visitCallInst(
         return;
     }
 
-    auto mangledName = pCallee->getName();
+    StringRef mangledName = pCallee->getName();
 
     std::string descLoadPrefix = LlpcName::DescriptorLoadPrefix;
-    bool isDescLoad = (strncmp(mangledName.data(),descLoadPrefix.c_str(), descLoadPrefix.size()) == 0);
-
+    bool isDescLoad = mangledName.startswith(LlpcName::DescriptorLoadPrefix);
     if (isDescLoad == false)
     {
-        return; // Not descriptor load call
+        return; // Not descriptor load
+    }
+
+    if (mangledName.startswith(LlpcName::DescriptorGetPtrPrefix) ||
+        mangledName.startswith(LlpcName::DescriptorIndex))
+    {
+        // Ignore llpc.descriptor.point.* calls and llpc.descriptor.index calls, as they
+        // get processed at llpc.descriptor.load.from.ptr.
+        return;
+    }
+
+    if (mangledName.startswith(LlpcName::DescriptorLoadFromPtr))
+    {
+        ProcessLoadDescFromPtr(&callInst);
+        return;
     }
 
     // Descriptor loading should be inlined and stay in shader entry-point
     LLPC_ASSERT(callInst.getParent()->getParent() == m_pEntryPoint);
 
     m_changed = true;
+
+    // Create the descriptor load (unless the call has no uses).
+    if (callInst.use_empty() == false)
+    {
+        Value* pDesc = nullptr;
+        if (mangledName == LlpcName::DescriptorLoadSpillTable)
+        {
+            pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr(m_pPipelineState);
+        }
+        else
+        {
+            uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+            uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+            Value* pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
+            pDesc = LoadDescriptor(callInst, descSet, binding, pArrayOffset, &callInst);
+        }
+
+        // Replace the call with the loaded descriptor.
+        callInst.replaceAllUsesWith(pDesc);
+    }
+
+    m_descLoadCalls.push_back(&callInst);
+    m_descLoadFuncs.insert(pCallee);
+}
+
+// =====================================================================================================================
+// Generate the code for the descriptor load
+Value* PatchDescriptorLoad::LoadDescriptor(
+    CallInst&     callInst,       // [in] The llpc.descriptor.load.* or llpc.descriptor.point.* call being replaced
+    uint32_t      descSet,        // Descriptor set
+    uint32_t      binding,        // Binding
+    Value*        pArrayOffset,   // [in] Index in descriptor array
+    Instruction*  pInsertPoint)   // [in] Insert point
+{
+    StringRef mangledName = callInst.getCalledFunction()->getName();
     Type* pDescPtrTy = nullptr;
     ResourceMappingNodeType nodeType1 = ResourceMappingNodeType::Unknown;
     ResourceMappingNodeType nodeType2 = ResourceMappingNodeType::Unknown;
 
-    bool loadSpillTable = false;
-
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
-    if (mangledName == LlpcName::DescriptorLoadResource)
+    if (mangledName == LlpcName::DescriptorGetResourcePtr)
     {
         pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorResource;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorLoadSampler)
+    else if (mangledName == LlpcName::DescriptorGetSamplerPtr)
     {
         pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorSampler;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorLoadFmask)
+    else if (mangledName == LlpcName::DescriptorGetFmaskPtr)
     {
         pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorFmask;
@@ -186,380 +295,353 @@ void PatchDescriptorLoad::visitCallInst(
         nodeType1 = ResourceMappingNodeType::PushConst;
         nodeType2 = nodeType1;
     }
-    else if (mangledName == LlpcName::DescriptorLoadTexelBuffer)
+    else if (mangledName == LlpcName::DescriptorGetTexelBufferPtr)
     {
         pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorTexelBuffer;
         nodeType2 = nodeType1;
-    }
-    else if (mangledName == LlpcName::DescriptorLoadSpillTable)
-    {
-        loadSpillTable = true;
     }
     else
     {
         LLPC_NEVER_CALLED();
     }
 
-    if (loadSpillTable)
+    LLPC_ASSERT(nodeType1 != ResourceMappingNodeType::Unknown);
+
+    // Calculate descriptor offset (in bytes)
+    uint32_t descOffset = 0;
+    uint32_t descSize   = 0;
+    uint32_t dynDescIdx = InvalidValue;
+    Value*   pDesc = nullptr;
+    Constant* pDescRangeValue = nullptr;
+
+    if (nodeType1 == ResourceMappingNodeType::DescriptorSampler)
     {
-        // Do not do this if the llpc.descriptor.load.spilltable is unused, as no spill table pointer has
-        // been set up in PatchEntryPointMutate. That happens if PatchPushConst has unspilled all push constants.
-        if (callInst.use_empty() == false)
-        {
-            auto pSpilledPushConstTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->
-                                                GetSpilledPushConstTablePtr(m_pPipelineState);
-            callInst.replaceAllUsesWith(pSpilledPushConstTablePtr);
-        }
-        m_descLoadCalls.push_back(&callInst);
-        m_descLoadFuncs.insert(pCallee);
+        pDescRangeValue = GetDescriptorRangeValue(nodeType1, descSet, binding);
     }
-    else
+
+    if (pDescRangeValue != nullptr)
     {
-        LLPC_ASSERT(nodeType1 != ResourceMappingNodeType::Unknown);
+        // Descriptor range value (immutable sampler in Vulkan). pDescRangeValue is a constant array of
+        // <4 x i32> descriptors.
+        IRBuilder<> builder(*m_pContext);
+        builder.SetInsertPoint(pInsertPoint);
 
-        // Calculate descriptor offset (in bytes)
-        auto pDescSet = cast<ConstantInt>(callInst.getOperand(0));
-        auto pBinding = cast<ConstantInt>(callInst.getOperand(1));
-        auto pArrayOffset = callInst.getOperand(2); // Offset for arrayed resource (index)
-
-        uint32_t descOffset = 0;
-        uint32_t descSize   = 0;
-        uint32_t dynDescIdx = InvalidValue;
-        Value*   pDesc = nullptr;
-        Constant* pDescRangeValue = nullptr;
-        if (nodeType1 == ResourceMappingNodeType::DescriptorSampler)
+        if (pDescRangeValue->getType()->getArrayNumElements() == 1)
         {
-            pDescRangeValue = GetDescriptorRangeValue(nodeType1, pDescSet->getZExtValue(), pBinding->getZExtValue());
+            // Immutable descriptor array is size 1, so we can assume index 0.
+            pDesc = builder.CreateExtractValue(pDescRangeValue, 0);
+        }
+        else if (auto pConstArrayOffset = dyn_cast<ConstantInt>(pArrayOffset))
+        {
+            // Array index is constant.
+            uint32_t index = pConstArrayOffset->getZExtValue();
+            pDesc = builder.CreateExtractValue(pDescRangeValue, {index});
+        }
+        else
+        {
+            // Array index is variable.
+            GlobalVariable* pDescs = new GlobalVariable(*m_pModule,
+                                                        pDescRangeValue->getType(),
+                                                        true, // isConstant
+                                                        GlobalValue::InternalLinkage,
+                                                        pDescRangeValue,
+                                                        "",
+                                                        nullptr,
+                                                        GlobalValue::NotThreadLocal,
+                                                        ADDR_SPACE_CONST);
+
+            auto pDescPtr = builder.CreateGEP(pDescs, {builder.getInt32(0), pArrayOffset});
+            pDesc = builder.CreateLoad(pDescPtr);
+        }
+    }
+
+    if (pDesc == nullptr)
+    {
+        auto foundNodeType = CalcDescriptorOffsetAndSize(nodeType1,
+                                                         nodeType2,
+                                                         descSet,
+                                                         binding,
+                                                         &descOffset,
+                                                         &descSize,
+                                                         &dynDescIdx);
+        if (foundNodeType == ResourceMappingNodeType::PushConst)
+        {
+            // Handle the case of an inline const node when we were expecting a buffer descriptor.
+            nodeType1 = foundNodeType;
         }
 
-        if (pDescRangeValue != nullptr)
+        uint32_t descSizeInDword = descSize / sizeof(uint32_t);
+        if (dynDescIdx != InvalidValue)
         {
-            // Descriptor range value (immutable sampler in Vulkan). pDescRangeValue is a constant array of
-            // <4 x i32> descriptors.
-            IRBuilder<> builder(*m_pContext);
-            builder.SetInsertPoint(&callInst);
-
-            if (pDescRangeValue->getType()->getArrayNumElements() == 1)
+            // Dynamic descriptors
+            pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(m_pPipelineState, dynDescIdx);
+            if (pDesc != nullptr)
             {
-                // Immutable descriptor array is size 1, so we can assume index 0.
-                pDesc = builder.CreateExtractValue(pDescRangeValue, 0);
-            }
-            else if (auto pConstArrayOffset = dyn_cast<ConstantInt>(pArrayOffset))
-            {
-                // Array index is constant.
-                uint32_t index = pConstArrayOffset->getZExtValue();
-                pDesc = builder.CreateExtractValue(pDescRangeValue, {index});
-            }
-            else
-            {
-                // Array index is variable.
-                GlobalVariable* pDescs = new GlobalVariable(*m_pModule,
-                                                            pDescRangeValue->getType(),
-                                                            true, // isConstant
-                                                            GlobalValue::InternalLinkage,
-                                                            pDescRangeValue,
-                                                            "",
-                                                            nullptr,
-                                                            GlobalValue::NotThreadLocal,
-                                                            ADDR_SPACE_CONST);
-
-                auto pDescPtr = builder.CreateGEP(pDescs, {builder.getInt32(0), pArrayOffset});
-                pDesc = builder.CreateLoad(pDescPtr);
-            }
-        }
-
-        if (pDesc == nullptr)
-        {
-            auto foundNodeType = CalcDescriptorOffsetAndSize(nodeType1,
-                                                             nodeType2,
-                                                             pDescSet->getZExtValue(),
-                                                             pBinding->getZExtValue(),
-                                                             &descOffset,
-                                                             &descSize,
-                                                             &dynDescIdx);
-            if (foundNodeType == ResourceMappingNodeType::PushConst)
-            {
-                // Handle the case of an inline const node when we were expecting a buffer descriptor.
-                nodeType1 = foundNodeType;
-            }
-
-            uint32_t descSizeInDword = descSize / sizeof(uint32_t);
-            if (dynDescIdx != InvalidValue)
-            {
-                // Dynamic descriptors
-                pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(m_pPipelineState, dynDescIdx);
-                if (pDesc != nullptr)
+                auto pDescTy = VectorType::get(m_pContext->Int32Ty(), descSizeInDword);
+                if (pDesc->getType() != pDescTy)
                 {
-                    auto pDescTy = VectorType::get(m_pContext->Int32Ty(), descSizeInDword);
-                    if (pDesc->getType() != pDescTy)
+                    // Array dynamic descriptor
+                    Value* pDynDesc = UndefValue::get(pDescTy);
+                    auto pDescStride = ConstantInt::get(m_pContext->Int32Ty(), descSizeInDword);
+                    auto pIndex = BinaryOperator::CreateMul(pArrayOffset, pDescStride, "", pInsertPoint);
+                    for (uint32_t i = 0; i < descSizeInDword; ++i)
                     {
-                        // Array dynamic descriptor
-                        Value* pDynDesc = UndefValue::get(pDescTy);
-                        auto pDescStride = ConstantInt::get(m_pContext->Int32Ty(), descSizeInDword);
-                        auto pIndex = BinaryOperator::CreateMul(pArrayOffset, pDescStride, "", &callInst);
-                        for (uint32_t i = 0; i < descSizeInDword; ++i)
-                        {
-                            auto pDescElem = ExtractElementInst::Create(pDesc, pIndex, "", &callInst);
-                            pDynDesc = InsertElementInst::Create(pDynDesc,
-                                                                 pDescElem,
-                                                                 ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                                 "",
-                                                                 &callInst);
-                            pIndex = BinaryOperator::CreateAdd(pIndex,
-                                                               ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                               "",
-                                                               &callInst);
-                        }
-                        pDesc = pDynDesc;
+                        auto pDescElem = ExtractElementInst::Create(pDesc, pIndex, "", pInsertPoint);
+                        pDynDesc = InsertElementInst::Create(pDynDesc,
+                                                             pDescElem,
+                                                             ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                             "",
+                                                             pInsertPoint);
+                        pIndex = BinaryOperator::CreateAdd(pIndex,
+                                                           ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                           "",
+                                                           pInsertPoint);
                     }
+                    pDesc = pDynDesc;
+                }
 
+                // Extract compact buffer descriptor
+                if (descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t))
+                {
                     // Extract compact buffer descriptor
-                    if (descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t))
-                    {
-                        // Extract compact buffer descriptor
-                        Value* pDescElem0 = ExtractElementInst::Create(pDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), 0),
-                            "",
-                            &callInst);
-
-                        Value* pDescElem1 = ExtractElementInst::Create(pDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), 1),
-                            "",
-                            &callInst);
-
-                        // Build normal buffer descriptor
-                        auto pBufDescTy = m_pContext->Int32x4Ty();
-                        Value* pBufDesc = UndefValue::get(pBufDescTy);
-
-                        // DWORD0
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            pDescElem0,
-                            ConstantInt::get(m_pContext->Int32Ty(), 0),
-                            "",
-                            &callInst);
-
-                        // DWORD1
-                        SqBufRsrcWord1 sqBufRsrcWord1 = {};
-                        sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-
-                        pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
-                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
-                            "",
-                            &callInst);
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            pDescElem1,
-                            ConstantInt::get(m_pContext->Int32Ty(), 1),
-                            "",
-                            &callInst);
-
-                        // DWORD2
-                        SqBufRsrcWord2 sqBufRsrcWord2 = {};
-                        sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
-
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
-                            ConstantInt::get(m_pContext->Int32Ty(), 2),
-                            "",
-                            &callInst);
-
-                        // DWORD3
-#if LLPC_BUILD_GFX10
-                        const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-                        if (gfxIp.major < 10)
-#endif
-                        {
-                            SqBufRsrcWord3 sqBufRsrcWord3 = {};
-                            sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                            sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                            sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                            sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                            sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                            sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
-                            LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
-
-                            pBufDesc = InsertElementInst::Create(pBufDesc,
-                                ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                                ConstantInt::get(m_pContext->Int32Ty(), 3),
-                                "",
-                                &callInst);
-                        }
-#if LLPC_BUILD_GFX10
-                        else if (gfxIp.major == 10)
-                        {
-                            SqBufRsrcWord3 sqBufRsrcWord3 = {};
-                            sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                            sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                            sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                            sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                            sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
-                            sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
-                            sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
-                            LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
-
-                            pBufDesc = InsertElementInst::Create(pBufDesc,
-                                ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                                ConstantInt::get(m_pContext->Int32Ty(), 3),
-                                "",
-                                &callInst);
-                        }
-                        else
-                        {
-                            LLPC_NOT_IMPLEMENTED();
-                        }
-#endif
-
-                        pDesc = pBufDesc;
-                    }
-
-                }
-                else
-                {
-                    LLPC_NEVER_CALLED();
-                }
-            }
-            else if (nodeType1 == ResourceMappingNodeType::PushConst)
-            {
-                auto pDescTablePtr =
-                    m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, pDescSet->getZExtValue());
-
-                Value* pDescTableAddr = new PtrToIntInst(pDescTablePtr,
-                                                         m_pContext->Int64Ty(),
-                                                         "",
-                                                         &callInst);
-
-                pDescTableAddr = new BitCastInst(pDescTableAddr, m_pContext->Int32x2Ty(), "", &callInst);
-
-                // Extract descriptor table address
-                Value* pDescElem0 = ExtractElementInst::Create(pDescTableAddr,
-                    ConstantInt::get(m_pContext->Int32Ty(), 0),
-                    "",
-                    &callInst);
-
-                auto pDescOffset = ConstantInt::get(m_pContext->Int32Ty(), descOffset);
-
-                pDescElem0 = BinaryOperator::CreateAdd(pDescElem0, pDescOffset, "", &callInst);
-
-                if (pDescPtrTy == nullptr)
-                {
-                    // Load the address of inline constant buffer
-                    pDesc = InsertElementInst::Create(pDescTableAddr,
-                        pDescElem0,
+                    Value* pDescElem0 = ExtractElementInst::Create(pDesc,
                         ConstantInt::get(m_pContext->Int32Ty(), 0),
                         "",
-                        &callInst);
-                }
-                else
-                {
-                    // Build buffer descriptor from inline constant buffer address
-                    SqBufRsrcWord1 sqBufRsrcWord1 = {};
-                    SqBufRsrcWord2 sqBufRsrcWord2 = {};
-                    SqBufRsrcWord3 sqBufRsrcWord3 = {};
+                        pInsertPoint);
 
-                    sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-                    sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
-
-                    sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                    sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                    sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                    sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                    sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                    sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
-                    LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
-
-                    Value* pDescElem1 = ExtractElementInst::Create(pDescTableAddr,
+                    Value* pDescElem1 = ExtractElementInst::Create(pDesc,
                         ConstantInt::get(m_pContext->Int32Ty(), 1),
                         "",
-                        &callInst);
+                        pInsertPoint);
 
+                    // Build normal buffer descriptor
                     auto pBufDescTy = m_pContext->Int32x4Ty();
-                    pDesc = UndefValue::get(pBufDescTy);
+                    Value* pBufDesc = UndefValue::get(pBufDescTy);
 
                     // DWORD0
-                    pDesc = InsertElementInst::Create(pDesc,
+                    pBufDesc = InsertElementInst::Create(pBufDesc,
                         pDescElem0,
                         ConstantInt::get(m_pContext->Int32Ty(), 0),
                         "",
-                        &callInst);
+                        pInsertPoint);
 
                     // DWORD1
+                    SqBufRsrcWord1 sqBufRsrcWord1 = {};
+                    sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
+
                     pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
                         ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
                         "",
-                        &callInst);
-                    pDesc = InsertElementInst::Create(pDesc,
+                        pInsertPoint);
+                    pBufDesc = InsertElementInst::Create(pBufDesc,
                         pDescElem1,
                         ConstantInt::get(m_pContext->Int32Ty(), 1),
                         "",
-                        &callInst);
+                        pInsertPoint);
 
                     // DWORD2
-                    pDesc = InsertElementInst::Create(pDesc,
+                    SqBufRsrcWord2 sqBufRsrcWord2 = {};
+                    sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+
+                    pBufDesc = InsertElementInst::Create(pBufDesc,
                         ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
                         ConstantInt::get(m_pContext->Int32Ty(), 2),
                         "",
-                        &callInst);
+                        pInsertPoint);
 
                     // DWORD3
-                    pDesc = InsertElementInst::Create(pDesc,
-                        ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                        ConstantInt::get(m_pContext->Int32Ty(), 3),
-                        "",
-                        &callInst);
+#if LLPC_BUILD_GFX10
+                    const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+                    if (gfxIp.major < 10)
+#endif
+                    {
+                        SqBufRsrcWord3 sqBufRsrcWord3 = {};
+                        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+                        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+                        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+                        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+                        sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+                        sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+                        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+
+                        pBufDesc = InsertElementInst::Create(pBufDesc,
+                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                            ConstantInt::get(m_pContext->Int32Ty(), 3),
+                            "",
+                            &callInst);
+                    }
+#if LLPC_BUILD_GFX10
+                    else if (gfxIp.major == 10)
+                    {
+                        SqBufRsrcWord3 sqBufRsrcWord3 = {};
+                        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+                        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+                        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+                        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+                        sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
+                        sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
+                        sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
+                        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
+
+                        pBufDesc = InsertElementInst::Create(pBufDesc,
+                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                            ConstantInt::get(m_pContext->Int32Ty(), 3),
+                            "",
+                            &callInst);
+                    }
+                    else
+                    {
+                        LLPC_NOT_IMPLEMENTED();
+                    }
+#endif
+
+                    pDesc = pBufDesc;
                 }
+
             }
             else
             {
-                auto pDescOffset = ConstantInt::get(m_pContext->Int32Ty(), descOffset);
-                auto pDescSize   = ConstantInt::get(m_pContext->Int32Ty(), descSize, 0);
-
-                Value* pOffset = BinaryOperator::CreateMul(pArrayOffset, pDescSize, "", &callInst);
-                pOffset = BinaryOperator::CreateAdd(pOffset, pDescOffset, "", &callInst);
-
-                pOffset = CastInst::CreateZExtOrBitCast(pOffset, m_pContext->Int64Ty(), "", &callInst);
-
-                // Get descriptor address
-                std::vector<Value*> idxs;
-                idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
-                idxs.push_back(pOffset);
-
-                Value* pDescTablePtr = nullptr;
-                uint32_t descSet = pDescSet->getZExtValue();
-
-                if (descSet == InternalResourceTable)
-                {
-                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalGlobalTablePtr();
-                }
-                else if (descSet == InternalPerShaderTable)
-                {
-                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
-                }
-                else if ((cl::EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
-                {
-                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->
-                                      GetShadowDescTablePtr(m_pPipelineState, descSet);
-                }
-                else
-                {
-                    pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, descSet);
-                }
-                auto pDescPtr = GetElementPtrInst::Create(nullptr, pDescTablePtr, idxs, "", &callInst);
-                auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", &callInst);
-
-                // Load descriptor
-                pCastedDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
-                pDesc = new LoadInst(pCastedDescPtr, "", &callInst);
-                cast<LoadInst>(pDesc)->setAlignment(16);
+                LLPC_NEVER_CALLED();
             }
         }
-
-        if (pDesc != nullptr)
+        else if (nodeType1 == ResourceMappingNodeType::PushConst)
         {
-            callInst.replaceAllUsesWith(pDesc);
-            m_descLoadCalls.push_back(&callInst);
-            m_descLoadFuncs.insert(pCallee);
+            auto pDescTablePtr =
+                m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, descSet);
+
+            Value* pDescTableAddr = new PtrToIntInst(pDescTablePtr,
+                                                     m_pContext->Int64Ty(),
+                                                     "",
+                                                     pInsertPoint);
+
+            pDescTableAddr = new BitCastInst(pDescTableAddr, m_pContext->Int32x2Ty(), "", pInsertPoint);
+
+            // Extract descriptor table address
+            Value* pDescElem0 = ExtractElementInst::Create(pDescTableAddr,
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                "",
+                pInsertPoint);
+
+            auto pDescOffset = ConstantInt::get(m_pContext->Int32Ty(), descOffset);
+
+            pDescElem0 = BinaryOperator::CreateAdd(pDescElem0, pDescOffset, "", pInsertPoint);
+
+            if (pDescPtrTy == nullptr)
+            {
+                // Load the address of inline constant buffer
+                pDesc = InsertElementInst::Create(pDescTableAddr,
+                    pDescElem0,
+                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                    "",
+                    pInsertPoint);
+            }
+            else
+            {
+                // Build buffer descriptor from inline constant buffer address
+                SqBufRsrcWord1 sqBufRsrcWord1 = {};
+                SqBufRsrcWord2 sqBufRsrcWord2 = {};
+                SqBufRsrcWord3 sqBufRsrcWord3 = {};
+
+                sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
+                sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+
+                sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+                sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+                sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+                sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+                sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+                sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+                LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+
+                Value* pDescElem1 = ExtractElementInst::Create(pDescTableAddr,
+                    ConstantInt::get(m_pContext->Int32Ty(), 1),
+                    "",
+                    pInsertPoint);
+
+                auto pBufDescTy = m_pContext->Int32x4Ty();
+                pDesc = UndefValue::get(pBufDescTy);
+
+                // DWORD0
+                pDesc = InsertElementInst::Create(pDesc,
+                    pDescElem0,
+                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                    "",
+                    pInsertPoint);
+
+                // DWORD1
+                pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
+                    ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
+                    "",
+                    pInsertPoint);
+                pDesc = InsertElementInst::Create(pDesc,
+                    pDescElem1,
+                    ConstantInt::get(m_pContext->Int32Ty(), 1),
+                    "",
+                    pInsertPoint);
+
+                // DWORD2
+                pDesc = InsertElementInst::Create(pDesc,
+                    ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
+                    ConstantInt::get(m_pContext->Int32Ty(), 2),
+                    "",
+                    pInsertPoint);
+
+                // DWORD3
+                pDesc = InsertElementInst::Create(pDesc,
+                    ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                    ConstantInt::get(m_pContext->Int32Ty(), 3),
+                    "",
+                    pInsertPoint);
+            }
+        }
+        else
+        {
+            auto pDescOffset = ConstantInt::get(m_pContext->Int32Ty(), descOffset);
+            auto pDescSize   = ConstantInt::get(m_pContext->Int32Ty(), descSize, 0);
+
+            Value* pOffset = BinaryOperator::CreateMul(pArrayOffset, pDescSize, "", pInsertPoint);
+            pOffset = BinaryOperator::CreateAdd(pOffset, pDescOffset, "", pInsertPoint);
+
+            pOffset = CastInst::CreateZExtOrBitCast(pOffset, m_pContext->Int64Ty(), "", pInsertPoint);
+
+            // Get descriptor address
+            std::vector<Value*> idxs;
+            idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
+            idxs.push_back(pOffset);
+
+            Value* pDescTablePtr = nullptr;
+
+            if (descSet == InternalResourceTable)
+            {
+                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalGlobalTablePtr();
+            }
+            else if (descSet == InternalPerShaderTable)
+            {
+                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetInternalPerShaderTablePtr();
+            }
+            else if ((cl::EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
+            {
+                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->
+                                  GetShadowDescTablePtr(m_pPipelineState, descSet);
+            }
+            else
+            {
+                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, descSet);
+            }
+            auto pDescPtr = GetElementPtrInst::Create(nullptr, pDescTablePtr, idxs, "", pInsertPoint);
+            auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", pInsertPoint);
+
+            // Load descriptor
+            pCastedDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+            pDesc = new LoadInst(pCastedDescPtr, "", pInsertPoint);
+            if (LoadInst *LI = dyn_cast<LoadInst>(pDesc))
+              LI->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+            cast<LoadInst>(pDesc)->setAlignment(16);
         }
     }
+
+    return pDesc;
 }
 
 // =====================================================================================================================

@@ -67,26 +67,47 @@ Value* BuilderImplSubgroup::CreateSubgroupElect(
 // Create a subgroup all call.
 Value* BuilderImplSubgroup::CreateSubgroupAll(
     Value* const pValue,   // [in] The value to compare across the subgroup. Must be an integer type.
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* const pResult = CreateICmpEQ(CreateGroupBallot(pValue), CreateGroupBallot(getTrue()));
-    return CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, pValue), pValue, pResult);
+    Value* pResult = CreateICmpEQ(CreateGroupBallot(pValue), CreateGroupBallot(getTrue()));
+    pResult = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, pValue), pValue, pResult);
+
+    // Helper invocations of whole quad mode should be included in the subgroup vote execution
+    if (wqm)
+    {
+        pResult = CreateZExt(pResult, getInt32Ty());
+        pResult = CreateIntrinsic(Intrinsic::amdgcn_wqm, { getInt32Ty() }, { pResult });
+        pResult = CreateTrunc(pResult, getInt1Ty());
+    }
+    return pResult;
 }
 
 // =====================================================================================================================
 // Create a subgroup any call.
 Value* BuilderImplSubgroup::CreateSubgroupAny(
     Value* const pValue,   // [in] The value to compare across the subgroup. Must be an integer type.
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give final instruction.
 {
-    Value* const pResult = CreateICmpNE(CreateGroupBallot(pValue), getInt64(0));
-    return CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, pValue), pValue, pResult);
+    Value* pResult = CreateICmpNE(CreateGroupBallot(pValue), getInt64(0));
+    pResult = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, pValue), pValue, pResult);
+
+    // Helper invocations of whole quad mode should be included in the subgroup vote execution
+    if (wqm)
+    {
+        pResult = CreateZExt(pResult, getInt32Ty());
+        pResult = CreateIntrinsic(Intrinsic::amdgcn_wqm, { getInt32Ty() }, { pResult });
+        pResult = CreateTrunc(pResult, getInt1Ty());
+    }
+    return pResult;
 }
 
 // =====================================================================================================================
 // Create a subgroup all equal call.
 Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
     Value* const pValue,   // [in] The value to compare across the subgroup. Must be an integer type.
+    bool         wqm,      // Executed in WQM (whole quad mode)
     const Twine& instName) // [in] Name to give final instruction.
 {
     Type* const pType = pValue->getType();
@@ -112,11 +133,11 @@ Value* BuilderImplSubgroup::CreateSubgroupAllEqual(
             pResult = CreateAnd(pResult, CreateExtractElement(pCompare, i));
         }
 
-        return CreateSubgroupAll(pResult, instName);
+        return CreateSubgroupAll(pResult, wqm, instName);
     }
     else
     {
-        return CreateSubgroupAll(pCompare, instName);
+        return CreateSubgroupAll(pCompare, wqm, instName);
     }
 }
 

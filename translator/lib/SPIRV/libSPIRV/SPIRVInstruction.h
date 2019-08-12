@@ -379,57 +379,83 @@ public:
 
 class SPIRVMemoryAccess {
 public:
-  SPIRVMemoryAccess(const std::vector<SPIRVWord> &TheMemoryAccess)
-      : TheMemoryAccessMask(0), Alignment(0) {
+  SPIRVMemoryAccess(const std::vector<SPIRVWord> &TheMemoryAccess) {
     memoryAccessUpdate(TheMemoryAccess);
   }
 
-  SPIRVMemoryAccess() : TheMemoryAccessMask(0), Alignment(0) {}
+  SPIRVMemoryAccess() {}
 
-  void memoryAccessUpdate(const std::vector<SPIRVWord> &MemoryAccess) {
-    if (!MemoryAccess.size())
+  void memoryAccessUpdate(const std::vector<SPIRVWord> &TheMemoryAccess) {
+    // No masks
+    if (!TheMemoryAccess.size())
       return;
-    assert((MemoryAccess.size() <= 4) && "Invalid memory access operand size");
-    TheMemoryAccessMask = MemoryAccess[0];
 
-    unsigned Idx = 1;
+    unsigned DestMaskCount = 1;
+    if (TheMemoryAccess[0] & MemoryAccessAlignedMask)
+      ++DestMaskCount;
+    if (TheMemoryAccess[0] & MemoryAccessMakePointerAvailableKHRMask)
+      ++DestMaskCount;
+    if (TheMemoryAccess[0] & MemoryAccessMakePointerVisibleKHRMask)
+      ++DestMaskCount;
 
-    if (MemoryAccess[0] & MemoryAccessAlignedMask) {
-      assert(MemoryAccess.size() > Idx && "Alignment operand is missing");
-      Alignment = MemoryAccess[Idx++];
+    // If HasBothMasks is false, the only one mask applies to both Source and Target
+    // Otherwise, the first applies to Target and the second applies to Source
+    bool HasBothMasks = TheMemoryAccess.size() > DestMaskCount ? true : false;
+    const unsigned MaxMaskCount = HasBothMasks ? 8 : 4;
+    assert((TheMemoryAccess.size() <= MaxMaskCount) && "Invalid count of memory access operands");
+
+    for (unsigned I = 0; I < 2; ++I) {
+      unsigned MaskIdx = HasBothMasks ? (I * DestMaskCount) : 0;
+      unsigned Idx = MaskIdx + 1;;
+      MemoryAccess[I].TheMemoryAccessMask = TheMemoryAccess[MaskIdx];
+
+      if (TheMemoryAccess[MaskIdx] & MemoryAccessAlignedMask) {
+        assert(TheMemoryAccess.size() > Idx && "Alignment operand is missing");
+        MemoryAccess[I].Alignment = TheMemoryAccess[Idx++];
+      }
+      if (TheMemoryAccess[MaskIdx] & MemoryAccessMakePointerAvailableKHRMask) {
+        assert(TheMemoryAccess.size() > Idx && "Scope operand is missing");
+        MemoryAccess[I].MakeAvailableScope = TheMemoryAccess[Idx++];
+      }
+
+      if (TheMemoryAccess[MaskIdx] & MemoryAccessMakePointerVisibleKHRMask) {
+        assert(TheMemoryAccess.size() > Idx && "Scope operand is missing");
+        MemoryAccess[I].MakeVisibleScope = TheMemoryAccess[Idx++];
+      }
     }
-    if (MemoryAccess[0] & MemoryAccessMakePointerAvailableKHRMask) {
-      assert(MemoryAccess.size() > Idx && "Scope operand is missing");
-      MakeAvailableScope = MemoryAccess[Idx++];
-    }
-
-    if (MemoryAccess[0] & MemoryAccessMakePointerVisibleKHRMask) {
-      assert(MemoryAccess.size() > Idx && "Scope operand is missing");
-      MakeVisisbleScope = MemoryAccess[Idx++];
-    }
   }
-  SPIRVWord isVolatile() const {
-    return getMemoryAccessMask() & MemoryAccessVolatileMask;
+  SPIRVWord isVolatile(bool CheckSrcMask) const {
+    return getMemoryAccessMask(CheckSrcMask) & MemoryAccessVolatileMask;
   }
-  SPIRVWord isNonTemporal() const {
-    return getMemoryAccessMask() & MemoryAccessNontemporalMask;
+  SPIRVWord isNonTemporal(bool CheckSrcMask) const {
+    return getMemoryAccessMask(CheckSrcMask) & MemoryAccessNontemporalMask;
   }
-  SPIRVWord getMemoryAccessMask() const { return TheMemoryAccessMask; }
-  SPIRVWord getAlignment() const { return Alignment; }
-
-  SPIRVId getMakeAvailableScope() const {
-    return MakeAvailableScope;
+  SPIRVWord getMemoryAccessMask(bool CheckSrcMask) const {
+    return CheckSrcMask ? MemoryAccess[1].TheMemoryAccessMask :
+                          MemoryAccess[0].TheMemoryAccessMask;
+  }
+  SPIRVWord getAlignment(bool CheckSrcMask) const {
+    return CheckSrcMask ? MemoryAccess[1].Alignment :
+                          MemoryAccess[0].Alignment;
   }
 
-  SPIRVId getMakeVisisbleScope() const {
-    return MakeVisisbleScope;
+  SPIRVId getMakeAvailableScope(bool CheckSrcMask) const {
+    return CheckSrcMask ? MemoryAccess[1].MakeAvailableScope :
+                          MemoryAccess[0].MakeAvailableScope;
+  }
+
+  SPIRVId getMakeVisibleScope(bool CheckSrcMask) const {
+    return CheckSrcMask ? MemoryAccess[1].MakeVisibleScope :
+                          MemoryAccess[0].MakeVisibleScope;
   }
 
 protected:
-  SPIRVWord TheMemoryAccessMask;
-  SPIRVWord Alignment;
-  SPIRVId MakeAvailableScope = SPIRVID_INVALID;
-  SPIRVId MakeVisisbleScope = SPIRVID_INVALID;
+  struct {
+    SPIRVWord TheMemoryAccessMask = 0;
+    SPIRVWord Alignment = 0;
+    SPIRVId MakeAvailableScope = SPIRVID_INVALID;
+    SPIRVId MakeVisibleScope = SPIRVID_INVALID;
+  }MemoryAccess[2]; //[0]:destination, [1]:source
 };
 
 class SPIRVVariable : public SPIRVInstruction {
@@ -2687,6 +2713,7 @@ _SPIRV_OP(SubgroupReadInvocationKHR, true, 5, false)
 _SPIRV_OP(SubgroupAllKHR, true, 4, false)
 _SPIRV_OP(SubgroupAnyKHR, true, 4, false)
 _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
+_SPIRV_OP(ReadClockKHR, true, 4)
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase:public SPIRVInstTemplateBase {
 protected:

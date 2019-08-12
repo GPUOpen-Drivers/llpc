@@ -30,12 +30,11 @@
  */
 #pragma once
 
-#include <metrohash.h>
-
 #include "llpc.h"
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
 #include "llpcInternal.h"
+#include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
 
 namespace Llpc
@@ -65,6 +64,7 @@ struct ShaderModuleInfo
     bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
     bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
     bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
+    bool            useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
 };
 
 // Represents output data of building a shader module.
@@ -165,8 +165,11 @@ struct WorkaroundFlags
             uint32_t  waNsaCannotFollowWritelane : 1;
             uint32_t  waThrottleInMultiDwordNsa : 1;
             uint32_t  waSmemFollowedByVopc : 1;
+            uint32_t  waNggCullingNoEmptySubgroups : 1;
+            uint32_t  waShaderInstPrefetchFwd64 : 1;
+            uint32_t  waWarFpAtomicDenormHazard : 1;
             uint32_t  placeholder1 : 2;
-            uint32_t  reserved : 17;
+            uint32_t  reserved : 14;
         };
         uint32_t u32All;
     } gfx10;

@@ -143,9 +143,6 @@ void SpirvLower::AddPasses(
     // Lower SPIR-V algebraic transforms
     passMgr.add(CreateSpirvLowerAlgebraTransform(false, true));
 
-    // Lower SPIR-V image operations (sample, fetch, gather, read/write),
-    passMgr.add(CreateSpirvLowerImageOp());
-
     // Lower SPIR-V instruction metadata remove
     passMgr.add(CreateSpirvLowerInstMetaRemove());
 

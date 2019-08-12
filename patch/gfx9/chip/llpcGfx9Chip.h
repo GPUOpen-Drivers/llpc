@@ -173,6 +173,10 @@ namespace Llpc
 // Sets register value
 #define SET_REG(_stage, _reg, _val)                (_stage)->_reg##_VAL.u32All = (_val);
 
+// Invalidate register, set it to invalid ID and value
+#define INVALIDATE_REG(_stage, _reg) \
+    { (_stage)->_reg##_ID = InvalidMetadataKey; (_stage)->_reg##_VAL.u32All = InvalidMetadataValue; }
+
 // Adds and sets dynamic register value
 #define SET_DYN_REG(_pipeline, _reg, _val) \
     LLPC_ASSERT((_pipeline)->m_dynRegCount < _pipeline->MaxDynamicRegs); \
@@ -381,6 +385,8 @@ struct PrimShaderRegConfig
 
     DEF_REG(GE_NGG_SUBGRP_CNTL);
     DEF_REG(SPI_SHADER_IDX_FORMAT);
+
+    DEF_REG(SPI_SHADER_PGM_LO_GS);
 
     void Init(GfxIpVersion gfxIp);
 };

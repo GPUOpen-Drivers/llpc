@@ -30,8 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-context"
 
-#include <metrohash.h>
-
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitstreamReader.h"
@@ -49,6 +47,7 @@
 
 #include "llpcCompiler.h"
 #include "llpcContext.h"
+#include "llpcMetroHash.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
 

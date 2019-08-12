@@ -390,6 +390,9 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNonWritable:
   case DecorationNonReadable:
   case DecorationUniform:
+#if SPV_VERSION >= 0x10400
+  case DecorationUniformId:
+#endif
   case DecorationSaturatedConversion:
   case DecorationStream:
   case DecorationLocation:
@@ -408,6 +411,10 @@ inline bool isValid(spv::Decoration V) {
   case DecorationInputAttachmentIndex:
   case DecorationAlignment:
   case DecorationMaxByteOffset:
+#if SPV_VERSION >= 0x10400
+  case DecorationNoSignedWrap:
+  case DecorationNoUnsignedWrap:
+#endif
   case DecorationExplicitInterpAMD:
   case DecorationNonUniformEXT:
   case DecorationHlslCounterBufferGOOGLE:
@@ -614,6 +621,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityImageGatherBiasLodAMD:
   case CapabilityFragmentMaskAMD:
   case CapabilityFloat16ImageAMD:
+  case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
   case CapabilityShaderNonUniformEXT:
@@ -997,6 +1005,7 @@ inline bool isValid(spv::Op V) {
   case OpGroupFMaxNonUniformAMD:
   case OpGroupUMaxNonUniformAMD:
   case OpGroupSMaxNonUniformAMD:
+  case OpReadClockKHR:
   case OpSubgroupShuffleINTEL:
   case OpSubgroupShuffleDownINTEL:
   case OpSubgroupShuffleUpINTEL:
@@ -1050,6 +1059,13 @@ inline bool isValidLoopControlMask(SPIRVWord Mask) {
   ValidMask |= LoopControlDontUnrollMask;
   ValidMask |= LoopControlDependencyInfiniteMask;
   ValidMask |= LoopControlDependencyLengthMask;
+#if SPV_VERSION >= 0x10400
+  ValidMask |= LoopControlMinIterationsMask;
+  ValidMask |= LoopControlMaxIterationsMask;
+  ValidMask |= LoopControlIterationMultipleMask;
+  ValidMask |= LoopControlPeelCountMask;
+  ValidMask |= LoopControlPartialCountMask;
+#endif
 
   return (Mask & ~ValidMask) == 0;
 }

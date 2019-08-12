@@ -201,10 +201,10 @@ void PatchResourceCollect::visitCallInst(
         }
     }
     else if (mangledName.startswith(LlpcName::DescriptorLoadBuffer) ||
-             mangledName.startswith(LlpcName::DescriptorLoadTexelBuffer) ||
-             mangledName.startswith(LlpcName::DescriptorLoadResource) ||
-             mangledName.startswith(LlpcName::DescriptorLoadFmask) ||
-             mangledName.startswith(LlpcName::DescriptorLoadSampler))
+             mangledName.startswith(LlpcName::DescriptorGetTexelBufferPtr) ||
+             mangledName.startswith(LlpcName::DescriptorGetResourcePtr) ||
+             mangledName.startswith(LlpcName::DescriptorGetFmaskPtr) ||
+             mangledName.startswith(LlpcName::DescriptorGetSamplerPtr))
     {
         uint32_t descSet = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
         uint32_t binding = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
@@ -214,22 +214,6 @@ void PatchResourceCollect::visitCallInst(
     else if (mangledName.startswith(LlpcName::BufferLoad))
     {
         if (isDeadCall)
-        {
-            m_deadCalls.insert(&callInst);
-        }
-    }
-    else if (mangledName.startswith(LlpcName::ImageCallPrefix))
-    {
-        // Image operations
-        ShaderImageCallMetadata imageCallMeta = {};
-        LLPC_ASSERT(callInst.getNumArgOperands() >= 2);
-        uint32_t metaOperandIndex = callInst.getNumArgOperands() - 1;
-        imageCallMeta.U32All =  cast<ConstantInt>(callInst.getArgOperand(metaOperandIndex))->getZExtValue();
-
-        SPIRVImageOpKind imageOp = imageCallMeta.OpKind;
-
-        // NOTE: All "readonly" image operations are expected to be less than the numeric value of "ImageOpWrite".
-        if (isDeadCall && isImageOpReadOnly(imageOp))
         {
             m_deadCalls.insert(&callInst);
         }

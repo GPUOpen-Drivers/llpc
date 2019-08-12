@@ -248,64 +248,6 @@ Value* BuilderReplayer::ProcessCall(
         }
 
     // Replayer implementations of BuilderImplDesc methods
-    case BuilderRecorder::Opcode::WaterfallLoop:
-    case BuilderRecorder::Opcode::WaterfallStoreLoop:
-        {
-            SmallVector<uint32_t, 2> operandIdxs;
-            for (Value* pOperand : args)
-            {
-                if (auto pConstOperand = dyn_cast<ConstantInt>(pOperand))
-                {
-                    operandIdxs.push_back(pConstOperand->getZExtValue());
-                }
-            }
-
-            Instruction* pNonUniformInst = nullptr;
-            if (opcode == BuilderRecorder::Opcode::WaterfallLoop)
-            {
-                pNonUniformInst = cast<Instruction>(args[0]);
-            }
-            else
-            {
-                // This is the special case that we want to waterfall a store op with no result.
-                // The llpc.call.waterfall.store.loop intercepts (one of) the non-uniform descriptor
-                // input(s) to the store. Use that interception to find the store, and remove the
-                // interception.
-                Use& useInNonUniformInst = *pCall->use_begin();
-                pNonUniformInst = cast<Instruction>(useInNonUniformInst.getUser());
-                useInNonUniformInst = args[0];
-            }
-
-            // BuilderImpl::CreateWaterfallLoop looks back at each descriptor input to the op to find
-            // the non-uniform index. It does not know about BuilderRecorder/BuilderReplayer, so here
-            // we must work around the unknown order of replaying by finding any recorded descriptor
-            // load and replay it first.
-            for (uint32_t operandIdx : operandIdxs)
-            {
-                Value* pInput = cast<Instruction>(args[0])->getOperand(operandIdx);
-                while (auto pGep = dyn_cast<GetElementPtrInst>(pInput))
-                {
-                    pInput = pGep->getOperand(0);
-                }
-                CheckCallAndReplay(pInput);
-            }
-
-            // Create the waterfall loop.
-            auto pWaterfallLoop = m_pBuilder->CreateWaterfallLoop(pNonUniformInst, operandIdxs);
-
-            if (opcode == BuilderRecorder::Opcode::WaterfallLoop)
-            {
-                return pWaterfallLoop;
-            }
-
-            // For the store op case, avoid using the replaceAllUsesWith in the caller.
-            if (pCall->getName() != "")
-            {
-                pWaterfallLoop->takeName(pCall);
-            }
-            return nullptr;
-        }
-
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {
             return m_pBuilder->CreateLoadBufferDesc(
@@ -318,40 +260,40 @@ Value* BuilderReplayer::ProcessCall(
                       nullptr);                                // pPointeeTy
         }
 
-    case BuilderRecorder::Opcode::LoadSamplerDesc:
+    case BuilderRecorder::Opcode::IndexDescPtr:
         {
-            return m_pBuilder->CreateLoadSamplerDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateIndexDescPtr(args[0],                                      // pDescPtr
+                                                  args[1],                                      // pIndex
+                                                  cast<ConstantInt>(args[2])->getZExtValue());  // isNonUniform
         }
 
-    case BuilderRecorder::Opcode::LoadResourceDesc:
+    case BuilderRecorder::Opcode::LoadDescFromPtr:
         {
-            return m_pBuilder->CreateLoadResourceDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateLoadDescFromPtr(args[0]);
         }
 
-    case BuilderRecorder::Opcode::LoadTexelBufferDesc:
+    case BuilderRecorder::Opcode::GetSamplerDescPtr:
         {
-            return m_pBuilder->CreateLoadTexelBufferDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateGetSamplerDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                       cast<ConstantInt>(args[1])->getZExtValue());  // binding
         }
 
-    case BuilderRecorder::Opcode::LoadFmaskDesc:
+    case BuilderRecorder::Opcode::GetImageDescPtr:
         {
-            return m_pBuilder->CreateLoadFmaskDesc(
-                  cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                  cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                  args[2],                                     // pDescIndex
-                  cast<ConstantInt>(args[3])->getZExtValue()); // isNonUniform
+            return m_pBuilder->CreateGetImageDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                     cast<ConstantInt>(args[1])->getZExtValue());  // binding
+        }
+
+    case BuilderRecorder::Opcode::GetFmaskDescPtr:
+        {
+            return m_pBuilder->CreateGetFmaskDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                     cast<ConstantInt>(args[1])->getZExtValue());  // binding
+        }
+
+    case BuilderRecorder::Opcode::GetTexelBufferDescPtr:
+        {
+            return m_pBuilder->CreateGetTexelBufferDescPtr(cast<ConstantInt>(args[0])->getZExtValue(),   // descSet
+                                                           cast<ConstantInt>(args[1])->getZExtValue());  // binding
         }
 
     case BuilderRecorder::Opcode::LoadPushConstantsPtr:
@@ -363,6 +305,157 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::GetBufferDescLength:
         {
             return m_pBuilder->CreateGetBufferDescLength(args[0]);
+        }
+
+    // Replayer implementations of BuilderImplImage methods
+    case BuilderRecorder::Opcode::ImageLoad:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pCoord = args[3];
+            Value* pMipLevel = (args.size() > 4) ? &*args[4] : nullptr;
+            return m_pBuilder->CreateImageLoad(pCall->getType(), dim, flags, pImageDesc, pCoord, pMipLevel);
+        }
+
+    case BuilderRecorder::Opcode::ImageLoadWithFmask:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pFmaskDesc = args[3];
+            Value* pCoord = args[4];
+            Value* pSampleNum = args[5];
+            return m_pBuilder->CreateImageLoadWithFmask(pCall->getType(),
+                                                        dim,
+                                                        flags,
+                                                        pImageDesc,
+                                                        pFmaskDesc,
+                                                        pCoord,
+                                                        pSampleNum);
+        }
+
+    case BuilderRecorder::Opcode::ImageStore:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pCoord = args[3];
+            Value* pMipLevel = (args.size() > 5) ? &*args[4] : nullptr;
+            Value* pTexel = args.back();
+            return m_pBuilder->CreateImageStore(dim, flags, pImageDesc, pCoord, pMipLevel, pTexel);
+        }
+
+    case BuilderRecorder::Opcode::ImageSample:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pSamplerDesc = args[3];
+            uint32_t argsMask = cast<ConstantInt>(args[4])->getZExtValue();
+            SmallVector<Value*, Builder::ImageAddressCount> address;
+            address.resize(Builder::ImageAddressCount);
+            args = args.slice(5);
+            for (uint32_t i = 0; i != Builder::ImageAddressCount; ++i)
+            {
+                if ((argsMask >> i) & 1)
+                {
+                    address[i] = args[0];
+                    args = args.slice(1);
+                }
+            }
+            return m_pBuilder->CreateImageSample(pCall->getType(), dim, flags, pImageDesc, pSamplerDesc, address);
+        }
+
+    case BuilderRecorder::Opcode::ImageGather:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pSamplerDesc = args[3];
+            uint32_t argsMask = cast<ConstantInt>(args[4])->getZExtValue();
+            SmallVector<Value*, Builder::ImageAddressCount> address;
+            address.resize(Builder::ImageAddressCount);
+            args = args.slice(5);
+            for (uint32_t i = 0; i != Builder::ImageAddressCount; ++i)
+            {
+                if ((argsMask >> i) & 1)
+                {
+                    address[i] = args[0];
+                    args = args.slice(1);
+                }
+            }
+            return m_pBuilder->CreateImageGather(pCall->getType(),
+                                                 dim,
+                                                 flags,
+                                                 pImageDesc,
+                                                 pSamplerDesc,
+                                                 address);
+        }
+
+    case BuilderRecorder::Opcode::ImageAtomic:
+        {
+            uint32_t atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t dim = cast<ConstantInt>(args[1])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[2])->getZExtValue();
+            auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[3])->getZExtValue());
+            Value* pImageDesc = args[4];
+            Value* pCoord = args[5];
+            Value* pInputValue = args[6];
+            return m_pBuilder->CreateImageAtomic(atomicOp, dim, flags, ordering, pImageDesc, pCoord, pInputValue);
+        }
+
+    case BuilderRecorder::Opcode::ImageAtomicCompareSwap:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[2])->getZExtValue());
+            Value* pImageDesc = args[3];
+            Value* pCoord = args[4];
+            Value* pInputValue = args[5];
+            Value* pComparatorValue = args[6];
+            return m_pBuilder->CreateImageAtomicCompareSwap(dim,
+                                                            flags,
+                                                            ordering,
+                                                            pImageDesc,
+                                                            pCoord,
+                                                            pInputValue,
+                                                            pComparatorValue);
+        }
+
+    case BuilderRecorder::Opcode::ImageQueryLevels:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            return m_pBuilder->CreateImageQueryLevels(dim, flags, pImageDesc);
+        }
+
+    case BuilderRecorder::Opcode::ImageQuerySamples:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            return m_pBuilder->CreateImageQuerySamples(dim, flags, pImageDesc);
+        }
+
+    case BuilderRecorder::Opcode::ImageQuerySize:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pLod = args[3];
+            return m_pBuilder->CreateImageQuerySize(dim, flags, pImageDesc, pLod);
+        }
+
+    case BuilderRecorder::Opcode::ImageGetLod:
+        {
+            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
+            Value* pImageDesc = args[2];
+            Value* pSamplerDesc = args[3];
+            Value* pCoord = args[4];
+            return m_pBuilder->CreateImageGetLod(dim, flags, pImageDesc, pSamplerDesc, pCoord);
         }
 
     // Replayer implementations of BuilderImplMisc methods
@@ -391,15 +484,15 @@ Value* BuilderReplayer::ProcessCall(
         }
     case BuilderRecorder::Opcode::SubgroupAll:
         {
-            return m_pBuilder->CreateSubgroupAll(args[0]);
+            return m_pBuilder->CreateSubgroupAll(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
         }
     case BuilderRecorder::Opcode::SubgroupAny:
         {
-            return m_pBuilder->CreateSubgroupAny(args[0]);
+            return m_pBuilder->CreateSubgroupAny(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
         }
     case BuilderRecorder::Opcode::SubgroupAllEqual:
         {
-            return m_pBuilder->CreateSubgroupAllEqual(args[0]);
+            return m_pBuilder->CreateSubgroupAllEqual(args[0], cast<ConstantInt>(args[1])->getZExtValue() != 0);
         }
     case BuilderRecorder::Opcode::SubgroupBroadcast:
         {

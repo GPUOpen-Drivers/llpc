@@ -97,10 +97,14 @@ GraphicsContext::GraphicsContext(
 
 #if LLPC_BUILD_GFX10
     memset(&m_nggControl, 0, sizeof(m_nggControl));
-    // NOTE: All fields of NGG controls are determined by the pass of resource collecting in patching. Here, we still
-    // set NGG enablement early. The field is used when deciding if we need extra optimizations after NGG primitive
-    // shader creation. At that time, the pass of resource collecting has not been run.
-    m_nggControl.enableNgg = pPipelineInfo->nggState.enableNgg;
+
+    if (gfxIp.major >= 10)
+    {
+        // NOTE: All fields of NGG controls are determined by the pass of resource collecting in patching. Here, we still
+        // set NGG enablement early. The field is used when deciding if we need extra optimizations after NGG primitive
+        // shader creation. At that time, the pass of resource collecting has not been run.
+        m_nggControl.enableNgg = pPipelineInfo->nggState.enableNgg;
+    }
 #endif
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
@@ -903,7 +907,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Collect user data nodes from all shader stages into one big table.
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -921,7 +925,7 @@ void GraphicsContext::DoUserDataNodeMerge()
 
     // Collect descriptor range values (immutable descriptors) from all shader stages into one big table.
     SmallVector<DescriptorRangeValue, 8> allRangeValues;
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {
@@ -981,7 +985,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     }
 
     // Point each shader stage at the merged user data nodes and descriptor range values.
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
     {
         if ((stageMask >> stage) & 1)
         {

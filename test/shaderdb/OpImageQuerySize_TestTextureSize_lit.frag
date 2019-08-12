@@ -24,14 +24,13 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 0, i32 0, i1 false)
-; SHADERTEST: call <2 x i32> @llpc.image.querynonlod.sizelod.2D.v2i32{{.*}}({{.*}}, i32 0,{{.*}})
-; SHADERTEST: call <4 x i32> {{.*}} @llpc.call.load.texel.buffer.desc.v4i32(i32 1, i32 0, i32 %{{[0-9]+}}, i1 false)
-; SHADERTEST: call i32 @llpc.image.querynonlod.sizelod.Buffer.i32({{.*}}, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 1, i32 0, i1 false)
-; SHADERTEST: call <2 x i32> @llpc.image.querynonlod.sizelod.2D.sample.v2i32{{.*}}({{.*}}, i32 0,{{.*}})
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 2, i32 0,{{.*}}, i1 false)
-; SHADERTEST: call <3 x i32> @llpc.image.querynonlod.sizelod.2DArray.sample.v3i32{{.*}}({{.*}}, i32 0,{{.*}})
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.query.size.v2i32(i32 1, i32 0, {{.*}}, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.query.size.i32(i32 0, i32 0, {{.*}}, i32 0) 
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 1) 
+; SHADERTEST: call {{.*}} @llpc.call.image.query.size.v2i32(i32 6, i32 0, {{.*}}, i32 0) 
+; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 2, i32 0) 
+; SHADERTEST: call {{.*}} @llpc.call.image.query.size.v3i32(i32 7, i32 0, {{.*}}, i32 0) 
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)

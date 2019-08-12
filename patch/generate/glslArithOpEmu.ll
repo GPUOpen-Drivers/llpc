@@ -2698,10 +2698,10 @@ define i32 @llpc.umid3.i32(i32 %x, i32 %y, i32 %z)
 define float @llpc.fmin3.f32(float %x, float %y, float %z)
 {
     ; min(x, y)
-    %1 = call float @llvm.minnum.f32(float %x, float %y)
+    %1 = call nnan float @llvm.minnum.f32(float %x, float %y)
 
     ; min(min(x, y), z)
-    %2 = call float @llvm.minnum.f32(float %1, float %z)
+    %2 = call nnan float @llvm.minnum.f32(float %1, float %z)
 
     ret float %2
 }
@@ -2710,10 +2710,10 @@ define float @llpc.fmin3.f32(float %x, float %y, float %z)
 define float @llpc.fmax3.f32(float %x, float %y, float %z)
 {
     ; max(x, y)
-    %1 = call float @llvm.maxnum.f32(float %x, float %y)
+    %1 = call nnan float @llvm.maxnum.f32(float %x, float %y)
 
     ; max(max(x, y), z)
-    %2 = call float @llvm.maxnum.f32(float %1, float %z)
+    %2 = call nnan float @llvm.maxnum.f32(float %1, float %z)
 
     ret float %2
 }

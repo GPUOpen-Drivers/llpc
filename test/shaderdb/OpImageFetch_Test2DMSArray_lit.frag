@@ -16,13 +16,16 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.resource.desc.v8i32(i32 0, i32 0, i32 0, i1 false)
-; SHADERTEST: call <8 x i32> {{.*}} @llpc.call.load.fmask.desc.v8i32(i32 0, i32 0, i32 0, i1 false)
-; SHADERTEST: call <4 x float> @llpc.image.fetch.f32.2DArray.sample.fmaskbased{{.*}}({{.*}},{{.*}},{{.*}}, i32 2,{{.*}})
+
+
+call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.image.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+call { <8 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.fmask.desc.ptr.s[p4v8i32,i32]"(i32 0, i32 0)
+call { <4 x i32> addrspace(4)*, i32 } (...) @"llpc.call.get.sampler.desc.ptr.s[p4v4i32,i32]"(i32 0, i32 0)
+call <4 x float> (...) @llpc.call.image.load.with.fmask.v4f32(i32 7, i32 0,{{.*}}, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call float @llvm.amdgcn.image.load.3d.f32.i32(i32 1,{{.*}},{{.*}},{{.*}},{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2darraymsaa.v4f32.i32(i32 15,{{.*}},{{.*}},{{.*}},{{.*}},{{.*}}, i32 0, i32 0)
+call i32 @llvm.amdgcn.image.load.3d.i32.i32(i32 1,{{.*}}, i32 0, i32 0)
+call <4 x float> @llvm.amdgcn.image.load.2darraymsaa.v4f32.i32(i32 15, i32 {{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

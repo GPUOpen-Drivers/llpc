@@ -36,6 +36,7 @@ option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
 #if VKI_BUILD_GFX10
 option(LLPC_BUILD_GFX10   "LLPC support for GFX10?"   OFF)
 #endif
+option(LLPC_BUILD_METROHASH   "LLPC build imported metrohash copy"   ON)
 # None
 
 set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
@@ -225,6 +226,7 @@ target_sources(llpc PRIVATE
     builder/llpcBuilder.cpp
     builder/llpcBuilderImpl.cpp
     builder/llpcBuilderImplDesc.cpp
+    builder/llpcBuilderImplImage.cpp
     builder/llpcBuilderImplMatrix.cpp
     builder/llpcBuilderImplMisc.cpp
     builder/llpcBuilderImplSubgroup.cpp
@@ -250,7 +252,6 @@ target_sources(llpc PRIVATE
     lower/llpcSpirvLowerAlgebraTransform.cpp
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerGlobal.cpp
-    lower/llpcSpirvLowerImageOp.cpp
     lower/llpcSpirvLowerInstMetaRemove.cpp
     lower/llpcSpirvLowerLoopUnrollControl.cpp
     lower/llpcSpirvLowerMemoryOp.cpp
@@ -273,8 +274,6 @@ target_sources(llpc PRIVATE
     patch/llpcPatchCopyShader.cpp
     patch/llpcPatchDescriptorLoad.cpp
     patch/llpcPatchEntryPointMutate.cpp
-    patch/llpcPatchGroupOp.cpp
-    patch/llpcPatchImageOp.cpp
     patch/llpcPatchInOutImportExport.cpp
     patch/llpcPatchLlvmIrInclusion.cpp
     patch/llpcPatchLoopUnrollInfoRectify.cpp
@@ -355,8 +354,13 @@ target_sources(llpc PRIVATE
 )
 
 # llpc/imported/metrohash
-add_subdirectory(imported/metrohash)
-target_link_libraries(llpc PRIVATE llpc_metrohash)
+if(LLPC_BUILD_METROHASH)
+    add_subdirectory(imported/metrohash)
+    target_link_libraries(llpc PRIVATE llpc_metrohash)
+else()
+    target_link_libraries(llpc PRIVATE metrohash)
+    target_compile_definitions(llpc PRIVATE SINGLE_EXTERNAL_METROHASH)
+endif()
 
 ### LLPC Auto-generated Files ##########################################################################################
 set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)
@@ -398,8 +402,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF16.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslImageOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
 )
 

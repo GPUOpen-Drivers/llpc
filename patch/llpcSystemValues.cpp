@@ -841,7 +841,6 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
         ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable),
         ConstantInt::get(m_pContext->Int32Ty(), tableOffset),
         ConstantInt::get(m_pContext->Int32Ty(), 0),
-        ConstantInt::get(m_pContext->BoolTy(), false)
     };
     return EmitCall(pModule,
                     LlpcName::DescriptorLoadBuffer,

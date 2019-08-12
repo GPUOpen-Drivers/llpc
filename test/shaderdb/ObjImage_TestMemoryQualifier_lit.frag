@@ -16,13 +16,13 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} <4 x float> @spirv.image.read.f32.1D
-; SHADERTEST: call {{.*}} <4 x float> @spirv.image.read.f32.2D
-; SHADERTEST: call {{.*}} void @spirv.image.write.f32.Rect
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 0, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call void (...) @llpc.call.image.store(i32 1, i32 0, <8 x i32>
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.1D.dimaware
-; SHADERTEST: call <4 x float> @llpc.image.read.f32.2D.dimaware
-; SHADERTEST: call void @llpc.image.write.f32.Rect.dimaware
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 0, i32 0, <8 x i32>
+; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call void (...) @llpc.call.image.store(i32 1, i32 0, <8 x i32>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

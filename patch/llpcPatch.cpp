@@ -108,6 +108,13 @@ void Patch::AddPrePatchPasses(
         passMgr.add(pBuilderReplayer);
     }
 
+    if (EnableOuts())
+    {
+        passMgr.add(createPrintModulePass(outs(),
+                    "===============================================================================\n"
+                    "// LLPC pipeline before-patching results\n"));
+    }
+
     // Build null fragment shader if necessary
     passMgr.add(CreatePatchNullFragShader());
 
@@ -142,14 +149,8 @@ void Patch::AddPasses(
     // Patch entry-point mutation (should be done before external library link)
     passMgr.add(CreatePatchEntryPointMutate());
 
-    // Patch image operations (should be done before external library link)
-    passMgr.add(CreatePatchImageOp());
-
     // Patch push constant loading (should be done before external library link)
     passMgr.add(CreatePatchPushConstOp());
-
-    // Patch group operations (should be done before external library link)
-    passMgr.add(CreatePatchGroupOp());
 
     // Link external libraries and remove dead functions after it
     passMgr.add(CreatePassExternalLibLink(false)); // Not native only

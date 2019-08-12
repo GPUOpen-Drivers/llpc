@@ -32,6 +32,7 @@
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 
 #include "llpc.h"
 #include "llpcInternal.h"
@@ -76,7 +77,7 @@ static uint32_t SizeOfDword = sizeof(uint32_t);
 class NggLdsManager
 {
 public:
-    NggLdsManager(llvm::Module* pModule, Context* pContext);
+    NggLdsManager(llvm::Module* pModule, Context* pContext, llvm::IRBuilder<>* pBuilder);
 
     static uint32_t CalcLdsRegionTotalSize(GraphicsContext* pContext);
 
@@ -91,13 +92,10 @@ public:
         return regionStart;
     }
 
-    llvm::Value* ReadValueFromLds(llvm::Type* pReadTy, llvm::Value* pLdsOffset, llvm::BasicBlock* pInsertAtEnd);
-    void WriteValueToLds(llvm::Value* pWriteValue, llvm::Value* pLdsOffset, llvm::BasicBlock* pInsertAtEnd);
+    llvm::Value* ReadValueFromLds(llvm::Type* pReadTy, llvm::Value* pLdsOffset, bool useDs128 = false);
+    void WriteValueToLds(llvm::Value* pWriteValue, llvm::Value* pLdsOffset, bool useDs128 = false);
 
-    void AtomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp,
-                         llvm::Value*               pAtomicValue,
-                         llvm::Value*               pLdsOffset,
-                         llvm::BasicBlock*          pInsertAtEnd);
+    void AtomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value* pAtomicValue, llvm::Value* pLdsOffset);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(NggLdsManager);
@@ -115,6 +113,8 @@ private:
     uint32_t        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all LDS region types (in BYTEs)
 
     uint32_t        m_waveCountInSubgroup; // Wave count in sub-group
+
+    llvm::IRBuilder<>*  m_pBuilder; // LLVM IR builder
 };
 
 } // Llpc
