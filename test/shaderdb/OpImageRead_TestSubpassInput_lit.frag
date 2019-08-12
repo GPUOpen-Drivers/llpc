@@ -42,7 +42,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32(i32 15, {{.*}}, i32 0, i32 0)
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.load.2dmsaa.v4i32.i32(i32 15,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32(i32 15,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

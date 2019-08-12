@@ -865,6 +865,31 @@ static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] =
 };
 
 // =====================================================================================================================
+// Convert an integer or vector of integer type to the equivalent (vector of) half/float/double
+static Type* ConvertToFloatingPointType(
+    Type* pOrigTy)    // Original type
+{
+    LLPC_ASSERT(pOrigTy->isIntOrIntVectorTy());
+    Type* pNewTy = pOrigTy;
+    switch (pNewTy->getScalarType()->getIntegerBitWidth())
+    {
+    case 16:
+        pNewTy = Type::getHalfTy(pNewTy->getContext());
+        break;
+    case 32:
+        pNewTy = Type::getFloatTy(pNewTy->getContext());
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+    }
+    if (isa<VectorType>(pOrigTy))
+    {
+        pNewTy = VectorType::get(pNewTy, pOrigTy->getVectorNumElements());
+    }
+    return pNewTy;
+}
+
+// =====================================================================================================================
 // Create an image load.
 Value* BuilderImplImage::CreateImageLoad(
     Type*             pResultTy,          // [in] Result type
@@ -881,16 +906,12 @@ Value* BuilderImplImage::CreateImageLoad(
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
     uint32_t dmask = 1;
-    VectorType* pVectorResultTy = nullptr;
+    Type* pTexelTy = pResultTy;
     if (auto pStructResultTy = dyn_cast<StructType>(pResultTy))
     {
-        pVectorResultTy = dyn_cast<VectorType>(pStructResultTy->getElementType(0));
+        pTexelTy = pStructResultTy->getElementType(0);
     }
-    else
-    {
-        pVectorResultTy = dyn_cast<VectorType>(pResultTy);
-    }
-    if (pVectorResultTy != nullptr)
+    if (auto pVectorResultTy = dyn_cast<VectorType>(pTexelTy))
     {
         dmask = (1U << pVectorResultTy->getNumElements()) - 1;
     }
@@ -906,14 +927,26 @@ Value* BuilderImplImage::CreateImageLoad(
                             coords,
                             derivatives);
 
+    // The intrinsics insist on an FP data type, so we need to bitcast if we want an integer data type.
+    Type* pIntrinsicDataTy = pResultTy;
+    if (pTexelTy->isIntOrIntVectorTy())
+    {
+        pIntrinsicDataTy = ConvertToFloatingPointType(pTexelTy);
+        if (pTexelTy != pResultTy)
+        {
+            // TFE
+            pIntrinsicDataTy = StructType::get(pTexelTy->getContext(), { pTexelTy, getInt32Ty() });
+        }
+    }
+
     SmallVector<Value*, 16> args;
-    Instruction *pResult = nullptr;
+    Value *pResult = nullptr;
     uint32_t imageDescArgIndex = 0;
     if (pImageDesc->getType() == GetImageDescTy())
     {
         // Not texel buffer; use image load instruction.
         // Build the intrinsic arguments.
-        bool tfe = isa<StructType>(pResultTy);
+        bool tfe = isa<StructType>(pIntrinsicDataTy);
         args.push_back(getInt32(dmask));
         args.insert(args.end(), coords.begin(), coords.end());
 
@@ -929,7 +962,7 @@ Value* BuilderImplImage::CreateImageLoad(
         // Get the intrinsic ID from the load intrinsic ID table and call it.
         auto pTable = (pMipLevel != nullptr) ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
         pResult = CreateIntrinsic(pTable[dim],
-                                  { pResultTy, coords[0]->getType() },
+                                  { pIntrinsicDataTy, coords[0]->getType() },
                                   args,
                                   nullptr,
                                   instName);
@@ -943,14 +976,38 @@ Value* BuilderImplImage::CreateImageLoad(
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
-        pResult = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, pResultTy, args, nullptr, instName);
+        pResult = CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format,
+                                  pIntrinsicDataTy,
+                                  args,
+                                  nullptr,
+                                  instName);
     }
 
     // Add a waterfall loop if needed.
     if (flags & ImageFlagNonUniformImage)
     {
-        pResult = CreateWaterfallLoop(pResult, imageDescArgIndex);
+        pResult = CreateWaterfallLoop(cast<Instruction>(pResult), imageDescArgIndex);
     }
+
+    // If we had to change the result type from int to FP above, bitcast the result.
+    if (pIntrinsicDataTy != pResultTy)
+    {
+        if (isa<StructType>(pIntrinsicDataTy))
+        {
+            // TFE
+            pResult = CreateInsertValue(CreateInsertValue(UndefValue::get(pResultTy),
+                                                          CreateBitCast(CreateExtractValue(pResult, uint64_t(0)),
+                                                                        pTexelTy),
+                                                          uint64_t(0)),
+                                        CreateExtractValue(pResult, 1),
+                                        1);
+        }
+        else
+        {
+            pResult = CreateBitCast(pResult, pResultTy);
+        }
+    }
+
     return pResult;
 }
 
@@ -1028,11 +1085,18 @@ Value* BuilderImplImage::CreateImageStore(
     Value*            pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
-    Type* pTexelTy = pTexel->getType();
     getContext().GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
+
+    // The intrinsics insist on an FP data type, so we need to bitcast from an integer data type.
+    Type* pIntrinsicDataTy = pTexel->getType();
+    if (pIntrinsicDataTy->isIntOrIntVectorTy())
+    {
+        pIntrinsicDataTy = ConvertToFloatingPointType(pIntrinsicDataTy);
+        pTexel = CreateBitCast(pTexel, pIntrinsicDataTy);
+    }
 
     // Prepare the coordinate, which might also change the dimension.
     SmallVector<Value*, 4> coords;
@@ -1045,6 +1109,7 @@ Value* BuilderImplImage::CreateImageStore(
                             coords,
                             derivatives);
 
+    Type* pTexelTy = pTexel->getType();
     SmallVector<Value*, 16> args;
     Instruction* pImageStore = nullptr;
     uint32_t imageDescArgIndex = 0;
