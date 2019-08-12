@@ -24,7 +24,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = call {{.*}} <3 x float> @_Z17VectorTimesMatrixDv4_fDv3_Dv4_f(<4 x float> %{{.*}}, [3 x <4 x float>] %{{.*}})
+; SHADERTEST: = call <3 x float> (...) @llpc.call.vector.times.matrix.v3f32(<4 x float> %{{.*}}, [3 x <4 x float>] %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

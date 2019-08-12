@@ -202,6 +202,16 @@ public:
                                                     //  for any stage not present in the pipeline
 
     // -----------------------------------------------------------------------------------------------------------------
+    // Base class operations
+
+    // Create vector dot product operation. The two vectors must be the same floating point vector type.
+    // Returns a value whose type is the element type of the vectors.
+    virtual Value* CreateDotProduct(
+        Value* const pVector1,            // [in] The float vector 1
+        Value* const pVector2,            // [in] The float vector 2
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
+
+    // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
     // Get the type of pointer returned by CreateLoadBufferDesc.
@@ -562,6 +572,36 @@ public:
     virtual Value* CreateTransposeMatrix(
         Value* const pMatrix,            // [in] The matrix to transpose
         const Twine& instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create matrix multiplication: matrix times scalar, resulting in matrix
+    virtual Value* CreateMatrixTimesScalar(
+        Value* const pMatrix,             // [in] The column major matrix, [n x <n x float>]
+        Value* const pScalar,             // [in] The float scalar
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
+
+    // Create matrix multiplication: vector times matrix, resulting in vector
+    virtual Value* CreateVectorTimesMatrix(
+        Value* const pVector,              // [in] The float vector
+        Value* const pMatrix,              // [in] The column major matrix, n x <n x float>
+        const Twine& instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create matrix multiplication: matrix times vector, resulting in vector
+    virtual Value* CreateMatrixTimesVector(
+        Value* const pMatrix,             // [in] The column major matrix, n x <n x float>
+        Value* const pVector,             // [in] The float vector
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
+
+    // Create matrix multiplication:  matrix times matrix, resulting in matrix
+    virtual Value* CreateMatrixTimesMatrix(
+        Value* const pMatrix1,             // [in] The float matrix 1
+        Value* const pMatrix2,             // [in] The float matrix 2
+        const Twine& instName = "") = 0 ;  // [in] Name to give instruction(s)
+
+    // Create vector outer product operation, resulting in matrix
+    virtual Value* CreateOuterProduct(
+        Value* const pVector1,            // [in] The float vector 1
+        Value* const pVector2,            // [in] The float vector 2
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations

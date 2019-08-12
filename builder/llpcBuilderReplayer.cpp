@@ -472,6 +472,30 @@ Value* BuilderReplayer::ProcessCall(
         {
             return m_pBuilder->CreateTransposeMatrix(args[0]);
         }
+    case BuilderRecorder::Opcode::MatrixTimesScalar:
+        {
+            return m_pBuilder->CreateMatrixTimesScalar(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::VectorTimesMatrix:
+        {
+            return m_pBuilder->CreateVectorTimesMatrix(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::MatrixTimesVector:
+        {
+            return m_pBuilder->CreateMatrixTimesVector(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::MatrixTimesMatrix:
+        {
+            return m_pBuilder->CreateMatrixTimesMatrix(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::OuterProduct:
+        {
+            return m_pBuilder->CreateOuterProduct(args[0], args[1]);
+        }
+    case BuilderRecorder::Opcode::DotProduct:
+        {
+            return m_pBuilder->CreateDotProduct(args[0], args[1]);
+        }
 
     // Replayer implementations of BuilderImplSubgroup methods
     case BuilderRecorder::Opcode::GetSubgroupSize:

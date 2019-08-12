@@ -47,6 +47,8 @@ StringRef BuilderRecorder::GetCallName(
     {
     case Opcode::Nop:
         return "nop";
+    case Opcode::DotProduct:
+        return "dot.product";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -67,6 +69,16 @@ StringRef BuilderRecorder::GetCallName(
         return "get.buffer.desc.length";
     case Opcode::TransposeMatrix:
         return "transpose.matrix";
+    case Opcode::MatrixTimesScalar:
+        return "matrix.times.scalar";
+    case Opcode::VectorTimesMatrix:
+        return "vector.times.matrix";
+    case Opcode::MatrixTimesVector:
+        return "matrix.times.vector";
+    case Opcode::MatrixTimesMatrix:
+        return "matrix.times.matrix";
+    case Opcode::OuterProduct:
+        return "outer.product";
     case Opcode::Kill:
         return "kill";
     case Opcode::ReadClock:
@@ -213,6 +225,17 @@ ModulePass* BuilderRecorder::CreateBuilderReplayer()
 }
 
 // =====================================================================================================================
+// Create scalar from dot product of vector
+Value* BuilderRecorder::CreateDotProduct(
+    Value* const pVector1,            // [in] The vector 1
+    Value* const pVector2,            // [in] The vector 2
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    Type* const pScalarType = pVector1->getType()->getVectorElementType();
+    return Record(Opcode::DotProduct, pScalarType, { pVector1, pVector2 }, instName);
+}
+
+// =====================================================================================================================
 // Create a "kill". Only allowed in a fragment shader.
 Instruction* BuilderRecorder::CreateKill(
     const Twine& instName)  // [in] Name to give final instruction
@@ -227,6 +250,69 @@ Value* BuilderRecorder::CreateTransposeMatrix(
     const Twine& instName)     // [in] Name to give final instruction
 {
     return Record(Opcode::TransposeMatrix, GetTransposedMatrixTy(pMatrix->getType()), { pMatrix }, instName);
+}
+
+// =====================================================================================================================
+// Create matrix from matrix times scalar
+Value* BuilderRecorder::CreateMatrixTimesScalar(
+    Value* const pMatrix,             // [in] The matrix
+    Value* const pScalar,             // [in] The scalar
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    return Record(Opcode::MatrixTimesScalar, pMatrix->getType(), { pMatrix, pScalar }, instName);
+}
+
+// =====================================================================================================================
+// Create vector from vector times matrix
+Value* BuilderRecorder::CreateVectorTimesMatrix(
+    Value* const pVector,         // [in] The vector
+    Value* const pMatrix,         // [in] The matrix
+    const Twine& instName)        // [in] Name to give instruction(s)
+{
+    Type* const pMatrixType = pMatrix->getType();
+    Type* const pCompType = pMatrixType->getArrayElementType()->getVectorElementType();
+    const uint32_t columnCount = pMatrixType->getArrayNumElements();
+    Type* const pResultTy = VectorType::get(pCompType, columnCount);
+    return Record(Opcode::VectorTimesMatrix, pResultTy, { pVector, pMatrix }, instName);
+}
+
+// =====================================================================================================================
+// Create vector from matrix times vector
+Value* BuilderRecorder::CreateMatrixTimesVector(
+    Value* const pMatrix,             // [in] The matrix
+    Value* const pVector,             // [in] The vector
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    Type* const pColumnType = pMatrix->getType()->getArrayElementType();
+    Type* const pCompType = pColumnType->getVectorElementType();
+    const uint32_t rowCount = pColumnType->getVectorNumElements();
+    Type* const pVectorType = VectorType::get(pCompType, rowCount);
+    return Record(Opcode::MatrixTimesVector, pVectorType, { pMatrix, pVector }, instName);
+}
+
+// =====================================================================================================================
+// Create matrix from matrix times matrix
+Value* BuilderRecorder::CreateMatrixTimesMatrix(
+    Value* const pMatrix1,             // [in] The matrix 1
+    Value* const pMatrix2,             // [in] The matrix 2
+    const Twine& instName)             // [in] Name to give instruction(s)
+{
+    Type* const pMat1ColumnType = pMatrix1->getType()->getArrayElementType();
+    const uint32_t mat2ColCount = pMatrix2->getType()->getArrayNumElements();
+    Type* const pResultTy = ArrayType::get(pMat1ColumnType, mat2ColCount);
+    return Record(Opcode::MatrixTimesMatrix, pResultTy, { pMatrix1, pMatrix2 }, instName);
+}
+
+// =====================================================================================================================
+// Create matrix from outer product of vector
+Value* BuilderRecorder::CreateOuterProduct(
+    Value* const pVector1,            // [in] The vector 1
+    Value* const pVector2,            // [in] The vector 2
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    const uint32_t colCount = pVector2->getType()->getVectorNumElements();
+    Type* const pResultTy = ArrayType::get(pVector1->getType(), colCount);
+    return Record(Opcode::OuterProduct, pResultTy, { pVector1, pVector2 }, instName);
 }
 
 // =====================================================================================================================

@@ -17,10 +17,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: [4 x <4 x double>] @_Z17MatrixTimesScalarDv4_Dv4_dd
+; SHADERTEST: [4 x <4 x double>] (...) @llpc.call.matrix.times.scalar.a4v4f64
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: fmul double %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: fmul double %{{[^, ]*}}, %{{[^, ]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

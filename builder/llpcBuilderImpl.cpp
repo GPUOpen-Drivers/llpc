@@ -42,6 +42,26 @@ Context& BuilderImplBase::getContext() const
 }
 
 // =====================================================================================================================
+// Create scalar from dot product of vector
+Value* BuilderImplBase::CreateDotProduct(
+    Value* const pVector1,            // [in] The float vector 1
+    Value* const pVector2,            // [in] The float vector 2
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    const uint32_t compCount = pVector1->getType()->getVectorNumElements();
+
+    Value* pVector = CreateFMul(pVector1, pVector2);
+    Value* pScalar = CreateExtractElement(pVector, uint64_t(0));
+
+    for (uint32_t i = 1; i < compCount; ++i)
+    {
+        pScalar = CreateFAdd(pScalar, CreateExtractElement(pVector, i));
+    }
+
+    return pScalar;
+}
+
+// =====================================================================================================================
 // Get whether the context we are building in supports DPP operations.
 bool BuilderImplBase::SupportDpp() const
 {
