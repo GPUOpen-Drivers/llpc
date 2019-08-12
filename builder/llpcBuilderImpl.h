@@ -47,6 +47,11 @@ public:
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
+    // Create scalar from dot product of vector
+    Value* CreateDotProduct(Value* const pVector1,
+                            Value* const pVector2,
+                            const Twine& instName = "") override final;
+
 protected:
     // Get whether the context we are building in supports DPP operations.
     bool SupportDpp() const;
@@ -314,6 +319,31 @@ public:
     // Create a matrix transpose.
     Value* CreateTransposeMatrix(Value* const pMatrix,
                                  const Twine& instName = "") override final;
+
+    // Create matrix multiplication: matrix times scalar, resulting in matrix
+    Value* CreateMatrixTimesScalar(Value* const pMatrix,
+                                   Value* const pScalar,
+                                   const Twine& instName = "") override final;
+
+    // Create matrix multiplication: vector times matrix, resulting in vector
+    Value* CreateVectorTimesMatrix(Value* const pVector,
+                                   Value* const pMatrix,
+                                   const Twine& instName = "") override final;
+
+    // Create matrix multiplication: matrix times vector, resulting in vector
+    Value* CreateMatrixTimesVector(Value* const pMatrix,
+                                   Value* const pVector,
+                                   const Twine& instName = "") override final;
+
+    // Create matrix multiplication:  matrix times matrix, resulting in matrix
+    Value* CreateMatrixTimesMatrix(Value* const pMatrix1,
+                                   Value* const pMatrix2,
+                                   const Twine& instName = "") override final;
+
+    // Create vector outer product operation, resulting in matrix
+    Value* CreateOuterProduct(Value* const pVector1,
+                              Value* const pVector2,
+                              const Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMatrix)

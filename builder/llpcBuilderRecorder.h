@@ -70,6 +70,9 @@ public:
         // NOP
         Nop = 0,
 
+        // Base class
+        DotProduct,
+
         // Descriptor
         LoadBufferDesc,
         IndexDescPtr,
@@ -96,6 +99,11 @@ public:
 
         // Matrix
         TransposeMatrix,
+        MatrixTimesScalar,
+        VectorTimesMatrix,
+        MatrixTimesVector,
+        MatrixTimesMatrix,
+        OuterProduct,
 
         // Misc.
         Kill,
@@ -152,6 +160,13 @@ public:
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
     ModulePass* CreateBuilderReplayer() override;
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Base class operations
+
+    Value* CreateDotProduct(Value* const pVector1,
+                            Value* const pVector2,
+                            const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
@@ -296,8 +311,24 @@ public:
     Instruction* CreateKill(const Twine& instName = "") override final;
     Instruction* CreateReadClock(bool realtime, const Twine& instName = "") override final;
 
+    // -----------------------------------------------------------------------------------------------------------------
     // Builder methods implemented in BuilderImplMatrix
     Value* CreateTransposeMatrix(Value* const pMatrix, const Twine& instName = "") override final;
+    Value* CreateMatrixTimesScalar(Value* const pMatrix,
+                                   Value* const pScalar,
+                                   const Twine& instName = "") override final;
+    Value* CreateVectorTimesMatrix(Value* const pVector,
+                                   Value* const pMatrix,
+                                   const Twine& instName = "") override final;
+    Value* CreateMatrixTimesVector(Value* const pMatrix,
+                                   Value* const pVector,
+                                   const Twine& instName = "") override final;
+    Value* CreateMatrixTimesMatrix(Value* const pMatrix1,
+                                   Value* const pMatrix2,
+                                   const Twine& instName = "") override final;
+    Value* CreateOuterProduct(Value* const pVector1,
+                              Value* const pVector2,
+                              const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Subgroup operations

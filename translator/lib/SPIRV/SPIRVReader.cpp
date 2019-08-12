@@ -5183,6 +5183,90 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
     return m_pBuilder->CreateTransposeMatrix(pMatrix);
 }
 
+// =====================================================================================================================
+// Handle OpMatrixTimesScalar.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
+    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    Value* const pMatrix = transValue(spvOperands[0], pFunc, pBlock);
+    Value* const pScalar = transValue(spvOperands[1], pFunc, pBlock);
+    return m_pBuilder->CreateMatrixTimesScalar(pMatrix, pScalar);
+}
+
+// =====================================================================================================================
+// Handle OpVectorTimesMatrix.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVectorTimesMatrix>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
+    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    Value* const pVector = transValue(spvOperands[0], pFunc, pBlock);
+    Value* const pMatrix = transValue(spvOperands[1], pFunc, pBlock);
+    return m_pBuilder->CreateVectorTimesMatrix(pVector, pMatrix);
+}
+
+// =====================================================================================================================
+// Handle OpMatrixTimesVector.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesVector>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
+    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    Value* const pMatrix = transValue(spvOperands[0], pFunc, pBlock);
+    Value* const pVector = transValue(spvOperands[1], pFunc, pBlock);
+    return m_pBuilder->CreateMatrixTimesVector(pMatrix, pVector);
+}
+
+// =====================================================================================================================
+// Handle OpMatrixTimesMatrix.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesMatrix>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
+    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    Value* const pMatrix1 = transValue(spvOperands[0], pFunc, pBlock);
+    Value* const pMatrix2 = transValue(spvOperands[1], pFunc, pBlock);
+    return m_pBuilder->CreateMatrixTimesMatrix(pMatrix1, pMatrix2);
+}
+
+// =====================================================================================================================
+// Handle OpOuterProduct.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
+    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    Value* const pVector1 = transValue(spvOperands[0], pFunc, pBlock);
+    Value* const pVector2 = transValue(spvOperands[1], pFunc, pBlock);
+    return m_pBuilder->CreateOuterProduct(pVector1, pVector2);
+}
+
+// =====================================================================================================================
+// Handle OpDot.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDot>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
+    std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
+    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    Value* const pVector1 = transValue(spvOperands[0], pFunc, pBlock);
+    Value* const pVector2 = transValue(spvOperands[1], pFunc, pBlock);
+    return m_pBuilder->CreateDotProduct(pVector1, pVector2);
+}
+
 /// For instructions, this function assumes they are created in order
 /// and appended to the given basic block. An instruction may use a
 /// instruction from another BB which has not been translated. Such
@@ -6066,6 +6150,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpGroupSMaxNonUniformAMD);
   HANDLE_OPCODE(OpTranspose);
   HANDLE_OPCODE(OpExtInst);
+  HANDLE_OPCODE(OpMatrixTimesScalar);
+  HANDLE_OPCODE(OpVectorTimesMatrix);
+  HANDLE_OPCODE(OpMatrixTimesVector);
+  HANDLE_OPCODE(OpMatrixTimesMatrix);
+  HANDLE_OPCODE(OpOuterProduct);
+  HANDLE_OPCODE(OpDot);
 
 #undef HANDLE_OPCODE
 
