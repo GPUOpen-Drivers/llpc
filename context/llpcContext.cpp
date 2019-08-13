@@ -45,6 +45,8 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "SPIRVInternal.h"
+
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcMetroHash.h"
@@ -165,11 +167,20 @@ Context::Context(
     }
     m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLib),
             sizeof(GlslEmuLib)), "GlslEmuLib"));
+
+    Reset();
 }
 
 // =====================================================================================================================
 Context::~Context()
 {
+}
+
+// =====================================================================================================================
+void Context::Reset()
+{
+    m_pPipelineContext = nullptr;
+    m_pResUsage = nullptr;
 }
 
 // =====================================================================================================================
@@ -209,6 +220,52 @@ void Context::SetModuleTargetMachine(
 {
     pModule->setTargetTriple(GetTargetMachine()->getTargetTriple().getTriple());
     pModule->setDataLayout(GetTargetMachine()->createDataLayout());
+}
+
+// =====================================================================================================================
+// Gets float control settings of the specified shader stage for the provide floating-point type.
+FloatControl Context::GetShaderFloatControl(
+    ShaderStage shaderStage,    // Shader stage
+    uint32_t    bitWidth)       // Bit width of the floating-point type
+{
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        // Treat copy shader as part of geometry shader
+        shaderStage = ShaderStageGeometry;
+    }
+
+    FloatControl floatControl = {};
+    const auto& commonUsage = GetShaderResourceUsage(shaderStage)->builtInUsage.common;
+
+    switch (bitWidth)
+    {
+    case 16:
+        floatControl.denormPerserve = ((commonUsage.denormPerserve & SPIRV::SPIRVTW_16Bit) != 0);
+        floatControl.denormFlushToZero = ((commonUsage.denormFlushToZero & SPIRV::SPIRVTW_16Bit) != 0);
+        floatControl.signedZeroInfNanPreserve = ((commonUsage.signedZeroInfNanPreserve & SPIRV::SPIRVTW_16Bit) != 0);
+        floatControl.roundingModeRTE = ((commonUsage.roundingModeRTE & SPIRV::SPIRVTW_16Bit) != 0);
+        floatControl.roundingModeRTZ = ((commonUsage.roundingModeRTZ & SPIRV::SPIRVTW_16Bit) != 0);
+        break;
+    case 32:
+        floatControl.denormPerserve = ((commonUsage.denormPerserve & SPIRV::SPIRVTW_32Bit) != 0);
+        floatControl.denormFlushToZero = ((commonUsage.denormFlushToZero & SPIRV::SPIRVTW_32Bit) != 0);
+        floatControl.signedZeroInfNanPreserve = ((commonUsage.signedZeroInfNanPreserve & SPIRV::SPIRVTW_32Bit) != 0);
+        floatControl.roundingModeRTE = ((commonUsage.roundingModeRTE & SPIRV::SPIRVTW_32Bit) != 0);
+        floatControl.roundingModeRTZ = ((commonUsage.roundingModeRTZ & SPIRV::SPIRVTW_32Bit) != 0);
+        break;
+    case 64:
+        floatControl.denormPerserve = ((commonUsage.denormPerserve & SPIRV::SPIRVTW_64Bit) != 0);
+        floatControl.denormFlushToZero = ((commonUsage.denormFlushToZero & SPIRV::SPIRVTW_64Bit) != 0);
+        floatControl.signedZeroInfNanPreserve = ((commonUsage.signedZeroInfNanPreserve & SPIRV::SPIRVTW_64Bit) != 0);
+        floatControl.roundingModeRTE = ((commonUsage.roundingModeRTE & SPIRV::SPIRVTW_64Bit) != 0);
+        floatControl.roundingModeRTZ = ((commonUsage.roundingModeRTZ & SPIRV::SPIRVTW_64Bit) != 0);
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return floatControl;
 }
 
 } // Llpc

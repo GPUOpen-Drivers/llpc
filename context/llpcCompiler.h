@@ -53,18 +53,42 @@ enum class BinaryType : uint32_t
     Unknown = 0,  // Invalid type
     Spirv,        // SPIR-V binary
     LlvmBc,       // LLVM bitcode
+    MultiLlvmBc,  // Multiple LLVM bitcode
     Elf,          // ELF
+};
+
+// Represents the information of one shader entry in ShaderModuleData
+struct ShaderModuleEntry
+{
+    ShaderStage stage;              // Shader stage
+    uint32_t    entryNameHash[4];   // Hash code of entry name
+    uint32_t    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
+    uint32_t    entrySize;          // Byte size of the entry data
+    uint32_t    resUsageSize;       // Byte size of the resource usage
+                                    // NOTE: It should be removed after we move all necessary resUsage info to
+                                    // LLVM module metadata
+    uint32_t    passIndex;          // Indices of passes, It is only for internal debug.
+};
+
+// Represents the name map <stage, name> of shader entry-point
+struct ShaderEntryName
+{
+    ShaderStage stage;             // Shader stage
+    const char* pName;             // Entry name
 };
 
 // Represents the information of a shader module
 struct ShaderModuleInfo
 {
-    uint32_t        cacheHash[4];            // hash code for calculate pipeline cache key
-    uint32_t        debugInfoSize;           // Byte size of debug instructions
-    bool            enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
-    bool            enableVarPtr;            // Whether to enable "VariablePointer" capability
-    bool            useSubgroupSize;         // Whether gl_SubgroupSize is used
-    bool            useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
+    uint32_t              cacheHash[4];            // hash code for calculate pipeline cache key
+    uint32_t              debugInfoSize;           // Byte size of debug instructions
+    bool                  enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
+    bool                  enableVarPtr;            // Whether to enable "VariablePointer" capability
+    bool                  useSubgroupSize;         // Whether gl_SubgroupSize is used
+    bool                  useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
+    bool                  useSpecConstant;         // Whether specializaton constant is used
+    uint32_t              entryCount;              // Entry count in the module
+    ShaderModuleEntry     entries[1];              // Array of all entries
 };
 
 // Represents output data of building a shader module.
@@ -235,10 +259,7 @@ public:
 
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 
-    static void TranslateSpirvToLlvm(const BinaryData*            pSpirvBin,
-                                     ShaderStage                  shaderStage,
-                                     const char*                  pEntryTarget,
-                                     const VkSpecializationInfo*  pSpecializationInfo,
+    static void TranslateSpirvToLlvm(const PipelineShaderInfo*    pShaderInfo,
                                      llvm::Module*                pModule);
 
 private:
@@ -247,14 +268,11 @@ private:
 
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
-    Result BuildNullFs(Context* pContext, std::unique_ptr<llvm::Module>& pNullFsModule) const;
-
     void InitGpuProperty();
     void InitGpuWorkaround();
-    void DumpTimeProfilingResult(const MetroHash::Hash* pHash);
 
-    Context* AcquireContext();
-    void ReleaseContext(Context* pContext);
+    Context* AcquireContext() const;
+    void ReleaseContext(Context* pContext) const;
 
     static Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut);
 
@@ -262,7 +280,9 @@ private:
 
     static void TrimSpirvDebugInfo(const BinaryData* pSpvBinCode, uint32_t bufferSize, void* pTrimCode);
 
-    static Result CollectInfoFromSpirvBinary(const BinaryData* pSpvBinCode, ShaderModuleInfo* pShaderModuleInfo);
+    static Result CollectInfoFromSpirvBinary(const BinaryData*                      pSpvBinCode,
+                                             ShaderModuleInfo*                      pShaderModuleInfo,
+                                             llvm::SmallVector<ShaderEntryName, 4>& shaderEntryNames);
 
     void GetPipelineStatistics(const void*             pCode,
                                size_t                  codeSize,
@@ -272,9 +292,7 @@ private:
     uint32_t ChooseLoopUnrollCountCandidate(PipelineStatistics* pPipelineStats,
                                             uint32_t            candidateCount) const;
 
-    static llvm::Module* LinkShaderModules(Context* pContext, llvm::ArrayRef<llvm::Module*> modules);
-
-    bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule);
+    bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
 
     ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
                                         MetroHash::Hash*    pCacheHash,

@@ -1443,6 +1443,16 @@ static Result ProcessPipeline(
                         }
                     }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
+                    bool isGraphics = (compileInfo.stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
+                    for (uint32_t i = 0; i < ShaderStageCount; ++i)
+                    {
+                        compileInfo.shaderInfo[i].options.pipelineOptions = isGraphics ?
+                                                                            compileInfo.gfxPipelineInfo.options :
+                                                                            compileInfo.compPipelineInfo.options;
+                    }
+#endif
+
                     fileNames += inFile;
                     fileNames += " ";
                     *pNextFile = i + 1;

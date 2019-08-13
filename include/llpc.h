@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 31
+#define LLPC_INTERFACE_MAJOR_VERSION 32
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     32.0 | Add ShdaerModuleOptions in ShaderModuleBuildInfo                                                      |
 //* |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
 //* |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
 //* |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
@@ -186,8 +187,40 @@ struct BinaryData
     const void*     pCode;              ///< Shader binary data
 };
 
+/// Represents per pipeline options.
+struct PipelineOptions
+{
+    bool includeDisassembly;       ///< If set, the disassembly for all compiled shaders will be included in
+                                   ///  the pipeline ELF.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
+    bool autoLayoutDesc;           ///< If set, the LLPC standalone compiler is compiling individual shader(s)
+                                   ///  without pipeline info, so LLPC needs to do auto descriptor layout.
+#endif
+    bool scalarBlockLayout;        ///< If set, allows scalar block layout of types.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    bool reconfigWorkgroupLayout;  ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
+#endif
+    bool includeIr;                ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    bool robustBufferAccess;       ///< If set, out of bounds accesses to buffer or private array will be handled.
+                                   ///  for now this option is used by LLPC shader and affects only the private array,
+                                   ///  the out of bounds accesses will be skipped with this setting.
+#endif
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
+    bool includeIrBinary;          ///< If set, the IR binary for all compiled shaders will be included in the pipeline
+                                   ///  ELF.
+#endif
+};
+
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
 typedef void* (VKAPI_CALL *OutputAllocFunc)(void* pInstance, void* pUserData, size_t size);
+
+/// Represents per shader module options.
+struct ShaderModuleOptions
+{
+    PipelineOptions     pipelineOptions;   ///< Pipeline options related with this shader module
+    bool                enableOpt;         ///< Enable translate & lower phase in build shader module
+};
 
 /// Represents info to build a shader module.
 struct ShaderModuleBuildInfo
@@ -196,6 +229,9 @@ struct ShaderModuleBuildInfo
     void*                pUserData;         ///< User data
     OutputAllocFunc      pfnOutputAlloc;    ///< Output buffer allocator
     BinaryData           shaderBin;         ///< Shader binary data (SPIR-V binary)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
+    ShaderModuleOptions  options;           ///< Per shader module options
+#endif
 };
 
 /// Represents the header part of LLPC shader module data
@@ -268,31 +304,6 @@ struct PipelineShaderOptions
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     /// Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
-#endif
-};
-
-/// Represents per pipeline options.
-struct PipelineOptions
-{
-    bool includeDisassembly;       ///< If set, the disassembly for all compiled shaders will be included in
-                                   ///  the pipeline ELF.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    bool autoLayoutDesc;           ///< If set, the LLPC standalone compiler is compiling individual shader(s)
-                                   ///  without pipeline info, so LLPC needs to do auto descriptor layout.
-#endif
-    bool scalarBlockLayout;        ///< If set, allows scalar block layout of types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-    bool reconfigWorkgroupLayout;  ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
-#endif
-    bool includeIr;                ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-    bool robustBufferAccess;       ///< If set, out of bounds accesses to buffer or private array will be handled.
-                                   ///  for now this option is used by LLPC shader and affects only the private array,
-                                   ///  the out of bounds accesses will be skipped with this setting.
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    bool includeIrBinary;          ///< If set, the IR binary for all compiled shaders will be included in the pipeline
-                                   ///  ELF.
 #endif
 };
 

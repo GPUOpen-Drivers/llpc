@@ -206,6 +206,8 @@ void PatchEntryPointMutate::ProcessShader()
         builder.addAttribute("amdgpu-num-vgpr", std::to_string(vgprLimit));
         pResUsage->numVgprsAvailable = std::min(vgprLimit, pResUsage->numVgprsAvailable);
     }
+    pResUsage->numVgprsAvailable = std::min(pResUsage->numVgprsAvailable,
+                                           m_pContext->GetGpuProperty()->maxVgprsAvailable);
 
     if ((pShaderOptions->sgprLimit != 0) && (pShaderOptions->sgprLimit != UINT32_MAX))
     {
@@ -221,6 +223,8 @@ void PatchEntryPointMutate::ProcessShader()
         builder.addAttribute("amdgpu-num-sgpr", std::to_string(sgprLimit));
         pResUsage->numSgprsAvailable = std::min(sgprLimit, pResUsage->numSgprsAvailable);
     }
+    pResUsage->numSgprsAvailable = std::min(pResUsage->numSgprsAvailable,
+                                            m_pContext->GetGpuProperty()->maxSgprsAvailable);
 
     if (pShaderOptions->maxThreadGroupsPerComputeUnit != 0)
     {

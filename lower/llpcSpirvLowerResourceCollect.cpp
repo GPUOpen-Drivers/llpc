@@ -78,34 +78,6 @@ bool SpirvLowerResourceCollect::runOnModule(
 
     CollectExecutionModeUsage();
 
-    if (m_shaderStage == ShaderStageVertex)
-    {
-        // Collect resource usages from vertex input create info
-        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-        auto pVertexInput = pPipelineInfo->pVertexInput;
-
-        // TODO: In the future, we might check if the corresponding vertex attribute is active in vertex shader
-        // and set the usage based on this info.
-        if (pVertexInput != nullptr)
-        {
-            for (uint32_t i = 0; i < pVertexInput->vertexBindingDescriptionCount; ++i)
-            {
-                auto pBinding = &pVertexInput->pVertexBindingDescriptions[i];
-                if (pBinding->inputRate == VK_VERTEX_INPUT_RATE_VERTEX)
-                {
-                    m_pResUsage->builtInUsage.vs.vertexIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseVertex = true;
-                }
-                else
-                {
-                    LLPC_ASSERT(pBinding->inputRate == VK_VERTEX_INPUT_RATE_INSTANCE);
-                    m_pResUsage->builtInUsage.vs.instanceIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseInstance = true;
-                }
-            }
-        }
-    }
-
     // Collect unused globals and remove them
     std::unordered_set<GlobalVariable*> removedGlobals;
     for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
@@ -188,12 +160,6 @@ bool SpirvLowerResourceCollect::runOnModule(
                             }
                         }
                     }
-
-                    DescriptorBinding bindingInfo = {};
-                    bindingInfo.descType  = descType;
-                    bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
-
-                    CollectDescriptorUsage(descSet, binding, &bindingInfo);
                 }
                 break;
             }
@@ -265,13 +231,6 @@ bool SpirvLowerResourceCollect::runOnModule(
                 auto binding   = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
                 auto blockType = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(2))->getZExtValue();
                 LLPC_ASSERT((blockType == BlockTypeUniform) || (blockType == BlockTypeShaderStorage));
-
-                DescriptorBinding bindingInfo = {};
-                bindingInfo.descType  = (blockType == BlockTypeUniform) ? DescriptorType::UniformBlock :
-                                                                          DescriptorType::ShaderStorageBlock;
-                bindingInfo.arraySize = GetFlattenArrayElementCount(pGlobalTy);
-
-                CollectDescriptorUsage(descSet, binding, &bindingInfo);
                 break;
             }
         default:
@@ -641,30 +600,6 @@ void SpirvLowerResourceCollect::CollectExecutionModeUsage()
             }
         }
     }
-}
-
-// =====================================================================================================================
-// Collects the usage info of descriptor sets and their bindings.
-void SpirvLowerResourceCollect::CollectDescriptorUsage(
-    uint32_t                 descSet,       // ID of descriptor set
-    uint32_t                 binding,       // ID of descriptor binding
-    const DescriptorBinding* pBindingInfo)  // [in] Descriptor binding info
-{
-    // The set ID is somewhat larger than expected
-    if ((descSet + 1) > m_pResUsage->descSets.size())
-    {
-        m_pResUsage->descSets.resize(descSet + 1);
-    }
-
-    auto pDescSet = &m_pResUsage->descSets[descSet];
-    static const DescriptorBinding DummyBinding = {};
-    while ((binding + 1) > pDescSet->size())
-    {
-        // Insert dummy bindings till the binding ID is reached
-        pDescSet->push_back(DummyBinding);
-    }
-
-    (*pDescSet)[binding] = *pBindingInfo;
 }
 
 // =====================================================================================================================

@@ -68,7 +68,8 @@ PipelineContext::~PipelineContext()
 
 // =====================================================================================================================
 // Gets the name string of GPU target according to graphics IP version info.
-const char* PipelineContext::GetGpuNameString() const
+const char* PipelineContext::GetGpuNameString(
+    GfxIpVersion gfxIp)   // Graphics IP version info
 {
     struct GpuNameStringMap
     {
@@ -108,9 +109,9 @@ const char* PipelineContext::GetGpuNameString() const
     const GpuNameStringMap* pNameMap = nullptr;
     for (auto& nameMap : GpuNameMap)
     {
-        if ((nameMap.gfxIp.major    == m_gfxIp.major) &&
-            (nameMap.gfxIp.minor    == m_gfxIp.minor) &&
-            (nameMap.gfxIp.stepping == m_gfxIp.stepping))
+        if ((nameMap.gfxIp.major    == gfxIp.major) &&
+            (nameMap.gfxIp.minor    == gfxIp.minor) &&
+            (nameMap.gfxIp.stepping == gfxIp.stepping))
         {
             pNameMap = &nameMap;
             break;
@@ -124,10 +125,11 @@ const char* PipelineContext::GetGpuNameString() const
 
 // =====================================================================================================================
 // Gets the name string of the abbreviation for GPU target according to graphics IP version info.
-const char* PipelineContext::GetGpuNameAbbreviation() const
+const char* PipelineContext::GetGpuNameAbbreviation(
+    GfxIpVersion gfxIp)  // Graphics IP version info
 {
     const char* pNameAbbr = nullptr;
-    switch (m_gfxIp.major)
+    switch (gfxIp.major)
     {
     case 6:
         pNameAbbr = "SI";
@@ -152,10 +154,9 @@ const char* PipelineContext::GetGpuNameAbbreviation() const
 // =====================================================================================================================
 // Initializes resource usage of the specified shader stage.
 void PipelineContext::InitShaderResourceUsage(
-    ShaderStage shaderStage)    // Shader stage
+    ShaderStage    shaderStage,      // Shader stage
+    ResourceUsage* pResUsage)        // [out] Resource usage
 {
-    auto pResUsage = GetShaderResourceUsage(shaderStage);
-
     memset(&pResUsage->builtInUsage, 0, sizeof(pResUsage->builtInUsage));
 
     pResUsage->pushConstSizeInBytes = 0;
@@ -164,8 +165,8 @@ void PipelineContext::InitShaderResourceUsage(
     pResUsage->perShaderTable = false;
     pResUsage->globalConstant = false;
 
-    pResUsage->numSgprsAvailable = m_pGpuProperty->maxSgprsAvailable;
-    pResUsage->numVgprsAvailable = m_pGpuProperty->maxVgprsAvailable;
+    pResUsage->numSgprsAvailable = UINT32_MAX;
+    pResUsage->numVgprsAvailable = UINT32_MAX;
 
     pResUsage->inOutUsage.inputMapLocCount = 0;
     pResUsage->inOutUsage.outputMapLocCount = 0;
@@ -224,10 +225,8 @@ void PipelineContext::InitShaderResourceUsage(
 // =====================================================================================================================
 // Initializes interface data of the specified shader stage.
 void PipelineContext::InitShaderInterfaceData(
-    ShaderStage shaderStage)  // Shader stage
+    InterfaceData* pIntfData)  // [out] Interface data
 {
-    auto pIntfData = GetShaderInterfaceData(shaderStage);
-
     pIntfData->userDataCount = 0;
     memset(pIntfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(pIntfData->userDataMap));
 

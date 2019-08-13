@@ -77,7 +77,7 @@ struct ElfDataEntry
 class CodeGenManager
 {
 public:
-    static Result CreateTargetMachine(Context* pContext);
+    static Result CreateTargetMachine(Context* pContext, const PipelineOptions* pPipelineOptions);
 
     static void SetupTargetFeatures(llvm::Module* pModule);
 
