@@ -1,0 +1,73 @@
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 41
+; Schema: 0
+               OpCapability Shader
+               OpCapability VariablePointers
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %2 %3 %4 %5
+               OpExecutionMode %1 LocalSize 1 1 1
+               OpDecorate %_runtimearr_v2int ArrayStride 8
+               OpDecorate %_struct_7 Block
+               OpMemberDecorate %_struct_7 0 Offset 0
+               OpDecorate %3 DescriptorSet 0
+               OpDecorate %3 Binding 0
+               OpDecorate %_ptr_Workgroup_int ArrayStride 4
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+        %int = OpTypeInt 32 1
+     %int_n1 = OpConstant %int -1
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+      %int_3 = OpConstant %int 3
+     %int_32 = OpConstant %int 32
+      %v2int = OpTypeVector %int 2
+%_arr_int_int_32 = OpTypeArray %int %int_32
+%_ptr_Workgroup__arr_int_int_32 = OpTypePointer Workgroup %_arr_int_int_32
+          %2 = OpVariable %_ptr_Workgroup__arr_int_int_32 Workgroup
+%_runtimearr_v2int = OpTypeRuntimeArray %v2int
+  %_struct_7 = OpTypeStruct %_runtimearr_v2int
+%_ptr_StorageBuffer__struct_7 = OpTypePointer StorageBuffer %_struct_7
+          %3 = OpVariable %_ptr_StorageBuffer__struct_7 StorageBuffer
+%_ptr_Workgroup_int = OpTypePointer Workgroup %int
+%_ptr_Private__ptr_Workgroup_int = OpTypePointer Private %_ptr_Workgroup_int
+          %4 = OpVariable %_ptr_Private__ptr_Workgroup_int Private
+          %5 = OpVariable %_ptr_Private__ptr_Workgroup_int Private
+%_ptr_StorageBuffer_v2int = OpTypePointer StorageBuffer %v2int
+         %24 = OpTypeFunction %void
+          %1 = OpFunction %void None %24
+         %25 = OpLabel
+         %26 = OpAccessChain %_ptr_Workgroup_int %2 %int_0
+               OpStore %4 %26
+         %27 = OpPtrAccessChain %_ptr_Workgroup_int %26 %int_32
+               OpStore %5 %27
+               OpBranch %28
+         %28 = OpLabel
+         %29 = OpPhi %int %int_0 %25 %30 %28
+         %31 = OpLoad %_ptr_Workgroup_int %4
+         %32 = OpLoad %_ptr_Workgroup_int %5
+         %33 = OpPtrAccessChain %_ptr_Workgroup_int %31 %int_1
+         %34 = OpPtrAccessChain %_ptr_Workgroup_int %32 %int_n1
+         %30 = OpIAdd %int %29 %int_1
+               OpStore %4 %33
+               OpStore %5 %34
+         %35 = OpPtrDiff %int %31 %32
+         %36 = OpPtrDiff %int %32 %31
+         %37 = OpCompositeConstruct %v2int %35 %36
+         %38 = OpAccessChain %_ptr_StorageBuffer_v2int %3 %int_0 %29
+               OpStore %38 %37
+         %39 = OpSGreaterThan %bool %29 %int_32
+               OpLoopMerge %40 %28 None
+               OpBranchConditional %39 %40 %28
+         %40 = OpLabel
+               OpReturn
+               OpFunctionEnd

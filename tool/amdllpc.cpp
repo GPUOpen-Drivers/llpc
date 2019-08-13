@@ -375,6 +375,7 @@ static Result Init(
             "-unroll-allow-partial",               "-unroll-allow-partial",
             "-simplifycfg-sink-common",            "-simplifycfg-sink-common=false",
             "-amdgpu-vgpr-index-mode",             "-amdgpu-vgpr-index-mode",         // force VGPR indexing on GFX8
+            "-amdgpu-atomic-optimizations",        "-amdgpu-atomic-optimizations",    // enable atomic optimizations
             "-filetype",                           "-filetype=obj",   // target = obj, ELF binary; target = asm, ISA assembly text
         };
 
@@ -434,13 +435,6 @@ static Result Init(
                     delete[] pGfxIp;
                 }
             }
-        }
-
-#if VKI_BUILD_GFX10
-        if (ParsedGfxIp.major < 10)
-#endif
-        {
-            newArgs.push_back("-amdgpu-atomic-optimizations");
         }
 
         // Initialize the path for shader cache

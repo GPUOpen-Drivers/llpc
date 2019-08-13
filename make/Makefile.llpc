@@ -91,6 +91,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     # llpc/lower
     CPPFILES +=                                 \
         llpcSpirvLower.cpp                      \
+        llpcSpirvLowerAccessChain.cpp           \
         llpcSpirvLowerAlgebraTransform.cpp      \
         llpcSpirvLowerConstImmediateStore.cpp   \
         llpcSpirvLowerGlobal.cpp                \

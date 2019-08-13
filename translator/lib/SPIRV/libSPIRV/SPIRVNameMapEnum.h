@@ -346,6 +346,10 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
 #endif
   add(DecorationExplicitInterpAMD, "ExplicitInterpAMD");
   add(DecorationNonUniformEXT, "NonUniformEXT");
+#if SPV_VERSION >= 0x10400
+  add(DecorationCounterBuffer, "CounterBuffer");
+  add(DecorationUserSemantic, "UserSemantic");
+#endif
   add(DecorationHlslCounterBufferGOOGLE, "HlslCounterBufferGOOGLE");
   add(DecorationHlslSemanticGOOGLE, "HlslSemanticGOOGLE");
 }
