@@ -166,7 +166,6 @@ union XfbOutInfo
 // NOTE: All fields must be initialized in InitShaderResourceUsage().
 struct ResourceUsage
 {
-    std::vector<DescriptorSet> descSets;              // Info array of descriptor sets and bindings
     std::unordered_set<uint64_t> descPairs;           // Pairs of descriptor set/binding
     uint32_t                   pushConstSizeInBytes;  // Push constant size (in bytes)
     bool                       resourceWrite;         // Whether shader does resource-write operations (UAV)
@@ -799,17 +798,14 @@ public:
     virtual bool GetShaderWgpMode(ShaderStage shaderStage) const = 0;
 #endif
 
-    // Gets float control settings of the specified shader stage for the provide floating-point type.
-    virtual FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const = 0;
-
     // Gets the count of vertices per primitive
     virtual uint32_t GetVerticesPerPrimitive() const = 0;
 
     // Gets wave size for the specified shader stage
     virtual uint32_t GetShaderWaveSize(ShaderStage stage) = 0;
 
-    const char* GetGpuNameString() const;
-    const char* GetGpuNameAbbreviation() const;
+    static const char* GetGpuNameString(GfxIpVersion gfxIp);
+    static const char* GetGpuNameAbbreviation(GfxIpVersion gfxIp);
 
     // Gets graphics IP version info
     GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
@@ -830,6 +826,9 @@ public:
     // Set pipeline state in Builder
     void SetBuilderPipelineState(Builder* pBuilder) const;
 
+    static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
+
+    static void InitShaderInterfaceData(InterfaceData* pIntfData);
 protected:
     // Gets dummy vertex input create info
     virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return nullptr; }
@@ -839,10 +838,6 @@ protected:
 
     // Gets dummy vertex attribute info
     virtual std::vector<VkVertexInputAttributeDescription>* GetDummyVertexAttributes() { return nullptr; }
-
-    void InitShaderResourceUsage(ShaderStage shaderStage);
-
-    void InitShaderInterfaceData(ShaderStage shaderStage);
 
     // -----------------------------------------------------------------------------------------------------------------
 

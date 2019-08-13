@@ -32,6 +32,7 @@
 
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
@@ -132,6 +133,11 @@ opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dyn
 // -force-loop-unroll-count: Force to set the loop unroll count; this option will ignore dynamic loop unroll.
 opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
 
+// -enable-shader-module-opt: Enable translate & lower phase in shader module build.
+opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
+                                cl::desc("Enable translate & lower phase in shader module build."),
+                                init(false));
+
 #if LLPC_BUILD_GFX10
 // -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
 // final wave size base on it. Used in pre-silicon verification.
@@ -223,6 +229,34 @@ class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
 };
 
 // =====================================================================================================================
+// Gets dummy TimeRecords.
+static const StringMap<TimeRecord>& GetDummyTimeRecords()
+{
+    static StringMap<TimeRecord> dummyTimeRecords;
+    if (TimePassesIsEnabled && dummyTimeRecords.empty())
+    {
+        // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
+        // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
+        // compile multiple pipelines. so we add a dummy record to force all fields is shown.
+        // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
+        // in TimeRecord.
+        TimeRecord timeRecord;
+        struct HackedTimeRecord
+        {
+            double t1;
+            double t2;
+            double t3;
+            ssize_t m1;
+        } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
+        static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
+        memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
+        dummyTimeRecords["DUMMY"] = timeRecord;
+    }
+
+    return dummyTimeRecords;
+}
+
+// =====================================================================================================================
 // Creates LLPC compiler from the specified info.
 Result VKAPI_CALL ICompiler::Create(
     GfxIpVersion      gfxIp,        // Graphics IP version
@@ -300,6 +334,222 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 {
     auto pInfo = VertexFetch::GetVertexFormatInfo(format);
     return ((pInfo->dfmt == BUF_DATA_FORMAT_INVALID) && (pInfo->numChannels == 0)) ? false : true;
+}
+
+// =====================================================================================================================
+//  Represents the template stream class which read or write data in binary format.
+template<class Stream>
+class BinaryStream
+{
+public:
+    BinaryStream(Stream& stream) : m_stream(stream) {}
+
+    // Write obj to Stream m_ss with binary format
+    template<class T>
+    BinaryStream& operator <<(const T& object)
+    {
+        m_stream.write(reinterpret_cast<const char*>(&object), sizeof(T));
+        return *this;
+    }
+
+    // Read obj from Stream m_ss with binary format
+    template<class T>
+    BinaryStream& operator >>(T& object)
+    {
+        m_stream.read(reinterpret_cast<char*>(&object), sizeof(T));
+        return *this;
+    }
+
+private:
+    Stream& m_stream;   // Stream for binary data read/write
+};
+
+// =====================================================================================================================
+// Write set object to BinaryStream
+template <class OStream>
+BinaryStream<OStream>& operator << (
+    BinaryStream<OStream>&              out,   // [out] Binary stream
+    const std::unordered_set<uint64_t>& set)   // [in] set object
+{
+    uint32_t setSize = set.size();
+    out << setSize;
+    for (auto item : set)
+    {
+        out << item;
+    }
+    return out;
+}
+
+// =====================================================================================================================
+// Read set object to BinaryStream
+template <class IStream>
+BinaryStream<IStream>& operator >> (
+    BinaryStream<IStream>&        in,   // [out] Binary stream
+    std::unordered_set<uint64_t>& set)  // [out] set object
+{
+    uint32_t setSize = 0;
+    in >> setSize;
+    for (uint32_t i = 0; i < setSize; ++i)
+    {
+        uint64_t item;
+        in >> item;
+        set.insert(item);
+    }
+    return in;
+}
+
+// =====================================================================================================================
+// Write map object to BinaryStream
+template <class OStream>
+BinaryStream<OStream>& operator << (
+    BinaryStream<OStream>&              out,  // [out] Binary stream
+    const std::map<uint32_t, uint32_t>& map)  // [in] map object
+{
+    uint32_t mapSize = map.size();
+    out << mapSize;
+    for (auto item : map)
+    {
+        out << item.first;
+        out << item.second;
+    }
+    return out;
+}
+
+// =====================================================================================================================
+// Read map object to BinaryStream
+template <class IStream>
+BinaryStream<IStream>& operator >> (
+    BinaryStream<IStream>&        in,    // [out] Binary stream
+    std::map<uint32_t, uint32_t>& map)   // [out] map object
+{
+    uint32_t mapSize = 0;
+    in >> mapSize;
+    for (uint32_t i = 0; i < mapSize; ++i)
+    {
+        uint32_t first;
+        uint32_t second;
+        in >> first;
+        in >> second;
+        map[first] = second;
+    }
+    return in;
+}
+
+// =====================================================================================================================
+// Output resource usage to stream out with binary format.
+//
+// NOTE: This function must keep same order with IStream& operator >> (IStream& in, ResourceUsage& resUsage)
+template <class OStream>
+OStream& operator << (
+    OStream&             out,          // [out] Output stream
+    const ResourceUsage& resUsage)     // [in] Resource usage object
+{
+    BinaryStream<OStream> binOut(out);
+
+    binOut << resUsage.descPairs;
+    binOut << resUsage.pushConstSizeInBytes;
+    binOut << resUsage.resourceWrite;
+    binOut << resUsage.resourceRead;
+    binOut << resUsage.perShaderTable;
+    binOut << resUsage.globalConstant;
+    binOut << resUsage.numSgprsAvailable;
+    binOut << resUsage.numVgprsAvailable;
+    binOut << resUsage.builtInUsage.perStage.u64All;
+    binOut << resUsage.builtInUsage.allStage.u64All;
+
+    // Map from shader specified locations to tightly packed locations
+    binOut << resUsage.inOutUsage.inputLocMap;
+    binOut << resUsage.inOutUsage.outputLocMap;
+    binOut << resUsage.inOutUsage.perPatchInputLocMap;
+    binOut << resUsage.inOutUsage.perPatchOutputLocMap;
+    binOut << resUsage.inOutUsage.builtInInputLocMap;
+    binOut << resUsage.inOutUsage.builtInOutputLocMap;
+    binOut << resUsage.inOutUsage.perPatchBuiltInInputLocMap;
+    binOut << resUsage.inOutUsage.perPatchBuiltInOutputLocMap;
+
+    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+    {
+        binOut << resUsage.inOutUsage.xfbStrides[i];
+    }
+
+    binOut << resUsage.inOutUsage.enableXfb;
+    for (uint32_t i = 0; i < MaxGsStreams; ++i)
+    {
+        binOut << resUsage.inOutUsage.streamXfbBuffers[i];
+    }
+
+    binOut << resUsage.inOutUsage.inputMapLocCount;
+    binOut << resUsage.inOutUsage.outputMapLocCount;
+    binOut << resUsage.inOutUsage.perPatchInputMapLocCount;
+    binOut << resUsage.inOutUsage.perPatchOutputMapLocCount;
+    binOut << resUsage.inOutUsage.expCount;
+
+    binOut << resUsage.inOutUsage.gs.rasterStream;
+    binOut << resUsage.inOutUsage.gs.xfbOutsInfo;
+    for (uint32_t i = 0; i < MaxColorTargets; ++i)
+    {
+        binOut << static_cast<uint32_t>(resUsage.inOutUsage.fs.outputTypes[i]);
+    }
+    return out;
+}
+
+// =====================================================================================================================
+// Read resUsage from stream in with binary format.
+//
+// NOTE: This function must keep same order with OStream& operator << (OStream& out, const ResourceUsage& resUsage)
+template <class IStream>
+IStream& operator >> (
+    IStream&       in,        // [out] Input stream
+    ResourceUsage& resUsage)  // [out] Resource usage object
+{
+    BinaryStream<IStream> binIn(in);
+
+    binIn >> resUsage.descPairs;
+    binIn >> resUsage.pushConstSizeInBytes;
+    binIn >> resUsage.resourceWrite;
+    binIn >> resUsage.resourceRead;
+    binIn >> resUsage.perShaderTable;
+    binIn >> resUsage.globalConstant;
+    binIn >> resUsage.numSgprsAvailable;
+    binIn >> resUsage.numVgprsAvailable;
+    binIn >> resUsage.builtInUsage.perStage.u64All;
+    binIn >> resUsage.builtInUsage.allStage.u64All;
+
+    binIn >> resUsage.inOutUsage.inputLocMap;
+    binIn >> resUsage.inOutUsage.outputLocMap;
+    binIn >> resUsage.inOutUsage.perPatchInputLocMap;
+    binIn >> resUsage.inOutUsage.perPatchOutputLocMap;
+    binIn >> resUsage.inOutUsage.builtInInputLocMap;
+    binIn >> resUsage.inOutUsage.builtInOutputLocMap;
+    binIn >> resUsage.inOutUsage.perPatchBuiltInInputLocMap;
+    binIn >> resUsage.inOutUsage.perPatchBuiltInOutputLocMap;
+
+    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
+    {
+        binIn >> resUsage.inOutUsage.xfbStrides[i];
+    }
+
+    binIn >> resUsage.inOutUsage.enableXfb;
+    for (uint32_t i = 0; i < MaxGsStreams; ++i)
+    {
+        binIn >> resUsage.inOutUsage.streamXfbBuffers[i];
+    }
+
+    binIn >> resUsage.inOutUsage.inputMapLocCount;
+    binIn >> resUsage.inOutUsage.outputMapLocCount;
+    binIn >> resUsage.inOutUsage.perPatchInputMapLocCount;
+    binIn >> resUsage.inOutUsage.perPatchOutputMapLocCount;
+    binIn >> resUsage.inOutUsage.expCount;
+
+    binIn >> resUsage.inOutUsage.gs.rasterStream;
+    binIn >> resUsage.inOutUsage.gs.xfbOutsInfo;
+    for (uint32_t i = 0; i < MaxColorTargets; ++i)
+    {
+        uint32_t outType;
+        binIn >> outType;
+        resUsage.inOutUsage.fs.outputTypes[i] = static_cast<BasicType>(outType);
+    }
+    return in;
 }
 
 // =====================================================================================================================
@@ -461,16 +711,55 @@ Result Compiler::BuildShaderModule(
     ) const
 {
     Result result = Result::Success;
-
-    // Currently, copy SPIR-V binary as output shader module data
     void* pAllocBuf = nullptr;
-    BinaryType binType = BinaryType::Spirv;
-    ShaderModuleInfo moduleInfo = {};
+    const void* pCacheData = nullptr;
+    size_t allocSize = 0;
+    ShaderModuleData moduleData = {};
+
+    ElfPackage moduleBinary;
+    raw_svector_ostream moduleBinaryStream(moduleBinary);
+    SmallVector<ShaderEntryName, 4> entryNames;
+    SmallVector<ShaderModuleEntry, 4> moduleEntries;
+    ShaderModuleData* pModuleData = nullptr;
+
+    ShaderEntryState cacheEntryState = ShaderEntryState::New;
+    CacheEntryHandle hEntry = nullptr;
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
+    const PipelineOptions* pPipelineOptions = &pShaderInfo->options.pipelineOptions;
+#else
+    PipelineOptions dummyPipelineOptions = {};
+    const PipelineOptions* pPipelineOptions = &dummyPipelineOptions;
+#endif
+    // Calculate the hash code of input data
+    MetroHash::Hash hash = {};
+    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
+        pShaderInfo->shaderBin.codeSize,
+        hash.bytes);
+
+    memcpy(moduleData.hash, &hash, sizeof(hash));
+
+    std::string hashString;
+    raw_string_ostream ostream(hashString);
+    ostream << format("0x%016" PRIX64, MetroHash::Compact64(&hash));
+    ostream.flush();
+
+    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ShaderModule") + hashString).str(), GetDummyTimeRecords());
+    Timer wholeTimer("llpc-total", (Twine("LLPC ShaderModule Total ") + hashString).str(), timerGroupTotal);
+
+    TimerGroup timerGroupPhases("llpc", (Twine("LLPC ShaderModule Phases ") + hashString).str(), GetDummyTimeRecords());
+    Timer translateTimer("llpc-translate", (Twine("LLPC ShaderModule Translate ") + hashString).str(), timerGroupPhases);
+    Timer lowerTimer("llpc-lower", (Twine("LLPC ShaderModule Lower ") + hashString).str(), timerGroupPhases);
+
+    if (TimePassesIsEnabled)
+    {
+        wholeTimer.startTimer();
+    }
 
     // Check the type of input shader binary
     if (IsSpirvBinary(&pShaderInfo->shaderBin))
     {
-        binType = BinaryType::Spirv;
+        moduleData.binType = BinaryType::Spirv;
         if (VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
         {
             LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
@@ -478,32 +767,193 @@ Result Compiler::BuildShaderModule(
         }
         if (result == Result::Success)
         {
-            CollectInfoFromSpirvBinary(&pShaderInfo->shaderBin, &moduleInfo);
+            CollectInfoFromSpirvBinary(&pShaderInfo->shaderBin, &moduleData.moduleInfo, entryNames);
+        }
+        moduleData.binCode.codeSize = pShaderInfo->shaderBin.codeSize;
+        if (cl::TrimDebugInfo)
+        {
+            moduleData.binCode.codeSize -= moduleData.moduleInfo.debugInfoSize;
         }
     }
     else if (IsLlvmBitcode(&pShaderInfo->shaderBin))
     {
-        binType = BinaryType::LlvmBc;
+        moduleData.binType = BinaryType::LlvmBc;
+        moduleData.binCode = pShaderInfo->shaderBin;
     }
     else
     {
         result = Result::ErrorInvalidShader;
     }
 
-    auto codeSize = pShaderInfo->shaderBin.codeSize;
-    if (cl::TrimDebugInfo)
+    if (moduleData.binType == BinaryType::Spirv)
     {
-        codeSize -= moduleInfo.debugInfoSize;
+        // Dump SPIRV binary
+        if (cl::EnablePipelineDump)
+        {
+            PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(),
+                &pShaderInfo->shaderBin,
+                &hash);
+        }
+
+        // Trim debug info
+        if (cl::TrimDebugInfo)
+        {
+            uint8_t* pTrimmedCode = new uint8_t[moduleData.binCode.codeSize];
+            TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleData.binCode.codeSize, pTrimmedCode);
+            moduleData.binCode.pCode = pTrimmedCode;
+        }
+        else
+        {
+            moduleData.binCode.pCode = pShaderInfo->shaderBin.pCode;
+        }
+
+        // Calculate SPIR-V cache hash
+        MetroHash::Hash cacheHash = {};
+        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(moduleData.binCode.pCode),
+            moduleData.binCode.codeSize,
+            cacheHash.bytes);
+        static_assert(sizeof(moduleData.moduleInfo.cacheHash) == sizeof(cacheHash), "Unexpected value!");
+        memcpy(moduleData.moduleInfo.cacheHash, cacheHash.dwords, sizeof(cacheHash));
+
+        // Do SPIR-V translate & lower if possible
+        bool enableOpt = cl::EnableShaderModuleOpt;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
+        enableOpt = enableOpt || pShaderInfo->options.enableOpt;
+#endif
+        enableOpt = moduleData.moduleInfo.useSpecConstant ? false : enableOpt;
+
+        if (enableOpt)
+        {
+            // Check internal cache for shader module build result
+            // NOTE: We should not cache non-opt result, we may compile shader module multiple
+            // times in async-compile mode.
+            cacheEntryState = m_shaderCache->FindShader(cacheHash, true, &hEntry);
+            if (cacheEntryState == ShaderEntryState::Ready)
+            {
+                result = m_shaderCache->RetrieveShader(hEntry, &pCacheData, &allocSize);
+            }
+
+            if (cacheEntryState != ShaderEntryState::Ready)
+            {
+                Context* pContext = AcquireContext();
+
+                pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
+                pContext->SetBuilder(Builder::Create(*pContext));
+                CodeGenManager::CreateTargetMachine(pContext, pPipelineOptions);
+
+                for (uint32_t i = 0; i < entryNames.size(); ++i)
+                {
+                    ShaderModuleEntry moduleEntry = {};
+                    ResourceUsage resUsage;
+                    PipelineContext::InitShaderResourceUsage(entryNames[i].stage, &resUsage);
+
+                    moduleEntry.stage = entryNames[i].stage;
+                    moduleEntry.entryOffset = moduleBinary.size();
+                    MetroHash::Hash entryNamehash = {};
+                    MetroHash64::Hash(reinterpret_cast<const uint8_t*>(entryNames[i].pName),
+                        strlen(entryNames[i].pName),
+                        entryNamehash.bytes);
+                    memcpy(moduleEntry.entryNameHash, entryNamehash.dwords, sizeof(entryNamehash));
+
+                    // Create empty modules and set target machine in each.
+                    Module* pModule = new Module(
+                        (Twine("llpc") + GetShaderStageName(static_cast<ShaderStage>(entryNames[i].stage))).str(),
+                        *pContext);
+
+                    pContext->SetModuleTargetMachine(pModule);
+                    pContext->SetResUsage(&resUsage);
+
+                    uint32_t passIndex = 0;
+                    PassManager lowerPassMgr(&passIndex);
+
+                    // Set the shader stage in the Builder.
+                    pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(entryNames[i].stage));
+
+                    // Start timer for translate.
+                    if (TimePassesIsEnabled)
+                    {
+                        lowerPassMgr.add(CreateStartStopTimer(&translateTimer, true));
+                    }
+
+                    // SPIR-V translation, then dump the result.
+                    PipelineShaderInfo shaderInfo = {};
+                    shaderInfo.pModuleData = &moduleData;
+                    shaderInfo.entryStage = entryNames[i].stage;
+                    shaderInfo.pEntryTarget = entryNames[i].pName;
+                    lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
+                                                                &shaderInfo));
+                    if (EnableOuts())
+                    {
+                        lowerPassMgr.add(createPrintModulePass(outs(), "\n"
+                            "===============================================================================\n"
+                            "// LLPC SPIRV-to-LLVM translation results\n"));
+                    }
+
+                    // Stop timer for translate.
+                    if (TimePassesIsEnabled)
+                    {
+                        lowerPassMgr.add(CreateStartStopTimer(&translateTimer, false));
+                    }
+
+                    // Per-shader SPIR-V lowering passes.
+                    SpirvLower::AddPasses(static_cast<ShaderStage>(entryNames[i].stage),
+                        lowerPassMgr,
+                        TimePassesIsEnabled ? &lowerTimer : nullptr,
+                        cl::ForceLoopUnrollCount,
+                        nullptr);
+
+                    lowerPassMgr.add(createBitcodeWriterPass(moduleBinaryStream));
+
+                    // Run the passes.
+                    bool success = RunPasses(&lowerPassMgr, pModule);
+                    if (success == false)
+                    {
+                        LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+                        result = Result::ErrorInvalidShader;
+                        delete pModule;
+                        break;
+                    }
+
+                    moduleEntry.entrySize = moduleBinary.size() - moduleEntry.entryOffset;
+
+                    // Serialize resource usage
+                    moduleBinaryStream << *pContext->GetShaderResourceUsage(entryNames[i].stage);
+
+                    moduleEntry.resUsageSize = moduleBinary.size() - moduleEntry.entryOffset - moduleEntry.entrySize;
+                    moduleEntry.passIndex = passIndex;
+                    moduleEntries.push_back(moduleEntry);
+                    delete pModule;
+                }
+
+                if (result == Result::Success)
+                {
+                    moduleData.binType = BinaryType::MultiLlvmBc;
+                    moduleData.moduleInfo.entryCount = entryNames.size();
+                    moduleData.binCode.pCode = moduleBinary.data();
+                    moduleData.binCode.codeSize = moduleBinary.size();
+                }
+
+                pContext->setDiagnosticHandlerCallBack(nullptr);
+            }
+        }
     }
 
+    // Allocate memory and copy output data
     if (result == Result::Success)
     {
         if (pShaderInfo->pfnOutputAlloc != nullptr)
         {
-            size_t allocSize = sizeof(ShaderModuleData) + codeSize;
+            if (cacheEntryState != ShaderEntryState::Ready)
+            {
+                allocSize = sizeof(ShaderModuleData) +
+                    moduleData.binCode.codeSize +
+                    (moduleData.moduleInfo.entryCount * sizeof(ShaderModuleEntry));
+            }
+
             pAllocBuf = pShaderInfo->pfnOutputAlloc(pShaderInfo->pInstance,
-                                                    pShaderInfo->pUserData,
-                                                    allocSize);
+                pShaderInfo->pUserData,
+                allocSize);
+
             result = (pAllocBuf != nullptr) ? Result::Success : Result::ErrorOutOfMemory;
         }
         else
@@ -511,53 +961,56 @@ Result Compiler::BuildShaderModule(
             // Allocator is not specified
             result = Result::ErrorInvalidPointer;
         }
-    }
+}
 
     if (result == Result::Success)
     {
         ShaderModuleData* pModuleData = reinterpret_cast<ShaderModuleData*>(pAllocBuf);
-        memset(pModuleData, 0, sizeof(*pModuleData));
 
-        pModuleData->binType = binType;
-        pModuleData->binCode.codeSize = codeSize;
-        MetroHash::Hash hash = {};
-        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
-                          pShaderInfo->shaderBin.codeSize,
-                          hash.bytes);
-        static_assert(sizeof(pModuleData->hash) == sizeof(hash), "Unexpected value!");
-        memcpy(pModuleData->hash, hash.dwords, sizeof(hash));
-        pModuleData->moduleInfo = moduleInfo;
-
-        void* pCode = VoidPtrInc(pAllocBuf, sizeof(ShaderModuleData));
-
-        if ((binType == BinaryType::Spirv) && cl::EnablePipelineDump)
+        if (cacheEntryState != ShaderEntryState::Ready)
         {
-            PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(),
-                &pShaderInfo->shaderBin,
-                &hash);
-        }
+            // Copy module data
+            memcpy(pModuleData, &moduleData, sizeof(moduleData));
+            pModuleData->binCode.pCode = nullptr;
 
-        // Copy SPIR-V binary to output buffer
-        if ((binType == BinaryType::Spirv) && cl::TrimDebugInfo)
-        {
-            TrimSpirvDebugInfo(&pShaderInfo->shaderBin, codeSize, pCode);
+            // Copy entry info
+            ShaderModuleEntry* pEntry = &pModuleData->moduleInfo.entries[0];
+            for (uint32_t i = 0; i < moduleData.moduleInfo.entryCount; ++i)
+            {
+                pEntry[i] = moduleEntries[i];
+            }
+
+            // Copy binary code
+            void* pCode = &pEntry[moduleData.moduleInfo.entryCount];
+            memcpy(pCode, moduleData.binCode.pCode, moduleData.binCode.codeSize);
+            if (cacheEntryState == ShaderEntryState::Compiling)
+            {
+                if (hEntry != nullptr)
+                {
+                    m_shaderCache->InsertShader(hEntry, pModuleData, allocSize);
+                }
+            }
         }
         else
         {
-            memcpy(pCode, pShaderInfo->shaderBin.pCode, pShaderInfo->shaderBin.codeSize);
-
+            memcpy(pModuleData, pCacheData, allocSize);
         }
-        pModuleData->binCode.pCode = pCode;
 
-        // Calculate SPIR-V cache hash
-        MetroHash::Hash cacheHash = {};
-        MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pModuleData->binCode.pCode),
-            pModuleData->binCode.codeSize,
-            cacheHash.bytes);
-        static_assert(sizeof(pModuleData->moduleInfo.cacheHash) == sizeof(cacheHash), "Unexpected value!");
-        memcpy(pModuleData->moduleInfo.cacheHash, cacheHash.dwords, sizeof(cacheHash));
-
+        // Update the pointers
+        pModuleData->binCode.pCode = &pModuleData->moduleInfo.entries[pModuleData->moduleInfo.entryCount];
         pShaderOut->pModuleData = pModuleData;
+    }
+    else
+    {
+        if (hEntry != nullptr)
+        {
+            m_shaderCache->ResetShader(hEntry);
+        }
+    }
+
+    if (TimePassesIsEnabled)
+    {
+        wholeTimer.stopTimer();
     }
 
     return result;
@@ -579,40 +1032,21 @@ Result Compiler::BuildPipelineInternal(
         pDynamicLoopUnroll = nullptr;
     }
 
+    uint32_t passIndex = 0;
+
     // Create the timer group and timers for -time-passes.
     std::string hash;
     raw_string_ostream ostream(hash);
     ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
     ostream.flush();
-    uint32_t passIndex = 0;
-    // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
-    // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
-    // compile multiple pipelines. so we add a dummy record to force all fields is shown.
-    // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
-    // in TimeRecord.
-    TimeRecord timeRecord;
-    struct HackedTimeRecord
-    {
-        double t1;
-        double t2;
-        double t3;
-        ssize_t m1;
-    } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
-    static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
-    memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
 
-    StringMap<TimeRecord> dummyTimeRecords;
-    if (TimePassesIsEnabled)
-    {
-        dummyTimeRecords["DUMMY"] = timeRecord;
-    }
-
-    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ") + hash).str(), dummyTimeRecords);
+    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ") + hash).str(), GetDummyTimeRecords());
     Timer wholeTimer("llpc-total", (Twine("LLPC Total ") + hash).str(), timerGroupTotal);
 
-    TimerGroup timerGroupPhases("llpc", (Twine("LLPC Phases ") + hash).str(), dummyTimeRecords);
+    TimerGroup timerGroupPhases("llpc", (Twine("LLPC Phases ") + hash).str(), GetDummyTimeRecords());
     Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroupPhases);
     Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroupPhases);
+    Timer loadTimer("llpc-load", (Twine("LLPC Load ") + hash).str(), timerGroupPhases);
     Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroupPhases);
     Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroupPhases);
     Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroupPhases);
@@ -625,7 +1059,7 @@ Result Compiler::BuildPipelineInternal(
     pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
 
     // Create the AMDGPU TargetMachine.
-    result = CodeGenManager::CreateTargetMachine(pContext);
+    result = CodeGenManager::CreateTargetMachine(pContext, pContext->GetPipelineContext()->GetPipelineOptions());
 
     Module* pPipelineModule = nullptr;
 
@@ -652,6 +1086,7 @@ Result Compiler::BuildPipelineInternal(
     {
         // Create empty modules and set target machine in each.
         Module* modules[ShaderStageNativeStageCount] = {};
+        uint32_t stageSkipMask = 0;
         for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
@@ -660,8 +1095,65 @@ Result Compiler::BuildPipelineInternal(
                 continue;
             }
 
-            Module* pModule = new Module((Twine("llpc") + GetShaderStageName(static_cast<ShaderStage>(stage))).str(),
-                                         *pContext);
+            const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+
+            Module* pModule = nullptr;
+            if (pModuleData->binType == BinaryType::MultiLlvmBc)
+            {
+                if (TimePassesIsEnabled)
+                {
+                    loadTimer.startTimer();
+                }
+
+                MetroHash::Hash entryNameHash = {};
+
+                LLPC_ASSERT(pShaderInfo->pEntryTarget != nullptr);
+                MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->pEntryTarget),
+                                  strlen(pShaderInfo->pEntryTarget),
+                                  entryNameHash.bytes);
+
+                BinaryData binCode = {};
+                for (uint32_t i = 0; i < pModuleData->moduleInfo.entryCount; ++i)
+                {
+                    auto pEntry = &pModuleData->moduleInfo.entries[i];
+                    if ((pEntry->stage == stage) &&
+                        (memcmp(pEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
+                    {
+                        // LLVM bitcode
+                        binCode.codeSize = pEntry->entrySize;
+                        binCode.pCode = VoidPtrInc(pModuleData->binCode.pCode, pEntry->entryOffset);
+
+                        // Resource usage
+                        const char* pResUsagePtr = reinterpret_cast<const char*>(
+                            VoidPtrInc(pModuleData->binCode.pCode, pEntry->entryOffset + pEntry->entrySize));
+                        std::string resUsageBuf(pResUsagePtr, pEntry->resUsageSize);
+                        std::istringstream resUsageStrem(resUsageBuf);
+                        resUsageStrem >> *(pContext->GetShaderResourceUsage(pEntry->stage));
+                        break;
+                    }
+                }
+
+                if (binCode.codeSize > 0)
+                {
+                    pModule = pContext->LoadLibary(&binCode).release();
+                    stageSkipMask |= (1 << stage);
+                }
+                else
+                {
+                    result = Result::ErrorInvalidShader;
+                }
+
+                if (TimePassesIsEnabled)
+                {
+                    loadTimer.stopTimer();
+                }
+            }
+            else
+            {
+                pModule = new Module((Twine("llpc") + GetShaderStageName(static_cast<ShaderStage>(stage))).str(),
+                                     *pContext);
+            }
+
             modules[stage] = pModule;
             pContext->SetModuleTargetMachine(pModule);
         }
@@ -673,7 +1165,9 @@ Result Compiler::BuildPipelineInternal(
         for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
-            if ((pShaderInfo == nullptr) || (pShaderInfo->pModuleData == nullptr))
+            if ((pShaderInfo == nullptr) ||
+                (pShaderInfo->pModuleData == nullptr) ||
+                (stageSkipMask & ShaderStageToMask(static_cast<ShaderStage>(stage))))
             {
                 continue;
             }
@@ -1239,6 +1733,12 @@ Result Compiler::BuildComputePipeline(
 {
     BinaryData elfBin = {};
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 32
+    // NOTE: It is to workaround the bug in Device::CreateInternalComputePipeline,
+    // we forgot to set the entryStage in it. To keep backward compatibility, set the entryStage within LLPC.
+    const_cast<ComputePipelineBuildInfo*>(pPipelineInfo)->cs.entryStage = ShaderStageCompute;
+#endif
+
     Result result = ValidatePipelineShaderInfo(ShaderStageCompute, &pPipelineInfo->cs);
 
     MetroHash::Hash cacheHash = {};
@@ -1410,14 +1910,13 @@ Result Compiler::BuildComputePipeline(
 // =====================================================================================================================
 // Translates SPIR-V binary to machine-independent LLVM module.
 void Compiler::TranslateSpirvToLlvm(
-    const BinaryData*           pSpirvBin,           // [in] SPIR-V binary
-    ShaderStage                 shaderStage,         // Shader stage
-    const char*                 pEntryTarget,        // [in] SPIR-V entry point
-    const VkSpecializationInfo* pSpecializationInfo, // [in] Specialization info
+    const PipelineShaderInfo*   pShaderInfo, // [in] Specialization info
     Module*                     pModule)             // [in/out] Module to translate into, initially empty
 {
     BinaryData  optSpirvBin = {};
-
+    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+    LLPC_ASSERT(pModuleData->binType == BinaryType::Spirv);
+    const BinaryData* pSpirvBin = &pModuleData->binCode;
     if (OptimizeSpirv(pSpirvBin, &optSpirvBin) == Result::Success)
     {
         pSpirvBin = &optSpirvBin;
@@ -1429,34 +1928,31 @@ void Compiler::TranslateSpirvToLlvm(
     SPIRVSpecConstMap specConstMap;
 
     // Build specialization constant map
-    if (pSpecializationInfo != nullptr)
+    if (pShaderInfo->pSpecializationInfo != nullptr)
     {
-        for (uint32_t i = 0; i < pSpecializationInfo->mapEntryCount; ++i)
+        for (uint32_t i = 0; i < pShaderInfo->pSpecializationInfo->mapEntryCount; ++i)
         {
             SPIRVSpecConstEntry specConstEntry  = {};
-            auto pMapEntry = &pSpecializationInfo->pMapEntries[i];
+            auto pMapEntry = &pShaderInfo->pSpecializationInfo->pMapEntries[i];
             specConstEntry.DataSize= pMapEntry->size;
-            specConstEntry.Data = VoidPtrInc(pSpecializationInfo->pData, pMapEntry->offset);
+            specConstEntry.Data = VoidPtrInc(pShaderInfo->pSpecializationInfo->pData, pMapEntry->offset);
             specConstMap[pMapEntry->constantID] = specConstEntry;
         }
     }
 
     Context* pContext = static_cast<Context*>(&pModule->getContext());
-    pContext->SetModuleTargetMachine(pModule);
-
-    const PipelineShaderInfo* pShaderInfo = pContext->GetPipelineShaderInfo(shaderStage);
 
     if (readSpirv(pContext->GetBuilder(),
                   pShaderInfo->pModuleData,
                   spirvStream,
-                  static_cast<spv::ExecutionModel>(shaderStage),
-                  pEntryTarget,
+                  static_cast<spv::ExecutionModel>(pShaderInfo->entryStage),
+                  pShaderInfo->pEntryTarget,
                   specConstMap,
                   pModule,
                   errMsg) == false)
     {
         report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
-                            GetShaderStageName(static_cast<ShaderStage>(shaderStage)) + " shader): " + errMsg,
+                            GetShaderStageName(static_cast<ShaderStage>(pShaderInfo->entryStage)) + " shader): " + errMsg,
                            false);
     }
 
@@ -1638,7 +2134,7 @@ Result Compiler::ValidatePipelineShaderInfo(
                 result = Result::ErrorInvalidShader;
             }
         }
-        else if (pModuleData->binType == BinaryType::LlvmBc)
+        else if ((pModuleData->binType == BinaryType::LlvmBc) || (pModuleData->binType == BinaryType::MultiLlvmBc))
         {
             // Do nothing if input is LLVM IR
         }
@@ -1941,7 +2437,7 @@ void Compiler::InitGpuWorkaround()
 }
 // =====================================================================================================================
 // Acquires a free context from context pool.
-Context* Compiler::AcquireContext()
+Context* Compiler::AcquireContext() const
 {
     Context* pFreeContext = nullptr;
 
@@ -1979,7 +2475,8 @@ Context* Compiler::AcquireContext()
 // Run a pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
 bool Compiler::RunPasses(
     PassManager*  pPassMgr, // [in] Pass manager
-    Module*       pModule)  // [in/out] Module
+    Module*       pModule   // [in/out] Module
+    ) const
 {
     bool success = false;
 #if LLPC_ENABLE_EXCEPTION
@@ -2001,17 +2498,20 @@ bool Compiler::RunPasses(
 // =====================================================================================================================
 // Releases LLPC context.
 void Compiler::ReleaseContext(
-    Context* pContext)    // [in] LLPC context
+    Context* pContext    // [in] LLPC context
+    ) const
 {
     MutexGuard lock(m_contextPoolMutex);
+    pContext->Reset();
     pContext->SetInUse(false);
 }
 
 // =====================================================================================================================
 // Collect information from SPIR-V binary
 Result Compiler::CollectInfoFromSpirvBinary(
-    const BinaryData*  pSpvBinCode,                 // [in] SPIR-V binary data
-    ShaderModuleInfo*  pShaderModuleInfo            // [out] Shader module information
+    const BinaryData*                pSpvBinCode,           // [in] SPIR-V binary data
+    ShaderModuleInfo*                pShaderModuleInfo,     // [out] Shader module information
+    SmallVector<ShaderEntryName, 4>& shaderEntryNames       // [out] Entry names for this shader module
     )
 {
     Result result = Result::Success;
@@ -2084,6 +2584,24 @@ Result Compiler::CollectInfoFromSpirvBinary(
         case spv::OpModuleProcessed:
             {
                 pShaderModuleInfo->debugInfoSize += wordCount * sizeof(uint32_t);
+                break;
+            }
+        case OpSpecConstantTrue:
+        case OpSpecConstantFalse:
+        case OpSpecConstant:
+        case OpSpecConstantComposite:
+        case OpSpecConstantOp:
+            {
+                pShaderModuleInfo->useSpecConstant = true;
+                break;
+            }
+        case OpEntryPoint:
+            {
+                ShaderEntryName entry = {};
+                // The fourth word is start of the name string of the entry-point
+                entry.pName = reinterpret_cast<const char*>(&pCodePos[3]);
+                entry.stage = static_cast<ShaderStage>(pCodePos[1]);
+                shaderEntryNames.push_back(entry);
                 break;
             }
         default:

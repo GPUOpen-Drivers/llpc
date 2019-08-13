@@ -53,6 +53,8 @@ public:
     Context(GfxIpVersion gfxIp, const WorkaroundFlags* pGpuWorkarounds);
     ~Context();
 
+    void Reset();
+
     // Checks whether this context is in use.
     bool IsInUse() const { return m_isInUse; }
 
@@ -129,7 +131,14 @@ public:
     // Wrappers of interfaces of pipeline context
     ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage)
     {
-        return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
+        if (m_pResUsage != nullptr)
+        {
+            return m_pResUsage;
+        }
+        else
+        {
+            return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
+        }
     }
 
     InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage)
@@ -174,12 +183,12 @@ public:
 
     const char* GetGpuNameString() const
     {
-        return m_pPipelineContext->GetGpuNameString();
+        return PipelineContext::GetGpuNameString(m_gfxIp);
     }
 
     const char* GetGpuNameAbbreviation() const
     {
-        return m_pPipelineContext->GetGpuNameAbbreviation();
+        return PipelineContext::GetGpuNameAbbreviation(m_gfxIp);
     }
 
     GfxIpVersion GetGfxIpVersion() const
@@ -248,10 +257,7 @@ public:
 #endif
 
     // Gets float control settings of the specified shader stage for the provide floating-point type.
-    FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth) const
-    {
-        return m_pPipelineContext->GetShaderFloatControl(shaderStage, bitWidth);
-    }
+    FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth);
 
     // Gets the count of vertices per primitive
     uint32_t GetVerticesPerPrimitive()
@@ -288,6 +294,12 @@ public:
         return &m_glslEmuLib;
     }
 
+    // Sets external resource usage.
+    void SetResUsage(ResourceUsage* pResUsage)
+    {
+        m_pResUsage = pResUsage;
+    }
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);
@@ -299,6 +311,8 @@ private:
     EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
     Builder*                      m_pBuilder = nullptr; // LLPC builder object
+
+    ResourceUsage*                m_pResUsage;          // External resource usage
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine

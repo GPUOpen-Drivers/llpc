@@ -64,13 +64,7 @@ bool SpirvLowerTranslator::runOnModule(
     m_pContext = static_cast<Context*>(&module.getContext());
 
     // Translate SPIR-V binary to machine-independent LLVM module
-    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(m_pShaderInfo->pModuleData);
-    LLPC_ASSERT(pModuleData->binType == BinaryType::Spirv);
-
-    Compiler::TranslateSpirvToLlvm(&pModuleData->binCode,
-                                   m_shaderStage,
-                                   m_pShaderInfo->pEntryTarget,
-                                   m_pShaderInfo->pSpecializationInfo,
+    Compiler::TranslateSpirvToLlvm(m_pShaderInfo,
                                    &module);
     return true;
 }

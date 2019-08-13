@@ -86,9 +86,9 @@ namespace Llpc
 // Creates the TargetMachine if not already created, and stores it in the context. It then persists as long as
 // the context.
 Result CodeGenManager::CreateTargetMachine(
-    Context*           pContext)  // [in/out] Pipeline context
+    Context*               pContext,          // [in/out] Pipeline context
+    const PipelineOptions* pPipelineOptions)  // [in] Pipeline options
 {
-    auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
     if ((pContext->GetTargetMachine() != nullptr) &&
         (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
