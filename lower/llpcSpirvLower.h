@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +47,7 @@ class PassManager;
 } // legacy
 
 class PassRegistry;
+void initializeSpirvLowerAccessChainPass(PassRegistry&);
 void initializeSpirvLowerAlgebraTransformPass(PassRegistry&);
 void initializeSpirvLowerConstImmediateStorePass(PassRegistry&);
 void initializeSpirvLowerMemoryOpPass(PassRegistry&);
@@ -65,6 +66,7 @@ namespace Llpc
 inline static void InitializeLowerPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
+    initializeSpirvLowerAccessChainPass(passRegistry);
   initializeSpirvLowerAlgebraTransformPass(passRegistry);
   initializeSpirvLowerConstImmediateStorePass(passRegistry);
   initializeSpirvLowerMemoryOpPass(passRegistry);
@@ -77,6 +79,7 @@ inline static void InitializeLowerPasses(
 
 class Context;
 
+llvm::ModulePass* CreateSpirvLowerAccessChain();
 llvm::ModulePass* CreateSpirvLowerAlgebraTransform(bool enableConstFolding, bool enableFloatOpt);
 llvm::ModulePass* CreateSpirvLowerConstImmediateStore();
 llvm::ModulePass* CreateSpirvLowerMemoryOp();

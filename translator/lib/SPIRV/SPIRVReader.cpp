@@ -5945,6 +5945,28 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto ResidentCode = transValue(BI->getResidentCode(), F, BB);
     return mapValue(BV, m_pBuilder->CreateICmpEQ(ResidentCode, m_pBuilder->getInt32(0)));
   }
+#if SPV_VERSION >= 0x10400
+  case OpPtrDiff: {
+    SPIRVBinary *const BI = static_cast<SPIRVBinary *>(BV);
+    Value *const Op1 = transValue(BI->getOpValue(0),
+                                  m_pBuilder->GetInsertBlock()->getParent(),
+                                  m_pBuilder->GetInsertBlock());
+    Value *const Op2 = transValue(BI->getOpValue(1),
+                                  m_pBuilder->GetInsertBlock()->getParent(),
+                                  m_pBuilder->GetInsertBlock());
+
+    m_pBuilder->SetInsertPoint(BB);
+    Value *PtrDiff = m_pBuilder->CreatePtrDiff(Op1, Op2);
+
+    auto DestType = dyn_cast<IntegerType>(transType(BV->getType()));
+    auto PtrDiffType = dyn_cast<IntegerType>(PtrDiff->getType());
+    assert(DestType->getBitWidth() <= PtrDiffType->getBitWidth());
+    if (DestType->getBitWidth() < PtrDiffType->getBitWidth())
+        PtrDiff = new TruncInst(PtrDiff, DestType, "", BB);
+
+    return mapValue(BV, PtrDiff);
+  }
+#endif
   case OpImageTexelPointer:
     return nullptr;
 

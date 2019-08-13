@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 30
+#define LLPC_INTERFACE_MAJOR_VERSION 31
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,7 +51,8 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
-//* |     30.0 | Removed PipelineOptions::autoLayoutDesc
+//* |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
+//* |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
 //* |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
 //* |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
 //* |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
@@ -131,12 +132,6 @@ enum class ResourceMappingNodeType : uint32_t
     PushConst,                      ///< Push constant
     DescriptorBufferCompact,        ///< Compact buffer descriptor, only contains the buffer address
     StreamOutTableVaPtr,            ///< Stream-out buffer table VA pointer
-#if VKI_IMAGE_BVH_INTERSECT_RAY
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 29
-    DescriptorCombinedBvhBuffer,    ///< Generic descriptor: combined bvh buffer srd with normal buffer srd,
-                                    ///  starting with normal buffer srd
-#endif
-#endif
     Count,                          ///< Count of resource mapping node types.
 };
 
@@ -265,7 +260,9 @@ struct PipelineShaderOptions
     uint32_t  forceLoopUnrollCount;
 #endif
 
-#if VKI_EXT_SUBGROUP_SIZE_CONTROL
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
+    bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
+#elif VKI_EXT_SUBGROUP_SIZE_CONTROL
     bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28

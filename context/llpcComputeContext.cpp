@@ -111,7 +111,7 @@ uint32_t ComputeContext::GetShaderWaveSize(
     {
         // NOTE: GPU property wave size is used in shader, unless:
         //  1) If specified by tuning option, use the specified wave size.
-        //  2) If gl_SubgroupSize is used in shader, use the specified subgroup size.
+        //  2) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
 
         if (m_pPipelineInfo->cs.options.waveSize != 0)
         {
@@ -125,8 +125,12 @@ uint32_t ComputeContext::GetShaderWaveSize(
 
         if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize)
         {
-#if VKI_EXT_SUBGROUP_SIZE_CONTROL
-            if (pShaderInfo->options.allowVaryWaveSize == false)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
+            if (m_pPipelineInfo->cs.options.allowVaryWaveSize)
+            {
+                waveSize = m_pGpuProperty->waveSize;
+            }
+            else
 #endif
             {
                 waveSize = cl::SubgroupSize;

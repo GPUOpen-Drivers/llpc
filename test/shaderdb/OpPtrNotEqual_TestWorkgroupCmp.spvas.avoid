@@ -1,0 +1,91 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 58
+; Schema: 0
+               OpCapability Shader
+               OpCapability VariablePointers
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %2 %3 %4
+               OpExecutionMode %1 LocalSize 16 4 1
+               OpDecorate %_struct_5 Block
+               OpMemberDecorate %_struct_5 0 Offset 0
+               OpDecorate %_runtimearr__arr_int_int_17 ArrayStride 68
+               OpDecorate %_arr_int_int_17 ArrayStride 4
+               OpDecorate %3 DescriptorSet 0
+               OpDecorate %3 Binding 0
+               OpDecorate %_struct_8 Block
+               OpMemberDecorate %_struct_8 0 BuiltIn LocalInvocationId
+               OpMemberDecorate %_struct_8 1 BuiltIn GlobalInvocationId
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_4 = OpConstant %int 4
+     %int_16 = OpConstant %int 16
+     %int_17 = OpConstant %int 17
+     %int_64 = OpConstant %int 64
+      %v3int = OpTypeVector %int 3
+  %_struct_8 = OpTypeStruct %v3int %v3int
+%_ptr_Input__struct_8 = OpTypePointer Input %_struct_8
+%_ptr_Input_v3int = OpTypePointer Input %v3int
+%_arr_int_int_4 = OpTypeArray %int %int_4
+%_arr__arr_int_int_4_int_16 = OpTypeArray %_arr_int_int_4 %int_16
+%_ptr_Workgroup__arr__arr_int_int_4_int_16 = OpTypePointer Workgroup %_arr__arr_int_int_4_int_16
+%_ptr_Workgroup__arr_int_int_4 = OpTypePointer Workgroup %_arr_int_int_4
+%_ptr_Workgroup_int = OpTypePointer Workgroup %int
+%_arr_int_int_17 = OpTypeArray %int %int_17
+%_runtimearr__arr_int_int_17 = OpTypeRuntimeArray %_arr_int_int_17
+  %_struct_5 = OpTypeStruct %_runtimearr__arr_int_int_17
+%_ptr_StorageBuffer__struct_5 = OpTypePointer StorageBuffer %_struct_5
+%_ptr_StorageBuffer__arr_int_int_17 = OpTypePointer StorageBuffer %_arr_int_int_17
+%_ptr_StorageBuffer_int = OpTypePointer StorageBuffer %int
+          %2 = OpVariable %_ptr_Workgroup__arr__arr_int_int_4_int_16 Workgroup
+          %3 = OpVariable %_ptr_StorageBuffer__struct_5 StorageBuffer
+          %4 = OpVariable %_ptr_Input__struct_8 Input
+         %29 = OpTypeFunction %void
+          %1 = OpFunction %void None %29
+         %30 = OpLabel
+         %31 = OpAccessChain %_ptr_Input_v3int %4 %int_1
+         %32 = OpLoad %v3int %31
+         %33 = OpCompositeExtract %int %32 0
+         %34 = OpCompositeExtract %int %32 1
+         %35 = OpAccessChain %_ptr_Input_v3int %4 %int_0
+         %36 = OpLoad %v3int %35
+         %37 = OpCompositeExtract %int %36 0
+         %38 = OpCompositeExtract %int %36 1
+         %39 = OpAccessChain %_ptr_Workgroup__arr_int_int_4 %2 %int_0
+         %40 = OpAccessChain %_ptr_Workgroup__arr_int_int_4 %2 %37
+         %41 = OpIEqual %bool %38 %int_1
+               OpSelectionMerge %42 None
+               OpBranchConditional %41 %43 %42
+         %43 = OpLabel
+         %44 = OpPtrNotEqual %bool %40 %39
+         %45 = OpAccessChain %_ptr_StorageBuffer_int %3 %int_0 %33 %int_16
+         %46 = OpSelect %int %44 %int_1 %int_0
+               OpStore %45 %46
+               OpBranch %42
+         %42 = OpLabel
+         %47 = OpPhi %int %int_0 %30 %int_0 %43 %48 %42
+         %48 = OpIAdd %int %47 %int_1
+         %49 = OpIEqual %bool %48 %int_4
+         %50 = OpIMul %int %38 %int_4
+         %51 = OpIAdd %int %47 %50
+         %52 = OpAccessChain %_ptr_Workgroup_int %40 %38
+         %53 = OpAccessChain %_ptr_Workgroup_int %40 %47
+         %54 = OpPtrNotEqual %bool %52 %53
+         %55 = OpSelect %int %54 %int_1 %int_0
+         %56 = OpAccessChain %_ptr_StorageBuffer_int %3 %int_0 %33 %51
+               OpStore %56 %55
+               OpLoopMerge %57 %42 None
+               OpBranchConditional %49 %57 %42
+         %57 = OpLabel
+               OpReturn
+               OpFunctionEnd

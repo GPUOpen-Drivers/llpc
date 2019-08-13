@@ -72,7 +72,7 @@ private:
     void DoParamCacheAllocRequest();
     void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
 
-    llvm::BasicBlock* ConstructDummyExport(llvm::Module* pModule, llvm::Function* pEntryPoint);
+    void DoEarlyExit(uint32_t fullyCullThreadCount);
 
     void RunEsOrEsVariant(llvm::Module*         pModule,
                           llvm::StringRef       entryName,
@@ -176,7 +176,8 @@ private:
 
         llvm::Value*    pPrimitiveId;               // Primitive ID (for VS)
 
-        // System values (SGPRs)
+        // System values, not used in pass-through mode (SGPRs)
+        llvm::Value*    pMergedGroupInfo;           // Merged group info
         llvm::Value*    pPrimShaderTableAddrLow;    // Primitive shader table address low
         llvm::Value*    pPrimShaderTableAddrHigh;   // Primitive shader table address high
 

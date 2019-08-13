@@ -97,10 +97,14 @@ GraphicsContext::GraphicsContext(
 
 #if LLPC_BUILD_GFX10
     memset(&m_nggControl, 0, sizeof(m_nggControl));
-    // NOTE: All fields of NGG controls are determined by the pass of resource collecting in patching. Here, we still
-    // set NGG enablement early. The field is used when deciding if we need extra optimizations after NGG primitive
-    // shader creation. At that time, the pass of resource collecting has not been run.
-    m_nggControl.enableNgg = pPipelineInfo->nggState.enableNgg;
+
+    if (gfxIp.major >= 10)
+    {
+        // NOTE: All fields of NGG controls are determined by the pass of resource collecting in patching. Here, we still
+        // set NGG enablement early. The field is used when deciding if we need extra optimizations after NGG primitive
+        // shader creation. At that time, the pass of resource collecting has not been run.
+        m_nggControl.enableNgg = pPipelineInfo->nggState.enableNgg;
+    }
 #endif
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
@@ -1417,14 +1421,14 @@ uint32_t GraphicsContext::GetShaderWaveSize(
         // NOTE: GPU property wave size is used in shader, unless:
         //  1) A stage-specific default is preferred.
         //  2) If specified by tuning option, use the specified wave size.
-        //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size.
+        //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
 
         if (stage == ShaderStageFragment)
         {
             // Per programming guide, it's recommended to use wave64 for fragment shader.
             waveSize = 64;
         }
-        else if((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0)
+        else if ((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0)
         {
             // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
             waveSize = 64;
@@ -1489,8 +1493,13 @@ uint32_t GraphicsContext::GetShaderWaveSize(
 
             if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize)
             {
-#if VKI_EXT_SUBGROUP_SIZE_CONTROL
-                if (pShaderInfo->options.allowVaryWaveSize == false)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
+                // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
+                if ((i != ShaderStageGeometry) && pShaderInfo->options.allowVaryWaveSize)
+                {
+                    waveSize = m_pGpuProperty->waveSize;
+                }
+                else
 #endif
                 {
                     waveSize = cl::SubgroupSize;

@@ -249,6 +249,7 @@ target_sources(llpc PRIVATE
 # llpc/lower
 target_sources(llpc PRIVATE
     lower/llpcSpirvLower.cpp
+    lower/llpcSpirvLowerAccessChain.cpp
     lower/llpcSpirvLowerAlgebraTransform.cpp
     lower/llpcSpirvLowerConstImmediateStore.cpp
     lower/llpcSpirvLowerGlobal.cpp

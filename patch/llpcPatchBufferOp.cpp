@@ -129,7 +129,12 @@ bool PatchBufferOp::runOnFunction(
 
     for (auto& replaceMap : m_replacementMap)
     {
-        Instruction* const pInst = replaceMap.first;
+        Instruction* const pInst = dyn_cast<Instruction>(replaceMap.first);
+
+        if (pInst == nullptr)
+        {
+            continue;
+        }
 
         if (isa<StoreInst>(pInst) == false)
         {
@@ -159,7 +164,7 @@ void PatchBufferOp::visitAtomicCmpXchgInst(
 
     m_pBuilder->SetInsertPoint(&atomicCmpXchgInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(atomicCmpXchgInst.getPointerOperand());
+    Value* const pPointer = GetPointerOperandAsInst(atomicCmpXchgInst.getPointerOperand());
 
     Type* const pStoreType = atomicCmpXchgInst.getNewValOperand()->getType();
 
@@ -287,7 +292,7 @@ void PatchBufferOp::visitAtomicRMWInst(
 
     m_pBuilder->SetInsertPoint(&atomicRmwInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(atomicRmwInst.getPointerOperand());
+    Value* const pPointer = GetPointerOperandAsInst(atomicRmwInst.getPointerOperand());
 
     Type* const pStoreType = atomicRmwInst.getValOperand()->getType();
 
@@ -436,7 +441,7 @@ void PatchBufferOp::visitBitCastInst(
 
     m_pBuilder->SetInsertPoint(&bitCastInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(bitCastInst.getOperand(0));
+    Value* const pPointer = GetPointerOperandAsInst(bitCastInst.getOperand(0));
 
     Value* const pNewBitCast = m_pBuilder->CreateBitCast(m_replacementMap[pPointer].second,
                                                          GetRemappedType(bitCastInst.getDestTy()));
@@ -488,7 +493,7 @@ void PatchBufferOp::visitCallInst(
     }
     else if (callName.equals(LlpcName::LateBufferLength))
     {
-        Instruction* const pPointer = GetPointerOperandAsInst(callInst.getArgOperand(0));
+        Value* const pPointer = GetPointerOperandAsInst(callInst.getArgOperand(0));
 
         // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
         Value* const pBufferLength = m_pBuilder->CreateExtractElement(m_replacementMap[pPointer].first, 2);
@@ -524,7 +529,7 @@ void PatchBufferOp::visitExtractElementInst(
 
     m_pBuilder->SetInsertPoint(&extractElementInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(extractElementInst.getVectorOperand());
+    Value* const pPointer = GetPointerOperandAsInst(extractElementInst.getVectorOperand());
     Value* const pIndex = extractElementInst.getIndexOperand();
 
     Value* const pPointerElem = m_pBuilder->CreateExtractElement(m_replacementMap[pPointer].second, pIndex);
@@ -546,7 +551,7 @@ void PatchBufferOp::visitGetElementPtrInst(
 
     m_pBuilder->SetInsertPoint(&getElemPtrInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(getElemPtrInst.getPointerOperand());
+    Value* const pPointer = GetPointerOperandAsInst(getElemPtrInst.getPointerOperand());
 
     SmallVector<Value*, 8> indices(getElemPtrInst.idx_begin(), getElemPtrInst.idx_end());
 
@@ -595,7 +600,7 @@ void PatchBufferOp::visitInsertElementInst(
 
     m_pBuilder->SetInsertPoint(&insertElementInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(insertElementInst.getOperand(1));
+    Value* const pPointer = GetPointerOperandAsInst(insertElementInst.getOperand(1));
     Value* const pIndex = m_replacementMap[pPointer].second;
 
     Value* pIndexVector = nullptr;
@@ -645,7 +650,7 @@ void PatchBufferOp::visitLoadInst(
 
         Type* const pCastType = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
 
-        Instruction* const pPointer = GetPointerOperandAsInst(loadInst.getPointerOperand());
+        Value* const pPointer = GetPointerOperandAsInst(loadInst.getPointerOperand());
 
         Value* const pLoadPointer = m_pBuilder->CreateBitCast(pPointer, pCastType);
 
@@ -802,7 +807,7 @@ void PatchBufferOp::visitPHINode(
         return;
     }
 
-    SmallVector<Instruction*, 8> incomings;
+    SmallVector<Value*, 8> incomings;
 
     for (uint32_t i = 0, incomingValueCount = phiNode.getNumIncomingValues(); i < incomingValueCount; i++)
     {
@@ -814,7 +819,7 @@ void PatchBufferOp::visitPHINode(
 
     Value* pBufferDesc = nullptr;
 
-    for (Instruction* const pIncoming : incomings)
+    for (Value* const pIncoming : incomings)
     {
         Value* const pIncomingBufferDesc = m_replacementMap[pIncoming].first;
 
@@ -877,12 +882,23 @@ void PatchBufferOp::visitPHINode(
     PHINode* const pNewPhiNode = m_pBuilder->CreatePHI(GetRemappedType(phiNode.getType()), incomings.size());
     CopyMetadata(pNewPhiNode, &phiNode);
 
+    m_replacementMap[&phiNode] = std::make_pair(pBufferDesc, pNewPhiNode);
+
     for (BasicBlock* const pBlock : phiNode.blocks())
     {
         const int32_t blockIndex = phiNode.getBasicBlockIndex(pBlock);
         LLPC_ASSERT(blockIndex >= 0);
 
-        Value* const pIncomingIndex = m_replacementMap[incomings[blockIndex]].second;
+        Value* pIncomingIndex = m_replacementMap[incomings[blockIndex]].second;
+
+        if (pIncomingIndex == nullptr)
+        {
+            if (Instruction* const pInst = dyn_cast<Instruction>(incomings[blockIndex]))
+            {
+                visit(*pInst);
+                pIncomingIndex = m_replacementMap[pInst].second;
+            }
+        }
 
         pNewPhiNode->addIncoming(pIncomingIndex, pBlock);
     }
@@ -911,8 +927,8 @@ void PatchBufferOp::visitSelectInst(
 
     m_pBuilder->SetInsertPoint(&selectInst);
 
-    Instruction* const pValue1 = GetPointerOperandAsInst(selectInst.getTrueValue());
-    Instruction* const pValue2 = GetPointerOperandAsInst(selectInst.getFalseValue());
+    Value* const pValue1 = GetPointerOperandAsInst(selectInst.getTrueValue());
+    Value* const pValue2 = GetPointerOperandAsInst(selectInst.getFalseValue());
 
     Value* const pBufferDesc1 = m_replacementMap[pValue1].first;
     Value* const pBufferDesc2 = m_replacementMap[pValue2].first;
@@ -923,6 +939,11 @@ void PatchBufferOp::visitSelectInst(
     {
         // If the buffer descriptors are the same, then no select needed.
         pBufferDesc = pBufferDesc1;
+    }
+    else if ((pBufferDesc1 == nullptr) || (pBufferDesc2 == nullptr))
+    {
+        // Select the non-nullptr buffer descriptor
+        pBufferDesc = pBufferDesc1 != nullptr ? pBufferDesc1 : pBufferDesc2;
     }
     else
     {
@@ -972,6 +993,40 @@ void PatchBufferOp::visitStoreInst(
 
     // Record the store instruction so we remember to delete it later.
     m_replacementMap[&storeInst] = std::make_pair(nullptr, nullptr);
+}
+
+// =====================================================================================================================
+// Visits "icmp" instruction.
+void PatchBufferOp::visitICmpInst(
+    ICmpInst& icmpInst) // [in] The instuction
+{
+    Type* const pType = icmpInst.getOperand(0)->getType();
+
+    // If the type is not a pointer type, bail.
+    if (pType->isPointerTy() == false)
+    {
+        return;
+    }
+
+    // If the pointer is not a fat pointer, bail.
+    if (pType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    {
+        return;
+    }
+
+    m_pBuilder->SetInsertPoint(&icmpInst);
+
+    Value* const pOperand0 = GetPointerOperandAsInst(icmpInst.getOperand(0));
+    Value* const pOperand1 = GetPointerOperandAsInst(icmpInst.getOperand(1));
+
+    Value* const pNewICmp = m_pBuilder->CreateICmp(icmpInst.getPredicate(),
+        m_replacementMap[pOperand0].second, m_replacementMap[pOperand1].second);
+
+    CopyMetadata(pNewICmp, &icmpInst);
+
+    m_replacementMap[&icmpInst] = std::make_pair(m_replacementMap[pOperand0].first, pNewICmp);
+
+    icmpInst.replaceAllUsesWith(pNewICmp);
 }
 
 // =====================================================================================================================
@@ -1291,13 +1346,21 @@ void PatchBufferOp::PostVisitMemSetInst(
 
 // =====================================================================================================================
 // Get a pointer operand as an instruction.
-Instruction* PatchBufferOp::GetPointerOperandAsInst(
+Value* PatchBufferOp::GetPointerOperandAsInst(
     Value* const pValue) // [in] The pointer operand value to get as an instruction.
 {
     // If the value is already an instruction, return it.
     if (Instruction* const pInst = dyn_cast<Instruction>(pValue))
     {
         return pInst;
+    }
+
+    // If the value is a constant (i.e., null pointer), return it.
+    if (Constant* const pConst = dyn_cast<Constant>(pValue))
+    {
+        Constant* const pNullPointer = ConstantPointerNull::get(GetRemappedType(pValue->getType()));
+        m_replacementMap[pValue] = std::make_pair(nullptr, pNullPointer);
+        return pValue;
     }
 
     ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pValue);
@@ -1431,7 +1494,7 @@ Value* PatchBufferOp::ReplaceLoad(
 {
     m_pBuilder->SetInsertPoint(pLoadInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(pLoadInst->getPointerOperand());
+    Value* const pPointer = GetPointerOperandAsInst(pLoadInst->getPointerOperand());
 
     const DataLayout& dataLayout = m_pBuilder->GetInsertBlock()->getModule()->getDataLayout();
 
@@ -1708,7 +1771,7 @@ void PatchBufferOp::ReplaceStore(
 {
     m_pBuilder->SetInsertPoint(pStoreInst);
 
-    Instruction* const pPointer = GetPointerOperandAsInst(pStoreInst->getPointerOperand());
+    Value* const pPointer = GetPointerOperandAsInst(pStoreInst->getPointerOperand());
 
     const DataLayout& dataLayout = m_pBuilder->GetInsertBlock()->getModule()->getDataLayout();
 
