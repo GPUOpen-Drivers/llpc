@@ -951,6 +951,10 @@ inline bool isValid(spv::Op V) {
   case OpModuleProcessed:
   case OpExecutionModeId:
   case OpDecorateId:
+#if SPV_VERSION >= 0x10400
+  case OpDecorateString:
+  case OpMemberDecorateString:
+#endif
   case OpGroupNonUniformElect:
   case OpGroupNonUniformAll:
   case OpGroupNonUniformAny:
@@ -987,6 +991,8 @@ inline bool isValid(spv::Op V) {
   case OpGroupNonUniformQuadSwap:
 #if SPV_VERSION >= 0x10400
   case OpCopyLogical:
+  case OpPtrEqual:
+  case OpPtrNotEqual:
 #endif
   case OpForward:
   case OpSubgroupBallotKHR:

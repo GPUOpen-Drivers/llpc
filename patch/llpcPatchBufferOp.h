@@ -65,6 +65,7 @@ public:
     void visitPHINode(llvm::PHINode& phiNode);
     void visitSelectInst(llvm::SelectInst& selectInst);
     void visitStoreInst(llvm::StoreInst& storeInst);
+    void visitICmpInst(llvm::ICmpInst& icmpInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -73,7 +74,7 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchBufferOp);
 
-    llvm::Instruction* GetPointerOperandAsInst(llvm::Value* const pValue);
+    llvm::Value* GetPointerOperandAsInst(llvm::Value* const pValue);
     llvm::Value* GetBaseAddressFromBufferDesc(llvm::Value* const pBufferDesc) const;
     void CopyMetadata(llvm::Value* const pDest, const llvm::Value* const pSrc) const;
     llvm::PointerType* GetRemappedType(llvm::Type* const pType) const;
@@ -90,7 +91,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     using Replacement = std::pair<llvm::Value*, llvm::Value*>;
-    llvm::DenseMap<llvm::Instruction*, Replacement> m_replacementMap;      // The replacement map.
+    llvm::DenseMap<llvm::Value*, Replacement>       m_replacementMap;      // The replacement map.
     llvm::DenseSet<llvm::Value*>                    m_invariantSet;        // The invariant set.
     llvm::DenseSet<llvm::Value*>                    m_divergenceSet;       // The divergence set.
     llvm::LegacyDivergenceAnalysis*                 m_pDivergenceAnalysis; // The divergence analysis.

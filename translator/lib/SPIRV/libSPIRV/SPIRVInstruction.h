@@ -1080,6 +1080,13 @@ protected:
       Op1Ty = getValueType(Op1);
       Op2Ty = getValueType(Op2);
       ResTy = Type;
+#if SPV_VERSION >= 0x10400
+      if (Op1Ty->isTypePointer() || Op2Ty->isTypePointer()) {
+          assert(Op1Ty == Op2Ty && "Invalid type for ptr cmp inst");
+          Op1Ty = Op1Ty->getPointerElementType();
+          Op2Ty = Op2Ty->getPointerElementType();
+      }
+#endif
     }
     assert(isCmpOpCode(OpCode) && "Invalid op code for cmp inst");
     assert((ResTy->isTypeBool() || ResTy->isTypeInt()) &&
@@ -1121,6 +1128,10 @@ _SPIRV_OP(FUnordGreaterThanEqual)
 _SPIRV_OP(LessOrGreater)
 _SPIRV_OP(Ordered)
 _SPIRV_OP(Unordered)
+#if SPV_VERSION >= 0x10400
+_SPIRV_OP(PtrEqual)
+_SPIRV_OP(PtrNotEqual)
+#endif
 #undef _SPIRV_OP
 
 class SPIRVSelect : public SPIRVInstruction {
