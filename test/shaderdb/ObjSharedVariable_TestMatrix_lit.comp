@@ -22,9 +22,9 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: @{{[0-9]}} = addrspace(3) global [4 x <4 x float>] undef
-; SHADERTEST: store <4 x float> %{{[0-9]*}}, <4 x float> addrspace(3)* getelementptr inbounds ([4 x <4 x float>], [4 x <4 x float>] addrspace(3)* @{{[0-9]}}, i32 0, i32 {{[0-3]}})
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(3)* getelementptr inbounds ([4 x <4 x float>], [4 x <4 x float>] addrspace(3)* @{{[0-9]}}, i32 0, i32 {{[0-3]}})
+; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global [4 x <4 x float>] undef
+; SHADERTEST: store <4 x float> %{{[0-9]*}}, <4 x float> addrspace(3)* getelementptr inbounds ([4 x <4 x float>], [4 x <4 x float>] addrspace(3)* @[[LDS]], i32 0, i32 {{[0-3]}})
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, <4 x float> addrspace(3)* getelementptr inbounds ([4 x <4 x float>], [4 x <4 x float>] addrspace(3)* @[[LDS]], i32 0, i32 {{[0-3]}})
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
