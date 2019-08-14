@@ -1569,9 +1569,9 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
     Name = llvm::MDString::get(*Context, "llvm.loop.unroll.count");
     MDs.push_back(Name);
 
-    std::string partialCount = std::to_string(LM->getLoopControlParameters().at(0));
-    Name = llvm::MDString::get(*Context, partialCount.c_str());
-    MDs.push_back(Name);
+    auto PartialCount = ConstantInt::get(Type::getInt32Ty(*Context),
+                                         LM->getLoopControlParameters().at(0));
+    MDs.push_back(ConstantAsMetadata::get(PartialCount));
   }
 #endif
 
@@ -5159,6 +5159,14 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     if (addrSpace == SPIRAS_Local)
     {
         pGlobalVar->setAlignment(16);
+
+        // NOTE: Give shared variable a name to skip "global optimize pass".
+        // The pass will change constant store operations to initializerand this
+        // is disallowed in backend compiler.
+        if (!pGlobalVar->hasName())
+        {
+            pGlobalVar->setName("lds");
+        }
     }
 
     SPIRVBuiltinVariableKind builtinKind;
