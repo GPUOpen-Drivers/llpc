@@ -66,6 +66,7 @@ public:
     void visitSelectInst(llvm::SelectInst& selectInst);
     void visitStoreInst(llvm::StoreInst& storeInst);
     void visitICmpInst(llvm::ICmpInst& icmpInst);
+    void visitPtrToIntInst(llvm::PtrToIntInst& ptrToIntInst);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -81,6 +82,7 @@ private:
     bool RemoveUsersForInvariantStarts(llvm::Value* const pValue);
     llvm::Value* ReplaceLoad(llvm::LoadInst* const pLoadInst);
     void ReplaceStore(llvm::StoreInst* const pStoreInst);
+    llvm::Value* ReplaceICmp(llvm::ICmpInst* const pICmpInst);
     llvm::Instruction* MakeLoop(llvm::Value* const       pLoopStart,
                                 llvm::Value* const       pLoopEnd,
                                 llvm::Value* const       pLoopStride,
