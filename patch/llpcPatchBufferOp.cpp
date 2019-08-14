@@ -1014,19 +1014,47 @@ void PatchBufferOp::visitICmpInst(
         return;
     }
 
-    m_pBuilder->SetInsertPoint(&icmpInst);
-
-    Value* const pOperand0 = GetPointerOperandAsInst(icmpInst.getOperand(0));
-    Value* const pOperand1 = GetPointerOperandAsInst(icmpInst.getOperand(1));
-
-    Value* const pNewICmp = m_pBuilder->CreateICmp(icmpInst.getPredicate(),
-        m_replacementMap[pOperand0].second, m_replacementMap[pOperand1].second);
+    Value* const pNewICmp = ReplaceICmp(&icmpInst);
 
     CopyMetadata(pNewICmp, &icmpInst);
 
-    m_replacementMap[&icmpInst] = std::make_pair(m_replacementMap[pOperand0].first, pNewICmp);
+    // Record the icmp instruction so we remember to delete it later.
+    m_replacementMap[&icmpInst] = std::make_pair(nullptr, nullptr);
 
     icmpInst.replaceAllUsesWith(pNewICmp);
+}
+
+// =====================================================================================================================
+// Visits "ptrtoint" instruction.
+void PatchBufferOp::visitPtrToIntInst(
+    PtrToIntInst& ptrToIntInst) // [in] The "ptrtoint" instruction
+{
+    Type* const pType = ptrToIntInst.getOperand(0)->getType();
+
+    // If the type is not a pointer type, bail.
+    if (pType->isPointerTy() == false)
+    {
+        return;
+    }
+
+    // If the pointer is not a fat pointer, bail.
+    if (pType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    {
+        return;
+    }
+
+    m_pBuilder->SetInsertPoint(&ptrToIntInst);
+
+    Value* const pPointer = GetPointerOperandAsInst(ptrToIntInst.getOperand(0));
+
+    Value* const pNewPtrToInt = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second,
+                                                           ptrToIntInst.getDestTy());
+
+    CopyMetadata(pNewPtrToInt, pPointer);
+
+    m_replacementMap[&ptrToIntInst] = std::make_pair(m_replacementMap[pPointer].first, pNewPtrToInt);
+
+    ptrToIntInst.replaceAllUsesWith(pNewPtrToInt);
 }
 
 // =====================================================================================================================
@@ -2067,6 +2095,58 @@ void PatchBufferOp::ReplaceStore(
             break;
         }
     }
+}
+
+// =====================================================================================================================
+// Replace fat pointers icmp with the instruction required to do the icmp.
+Value* PatchBufferOp::ReplaceICmp(
+    ICmpInst* const pICmpInst) // [in] The "icmp" instruction to replace.
+{
+    m_pBuilder->SetInsertPoint(pICmpInst);
+
+    SmallVector<Value*, 2> bufferDescs;
+    SmallVector<Value*, 2> indices;
+    for (int i = 0; i < 2; ++i)
+    {
+        Value* const pOperand = GetPointerOperandAsInst(pICmpInst->getOperand(i));
+        bufferDescs.push_back(m_replacementMap[pOperand].first);
+        indices.push_back(m_pBuilder->CreatePtrToInt(m_replacementMap[pOperand].second, m_pBuilder->getInt32Ty()));
+    }
+
+    Type* const pBufferDescTy = bufferDescs[0]->getType();
+
+    LLPC_ASSERT(pBufferDescTy->isVectorTy());
+    LLPC_ASSERT(pBufferDescTy->getVectorNumElements() == 4);
+    LLPC_ASSERT(pBufferDescTy->getVectorElementType()->isIntegerTy(32));
+    LLPC_ASSERT((pICmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (pICmpInst->getPredicate() == ICmpInst::ICMP_NE));
+
+    Value* pBufferDescICmp = m_pBuilder->getFalse();
+    if ((bufferDescs[0] == nullptr) && (bufferDescs[1] == nullptr))
+    {
+        pBufferDescICmp = m_pBuilder->getTrue();
+    }
+    else if ((bufferDescs[0] != nullptr) && (bufferDescs[1] != nullptr))
+    {
+        Value* const pBufferDescEqual = m_pBuilder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
+
+        pBufferDescICmp = m_pBuilder->CreateExtractElement(pBufferDescEqual, static_cast<uint64_t>(0));
+        for (uint32_t i = 1; i < 4; ++i)
+        {
+            Value* pBufferDescElemEqual = m_pBuilder->CreateExtractElement(pBufferDescEqual, i);
+            pBufferDescICmp = m_pBuilder->CreateAnd(pBufferDescICmp, pBufferDescElemEqual);
+        }
+    }
+
+    Value* pIndexICmp = m_pBuilder->CreateICmpEQ(indices[0], indices[1]);
+
+    Value* pNewICmp = m_pBuilder->CreateAnd(pBufferDescICmp, pIndexICmp);
+
+    if (pICmpInst->getPredicate() == ICmpInst::ICMP_NE)
+    {
+        pNewICmp = m_pBuilder->CreateNot(pNewICmp);
+    }
+
+    return pNewICmp;
 }
 
 // =====================================================================================================================
