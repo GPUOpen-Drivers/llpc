@@ -322,14 +322,12 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/glslSharedVarOpEmu.ll               \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmu.ll                 \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmuD16.ll              \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslImageOpEmu.ll                   \
                             $(GEN_GLSL_EMU_LIB_DIR)/llvmIntrinsicEmu.ll                 \
                             \
                             $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslSpecialOpEmu.ll            \
                             \
                             $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmu.ll              \
                             $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmuF16.ll           \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslImageOpEmu.ll              \
                             \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCode.py     \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCode.txt    \
@@ -348,7 +346,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     #endif
 
     # workaround
-    GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/wa/treat1dImagesAs2d/glslImageOpEmu.ll
     #if LLPC_BUILD_GFX10
     ifeq ($(LLPC_BUILD_GFX10), 1)
         GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/wa/disableI32ModToI16Mod/glslArithOpEmu.ll

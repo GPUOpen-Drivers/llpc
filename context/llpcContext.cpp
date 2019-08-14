@@ -72,11 +72,6 @@ const uint8_t Context::GlslEmuLibGfx9[]=
     #include "./generate/gfx9/g_llpcGlslEmuLibGfx9.h"
 };
 
-const uint8_t Context::GlslEmuLibWaTreat1dImagesAs2d[] =
-{
-    #include "./generate/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h"
-};
-
 #if LLPC_BUILD_GFX10
 const uint8_t Context::GlslEmuLibGfx10[]=
 {
@@ -130,13 +125,6 @@ Context::Context(
     m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
 
     // Load external LLVM libraries, in search order.
-    if (pGpuWorkarounds->gfx9.treat1dImagesAs2d)
-    {
-        // Add library for "treat 1d image as 2d gpu workaround".
-        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibWaTreat1dImagesAs2d),
-                sizeof(GlslEmuLibWaTreat1dImagesAs2d)), "GlslEmuLibWaTreat1dImagesAs2d"));
-    }
-
 #if LLPC_BUILD_GFX10
     if (pGpuWorkarounds->gfx10.disableI32ModToI16Mod)
     {

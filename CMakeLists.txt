@@ -382,7 +382,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmuF16.ll
@@ -394,7 +393,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/llvmIntrinsicEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/wa/treat1dImagesAs2d/glslImageOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI8.txt
@@ -410,7 +408,6 @@ set(GEN_GLSL_EMU_LIB_OUTPUTS
     ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslEmuLib.h
     ${OP_EMU_LIB_GEN_DIR}/gfx8/g_llpcGlslEmuLibGfx8.h
     ${OP_EMU_LIB_GEN_DIR}/gfx9/g_llpcGlslEmuLibGfx9.h
-    ${OP_EMU_LIB_GEN_DIR}/wa/g_llpcGlslEmuLibTreat1dImagesAs2d.h
 )
 
 #if VKI_BUILD_GFX10
