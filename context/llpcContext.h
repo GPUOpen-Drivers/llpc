@@ -343,7 +343,6 @@ private:
     static const uint8_t GlslEmuLib[];
     static const uint8_t GlslEmuLibGfx8[];
     static const uint8_t GlslEmuLibGfx9[];
-    static const uint8_t GlslEmuLibWaTreat1dImagesAs2d[];
 
 #if LLPC_BUILD_GFX10
     static const uint8_t GlslEmuLibWaDisableI32ModToI16Mod[];
