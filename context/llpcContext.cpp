@@ -66,7 +66,7 @@ const uint8_t Context::GlslEmuLib[]=
 
 const uint8_t Context::GlslEmuLibGfx8[] =
 {
-#include "./generate/gfx8/g_llpcGlslEmuLibGfx8.h"
+    #include "./generate/gfx8/g_llpcGlslEmuLibGfx8.h"
 };
 
 const uint8_t Context::GlslEmuLibGfx9[]=
@@ -75,11 +75,6 @@ const uint8_t Context::GlslEmuLibGfx9[]=
 };
 
 #if LLPC_BUILD_GFX10
-const uint8_t Context::GlslEmuLibGfx10[]=
-{
-    #include "./generate/gfx10/g_llpcGlslEmuLibGfx10.h"
-};
-
 const uint8_t Context::GlslEmuLibWaDisableI32ModToI16Mod[] =
 {
     #include "./generate/wa/g_llpcGlslEmuLibDisableI32ModToI16Mod.h"
@@ -136,13 +131,6 @@ Context::Context(
     }
 #endif
 
-#if LLPC_BUILD_GFX10
-    if (gfxIp.major >= 10)
-    {
-        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx10),
-                sizeof(GlslEmuLibGfx10)), "GlslEmuLibGfx10"));
-    }
-#endif
     if (gfxIp.major >= 9)
     {
         m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),

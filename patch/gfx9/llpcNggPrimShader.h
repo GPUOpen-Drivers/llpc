@@ -72,7 +72,7 @@ private:
     void DoParamCacheAllocRequest();
     void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
 
-    void DoEarlyExit(uint32_t fullyCullThreadCount);
+    void DoEarlyExit(uint32_t fullyCullThreadCount, uint32_t expPosCount);
 
     void RunEsOrEsVariant(llvm::Module*         pModule,
                           llvm::StringRef       entryName,
@@ -138,6 +138,15 @@ private:
     llvm::Value* FetchCullingControlRegister(llvm::Module*     pModule,
                                              uint32_t          regOffset,
                                              llvm::BasicBlock* pInsertAtEnd);
+
+    void CreateBackfaceCuller(llvm::Module* pModule);
+    void CreateFrustumCuller(llvm::Module* pModule);
+    void CreateBoxFilterCuller(llvm::Module* pModule);
+    void CreateSphereCuller(llvm::Module* pModule);
+    void CreateSmallPrimFilterCuller(llvm::Module* pModule);
+    void CreateCullDistanceCuller(llvm::Module* pModule);
+
+    void CreateFetchCullingRegister(llvm::Module* pModule);
 
     llvm::Value* DoSubgroupBallot(llvm::Value* pValue);
 

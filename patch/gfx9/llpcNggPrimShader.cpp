@@ -548,7 +548,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 
                     uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
-                    auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, m_pBuilder->getInt32(2));
+                    auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
                     pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
 
                     auto pPrimIdWriteValue = pGsPrimitiveId;
@@ -575,7 +575,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 
                     uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
-                    auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(2));
+                    auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
                     pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
 
                     pPrimIdReadValue = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
@@ -1085,11 +1085,11 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                                                                         m_pBuilder->getInt32(16),
                                                                     });
 
-                    auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, m_pBuilder->getInt32(2));
+                    auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
 
                     uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
-                    auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, m_pBuilder->getInt32(2));
+                    auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
                     pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
 
                     auto pPrimIdWriteValue = pGsPrimitiveId;
@@ -1116,7 +1116,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 
                     uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
 
-                    auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(2));
+                    auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
                     pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
 
                     pPrimIdReadValue =
@@ -1324,7 +1324,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                                                                           m_pBuilder->getInt32(31),
                                                                           m_pBuilder->getInt32(1)
                                                                       });
-                        pSignBit = m_pBuilder->CreateShl(pSignBit, m_pBuilder->getInt32(i));
+                        pSignBit = m_pBuilder->CreateShl(pSignBit, i);
 
                         pSignMask = m_pBuilder->CreateOr(pSignMask, pSignBit);
                     }
@@ -1402,7 +1402,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                                                                     m_pBuilder->getInt32(0),
                                                                     m_pBuilder->getInt32(16)
                                                                 });
-                auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, m_pBuilder->getInt32(2));
+                auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
 
                 auto pEsGsOffset1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                                 m_pBuilder->getInt32Ty(),
@@ -1411,7 +1411,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                                                                     m_pBuilder->getInt32(16),
                                                                     m_pBuilder->getInt32(16)
                                                                 });
-                auto pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, m_pBuilder->getInt32(2));
+                auto pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, 2);
 
                 auto pEsGsOffset2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                                 m_pBuilder->getInt32Ty(),
@@ -1420,7 +1420,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                                                                     m_pBuilder->getInt32(0),
                                                                     m_pBuilder->getInt32(16)
                                                                 });
-                auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, m_pBuilder->getInt32(2));
+                auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, 2);
 
                 Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
 
@@ -1489,7 +1489,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 
                 auto pLdsOffset = m_pBuilder->CreateAdd(m_nggFactor.pWaveIdInSubgroup, m_nggFactor.pThreadIdInWave);
                 pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(1));
-                pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, m_pBuilder->getInt32(2));
+                pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
 
                 uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
                     vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
@@ -1542,7 +1542,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                     pThreadCountInWaves = pVertCountInWaves;
 
                     // Get vertex count for all waves prior to this wave
-                    pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(2));
+                    pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
                     pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
 
                     pVertCountInPrevWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
@@ -1797,7 +1797,17 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
             // Construct ".earlyExit" block
             {
                 m_pBuilder->SetInsertPoint(pEarlyExitBlock);
-                DoEarlyExit(fullyCulledThreadCount);
+
+                uint32_t expPosCount = 0;
+                for (const auto& expData : expDataSet)
+                {
+                    if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
+                    {
+                        ++expPosCount;
+                    }
+                }
+
+                DoEarlyExit(fullyCulledThreadCount, expPosCount);
             }
 
             // Construct ".noEarlyExit" block
@@ -1990,7 +2000,7 @@ Value* NggPrimShader::DoCulling(
                                                         m_pBuilder->getInt32(0),
                                                         m_pBuilder->getInt32(16),
                                                     });
-    auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, m_pBuilder->getInt32(2));
+    auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
 
     auto pEsGsOffset1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                     m_pBuilder->getInt32Ty(),
@@ -1999,7 +2009,7 @@ Value* NggPrimShader::DoCulling(
                                                         m_pBuilder->getInt32(16),
                                                         m_pBuilder->getInt32(16),
                                                     });
-    auto pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, m_pBuilder->getInt32(2));
+    auto pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, 2);
 
     auto pEsGsOffset2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                     m_pBuilder->getInt32Ty(),
@@ -2008,7 +2018,7 @@ Value* NggPrimShader::DoCulling(
                                                         m_pBuilder->getInt32(0),
                                                         m_pBuilder->getInt32(16),
                                                     });
-    auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, m_pBuilder->getInt32(2));
+    auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, 2);
 
     Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
     Value* vertex[3] = { nullptr };
@@ -2065,7 +2075,7 @@ Value* NggPrimShader::DoCulling(
 
         for (uint32_t i = 0; i < 3; ++i)
         {
-            Value* pLdsOffset = m_pBuilder->CreateMul(vertex[i], m_pBuilder->getInt32(SizeOfDword));
+            Value* pLdsOffset = m_pBuilder->CreateMul(vertexId[i], m_pBuilder->getInt32(SizeOfDword));
             pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStart);
 
             signMask[i] = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
@@ -2082,7 +2092,7 @@ Value* NggPrimShader::DoCulling(
 void NggPrimShader::DoParamCacheAllocRequest()
 {
     // M0[10:0] = vertCntInSubgroup, M0[22:12] = primCntInSubgroup
-    Value* pM0 = m_pBuilder->CreateShl(m_nggFactor.pPrimCountInSubgroup, m_pBuilder->getInt32(12));
+    Value* pM0 = m_pBuilder->CreateShl(m_nggFactor.pPrimCountInSubgroup, 12);
     pM0 = m_pBuilder->CreateOr(pM0, m_nggFactor.pVertCountInSubgroup);
 
     m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { m_pBuilder->getInt32(GS_ALLOC_REQ), pM0 });
@@ -2118,7 +2128,7 @@ void NggPrimShader::DoPrimitiveExport(
                                                             m_pBuilder->getInt32(0),
                                                             m_pBuilder->getInt32(16),
                                                         });
-        Value* pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, m_pBuilder->getInt32(2));
+        Value* pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
 
         auto pEsGsOffset1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                         m_pBuilder->getInt32Ty(),
@@ -2127,7 +2137,7 @@ void NggPrimShader::DoPrimitiveExport(
                                                             m_pBuilder->getInt32(16),
                                                             m_pBuilder->getInt32(16),
                                                         });
-        Value* pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, m_pBuilder->getInt32(2));
+        Value* pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, 2);
 
         auto pEsGsOffset2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                         m_pBuilder->getInt32Ty(),
@@ -2136,7 +2146,7 @@ void NggPrimShader::DoPrimitiveExport(
                                                             m_pBuilder->getInt32(0),
                                                             m_pBuilder->getInt32(16),
                                                         });
-        Value* pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, m_pBuilder->getInt32(2));
+        Value* pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, 2);
 
         if (vertexCompact)
         {
@@ -2208,10 +2218,10 @@ void NggPrimShader::DoPrimitiveExport(
             }
         }
 
-        pPrimData = m_pBuilder->CreateShl(pVertexId2, m_pBuilder->getInt32(10));
+        pPrimData = m_pBuilder->CreateShl(pVertexId2, 10);
         pPrimData = m_pBuilder->CreateOr(pPrimData, pVertexId1);
 
-        pPrimData = m_pBuilder->CreateShl(pPrimData, m_pBuilder->getInt32(10));
+        pPrimData = m_pBuilder->CreateShl(pPrimData, 10);
         pPrimData = m_pBuilder->CreateOr(pPrimData, pVertexId0);
 
         if (vertexCompact)
@@ -2243,7 +2253,8 @@ void NggPrimShader::DoPrimitiveExport(
 // Early exit NGG primitive shader when we detect that the entire sub-group is fully culled, doing dummy
 // primitive/vertex export if necessary.
 void NggPrimShader::DoEarlyExit(
-    uint32_t  fullyCulledThreadCount)   // Thread count left when the entire sub-group is fully culled
+    uint32_t  fullyCulledThreadCount,   // Thread count left when the entire sub-group is fully culled
+    uint32_t  expPosCount)              // Position export count
 {
     if (fullyCulledThreadCount > 0)
     {
@@ -2286,19 +2297,22 @@ void NggPrimShader::DoEarlyExit(
 
             pUndef = UndefValue::get(m_pBuilder->getFloatTy());
 
-            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp,
-                                        m_pBuilder->getFloatTy(),
-                                        {
-                                            m_pBuilder->getInt32(EXP_TARGET_POS_0),         // tgt
-                                            m_pBuilder->getInt32(0x0),                      // en
-                                            // src0 ~ src3
-                                            pUndef,
-                                            pUndef,
-                                            pUndef,
-                                            pUndef,
-                                            m_pBuilder->getTrue(),                          // done
-                                            m_pBuilder->getFalse()                          // vm
-                                        });
+            for (uint32_t i = 0; i < expPosCount; ++i)
+            {
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp,
+                                            m_pBuilder->getFloatTy(),
+                                            {
+                                                m_pBuilder->getInt32(EXP_TARGET_POS_0 + i), // tgt
+                                                m_pBuilder->getInt32(0x0),                  // en
+                                                // src0 ~ src3
+                                                pUndef,
+                                                pUndef,
+                                                pUndef,
+                                                pUndef,
+                                                m_pBuilder->getInt1(i == expPosCount - 1),  // done
+                                                m_pBuilder->getFalse()                      // vm
+                                            });
+            }
 
             m_pBuilder->CreateBr(pEndDummyExpBlock);
         }
@@ -2818,6 +2832,11 @@ Value* NggPrimShader::DoBackfaceCulling(
 {
     LLPC_ASSERT(m_pNggControl->enableBackfaceCulling);
 
+    if (pModule->getFunction(LlpcName::NggCullingBackface) == nullptr)
+    {
+        CreateBackfaceCuller(pModule);
+    }
+
     uint32_t regOffset = 0;
 
     // Get register PA_SU_SC_MODE_CNTL
@@ -2844,27 +2863,21 @@ Value* NggPrimShader::DoBackfaceCulling(
     auto pPaClVportYscale = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
 
     // Do backface culling
-    std::vector<Value*> args;
-    args.push_back(pCullFlag);
-    args.push_back(pVertex0);
-    args.push_back(pVertex1);
-    args.push_back(pVertex2);
-    args.push_back(m_pBuilder->getInt32(m_pNggControl->backfaceExponent));
-    args.push_back(pPaSuScModeCntl);
-    args.push_back(pPaClVportXscale);
-    args.push_back(pPaClVportYscale);
-
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadNone);
-
-    pCullFlag = EmitCall(pModule,
-                         LlpcName::NggCullingBackface,
-                         m_pBuilder->getInt1Ty(),
-                         args,
-                         attribs,
-                         pInsertAtEnd);
-
-    return pCullFlag;
+    return EmitCall(pModule,
+                    LlpcName::NggCullingBackface,
+                    m_pBuilder->getInt1Ty(),
+                    {
+                        pCullFlag,
+                        pVertex0,
+                        pVertex1,
+                        pVertex2,
+                        m_pBuilder->getInt32(m_pNggControl->backfaceExponent),
+                        pPaSuScModeCntl,
+                        pPaClVportXscale,
+                        pPaClVportYscale
+                    },
+                    Attribute::ReadNone,
+                    pInsertAtEnd);
 }
 
 // =====================================================================================================================
@@ -2878,6 +2891,11 @@ Value* NggPrimShader::DoFrustumCulling(
     BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
 {
     LLPC_ASSERT(m_pNggControl->enableFrustumCulling);
+
+    if (pModule->getFunction(LlpcName::NggCullingFrustum) == nullptr)
+    {
+        CreateFrustumCuller(pModule);
+    }
 
     uint32_t regOffset = 0;
 
@@ -2905,26 +2923,20 @@ Value* NggPrimShader::DoFrustumCulling(
     auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
 
     // Do frustum culling
-    std::vector<Value*> args;
-    args.push_back(pCullFlag);
-    args.push_back(pVertex0);
-    args.push_back(pVertex1);
-    args.push_back(pVertex2);
-    args.push_back(pPaClClipCntl);
-    args.push_back(pPaClGbHorzDiscAdj);
-    args.push_back(pPaClGbVertDiscAdj);
-
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadNone);
-
-    pCullFlag = EmitCall(pModule,
-                         LlpcName::NggCullingFrustum,
-                         m_pBuilder->getInt1Ty(),
-                         args,
-                         attribs,
-                         pInsertAtEnd);
-
-    return pCullFlag;
+    return EmitCall(pModule,
+                    LlpcName::NggCullingFrustum,
+                    m_pBuilder->getInt1Ty(),
+                    {
+                        pCullFlag,
+                        pVertex0,
+                        pVertex1,
+                        pVertex2,
+                        pPaClClipCntl,
+                        pPaClGbHorzDiscAdj,
+                        pPaClGbVertDiscAdj
+                    },
+                    Attribute::ReadNone,
+                    pInsertAtEnd);
 }
 
 // =====================================================================================================================
@@ -2938,6 +2950,11 @@ Value* NggPrimShader::DoBoxFilterCulling(
     BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
 {
     LLPC_ASSERT(m_pNggControl->enableBoxFilterCulling);
+
+    if (pModule->getFunction(LlpcName::NggCullingBoxFilter) == nullptr)
+    {
+        CreateBoxFilterCuller(pModule);
+    }
 
     uint32_t regOffset = 0;
 
@@ -2968,27 +2985,21 @@ Value* NggPrimShader::DoBoxFilterCulling(
     auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
 
     // Do box filter culling
-    std::vector<Value*> args;
-    args.push_back(pCullFlag);
-    args.push_back(pVertex0);
-    args.push_back(pVertex1);
-    args.push_back(pVertex2);
-    args.push_back(pPaClVteCntl);
-    args.push_back(pPaClClipCntl);
-    args.push_back(pPaClGbHorzDiscAdj);
-    args.push_back(pPaClGbVertDiscAdj);
-
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadNone);
-
-    pCullFlag = EmitCall(pModule,
-                         LlpcName::NggCullingBoxFilter,
-                         m_pBuilder->getInt1Ty(),
-                         args,
-                         attribs,
-                         pInsertAtEnd);
-
-    return pCullFlag;
+    return EmitCall(pModule,
+                    LlpcName::NggCullingBoxFilter,
+                    m_pBuilder->getInt1Ty(),
+                    {
+                        pCullFlag,
+                        pVertex0,
+                        pVertex1,
+                        pVertex2,
+                        pPaClVteCntl,
+                        pPaClClipCntl,
+                        pPaClGbHorzDiscAdj,
+                        pPaClGbVertDiscAdj
+                    },
+                    Attribute::ReadNone,
+                    pInsertAtEnd);
 }
 
 // =====================================================================================================================
@@ -3002,6 +3013,11 @@ Value* NggPrimShader::DoSphereCulling(
     BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
 {
     LLPC_ASSERT(m_pNggControl->enableSphereCulling);
+
+    if (pModule->getFunction(LlpcName::NggCullingSphere) == nullptr)
+    {
+        CreateSphereCuller(pModule);
+    }
 
     uint32_t regOffset = 0;
 
@@ -3032,27 +3048,21 @@ Value* NggPrimShader::DoSphereCulling(
     auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
 
     // Do small primitive filter culling
-    std::vector<Value*> args;
-    args.push_back(pCullFlag);
-    args.push_back(pVertex0);
-    args.push_back(pVertex1);
-    args.push_back(pVertex2);
-    args.push_back(pPaClVteCntl);
-    args.push_back(pPaClClipCntl);
-    args.push_back(pPaClGbHorzDiscAdj);
-    args.push_back(pPaClGbVertDiscAdj);
-
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadNone);
-
-    pCullFlag = EmitCall(pModule,
-                         LlpcName::NggCullingSphere,
-                         m_pBuilder->getInt1Ty(),
-                         args,
-                         attribs,
-                         pInsertAtEnd);
-
-    return pCullFlag;
+    return EmitCall(pModule,
+                    LlpcName::NggCullingSphere,
+                    m_pBuilder->getInt1Ty(),
+                    {
+                        pCullFlag,
+                        pVertex0,
+                        pVertex1,
+                        pVertex2,
+                        pPaClVteCntl,
+                        pPaClClipCntl,
+                        pPaClGbHorzDiscAdj,
+                        pPaClGbVertDiscAdj
+                    },
+                    Attribute::ReadNone,
+                    pInsertAtEnd);
 }
 
 // =====================================================================================================================
@@ -3066,6 +3076,11 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
     BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
 {
     LLPC_ASSERT(m_pNggControl->enableSmallPrimFilter);
+
+    if (pModule->getFunction(LlpcName::NggCullingSmallPrimFilter) == nullptr)
+    {
+        CreateSmallPrimFilterCuller(pModule);
+    }
 
     uint32_t regOffset = 0;
 
@@ -3083,26 +3098,20 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
     auto pPaClVportYscale = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
 
     // Do small primitive filter culling
-    std::vector<Value*> args;
-    args.push_back(pCullFlag);
-    args.push_back(pVertex0);
-    args.push_back(pVertex1);
-    args.push_back(pVertex2);
-    args.push_back(pPaClVteCntl);
-    args.push_back(pPaClVportXscale);
-    args.push_back(pPaClVportYscale);
-
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadNone);
-
-    pCullFlag = EmitCall(pModule,
-                         LlpcName::NggCullingSmallPrimFilter,
-                         m_pBuilder->getInt1Ty(),
-                         args,
-                         attribs,
-                         pInsertAtEnd);
-
-    return pCullFlag;
+    return EmitCall(pModule,
+                    LlpcName::NggCullingSmallPrimFilter,
+                    m_pBuilder->getInt1Ty(),
+                    {
+                        pCullFlag,
+                        pVertex0,
+                        pVertex1,
+                        pVertex2,
+                        pPaClVteCntl,
+                        pPaClVportXscale,
+                        pPaClVportYscale
+                    },
+                    Attribute::ReadNone,
+                    pInsertAtEnd);
 }
 
 // =====================================================================================================================
@@ -3117,24 +3126,23 @@ Value* NggPrimShader::DoCullDistanceCulling(
 {
     LLPC_ASSERT(m_pNggControl->enableCullDistanceCulling);
 
+    if (pModule->getFunction(LlpcName::NggCullingCullDistance) == nullptr)
+    {
+        CreateCullDistanceCuller(pModule);
+    }
+
     // Do cull distance culling
-    std::vector<Value*> args;
-    args.push_back(pCullFlag);
-    args.push_back(pSignMask0);
-    args.push_back(pSignMask1);
-    args.push_back(pSignMask2);
-
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadNone);
-
-    pCullFlag = EmitCall(pModule,
-                         LlpcName::NggCullingCullDistance,
-                         m_pBuilder->getInt1Ty(),
-                         args,
-                         attribs,
-                         pInsertAtEnd);
-
-    return pCullFlag;
+    return EmitCall(pModule,
+                    LlpcName::NggCullingCullDistance,
+                    m_pBuilder->getInt1Ty(),
+                    {
+                        pCullFlag,
+                        pSignMask0,
+                        pSignMask1,
+                        pSignMask2
+                    },
+                    Attribute::ReadNone,
+                    pInsertAtEnd);
 }
 
 // =====================================================================================================================
@@ -3144,23 +3152,1635 @@ Value* NggPrimShader::FetchCullingControlRegister(
     uint32_t    regOffset,      // Register offset in the primitive shader table (in BYTEs)
     BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
 {
-    std::vector<Value*> args;
+    if (pModule->getFunction(LlpcName::NggCullingFetchReg) == nullptr)
+    {
+        CreateFetchCullingRegister(pModule);
+    }
 
-    args.push_back(m_nggFactor.pPrimShaderTableAddrLow);
-    args.push_back(m_nggFactor.pPrimShaderTableAddrHigh);
-    args.push_back(m_pBuilder->getInt32(regOffset));
+    return EmitCall(pModule,
+                    LlpcName::NggCullingFetchReg,
+                    m_pBuilder->getInt32Ty(),
+                    {
+                        m_nggFactor.pPrimShaderTableAddrLow,
+                        m_nggFactor.pPrimShaderTableAddrHigh,
+                        m_pBuilder->getInt32(regOffset)
+                    },
+                    Attribute::ReadOnly,
+                    pInsertAtEnd);
+}
 
-    std::vector<Attribute::AttrKind> attribs;
-    attribs.push_back(Attribute::ReadOnly);
+// =====================================================================================================================
+// Creates the function that does backface culling.
+void NggPrimShader::CreateBackfaceCuller(
+    Module* pModule) // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
+                                     {
+                                         m_pBuilder->getInt1Ty(),   // %cullFlag
+                                         m_pContext->Floatx4Ty(),   // %vertex0
+                                         m_pContext->Floatx4Ty(),   // %vertex1
+                                         m_pContext->Floatx4Ty(),   // %vertex2
+                                         m_pBuilder->getInt32Ty(),  // %backfaceExponent
+                                         m_pBuilder->getInt32Ty(),  // %paSuScModeCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClVportXscale
+                                         m_pBuilder->getInt32Ty()   // %paClVportYscale
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingBackface, pModule);
 
-    auto pRegValue = EmitCall(pModule,
-                              LlpcName::NggCullingFetchReg,
-                              m_pBuilder->getInt32Ty(),
-                              args,
-                              attribs,
-                              pInsertAtEnd);
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadNone);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
 
-    return pRegValue;
+    auto argIt = pFunc->arg_begin();
+    Value* pCullFlag = argIt++;
+    pCullFlag->setName("cullFlag");
+
+    Value* pVertex0 = argIt++;
+    pVertex0->setName("vertex0");
+
+    Value* pVertex1 = argIt++;
+    pVertex1->setName("vertex1");
+
+    Value* pVertex2 = argIt++;
+    pVertex2->setName("vertex2");
+
+    Value* pBackfaceExponent = argIt++;
+    pBackfaceExponent->setName("backfaceExponent");
+
+    Value* pPaSuScModeCntl = argIt++;
+    pPaSuScModeCntl->setName("paSuScModeCntl");
+
+    Value* pPaClVportXscale = argIt++;
+    pPaClVportXscale->setName("paClVportXscale");
+
+    Value* pPaClVportYscale = argIt++;
+    pPaClVportYscale->setName("paClVportYscale");
+
+    auto pBackfaceEntryBlock = BasicBlock::Create(*m_pContext, ".backfaceEntry", pFunc);
+    auto pBackfaceCullBlock = BasicBlock::Create(*m_pContext, ".backfaceCull", pFunc);
+    auto pBackfaceExponentBlock = BasicBlock::Create(*m_pContext, ".backfaceExponent", pFunc);
+    auto pEndBackfaceCullBlock = BasicBlock::Create(*m_pContext, ".endBackfaceCull", pFunc);
+    auto pBackfaceExitBlock = BasicBlock::Create(*m_pContext, ".backfaceExit", pFunc);
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct ".backfaceEntry" block
+    {
+        m_pBuilder->SetInsertPoint(pBackfaceEntryBlock);
+        // If cull flag has already been TRUE, early return
+        m_pBuilder->CreateCondBr(pCullFlag, pBackfaceExitBlock, pBackfaceCullBlock);
+    }
+
+    // Construct ".backfaceCull" block
+    Value* pCullFlag1 = nullptr;
+    Value* pW0 = nullptr;
+    Value* pW1 = nullptr;
+    Value* pW2 = nullptr;
+    Value* pArea = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pBackfaceCullBlock);
+
+        //
+        // Backface culling algorithm is described as follow:
+        //
+        //   if (((area > 0) && (face == CCW)) || ((area < 0) && (face == CW)))
+        //       frontFace = true
+        //
+        //   if (((area < 0) && (face == CCW)) || ((area > 0) && (face == CW)))
+        //       backFace = true
+        //
+        //   if ((area == 0) || (frontFace && cullFront) || (backFace && cullBack))
+        //       cullFlag = true
+        //
+
+        //        | x0 y0 w0 |
+        //        |          |
+        // area = | x1 y1 w1 | =  x0 * (y1 * w2 - y2 * w1) - x1 * (y0 * w2 - y2 * w0) + x2 * (y0 * w1 - y1 * w0)
+        //        |          |
+        //        | x2 y2 w2 |
+        //
+        auto pX0 = m_pBuilder->CreateExtractElement(pVertex0, static_cast<uint64_t>(0));
+        auto pY0 = m_pBuilder->CreateExtractElement(pVertex0, 1);
+        pW0 = m_pBuilder->CreateExtractElement(pVertex0, 3);
+
+        auto pX1 = m_pBuilder->CreateExtractElement(pVertex1, static_cast<uint64_t>(0));
+        auto pY1 = m_pBuilder->CreateExtractElement(pVertex1, 1);
+        pW1 = m_pBuilder->CreateExtractElement(pVertex1, 3);
+
+        auto pX2 = m_pBuilder->CreateExtractElement(pVertex2, static_cast<uint64_t>(0));
+        auto pY2 = m_pBuilder->CreateExtractElement(pVertex2, 1);
+        pW2 = m_pBuilder->CreateExtractElement(pVertex2, 3);
+
+        auto pY1W2 = m_pBuilder->CreateFMul(pY1, pW2);
+        auto pY2W1 = m_pBuilder->CreateFMul(pY2, pW1);
+        auto pDet0 = m_pBuilder->CreateFSub(pY1W2, pY2W1);
+        pDet0 = m_pBuilder->CreateFMul(pX0, pDet0);
+
+        auto pY0W2 = m_pBuilder->CreateFMul(pY0, pW2);
+        auto pY2W0 = m_pBuilder->CreateFMul(pY2, pW0);
+        auto pDet1 = m_pBuilder->CreateFSub(pY0W2, pY2W0);
+        pDet1 = m_pBuilder->CreateFMul(pX1, pDet1);
+
+        auto pY0W1 = m_pBuilder->CreateFMul(pY0, pW1);
+        auto pY1W0 = m_pBuilder->CreateFMul(pY1, pW0);
+        auto pDet2 = m_pBuilder->CreateFSub(pY0W1, pY1W0);
+        pDet2 = m_pBuilder->CreateFMul(pX2, pDet2);
+
+        pArea = m_pBuilder->CreateFSub(pDet0, pDet1);
+        pArea = m_pBuilder->CreateFAdd(pArea, pDet2);
+
+        auto pAreaLtZero = m_pBuilder->CreateFCmpOLT(pArea, ConstantFP::get(m_pBuilder->getFloatTy(), 0.0));
+        auto pAreaGtZero = m_pBuilder->CreateFCmpOGT(pArea, ConstantFP::get(m_pBuilder->getFloatTy(), 0.0));
+
+        // xScale ^ yScale
+        auto pFrontFace = m_pBuilder->CreateXor(pPaClVportXscale, pPaClVportYscale);
+
+        // signbit(xScale ^ yScale)
+        pFrontFace = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                 m_pBuilder->getInt32Ty(),
+                                                 {
+                                                     pFrontFace,
+                                                     m_pBuilder->getInt32(31),
+                                                     m_pBuilder->getInt32(1)
+                                                 });
+
+        // face = (FACE, PA_SU_SC_MODE_CNTRL[2], 0 = CCW, 1 = CW)
+        auto pFace = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                 m_pBuilder->getInt32Ty(),
+                                                 {
+                                                     pPaSuScModeCntl,
+                                                     m_pBuilder->getInt32(2),
+                                                     m_pBuilder->getInt32(1)
+                                                 });
+
+        // face ^ signbit(xScale ^ yScale)
+        pFrontFace = m_pBuilder->CreateXor(pFace, pFrontFace);
+
+        // (face ^ signbit(xScale ^ yScale)) == 0
+        pFrontFace = m_pBuilder->CreateICmpEQ(pFrontFace, m_pBuilder->getInt32(0));
+
+        // frontFace = ((face ^ signbit(xScale ^ yScale)) == 0) ? (area < 0) : (area > 0)
+        pFrontFace = m_pBuilder->CreateSelect(pFrontFace, pAreaLtZero, pAreaGtZero);
+
+        // backFace = !frontFace
+        auto pBackFace = m_pBuilder->CreateNot(pFrontFace);
+
+        // cullFront = (CULL_FRONT, PA_SU_SC_MODE_CNTRL[0], 0 = DONT CULL, 1 = CULL)
+        auto pCullFront = m_pBuilder->CreateAnd(pPaSuScModeCntl, m_pBuilder->getInt32(1));
+        pCullFront = m_pBuilder->CreateTrunc(pCullFront, m_pBuilder->getInt1Ty());
+
+        // cullBack = (CULL_BACK, PA_SU_SC_MODE_CNTRL[1], 0 = DONT CULL, 1 = CULL)
+        Value* pCullBack = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                       m_pBuilder->getInt32Ty(),
+                                                       {
+                                                           pPaSuScModeCntl,
+                                                           m_pBuilder->getInt32(1),
+                                                           m_pBuilder->getInt32(1)
+                                                       });
+        pCullBack = m_pBuilder->CreateTrunc(pCullBack, m_pBuilder->getInt1Ty());
+
+        // cullFront = cullFront ? frontFace : false
+        pCullFront = m_pBuilder->CreateSelect(pCullFront, pFrontFace, m_pBuilder->getFalse());
+
+        // cullBack = cullBack ? backFace : false
+        pCullBack = m_pBuilder->CreateSelect(pCullBack, pBackFace, m_pBuilder->getFalse());
+
+        // cullFlag = cullFront || cullBack
+        pCullFlag1 = m_pBuilder->CreateOr(pCullFront, pCullBack);
+
+        auto pNonZeroBackfaceExp = m_pBuilder->CreateICmpNE(pBackfaceExponent, m_pBuilder->getInt32(0));
+        m_pBuilder->CreateCondBr(pNonZeroBackfaceExp, pBackfaceExponentBlock, pEndBackfaceCullBlock);
+    }
+
+    // Construct ".backfaceExponent" block
+    Value* pCullFlag2 = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pBackfaceExponentBlock);
+
+        //
+        // Ignore area calculations that are less enough
+        //   if (|area| < (10 ^ (-backfaceExponent)) / |w0 * w1 * w2| )
+        //       cullFlag = false
+        //
+
+        // |w0 * w1 * w2|
+        auto pAbsW0W1W2 = m_pBuilder->CreateFMul(pW0, pW1);
+        pAbsW0W1W2 = m_pBuilder->CreateFMul(pAbsW0W1W2, pW2);
+        pAbsW0W1W2 = m_pBuilder->CreateIntrinsic(Intrinsic::fabs, m_pBuilder->getFloatTy(), pAbsW0W1W2);
+
+        // threeshold = (10 ^ (-backfaceExponent)) / |w0 * w1 * w2|
+        auto pThreshold = m_pBuilder->CreateNeg(pBackfaceExponent);
+        pThreshold = m_pBuilder->CreateIntrinsic(Intrinsic::powi,
+                                                 m_pBuilder->getFloatTy(),
+                                                 {
+                                                     ConstantFP::get(m_pBuilder->getFloatTy(), 10.0),
+                                                     pThreshold
+                                                 });
+
+        auto pRcpAbsW0W1W2 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pAbsW0W1W2);
+        pThreshold = m_pBuilder->CreateFMul(pThreshold, pRcpAbsW0W1W2);
+
+        // |area|
+        auto pAbsArea = m_pBuilder->CreateIntrinsic(Intrinsic::fabs, m_pBuilder->getFloatTy(), pArea);
+
+        // cullFlag = cullFlag && (abs(area) >= threshold)
+        pCullFlag2 = m_pBuilder->CreateFCmpOGE(pAbsArea, pThreshold);
+        pCullFlag2 = m_pBuilder->CreateAnd(pCullFlag1, pCullFlag2);
+
+        m_pBuilder->CreateBr(pEndBackfaceCullBlock);
+    }
+
+    // Construct ".endBackfaceCull" block
+    Value* pCullFlag3 = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pEndBackfaceCullBlock);
+
+        // cullFlag = cullFlag || (area == 0)
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag1, pBackfaceCullBlock);
+        pCullFlagPhi->addIncoming(pCullFlag2, pBackfaceExponentBlock);
+
+        auto pAreaEqZero = m_pBuilder->CreateFCmpOEQ(pArea, ConstantFP::get(m_pBuilder->getFloatTy(), 0.0));
+
+        pCullFlag3 = m_pBuilder->CreateOr(pCullFlagPhi, pAreaEqZero);
+
+        m_pBuilder->CreateBr(pBackfaceExitBlock);
+    }
+
+    // Construct ".backfaceExit" block
+    {
+        m_pBuilder->SetInsertPoint(pBackfaceExitBlock);
+
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag, pBackfaceEntryBlock);
+        pCullFlagPhi->addIncoming(pCullFlag3, pEndBackfaceCullBlock);
+
+        // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTRL[4:3], 0 = DISABLE, 1 = DUAL)
+        auto pPolyMode = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                     m_pBuilder->getInt32Ty(),
+                                                     {
+                                                         pPaSuScModeCntl,
+                                                         m_pBuilder->getInt32(3),
+                                                         m_pBuilder->getInt32(2),
+                                                     });
+
+        // polyMode == 1
+        auto pWireFrameMode = m_pBuilder->CreateICmpEQ(pPolyMode, m_pBuilder->getInt32(1));
+
+        // Disable backface culler if POLY_MODE is set to 1 (wireframe)
+        // cullFlag = (polyMode == 1) ? false : cullFlag
+        pCullFlag = m_pBuilder->CreateSelect(pWireFrameMode, m_pBuilder->getFalse(), pCullFlagPhi);
+
+        m_pBuilder->CreateRet(pCullFlag);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
+}
+
+// =====================================================================================================================
+// Creates the function that does frustum culling.
+void NggPrimShader::CreateFrustumCuller(
+    Module* pModule)    // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
+                                     {
+                                         m_pBuilder->getInt1Ty(),   // %cullFlag
+                                         m_pContext->Floatx4Ty(),   // %vertex0
+                                         m_pContext->Floatx4Ty(),   // %vertex1
+                                         m_pContext->Floatx4Ty(),   // %vertex2
+                                         m_pBuilder->getInt32Ty(),  // %paClClipCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClGbHorzDiscAdj
+                                         m_pBuilder->getInt32Ty()   // %paClGbVertDiscAdj
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingFrustum, pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadNone);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pCullFlag = argIt++;
+    pCullFlag->setName("cullFlag");
+
+    Value* pVertex0 = argIt++;
+    pVertex0->setName("vertex0");
+
+    Value* pVertex1 = argIt++;
+    pVertex1->setName("vertex1");
+
+    Value* pVertex2 = argIt++;
+    pVertex2->setName("vertex2");
+
+    Value* pPaClClipCntl = argIt++;
+    pPaClClipCntl->setName("paClClipCntl");
+
+    Value* pPaClGbHorzDiscAdj = argIt++;
+    pPaClGbHorzDiscAdj->setName("paClGbHorzDiscAdj");
+
+    Value* pPaClGbVertDiscAdj = argIt++;
+    pPaClGbVertDiscAdj->setName("paClGbVertDiscAdj");
+
+    auto pFrustumEntryBlock = BasicBlock::Create(*m_pContext, ".frustumEntry", pFunc);
+    auto pFrustumCullBlock = BasicBlock::Create(*m_pContext, ".frustumCull", pFunc);
+    auto pFrustumExitBlock = BasicBlock::Create(*m_pContext, ".frustumExit", pFunc);
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct ".frustumEntry" block
+    {
+        m_pBuilder->SetInsertPoint(pFrustumEntryBlock);
+        // If cull flag has already been TRUE, early return
+        m_pBuilder->CreateCondBr(pCullFlag, pFrustumExitBlock, pFrustumCullBlock);
+    }
+
+    // Construct ".frustumCull" block
+    Value* pNewCullFlag = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pFrustumCullBlock);
+
+        //
+        // Frustum culling algorithm is described as follow:
+        //
+        //   if ((x[i] > xDiscAdj * w[i]) && (y[i] > yDiscAdj * w[i]) && (z[i] > zFar * w[i]))
+        //       cullFlag = true
+        //
+        //   if ((x[i] < -xDiscAdj * w[i]) && (y[i] < -yDiscAdj * w[i]) && (z[i] < zNear * w[i]))
+        //       cullFlag &= true
+        //
+        //   i = [0..2]
+        //
+
+        // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
+        Value* pClipSpaceDef = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                           m_pBuilder->getInt32Ty(),
+                                                           {
+                                                               pPaClClipCntl,
+                                                               m_pBuilder->getInt32(19),
+                                                               m_pBuilder->getInt32(1)
+                                                           });
+        pClipSpaceDef = m_pBuilder->CreateTrunc(pClipSpaceDef, m_pBuilder->getInt1Ty());
+
+        // zNear = clipSpaceDef ? -1.0 : 0.0, zFar = 1.0
+        auto pZNear = m_pBuilder->CreateSelect(pClipSpaceDef,
+                                               ConstantFP::get(m_pBuilder->getFloatTy(), -1.0),
+                                               ConstantFP::get(m_pBuilder->getFloatTy(), 0.0));
+
+        // xDiscAdj = (DATA_REGISTER, PA_CL_GB_HORZ_DISC_ADJ[31:0])
+        auto pXDiscAdj = m_pBuilder->CreateBitCast(pPaClGbHorzDiscAdj, m_pBuilder->getFloatTy());
+
+        // yDiscAdj = (DATA_REGISTER, PA_CL_GB_VERT_DISC_ADJ[31:0])
+        auto pYDiscAdj = m_pBuilder->CreateBitCast(pPaClGbVertDiscAdj, m_pBuilder->getFloatTy());
+
+        auto pX0 = m_pBuilder->CreateExtractElement(pVertex0, static_cast<uint64_t>(0));
+        auto pY0 = m_pBuilder->CreateExtractElement(pVertex0, 1);
+        auto pZ0 = m_pBuilder->CreateExtractElement(pVertex0, 2);
+        auto pW0 = m_pBuilder->CreateExtractElement(pVertex0, 3);
+
+        auto pX1 = m_pBuilder->CreateExtractElement(pVertex1, static_cast<uint64_t>(0));
+        auto pY1 = m_pBuilder->CreateExtractElement(pVertex1, 1);
+        auto pZ1 = m_pBuilder->CreateExtractElement(pVertex1, 2);
+        auto pW1 = m_pBuilder->CreateExtractElement(pVertex1, 3);
+
+        auto pX2 = m_pBuilder->CreateExtractElement(pVertex2, static_cast<uint64_t>(0));
+        auto pY2 = m_pBuilder->CreateExtractElement(pVertex2, 1);
+        auto pZ2 = m_pBuilder->CreateExtractElement(pVertex2, 2);
+        auto pW2 = m_pBuilder->CreateExtractElement(pVertex2, 3);
+
+        // -xDiscAdj
+        auto pNegXDiscAdj = m_pBuilder->CreateFNeg(pXDiscAdj);
+
+        // -yDiscAdj
+        auto pNegYDiscAdj = m_pBuilder->CreateFNeg(pYDiscAdj);
+
+        Value* pClipMask[6] = { nullptr };
+
+        //
+        // Get clip mask for vertex0
+        //
+
+        // (x0 < -xDiscAdj * w0) ? 0x1 : 0
+        pClipMask[0] = m_pBuilder->CreateFMul(pNegXDiscAdj, pW0);
+        pClipMask[0] = m_pBuilder->CreateFCmpOLT(pX0, pClipMask[0]);
+        pClipMask[0] = m_pBuilder->CreateSelect(pClipMask[0], m_pBuilder->getInt32(0x1), m_pBuilder->getInt32(0));
+
+        // (x0 > xDiscAdj * w0) ? 0x2 : 0
+        pClipMask[1] = m_pBuilder->CreateFMul(pXDiscAdj, pW0);
+        pClipMask[1] = m_pBuilder->CreateFCmpOGT(pX0, pClipMask[1]);
+        pClipMask[1] = m_pBuilder->CreateSelect(pClipMask[1], m_pBuilder->getInt32(0x2), m_pBuilder->getInt32(0));
+
+        // (y0 < -yDiscAdj * w0) ? 0x4 : 0
+        pClipMask[2] = m_pBuilder->CreateFMul(pNegYDiscAdj, pW0);
+        pClipMask[2] = m_pBuilder->CreateFCmpOLT(pY0, pClipMask[2]);
+        pClipMask[2] = m_pBuilder->CreateSelect(pClipMask[2], m_pBuilder->getInt32(0x4), m_pBuilder->getInt32(0));
+
+        // (y0 > yDiscAdj * w0) ? 0x8 : 0
+        pClipMask[3] = m_pBuilder->CreateFMul(pYDiscAdj, pW0);
+        pClipMask[3] = m_pBuilder->CreateFCmpOGT(pY0, pClipMask[3]);
+        pClipMask[3] = m_pBuilder->CreateSelect(pClipMask[3], m_pBuilder->getInt32(0x8), m_pBuilder->getInt32(0));
+
+        // (z0 < zNear * w0) ? 0x10 : 0
+        pClipMask[4] = m_pBuilder->CreateFMul(pZNear, pW0);
+        pClipMask[4] = m_pBuilder->CreateFCmpOLT(pZ0, pClipMask[4]);
+        pClipMask[4] = m_pBuilder->CreateSelect(pClipMask[4], m_pBuilder->getInt32(0x10), m_pBuilder->getInt32(0));
+
+        // (z0 > w0) ? 0x20 : 0
+        pClipMask[5] = m_pBuilder->CreateFCmpOGT(pZ0, pW0);
+        pClipMask[5] = m_pBuilder->CreateSelect(pClipMask[5], m_pBuilder->getInt32(0x20), m_pBuilder->getInt32(0));
+
+        // clipMask0
+        auto pClipMaskX0 = m_pBuilder->CreateOr(pClipMask[0], pClipMask[1]);
+        auto pClipMaskY0 = m_pBuilder->CreateOr(pClipMask[2], pClipMask[3]);
+        auto pClipMaskZ0 = m_pBuilder->CreateOr(pClipMask[4], pClipMask[5]);
+        auto pClipMask0 = m_pBuilder->CreateOr(pClipMaskX0, pClipMaskY0);
+        pClipMask0 = m_pBuilder->CreateOr(pClipMask0, pClipMaskZ0);
+
+        //
+        // Get clip mask for vertex1
+        //
+
+        // (x1 < -xDiscAdj * w1) ? 0x1 : 0
+        pClipMask[0] = m_pBuilder->CreateFMul(pNegXDiscAdj, pW1);
+        pClipMask[0] = m_pBuilder->CreateFCmpOLT(pX1, pClipMask[0]);
+        pClipMask[0] = m_pBuilder->CreateSelect(pClipMask[0], m_pBuilder->getInt32(0x1), m_pBuilder->getInt32(0));
+
+        // (x1 > xDiscAdj * w1) ? 0x2 : 0
+        pClipMask[1] = m_pBuilder->CreateFMul(pXDiscAdj, pW1);
+        pClipMask[1] = m_pBuilder->CreateFCmpOGT(pX1, pClipMask[1]);
+        pClipMask[1] = m_pBuilder->CreateSelect(pClipMask[1], m_pBuilder->getInt32(0x2), m_pBuilder->getInt32(0));
+
+        // (y1 < -yDiscAdj * w1) ? 0x4 : 0
+        pClipMask[2] = m_pBuilder->CreateFMul(pNegYDiscAdj, pW1);
+        pClipMask[2] = m_pBuilder->CreateFCmpOLT(pY1, pClipMask[2]);
+        pClipMask[2] = m_pBuilder->CreateSelect(pClipMask[2], m_pBuilder->getInt32(0x4), m_pBuilder->getInt32(0));
+
+        // (y1 > yDiscAdj * w1) ? 0x8 : 0
+        pClipMask[3] = m_pBuilder->CreateFMul(pYDiscAdj, pW1);
+        pClipMask[3] = m_pBuilder->CreateFCmpOGT(pY1, pClipMask[3]);
+        pClipMask[3] = m_pBuilder->CreateSelect(pClipMask[3], m_pBuilder->getInt32(0x8), m_pBuilder->getInt32(0));
+
+        // (z1 < zNear * w1) ? 0x10 : 0
+        pClipMask[4] = m_pBuilder->CreateFMul(pZNear, pW1);
+        pClipMask[4] = m_pBuilder->CreateFCmpOLT(pZ1, pClipMask[4]);
+        pClipMask[4] = m_pBuilder->CreateSelect(pClipMask[4], m_pBuilder->getInt32(0x10), m_pBuilder->getInt32(0));
+
+        // (z1 > w1) ? 0x20 : 0
+        pClipMask[5] = m_pBuilder->CreateFCmpOGT(pZ1, pW1);
+        pClipMask[5] = m_pBuilder->CreateSelect(pClipMask[5], m_pBuilder->getInt32(0x20), m_pBuilder->getInt32(0));
+
+        // clipMask1
+        auto pClipMaskX1 = m_pBuilder->CreateOr(pClipMask[0], pClipMask[1]);
+        auto pClipMaskY1 = m_pBuilder->CreateOr(pClipMask[2], pClipMask[3]);
+        auto pClipMaskZ1 = m_pBuilder->CreateOr(pClipMask[4], pClipMask[5]);
+        auto pClipMask1 = m_pBuilder->CreateOr(pClipMaskX1, pClipMaskY1);
+        pClipMask1 = m_pBuilder->CreateOr(pClipMask1, pClipMaskZ1);
+
+        //
+        // Get clip mask for vertex2
+        //
+
+        // (x2 < -xDiscAdj * w2) ? 0x1 : 0
+        pClipMask[0] = m_pBuilder->CreateFMul(pNegXDiscAdj, pW2);
+        pClipMask[0] = m_pBuilder->CreateFCmpOLT(pX2, pClipMask[0]);
+        pClipMask[0] = m_pBuilder->CreateSelect(pClipMask[0], m_pBuilder->getInt32(0x1), m_pBuilder->getInt32(0));
+
+        // (x2 > xDiscAdj * w2) ? 0x2 : 0
+        pClipMask[1] = m_pBuilder->CreateFMul(pXDiscAdj, pW2);
+        pClipMask[1] = m_pBuilder->CreateFCmpOGT(pX2, pClipMask[1]);
+        pClipMask[1] = m_pBuilder->CreateSelect(pClipMask[1], m_pBuilder->getInt32(0x2), m_pBuilder->getInt32(0));
+
+        // (y2 < -yDiscAdj * w2) ? 0x4 : 0
+        pClipMask[2] = m_pBuilder->CreateFMul(pNegYDiscAdj, pW2);
+        pClipMask[2] = m_pBuilder->CreateFCmpOLT(pY2, pClipMask[2]);
+        pClipMask[2] = m_pBuilder->CreateSelect(pClipMask[2], m_pBuilder->getInt32(0x4), m_pBuilder->getInt32(0));
+
+        // (y2 > yDiscAdj * w2) ? 0x8 : 0
+        pClipMask[3] = m_pBuilder->CreateFMul(pYDiscAdj, pW2);
+        pClipMask[3] = m_pBuilder->CreateFCmpOGT(pY2, pClipMask[3]);
+        pClipMask[3] = m_pBuilder->CreateSelect(pClipMask[3], m_pBuilder->getInt32(0x8), m_pBuilder->getInt32(0));
+
+        // (z2 < zNear * w2) ? 0x10 : 0
+        pClipMask[4] = m_pBuilder->CreateFMul(pZNear, pW2);
+        pClipMask[4] = m_pBuilder->CreateFCmpOLT(pZ2, pClipMask[4]);
+        pClipMask[4] = m_pBuilder->CreateSelect(pClipMask[4], m_pBuilder->getInt32(0x10), m_pBuilder->getInt32(0));
+
+        // (z2 > zFar * w2) ? 0x20 : 0
+        pClipMask[5] = m_pBuilder->CreateFCmpOGT(pZ2, pW2);
+        pClipMask[5] = m_pBuilder->CreateSelect(pClipMask[5], m_pBuilder->getInt32(0x20), m_pBuilder->getInt32(0));
+
+        // clipMask2
+        auto pClipMaskX2 = m_pBuilder->CreateOr(pClipMask[0], pClipMask[1]);
+        auto pClipMaskY2 = m_pBuilder->CreateOr(pClipMask[2], pClipMask[3]);
+        auto pClipMaskZ2 = m_pBuilder->CreateOr(pClipMask[4], pClipMask[5]);
+        auto pClipMask2 = m_pBuilder->CreateOr(pClipMaskX2, pClipMaskY2);
+        pClipMask2 = m_pBuilder->CreateOr(pClipMask2, pClipMaskZ2);
+
+        // clip = clipMask0 & clipMask1 & clipMask2
+        auto pClip = m_pBuilder->CreateAnd(pClipMask0, pClipMask1);
+        pClip = m_pBuilder->CreateAnd(pClip, pClipMask2);
+
+        // cullFlag = (clip != 0)
+        pNewCullFlag = m_pBuilder->CreateICmpNE(pClip, m_pBuilder->getInt32(0));
+
+        m_pBuilder->CreateBr(pFrustumExitBlock);
+    }
+
+    // Construct ".frustumExit" block
+    {
+        m_pBuilder->SetInsertPoint(pFrustumExitBlock);
+
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag, pFrustumEntryBlock);
+        pCullFlagPhi->addIncoming(pNewCullFlag, pFrustumCullBlock);
+
+        m_pBuilder->CreateRet(pCullFlagPhi);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
+}
+
+// =====================================================================================================================
+// Creates the function that does box filter culling.
+void NggPrimShader::CreateBoxFilterCuller(
+    Module* pModule)    // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
+                                     {
+                                         m_pBuilder->getInt1Ty(),   // %cullFlag
+                                         m_pContext->Floatx4Ty(),   // %vertex0
+                                         m_pContext->Floatx4Ty(),   // %vertex1
+                                         m_pContext->Floatx4Ty(),   // %vertex2
+                                         m_pBuilder->getInt32Ty(),  // %paClVteCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClClipCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClGbHorzDiscAdj
+                                         m_pBuilder->getInt32Ty()   // %paClGbVertDiscAdj
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingBoxFilter, pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadNone);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pCullFlag = argIt++;
+    pCullFlag->setName("cullFlag");
+
+    Value* pVertex0 = argIt++;
+    pVertex0->setName("vertex0");
+
+    Value* pVertex1 = argIt++;
+    pVertex1->setName("vertex1");
+
+    Value* pVertex2 = argIt++;
+    pVertex2->setName("vertex2");
+
+    Value* pPaClVteCntl = argIt++;
+    pPaClVteCntl->setName("paClVteCntl");
+
+    Value* pPaClClipCntl = argIt++;
+    pPaClVteCntl->setName("paClClipCntl");
+
+    Value* pPaClGbHorzDiscAdj = argIt++;
+    pPaClGbHorzDiscAdj->setName("paClGbHorzDiscAdj");
+
+    Value* pPaClGbVertDiscAdj = argIt++;
+    pPaClGbVertDiscAdj->setName("paClGbVertDiscAdj");
+
+    auto pBoxFilterEntryBlock = BasicBlock::Create(*m_pContext, ".boxfilterEntry", pFunc);
+    auto pBoxFilterCullBlock = BasicBlock::Create(*m_pContext, ".boxfilterCull", pFunc);
+    auto pBoxFilterExitBlock = BasicBlock::Create(*m_pContext, ".boxfilterExit", pFunc);
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct ".boxfilterEntry" block
+    {
+        m_pBuilder->SetInsertPoint(pBoxFilterEntryBlock);
+        // If cull flag has already been TRUE, early return
+        m_pBuilder->CreateCondBr(pCullFlag, pBoxFilterExitBlock, pBoxFilterCullBlock);
+    }
+
+    // Construct ".boxfilterCull" block
+    Value* pNewCullFlag = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pBoxFilterCullBlock);
+
+        //
+        // Box filter culling algorithm is described as follow:
+        //
+        //   if ((min(x0/w0, x1/w1, x2/w2) > xDiscAdj)  ||
+        //       (max(x0/w0, x1/w1, x2/w2) < -xDiscAdj) ||
+        //       (min(y0/w0, y1/w1, y2/w2) > yDiscAdj)  ||
+        //       (max(y0/w0, y1/w1, y2/w2) < -yDiscAdj) ||
+        //       (min(z0/w0, z1/w1, z2/w2) > zFar)      ||
+        //       (min(z0/w0, z1/w1, z2/w2) < zNear))
+        //       cullFlag = true
+        //
+
+        // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
+        Value* pVtxXyFmt = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                       m_pBuilder->getInt32Ty(),
+                                                       {
+                                                           pPaClVteCntl,
+                                                           m_pBuilder->getInt32(8),
+                                                           m_pBuilder->getInt32(1)
+                                                       });
+        pVtxXyFmt = m_pBuilder->CreateTrunc(pVtxXyFmt, m_pBuilder->getInt1Ty());
+
+        // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
+        Value* pVtxZFmt = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                       m_pBuilder->getInt32Ty(),
+                                                       {
+                                                           pPaClVteCntl,
+                                                           m_pBuilder->getInt32(9),
+                                                           m_pBuilder->getInt32(1)
+                                                       });
+        pVtxZFmt = m_pBuilder->CreateTrunc(pVtxXyFmt, m_pBuilder->getInt1Ty());
+
+        // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
+        Value* pClipSpaceDef = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                           m_pBuilder->getInt32Ty(),
+                                                           {
+                                                               pPaClClipCntl,
+                                                               m_pBuilder->getInt32(19),
+                                                               m_pBuilder->getInt32(1)
+                                                           });
+        pClipSpaceDef = m_pBuilder->CreateTrunc(pClipSpaceDef, m_pBuilder->getInt1Ty());
+
+        // zNear = clipSpaceDef ? -1.0 : 0.0, zFar = 1.0
+        auto pZNear = m_pBuilder->CreateSelect(pClipSpaceDef,
+                                               ConstantFP::get(m_pBuilder->getFloatTy(), -1.0),
+                                               ConstantFP::get(m_pBuilder->getFloatTy(), 0.0));
+        auto pZFar = ConstantFP::get(m_pBuilder->getFloatTy(), 1.0);
+
+        // xDiscAdj = (DATA_REGISTER, PA_CL_GB_HORZ_DISC_ADJ[31:0])
+        auto pXDiscAdj = m_pBuilder->CreateBitCast(pPaClGbHorzDiscAdj, m_pBuilder->getFloatTy());
+
+        // yDiscAdj = (DATA_REGISTER, PA_CL_GB_VERT_DISC_ADJ[31:0])
+        auto pYDiscAdj = m_pBuilder->CreateBitCast(pPaClGbVertDiscAdj, m_pBuilder->getFloatTy());
+
+        auto pX0 = m_pBuilder->CreateExtractElement(pVertex0, static_cast<uint64_t>(0));
+        auto pY0 = m_pBuilder->CreateExtractElement(pVertex0, 1);
+        auto pZ0 = m_pBuilder->CreateExtractElement(pVertex0, 2);
+        auto pW0 = m_pBuilder->CreateExtractElement(pVertex0, 3);
+
+        auto pX1 = m_pBuilder->CreateExtractElement(pVertex1, static_cast<uint64_t>(0));
+        auto pY1 = m_pBuilder->CreateExtractElement(pVertex1, 1);
+        auto pZ1 = m_pBuilder->CreateExtractElement(pVertex1, 2);
+        auto pW1 = m_pBuilder->CreateExtractElement(pVertex1, 3);
+
+        auto pX2 = m_pBuilder->CreateExtractElement(pVertex2, static_cast<uint64_t>(0));
+        auto pY2 = m_pBuilder->CreateExtractElement(pVertex2, 1);
+        auto pZ2 = m_pBuilder->CreateExtractElement(pVertex2, 2);
+        auto pW2 = m_pBuilder->CreateExtractElement(pVertex2, 3);
+
+        // Convert xyz coordinate to normalized device coordinate (NDC)
+        auto pRcpW0 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW0);
+        auto pRcpW1 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW1);
+        auto pRcpW2 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW2);
+
+        // VTX_XY_FMT ? 1.0 : 1 / w0
+        auto pRcpW0ForXy = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW0);
+        // VTX_XY_FMT ? 1.0 : 1 / w1
+        auto pRcpW1ForXy = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW1);
+        // VTX_XY_FMT ? 1.0 : 1 / w2
+        auto pRcpW2ForXy = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW2);
+
+        // VTX_Z_FMT ? 1.0 : 1 / w0
+        auto pRcpW0ForZ = m_pBuilder->CreateSelect(pVtxZFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW0);
+        // VTX_Z_FMT ? 1.0 : 1 / w1
+        auto pRcpW1ForZ = m_pBuilder->CreateSelect(pVtxZFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW1);
+        // VTX_Z_FMT ? 1.0 : 1 / w2
+        auto pRcpW2ForZ = m_pBuilder->CreateSelect(pVtxZFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW2);
+
+        // x0' = x0/w0
+        pX0 = m_pBuilder->CreateFMul(pX0, pRcpW0ForXy);
+        // y0' = y0/w0
+        pY0 = m_pBuilder->CreateFMul(pY0, pRcpW0ForXy);
+        // z0' = z0/w0
+        pZ0 = m_pBuilder->CreateFMul(pZ0, pRcpW0ForZ);
+        // x1' = x1/w1
+        pX1 = m_pBuilder->CreateFMul(pX1, pRcpW1ForXy);
+        // y1' = y1/w1
+        pY1 = m_pBuilder->CreateFMul(pY1, pRcpW1ForXy);
+        // z1' = z1/w1
+        pZ1 = m_pBuilder->CreateFMul(pZ1, pRcpW1ForZ);
+        // x2' = x2/w2
+        pX2 = m_pBuilder->CreateFMul(pX2, pRcpW2ForXy);
+        // y2' = y2/w2
+        pY2 = m_pBuilder->CreateFMul(pY2, pRcpW2ForXy);
+        // z2' = z2/w2
+        pZ2 = m_pBuilder->CreateFMul(pZ2, pRcpW2ForZ);
+
+        // -xDiscAdj
+        auto pNegXDiscAdj = m_pBuilder->CreateFNeg(pXDiscAdj);
+
+        // -yDiscAdj
+        auto pNegYDiscAdj = m_pBuilder->CreateFNeg(pYDiscAdj);
+
+        // minX = min(x0', x1', x2')
+        auto pMinX = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pX0, pX1 });
+        pMinX = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pMinX, pX2 });
+
+        // minX > xDiscAdj
+        auto pMinXGtXDiscAdj = m_pBuilder->CreateFCmpOGT(pMinX, pXDiscAdj);
+
+        // maxX = max(x0', x1', x2')
+        auto pMaxX = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pX0, pX1 });
+        pMaxX = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pMaxX, pX2 });
+
+        // maxX < -xDiscAdj
+        auto pMaxXLtNegXDiscAdj = m_pBuilder->CreateFCmpOLT(pMaxX, pNegXDiscAdj);
+
+        // minY = min(y0', y1', y2')
+        auto pMinY = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pY0, pY1 });
+        pMinY = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pMinY, pY2 });
+
+        // minY > yDiscAdj
+        auto pMinYGtYDiscAdj = m_pBuilder->CreateFCmpOGT(pMinY, pYDiscAdj);
+
+        // maxY = max(y0', y1', y2')
+        auto pMaxY = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pY0, pY1 });
+        pMaxY = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pMaxY, pY2 });
+
+        // maxY < -yDiscAdj
+        auto pMaxYLtNegYDiscAdj = m_pBuilder->CreateFCmpOLT(pMaxY, pNegYDiscAdj);
+
+        // minZ = min(z0', z1', z2')
+        auto pMinZ = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pZ0, pZ1 });
+        pMinZ = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pMinZ, pZ2 });
+
+        // minZ > zFar (1.0)
+        auto pMinZGtZFar = m_pBuilder->CreateFCmpOGT(pMinZ, pZFar);
+
+        // maxZ = min(z0', z1', z2')
+        auto pMaxZ = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pZ0, pZ1 });
+        pMaxZ = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pMaxZ, pZ2 });
+
+        // maxZ < zNear
+        auto pMaxZLtZNear = m_pBuilder->CreateFCmpOLT(pMaxZ, pZNear);
+
+        // Get cull flag
+        auto pCullX = m_pBuilder->CreateOr(pMinXGtXDiscAdj, pMaxXLtNegXDiscAdj);
+        auto pCullY = m_pBuilder->CreateOr(pMinYGtYDiscAdj, pMaxYLtNegYDiscAdj);
+        auto pCullZ = m_pBuilder->CreateOr(pMinZGtZFar, pMaxZLtZNear);
+        pNewCullFlag = m_pBuilder->CreateOr(pCullX, pCullY);
+        pNewCullFlag = m_pBuilder->CreateOr(pNewCullFlag, pCullZ);
+
+        m_pBuilder->CreateBr(pBoxFilterExitBlock);
+    }
+
+    // Construct ".boxfilterExit" block
+    {
+        m_pBuilder->SetInsertPoint(pBoxFilterExitBlock);
+
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag, pBoxFilterEntryBlock);
+        pCullFlagPhi->addIncoming(pNewCullFlag, pBoxFilterCullBlock);
+
+        m_pBuilder->CreateRet(pCullFlagPhi);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
+}
+
+// =====================================================================================================================
+// Creates the function that does sphere culling.
+void NggPrimShader::CreateSphereCuller(
+    Module* pModule)    // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
+                                     {
+                                         m_pBuilder->getInt1Ty(),   // %cullFlag
+                                         m_pContext->Floatx4Ty(),   // %vertex0
+                                         m_pContext->Floatx4Ty(),   // %vertex1
+                                         m_pContext->Floatx4Ty(),   // %vertex2
+                                         m_pBuilder->getInt32Ty(),  // %paClVteCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClClipCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClGbHorzDiscAdj
+                                         m_pBuilder->getInt32Ty()   // %paClGbVertDiscAdj
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingSphere, pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadNone);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pCullFlag = argIt++;
+    pCullFlag->setName("cullFlag");
+
+    Value* pVertex0 = argIt++;
+    pVertex0->setName("vertex0");
+
+    Value* pVertex1 = argIt++;
+    pVertex1->setName("vertex1");
+
+    Value* pVertex2 = argIt++;
+    pVertex2->setName("vertex2");
+
+    Value* pPaClVteCntl = argIt++;
+    pPaClVteCntl->setName("paClVteCntl");
+
+    Value* pPaClClipCntl = argIt++;
+    pPaClVteCntl->setName("paClClipCntl");
+
+    Value* pPaClGbHorzDiscAdj = argIt++;
+    pPaClGbHorzDiscAdj->setName("paClGbHorzDiscAdj");
+
+    Value* pPaClGbVertDiscAdj = argIt++;
+    pPaClGbVertDiscAdj->setName("paClGbVertDiscAdj");
+
+    auto pSphereEntryBlock = BasicBlock::Create(*m_pContext, ".sphereEntry", pFunc);
+    auto pSphereCullBlock = BasicBlock::Create(*m_pContext, ".sphereCull", pFunc);
+    auto pSphereExitBlock = BasicBlock::Create(*m_pContext, ".sphereExit", pFunc);
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct ".sphereEntry" block
+    {
+        m_pBuilder->SetInsertPoint(pSphereEntryBlock);
+        // If cull flag has already been TRUE, early return
+        m_pBuilder->CreateCondBr(pCullFlag, pSphereExitBlock, pSphereCullBlock);
+    }
+
+    // Construct ".sphereCull" block
+    Value* pNewCullFlag = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pSphereCullBlock);
+
+        //
+        // Sphere culling algorithm is somewhat complex and is described as following steps:
+        //   (1) Transform discard space to -1..1 space;
+        //   (2) Project from 3D coordinates to barycentric coordinates;
+        //   (3) Solve linear system and find barycentric coordinates of the point closest to the origin;
+        //   (4) Do clamping for the closest point if necessary;
+        //   (5) Backproject from barycentric coordinates to 3D coordinates;
+        //   (6) Compute the distance squared from 3D coordinates of the closest point;
+        //   (7) Compare the distance with 3.0 and determine the cull flag.
+        //
+
+        // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
+        Value* pVtxXyFmt = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                       m_pBuilder->getInt32Ty(),
+                                                       {
+                                                           pPaClVteCntl,
+                                                           m_pBuilder->getInt32(8),
+                                                           m_pBuilder->getInt32(1)
+                                                       });
+        pVtxXyFmt = m_pBuilder->CreateTrunc(pVtxXyFmt, m_pBuilder->getInt1Ty());
+
+        // vtxZFmt = (VTX_Z_FMT, PA_CL_VTE_CNTL[9], 0 = 1/W0, 1 = none)
+        Value* pVtxZFmt = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                       m_pBuilder->getInt32Ty(),
+                                                       {
+                                                           pPaClVteCntl,
+                                                           m_pBuilder->getInt32(9),
+                                                           m_pBuilder->getInt32(1)
+                                                       });
+        pVtxZFmt = m_pBuilder->CreateTrunc(pVtxXyFmt, m_pBuilder->getInt1Ty());
+
+        // clipSpaceDef = (DX_CLIP_SPACE_DEF, PA_CL_CLIP_CNTL[19], 0 = OGL clip space, 1 = DX clip space)
+        Value* pClipSpaceDef = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                           m_pBuilder->getInt32Ty(),
+                                                           {
+                                                               pPaClClipCntl,
+                                                               m_pBuilder->getInt32(19),
+                                                               m_pBuilder->getInt32(1)
+                                                           });
+        pClipSpaceDef = m_pBuilder->CreateTrunc(pClipSpaceDef, m_pBuilder->getInt1Ty());
+
+        // zNear = clipSpaceDef ? -1.0 : 0.0
+        auto pZNear = m_pBuilder->CreateSelect(pClipSpaceDef,
+                                               ConstantFP::get(m_pBuilder->getFloatTy(), -1.0),
+                                               ConstantFP::get(m_pBuilder->getFloatTy(), 0.0));
+
+        // xDiscAdj = (DATA_REGISTER, PA_CL_GB_HORZ_DISC_ADJ[31:0])
+        auto pXDiscAdj = m_pBuilder->CreateBitCast(pPaClGbHorzDiscAdj, m_pBuilder->getFloatTy());
+
+        // yDiscAdj = (DATA_REGISTER, PA_CL_GB_VERT_DISC_ADJ[31:0])
+        auto pYDiscAdj = m_pBuilder->CreateBitCast(pPaClGbVertDiscAdj, m_pBuilder->getFloatTy());
+
+        auto pX0 = m_pBuilder->CreateExtractElement(pVertex0, static_cast<uint64_t>(0));
+        auto pY0 = m_pBuilder->CreateExtractElement(pVertex0, 1);
+        auto pZ0 = m_pBuilder->CreateExtractElement(pVertex0, 2);
+        auto pW0 = m_pBuilder->CreateExtractElement(pVertex0, 3);
+
+        auto pX1 = m_pBuilder->CreateExtractElement(pVertex1, static_cast<uint64_t>(0));
+        auto pY1 = m_pBuilder->CreateExtractElement(pVertex1, 1);
+        auto pZ1 = m_pBuilder->CreateExtractElement(pVertex1, 2);
+        auto pW1 = m_pBuilder->CreateExtractElement(pVertex1, 3);
+
+        auto pX2 = m_pBuilder->CreateExtractElement(pVertex2, static_cast<uint64_t>(0));
+        auto pY2 = m_pBuilder->CreateExtractElement(pVertex2, 1);
+        auto pZ2 = m_pBuilder->CreateExtractElement(pVertex2, 2);
+        auto pW2 = m_pBuilder->CreateExtractElement(pVertex2, 3);
+
+        // Convert xyz coordinate to normalized device coordinate (NDC)
+        auto pRcpW0 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW0);
+        auto pRcpW1 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW1);
+        auto pRcpW2 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW2);
+
+        // VTX_XY_FMT ? 1.0 : 1 / w0
+        auto pRcpW0ForXy = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW0);
+        // VTX_XY_FMT ? 1.0 : 1 / w1
+        auto pRcpW1ForXy = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW1);
+        // VTX_XY_FMT ? 1.0 : 1 / w2
+        auto pRcpW2ForXy = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW2);
+
+        // VTX_Z_FMT ? 1.0 : 1 / w0
+        auto pRcpW0ForZ = m_pBuilder->CreateSelect(pVtxZFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW0);
+        // VTX_Z_FMT ? 1.0 : 1 / w1
+        auto pRcpW1ForZ = m_pBuilder->CreateSelect(pVtxZFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW1);
+        // VTX_Z_FMT ? 1.0 : 1 / w2
+        auto pRcpW2ForZ = m_pBuilder->CreateSelect(pVtxZFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW2);
+
+        // x0' = x0/w0
+        pX0 = m_pBuilder->CreateFMul(pX0, pRcpW0ForXy);
+        // y0' = y0/w0
+        pY0 = m_pBuilder->CreateFMul(pY0, pRcpW0ForXy);
+        // z0' = z0/w0
+        pZ0 = m_pBuilder->CreateFMul(pZ0, pRcpW0ForZ);
+        // x1' = x1/w1
+        pX1 = m_pBuilder->CreateFMul(pX1, pRcpW1ForXy);
+        // y1' = y1/w1
+        pY1 = m_pBuilder->CreateFMul(pY1, pRcpW1ForXy);
+        // z1' = z1/w1
+        pZ1 = m_pBuilder->CreateFMul(pZ1, pRcpW1ForZ);
+        // x2' = x2/w2
+        pX2 = m_pBuilder->CreateFMul(pX2, pRcpW2ForXy);
+        // y2' = y2/w2
+        pY2 = m_pBuilder->CreateFMul(pY2, pRcpW2ForXy);
+        // z2' = z2/w2
+        pZ2 = m_pBuilder->CreateFMul(pZ2, pRcpW2ForZ);
+
+        //
+        // === Step 1 ===: Discard space to -1..1 space.
+        //
+
+        // x" = x'/xDiscAdj
+        // y" = y'/yDiscAdj
+        // z" = (zNear + 2.0)z' + (-1.0 - zNear)
+        auto pRcpXDiscAdj = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pXDiscAdj);
+        auto pRcpYDiscAdj = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pYDiscAdj);
+        auto pRcpXyDiscAdj =
+            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pRcpXDiscAdj, pRcpYDiscAdj });
+
+        Value* pX0Y0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pX0, pY0 });
+        Value* pX1Y1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pX1, pY1 });
+        Value* pX2Y2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pX2, pY2 });
+
+        pX0Y0 = m_pBuilder->CreateFMul(pX0Y0, pRcpXyDiscAdj);
+        pX1Y1 = m_pBuilder->CreateFMul(pX1Y1, pRcpXyDiscAdj);
+        pX2Y2 = m_pBuilder->CreateFMul(pX2Y2, pRcpXyDiscAdj);
+
+        // zNear + 2.0
+        auto pZNearPlusTwo = m_pBuilder->CreateFAdd(pZNear, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+        pZNearPlusTwo = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pZNearPlusTwo, pZNearPlusTwo });
+
+        // -1.0 - zNear
+        auto pNegOneMinusZNear = m_pBuilder->CreateFSub(ConstantFP::get(m_pBuilder->getFloatTy(), -1.0), pZNear);
+        pNegOneMinusZNear =
+            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pNegOneMinusZNear, pNegOneMinusZNear });
+
+        Value* pZ0Z0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pZ0, pZ0 });
+        Value* pZ2Z1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pZ2, pZ1 });
+
+        pZ0Z0 = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
+                                            m_pContext->Float16x2Ty(),
+                                            { pZNearPlusTwo, pZ0Z0, pNegOneMinusZNear });
+        pZ2Z1 = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
+                                            m_pContext->Float16x2Ty(),
+                                            { pZNearPlusTwo, pZ2Z1, pNegOneMinusZNear });
+
+        //
+        // === Step 2 ===: 3D coordinates to barycentric coordinates.
+        //
+
+        // <x20, y20> = <x2", y2"> - <x0", y0">
+        auto pX20Y20 = m_pBuilder->CreateFSub(pX2Y2, pX0Y0);
+
+        // <x10, y10> = <x1", y1"> - <x0", y0">
+        auto pX10Y10 = m_pBuilder->CreateFSub(pX1Y1, pX0Y0);
+
+        // <z20, z10> = <z2", z1"> - <z0", z0">
+        auto pZ20Z10 = m_pBuilder->CreateFSub(pZ2Z1, pZ0Z0);
+
+        //
+        // === Step 3 ===: Solve linear system and find the point closest to the origin.
+        //
+
+        // a00 = x10 + z10
+        auto pX10 = m_pBuilder->CreateExtractElement(pX10Y10, static_cast<uint64_t>(0));
+        auto pZ10 = m_pBuilder->CreateExtractElement(pZ20Z10, 1);
+        auto pA00 = m_pBuilder->CreateFAdd(pX10, pZ10);
+
+        // a01 = x20 + z20
+        auto pX20 = m_pBuilder->CreateExtractElement(pX20Y20, static_cast<uint64_t>(0));
+        auto pZ20 = m_pBuilder->CreateExtractElement(pZ20Z10, static_cast<uint64_t>(0));
+        auto pA01 = m_pBuilder->CreateFAdd(pX20, pZ20);
+
+        // a10 = y10 + y10
+        auto pY10 = m_pBuilder->CreateExtractElement(pX10Y10, 1);
+        auto pA10 = m_pBuilder->CreateFAdd(pY10, pY10);
+
+        // a11 = y20 + z20
+        auto pY20 = m_pBuilder->CreateExtractElement(pX20Y20, 1);
+        auto pA11 = m_pBuilder->CreateFAdd(pY20, pZ20);
+
+        // b0 = -x0" - x2"
+        pX0 = m_pBuilder->CreateExtractElement(pX0Y0, static_cast<uint64_t>(0));
+        auto pNegX0 = m_pBuilder->CreateFNeg(pX0);
+        pX2 = m_pBuilder->CreateExtractElement(pX2Y2, static_cast<uint64_t>(0));
+        auto pB0 = m_pBuilder->CreateFSub(pNegX0, pX2);
+
+        // b1 = -x1" - x2"
+        pX1 = m_pBuilder->CreateExtractElement(pX1Y1, static_cast<uint64_t>(0));
+        auto pNegX1 = m_pBuilder->CreateFNeg(pX1);
+        auto pB1 = m_pBuilder->CreateFSub(pNegX1, pX2);
+
+        //     [ a00 a01 ]      [ b0 ]       [ s ]
+        // A = [         ], B = [    ], ST = [   ], A * ST = B (crame rules)
+        //     [ a10 a11 ]      [ b1 ]       [ t ]
+
+        //           | a00 a01 |
+        // det(A) =  |         | = a00 * a11 - a01 * a10
+        //           | a10 a11 |
+        auto pDetA = m_pBuilder->CreateFMul(pA00, pA11);
+        auto pNegA01 = m_pBuilder->CreateFNeg(pA01);
+        pDetA = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pNegA01, pA10, pDetA });
+
+        //            | b0 a01 |
+        // det(Ab0) = |        | = b0 * a11 - a01 * b1
+        //            | b1 a11 |
+        auto pDetAB0 = m_pBuilder->CreateFMul(pB0, pA11);
+        pDetAB0 = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pNegA01, pB1, pDetAB0 });
+
+        //            | a00 b0 |
+        // det(Ab1) = |        | = a00 * b1 - b0 * a10
+        //            | a10 b1 |
+        auto pDetAB1 = m_pBuilder->CreateFMul(pA00, pB1);
+        auto pNegB0 = m_pBuilder->CreateFNeg(pB0);
+        pDetAB1 = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pNegB0, pA10, pDetAB1 });
+
+        // s = det(Ab0) / det(A)
+        auto pRcpDetA = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getHalfTy(), 1.0), pDetA);
+        auto pS = m_pBuilder->CreateFMul(pDetAB0, pRcpDetA);
+
+        // t = det(Ab1) / det(A)
+        auto pT = m_pBuilder->CreateFMul(pDetAB1, pRcpDetA);
+
+        //
+        // === Step 4 ===: Do clamping for the closest point.
+        //
+
+        // <s, t>
+        auto pST =
+            m_pBuilder->CreateInsertElement(UndefValue::get(m_pContext->Float16x2Ty()), pS, static_cast<uint64_t>(0));
+        pST = m_pBuilder->CreateInsertElement(pST, pT, 1);
+
+        // <s', t'> = <0.5 - 0.5(t - s), 0.5 + 0.5(t - s)>
+        auto pTMinusS = m_pBuilder->CreateFSub(pT, pS);
+        auto pST1 = m_pBuilder->CreateInsertElement(UndefValue::get(m_pContext->Float16x2Ty()),
+                                                    pTMinusS,
+                                                    static_cast<uint64_t>(0));
+        pST1 = m_pBuilder->CreateInsertElement(pST1, pTMinusS, 1);
+
+        pST1 = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
+                                           m_pContext->Float16x2Ty(),
+                                           {
+                                               ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), -0.5),
+                                                                     ConstantFP::get(m_pBuilder->getHalfTy(), 0.5) }),
+                                               pST1,
+                                               ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), 0.5),
+                                                                     ConstantFP::get(m_pBuilder->getHalfTy(), 0.5) })
+                                           });
+
+        // <s", t"> = clamp(<s, t>)
+        auto pST2 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                                m_pContext->Float16x2Ty(),
+                                                {
+                                                   pST,
+                                                   ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), 0.0),
+                                                                         ConstantFP::get(m_pBuilder->getHalfTy(), 0.0) })
+                                               });
+        pST2 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                           m_pContext->Float16x2Ty(),
+                                           {
+                                               pST2,
+                                               ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), 1.0),
+                                                                     ConstantFP::get(m_pBuilder->getHalfTy(), 1.0) })
+                                           });
+
+        // <s, t> = (s + t) > 1.0 ? <s', t'> : <s", t">
+        auto pSPlusT = m_pBuilder->CreateFAdd(pS, pT);
+        auto pSPlusTGtOne = m_pBuilder->CreateFCmpOGT(pSPlusT, ConstantFP::get(m_pBuilder->getHalfTy(), 1.0));
+        pST = m_pBuilder->CreateSelect(pSPlusTGtOne, pST1, pST2);
+
+        //
+        // === Step 5 ===: Barycentric coordinates to 3D coordinates.
+        //
+
+        // x = x0" + s * x10 + t * x20
+        // y = y0" + s * y10 + t * y20
+        // z = z0" + s * z10 + t * z20
+        pS = m_pBuilder->CreateExtractElement(pST, static_cast<uint64_t>(0));
+        pT = m_pBuilder->CreateExtractElement(pST, 1);
+        auto pSS = m_pBuilder->CreateInsertElement(pST, pS, 1);
+        auto pTT = m_pBuilder->CreateInsertElement(pST, pT, static_cast<uint64_t>(0));
+
+        // s * <x10, y10> + <x0", y0">
+        auto pXY = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pContext->Float16x2Ty(), { pSS, pX10Y10, pX0Y0 });
+
+        // <x, y> = t * <x20, y20> + (s * <x10, y10> + <x0", y0">)
+        pXY = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pContext->Float16x2Ty(), { pTT, pX20Y20, pXY });
+
+        // s * z10 + z0"
+        pZ0 = m_pBuilder->CreateExtractElement(pZ0Z0, static_cast<uint64_t>(0));
+        auto pZ = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pS, pZ10, pZ0});
+
+        // z = t * z20 + (s * z10 + z0")
+        pZ = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pT, pZ20, pZ });
+
+        auto pX = m_pBuilder->CreateExtractElement(pXY, static_cast<uint64_t>(0));
+        auto pY = m_pBuilder->CreateExtractElement(pXY, 1);
+
+        //
+        // === Step 6 ===: Compute the distance squared of the closest point.
+        //
+
+        // r^2 = x^2 + y^2 + z^2
+        auto pSquareR = m_pBuilder->CreateFMul(pX, pX);
+        pSquareR = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pY, pY, pSquareR });
+        pSquareR = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pBuilder->getHalfTy(), { pZ, pZ, pSquareR });
+
+        //
+        // == = Step 7 == = : Determine the cull flag
+        //
+
+        // cullFlag = (r ^ 2 > 3.0)
+        pNewCullFlag = m_pBuilder->CreateFCmpOGT(pSquareR, ConstantFP::get(m_pBuilder->getHalfTy(), 3.0));
+
+        m_pBuilder->CreateBr(pSphereExitBlock);
+    }
+
+    // Construct ".sphereExit" block
+    {
+        m_pBuilder->SetInsertPoint(pSphereExitBlock);
+
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag, pSphereEntryBlock);
+        pCullFlagPhi->addIncoming(pNewCullFlag, pSphereCullBlock);
+
+        m_pBuilder->CreateRet(pCullFlagPhi);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
+}
+
+// =====================================================================================================================
+// Creates the function that does small primitive filter culling.
+void NggPrimShader::CreateSmallPrimFilterCuller(
+    Module* pModule)    // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
+                                     {
+                                         m_pBuilder->getInt1Ty(),   // %cullFlag
+                                         m_pContext->Floatx4Ty(),   // %vertex0
+                                         m_pContext->Floatx4Ty(),   // %vertex1
+                                         m_pContext->Floatx4Ty(),   // %vertex2
+                                         m_pBuilder->getInt32Ty(),  // %paClVteCntl
+                                         m_pBuilder->getInt32Ty(),  // %paClVportXscale
+                                         m_pBuilder->getInt32Ty()   // %paClVportYscale
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingSmallPrimFilter, pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadNone);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pCullFlag = argIt++;
+    pCullFlag->setName("cullFlag");
+
+    Value* pVertex0 = argIt++;
+    pVertex0->setName("vertex0");
+
+    Value* pVertex1 = argIt++;
+    pVertex1->setName("vertex1");
+
+    Value* pVertex2 = argIt++;
+    pVertex2->setName("vertex2");
+
+    Value* pPaClVteCntl = argIt++;
+    pPaClVteCntl->setName("paClVteCntl");
+
+    Value* pPaClVportXscale = argIt++;
+    pPaClVportXscale->setName("paClVportXscale");
+
+    Value* pPaClVportYscale = argIt++;
+    pPaClVportYscale->setName("paClVportYscale");
+
+    auto pSmallPrimFilterEntryBlock = BasicBlock::Create(*m_pContext, ".smallprimfilterEntry", pFunc);
+    auto pSmallPrimFilterCullBlock = BasicBlock::Create(*m_pContext, ".smallprimfilterCull", pFunc);
+    auto pSmallPrimFilterExitBlock = BasicBlock::Create(*m_pContext, ".smallprimfilterExit", pFunc);
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct ".smallprimfilterEntry" block
+    {
+        m_pBuilder->SetInsertPoint(pSmallPrimFilterEntryBlock);
+        // If cull flag has already been TRUE, early return
+        m_pBuilder->CreateCondBr(pCullFlag, pSmallPrimFilterExitBlock, pSmallPrimFilterCullBlock);
+    }
+
+    // Construct ".smallprimfilterCull" block
+    Value* pNewCullFlag = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pSmallPrimFilterCullBlock);
+
+        //
+        // Small primitive filter culling algorithm is described as follow:
+        //
+        //   if ((floor(min(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2))) ==
+        //        floor(max(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2)))) ||
+        //       (floor(min(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2))) ==
+        //        floor(max(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2)))))
+        //       cullFlag = true
+        //
+
+        // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
+        Value* pVtxXyFmt = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                       m_pBuilder->getInt32Ty(),
+                                                       {
+                                                           pPaClVteCntl,
+                                                           m_pBuilder->getInt32(8),
+                                                           m_pBuilder->getInt32(1)
+                                                       });
+        pVtxXyFmt = m_pBuilder->CreateTrunc(pVtxXyFmt, m_pBuilder->getInt1Ty());
+
+        // xScale = (VPORT_XSCALE, PA_CL_VPORT_XSCALE[31:0])
+        auto pXSCale = m_pBuilder->CreateBitCast(pPaClVportXscale, m_pBuilder->getFloatTy());
+
+        // yScale = (VPORT_YSCALE, PA_CL_VPORT_YSCALE[31:0])
+        auto pYSCale = m_pBuilder->CreateBitCast(pPaClVportYscale, m_pBuilder->getFloatTy());
+
+        auto pX0 = m_pBuilder->CreateExtractElement(pVertex0, static_cast<uint64_t>(0));
+        auto pY0 = m_pBuilder->CreateExtractElement(pVertex0, 1);
+        auto pW0 = m_pBuilder->CreateExtractElement(pVertex0, 3);
+
+        auto pX1 = m_pBuilder->CreateExtractElement(pVertex1, static_cast<uint64_t>(0));
+        auto pY1 = m_pBuilder->CreateExtractElement(pVertex1, 1);
+        auto pW1 = m_pBuilder->CreateExtractElement(pVertex1, 3);
+
+        auto pX2 = m_pBuilder->CreateExtractElement(pVertex2, static_cast<uint64_t>(0));
+        auto pY2 = m_pBuilder->CreateExtractElement(pVertex2, 1);
+        auto pW2 = m_pBuilder->CreateExtractElement(pVertex2, 3);
+
+        // Convert xyz coordinate to normalized device coordinate (NDC)
+        auto pRcpW0 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW0);
+        auto pRcpW1 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW1);
+        auto pRcpW2 = m_pBuilder->CreateFDiv(ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pW2);
+
+        // VTX_XY_FMT ? 1.0 : 1 / w0
+        pRcpW0 = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW0);
+        // VTX_XY_FMT ? 1.0 : 1 / w1
+        pRcpW1 = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW1);
+        // VTX_XY_FMT ? 1.0 : 1 / w2
+        pRcpW2 = m_pBuilder->CreateSelect(pVtxXyFmt, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0), pRcpW2);
+
+        // x0' = x0/w0
+        pX0 = m_pBuilder->CreateFMul(pX0, pRcpW0);
+        // y0' = y0/w0
+        pY0 = m_pBuilder->CreateFMul(pY0, pRcpW0);
+        // x1' = x1/w1
+        pX1 = m_pBuilder->CreateFMul(pX1, pRcpW1);
+        // y1' = y1/w1
+        pY1 = m_pBuilder->CreateFMul(pY1, pRcpW1);
+        // x2' = x2/w2
+        pX2 = m_pBuilder->CreateFMul(pX2, pRcpW2);
+        // y2' = y2/w2
+        pY2 = m_pBuilder->CreateFMul(pY2, pRcpW2);
+
+        // clampX0' = clamp((x0' + 1.0) / 2)
+        auto pClampX0 = m_pBuilder->CreateFAdd(pX0, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0));
+        pClampX0 = m_pBuilder->CreateFMul(pClampX0, ConstantFP::get(m_pBuilder->getFloatTy(), 0.5));
+        pClampX0 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampX0,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 0.0)
+                                               });
+        pClampX0 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampX0,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 1.0)
+                                               });
+
+        // scaledX0' = (clampX0' * xScale) * 2
+        auto pScaledX0 = m_pBuilder->CreateFMul(pClampX0, pXSCale);
+        pScaledX0 = m_pBuilder->CreateFMul(pScaledX0, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+
+        // clampX1' = clamp((x1' + 1.0) / 2)
+        auto pClampX1 = m_pBuilder->CreateFAdd(pX1, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0));
+        pClampX1 = m_pBuilder->CreateFMul(pClampX1, ConstantFP::get(m_pBuilder->getFloatTy(), 0.5));
+        pClampX1 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampX1,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 0.0)
+                                               });
+        pClampX1 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampX1,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 1.0)
+                                               });
+
+        // scaledX1' = (clampX1' * xScale) * 2
+        auto pScaledX1 = m_pBuilder->CreateFMul(pClampX1, pXSCale);
+        pScaledX1 = m_pBuilder->CreateFMul(pScaledX1, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+
+        // clampX2' = clamp((x2' + 1.0) / 2)
+        auto pClampX2 = m_pBuilder->CreateFAdd(pX2, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0));
+        pClampX2 = m_pBuilder->CreateFMul(pClampX2, ConstantFP::get(m_pBuilder->getFloatTy(), 0.5));
+        pClampX2 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampX2,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 0.0)
+                                               });
+        pClampX2 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampX2,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 1.0)
+                                               });
+
+        // scaledX2' = (clampX2' * xScale) * 2
+        auto pScaledX2 = m_pBuilder->CreateFMul(pClampX2, pXSCale);
+        pScaledX2 = m_pBuilder->CreateFMul(pScaledX2, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+
+        // clampY0' = clamp((y0' + 1.0) / 2)
+        auto pClampY0 = m_pBuilder->CreateFAdd(pY0, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0));
+        pClampY0 = m_pBuilder->CreateFMul(pClampY0, ConstantFP::get(m_pBuilder->getFloatTy(), 0.5));
+        pClampY0 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampY0,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 0.0)
+                                               });
+        pClampY0 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampY0,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 1.0)
+                                               });
+
+        // scaledY0' = (clampY0' * yScale) * 2
+        auto pScaledY0 = m_pBuilder->CreateFMul(pClampY0, pYSCale);
+        pScaledY0 = m_pBuilder->CreateFMul(pScaledY0, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+
+        // clampY1' = clamp((y1' + 1.0) / 2)
+        auto pClampY1 = m_pBuilder->CreateFAdd(pY1, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0));
+        pClampY1 = m_pBuilder->CreateFMul(pClampY1, ConstantFP::get(m_pBuilder->getFloatTy(), 0.5));
+        pClampY1 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampY1,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 0.0)
+                                               });
+        pClampY1 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampY1,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 1.0)
+                                               });
+
+        // scaledY1' = (clampY1' * yScale) * 2
+        auto pScaledY1 = m_pBuilder->CreateFMul(pClampY1, pYSCale);
+        pScaledY1 = m_pBuilder->CreateFMul(pScaledY1, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+
+        // clampY2' = clamp((y2' + 1.0) / 2)
+        auto pClampY2 = m_pBuilder->CreateFAdd(pY2, ConstantFP::get(m_pBuilder->getFloatTy(), 1.0));
+        pClampY2 = m_pBuilder->CreateFMul(pClampY2, ConstantFP::get(m_pBuilder->getFloatTy(), 0.5));
+        pClampY2 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampY2,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 0.0)
+                                               });
+        pClampY2 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
+                                               m_pBuilder->getFloatTy(),
+                                               {
+                                                   pClampY2,
+                                                   ConstantFP::get(m_pBuilder->getFloatTy(), 1.0)
+                                               });
+
+        // scaledY2' = (clampY2' * yScale) * 2
+        auto pScaledY2 = m_pBuilder->CreateFMul(pClampY2, pYSCale);
+        pScaledY2 = m_pBuilder->CreateFMul(pScaledY2, ConstantFP::get(m_pBuilder->getFloatTy(), 2.0));
+
+        // minX = roundEven(min(scaledX0', scaledX1', scaledX2') - 1/256.0)
+        Value* pMinX =
+            m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pScaledX0, pScaledX1 });
+        pMinX = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pMinX, pScaledX2 });
+        pMinX = m_pBuilder->CreateFSub(pMinX, ConstantFP::get(m_pBuilder->getFloatTy(), 1/256.0));
+        pMinX = m_pBuilder->CreateIntrinsic(Intrinsic::rint, m_pBuilder->getFloatTy(), pMinX);
+
+        // maxX = roundEven(max(scaledX0', scaledX1', scaledX2') + 1/256.0)
+        Value* pMaxX =
+            m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pScaledX0, pScaledX1 });
+        pMaxX = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pMaxX, pScaledX2 });
+        pMaxX = m_pBuilder->CreateFAdd(pMaxX, ConstantFP::get(m_pBuilder->getFloatTy(), 1 / 256.0));
+        pMaxX = m_pBuilder->CreateIntrinsic(Intrinsic::rint, m_pBuilder->getFloatTy(), pMaxX);
+
+        // minY = roundEven(min(scaledY0', scaledY1', scaledY2') - 1/256.0)
+        Value* pMinY =
+            m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pScaledY0, pScaledY1 });
+        pMinY = m_pBuilder->CreateIntrinsic(Intrinsic::minnum, m_pBuilder->getFloatTy(), { pMinY, pScaledY2 });
+        pMinY = m_pBuilder->CreateFSub(pMinY, ConstantFP::get(m_pBuilder->getFloatTy(), 1 / 256.0));
+        pMinY = m_pBuilder->CreateIntrinsic(Intrinsic::rint, m_pBuilder->getFloatTy(), pMinY);
+
+        // maxX = roundEven(max(scaledX0', scaledX1', scaledX2') + 1/256.0)
+        Value* pMaxY =
+            m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pScaledY0, pScaledY1 });
+        pMaxY = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum, m_pBuilder->getFloatTy(), { pMaxY, pScaledY2 });
+        pMaxY = m_pBuilder->CreateFAdd(pMaxY, ConstantFP::get(m_pBuilder->getFloatTy(), 1 / 256.0));
+        pMaxY = m_pBuilder->CreateIntrinsic(Intrinsic::rint, m_pBuilder->getFloatTy(), pMaxY);
+
+        // minX == maxX
+        auto pMinXEqMaxX = m_pBuilder->CreateFCmpOEQ(pMinX, pMaxX);
+
+        // minY == maxY
+        auto pMinYEqMaxY = m_pBuilder->CreateFCmpOEQ(pMinY, pMaxY);
+
+        // Get cull flag
+        pNewCullFlag = m_pBuilder->CreateOr(pMinXEqMaxX, pMinYEqMaxY);
+
+        m_pBuilder->CreateBr(pSmallPrimFilterExitBlock);
+    }
+
+    // Construct ".smallprimfilterExit" block
+    {
+        m_pBuilder->SetInsertPoint(pSmallPrimFilterExitBlock);
+
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag, pSmallPrimFilterEntryBlock);
+        pCullFlagPhi->addIncoming(pNewCullFlag, pSmallPrimFilterCullBlock);
+
+        m_pBuilder->CreateRet(pCullFlagPhi);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
+}
+
+// =====================================================================================================================
+// Creates the function that does frustum culling.
+void NggPrimShader::CreateCullDistanceCuller(
+    Module* pModule)    // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
+                                     {
+                                         m_pBuilder->getInt1Ty(),    // %cullFlag
+                                         m_pBuilder->getInt32Ty(),   // %signMask0
+                                         m_pBuilder->getInt32Ty(),   // %signMask1
+                                         m_pBuilder->getInt32Ty()    // %signMask2
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingCullDistance, pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadNone);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pCullFlag = argIt++;
+    pCullFlag->setName("cullFlag");
+
+    Value* pSignMask0 = argIt++;
+    pSignMask0->setName("signMask0");
+
+    Value* pSignMask1 = argIt++;
+    pSignMask1->setName("signMask1");
+
+    Value* pSignMask2 = argIt++;
+    pSignMask2->setName("signMask2");
+
+    auto pCullDistanceEntryBlock = BasicBlock::Create(*m_pContext, ".culldistanceEntry", pFunc);
+    auto pCullDistanceCullBlock = BasicBlock::Create(*m_pContext, ".culldistanceCull", pFunc);
+    auto pCullDistanceExitBlock = BasicBlock::Create(*m_pContext, ".culldistanceExit", pFunc);
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct ".culldistanceEntry" block
+    {
+        m_pBuilder->SetInsertPoint(pCullDistanceEntryBlock);
+        // If cull flag has already been TRUE, early return
+        m_pBuilder->CreateCondBr(pCullFlag, pCullDistanceExitBlock, pCullDistanceCullBlock);
+    }
+
+    // Construct ".culldistanceCull" block
+    Value* pCullFlag1 = nullptr;
+    {
+        m_pBuilder->SetInsertPoint(pCullDistanceCullBlock);
+
+        //
+        // Cull distance culling algorithm is described as follow:
+        //
+        //   vertexSignMask[7:0] = [sign(ClipDistance[0])..sign(ClipDistance[7])]
+        //   primSignMask = vertexSignMask0 & vertexSignMask1 & vertexSignMask2
+        //   cullFlag = (primSignMask != 0)
+        //
+        auto pSignMask = m_pBuilder->CreateAnd(pSignMask0, pSignMask1);
+        pSignMask = m_pBuilder->CreateAnd(pSignMask, pSignMask2);
+
+        pCullFlag1 = m_pBuilder->CreateICmpNE(pSignMask, m_pBuilder->getInt32(0));
+
+        m_pBuilder->CreateBr(pCullDistanceExitBlock);
+    }
+
+    // Construct ".culldistanceExit" block
+    {
+        m_pBuilder->SetInsertPoint(pCullDistanceExitBlock);
+
+        auto pCullFlagPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+        pCullFlagPhi->addIncoming(pCullFlag, pCullDistanceEntryBlock);
+        pCullFlagPhi->addIncoming(pCullFlag1, pCullDistanceCullBlock);
+
+        m_pBuilder->CreateRet(pCullFlagPhi);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
+}
+
+// =====================================================================================================================
+// Creates the function that fetches culling control registers.
+void NggPrimShader::CreateFetchCullingRegister(
+    Module* pModule) // [in] LLVM module
+{
+    auto pFuncTy = FunctionType::get(m_pBuilder->getInt32Ty(),
+                                     {
+                                         m_pBuilder->getInt32Ty(),  // %primShaderTableAddrLow
+                                         m_pBuilder->getInt32Ty(),  // %primShaderTableAddrHigh
+                                         m_pBuilder->getInt32Ty()   // %regOffset
+                                     },
+                                     false);
+    auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingFetchReg, pModule);
+
+    pFunc->setCallingConv(CallingConv::C);
+    pFunc->addFnAttr(Attribute::ReadOnly);
+    pFunc->addFnAttr(Attribute::AlwaysInline);
+
+    auto argIt = pFunc->arg_begin();
+    Value* pPrimShaderTableAddrLow = argIt++;
+    pPrimShaderTableAddrLow->setName("primShaderTableAddrLow");
+
+    Value* pPrimShaderTableAddrHigh = argIt++;
+    pPrimShaderTableAddrHigh->setName("primShaderTableAddrHigh");
+
+    Value* pRegOffset = argIt++;
+    pRegOffset->setName("regOffset");
+
+    BasicBlock* pEntryBlock = BasicBlock::Create(*m_pContext, "", pFunc); // Create entry block
+
+    auto savedInsertPoint = m_pBuilder->saveIP();
+
+    // Construct entry block
+    {
+        m_pBuilder->SetInsertPoint(pEntryBlock);
+
+        Value* pPrimShaderTableAddr = m_pBuilder->CreateInsertElement(UndefValue::get(m_pContext->Int32x2Ty()),
+                                                                      pPrimShaderTableAddrLow,
+                                                                      static_cast<uint64_t>(0));
+
+        pPrimShaderTableAddr = m_pBuilder->CreateInsertElement(pPrimShaderTableAddr, pPrimShaderTableAddrHigh, 1);
+
+        pPrimShaderTableAddr = m_pBuilder->CreateBitCast(pPrimShaderTableAddr, m_pBuilder->getInt64Ty());
+
+        auto pPrimShaderTablePtrTy = PointerType::get(ArrayType::get(m_pBuilder->getInt32Ty(), 256),
+                                                      ADDR_SPACE_CONST); // [256 x i32]
+        auto pPrimShaderTablePtr = m_pBuilder->CreateIntToPtr(pPrimShaderTableAddr, pPrimShaderTablePtrTy);
+
+        // regOffset = regOffset >> 2
+        pRegOffset = m_pBuilder->CreateLShr(pRegOffset, 2); // To DWORD offset
+
+        auto pLoadPtr = m_pBuilder->CreateGEP(pPrimShaderTablePtr, { m_pBuilder->getInt32(0), pRegOffset });
+        static_cast<Instruction*>(pLoadPtr)->setMetadata(m_pContext->MetaIdUniform(),
+                                                         m_pContext->GetEmptyMetadataNode());
+
+        auto pRegValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, 4);
+        pRegValue->setVolatile(true);
+        pRegValue->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+
+        m_pBuilder->CreateRet(pRegValue);
+    }
+
+    m_pBuilder->restoreIP(savedInsertPoint);
 }
 
 // =====================================================================================================================
