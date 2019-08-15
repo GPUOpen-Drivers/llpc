@@ -410,14 +410,6 @@ set(GEN_GLSL_EMU_LIB_OUTPUTS
     ${OP_EMU_LIB_GEN_DIR}/gfx9/g_llpcGlslEmuLibGfx9.h
 )
 
-#if VKI_BUILD_GFX10
-if(LLPC_BUILD_GFX10)
-    set(GEN_GLSL_EMU_LIB_OUTPUTS ${GEN_GLSL_EMU_LIB_OUTPUTS}
-        ${OP_EMU_LIB_GEN_DIR}/gfx10/g_llpcGlslEmuLibGfx10.h
-    )
-endif()
-#endif
-
 if(UNIX)
     set(LLVM_BIN_DIR ${XGL_LLVM_BUILD_PATH}/bin/)
 elseif(WIN32)

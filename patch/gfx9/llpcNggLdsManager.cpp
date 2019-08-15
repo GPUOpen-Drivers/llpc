@@ -502,7 +502,7 @@ void NggLdsManager::AtomicOpWithLds(
 
     // NOTE: LDS variable is defined as a pointer to i32 array. The LDS offset here has to be casted to DWORD offset
     // from BYTE offset.
-    pLdsOffset = m_pBuilder->CreateLShr(pLdsOffset, m_pBuilder->getInt32(2));
+    pLdsOffset = m_pBuilder->CreateLShr(pLdsOffset, 2);
 
     Value* pAtomicPtr = m_pBuilder->CreateGEP(m_pLds, { m_pBuilder->getInt32(0), pLdsOffset });
 

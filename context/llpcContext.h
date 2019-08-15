@@ -360,7 +360,6 @@ private:
 
 #if LLPC_BUILD_GFX10
     static const uint8_t GlslEmuLibWaDisableI32ModToI16Mod[];
-    static const uint8_t GlslEmuLibGfx10[];
 #endif
 };
 
