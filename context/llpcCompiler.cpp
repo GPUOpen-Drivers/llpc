@@ -337,26 +337,50 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 }
 
 // =====================================================================================================================
-//  Represents the template stream class which read or write data in binary format.
+//  Represents the template stream class which reads data in binary format.
 template<class Stream>
-class BinaryStream
+class BinaryIStream
 {
 public:
-    BinaryStream(Stream& stream) : m_stream(stream) {}
-
-    // Write obj to Stream m_ss with binary format
-    template<class T>
-    BinaryStream& operator <<(const T& object)
-    {
-        m_stream.write(reinterpret_cast<const char*>(&object), sizeof(T));
-        return *this;
-    }
+    BinaryIStream(Stream& stream) : m_stream(stream) {}
 
     // Read obj from Stream m_ss with binary format
     template<class T>
-    BinaryStream& operator >>(T& object)
+    BinaryIStream& operator >>(T& object)
     {
         m_stream.read(reinterpret_cast<char*>(&object), sizeof(T));
+        return *this;
+    }
+
+    // Read set object to BinaryIStream
+    BinaryIStream& operator >> (
+        std::unordered_set<uint64_t>& set)  // [out] set object
+    {
+        uint32_t setSize = 0;
+        *this >> setSize;
+        for (uint32_t i = 0; i < setSize; ++i)
+        {
+            uint64_t item;
+            *this >> item;
+            set.insert(item);
+        }
+        return *this;
+    }
+
+    // Read map object to BinaryIStream
+    BinaryIStream& operator >> (
+        std::map<uint32_t, uint32_t>& map)   // [out] map object
+    {
+        uint32_t mapSize = 0;
+        *this >> mapSize;
+        for (uint32_t i = 0; i < mapSize; ++i)
+        {
+            uint32_t first;
+            uint32_t second;
+            *this >> first;
+            *this >> second;
+            map[first] = second;
+        }
         return *this;
     }
 
@@ -365,75 +389,51 @@ private:
 };
 
 // =====================================================================================================================
-// Write set object to BinaryStream
-template <class OStream>
-BinaryStream<OStream>& operator << (
-    BinaryStream<OStream>&              out,   // [out] Binary stream
-    const std::unordered_set<uint64_t>& set)   // [in] set object
+//  Represents the template stream class which writes data in binary format.
+template<class Stream>
+class BinaryOStream
 {
-    uint32_t setSize = set.size();
-    out << setSize;
-    for (auto item : set)
-    {
-        out << item;
-    }
-    return out;
-}
+public:
+    BinaryOStream(Stream& stream) : m_stream(stream) {}
 
-// =====================================================================================================================
-// Read set object to BinaryStream
-template <class IStream>
-BinaryStream<IStream>& operator >> (
-    BinaryStream<IStream>&        in,   // [out] Binary stream
-    std::unordered_set<uint64_t>& set)  // [out] set object
-{
-    uint32_t setSize = 0;
-    in >> setSize;
-    for (uint32_t i = 0; i < setSize; ++i)
+    // Write obj to Stream m_ss with binary format
+    template<class T>
+    BinaryOStream& operator <<(const T& object)
     {
-        uint64_t item;
-        in >> item;
-        set.insert(item);
+        m_stream.write(reinterpret_cast<const char*>(&object), sizeof(T));
+        return *this;
     }
-    return in;
-}
 
-// =====================================================================================================================
-// Write map object to BinaryStream
-template <class OStream>
-BinaryStream<OStream>& operator << (
-    BinaryStream<OStream>&              out,  // [out] Binary stream
-    const std::map<uint32_t, uint32_t>& map)  // [in] map object
-{
-    uint32_t mapSize = map.size();
-    out << mapSize;
-    for (auto item : map)
+    // Write set object to BinaryOStream
+    BinaryOStream& operator << (
+        const std::unordered_set<uint64_t>& set)   // [in] set object
     {
-        out << item.first;
-        out << item.second;
+        uint32_t setSize = set.size();
+        *this << setSize;
+        for (auto item : set)
+        {
+            *this << item;
+        }
+        return *this;
     }
-    return out;
-}
 
-// =====================================================================================================================
-// Read map object to BinaryStream
-template <class IStream>
-BinaryStream<IStream>& operator >> (
-    BinaryStream<IStream>&        in,    // [out] Binary stream
-    std::map<uint32_t, uint32_t>& map)   // [out] map object
-{
-    uint32_t mapSize = 0;
-    in >> mapSize;
-    for (uint32_t i = 0; i < mapSize; ++i)
+    // Write map object to BinaryOStream
+    BinaryOStream& operator << (
+        const std::map<uint32_t, uint32_t>& map)  // [in] map object
     {
-        uint32_t first;
-        uint32_t second;
-        in >> first;
-        in >> second;
-        map[first] = second;
+        uint32_t mapSize = map.size();
+        *this << mapSize;
+        for (auto item : map)
+        {
+            *this << item.first;
+            *this << item.second;
+        }
+        return *this;
     }
-    return in;
-}
+
+private:
+    Stream& m_stream;   // Stream for binary data read/write
+};
 
 // =====================================================================================================================
 // Output resource usage to stream out with binary format.
@@ -444,7 +444,7 @@ OStream& operator << (
     OStream&             out,          // [out] Output stream
     const ResourceUsage& resUsage)     // [in] Resource usage object
 {
-    BinaryStream<OStream> binOut(out);
+    BinaryOStream<OStream> binOut(out);
 
     binOut << resUsage.descPairs;
     binOut << resUsage.pushConstSizeInBytes;
@@ -502,7 +502,7 @@ IStream& operator >> (
     IStream&       in,        // [out] Input stream
     ResourceUsage& resUsage)  // [out] Resource usage object
 {
-    BinaryStream<IStream> binIn(in);
+    BinaryIStream<IStream> binIn(in);
 
     binIn >> resUsage.descPairs;
     binIn >> resUsage.pushConstSizeInBytes;
@@ -720,7 +720,6 @@ Result Compiler::BuildShaderModule(
     raw_svector_ostream moduleBinaryStream(moduleBinary);
     SmallVector<ShaderEntryName, 4> entryNames;
     SmallVector<ShaderModuleEntry, 4> moduleEntries;
-    ShaderModuleData* pModuleData = nullptr;
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     CacheEntryHandle hEntry = nullptr;
