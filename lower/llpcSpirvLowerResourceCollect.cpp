@@ -127,11 +127,6 @@ bool SpirvLowerResourceCollect::runOnModule(
                 {
                     useImages = true;
 
-                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-
-                    auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                    auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
-
                     // TODO: Will support separated texture resource/sampler.
                     DescriptorType descType = DescriptorType::Texture;
 
@@ -226,11 +221,11 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Uniform:
             {
                 // Buffer block
+#ifndef NDEBUG
                 MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-                auto descSet   = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                auto binding   = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
                 auto blockType = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(2))->getZExtValue();
                 LLPC_ASSERT((blockType == BlockTypeUniform) || (blockType == BlockTypeShaderStorage));
+#endif
                 break;
             }
         default:
