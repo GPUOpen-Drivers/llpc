@@ -461,12 +461,12 @@ public:
 
     // Create an image store.
     virtual Value* CreateImageStore(
+        Value*                  pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
         uint32_t                dim,                // Image dimension
         uint32_t                flags,              // ImageFlag* flags
         Value*                  pImageDesc,         // [in] Image descriptor or texel buffer descriptor
         Value*                  pCoord,             // [in] Coordinates: scalar or vector i32, exactly right width
         Value*                  pMipLevel,          // [in] Mipmap level if doing store_mip, otherwise nullptr
-        Value*                  pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
         const Twine&            instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create an image sample.

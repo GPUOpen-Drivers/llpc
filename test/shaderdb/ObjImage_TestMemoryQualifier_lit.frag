@@ -18,11 +18,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
-; SHADERTEST: call void (...) @llpc.call.image.store(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call void (...) @llpc.call.image.store(<4 x float> %{{[^,]*}}, i32 1, i32 0, <8 x i32>
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 1, i32 0, <8 x i32>
-; SHADERTEST: call void (...) @llpc.call.image.store(i32 1, i32 0, <8 x i32>
+; SHADERTEST: call void (...) @llpc.call.image.store(<4 x float> %{{[^,]*}}, i32 1, i32 0, <8 x i32>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

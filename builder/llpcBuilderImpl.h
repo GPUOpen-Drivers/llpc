@@ -164,12 +164,12 @@ public:
                                     const Twine&      instName = "") override final;
 
     // Create an image store.
-    Value* CreateImageStore(uint32_t         dim,
+    Value* CreateImageStore(Value*           pTexel,
+                            uint32_t         dim,
                             uint32_t         flags,
                             Value*           pImageDesc,
                             Value*           pCoord,
                             Value*           pMipLevel,
-                            Value*           pTexel,
                             const Twine&     instName = "") override final;
 
     // Create an image sample.

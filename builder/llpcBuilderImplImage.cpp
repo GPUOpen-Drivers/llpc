@@ -1077,12 +1077,12 @@ Value* BuilderImplImage::CreateImageLoadWithFmask(
 // =====================================================================================================================
 // Create an image store.
 Value* BuilderImplImage::CreateImageStore(
+    Value*            pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
     uint32_t          dim,                // Image dimension
     uint32_t          flags,              // ImageFlag* flags
     Value*            pImageDesc,         // [in] Image descriptor
     Value*            pCoord,             // [in] Coordinates: scalar or vector i32
     Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-    Value*            pTexel,             // [in] Texel value to store; v4i16, v4i32, v4f16 or v4f32
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     getContext().GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
