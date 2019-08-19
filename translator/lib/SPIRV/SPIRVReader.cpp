@@ -7616,8 +7616,8 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
 
   // Do the image store.
   Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
-  return m_pBuilder->CreateImageStore(ImageInfo.Dim, ImageInfo.Flags,
-                                      ImageInfo.ImageDesc, Coord, Lod, Texel);
+  return m_pBuilder->CreateImageStore(Texel, ImageInfo.Dim, ImageInfo.Flags,
+                                      ImageInfo.ImageDesc, Coord, Lod);
 }
 
 // =============================================================================

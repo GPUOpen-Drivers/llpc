@@ -486,15 +486,16 @@ Value* BuilderRecorder::CreateImageLoadWithFmask(
 // =====================================================================================================================
 // Create an image store.
 Value* BuilderRecorder::CreateImageStore(
+    Value*            pTexel,             // [in] Texel value to store; v4f16 or v4f32
     uint32_t          dim,                // Image dimension
     uint32_t          flags,              // ImageFlag* flags
     Value*            pImageDesc,         // [in] Image descriptor
     Value*            pCoord,             // [in] Coordinates: scalar or vector i32
     Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
-    Value*            pTexel,             // [in] Texel value to store; v4f16 or v4f32
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     SmallVector<Value*, 6> args;
+    args.push_back(pTexel);
     args.push_back(getInt32(dim));
     args.push_back(getInt32(flags));
     args.push_back(pImageDesc);
@@ -503,7 +504,6 @@ Value* BuilderRecorder::CreateImageStore(
     {
         args.push_back(pMipLevel);
     }
-    args.push_back(pTexel);
     return Record(Opcode::ImageStore, nullptr, args, instName);
 }
 

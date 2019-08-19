@@ -337,13 +337,13 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ImageStore:
         {
-            uint32_t dim = cast<ConstantInt>(args[0])->getZExtValue();
-            uint32_t flags = cast<ConstantInt>(args[1])->getZExtValue();
-            Value* pImageDesc = args[2];
-            Value* pCoord = args[3];
-            Value* pMipLevel = (args.size() > 5) ? &*args[4] : nullptr;
-            Value* pTexel = args.back();
-            return m_pBuilder->CreateImageStore(dim, flags, pImageDesc, pCoord, pMipLevel, pTexel);
+            Value* pTexel = args[0];
+            uint32_t dim = cast<ConstantInt>(args[1])->getZExtValue();
+            uint32_t flags = cast<ConstantInt>(args[2])->getZExtValue();
+            Value* pImageDesc = args[3];
+            Value* pCoord = args[4];
+            Value* pMipLevel = (args.size() > 5) ? &*args[5] : nullptr;
+            return m_pBuilder->CreateImageStore(pTexel, dim, flags, pImageDesc, pCoord, pMipLevel);
         }
 
     case BuilderRecorder::Opcode::ImageSample:
