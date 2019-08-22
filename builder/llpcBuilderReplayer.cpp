@@ -590,6 +590,14 @@ Value* BuilderReplayer::ProcessCall(
         {
             return m_pBuilder->CreateDotProduct(args[0], args[1]);
         }
+    case BuilderRecorder::Opcode::Determinant:
+        {
+            return m_pBuilder->CreateDeterminant(args[0]);
+        }
+    case BuilderRecorder::Opcode::MatrixInverse:
+        {
+            return m_pBuilder->CreateMatrixInverse(args[0]);
+        }
 
     // Replayer implementations of BuilderImplSubgroup methods
     case BuilderRecorder::Opcode::GetSubgroupSize:

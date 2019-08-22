@@ -384,9 +384,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmuF16.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslMatrixOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslPushConstOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll

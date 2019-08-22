@@ -363,7 +363,8 @@ public:
   Constant *buildShaderBlockMetadata(SPIRVType* BT, ShaderBlockDecorate &BlockDec, Type *&MDTy);
   uint32_t calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize, uint32_t MatrixStride, bool IsRowMajor);
   Instruction *transOCLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
-  Instruction *transGLSLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
+  Value *transGLSLExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
+  Value *transGLSLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
   std::vector<Value *> transValue(const std::vector<SPIRVValue *> &,
                                   Function *F, BasicBlock *);
   Function *transFunction(SPIRVFunction *F);
@@ -4952,6 +4953,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
             return nullptr;
         }
     case SPIRVEIS_GLSL:
+        return transGLSLExtInst(pSpvExtInst, pBlock);
+
     case SPIRVEIS_ShaderExplicitVertexParameterAMD:
     case SPIRVEIS_GcnShaderAMD:
     case SPIRVEIS_ShaderTrinaryMinMaxAMD:
@@ -9263,8 +9266,31 @@ Instruction *SPIRVToLLVM::transOCLBuiltinFromExtInst(SPIRVExtInst *BC,
   return transOCLBuiltinPostproc(BC, Call, BB, UnmangledName);
 }
 
-Instruction * SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
-                                                       BasicBlock *BB) {
+// =============================================================================
+// Translate GLSL.std.450 extended instruction
+Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
+                                           BasicBlock *BB) {
+  auto BArgs = ExtInst->getArguments();
+  auto Args = transValue(ExtInst->getValues(BArgs), BB->getParent(), BB);
+  switch (static_cast<GLSLExtOpKind>(ExtInst->getExtOp())) {
+
+  case GLSLstd450Determinant:
+    // Determinant of square matrix
+    return m_pBuilder->CreateDeterminant(Args[0]);
+
+  case GLSLstd450MatrixInverse:
+    // Inverse of square matrix
+    return m_pBuilder->CreateMatrixInverse(Args[0]);
+
+  default:
+    // Other instructions are handled the old way, by generating a call.
+    return transGLSLBuiltinFromExtInst(ExtInst, BB);
+  }
+}
+
+// =============================================================================
+Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
+                                                BasicBlock *BB) {
   assert(BB && "Invalid BB");
 
   SPIRVExtInstSetKind Set = BM->getBuiltinSet(BC->getExtSetId());

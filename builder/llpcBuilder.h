@@ -802,6 +802,17 @@ public:
         Value* const pVector2,            // [in] The float vector 2
         const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
 
+    // Create matrix determinant operation. Matrix must be square
+    virtual Value* CreateDeterminant(
+        Value* const pMatrix,             // [in] Matrix
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
+
+    // Create matrix inverse operation. Matrix must be square. Result is undefined if the matrix
+    // is singular or poorly conditioned (nearly singular).
+    virtual Value* CreateMatrixInverse(
+        Value* const pMatrix,             // [in] Matrix
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
+
     // -----------------------------------------------------------------------------------------------------------------
     // Miscellaneous operations
 

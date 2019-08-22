@@ -41,12 +41,12 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call [2 x <3 x half>] (...) @llpc.call.outer.product.a2v3f16(<3 x half> %{{.*}}, <2 x half> %{{.*}})
 ; SHADERTEST: %{{[^, ]*}} = call [3 x <2 x half>] {{.*}}@llpc.call.transpose.matrix.a3v2f16([2 x <3 x half>] %{{[^, ]*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z11determinantDv2_Dv2_Dh([2 x <2 x half>] %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z11determinantDv3_Dv3_Dh([3 x <3 x half>] %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z11determinantDv4_Dv4_Dh([4 x <4 x half>] %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} [2 x <2 x half>] @_Z13matrixInverseDv2_Dv2_Dh([2 x <2 x half>] %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} [3 x <3 x half>] @_Z13matrixInverseDv3_Dv3_Dh([3 x <3 x half>] %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} [4 x <4 x half>] @_Z13matrixInverseDv4_Dv4_Dh([4 x <4 x half>] %{{.*}})
+; SHADERTEST: = call half (...) @llpc.call.determinant.f16([2 x <2 x half>] %
+; SHADERTEST: = call half (...) @llpc.call.determinant.f16([3 x <3 x half>] %
+; SHADERTEST: = call half (...) @llpc.call.determinant.f16([4 x <4 x half>] %
+; SHADERTEST: = call [2 x <2 x half>] (...) @llpc.call.matrix.inverse.a2v2f16([2 x <2 x half>] %
+; SHADERTEST: = call [3 x <3 x half>] (...) @llpc.call.matrix.inverse.a3v3f16([3 x <3 x half>] %
+; SHADERTEST: = call [4 x <4 x half>] (...) @llpc.call.matrix.inverse.a4v4f16([4 x <4 x half>] %
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
