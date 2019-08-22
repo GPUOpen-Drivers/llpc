@@ -113,6 +113,8 @@ public:
         MatrixTimesVector,
         MatrixTimesMatrix,
         OuterProduct,
+        Determinant,
+        MatrixInverse,
 
         // Misc.
         EmitVertex,
@@ -409,6 +411,8 @@ public:
     Value* CreateOuterProduct(Value* const pVector1,
                               Value* const pVector2,
                               const Twine& instName = "") override final;
+    Value* CreateDeterminant(Value* const pMatrix, const Twine& instName = "") override final;
+    Value* CreateMatrixInverse(Value* const pMatrix, const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Subgroup operations
