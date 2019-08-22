@@ -1443,10 +1443,10 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
             {
                 m_pBuilder->SetInsertPoint(pEndWriteDrawFlagBlock);
 
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
                 if (vertexCompact)
                 {
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
                     uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
 
                     auto pLdsOffset =
@@ -1480,7 +1480,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                     pPrimCountAcc = m_pBuilder->CreateAnd(pHasSurviveDraw, pThreadValid);
                 }
 
-                m_pBuilder->CreateCondBr(pPrimCountAcc, pAccThreadCountBlock,pEndAccThreadCountBlock);
+                m_pBuilder->CreateCondBr(pPrimCountAcc, pAccThreadCountBlock, pEndAccThreadCountBlock);
             }
 
             // Construct ".accThreadCount" block
@@ -1750,8 +1750,6 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                     pPrimCountInSubgroup =
                         m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCountInSubgroup);
 
-                    pHasSurvivePrim = m_pBuilder->CreateICmpNE(pPrimCountInSubgroup, m_pBuilder->getInt32(0));
-
                     Value* pVertCountInSubgroup =
                         m_pBuilder->CreateSelect(pHasSurvivePrim,
                                                  m_nggFactor.pVertCountInSubgroup,
@@ -1785,10 +1783,7 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
             {
                 m_pBuilder->SetInsertPoint(pEndAllocReqBlock);
 
-                if (vertexCompact)
-                {
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-                }
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
                 auto pNoSurviveThread = m_pBuilder->CreateICmpEQ(pThreadCountInWaves, m_pBuilder->getInt32(0));
                 m_pBuilder->CreateCondBr(pNoSurviveThread, pEarlyExitBlock, pNoEarlyExitBlock);
@@ -4405,10 +4400,10 @@ void NggPrimShader::CreateSmallPrimFilterCuller(
         //
         // Small primitive filter culling algorithm is described as follow:
         //
-        //   if ((floor(min(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2))) ==
-        //        floor(max(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2)))) ||
-        //       (floor(min(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2))) ==
-        //        floor(max(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2)))))
+        //   if ((roundEven(min(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2))) ==
+        //        roundEven(max(scaled(x0/w0), scaled(x1/w1), scaled(x2/w2)))) ||
+        //       (roundEven(min(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2))) ==
+        //        roundEven(max(scaled(y0/w0), scaled(y1/w1), scaled(y2/w2)))))
         //       cullFlag = true
         //
 
