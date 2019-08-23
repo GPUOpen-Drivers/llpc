@@ -40,17 +40,6 @@ genIType findILsb genUType value : llpc.findIlsb.i32 #0
 genIType findUMsb genUType value : llpc.findUMsb.i32 #0
 genIType findSMsb genIType value : llpc.findSMsb.i32 #0
 
-# Derivative Functions
-genType DPdx genType p : llpc.dpdx.f32 #0
-genType DPdy genType p : llpc.dpdy.f32 #0
-genType Fwidth genType p : llpc.fwidth.f32 #0
-genType DPdxFine genType p : llpc.dpdxFine.f32 #0
-genType DPdyFine genType p : llpc.dpdyFine.f32 #0
-genType FwidthFine genType p : llpc.fwidthFine.f32 #0
-genType DPdxCoarse genType p : llpc.dpdxCoarse.f32 #0
-genType DPdyCoarse genType p : llpc.dpdyCoarse.f32 #0
-genType FwidthCoarse genType p : llpc.fwidthCoarse.f32 #0
-
 # Functions of extension AMD_shader_trinary_minmax
 genIType SMin3AMD genIType x genIType y genIType z : llpc.smin3.i32 #0
 genIType SMax3AMD genIType x genIType y genIType z : llpc.smax3.i32 #0

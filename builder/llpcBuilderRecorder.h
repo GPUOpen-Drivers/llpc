@@ -142,6 +142,7 @@ public:
         EndPrimitive,
         Kill,
         ReadClock,
+        Derivative,
 
         // Subgroup
         GetSubgroupSize,
@@ -236,6 +237,9 @@ public:
     Value* CreateExp(Value* pX, const Twine& instName = "") override final;
     Value* CreateLog(Value* pX, const Twine& instName = "") override final;
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
+
+    // Create derivative calculation on float or vector of float or half
+    Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations

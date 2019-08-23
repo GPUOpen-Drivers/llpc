@@ -72,6 +72,14 @@ protected:
                                      ArrayRef<uint32_t> operandIdxs,
                                      const Twine&       instName = "");
 
+    // Helper method to scalarize a possibly vector unary operation
+    Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
+
+    // Helper method to scalarize a possibly vector binary operation
+    Value* Scalarize(Value*                                 pValue0,
+                     Value*                                 pValue1,
+                     std::function<Value*(Value*, Value*)>  callback);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
@@ -132,14 +140,6 @@ private:
     // Helper method to create call to llvm.amdgcn.class, scalarizing if necessary. This is not exposed outside of
     // BuilderImplArith.
     Value* CreateCallAmdgcnClass(Value* pValue, uint32_t flags, const Twine& instName = "");
-
-    // Helper method to scalarize a possibly vector unary operation
-    Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
-
-    // Helper method to scalarize a possibly vector binary operation
-    Value* Scalarize(Value*                                 pValue0,
-                     Value*                                 pValue1,
-                     std::function<Value*(Value*, Value*)>  callback);
 
     // Methods to get various FP constants as scalar or vector. Any needed directly by a client should be moved
     // to llpcBuilder.h. Using these (rather than just using for example
@@ -625,6 +625,9 @@ public:
 
     // Create a "readclock".
     Instruction* CreateReadClock(bool realtime, const Twine& instName) override final;
+
+    // Create derivative calculation on float or vector of float or half
+    Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMisc)

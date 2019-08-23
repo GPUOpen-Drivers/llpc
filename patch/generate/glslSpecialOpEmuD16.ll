@@ -27,63 +27,8 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; =====================================================================================================================
-; >>>  Derivative Functions
+; >>>  Derivative Functions (now only used by interpolation functions below)
 ; =====================================================================================================================
-
-; GLSL: float16_t dFdx(float16_t)
-define half @llpc.dpdx.f16(half %p) #0
-{
-    ; broadcast pix1, [0,1,2,3]->[1,1,1,1], so dpp_ctrl = 85(0b01010101)
-    %p.i16 = bitcast half %p to i16
-    %p.i32 = zext i16 %p.i16 to i32
-    %p0.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 85, i32 15, i32 15, i1 1)
-    %p0.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.dpp)
-    %p0.i16 = trunc i32 %p0.i32 to i16
-    %p0 = bitcast i16 %p0.i16 to half
-
-    ; Broadcast pix0, [0,1,2,3]->[0,0,0,0], so dpp_ctrl = 0(0b00000000)
-    %p1.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 0, i32 15, i32 15, i1 1)
-    %p1.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.dpp)
-    %p1.i16 = trunc i32 %p1.i32 to i16
-    %p1 = bitcast i16 %p1.i16 to half
-
-    ; Calculate the delta value p0 - p1
-    %dpdx = fsub half %p0, %p1
-    ret half %dpdx
-}
-
-; GLSL: float16_t dFdy(float16_t)
-define half @llpc.dpdy.f16(half %p) #0
-{
-    ; broadcast pix2 [0,1,2,3] -> [2,2,2,2], so dpp_ctrl = 170(0b10101010)
-    %p.i16 = bitcast half %p to i16
-    %p.i32 = zext i16 %p.i16 to i32
-    %p0.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 170, i32 15, i32 15, i1 1)
-    %p0.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.dpp)
-    %p0.i16 = trunc i32 %p0.i32 to i16
-    %p0 = bitcast i16 %p0.i16 to half
-
-    ; Broadcast pix0, [0,1,2,3]->[0,0,0,0], so dpp_ctrl = 0(0b00000000)
-    %p1.dpp = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %p.i32, i32 0, i32 15, i32 15, i1 1)
-    %p1.i32 = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.dpp)
-    %p1.i16 = trunc i32 %p1.i32 to i16
-    %p1 = bitcast i16 %p1.i16 to half
-
-    ; Calculate the delta value p0 - p1
-    %dpdy =  fsub half %p0, %p1
-    ret half %dpdy
-}
-
-; GLSL: float16_t fwidth(float16_t)
-define half @llpc.fwidth.f16(half %p) #0
-{
-    %1 = call half @llpc.dpdx.f16(half %p)
-    %2 = call half @llpc.dpdy.f16(half %p)
-    %3 = call half @llvm.fabs.f16(half %1)
-    %4 = call half @llvm.fabs.f16(half %2)
-    %5 = fadd half %3, %4
-    ret half %5
-}
 
 ; GLSL: float16_t dFdxFine(float16_t)
 define half @llpc.dpdxFine.f16(half %p) #0
@@ -127,42 +72,6 @@ define half @llpc.dpdyFine.f16(half %p) #0
     ; Calculate the delta value
     %dpdy =  fsub half %p0, %p1
     ret half %dpdy
-}
-
-; GLSL: float16_t fwidthFine(float16_t)
-define half @llpc.fwidthFine.f16(half %p) #0
-{
-    %1 = call half @llpc.dpdxFine.f16(half %p)
-    %2 = call half @llpc.dpdyFine.f16(half %p)
-    %3 = call half @llvm.fabs.f16(half %1)
-    %4 = call half @llvm.fabs.f16(half %2)
-    %5 = fadd half %3, %4
-    ret half %5
-}
-
-; GLSL: float16_t dFdxCoarse(float16_t)
-define half @llpc.dpdxCoarse.f16(half %p) #0
-{
-    %1 = call half @llpc.dpdx.f16(half %p)
-    ret half %1
-}
-
-; GLSL: float16_t dFdyCoarse(float16_t)
-define half @llpc.dpdyCoarse.f16(half %p) #0
-{
-    %1 = call half @llpc.dpdy.f16(half %p)
-    ret half %1
-}
-
-; GLSL: float16_t fwidthCoarse(float16_t)
-define half @llpc.fwidthCoarse.f16(half %p) #0
-{
-    %1 = call half @llpc.dpdxCoarse.f16(half %p)
-    %2 = call half @llpc.dpdyCoarse.f16(half %p)
-    %3 = call half @llvm.fabs.f16(half %1)
-    %4 = call half @llvm.fabs.f16(half %2)
-    %5 = fadd half %3, %4
-    ret half %5
 }
 
 ; =====================================================================================================================
