@@ -91,6 +91,20 @@ Builder::~Builder()
 }
 
 // =====================================================================================================================
+// Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
+// is a vector type.
+Type* Builder::GetConditionallyVectorizedTy(
+    Type* pElementTy,           // [in] Element type
+    Type* pMaybeVecTy)          // [in] Possible vector type to get number of elements from
+{
+    if (auto pVecTy = dyn_cast<VectorType>(pMaybeVecTy))
+    {
+        return VectorType::get(pElementTy, pVecTy->getNumElements());
+    }
+    return pElementTy;
+}
+
+// =====================================================================================================================
 // Set the resource mapping nodes for the given shader stage.
 // This stores the nodes as IR metadata.
 void Builder::SetUserDataNodes(

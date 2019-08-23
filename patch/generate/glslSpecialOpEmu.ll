@@ -270,54 +270,6 @@ define <2 x float> @llpc.input.interpolate.evalij.sample.noperspective(i32 %samp
     ret <2 x float> %2
 }
 
-; =====================================================================================================================
-; >>>  Functions of Extension AMD_gcn_shader
-; =====================================================================================================================
-
-; GLSL: float cubeFaceIndex(vec3)
-define spir_func float @_Z16CubeFaceIndexAMDDv3_f(<3 x float> %coord)
-{
-    %1 = extractelement <3 x float> %coord, i32 0
-    %2 = extractelement <3 x float> %coord, i32 1
-    %3 = extractelement <3 x float> %coord, i32 2
-
-    %4 = call float @llvm.amdgcn.cubeid(float %1, float %2, float %3)
-    ret float %4
-}
-
-; GLSL: vec2 cubeFaceCoord(vec3)
-define spir_func <2 x float> @_Z16CubeFaceCoordAMDDv3_f(<3 x float> %coord)
-{
-    %1 = extractelement <3 x float> %coord, i32 0
-    %2 = extractelement <3 x float> %coord, i32 1
-    %3 = extractelement <3 x float> %coord, i32 2
-
-    %4 = call float @llvm.amdgcn.cubema(float %1, float %2, float %3)
-    %5 = fdiv float 1.0, %4
-
-    %6 = call float @llvm.amdgcn.cubesc(float %1, float %2, float %3)
-    %7 = fmul float %5, %6
-    %8 = fadd float %7, 0.5
-
-    %9  = call float @llvm.amdgcn.cubetc(float %1, float %2, float %3)
-    %10 = fmul float %5, %9
-    %11 = fadd float %10, 0.5
-
-    %12 = insertelement <2 x float> undef, float %8, i32 0
-    %13 = insertelement <2 x float> %12, float %11, i32 1
-
-    ret <2 x float> %13
-}
-
-; GLSL: uint64_t time()
-define spir_func i64 @_Z7TimeAMDv()
-{
-    %1 = call i64 @llvm.amdgcn.s.memtime() #0
-    ; Prevent optimization of backend compiler on the control flow
-    %2 = call i64 asm sideeffect "; %1", "=v,0"(i64 %1)
-    ret i64 %2
-}
-
 declare float @llvm.fabs.f32(float) #0
 declare i32 @llvm.amdgcn.ds.swizzle(i32, i32) #2
 declare void @llvm.amdgcn.s.waitcnt(i32) #0
@@ -337,11 +289,6 @@ declare i1 @llvm.amdgcn.ps.live() #1
 declare i64 @llvm.cttz.i64(i64, i1) #0
 declare i64 @llvm.ctlz.i64(i64, i1) #0
 declare i64 @llvm.ctpop.i64(i64) #0
-declare float @llvm.amdgcn.cubeid(float, float, float) #1
-declare float @llvm.amdgcn.cubesc(float, float, float) #1
-declare float @llvm.amdgcn.cubema(float, float, float) #1
-declare float @llvm.amdgcn.cubetc(float, float, float) #1
-declare i64 @llvm.amdgcn.s.memtime() #0
 declare i32 @llvm.amdgcn.wwm.i32(i32) #1
 declare i64 @llvm.amdgcn.wwm.i64(i64) #1
 declare <2 x i32> @llvm.amdgcn.wwm.v2i32(<2 x i32>) #1

@@ -1,6 +1,3 @@
-# Operators
-genI8Type smod genI8Type x genI8Type y : llpc.mod.i8 #0
-
 # Common Functions
 genI8Type sabs genI8Type x : llpc.sabs.i8 #0
 genI8Type ssign genI8Type x : llpc.ssign.i8 #0

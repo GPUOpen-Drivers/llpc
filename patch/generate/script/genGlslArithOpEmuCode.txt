@@ -1,9 +1,3 @@
-# SPIR-V specific
-genType quantizeToF16 genType x : llpc.quantizeToF16 #0
-
-# Operators
-genIType smod genIType x genIType y : llpc.mod.i32 #0
-
 # Angle and Trigonometry Functions
 genType sin genType angle : llvm.sin.f32
 genType cos genType angle : llvm.cos.f32

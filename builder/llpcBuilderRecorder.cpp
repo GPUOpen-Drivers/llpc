@@ -49,6 +49,14 @@ StringRef BuilderRecorder::GetCallName(
         return "nop";
     case Opcode::DotProduct:
         return "dot.product";
+    case Opcode::CubeFaceCoord:
+        return "cube.face.coord";
+    case Opcode::CubeFaceIndex:
+        return "cube.face.index";
+    case Opcode::QuantizeToFp16:
+        return "quantize.to.fp16";
+    case Opcode::SMod:
+        return "smod";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -382,6 +390,46 @@ Instruction* BuilderRecorder::CreateReadClock(
     const Twine& instName)   // [in] Name to give final instruction
 {
     return Record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
+}
+
+// =====================================================================================================================
+// Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
+// the given cube map texture coordinates. Returns <2 x float>.
+Value* BuilderRecorder::CreateCubeFaceCoord(
+    Value*        pCoord,     // [in] Input coordinate <3 x float>
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::CubeFaceCoord, VectorType::get(pCoord->getType()->getScalarType(), 2), pCoord, instName);
+}
+
+// =====================================================================================================================
+// Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
+// the given cube map texture coordinates.
+Value* BuilderRecorder::CreateCubeFaceIndex(
+    Value*        pCoord,     // [in] Input coordinate <3 x float>
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::CubeFaceIndex, pCoord->getType()->getScalarType(), pCoord, instName);
+}
+
+// =====================================================================================================================
+// Create quantize operation.
+Value* BuilderRecorder::CreateQuantizeToFp16(
+    Value*        pValue,     // [in] Input value (float or float vector)
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::QuantizeToFp16, pValue->getType(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create signed integer modulo operation, where the sign of the result (if not zero) is the same as the sign
+// of the divisor.
+Value* BuilderRecorder::CreateSMod(
+    Value*        pDividend,  // [in] Dividend value
+    Value*        pDivisor,   // [in] Divisor value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SMod, pDividend->getType(), { pDividend, pDivisor }, instName);
 }
 
 // =====================================================================================================================

@@ -175,6 +175,10 @@ public:
     // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
     virtual ModulePass* CreateBuilderReplayer() { return nullptr; }
 
+    // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
+    // is a vector type.
+    static Type* GetConditionallyVectorizedTy(Type* pElementTy, Type* pMaybeVecTy);
+
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
@@ -216,6 +220,36 @@ public:
 
     // -----------------------------------------------------------------------------------------------------------------
     // Arithmetic operations
+
+    // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
+    // the given cube map texture coordinates. Returns <2 x float>.
+    virtual Value* CreateCubeFaceCoord(
+        Value*        pCoord,             // [in] Input coordinate <3 x float>
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
+    // the given cube map texture coordinates. Returns a single float with value:
+    //  0.0 = the cube map face facing the positive X direction
+    //  1.0 = the cube map face facing the negative X direction
+    //  2.0 = the cube map face facing the positive Y direction
+    //  3.0 = the cube map face facing the negative Y direction
+    //  4.0 = the cube map face facing the positive Z direction
+    //  5.0 = the cube map face facing the negative Z direction
+    virtual Value* CreateCubeFaceIndex(
+        Value*        pCoord,             // [in] Input coordinate <3 x float>
+        const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
+    virtual Value* CreateQuantizeToFp16(
+        Value*        pValue,               // [in] Input value (float or float vector)
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as the sign
+    // of the divisor.
+    virtual Value* CreateSMod(
+        Value*        pDividend,            // [in] Dividend value
+        Value*        pDivisor,             // [in] Divisor value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations

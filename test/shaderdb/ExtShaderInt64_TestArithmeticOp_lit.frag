@@ -43,7 +43,7 @@ void main()
 ; SHADERTEST: sub i64 %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: mul i64 %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: sdiv i64 %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: call {{.*}} i64 @_Z4smodll
+; SHADERTEST: call i64 (...) @llpc.call.smod.i64(i64
 ; SHADERTEST: sub nsw i64 0, %{{[0-9]*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */

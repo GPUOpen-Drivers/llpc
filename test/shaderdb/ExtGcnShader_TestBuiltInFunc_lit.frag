@@ -23,15 +23,16 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} float @_Z16CubeFaceIndexAMDDv3_f
-; SHADERTEST: call {{.*}} <2 x float> @_Z16CubeFaceCoordAMDDv3_f
-; SHADERTEST: call {{.*}} i64 @_Z7TimeAMDv
+; SHADERTEST: = call float (...) @llpc.call.cube.face.index.f32(<3 x float>
+; SHADERTEST: = call <2 x float> (...) @llpc.call.cube.face.coord.v2f32(<3 x float>
+; SHADERTEST: = call i64 (...) @llpc.call.read.clock.i64(i1 false)
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call float @llvm.amdgcn.cubeid
 ; SHADERTEST: call float @llvm.amdgcn.cubema
 ; SHADERTEST: call float @llvm.amdgcn.cubesc
 ; SHADERTEST: call float @llvm.amdgcn.cubetc
-; SHADERTEST: call i64 @llvm.amdgcn.s.memtime
+; SHADERTEST: [[TIME:%[^ ]*]] = call i64 @llvm.amdgcn.s.memtime()
+; SHADERTEST: = call i64 asm sideeffect "; %1", "=r,0"(i64 [[TIME]])
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
