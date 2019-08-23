@@ -342,3 +342,32 @@ Value* BuilderImplBase::Scalarize(
     return pResult;
 }
 
+// =====================================================================================================================
+// Helper method to scalarize a possibly vector trinary operation
+Value* BuilderImplBase::Scalarize(
+    Value*                                        pValue0,    // [in] Input value 0
+    Value*                                        pValue1,    // [in] Input value 1
+    Value*                                        pValue2,    // [in] Input value 2
+    std::function<Value*(Value*, Value*, Value*)> callback)   // [in] Callback function
+{
+    if (auto pVecTy = dyn_cast<VectorType>(pValue0->getType()))
+    {
+        Value* pResult0 = callback(CreateExtractElement(pValue0, uint64_t(0)),
+                                   CreateExtractElement(pValue1, uint64_t(0)),
+                                   CreateExtractElement(pValue2, uint64_t(0)));
+        Value* pResult = UndefValue::get(VectorType::get(pResult0->getType(), pVecTy->getNumElements()));
+        pResult = CreateInsertElement(pResult, pResult0, uint64_t(0));
+        for (uint32_t idx = 1, end = pVecTy->getNumElements(); idx != end; ++idx)
+        {
+            pResult = CreateInsertElement(pResult,
+                                          callback(CreateExtractElement(pValue0, idx),
+                                                   CreateExtractElement(pValue1, idx),
+                                                   CreateExtractElement(pValue2, idx)),
+                                          idx);
+        }
+        return pResult;
+    }
+    Value* pResult = callback(pValue0, pValue1, pValue2);
+    return pResult;
+}
+

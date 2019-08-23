@@ -93,6 +93,7 @@ public:
         Exp,
         Log,
         InverseSqrt,
+        FMed3,
 
         // Descriptor
         LoadBufferDesc,
@@ -237,6 +238,9 @@ public:
     Value* CreateExp(Value* pX, const Twine& instName = "") override final;
     Value* CreateLog(Value* pX, const Twine& instName = "") override final;
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
+
+    // Create fmed3 operation.
+    Value* CreateFMed3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
 
     // Create derivative calculation on float or vector of float or half
     Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;

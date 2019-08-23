@@ -87,6 +87,8 @@ StringRef BuilderRecorder::GetCallName(
         return "log";
     case InverseSqrt:
         return "inverse.sqrt";
+    case Opcode::FMed3:
+        return "fmed3";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -610,6 +612,17 @@ Value* BuilderRecorder::CreateDerivative(
     const Twine&  instName)     // [in] Name to give instruction(s)
 {
     return Record(Opcode::Derivative, pValue->getType(), { pValue, getInt1(isDirectionY), getInt1(isFine) }, instName);
+}
+
+// =====================================================================================================================
+// Create "fmed3" operation, returning the middle one of three float values.
+Value* BuilderRecorder::CreateFMed3(
+    Value*        pValue1,              // [in] First value
+    Value*        pValue2,              // [in] Second value
+    Value*        pValue3,              // [in] Third value
+    const Twine&  instName)             // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMed3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
 }
 
 // =====================================================================================================================

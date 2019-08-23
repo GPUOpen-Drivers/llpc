@@ -80,6 +80,12 @@ protected:
                      Value*                                 pValue1,
                      std::function<Value*(Value*, Value*)>  callback);
 
+    // Helper method to scalarize a possibly vector trinary operation
+    Value* Scalarize(Value*                                        pValue0,
+                     Value*                                        pValue1,
+                     Value*                                        pValue2,
+                     std::function<Value*(Value*, Value*, Value*)> callback);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)
@@ -123,6 +129,9 @@ public:
     Value* CreateLog(Value* pX, const Twine& instName = "") override final;
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
     Value* CreateFSign(Value* pX, const Twine& instName = ""); // TODO add override final
+
+    // Create "fmed3" operation, returning the middle one of three float values.
+    Value* CreateFMed3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)

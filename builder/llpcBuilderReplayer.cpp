@@ -351,6 +351,11 @@ Value* BuilderReplayer::ProcessCall(
                                                 cast<ConstantInt>(args[2])->getZExtValue());  // isFine
         }
 
+    case BuilderRecorder::Opcode::FMed3:
+        {
+            return m_pBuilder->CreateFMed3(args[0], args[1], args[2]);
+        }
+
     // Replayer implementations of BuilderImplDesc methods
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {
