@@ -364,6 +364,7 @@ public:
   uint32_t calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize, uint32_t MatrixStride, bool IsRowMajor);
   Instruction *transOCLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
   Value *transGLSLExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
+  Value *transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
   Value *transGLSLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
   std::vector<Value *> transValue(const std::vector<SPIRVValue *> &,
                                   Function *F, BasicBlock *);
@@ -4958,7 +4959,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         return transGLSLExtInst(pSpvExtInst, pBlock);
 
     case SPIRVEIS_ShaderExplicitVertexParameterAMD:
-    case SPIRVEIS_ShaderTrinaryMinMaxAMD:
         return transGLSLBuiltinFromExtInst(pSpvExtInst, pBlock);
 
     case SPIRVEIS_GcnShaderAMD:
@@ -4974,6 +4974,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
             LLPC_NEVER_CALLED();
             return nullptr;
         }
+
+    case SPIRVEIS_ShaderTrinaryMinMaxAMD:
+        return transTrinaryMinMaxExtInst(pSpvExtInst, pBlock);
 
     default:
         LLPC_NEVER_CALLED();
@@ -9401,6 +9404,101 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
   default:
     // Other instructions are handled the old way, by generating a call.
     return transGLSLBuiltinFromExtInst(ExtInst, BB);
+  }
+}
+
+// =============================================================================
+// Translate ShaderTrinaryMinMax extended instructions
+Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst,
+                                              BasicBlock *BB) {
+  auto BArgs = ExtInst->getArguments();
+  auto Args = transValue(ExtInst->getValues(BArgs), BB->getParent(), BB);
+  switch (ExtInst->getExtOp()) {
+
+  case FMin3AMD: {
+    // Minimum of three FP values. Undefined result if any NaNs.
+    FastMathFlags FMF;
+    FMF.setNoNaNs();
+    CallInst *Min1 = getBuilder()->CreateMinNum(Args[0], Args[1]);
+    Min1->setFastMathFlags(FMF);
+    CallInst *Min2 = getBuilder()->CreateMinNum(Min1, Args[2]);
+    Min2->setFastMathFlags(FMF);
+    return Min2;
+  }
+
+  case FMax3AMD: {
+    // Maximum of three FP values. Undefined result if any NaNs.
+    FastMathFlags FMF;
+    FMF.setNoNaNs();
+    CallInst *Max1 = getBuilder()->CreateMaxNum(Args[0], Args[1]);
+    Max1->setFastMathFlags(FMF);
+    CallInst *Max2 = getBuilder()->CreateMaxNum(Max1, Args[2]);
+    Max2->setFastMathFlags(FMF);
+    return Max2;
+  }
+
+  case FMid3AMD:
+    // Middle of three FP values. Undefined result if any NaNs.
+    return getBuilder()->CreateFMed3(Args[0], Args[1], Args[2]);
+
+  case UMin3AMD: {
+    // Minimum of three unsigned integer values.
+    Value *Cond = getBuilder()->CreateICmpULT(Args[0], Args[1]);
+    Value *Min1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpULT(Min1, Args[2]);
+    return getBuilder()->CreateSelect(Cond, Min1, Args[2]);
+  }
+
+  case UMax3AMD: {
+    // Maximum of three unsigned integer values.
+    Value *Cond = getBuilder()->CreateICmpUGT(Args[0], Args[1]);
+    Value *Max1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpUGT(Max1, Args[2]);
+    return getBuilder()->CreateSelect(Cond, Max1, Args[2]);
+  }
+
+  case UMid3AMD: {
+    // Middle of three unsigned integer values.
+    Value *Cond = getBuilder()->CreateICmpULT(Args[0], Args[1]);
+    Value *Min1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpUGT(Args[0], Args[1]);
+    Value *Max1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpULT(Max1, Args[2]);
+    Value *Min2 = getBuilder()->CreateSelect(Cond, Max1, Args[2]);
+    Cond = getBuilder()->CreateICmpUGT(Min1, Min2);
+    return getBuilder()->CreateSelect(Cond, Min1, Min2);
+  }
+
+  case SMin3AMD: {
+    // Minimum of three signed integer values.
+    Value *Cond = getBuilder()->CreateICmpSLT(Args[0], Args[1]);
+    Value *Min1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpSLT(Min1, Args[2]);
+    return getBuilder()->CreateSelect(Cond, Min1, Args[2]);
+  }
+
+  case SMax3AMD: {
+    // Maximum of three signed integer values.
+    Value *Cond = getBuilder()->CreateICmpSGT(Args[0], Args[1]);
+    Value *Max1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpSGT(Max1, Args[2]);
+    return getBuilder()->CreateSelect(Cond, Max1, Args[2]);
+  }
+
+  case SMid3AMD: {
+    // Middle of three signed integer values.
+    Value *Cond = getBuilder()->CreateICmpSLT(Args[0], Args[1]);
+    Value *Min1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpSGT(Args[0], Args[1]);
+    Value *Max1 = getBuilder()->CreateSelect(Cond, Args[0], Args[1]);
+    Cond = getBuilder()->CreateICmpSLT(Max1, Args[2]);
+    Value *Min2 = getBuilder()->CreateSelect(Cond, Max1, Args[2]);
+    Cond = getBuilder()->CreateICmpSGT(Min1, Min2);
+    return getBuilder()->CreateSelect(Cond, Min1, Min2);
+  }
+
+  default:
+    llvm_unreachable("Unrecognized ShaderTrinaryMinMax instruction");
   }
 }
 

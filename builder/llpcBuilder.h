@@ -339,6 +339,13 @@ public:
         Value*        pX,                   // [in] Input value X
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
+    // Create "fmed3" operation, returning the middle one of three scalar or vector float or half values.
+    virtual Value* CreateFMed3(
+        Value*        pValue1,              // [in] First value
+        Value*        pValue2,              // [in] Second value
+        Value*        pValue3,              // [in] Third value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 

@@ -1634,52 +1634,6 @@ define spir_func { <4 x half>, <4 x i32> } @_Z11frexpStructDv4_DhDv4_i(
     ret { <4 x half>, <4 x i32> } %6
 }
 
-; =====================================================================================================================
-; >>>  Functions of Extension AMD_shader_trinary_minmax
-; =====================================================================================================================
-
-; GLSL: float16_t min3(float16_t, float16_t, float16_t)
-define half @llpc.fmin3.f16(half %x, half %y, half %z)
-{
-    ; min(x, y)
-    %1 = call nnan half @llvm.minnum.f16(half %x, half %y)
-
-    ; min(min(x, y), z)
-    %2 = call nnan half @llvm.minnum.f16(half %1, half %z)
-
-    ret half %2
-}
-
-; GLSL: float16_t max3(float16_t, float16_t, float16_t)
-define half @llpc.fmax3.f16(half %x, half %y, half %z)
-{
-    ; max(x, y)
-    %1 = call nnan half @llvm.maxnum.f16(half %x, half %y)
-
-    ; max(max(x, y), z)
-    %2 = call nnan half @llvm.maxnum.f16(half %1, half %z)
-
-    ret half %2
-}
-
-; GLSL: float16_t mid3(float16_t, float16_t, float16_t)
-define half @llpc.fmid3.f16(half %x, half %y, half %z)
-{
-    ; min(x, y)
-    %1 = call nnan half @llvm.minnum.f16(half %x, half %y)
-
-    ; max(x, y)
-    %2 = call nnan half @llvm.maxnum.f16(half %x, half %y)
-
-    ; min(max(x, y), z)
-    %3 = call nnan half @llvm.minnum.f16(half %2, half %z)
-
-    ; max(min(x, y), min(max(x, y), z))
-    %4 = call nnan half @llvm.maxnum.f16(half %1, half %3)
-
-    ret half %4
-}
-
 declare half @llvm.trunc.f16(half) #0
 declare half @llvm.fabs.f16(half) #0
 declare half @llvm.sqrt.f16(half) #0
