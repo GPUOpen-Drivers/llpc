@@ -16,14 +16,13 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = call {{[a-zA-Z_]+}} <3 x float> @_Z4DPdxDv3_f(<3 x float> %{{[0-9]+}})
-; SHADERTEST: %{{[0-9]+}} = call {{[a-zA-Z_]+}} <3 x float> @_Z8DPdxFineDv3_f(<3 x float> %{{[0-9]+}})
-; SHADERTEST: %{{[0-9]+}} = call {{[a-zA-Z_]+}} <3 x float> @_Z10DPdxCoarseDv3_f(<3 x float> %{{[0-9]+}})
+; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 true)
+; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32(i32 {{[%0-9]+}}, i32 85, i32 15, i32 15, i1 true)
-; SHADERTEST: call i32 @llvm.amdgcn.wqm.i32(i32 %{{[0-9]+}})
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32(i32 {{[%0-9]+}}, i32 0, i32 15, i32 15, i1 true)
-; SHADERTEST: call i32 @llvm.amdgcn.wqm.i32(i32 %{{[0-9]+}})
+; SHADERTEST: call float @llvm.amdgcn.wqm.f32(float %{{[0-9]+}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

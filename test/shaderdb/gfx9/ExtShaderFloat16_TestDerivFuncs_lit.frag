@@ -30,15 +30,27 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} <3 x half> @_Z4DPdxDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: call {{.*}} <3 x half> @_Z4DPdyDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: call {{.*}} <3 x half> @_Z8DPdxFineDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: call {{.*}} <3 x half> @_Z8DPdyFineDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: call half @llpc.dpdxFine.f16(half %{{[0-9]*}})
-; SHADERTEST: call half @llpc.dpdyFine.f16(half %{{[0-9]*}})
-; SHADERTEST: call half @llpc.dpdx.f16(half %{{[0-9]*}})
-; SHADERTEST: call half @llpc.dpdy.f16(half %{{[0-9]*}})
-; SHADERTEST: call half @llvm.fabs.f16(half %{{[0-9]*}})
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = fadd <3 x half>
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
+; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = fadd <3 x half>
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = fadd <3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

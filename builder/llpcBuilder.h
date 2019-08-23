@@ -959,6 +959,15 @@ public:
         bool          realtime,           // Whether to read real-time clock counter
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    // Create derivative calculation on float or vector of float or half
+    virtual Value* CreateDerivative(
+        Value*        pValue,               // [in] Input value
+        bool          isDirectionY,         // False for derivative in X direction, true for Y direction
+        bool          isFine,               // True for "fine" calculation, where the value in the current fragment
+                                            //   is used. False for "coarse" calculation, where it might use fewer
+                                            //   locations to calculate.
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
     // -----------------------------------------------------------------------------------------------------------------
     // Subgroup operations
 

@@ -5990,6 +5990,39 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(
         BV, transOCLRelational(static_cast<SPIRVInstruction *>(BV), BB));
 
+  case OpDPdx:
+  case OpDPdxCoarse:
+  case OpDPdxFine: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    bool IsFine = OC == OpDPdxFine;
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    return mapValue(
+        BV, getBuilder()->CreateDerivative(Val0, /*isY=*/false, IsFine));
+  }
+
+  case OpDPdy:
+  case OpDPdyCoarse:
+  case OpDPdyFine: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    bool IsFine = OC == OpDPdyFine;
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    return mapValue(BV,
+                    getBuilder()->CreateDerivative(Val0, /*isY=*/true, IsFine));
+  }
+
+  case OpFwidth:
+  case OpFwidthCoarse:
+  case OpFwidthFine: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    bool IsFine = OC == OpFwidthFine;
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Dpdx = getBuilder()->CreateDerivative(Val0, /*isY=*/false, IsFine);
+    Value *Dpdy = getBuilder()->CreateDerivative(Val0, /*isY=*/true, IsFine);
+    Value *AbsDpdx = getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, Dpdx);
+    Value *AbsDpdy = getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, Dpdy);
+    return mapValue(BV, getBuilder()->CreateFAdd(AbsDpdx, AbsDpdy));
+  }
+
   case OpImageSampleImplicitLod:
   case OpImageSampleExplicitLod:
   case OpImageSampleDrefImplicitLod:

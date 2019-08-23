@@ -343,6 +343,14 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateInverseSqrt(args[0]);
         }
 
+    // Replayer implementations of BuilderImplArith methods
+    case BuilderRecorder::Opcode::Derivative:
+        {
+            return m_pBuilder->CreateDerivative(args[0],                                      // pInputValue
+                                                cast<ConstantInt>(args[1])->getZExtValue(),   // isY
+                                                cast<ConstantInt>(args[2])->getZExtValue());  // isFine
+        }
+
     // Replayer implementations of BuilderImplDesc methods
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {

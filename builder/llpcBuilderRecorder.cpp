@@ -143,6 +143,8 @@ StringRef BuilderRecorder::GetCallName(
         return "kill";
     case Opcode::ReadClock:
         return "read.clock";
+    case Opcode::Derivative:
+        return "derivative";
     case Opcode::ImageLoad:
         return "image.load";
     case Opcode::ImageLoadWithFmask:
@@ -597,6 +599,17 @@ Value* BuilderRecorder::CreateSMod(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     return Record(Opcode::SMod, pDividend->getType(), { pDividend, pDivisor }, instName);
+}
+
+// =====================================================================================================================
+// Create derivative calculation on float or vector of float or half
+Value* BuilderRecorder::CreateDerivative(
+    Value*        pValue,       // [in] Input value
+    bool          isDirectionY, // False for derivative in X direction, true for Y direction
+    bool          isFine,       // True for "fine" calculation, false for "coarse" calculation.
+    const Twine&  instName)     // [in] Name to give instruction(s)
+{
+    return Record(Opcode::Derivative, pValue->getType(), { pValue, getInt1(isDirectionY), getInt1(isFine) }, instName);
 }
 
 // =====================================================================================================================

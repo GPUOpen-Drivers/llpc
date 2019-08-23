@@ -22,17 +22,6 @@ genBType isnan genF16Type value : llpc.isnan.f16 #0
 genF16Type fma genF16Type a genF16Type b genF16Type c : llpc.fma.f16 #0
 genF16Type ldexp genF16Type x genIType exp : llvm.amdgcn.ldexp.f16 #1
 
-# Derivative Functions
-genF16Type DPdx genF16Type p : llpc.dpdx.f16 #0
-genF16Type DPdy genF16Type p : llpc.dpdy.f16 #0
-genF16Type Fwidth genF16Type p : llpc.fwidth.f16 #0
-genF16Type DPdxFine genF16Type p : llpc.dpdxFine.f16 #0
-genF16Type DPdyFine genF16Type p : llpc.dpdyFine.f16 #0
-genF16Type FwidthFine genF16Type p : llpc.fwidthFine.f16 #0
-genF16Type DPdxCoarse genF16Type p : llpc.dpdxCoarse.f16 #0
-genF16Type DPdyCoarse genF16Type p : llpc.dpdyCoarse.f16 #0
-genF16Type FwidthCoarse genF16Type p : llpc.fwidthCoarse.f16 #0
-
 # Functions of extension AMD_shader_trinary_minmax
 genF16Type FMin3AMD genF16Type x genF16Type y genF16Type z : llpc.fmin3.f16 #0
 genF16Type FMax3AMD genF16Type x genF16Type y genF16Type z : llpc.fmax3.f16 #0

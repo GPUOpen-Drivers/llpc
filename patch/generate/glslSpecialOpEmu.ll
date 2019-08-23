@@ -27,57 +27,8 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; =====================================================================================================================
-; >>>  Derivative Functions
+; >>>  Derivative Functions (now only used by interpolation functions below)
 ; =====================================================================================================================
-
-; GLSL: float dFdx(float)
-define float @llpc.dpdx.f32(float %p) #0
-{
-    ; Broadcast channel 1 to whole quad (32853 = 0x8055)
-    %p.i32 = bitcast float %p to i32
-    %p0.i32 = call i32 @llvm.amdgcn.ds.swizzle(i32 %p.i32, i32 32853)
-    %p0.i32.wqm = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.i32)
-    %p0 = bitcast i32 %p0.i32.wqm to float
-    ; Broadcast channel 0 to whole quad (32768 = 0x8000)
-    %p1.i32 = call i32 @llvm.amdgcn.ds.swizzle(i32 %p.i32, i32 32768)
-    %p1.i32.wqm = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.i32)
-    %p1 = bitcast i32 %p1.i32.wqm to float
-
-    ; Calculate the delta value
-    %dpdx = fsub float %p0, %p1
-
-    ret float %dpdx
-}
-
-; GLSL: float dFdy(float)
-define float @llpc.dpdy.f32(float %p) #0
-{
-    ; Broadcast channel 2 to whole quad (32938 = 0x80AA)
-    %p.i32 = bitcast float %p to i32
-    %p0.i32 = call i32 @llvm.amdgcn.ds.swizzle(i32 %p.i32, i32 32938)
-    %p0.i32.wqm = call i32 @llvm.amdgcn.wqm.i32(i32 %p0.i32)
-    %p0 = bitcast i32 %p0.i32.wqm to float
-    ; Broadcast channel 0 to whole quad (32768 = 0x8000)
-    %p1.i32 = call i32 @llvm.amdgcn.ds.swizzle(i32 %p.i32, i32 32768)
-    %p1.i32.wqm = call i32 @llvm.amdgcn.wqm.i32(i32 %p1.i32)
-    %p1 = bitcast i32 %p1.i32.wqm to float
-
-    ; Calculate the delta value
-    %dpdy = fsub float %p0, %p1
-
-    ret float %dpdy
-}
-
-; GLSL: float fwidth(float)
-define float @llpc.fwidth.f32(float %p) #0
-{
-    %1 = call float @llpc.dpdx.f32(float %p)
-    %2 = call float @llpc.dpdy.f32(float %p)
-    %3 = call float @llvm.fabs.f32(float %1)
-    %4 = call float @llvm.fabs.f32(float %2)
-    %5 = fadd float %3, %4
-    ret float %5
-}
 
 ; GLSL: float dFdxFine(float)
 define float @llpc.dpdxFine.f32(float %p) #0
@@ -115,42 +66,6 @@ define float @llpc.dpdyFine.f32(float %p) #0
     %dpdy = fsub float %p0, %p1
 
     ret float %dpdy
-}
-
-; GLSL: float fwidthFine(float)
-define float @llpc.fwidthFine.f32(float %p) #0
-{
-    %1 = call float @llpc.dpdxFine.f32(float %p)
-    %2 = call float @llpc.dpdyFine.f32(float %p)
-    %3 = call float @llvm.fabs.f32(float %1)
-    %4 = call float @llvm.fabs.f32(float %2)
-    %5 = fadd float %3, %4
-    ret float %5
-}
-
-; GLSL: float dFdxCoarse(float)
-define float @llpc.dpdxCoarse.f32(float %p) #0
-{
-    %1 = call float @llpc.dpdx.f32(float %p)
-    ret float %1
-}
-
-; GLSL: float dFdyCoarse(float)
-define float @llpc.dpdyCoarse.f32(float %p) #0
-{
-    %1 = call float @llpc.dpdy.f32(float %p)
-    ret float %1
-}
-
-; GLSL: float fwidthCoarse(float)
-define float @llpc.fwidthCoarse.f32(float %p) #0
-{
-    %1 = call float @llpc.dpdxCoarse.f32(float %p)
-    %2 = call float @llpc.dpdyCoarse.f32(float %p)
-    %3 = call float @llvm.fabs.f32(float %1)
-    %4 = call float @llvm.fabs.f32(float %2)
-    %5 = fadd float %3, %4
-    ret float %5
 }
 
 ; =====================================================================================================================
