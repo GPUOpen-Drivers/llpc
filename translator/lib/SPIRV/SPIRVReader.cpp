@@ -4958,9 +4958,23 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         return transGLSLExtInst(pSpvExtInst, pBlock);
 
     case SPIRVEIS_ShaderExplicitVertexParameterAMD:
-    case SPIRVEIS_GcnShaderAMD:
     case SPIRVEIS_ShaderTrinaryMinMaxAMD:
         return transGLSLBuiltinFromExtInst(pSpvExtInst, pBlock);
+
+    case SPIRVEIS_GcnShaderAMD:
+        switch (pSpvExtInst->getExtOp())
+        {
+        case CubeFaceCoordAMD:
+            return getBuilder()->CreateCubeFaceCoord(transValue(spvArgValues[0], pFunc, pBlock));
+        case CubeFaceIndexAMD:
+            return getBuilder()->CreateCubeFaceIndex(transValue(spvArgValues[0], pFunc, pBlock));
+        case TimeAMD:
+            return getBuilder()->CreateReadClock(false);
+        default:
+            LLPC_NEVER_CALLED();
+            return nullptr;
+        }
+
     default:
         LLPC_NEVER_CALLED();
         return nullptr;
@@ -5900,8 +5914,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                                          BV->getName(), BB));
   }
   case OpSMod: {
-    return mapValue(BV, transBuiltinFromInst(
-      "smod", static_cast<SPIRVInstruction *>(BV), BB));
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Val1 = transValue(BC->getOperand(1), F, BB);
+    return mapValue(BC, getBuilder()->CreateSMod(Val0, Val1));
   }
   case OpFMod: {
     // translate OpFMod(a, b) to copysign(frem(a, b), b)
@@ -5947,8 +5963,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, FNeg);
   }
   case OpQuantizeToF16: {
-    return mapValue(BV, transBuiltinFromInst(
-      "quantizeToF16", static_cast<SPIRVInstruction *>(BV), BB));
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val = transValue(BC->getOperand(0), F, BB);
+    Value *Result = getBuilder()->CreateQuantizeToFp16(Val);
+    return mapValue(BC, Result);
   }
 
   case OpLogicalNot:

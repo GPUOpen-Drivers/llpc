@@ -27,50 +27,6 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; =====================================================================================================================
-; >>>  SPIR-V Specific
-; =====================================================================================================================
-
-; Non GLSL: float = quantizeToF16(float)
-define float @llpc.quantizeToF16(float %x) #0
-{
-    %1 = fptrunc float %x to half
-    %2 = fpext half %1 to float
-    %3 = call float @llvm.fabs.f32(float %2)
-
-    ; 0.000030517578125: 2^-15 (normalized float16 minimum)
-    %4 = fcmp olt float %3, 0.000030517578125
-    %5 = fcmp one float %3, 0.0
-    %6 = and i1 %4, %5
-    %7 = select i1 %6, float 0.0, float %2
-
-    ; check NaN
-    %8 = call i1 @llvm.amdgcn.class.f32(float %x, i32 3)
-    ; 0xFFFFFFFF000000000: NaN
-    %9 = select i1 %8, float 0xFFFFFFFF00000000, float %7
-    ret float %9
-}
-
-; =====================================================================================================================
-; >>>  Operators
-; =====================================================================================================================
-
-; GLSL: int = int % int
-define i32 @llpc.mod.i32(i32 %x, i32 %y) #0
-{
-    %1 = srem i32 %x, %y
-    %2 = add i32 %1, %y
-    ; Check if the signedness of x and y are the same.
-    %3 = xor i32 %x, %y
-    ; if negative, slt signed less than
-    %4 = icmp slt i32 %3, 0
-    ; Check if the remainder is not 0.
-    %5 = icmp ne i32 %1, 0
-    %6 = and i1 %4, %5
-    %7 = select i1 %6, i32 %2, i32 %1
-    ret i32 %7
-}
-
-; =====================================================================================================================
 ; >>>  Angle and Trigonometry Functions
 ; =====================================================================================================================
 

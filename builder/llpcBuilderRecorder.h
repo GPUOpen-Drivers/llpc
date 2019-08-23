@@ -73,6 +73,12 @@ public:
         // Base class
         DotProduct,
 
+        // Arithmetic
+        CubeFaceCoord,
+        CubeFaceIndex,
+        QuantizeToFp16,
+        SMod,
+
         // Descriptor
         LoadBufferDesc,
         IndexDescPtr,
@@ -180,6 +186,23 @@ public:
     Value* CreateDotProduct(Value* const pVector1,
                             Value* const pVector2,
                             const Twine& instName = "") override final;
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Arithmetic operations
+
+    // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
+    // the given cube map texture coordinates.
+    Value* CreateCubeFaceCoord(Value* pCoord, const Twine& instName = "") override final;
+
+    // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
+    // the given cube map texture coordinates.
+    Value* CreateCubeFaceIndex(Value* pCoord, const Twine& instName = "") override final;
+
+    // Create quantize operation.
+    Value* CreateQuantizeToFp16(Value* pValue, const Twine& instName = "") override final;
+
+    // Create signed integer modulo operation.
+    Value* CreateSMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations

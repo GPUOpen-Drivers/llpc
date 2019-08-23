@@ -74,13 +74,6 @@ const uint8_t Context::GlslEmuLibGfx9[]=
     #include "./generate/gfx9/g_llpcGlslEmuLibGfx9.h"
 };
 
-#if LLPC_BUILD_GFX10
-const uint8_t Context::GlslEmuLibWaDisableI32ModToI16Mod[] =
-{
-    #include "./generate/wa/g_llpcGlslEmuLibDisableI32ModToI16Mod.h"
-};
-#endif
-
 // =====================================================================================================================
 Context::Context(
     GfxIpVersion gfxIp,                     // Graphics IP version info
@@ -122,15 +115,6 @@ Context::Context(
     m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
 
     // Load external LLVM libraries, in search order.
-#if LLPC_BUILD_GFX10
-    if (pGpuWorkarounds->gfx10.disableI32ModToI16Mod)
-    {
-        // Add library for "disable Int32Mod to Int16Mod workaround".
-        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibWaDisableI32ModToI16Mod),
-                sizeof(GlslEmuLibWaDisableI32ModToI16Mod)), "GlslEmuLibWaDisableI32ModToI16Mod"));
-    }
-#endif
-
     if (gfxIp.major >= 9)
     {
         m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),

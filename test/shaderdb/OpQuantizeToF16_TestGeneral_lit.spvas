@@ -2,15 +2,15 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: <4 x float> @_Z13quantizeToF16Dv4_f
+; SHADERTEST: call <4 x float> (...) @llpc.call.quantize.to.fp16.v4f32(<4 x float> %{{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: fptrunc float
-; SHADERTEST: fpext half %{{[0-9]*}} to float
+; SHADERTEST: fpext half %{{.*}} to float
 ; SHADERTEST: call float @llvm.fabs.f32
 ; SHADERTEST: fcmp olt float
 ; SHADERTEST: fcmp one half
-; SHADERTEST: and i1 %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: and i1 %{{.*}}, %{{.*}}
 ; SHADERTEST: select i1
 ; SHADERTEST: fcmp uno float
 

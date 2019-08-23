@@ -84,10 +84,33 @@ class BuilderImplArith : virtual public BuilderImplBase
 public:
     BuilderImplArith(LLVMContext& context) : BuilderImplBase(context) {}
 
+    // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
+    // the given cube map texture coordinates.
+    Value* CreateCubeFaceCoord(Value* pCoord, const Twine& instName = "") override final;
+
+    // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
+    // the given cube map texture coordinates.
+    Value* CreateCubeFaceIndex(Value* pCoord, const Twine& instName = "") override final;
+
+    // Create quantize operation.
+    Value* CreateQuantizeToFp16(Value* pValue, const Twine& instName = "") override final;
+
+    // Create signed integer modulo operation.
+    Value* CreateSMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)
 
+    // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+    Value* CreateIsNaN(Value* pX, const Twine& instName = "");
+
+    // Helper method to create call to llvm.amdgcn.class, scalarizing if necessary. This is not exposed outside of
+    // BuilderImplArith.
+    Value* CreateCallAmdgcnClass(Value* pValue, uint32_t flags, const Twine& instName = "");
+
+    // Helper method to scalarize a possibly vector unary operation
+    Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
 };
 
 // =====================================================================================================================

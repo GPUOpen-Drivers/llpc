@@ -339,13 +339,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py             \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
 
-    # workaround
-    #if LLPC_BUILD_GFX10
-    ifeq ($(LLPC_BUILD_GFX10), 1)
-        GEN_GLSL_EMU_LIB_DEPS += $(GEN_GLSL_EMU_LIB_DIR)/wa/disableI32ModToI16Mod/glslArithOpEmu.ll
-    endif
-    #endif
-
     PRE_TARGETS = $(GEN_GLSL_EMU_LIB_DIR)/g_llpcGlslEmuLib.h
 
 else

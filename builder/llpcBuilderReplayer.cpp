@@ -247,6 +247,27 @@ Value* BuilderReplayer::ProcessCall(
             return nullptr;
         }
 
+    // Replayer implementation of BuilderImplArith methods
+    case BuilderRecorder::CubeFaceCoord:
+        {
+            return m_pBuilder->CreateCubeFaceCoord(args[0]);
+        }
+
+    case BuilderRecorder::CubeFaceIndex:
+        {
+            return m_pBuilder->CreateCubeFaceIndex(args[0]);
+        }
+
+    case BuilderRecorder::QuantizeToFp16:
+        {
+            return m_pBuilder->CreateQuantizeToFp16(args[0]);
+        }
+
+    case BuilderRecorder::SMod:
+        {
+            return m_pBuilder->CreateSMod(args[0], args[1]);
+        }
+
     // Replayer implementations of BuilderImplDesc methods
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {
