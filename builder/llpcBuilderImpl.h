@@ -78,6 +78,19 @@ private:
 };
 
 // =====================================================================================================================
+// Builder implementation subclass for arithmetic operations
+class BuilderImplArith : virtual public BuilderImplBase
+{
+public:
+    BuilderImplArith(LLVMContext& context) : BuilderImplBase(context) {}
+
+private:
+    LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
+    LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)
+
+};
+
+// =====================================================================================================================
 // Builder implementation subclass for descriptors
 class BuilderImplDesc : virtual public BuilderImplBase
 {
@@ -730,7 +743,8 @@ private:
 
 // =====================================================================================================================
 // The Builder implementation, encompassing all the individual builder implementation subclasses
-class BuilderImpl final : public BuilderImplDesc,
+class BuilderImpl final : public BuilderImplArith,
+                                 BuilderImplDesc,
                                  BuilderImplImage,
                                  BuilderImplInOut,
                                  BuilderImplMatrix,
@@ -739,6 +753,7 @@ class BuilderImpl final : public BuilderImplDesc,
 {
 public:
     BuilderImpl(LLVMContext& context) : BuilderImplBase(context),
+                                        BuilderImplArith(context),
                                         BuilderImplDesc(context),
                                         BuilderImplImage(context),
                                         BuilderImplInOut(context),

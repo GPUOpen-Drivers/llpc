@@ -225,6 +225,7 @@ endif()
 target_sources(llpc PRIVATE
     builder/llpcBuilder.cpp
     builder/llpcBuilderImpl.cpp
+    builder/llpcBuilderImplArith.cpp
     builder/llpcBuilderImplDesc.cpp
     builder/llpcBuilderImplImage.cpp
     builder/llpcBuilderImplInOut.cpp

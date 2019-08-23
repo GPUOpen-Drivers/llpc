@@ -215,6 +215,9 @@ public:
         const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
+    // Arithmetic operations
+
+    // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations
 
     // Get the type of pointer returned by CreateLoadBufferDesc.

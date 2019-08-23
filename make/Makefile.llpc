@@ -69,6 +69,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
     CPPFILES +=                             \
         llpcBuilder.cpp                     \
         llpcBuilderImpl.cpp                 \
+        llpcBuilderImplArith.cpp            \
         llpcBuilderImplDesc.cpp             \
         llpcBuilderImplImage.cpp            \
         llpcBuilderImplInOut.cpp            \
