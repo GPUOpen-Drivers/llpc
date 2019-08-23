@@ -1,7 +1,3 @@
-# Exponential Functions
-genDType sqrt genDType x : llvm.sqrt.f64 #0
-genDType inverseSqrt genDType x : llpc.inverseSqrt.f64 #0
-
 # Common Functions
 genDType fabs genDType x : llvm.fabs.f64 #0
 genDType fsign genDType x : llpc.fsign.f64 #0

@@ -57,6 +57,36 @@ StringRef BuilderRecorder::GetCallName(
         return "quantize.to.fp16";
     case Opcode::SMod:
         return "smod";
+    case Tan:
+        return "tan";
+    case ASin:
+        return "asin";
+    case ACos:
+        return "acos";
+    case ATan:
+        return "atan";
+    case ATan2:
+        return "atan2";
+    case Sinh:
+        return "sinh";
+    case Cosh:
+        return "cosh";
+    case Tanh:
+        return "tanh";
+    case ASinh:
+        return "asinh";
+    case ACosh:
+        return "acosh";
+    case ATanh:
+        return "atanh";
+    case Power:
+        return "power";
+    case Exp:
+        return "exp";
+    case Log:
+        return "log";
+    case InverseSqrt:
+        return "inverse.sqrt";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -390,6 +420,143 @@ Instruction* BuilderRecorder::CreateReadClock(
     const Twine& instName)   // [in] Name to give final instruction
 {
     return Record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
+}
+
+// =====================================================================================================================
+// Create tan operation
+Value* BuilderRecorder::CreateTan(
+        Value*        pX,        // [in] Input value X
+        const Twine&  instName)  // [in] Name to give final instruction)
+{
+    return Record(Tan, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create arc sin operation
+Value* BuilderRecorder::CreateASin(
+        Value*        pX,        // [in] Input value X
+        const Twine&  instName)  // [in] Name to give final instruction)
+{
+    return Record(ASin, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create arc cos operation
+Value* BuilderRecorder::CreateACos(
+        Value*        pX,        // [in] Input value X
+        const Twine&  instName)  // [in] Name to give final instruction)
+{
+    return Record(ACos, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create arc tan operation
+Value* BuilderRecorder::CreateATan(
+        Value*        pYOverX,    // [in] Input value Y/X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(ATan, pYOverX->getType(), pYOverX, instName, {});
+}
+
+// =====================================================================================================================
+// Create arc tan operation with result in the correct quadrant for the signs of the inputs
+Value* BuilderRecorder::CreateATan2(
+        Value*        pY,         // [in] Input value Y
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(ATan2, pY->getType(), { pY, pX }, instName, {});
+}
+
+// =====================================================================================================================
+// Create hyperbolic sin operation
+Value* BuilderRecorder::CreateSinh(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(Sinh, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create hyperbolic cos operation
+Value* BuilderRecorder::CreateCosh(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(Cosh, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create hyperbolic tan operation
+Value* BuilderRecorder::CreateTanh(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(Tanh, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create hyperbolic arc sin operation
+Value* BuilderRecorder::CreateASinh(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(ASinh, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create hyperbolic arc cos operation
+Value* BuilderRecorder::CreateACosh(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(ACosh, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create hyperbolic arc tan operation
+Value* BuilderRecorder::CreateATanh(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(ATanh, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create power operation
+Value* BuilderRecorder::CreatePower(
+        Value*        pX,         // [in] Input value X
+        Value*        pY,         // [in] Input value Y
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(Power, pX->getType(), { pX, pY }, instName, {});
+}
+
+// =====================================================================================================================
+// Create exp operation
+Value* BuilderRecorder::CreateExp(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(Exp, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create natural log operation
+Value* BuilderRecorder::CreateLog(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(Log, pX->getType(), pX, instName, {});
+}
+
+// =====================================================================================================================
+// Create inverse square root operation
+Value* BuilderRecorder::CreateInverseSqrt(
+        Value*        pX,         // [in] Input value X
+        const Twine&  instName)   // [in] Name to give final instruction
+{
+    return Record(InverseSqrt, pX->getType(), pX, instName, {});
 }
 
 // =====================================================================================================================

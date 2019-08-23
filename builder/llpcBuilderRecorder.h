@@ -78,6 +78,21 @@ public:
         CubeFaceIndex,
         QuantizeToFp16,
         SMod,
+        Tan,
+        ASin,
+        ACos,
+        ATan,
+        ATan2,
+        Sinh,
+        Cosh,
+        Tanh,
+        ASinh,
+        ACosh,
+        ATanh,
+        Power,
+        Exp,
+        Log,
+        InverseSqrt,
 
         // Descriptor
         LoadBufferDesc,
@@ -187,6 +202,7 @@ public:
                             Value* const pVector2,
                             const Twine& instName = "") override final;
 
+
     // -----------------------------------------------------------------------------------------------------------------
     // Arithmetic operations
 
@@ -203,6 +219,23 @@ public:
 
     // Create signed integer modulo operation.
     Value* CreateSMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
+
+    // Trig and exponent operations.
+    Value* CreateTan(Value* pX, const Twine& instName = "") override final;
+    Value* CreateASin(Value* pX, const Twine& instName = "") override final;
+    Value* CreateACos(Value* pX, const Twine& instName = "") override final;
+    Value* CreateATan(Value* pYOverX, const Twine& instName = "") override final;
+    Value* CreateATan2(Value* pY, Value* pX, const Twine& instName = "") override final;
+    Value* CreateSinh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateCosh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateTanh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateASinh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateACosh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateATanh(Value* pX, const Twine& instName = "") override final;
+    Value* CreatePower(Value* pX, Value* pY, const Twine& instName = "") override final;
+    Value* CreateExp(Value* pX, const Twine& instName = "") override final;
+    Value* CreateLog(Value* pX, const Twine& instName = "") override final;
+    Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations

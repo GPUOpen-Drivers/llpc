@@ -268,6 +268,81 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateSMod(args[0], args[1]);
         }
 
+    case BuilderRecorder::Tan:
+        {
+            return m_pBuilder->CreateTan(args[0]);
+        }
+
+    case BuilderRecorder::ASin:
+        {
+            return m_pBuilder->CreateASin(args[0]);
+        }
+
+    case BuilderRecorder::ACos:
+        {
+            return m_pBuilder->CreateACos(args[0]);
+        }
+
+    case BuilderRecorder::ATan:
+        {
+            return m_pBuilder->CreateATan(args[0]);
+        }
+
+    case BuilderRecorder::ATan2:
+        {
+            return m_pBuilder->CreateATan2(args[0], args[1]);
+        }
+
+    case BuilderRecorder::Sinh:
+        {
+            return m_pBuilder->CreateSinh(args[0]);
+        }
+
+    case BuilderRecorder::Cosh:
+        {
+            return m_pBuilder->CreateCosh(args[0]);
+        }
+
+    case BuilderRecorder::Tanh:
+        {
+            return m_pBuilder->CreateTanh(args[0]);
+        }
+
+    case BuilderRecorder::ASinh:
+        {
+            return m_pBuilder->CreateASinh(args[0]);
+        }
+
+    case BuilderRecorder::ACosh:
+        {
+            return m_pBuilder->CreateACosh(args[0]);
+        }
+
+    case BuilderRecorder::ATanh:
+        {
+            return m_pBuilder->CreateATanh(args[0]);
+        }
+
+    case BuilderRecorder::Power:
+        {
+            return m_pBuilder->CreatePower(args[0], args[1]);
+        }
+
+    case BuilderRecorder::Exp:
+        {
+            return m_pBuilder->CreateExp(args[0]);
+        }
+
+    case BuilderRecorder::Log:
+        {
+            return m_pBuilder->CreateLog(args[0]);
+        }
+
+    case BuilderRecorder::InverseSqrt:
+        {
+            return m_pBuilder->CreateInverseSqrt(args[0]);
+        }
+
     // Replayer implementations of BuilderImplDesc methods
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {
