@@ -221,6 +221,16 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Arithmetic operations
 
+    // Methods to get useful FP constants. Using these (rather than just using for example
+    // ConstantFP::get(.., 180 / M_PI)) ensures that we always get the same value, independent of the
+    // host platform and its compiler.
+
+    // Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
+    Constant* GetPiOver180(Type* pTy);
+
+    // Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
+    Constant* Get180OverPi(Type* pTy);
+
     // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
     // the given cube map texture coordinates. Returns <2 x float>.
     virtual Value* CreateCubeFaceCoord(
@@ -249,6 +259,84 @@ public:
     virtual Value* CreateSMod(
         Value*        pDividend,            // [in] Dividend value
         Value*        pDivisor,             // [in] Divisor value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create a "tan" operation for a scalar or vector float or half.
+    virtual Value* CreateTan(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "asin" operation for a scalar or vector float or half.
+    virtual Value* CreateASin(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "acos" operation for a scalar or vector float or half.
+    virtual Value* CreateACos(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "atan" operation for a scalar or vector float or half.
+    virtual Value* CreateATan(
+        Value*        pYOverX,              // [in] Input value Y/X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "atan2" operation for a scalar or vector float or half.
+    // Returns atan(Y/X) but in the correct quadrant for the input value signs.
+    virtual Value* CreateATan2(
+        Value*        pY,                   // [in] Input value Y
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create a "sinh" operation for a scalar or vector float or half.
+    virtual Value* CreateSinh(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create a "cosh" operation for a scalar or vector float or half.
+    virtual Value* CreateCosh(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create a "tanh" operation for a scalar or vector float or half.
+    virtual Value* CreateTanh(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "asinh" operation for a scalar or vector float or half.
+    virtual Value* CreateASinh(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "acosh" operation for a scalar or vector float or half.
+    virtual Value* CreateACosh(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "atanh" operation for a scalar or vector float or half.
+    virtual Value* CreateATanh(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create a "power" operation for a scalar or vector float or half, calculating X ^ Y
+    virtual Value* CreatePower(
+        Value*        pX,                   // [in] Input value X
+        Value*        pY,                   // [in] Input value Y
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an "exp" operation for a scalar or vector float or half.
+    virtual Value* CreateExp(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create a "log" operation for a scalar or vector float or half.
+    virtual Value* CreateLog(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create an inverse square root operation for a scalar or vector FP type
+    virtual Value* CreateInverseSqrt(
+        Value*        pX,                   // [in] Input value X
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -1046,6 +1134,9 @@ public:
 
 protected:
     Builder(LLVMContext& context);
+
+    // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
+    Constant* GetFpConstant(Type* pTy, APFloat value);
 
     // -----------------------------------------------------------------------------------------------------------------
 

@@ -493,3 +493,44 @@ Type* Builder::GetBuiltInTy(
     }
 }
 
+// =====================================================================================================================
+// Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
+Constant* Builder::GetFpConstant(
+    Type*           pTy,    // [in] FP scalar or vector type
+    APFloat         value)  // APFloat value
+{
+    const fltSemantics* pSemantics = &APFloat::IEEEdouble();
+    Type* pScalarTy = pTy->getScalarType();
+    if (pScalarTy->isHalfTy())
+    {
+        pSemantics = &APFloat::IEEEhalf();
+    }
+    else if (pScalarTy->isFloatTy())
+    {
+        pSemantics = &APFloat::IEEEsingle();
+    }
+    bool ignored = true;
+    value.convert(*pSemantics, APFloat::rmNearestTiesToEven, &ignored);
+    return ConstantFP::get(pTy, value);
+}
+
+// =====================================================================================================================
+// Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
+Constant* Builder::GetPiOver180(
+    Type* pTy)    // [in] FP scalar or vector type
+{
+    // PI/180, 0.017453292
+    // TODO: Use a value that works for double as well.
+    return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3F91DF46A0000000)));
+}
+
+// =====================================================================================================================
+// Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
+Constant* Builder::Get180OverPi(
+    Type* pTy)    // [in] FP scalar or vector type
+{
+    // 180/PI, 57.29577951308232
+    // TODO: Use a value that works for double as well.
+    return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x404CA5DC20000000)));
+}
+

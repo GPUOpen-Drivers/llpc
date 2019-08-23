@@ -98,6 +98,24 @@ public:
     // Create signed integer modulo operation.
     Value* CreateSMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
 
+    // Methods to create trig and exponential operations.
+    Value* CreateTan(Value* pX, const Twine& instName = "") override final;
+    Value* CreateASin(Value* pX, const Twine& instName = "") override final;
+    Value* CreateACos(Value* pX, const Twine& instName = "") override final;
+    Value* CreateATan(Value* pYOverX, const Twine& instName = "") override final;
+    Value* CreateATan2(Value* pY, Value* pX, const Twine& instName = "") override final;
+    Value* CreateSinh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateCosh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateTanh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateASinh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateACosh(Value* pX, const Twine& instName = "") override final;
+    Value* CreateATanh(Value* pX, const Twine& instName = "") override final;
+    Value* CreatePower(Value* pX, Value* pY, const Twine& instName = "") override final;
+    Value* CreateExp(Value* pX, const Twine& instName = "") override final;
+    Value* CreateLog(Value* pX, const Twine& instName = "") override final;
+    Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
+    Value* CreateFSign(Value* pX, const Twine& instName = ""); // TODO add override final
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)
@@ -105,12 +123,71 @@ private:
     // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
     Value* CreateIsNaN(Value* pX, const Twine& instName = "");
 
+    // Common code for asin and acos
+    Value* ASinACosCommon(Value* pX, Constant* pCoefP0, Constant* pCoefP1);
+
+    // Generate FP division, using fast fdiv for float to bypass optimization.
+    Value* FDivFast(Value* pNumerator, Value* pDenominator);
+
     // Helper method to create call to llvm.amdgcn.class, scalarizing if necessary. This is not exposed outside of
     // BuilderImplArith.
     Value* CreateCallAmdgcnClass(Value* pValue, uint32_t flags, const Twine& instName = "");
 
     // Helper method to scalarize a possibly vector unary operation
     Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
+
+    // Helper method to scalarize a possibly vector binary operation
+    Value* Scalarize(Value*                                 pValue0,
+                     Value*                                 pValue1,
+                     std::function<Value*(Value*, Value*)>  callback);
+
+    // Methods to get various FP constants as scalar or vector. Any needed directly by a client should be moved
+    // to llpcBuilder.h. Using these (rather than just using for example
+    // ConstantFP::get(.., M_PI)) ensures that we always get the same value, independent of the
+    // host platform and its compiler.
+    // TODO: Use values that are suitable for doubles.
+
+    // Get PI = 3.14159274 scalar or vector
+    Constant* GetPi(Type* pTy)
+    {
+        return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x400921FB60000000)));
+    }
+
+    // Get PI/2 = 1.57079637 scalar or vector
+    Constant* GetPiByTwo(Type* pTy)
+    {
+        return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3FF921FB60000000)));
+    }
+
+    // Get PI/4 - 1 = -0.21460181 scalar or vector
+    Constant* GetPiByFourMinusOne(Type* pTy)
+    {
+        return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0xBFCB781280000000)));
+    }
+
+    // Get 1/log(2) = 1.442695 scalar or vector
+    Constant* GetRecipLog2(Type* pTy)
+    {
+        return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3FF7154760000000)));
+    }
+
+    // Get 0.5 * log(2) = 0.34657359 scalar or vector
+    Constant* GetHalfLog2(Type* pTy)
+    {
+        return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3FD62E4300000000)));
+    }
+
+    // Get log(2) = 0.6931471824646 scalar or vector
+    Constant* GetLog2(Type* pTy)
+    {
+        return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x3FE62E4300000000)));
+    }
+
+    // Get 2^-15 (normalized float16 minimum) scalar or vector
+    Constant* GetMinNormalizedF16(Type* pTy)
+    {
+        return ConstantFP::get(pTy, 0.000030517578125);
+    }
 };
 
 // =====================================================================================================================

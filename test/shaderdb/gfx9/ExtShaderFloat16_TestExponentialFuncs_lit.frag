@@ -32,19 +32,16 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-COUNT-3: %{{[0-9]*}} = call {{.*}} half @_Z3powDhDh(half %{{.*}}, half {{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z3powDv3_DhDv3_Dh(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z3expDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z3logDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4exp2Dv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4log2Dv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4sqrtDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z11inverseSqrtDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST-COUNT-3: = call half (...) @llpc.call.power.f16(half
+; SHADERTEST: = call <3 x half> (...) @llpc.call.power.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> (...) @llpc.call.exp.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> (...) @llpc.call.log.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> @llvm.exp2.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> @llvm.log2.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> @llvm.sqrt.v3f16(<3 x half>
+; SHADERTEST: = call <3 x half> @llvm.sqrt.v3f16(<3 x half>
+; SHADERTEST: = fdiv <3 x half> <half 0xH3C00, half 0xH3C00, half 0xH3C00>,
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call half @llvm.log2.f16(half %{{[0-9]*}})
-; SHADERTEST: call half @llvm.exp2.f16(half %{{[0-9]*}})
-; SHADERTEST: call half @llvm.sqrt.f16(half %{{[0-9]*}})
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
