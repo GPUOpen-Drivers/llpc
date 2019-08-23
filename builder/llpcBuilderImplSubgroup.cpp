@@ -77,7 +77,7 @@ Value* BuilderImplSubgroup::CreateSubgroupAll(
     if (wqm)
     {
         pResult = CreateZExt(pResult, getInt32Ty());
-        pResult = CreateIntrinsic(Intrinsic::amdgcn_wqm, { getInt32Ty() }, { pResult });
+        pResult = CreateIntrinsic(Intrinsic::amdgcn_softwqm, { getInt32Ty() }, { pResult });
         pResult = CreateTrunc(pResult, getInt1Ty());
     }
     return pResult;
@@ -97,7 +97,7 @@ Value* BuilderImplSubgroup::CreateSubgroupAny(
     if (wqm)
     {
         pResult = CreateZExt(pResult, getInt32Ty());
-        pResult = CreateIntrinsic(Intrinsic::amdgcn_wqm, { getInt32Ty() }, { pResult });
+        pResult = CreateIntrinsic(Intrinsic::amdgcn_softwqm, { getInt32Ty() }, { pResult });
         pResult = CreateTrunc(pResult, getInt1Ty());
     }
     return pResult;
