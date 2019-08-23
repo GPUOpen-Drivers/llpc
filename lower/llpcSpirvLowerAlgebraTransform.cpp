@@ -32,6 +32,7 @@
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -378,20 +379,23 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         }
     }
 
-    // Replace FDIV with function call if it isn't optimized
+    // Replace FDIV x, y with FDIV 1.0, y; MUL x if it isn't optimized
     if ((opCode == Instruction::FDiv) && (pDest == nullptr) && (pSrc1 != nullptr) && (pSrc2 != nullptr))
     {
-        BuiltinFuncMangleInfo Info("fdiv");
-        Type* argTypes[] = { pSrc1->getType(), pSrc2->getType() };
-        Value* args[] = { pSrc1, pSrc2 };
-        auto mangledName = SPIRV::mangleBuiltin("fdiv", argTypes, &Info);
-        auto pFDiv = EmitCall(m_pModule, mangledName, binaryOp.getType(), args, NoAttrib, &binaryOp);
+        Constant* pOne = ConstantFP::get(binaryOp.getType(), 1.0);
+        if (pSrc1 != pOne)
+        {
+            IRBuilder<> builder(*m_pContext);
+            builder.SetInsertPoint(&binaryOp);
+            Value* pRcp = builder.CreateFDiv(ConstantFP::get(binaryOp.getType(), 1.0), pSrc2);
+            Value* pFDiv = builder.CreateFMul(pSrc1, pRcp);
 
-        binaryOp.replaceAllUsesWith(pFDiv);
-        binaryOp.dropAllReferences();
-        binaryOp.eraseFromParent();
+            binaryOp.replaceAllUsesWith(pFDiv);
+            binaryOp.dropAllReferences();
+            binaryOp.eraseFromParent();
 
-        m_changed = true;
+            m_changed = true;
+        }
     }
 }
 

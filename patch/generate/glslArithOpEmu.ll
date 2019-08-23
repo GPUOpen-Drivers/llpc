@@ -54,14 +54,6 @@ define float @llpc.quantizeToF16(float %x) #0
 ; >>>  Operators
 ; =====================================================================================================================
 
-; GLSL: float = float/float
-define float @llpc.fdiv.f32(float %y, float %x) #0
-{
-    %1 = fdiv float 1.0, %x
-    %2 = fmul float %y, %1
-    ret float %2
-}
-
 ; GLSL: int = int % int
 define i32 @llpc.mod.i32(i32 %x, i32 %y) #0
 {

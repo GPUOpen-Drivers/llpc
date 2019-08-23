@@ -1,6 +1,3 @@
-# Operators
-genF16Type fdiv genF16Type y genF16Type x : llpc.fdiv.f16 #0
-
 # Angle and Trigonometry Functions
 genF16Type sin genF16Type angle : llvm.sin.f16
 genF16Type cos genF16Type angle : llvm.cos.f16

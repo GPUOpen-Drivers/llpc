@@ -55,7 +55,8 @@ void main()
 ; SHADERTEST-COUNT-3: %{{.*}} = call half @llvm.rint.f16(half %{{[0-9]*}})
 ; SHADERTEST-COUNT-3: %{{.*}} = call half @llvm.ceil.f16(half %{{[0-9]*}})
 ; SHADERTEST: %{{.*}} = call {{.*}} <3 x half> @_Z5fractDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{.*}} = call half @_Z4fdivDhDh(half {{.*}}, half %{{.*}})
+; SHADERTEST: = fdiv half 0xH3C00,
+; SHADERTEST: = fmul half
 ; SHADERTEST: %{{.*}} = call half @llvm.floor.f16(half %{{[0-9]*}})
 ; SHADERTEST-COUNT-3: %{{.*}} = call half @llvm.trunc.f16(half %{{.*}})
 ; SHADERTEST-COUNT-3: %{{.*}} = call nnan half @llvm.minnum.f16(half %{{[0-9]*}}, half %{{[0-9]*}})

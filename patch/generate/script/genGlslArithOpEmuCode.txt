@@ -2,7 +2,6 @@
 genType quantizeToF16 genType x : llpc.quantizeToF16 #0
 
 # Operators
-genType fdiv genType y genType x : llpc.fdiv.f32 #0
 genIType smod genIType x genIType y : llpc.mod.i32 #0
 
 # Angle and Trigonometry Functions
