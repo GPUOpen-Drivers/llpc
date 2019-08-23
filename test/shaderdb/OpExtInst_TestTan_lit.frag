@@ -25,15 +25,6 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.sin.f32(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.cos.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @_Z4fdivff(float 1.000000e+00, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.cos.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @_Z4fdivff(float 1.000000e+00, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, %{{.*}}
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.cos.f32(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = fdiv float 1.000000e+00, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = call float @llvm.sin.f32(float %{{.*}})

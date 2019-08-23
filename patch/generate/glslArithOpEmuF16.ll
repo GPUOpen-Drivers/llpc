@@ -29,14 +29,6 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 ; >>>  Operators
 ; =====================================================================================================================
 
-; GLSL: float16_t = float16_t/float16_t
-define half @llpc.fdiv.f16(half %y, half %x) #0
-{
-    %1 = fdiv half 1.0, %x
-    %2 = fmul half %y, %1
-    ret half %2
-}
-
 ; GLSL: float16_t = float16_t(float) (rounding mode: RTZ)
 define spir_func half @_Z16convert_half_rtzf(float %x) #0
 {
