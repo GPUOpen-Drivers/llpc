@@ -278,6 +278,11 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateSMod(args[0], args[1]);
         }
 
+    case BuilderRecorder::Fma:
+        {
+            return m_pBuilder->CreateFma(args[0], args[1], args[2]);
+        }
+
     case BuilderRecorder::Tan:
         {
             return m_pBuilder->CreateTan(args[0]);
@@ -353,7 +358,71 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateInverseSqrt(args[0]);
         }
 
-    // Replayer implementations of BuilderImplArith methods
+    case BuilderRecorder::SAbs:
+        {
+            return m_pBuilder->CreateSAbs(args[0]);
+        }
+
+    case BuilderRecorder::FSign:
+        {
+            return m_pBuilder->CreateFSign(args[0]);
+        }
+
+    case BuilderRecorder::SSign:
+        {
+            return m_pBuilder->CreateSSign(args[0]);
+        }
+
+    case BuilderRecorder::Fract:
+        {
+            return m_pBuilder->CreateFract(args[0]);
+        }
+
+    case BuilderRecorder::SmoothStep:
+        {
+            return m_pBuilder->CreateSmoothStep(args[0], args[1], args[2]);
+        }
+
+    case BuilderRecorder::Ldexp:
+        {
+            return m_pBuilder->CreateLdexp(args[0], args[1]);
+        }
+
+    case BuilderRecorder::ExtractSignificand:
+        {
+            return m_pBuilder->CreateExtractSignificand(args[0]);
+        }
+
+    case BuilderRecorder::ExtractExponent:
+        {
+            return m_pBuilder->CreateExtractExponent(args[0]);
+        }
+
+    case BuilderRecorder::CrossProduct:
+        {
+            return m_pBuilder->CreateCrossProduct(args[0], args[1]);
+        }
+
+    case BuilderRecorder::NormalizeVector:
+        {
+            return m_pBuilder->CreateNormalizeVector(args[0]);
+        }
+
+    case BuilderRecorder::FaceForward:
+        {
+            return m_pBuilder->CreateFaceForward(args[0], args[1], args[2]);
+        }
+
+    case BuilderRecorder::Reflect:
+        {
+            return m_pBuilder->CreateReflect(args[0], args[1]);
+        }
+
+    case BuilderRecorder::Refract:
+        {
+            return m_pBuilder->CreateRefract(args[0], args[1], args[2]);
+        }
+
     case BuilderRecorder::Opcode::Derivative:
         {
             return m_pBuilder->CreateDerivative(args[0],                                      // pInputValue
@@ -364,6 +433,16 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::FClamp:
         {
             return m_pBuilder->CreateFClamp(args[0], args[1], args[2]);
+        }
+
+    case BuilderRecorder::Opcode::FMin:
+        {
+            return m_pBuilder->CreateFMin(args[0], args[1]);
+        }
+
+    case BuilderRecorder::Opcode::FMax:
+        {
+            return m_pBuilder->CreateFMax(args[0], args[1]);
         }
 
     case BuilderRecorder::Opcode::FMin3:
@@ -392,6 +471,11 @@ Value* BuilderReplayer::ProcessCall(
                                                      args[1],
                                                      args[2],
                                                      cast<ConstantInt>(args[3])->getZExtValue());
+        }
+
+    case BuilderRecorder::Opcode::FindSMsb:
+        {
+            return m_pBuilder->CreateFindSMsb(args[0]);
         }
 
     // Replayer implementations of BuilderImplDesc methods

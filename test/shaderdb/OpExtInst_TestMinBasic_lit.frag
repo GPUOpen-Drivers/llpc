@@ -17,30 +17,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z4fminDv4_fDv4_f(<4 x float> %{{.*}}, <4 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x i32> @_Z4sminDv4_iDv4_i(<4 x i32> %{{.*}}, <4 x i32> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x i32> @_Z4uminDv4_iDv4_i(<4 x i32> %{{.*}}, <4 x i32> %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call nnan float @llvm.minnum.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp ult i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp ult i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp ult i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = icmp ult i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 %{{.*}}
+; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x float> @llvm.minnum.v4f32(<4 x float>
+; SHADERTEST: = icmp slt <4 x i32>
+; SHADERTEST: = select <4 x i1> %{{.*}}, <4 x i32>
+; SHADERTEST: = icmp ult <4 x i32>
+; SHADERTEST: = select <4 x i1> %{{.*}}, <4 x i32>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -57,6 +57,8 @@ StringRef BuilderRecorder::GetCallName(
         return "quantize.to.fp16";
     case Opcode::SMod:
         return "smod";
+    case Opcode::Fma:
+        return "fma";
     case Tan:
         return "tan";
     case ASin:
@@ -87,8 +89,38 @@ StringRef BuilderRecorder::GetCallName(
         return "log";
     case InverseSqrt:
         return "inverse.sqrt";
+    case SAbs:
+        return "sabs";
+    case FSign:
+        return "fsign";
+    case SSign:
+        return "ssign";
+    case Fract:
+        return "fract";
+    case SmoothStep:
+        return "smooth.step";
+    case Ldexp:
+        return "ldexp";
+    case ExtractSignificand:
+        return "extract.significand";
+    case ExtractExponent:
+        return "extract.exponent";
+    case CrossProduct:
+        return "cross.product";
+    case NormalizeVector:
+        return "normalize.vector";
+    case FaceForward:
+        return "face.forward";
+    case Reflect:
+        return "reflect";
+    case Refract:
+        return "refract";
     case Opcode::FClamp:
         return "fclamp";
+    case Opcode::FMin:
+        return "fmin";
+    case Opcode::FMax:
+        return "fmax";
     case Opcode::FMin3:
         return "fmin3";
     case Opcode::FMax3:
@@ -99,6 +131,8 @@ StringRef BuilderRecorder::GetCallName(
         return "insert.bit.field";
     case Opcode::ExtractBitField:
         return "extract.bit.field";
+    case Opcode::FindSMsb:
+        return "find.smsb";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -598,6 +632,154 @@ Value* BuilderRecorder::CreateCubeFaceIndex(
 }
 
 // =====================================================================================================================
+// Create "signed integer abs" operation for a scalar or vector integer value.
+Value* BuilderRecorder::CreateSAbs(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SAbs, pX->getType(), pX, instName);
+}
+
+// =====================================================================================================================
+// Create "fsign" operation for a scalar or vector floating-point type, returning -1.0, 0.0 or +1.0 if the input
+// value is negative, zero or positive.
+Value* BuilderRecorder::CreateFSign(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FSign, pX->getType(), pX, instName);
+}
+
+// =====================================================================================================================
+// Create "ssign" operation for a scalar or vector integer type, returning -1, 0 or +1 if the input
+// value is negative, zero or positive.
+Value* BuilderRecorder::CreateSSign(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SSign, pX->getType(), pX, instName);
+}
+
+// =====================================================================================================================
+// Create "fract" operation for a scalar or vector floating-point type, returning x - floor(x).
+Value* BuilderRecorder::CreateFract(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::Fract, pX->getType(), pX, instName);
+}
+
+// =====================================================================================================================
+// Create "smoothStep" operation. Result is 0.0 if x <= edge0 and 1.0 if x >= edge1 and performs smooth Hermite
+// interpolation between 0 and 1 when edge0 < x < edge1. This is equivalent to:
+// t * t * (3 - 2 * t), where t = clamp ((x - edge0) / (edge1 - edge0), 0, 1)
+// Result is undefined if edge0 >= edge1.
+Value* BuilderRecorder::CreateSmoothStep(
+    Value*        pEdge0,     // [in] Edge0 value
+    Value*        pEdge1,     // [in] Edge1 value
+    Value*        pX,         // [in] X (input) value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::SmoothStep, pX->getType(), { pEdge0, pEdge1, pX }, instName);
+}
+
+// =====================================================================================================================
+// Create "ldexp" operation: given an FP mantissa and int exponent, build an FP value
+Value* BuilderRecorder::CreateLdexp(
+    Value*        pX,         // [in] Mantissa
+    Value*        pExp,       // [in] Exponent
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::Ldexp, pX->getType(), { pX, pExp }, instName);
+}
+
+// =====================================================================================================================
+// Create "extract significand" operation: given an FP scalar or vector value, return the significand in the range
+// [0.5,1.0), of the same type as the input. If the input is 0, the result is 0. If the input is infinite or NaN,
+// the result is undefined.
+Value* BuilderRecorder::CreateExtractSignificand(
+    Value*        pValue,   // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ExtractSignificand, pValue->getType(), pValue, instName);
+}
+
+// =====================================================================================================================
+// Create "extract exponent" operation: given an FP scalar or vector value, return the exponent as a signed integer.
+// If the input is (vector of) half, the result type is (vector of) i16, otherwise it is (vector of) i32.
+// If the input is 0, the result is 0. If the input is infinite or NaN, the result is undefined.
+Value* BuilderRecorder::CreateExtractExponent(
+    Value*        pValue,     // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Type* pResultTy = getInt32Ty();
+    if (pValue->getType()->getScalarType()->isHalfTy())
+    {
+        pResultTy = getInt16Ty();
+    }
+    pResultTy = GetConditionallyVectorizedTy(pResultTy, pValue->getType());
+    return Record(Opcode::ExtractExponent, pResultTy, pValue, instName);
+}
+
+// =====================================================================================================================
+// Create vector cross product operation. Inputs must be <3 x FP>
+Value* BuilderRecorder::CreateCrossProduct(
+    Value*        pX,         // [in] Input value X
+    Value*        pY,         // [in] Input value Y
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::CrossProduct, pX->getType(), { pX, pY }, instName);
+}
+
+// =====================================================================================================================
+// Create FP scalar/vector normalize operation: returns a scalar/vector with the same direction and magnitude 1.
+Value* BuilderRecorder::CreateNormalizeVector(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::NormalizeVector, pX->getType(), pX, instName);
+}
+
+// =====================================================================================================================
+// Create "face forward" operation: given three FP scalars/vectors {N, I, Nref}, if the dot product of
+// Nref and I is negative, the result is N, otherwise it is -N
+Value* BuilderRecorder::CreateFaceForward(
+    Value*        pN,         // [in] Input value "N"
+    Value*        pI,         // [in] Input value "I"
+    Value*        pNref,      // [in] Input value "Nref"
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FaceForward, pN->getType(), { pN, pI, pNref }, instName);
+}
+
+// =====================================================================================================================
+// Create "reflect" operation. For the incident vector I and normalized surface orientation N, the result is
+// the reflection direction:
+// I - 2 * dot(N, I) * N
+Value* BuilderRecorder::CreateReflect(
+    Value*        pI,         // [in] Input value "I"
+    Value*        pN,         // [in] Input value "N"
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::Reflect, pN->getType(), { pI, pN }, instName);
+}
+
+// =====================================================================================================================
+// Create "refract" operation. For the normalized incident vector I, normalized surface orientation N and ratio
+// of indices of refraction eta, the result is the refraction vector:
+// k = 1.0 - eta * eta * (1.0 - dot(N,I) * dot(N,I))
+// If k < 0.0 the result is 0.0.
+// Otherwise, the result is eta * I - (eta * dot(N,I) + sqrt(k)) * N
+Value* BuilderRecorder::CreateRefract(
+    Value*        pI,         // [in] Input value "I"
+    Value*        pN,         // [in] Input value "N"
+    Value*        pEta,       // [in] Input value "eta"
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::Refract, pN->getType(), { pI, pN, pEta }, instName);
+}
+
+// =====================================================================================================================
 // Create quantize operation.
 Value* BuilderRecorder::CreateQuantizeToFp16(
     Value*        pValue,     // [in] Input value (float or float vector)
@@ -615,6 +797,17 @@ Value* BuilderRecorder::CreateSMod(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     return Record(Opcode::SMod, pDividend->getType(), { pDividend, pDivisor }, instName);
+}
+
+// =====================================================================================================================
+// Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
+Value* BuilderRecorder::CreateFma(
+    Value*        pA,         // [in] One value to multiply
+    Value*        pB,         // [in] The other value to multiply
+    Value*        pC,         // [in] The value to add to the product of A and B
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::Fma, pA->getType(), { pA, pB, pC }, instName);
 }
 
 // =====================================================================================================================
@@ -637,6 +830,26 @@ Value* BuilderRecorder::CreateFClamp(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     return Record(Opcode::FClamp, pX->getType(), { pX, pMinVal, pMaxVal }, instName);
+}
+
+// =====================================================================================================================
+// Create "fmin" operation, returning the minimum of two scalar or vector FP values.
+Value* BuilderRecorder::CreateFMin(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMin, pValue1->getType(), { pValue1, pValue2 }, instName);
+}
+
+// =====================================================================================================================
+// Create "fmax" operation, returning the maximum of three scalar or vector FP values.
+Value* BuilderRecorder::CreateFMax(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMax, pValue1->getType(), { pValue1, pValue2 }, instName);
 }
 
 // =====================================================================================================================
@@ -703,6 +916,15 @@ Value* BuilderRecorder::CreateExtractBitField(
     const Twine&  instName)             // [in] Name to give instruction(s)
 {
     return Record(Opcode::ExtractBitField, pBase->getType(), { pBase, pOffset, pCount, getInt1(isSigned) }, instName);
+}
+
+// =====================================================================================================================
+// Create "find MSB" operation for a (vector of) signed int.
+Value* BuilderRecorder::CreateFindSMsb(
+    Value*        pValue,     // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FindSMsb, pValue->getType(), pValue, instName);
 }
 
 // =====================================================================================================================

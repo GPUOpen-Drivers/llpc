@@ -44,17 +44,35 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} <3 x i64> @_Z4sabsDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z5ssignDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z4uminDv3_lDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z4sminDv3_lDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z4umaxDv3_lDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z4smaxDv3_lDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z6uclampDv3_lDv3_lDv3_l
-; SHADERTEST: call {{.*}} <3 x i64> @_Z6sclampDv3_lDv3_lDv3_l
-; SHADERTEST: add <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST: = call <3 x i64> (...) @llpc.call.sabs.v3i64(<3 x i64>
+; SHADERTEST: call <3 x i64> (...) @llpc.call.ssign.v3i64(<3 x i64>
+
+; SHADERTEST: %[[UMINCMP:.*]] = icmp ult <3 x i64> %[[UMIN1:.*]], %[[UMIN2:.*]]
+; SHADERTEST: = select <3 x i1> %[[UMINCMP]], <3 x i64> %[[UMIN1]], <3 x i64> %[[UMIN2]]
+
+; SHADERTEST: %[[SMINCMP:.*]] = icmp slt <3 x i64> %[[SMIN1:.*]], %[[SMIN2:.*]]
+; SHADERTEST: = select <3 x i1> %[[SMINCMP]], <3 x i64> %[[SMIN1]], <3 x i64> %[[SMIN2]]
+
+; SHADERTEST: %[[UMAXCMP:.*]] = icmp ult <3 x i64> %[[UMAX1:.*]], %[[UMAX2:.*]]
+; SHADERTEST: = select <3 x i1> %[[UMAXCMP]], <3 x i64> %[[UMAX2]], <3 x i64> %[[UMAX1]]
+
+; SHADERTEST: %[[SMAXCMP:.*]] = icmp slt <3 x i64> %[[SMAX1:.*]], %[[SMAX2:.*]]
+; SHADERTEST: = select <3 x i1> %[[SMAXCMP]], <3 x i64> %[[SMAX2]], <3 x i64> %[[SMAX1]]
+
+; SHADERTEST: %[[UCLAMPCMP1:.*]] = icmp ugt <3 x i64> %[[UCLAMP1:.*]], %[[UCLAMP2:.*]]
+; SHADERTEST: %[[UCLAMPMAX:.*]] = select <3 x i1> %[[UCLAMPCMP1]], <3 x i64> %[[UCLAMP1]], <3 x i64> %[[UCLAMP2]]
+; SHADERTEST: %[[UCLAMPCMP2:.*]] = icmp ult <3 x i64> %[[UCLAMP3:.*]], %[[UCLAMPCMP1:.*]]
+; SHADERTEST: = select <3 x i1> %[[UCLAMPCMP2]], <3 x i64> %[[UCLAMP3]], <3 x i64> %[[UCLAMPCMP1]]
+
+; SHADERTEST: %[[SCLAMPCMP1:.*]] = icmp sgt <3 x i64> %[[SCLAMP1:.*]], %[[SCLAMP2:.*]]
+; SHADERTEST: %[[SCLAMPMAX:.*]] = select <3 x i1> %[[SCLAMPCMP1]], <3 x i64> %[[SCLAMP1]], <3 x i64> %[[SCLAMP2]]
+; SHADERTEST: %[[SCLAMPCMP2:.*]] = icmp slt <3 x i64> %[[SCLAMP3:.*]], %[[SCLAMPCMP1:.*]]
+; SHADERTEST: = select <3 x i1> %[[SCLAMPCMP2]], <3 x i64> %[[SCLAMP3]], <3 x i64> %[[SCLAMPCMP1]]
+
 ; SHADERTEST: bitcast <3 x double> %{{[0-9]*}} to <3 x i64>
 ; SHADERTEST: bitcast <3 x i64> %{{[0-9]*}} to <3 x double>
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

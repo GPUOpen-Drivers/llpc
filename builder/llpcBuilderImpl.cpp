@@ -42,22 +42,27 @@ Context& BuilderImplBase::getContext() const
 }
 
 // =====================================================================================================================
-// Create scalar from dot product of vector
+// Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
 Value* BuilderImplBase::CreateDotProduct(
     Value* const pVector1,            // [in] The float vector 1
     Value* const pVector2,            // [in] The float vector 2
     const Twine& instName)            // [in] Name to give instruction(s)
 {
-    const uint32_t compCount = pVector1->getType()->getVectorNumElements();
+    Value* pProduct = CreateFMul(pVector1, pVector2);
+    if (isa<VectorType>(pProduct->getType()) == false)
+    {
+        return pProduct;
+    }
 
-    Value* pVector = CreateFMul(pVector1, pVector2);
-    Value* pScalar = CreateExtractElement(pVector, uint64_t(0));
+    const uint32_t compCount = pProduct->getType()->getVectorNumElements();
+    Value* pScalar = CreateExtractElement(pProduct, uint64_t(0));
 
     for (uint32_t i = 1; i < compCount; ++i)
     {
-        pScalar = CreateFAdd(pScalar, CreateExtractElement(pVector, i));
+        pScalar = CreateFAdd(pScalar, CreateExtractElement(pProduct, i));
     }
 
+    pScalar->setName(instName);
     return pScalar;
 }
 

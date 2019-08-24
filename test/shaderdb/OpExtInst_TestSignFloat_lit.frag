@@ -20,13 +20,13 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z5fsignf(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x float> @_Z5fsignDv3_f(<3 x float> %{{.*}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @llpc.call.fsign.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.fsign.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = fcmp ogt float %{{.*}}, 0.000000e+00
-; SHADERTEST: %{{[0-9]*}} = fcmp ogt float %{{.*}}, 0.000000e+00
-; SHADERTEST: %{{[0-9]*}} = fcmp oge float %{{.*}}, 0.000000e+00
-; SHADERTEST: %{{[0-9]*}} = fcmp oge float %{{.*}}, 0.000000e+00
+; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract ogt float %{{.*}}, 0.000000e+00
+; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract ogt float %{{.*}}, 0.000000e+00
+; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract oge float %{{.*}}, 0.000000e+00
+; SHADERTEST: %{{[0-9]*}} = fcmp reassoc nnan nsz arcp contract oge float %{{.*}}, 0.000000e+00
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

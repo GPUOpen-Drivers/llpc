@@ -212,6 +212,14 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
 
+    // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
+    // The two vectors must be the same floating point scalar/vector type.
+    // Returns a value whose type is the element type of the vectors.
+    virtual Value* CreateDotProduct(
+        Value* const pVector1,            // [in] The float vector 1
+        Value* const pVector2,            // [in] The float vector 2
+        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
+
     // Create a call to the specified intrinsic with one operand, mangled on its type.
     // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
     // flags from the Builder if none are specified by pFmfSource.
@@ -232,13 +240,6 @@ public:
         Instruction*  pFmfSource = nullptr, // [in] Instruction to copy fast math flags from; nullptr to get
                                             //    from Builder
         const Twine&  name = "");           // [in] Name to give instruction
-
-    // Create vector dot product operation. The two vectors must be the same floating point vector type.
-    // Returns a value whose type is the element type of the vectors.
-    virtual Value* CreateDotProduct(
-        Value* const pVector1,            // [in] The float vector 1
-        Value* const pVector2,            // [in] The float vector 2
-        const Twine& instName = "") = 0;  // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------
     // Arithmetic operations
@@ -284,6 +285,13 @@ public:
     virtual Value* CreateSMod(
         Value*        pDividend,            // [in] Dividend value
         Value*        pDivisor,             // [in] Divisor value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
+    virtual Value* CreateFma(
+        Value*        pA,                   // [in] One value to multiply
+        Value*        pB,                   // [in] The other value to multiply
+        Value*        pC,                   // [in] The value to add to the product of A and B
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
     // Create a "tan" operation for a scalar or vector float or half.
@@ -364,6 +372,96 @@ public:
         Value*        pX,                   // [in] Input value X
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
+    // Create "signed integer abs" operation for a scalar or vector integer value.
+    virtual Value* CreateSAbs(
+        Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fsign" operation for a scalar or vector floating-point type, returning -1.0, 0.0 or +1.0 if the input
+    // value is negative, zero or positive.
+    virtual Value* CreateFSign(
+        Value*        pInValue,             // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "ssign" operation for a scalar or vector integer type, returning -1, 0 or +1 if the input
+    // value is negative, zero or positive.
+    virtual Value* CreateSSign(
+        Value*        pX,                   // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fract" operation for a scalar or vector floating-point type, returning x - floor(x).
+    virtual Value* CreateFract(
+        Value*        pX,                   // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "smoothStep" operation. Result is 0.0 if x <= edge0 and 1.0 if x >= edge1 and performs smooth Hermite
+    // interpolation between 0 and 1 when edge0 < x < edge1. This is equivalent to:
+    // t * t * (3 - 2 * t), where t = clamp ((x - edge0) / (edge1 - edge0), 0, 1)
+    // Result is undefined if edge0 >= edge1.
+    virtual Value* CreateSmoothStep(
+        Value*        pEdge0,               // [in] Edge0 value
+        Value*        pEdge1,               // [in] Edge1 value
+        Value*        pX,                   // [in] X (input) value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "ldexp" operation: given an FP mantissa and int exponent, build an FP value
+    virtual Value* CreateLdexp(
+        Value*        pX,                   // [in] Mantissa
+        Value*        pExp,                 // [in] Exponent
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "extract significand" operation: given an FP scalar or vector value, return the significand in the range
+    // [0.5,1.0), of the same type as the input. If the input is 0, the result is 0. If the input is infinite or NaN,
+    // the result is undefined.
+    virtual Value* CreateExtractSignificand(
+        Value*        pValue,               // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "extract exponent" operation: given an FP scalar or vector value, return the exponent as a signed integer.
+    // If the input is (vector of) half, the result type is (vector of) i16, otherwise it is (vector of) i32.
+    // If the input is 0, the result is 0. If the input is infinite or NaN, the result is undefined.
+    virtual Value* CreateExtractExponent(
+        Value*        pValue,               // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create vector cross product operation. Inputs must be <3 x FP>
+    virtual Value* CreateCrossProduct(
+        Value*        pX,                   // [in] Input value X
+        Value*        pY,                   // [in] Input value Y
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create FP scalar/vector normalize operation: returns a scalar/vector with the same direction and magnitude 1.
+    virtual Value* CreateNormalizeVector(
+        Value*        pX,                   // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "face forward" operation: given three FP scalars/vectors {N, I, Nref}, if the dot product of
+    // Nref and I is negative, the result is N, otherwise it is -N
+    virtual Value* CreateFaceForward(
+        Value*        pN,                   // [in] Input value "N"
+        Value*        pI,                   // [in] Input value "I"
+        Value*        pNref,                // [in] Input value "Nref"
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "reflect" operation. For the incident vector I and normalized surface orientation N, the result is
+    // the reflection direction:
+    // I - 2 * dot(N, I) * N
+    virtual Value* CreateReflect(
+        Value*        pI,                   // [in] Input value "I"
+        Value*        pN,                   // [in] Input value "N"
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "refract" operation. For the normalized incident vector I, normalized surface orientation N and ratio
+    // of indices of refraction eta, the result is the refraction vector:
+    // k = 1.0 - eta * eta * (1.0 - dot(N,I) * dot(N,I))
+    // If k < 0.0 the result is 0.0.
+    // Otherwise, the result is eta * I - (eta * dot(N,I) + sqrt(k)) * N
+    virtual Value* CreateRefract(
+        Value*        pI,                   // [in] Input value "I"
+        Value*        pN,                   // [in] Input value "N"
+        Value*        pEta,                 // [in] Input value "eta"
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
     // Create "fclamp" operation, returning min(max(x, minVal), maxVal). Result is undefined if minVal > maxVal.
     // This honors the fast math flags; clear "nnan" in fast math flags in order to obtain the "NaN avoiding
     // semantics" for the min and max where, if one input is NaN, it returns the other one.
@@ -372,6 +470,22 @@ public:
         Value*        pX,                   // [in] Value to clamp
         Value*        pMinVal,              // [in] Minimum of clamp range
         Value*        pMaxVal,              // [in] Maximum of clamp range
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fmin" operation, returning the minimum of two scalar or vector FP values.
+    // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+    // It also honors the shader's FP mode being "flush denorm".
+    virtual Value* CreateFMin(
+        Value*        pValue1,              // [in] First value
+        Value*        pValue2,              // [in] Second value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fmax" operation, returning the maximum of two scalar or vector float or half values.
+    // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+    // It also honors the shader's FP mode being "flush denorm".
+    virtual Value* CreateFMax(
+        Value*        pValue1,              // [in] First value
+        Value*        pValue2,              // [in] Second value
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
     // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
@@ -426,6 +540,17 @@ public:
         Value*        pOffset,              // Bit number of least-significant end of bitfield
         Value*        pCount,               // Count of bits in bitfield
         bool          isSigned,             // True for a signed int bitfield extract, false for unsigned
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "find MSB" operation for a (vector of) signed i32. For a postive number, the result is the bit number of
+    // the most significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
+    // For a value of 0 or -1, the result is -1.
+    //
+    // Note that unsigned "find MSB" is not provided as a Builder method, because it is easily synthesized from
+    // the standard LLVM intrinsic llvm.ctlz. Similarly "find LSB" is not provided because it is easily synthesized
+    // from the standard LLVM intrinsic llvm.cttz.
+    virtual Value* CreateFindSMsb(
+        Value*        pValue,               // [in] Input value
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
     // -----------------------------------------------------------------------------------------------------------------

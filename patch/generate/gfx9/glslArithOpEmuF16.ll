@@ -27,17 +27,6 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; =====================================================================================================================
-; >>>  Common Functions
-; =====================================================================================================================
-
-; GLSL: float16_t fma(float16_t, float16_t, float16_t)
-define half @llpc.fma.f16(half %a, half %b, half %c) #0
-{
-    %1 = call half @llvm.fma.f16(half %a, half %b, half %c)
-    ret half %1
-}
-
-; =====================================================================================================================
 ; >>>  Functions of Extension AMD_shader_trinary_minmax
 ; =====================================================================================================================
 
@@ -48,7 +37,6 @@ define half @llpc.fmid3.f16(half %x, half %y, half %z)
     ret half %1
 }
 
-declare half @llvm.fma.f16(half, half, half) #0
 declare half @llvm.amdgcn.fmed3.f16(half, half, half) #0
 
 attributes #0 = { nounwind readnone }

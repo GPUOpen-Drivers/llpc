@@ -59,34 +59,40 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z6lengthDh(half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z6lengthDv2_Dh(<2 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z6lengthDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z6lengthDv4_Dh(<4 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z8distanceDhDh(half %{{.*}}, half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z8distanceDv2_DhDv2_Dh(<2 x half> %{{.*}}, <2 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z8distanceDv3_DhDv3_Dh(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z8distanceDv4_DhDv4_Dh(<4 x half> %{{.*}}, <4 x half> %{{.*}})
-; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @llpc.call.dot.product.f16(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @llpc.call.dot.product.f16(<4 x half> %{{.*}}, <4 x half> %{{.*}})
-; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @llpc.call.dot.product.f16(<2 x half> %{{.*}}, <2 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <3 x half> @_Z5crossDv3_DhDv3_Dh(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z9normalizeDh(half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <2 x half> @_Z9normalizeDv2_Dh(<2 x half>  %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <3 x half> @_Z9normalizeDv3_Dh(<3 x half>  %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <4 x half> @_Z9normalizeDv4_Dh(<4 x half>  %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z11faceForwardDhDhDh(half %{{.*}}, half %{{.*}}, half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <2 x half> @_Z11faceForwardDv2_DhDv2_DhDv2_Dh(<2 x half> %{{.*}}, <2 x half> %{{.*}}, <2 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <3 x half> @_Z11faceForwardDv3_DhDv3_DhDv3_Dh(<3 x half> %{{.*}}, <3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <4 x half> @_Z11faceForwardDv4_DhDv4_DhDv4_Dh(<4 x half> %{{.*}}, <4 x half> %{{.*}}, <4 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z7reflectDhDh(half %{{.*}}, half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <2 x half> @_Z7reflectDv2_DhDv2_Dh(<2 x half> %{{.*}}, <2 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <3 x half> @_Z7reflectDv3_DhDv3_Dh(<3 x half> %{{.*}}, <3 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <4 x half> @_Z7reflectDv4_DhDv4_Dh(<4 x half> %{{.*}}, <4 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} half @_Z7refractDhDhDh(half %{{.*}}, half %{{.*}}, half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <2 x half> @_Z7refractDv2_DhDv2_DhDh(<2 x half> %{{.*}}, <2 x half> %{{.*}}, half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <3 x half> @_Z7refractDv3_DhDv3_DhDh(<3 x half> %{{.*}}, <3 x half> %{{.*}}, half %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call {{.*}} <4 x half> @_Z7refractDv4_DhDv4_DhDh(<4 x half> %{{.*}}, <4 x half> %{{.*}}, half %{{.*}})
+; SHADERTEST: = call {{.*}} half @llvm.fabs.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<2 x half>
+; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<3 x half>
+; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<4 x half>
+; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half @llvm.fabs.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<2 x half>
+; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<3 x half>
+; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<4 x half>
+; SHADERTEST: = call {{.*}} half @llvm.sqrt.f16(half
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<3 x half> %{{.*}}, <3 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<4 x half> %{{.*}}, <4 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.dot.product.f16(<2 x half> %{{.*}}, <2 x half> %{{.*}})
+; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.cross.product.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.normalize.vector.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.normalize.vector.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.normalize.vector.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.normalize.vector.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.face.forward.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.face.forward.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.face.forward.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.face.forward.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.reflect.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.reflect.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.reflect.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.reflect.v4f16(<4 x half>
+; SHADERTEST: = call {{.*}} half (...) @llpc.call.refract.f16(half
+; SHADERTEST: = call {{.*}} <2 x half> (...) @llpc.call.refract.v2f16(<2 x half>
+; SHADERTEST: = call {{.*}} <3 x half> (...) @llpc.call.refract.v3f16(<3 x half>
+; SHADERTEST: = call {{.*}} <4 x half> (...) @llpc.call.refract.v4f16(<4 x half>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

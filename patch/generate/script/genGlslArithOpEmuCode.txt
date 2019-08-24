@@ -1,37 +1,4 @@
 # Common Functions
-genType fabs genType x : llvm.fabs.f32 #0
-genIType sabs genIType x : llpc.sabs.i32 #0
-genType fsign genType x : llpc.fsign.f32 #0
-genIType ssign genIType x : llpc.ssign.i32 #0
-genType floor genType x : llvm.floor.f32 #0
-genType trunc genType x : llvm.trunc.f32 #0
-genType round genType x : llpc.round.f32 #0
-genType roundEven genType x : llvm.rint.f32 #0
-genType ceil genType x : llvm.ceil.f32 #0
-genType fract genType x : llpc.fract.f32 #0
 genType fmod genType x genType y : llpc.mod.f32 #0
-genType fmin genType x genType y : llvm.minnum.f32 #0
-genType nmin genType x genType y : llpc.nmin.f32 #0
-genIType smin genIType x genIType y : llpc.sminnum.i32 #0
-genIType umin genUType x genUType y : llpc.uminnum.i32 #0
-genType fmax genType x genType y : llvm.maxnum.f32 #0
-genType nmax genType x genType y : llpc.nmax.f32 #0
-genIType smax genIType x genIType y : llpc.smaxnum.i32 #0
-genIType umax genIType x genIType y : llpc.umaxnum.i32 #0
-genType fclamp genType x genType minVal genType maxVal : llpc.fclamp.f32 #0
-genType nclamp genType x genType minVal genType maxVal : llpc.nclamp.f32 #0
-genIType sclamp genIType x genIType minVal genIType maxVal : llpc.sclamp.i32 #0
-genUType uclamp genUType x genUType minVal genUType maxVal : llpc.uclamp.i32 #0
-genType fmix genType x genType y genType a : llpc.fmix.f32 #0
-genType step genType edge genType x : llpc.step.f32 #0
-genType smoothStep genType edge0 genType edge1 genType x : llpc.smoothStep.f32 #0
 genBType isinf genType value : llpc.isinf.f32 #0
 genBType isnan genType value : llpc.isnan.f32 #0
-genType fma genType a genType b genType c : llpc.fma.f32 #0
-genType ldexp genType x genIType exp : llvm.amdgcn.ldexp.f32 #1
-
-# Integer Functions
-genIType findILsb genUType value : llpc.findIlsb.i32 #0
-genIType findUMsb genUType value : llpc.findUMsb.i32 #0
-genIType findSMsb genIType value : llpc.findSMsb.i32 #0
-

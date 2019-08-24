@@ -20,8 +20,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} double @_Z5fractd(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x double> @_Z5fractDv3_d(<3 x double> %{{.*}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @llpc.call.fract.f64(double
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x double> (...) @llpc.call.fract.v3f64(<3 x double>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.fract.f64(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.fract.f64(double %{{.*}})
