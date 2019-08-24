@@ -1414,41 +1414,6 @@ define i32 @llpc.findSMsb.i32(i32 %value) #0
     ret i32 %end
 }
 
-; GLSL: int bitfieldInsert(int, int, int, int)
-define i32 @llpc.bitFieldInsert.i32(i32 %base, i32 %insert, i32 %offset, i32 %bits) #0
-{
-    %1 = shl i32 %insert, %offset
-    %2 = xor i32 %1, %base
-    %3 = shl i32 1, %bits
-    %4 = add i32 %3, -1
-    %5 = shl i32 %4, %offset
-    %6 = and i32 %2, %5
-    %7 = xor i32 %6, %base
-    %8 = icmp eq i32 %bits, 32
-    %9 = select i1 %8, i32 %insert, i32 %7
-    ret i32 %9
-}
-
-; GLSL: int bitfieldExtract(int, int ,int)
-define i32 @llpc.bitFieldSExtract.i32(i32 %value, i32 %offset, i32 %bits) #0
-{
-    %1 = icmp eq i32 %bits, 32
-    %2 = call i32 @llvm.amdgcn.sbfe.i32(i32 %value, i32 %offset, i32 %bits)
-    %3 = select i1 %1, i32 %value, i32 %2
-    ret i32 %3
-}
-
-; GLSL: uint bitfieldExtract(uint, uint ,uint)
-define i32 @llpc.bitFieldUExtract.i32(i32 %value, i32 %offset, i32 %bits) #0
-{
-    %1 = icmp eq i32 %bits, 32
-    %2 = call i32 @llvm.amdgcn.ubfe.i32(i32 %value, i32 %offset, i32 %bits)
-    %3 = select i1 %1, i32 %value, i32 %2
-    %4 = icmp eq i32 %bits, 0
-    %5 = select i1 %4, i32 0, i32 %3
-    ret i32 %5
-}
-
 ; =====================================================================================================================
 ; >>>  Vector Relational Functions
 ; =====================================================================================================================
