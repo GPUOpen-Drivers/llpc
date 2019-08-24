@@ -133,6 +133,20 @@ public:
     // Create "fmed3" operation, returning the middle one of three float values.
     Value* CreateFMed3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
 
+    // Create an "insert bitfield" operation for a (vector of) integer type.
+    Value* CreateInsertBitField(Value*        pBase,
+                                Value*        pInsert,
+                                Value*        pOffset,
+                                Value*        pCount,
+                                const Twine&  instName = "") override final;
+
+    // Create an "extract bitfield " operation for a (vector of) i32.
+    Value* CreateExtractBitField(Value*        pBase,
+                                 Value*        pOffset,
+                                 Value*        pCount,
+                                 bool          isSigned,
+                                 const Twine&  instName = "") override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)

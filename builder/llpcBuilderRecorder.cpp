@@ -89,6 +89,10 @@ StringRef BuilderRecorder::GetCallName(
         return "inverse.sqrt";
     case Opcode::FMed3:
         return "fmed3";
+    case Opcode::InsertBitField:
+        return "insert.bit.field";
+    case Opcode::ExtractBitField:
+        return "extract.bit.field";
     case Opcode::LoadBufferDesc:
         return "load.buffer.desc";
     case Opcode::IndexDescPtr:
@@ -623,6 +627,39 @@ Value* BuilderRecorder::CreateFMed3(
     const Twine&  instName)             // [in] Name to give instruction(s)
 {
     return Record(Opcode::FMed3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
+}
+
+// =====================================================================================================================
+// Create an "insert bitfield" operation for a (vector of) integer type.
+// Returns a value where the "pCount" bits starting at bit "pOffset" come from the least significant "pCount"
+// bits in "pInsert", and remaining bits come from "pBase". The result is undefined if "pCount"+"pOffset" is
+// more than the number of bits (per vector element) in "pBase" and "pInsert".
+// If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
+// width.
+Value* BuilderRecorder::CreateInsertBitField(
+    Value*        pBase,                // [in] Base value
+    Value*        pInsert,              // [in] Value to insert (same type as base)
+    Value*        pOffset,              // Bit number of least-significant end of bitfield
+    Value*        pCount,               // Count of bits in bitfield
+    const Twine&  instName)             // [in] Name to give instruction(s)
+{
+    return Record(Opcode::InsertBitField, pBase->getType(), { pBase, pInsert, pOffset, pCount }, instName);
+}
+
+// =====================================================================================================================
+// Create an "extract bitfield " operation for a (vector of) i32.
+// Returns a value where the least significant "pCount" bits come from the "pCount" bits starting at bit
+// "pOffset" in "pBase", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
+// If "pBase" and "pInsert" are vectors, "pOffset" and "pCount" can be either scalar or vector of the same
+// width.
+Value* BuilderRecorder::CreateExtractBitField(
+    Value*        pBase,                // [in] Base value
+    Value*        pOffset,              // Bit number of least-significant end of bitfield
+    Value*        pCount,               // Count of bits in bitfield
+    bool          isSigned,             // True for a signed int bitfield extract, false for unsigned
+    const Twine&  instName)             // [in] Name to give instruction(s)
+{
+    return Record(Opcode::ExtractBitField, pBase->getType(), { pBase, pOffset, pCount, getInt1(isSigned) }, instName);
 }
 
 // =====================================================================================================================

@@ -5965,6 +5965,44 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     setFastMathFlags(FNeg, BV);
     return mapValue(BV, FNeg);
   }
+
+  case OpBitCount: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val = transValue(BC->getOperand(0), F, BB);
+    Value *Result = getBuilder()->CreateUnaryIntrinsic(Intrinsic::ctpop, Val);
+    Result = getBuilder()->CreateZExtOrTrunc(Result, transType(BC->getType()));
+    return mapValue(BV, Result);
+  }
+
+  case OpBitReverse: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val = transValue(BC->getOperand(0), F, BB);
+    Value *Result =
+        getBuilder()->CreateUnaryIntrinsic(Intrinsic::bitreverse, Val);
+    return mapValue(BV, Result);
+  }
+
+  case OpBitFieldInsert: {
+    auto BC = static_cast<SPIRVInstTemplateBase *>(BV);
+    Value *Base = transValue(BC->getOperand(0), F, BB);
+    Value *Insert = transValue(BC->getOperand(1), F, BB);
+    Value *Offset = transValue(BC->getOperand(2), F, BB);
+    Value *Count = transValue(BC->getOperand(3), F, BB);
+    return mapValue(
+        BV, getBuilder()->CreateInsertBitField(Base, Insert, Offset, Count));
+  }
+
+  case OpBitFieldUExtract:
+  case OpBitFieldSExtract: {
+    auto BC = static_cast<SPIRVInstTemplateBase *>(BV);
+    Value *Base = transValue(BC->getOperand(0), F, BB);
+    bool IsSigned = (OC == OpBitFieldSExtract);
+    Value *Offset = transValue(BC->getOperand(1), F, BB);
+    Value *Count = transValue(BC->getOperand(2), F, BB);
+    return mapValue(
+        BV, getBuilder()->CreateExtractBitField(Base, Offset, Count, IsSigned));
+  }
+
   case OpQuantizeToF16: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     Value *Val = transValue(BC->getOperand(0), F, BB);

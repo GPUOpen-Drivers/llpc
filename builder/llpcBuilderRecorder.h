@@ -94,6 +94,8 @@ public:
         Log,
         InverseSqrt,
         FMed3,
+        InsertBitField,
+        ExtractBitField,
 
         // Descriptor
         LoadBufferDesc,
@@ -244,6 +246,20 @@ public:
 
     // Create derivative calculation on float or vector of float or half
     Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;
+
+    // Create an "insert bitfield" operation for a (vector of) integer type.
+    Value* CreateInsertBitField(Value*        pBase,
+                                Value*        pInsert,
+                                Value*        pOffset,
+                                Value*        pCount,
+                                const Twine&  instName = "") override final;
+
+    // Create an "extract bitfield " operation for a (vector of) i32.
+    Value* CreateExtractBitField(Value*        pBase,
+                                 Value*        pOffset,
+                                 Value*        pCount,
+                                 bool          isSigned,
+                                 const Twine&  instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations

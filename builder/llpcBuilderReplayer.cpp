@@ -356,6 +356,19 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateFMed3(args[0], args[1], args[2]);
         }
 
+    case BuilderRecorder::Opcode::InsertBitField:
+        {
+            return m_pBuilder->CreateInsertBitField(args[0], args[1], args[2], args[3]);
+        }
+
+    case BuilderRecorder::Opcode::ExtractBitField:
+        {
+            return m_pBuilder->CreateExtractBitField(args[0],
+                                                     args[1],
+                                                     args[2],
+                                                     cast<ConstantInt>(args[3])->getZExtValue());
+        }
+
     // Replayer implementations of BuilderImplDesc methods
     case BuilderRecorder::Opcode::LoadBufferDesc:
         {

@@ -22,8 +22,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} i32 {{.*}}BitFieldUExtract{{.*}}(i32 %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 %{{[0-9]*}})
-; SHADERTEST: call {{.*}} <3 x i32> {{.*}}BitFieldUExtract{{.*}}(<3 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i32 %{{[0-9]*}})
+; SHADERTEST: call i32 (...) @llpc.call.extract.bit.field.i32(i32 {{.*}}, i1 false)
+; SHADERTEST: call <3 x i32> (...) @llpc.call.extract.bit.field.v3i32(<3 x i32> {{.*}}, i1 false)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-2: call i32 @llvm.amdgcn.ubfe.i32

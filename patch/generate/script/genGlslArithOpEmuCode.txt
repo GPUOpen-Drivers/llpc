@@ -31,11 +31,6 @@ genType fma genType a genType b genType c : llpc.fma.f32 #0
 genType ldexp genType x genIType exp : llvm.amdgcn.ldexp.f32 #1
 
 # Integer Functions
-genIType BitFieldSExtract genIType value int offset int bits : llpc.bitFieldSExtract.i32 #0
-genUType BitFieldUExtract genUType value int offset int bits : llpc.bitFieldUExtract.i32 #0
-genIType BitFieldInsert genIType base genIType insert int offset int bits : llpc.bitFieldInsert.i32 #0
-genIType BitReverse genIType value : llvm.bitreverse.i32 #0
-genIType BitCount genIType value : llvm.ctpop.i32 #0
 genIType findILsb genUType value : llpc.findIlsb.i32 #0
 genIType findUMsb genUType value : llpc.findUMsb.i32 #0
 genIType findSMsb genIType value : llpc.findSMsb.i32 #0
