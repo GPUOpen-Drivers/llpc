@@ -149,6 +149,24 @@ Value* BuilderImplArith::CreateSMod(
 }
 
 // =====================================================================================================================
+// Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
+Value* BuilderImplArith::CreateFma(
+    Value*        pA,         // [in] One value to multiply
+    Value*        pB,         // [in] The other value to multiply
+    Value*        pC,         // [in] The value to add to the product of A and B
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    if (getContext().GetGfxIpVersion().major <= 8)
+    {
+        // Pre-GFX9 version: Use fmuladd.
+        return CreateIntrinsic(Intrinsic::fmuladd, pA->getType(), { pA, pB, pC }, nullptr, instName);
+    }
+
+    // GFX9+ version: Use fma.
+    return CreateIntrinsic(Intrinsic::fma, pA->getType(), { pA, pB, pC }, nullptr, instName);
+}
+
+// =====================================================================================================================
 // Create a "tan" operation for a scalar or vector float or half.
 Value* BuilderImplArith::CreateTan(
     Value*        pX,         // [in] Input value X
@@ -516,6 +534,17 @@ Value* BuilderImplArith::CreateInverseSqrt(
 }
 
 // =====================================================================================================================
+// Create "signed integer abs" operation for a scalar or vector integer value.
+Value* BuilderImplArith::CreateSAbs(
+    Value*        pX,         // [in] Input value X
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Value* pNegX = CreateNeg(pX);
+    Value* pIsPositive = CreateICmpSGT(pX, pNegX);
+    return CreateSelect(pIsPositive, pX, pNegX, instName);
+}
+
+// =====================================================================================================================
 // Create "fsign" operation for a scalar or vector floating-point type, returning -1.0, 0.0 or +1.0 if the input
 // value is negative, zero or positive.
 Value* BuilderImplArith::CreateFSign(
@@ -526,6 +555,257 @@ Value* BuilderImplArith::CreateFSign(
     Value* pPartialResult = CreateSelect(pIsPositive, ConstantFP::get(pX->getType(), 1.0), pX);
     Value* pIsNonNegative = CreateFCmpOGE(pPartialResult, Constant::getNullValue(pX->getType()));
     return CreateSelect(pIsNonNegative, pPartialResult, ConstantFP::get(pX->getType(), -1.0), instName);
+}
+
+// =====================================================================================================================
+// Create "ssign" operation for a scalar or vector integer type, returning -1, 0 or +1 if the input
+// value is negative, zero or positive.
+Value* BuilderImplArith::CreateSSign(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Value* pIsPositive = CreateICmpSGT(pX, Constant::getNullValue(pX->getType()));
+    Value* pPartialResult = CreateSelect(pIsPositive, ConstantInt::get(pX->getType(), 1, true), pX);
+    Value* pIsNonNegative = CreateICmpSGE(pPartialResult, Constant::getNullValue(pX->getType()));
+    return CreateSelect(pIsNonNegative, pPartialResult, ConstantInt::get(pX->getType(), -1, true), instName);
+}
+
+// =====================================================================================================================
+// Create "fract" operation for a scalar or vector floating-point type, returning x - floor(x).
+Value* BuilderImplArith::CreateFract(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    // We need to scalarize this ourselves.
+    Value* pResult = Scalarize(pX,
+                               [this](Value* pX)
+                               {
+                                  return CreateIntrinsic(Intrinsic::amdgcn_fract, pX->getType(), pX);
+                               });
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "smoothStep" operation. Result is 0.0 if x <= edge0 and 1.0 if x >= edge1 and performs smooth Hermite
+// interpolation between 0 and 1 when edge0 < x < edge1. This is equivalent to:
+// t * t * (3 - 2 * t), where t = clamp ((x - edge0) / (edge1 - edge0), 0, 1)
+// Result is undefined if edge0 >= edge1.
+Value* BuilderImplArith::CreateSmoothStep(
+    Value*        pEdge0,     // [in] Edge0 value
+    Value*        pEdge1,     // [in] Edge1 value
+    Value*        pX,         // [in] X (input) value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    if (pEdge0->getType()->getScalarType()->isHalfTy())
+    {
+        // Enabling fast math flags for half type here causes test problems.
+        // TODO: Investigate this further.
+        clearFastMathFlags();
+    }
+    Value* pDiff = CreateFSub(pX, pEdge0);
+    Constant* pOne = ConstantFP::get(pX->getType(), 1.0);
+    Value* pT = CreateFMul(pDiff, CreateFDiv(pOne, CreateFSub(pEdge1, pEdge0)));
+    pT = CreateFClamp(pT, Constant::getNullValue(pT->getType()), pOne);
+    Value* pTSquared = CreateFMul(pT, pT);
+    Value* pTerm = CreateFAdd(ConstantFP::get(pT->getType(), 3.0),
+                              CreateFMul(ConstantFP::get(pT->getType(), -2.0), pT));
+    return CreateFMul(pTSquared, pTerm, instName);
+}
+
+// =====================================================================================================================
+// Create "ldexp" operation: given an FP mantissa and int exponent, build an FP value
+Value* BuilderImplArith::CreateLdexp(
+    Value*        pX,         // [in] Mantissa
+    Value*        pExp,       // [in] Exponent
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    // Ensure exponent is i32.
+    if (pExp->getType()->getScalarType()->isIntegerTy(16))
+    {
+        pExp = CreateSExt(pExp, GetConditionallyVectorizedTy(getInt32Ty(), pExp->getType()));
+    }
+    else if (pExp->getType()->getScalarType()->isIntegerTy(64))
+    {
+        pExp = CreateTrunc(pExp, GetConditionallyVectorizedTy(getInt32Ty(), pExp->getType()));
+    }
+
+    // We need to scalarize this ourselves.
+    Value* pResult = Scalarize(pX,
+                               pExp,
+                               [this](Value* pX, Value* pExp)
+                               {
+                                  return CreateIntrinsic(Intrinsic::amdgcn_ldexp, pX->getType(), { pX, pExp });
+                               });
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "extract significand" operation: given an FP scalar or vector value, return the significand in the range
+// [0.5,1.0), of the same type as the input. If the input is 0, the result is 0. If the input is infinite or NaN,
+// the result is undefined.
+Value* BuilderImplArith::CreateExtractSignificand(
+    Value*        pValue,     // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    // We need to scalarize this ourselves.
+    Value* pMant = Scalarize(pValue,
+                             [this](Value* pValue)
+                             {
+                                return CreateIntrinsic(Intrinsic::amdgcn_frexp_mant, pValue->getType(), pValue);
+                             });
+    pMant->setName(instName);
+    return pMant;
+}
+
+// =====================================================================================================================
+// Create "extract exponent" operation: given an FP scalar or vector value, return the exponent as a signed integer.
+// If the input is (vector of) half, the result type is (vector of) i16, otherwise it is (vector of) i32.
+// If the input is 0, the result is 0. If the input is infinite or NaN, the result is undefined.
+Value* BuilderImplArith::CreateExtractExponent(
+    Value*        pValue,     // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    // We need to scalarize this ourselves.
+    Type* pExpTy = pValue->getType()->getScalarType()->isHalfTy() ? getInt16Ty() : getInt32Ty();
+    Value* pExp = Scalarize(pValue,
+                            [this, pExpTy](Value* pValue)
+                            {
+                                return CreateIntrinsic(Intrinsic::amdgcn_frexp_exp,
+                                                       { pExpTy, pValue->getType() },
+                                                       pValue);
+                            });
+    pExp->setName(instName);
+    return pExp;
+}
+
+// =====================================================================================================================
+// Create vector cross product operation. Inputs must be <3 x FP>
+Value* BuilderImplArith::CreateCrossProduct(
+    Value*        pX,         // [in] Input value X
+    Value*        pY,         // [in] Input value Y
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    LLPC_ASSERT((pX->getType() == pY->getType()) && (pX->getType()->getVectorNumElements() == 3));
+
+    Value* pLeft = UndefValue::get(pX->getType());
+    Value* pRight = UndefValue::get(pX->getType());
+    for (uint32_t idx = 0; idx != 3; ++idx)
+    {
+        pLeft = CreateInsertElement(pLeft,
+                                    CreateFMul(CreateExtractElement(pX, (idx + 1) % 3),
+                                               CreateExtractElement(pY, (idx + 2) % 3)),
+                                    idx);
+        pRight = CreateInsertElement(pLeft,
+                                     CreateFMul(CreateExtractElement(pX, (idx + 2) % 3),
+                                                CreateExtractElement(pY, (idx + 1) % 3)),
+                                     idx);
+    }
+    return CreateFSub(pLeft, pRight, instName);
+}
+
+// =====================================================================================================================
+// Create FP scalar/vector normalize operation: returns a scalar/vector with the same direction and magnitude 1.
+Value* BuilderImplArith::CreateNormalizeVector(
+    Value*        pX,         // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    if (isa<VectorType>(pX->getType()) == false)
+    {
+        // For a scalar, just return -1.0 or +1.0.
+        Value* pIsPositive = CreateFCmpOGT(pX, Constant::getNullValue(pX->getType()));
+        return CreateSelect(pIsPositive,
+                            ConstantFP::get(pX->getType(), 1.0),
+                            ConstantFP::get(pX->getType(), -1.0),
+                            instName);
+    }
+
+    // For a vector, divide by the length.
+    Value* pDot = CreateDotProduct(pX, pX);
+    Value* pSqrt = CreateIntrinsic(Intrinsic::sqrt, pDot->getType(), pDot);
+    Value* pRsq = CreateFDiv(ConstantFP::get(pSqrt->getType(), 1.0), pSqrt);
+    // We use fmul.legacy for float so that a zero vector is normalized to a zero vector,
+    // rather than NaNs. We must scalarize it ourselves.
+    Value* pResult = Scalarize(pX,
+                               [this, pRsq](Value* pX) -> Value*
+                               {
+                                  if (pRsq->getType()->isFloatTy())
+                                  {
+                                      return CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, { pX, pRsq });
+                                  }
+                                  return CreateFMul(pX, pRsq);
+                               });
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "face forward" operation: given three FP scalars/vectors {N, I, Nref}, if the dot product of
+// Nref and I is negative, the result is N, otherwise it is -N
+Value* BuilderImplArith::CreateFaceForward(
+    Value*        pN,         // [in] Input value "N"
+    Value*        pI,         // [in] Input value "I"
+    Value*        pNref,      // [in] Input value "Nref"
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Value* pDot = CreateDotProduct(pI, pNref);
+    Value* pIsDotNegative = CreateFCmpOLT(pDot, Constant::getNullValue(pDot->getType()));
+    Value* pNegN = CreateFSub(Constant::getNullValue(pN->getType()), pN);
+    return CreateSelect(pIsDotNegative, pN, pNegN, instName);
+}
+
+// =====================================================================================================================
+// Create "reflect" operation. For the incident vector I and normalized surface orientation N, the result is
+// the reflection direction:
+// I - 2 * dot(N, I) * N
+Value* BuilderImplArith::CreateReflect(
+    Value*        pI,         // [in] Input value "I"
+    Value*        pN,         // [in] Input value "N"
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Value* pDot = CreateDotProduct(pN, pI);
+    pDot = CreateFMul(pDot, ConstantFP::get(pDot->getType(), 2.0));
+    if (auto pVecTy = dyn_cast<VectorType>(pN->getType()))
+    {
+        pDot = CreateVectorSplat(pVecTy->getNumElements(), pDot);
+    }
+    return CreateFSub(pI, CreateFMul(pDot, pN), instName);
+}
+
+// =====================================================================================================================
+// Create "refract" operation. For the normalized incident vector I, normalized surface orientation N and ratio
+// of indices of refraction eta, the result is the refraction vector:
+// k = 1.0 - eta * eta * (1.0 - dot(N,I) * dot(N,I))
+// If k < 0.0 the result is 0.0.
+// Otherwise, the result is eta * I - (eta * dot(N,I) + sqrt(k)) * N
+Value* BuilderImplArith::CreateRefract(
+    Value*        pI,         // [in] Input value "I"
+    Value*        pN,         // [in] Input value "N"
+    Value*        pEta,       // [in] Input value "eta"
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Constant* pOne = ConstantFP::get(pEta->getType(), 1.0);
+    Value* pDot = CreateDotProduct(pI, pN);
+    Value* pDotSqr = CreateFMul(pDot, pDot);
+    Value* pE1 = CreateFSub(pOne, pDotSqr);
+    Value* pE2 = CreateFMul(pEta, pEta);
+    Value* pE3 = CreateFMul(pE1, pE2);
+    Value* pK = CreateFSub(pOne, pE3);
+    Value* pKSqrt = CreateUnaryIntrinsic(Intrinsic::sqrt, pK);
+    Value* pEtaDot = CreateFMul(pEta, pDot);
+    Value* pInnt = CreateFAdd(pEtaDot, pKSqrt);
+
+    if (auto pVecTy = dyn_cast<VectorType>(pN->getType()))
+    {
+        pEta = CreateVectorSplat(pVecTy->getNumElements(), pEta);
+        pInnt = CreateVectorSplat(pVecTy->getNumElements(), pInnt);
+    }
+    pI = CreateFMul(pI, pEta);
+    pN = CreateFMul(pN, pInnt);
+    Value* pS = CreateFSub(pI, pN);
+    Value* pCon = CreateFCmpOLT(pK, Constant::getNullValue(pK->getType()));
+    return CreateSelect(pCon, Constant::getNullValue(pS->getType()), pS);
 }
 
 // =====================================================================================================================
@@ -565,6 +845,54 @@ Value* BuilderImplArith::CreateFClamp(
         pMin->setFastMathFlags(getFastMathFlags());
         pResult = pMin;
     }
+
+    // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
+    // canonicalize the result here.
+    if (getContext().GetGfxIpVersion().major < 9)
+    {
+        pResult = Canonicalize(pResult);
+    }
+
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "fmin" operation, returning the minimum of two scalar or vector FP values.
+// This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+// It also honors the shader's FP mode being "flush denorm".
+Value* BuilderImplArith::CreateFMin(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    CallInst* pMin = CreateMinNum(pValue1, pValue2);
+    pMin->setFastMathFlags(getFastMathFlags());
+    Value* pResult = pMin;
+
+    // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
+    // canonicalize the result here.
+    if (getContext().GetGfxIpVersion().major < 9)
+    {
+        pResult = Canonicalize(pResult);
+    }
+
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "fmax" operation, returning the maximum of two scalar or vector FP values.
+// This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+// It also honors the shader's FP mode being "flush denorm".
+Value* BuilderImplArith::CreateFMax(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    CallInst* pMax = CreateMaxNum(pValue1, pValue2);
+    pMax->setFastMathFlags(getFastMathFlags());
+    Value* pResult = pMax;
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
@@ -839,6 +1167,29 @@ Value* BuilderImplArith::CreateExtractBitField(
     }
     Value* pIsZeroCount = CreateICmpEQ(pCount, Constant::getNullValue(pCount->getType()));
     return CreateSelect(pIsZeroCount, pCount, pResult, instName);
+}
+
+// =====================================================================================================================
+// Create "find MSB" operation for a (vector of) signed i32. For a postive number, the result is the bit number of
+// the most significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
+// For a value of 0 or -1, the result is -1.
+Value* BuilderImplArith::CreateFindSMsb(
+    Value*        pValue,     // [in] Input value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    LLPC_ASSERT(pValue->getType()->getScalarType()->isIntegerTy(32));
+
+    Constant* pNegOne = ConstantInt::get(pValue->getType(), -1);
+    Value* pLeadingZeroCount = Scalarize(pValue,
+                                         [this](Value* pValue)
+                                         {
+                                            return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, pValue);
+                                         });
+    Value* pBitOnePos = CreateSub(ConstantInt::get(pValue->getType(), 31), pLeadingZeroCount);
+    Value* pIsNegOne = CreateICmpEQ(pValue, pNegOne);
+    Value* pIsZero = CreateICmpEQ(pValue, Constant::getNullValue(pValue->getType()));
+    Value* pIsNegOneOrZero = CreateOr(pIsNegOne, pIsZero);
+    return CreateSelect(pIsNegOneOrZero, pNegOne, pBitOnePos, instName);
 }
 
 // =====================================================================================================================

@@ -20,8 +20,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z6lengthf(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z6lengthDv3_f(<3 x float> %{{.*}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.fabs.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @llpc.call.dot.product.f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.sqrt.f32(float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

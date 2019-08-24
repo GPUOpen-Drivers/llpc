@@ -1,3 +1,0 @@
-# Common Functions
-genI16Type sabs genI16Type x : llpc.sabs.i16 #0
-genI16Type ssign genI16Type x : llpc.ssign.i16 #0

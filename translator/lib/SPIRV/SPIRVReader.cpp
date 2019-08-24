@@ -9353,15 +9353,52 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
   auto Args = transValue(ExtInst->getValues(BArgs), BB->getParent(), BB);
   switch (static_cast<GLSLExtOpKind>(ExtInst->getExtOp())) {
 
+  case GLSLstd450Round:
+  case GLSLstd450RoundEven:
+    // Round to whole number
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::rint, Args[0]);
+
+  case GLSLstd450Trunc:
+    // Trunc to whole number
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, Args[0]);
+
+  case GLSLstd450FAbs:
+    // FP absolute value
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, Args[0]);
+
+  case GLSLstd450SAbs:
+    // Signed integer absolute value
+    return getBuilder()->CreateSAbs(Args[0]);
+
+  case GLSLstd450FSign:
+    // Get sign of FP value
+    return getBuilder()->CreateFSign(Args[0]);
+
+  case GLSLstd450SSign:
+    // Get sign of signed integer value
+    return getBuilder()->CreateSSign(Args[0]);
+
+  case GLSLstd450Floor:
+    // Round down to whole number
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::floor, Args[0]);
+
+  case GLSLstd450Ceil:
+    // Round up to whole number
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::ceil, Args[0]);
+
+  case GLSLstd450Fract:
+    // Get fractional part
+    return getBuilder()->CreateFract(Args[0]);
+
   case GLSLstd450Radians:
     // Convert from degrees to radians
-    return getBuilder()->CreateFMul(Args[0],
-                                  getBuilder()->GetPiOver180(Args[0]->getType()));
+    return getBuilder()->CreateFMul(
+        Args[0], getBuilder()->GetPiOver180(Args[0]->getType()));
 
   case GLSLstd450Degrees:
     // Convert from radians to degrees
-    return getBuilder()->CreateFMul(Args[0],
-                                  getBuilder()->Get180OverPi(Args[0]->getType()));
+    return getBuilder()->CreateFMul(
+        Args[0], getBuilder()->Get180OverPi(Args[0]->getType()));
 
   case GLSLstd450Sin:
     // sin operation
@@ -9454,6 +9491,151 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
     // Inverse of square matrix
     return getBuilder()->CreateMatrixInverse(Args[0]);
 
+  case GLSLstd450Modf: {
+    // Split input into fractional and whole number parts.
+    Value *WholeNum =
+        getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, Args[0]);
+    Value *Fract = getBuilder()->CreateFSub(Args[0], WholeNum);
+    getBuilder()->CreateStore(WholeNum, Args[1]);
+    return Fract;
+  }
+
+  case GLSLstd450ModfStruct: {
+    // Split input into fractional and whole number parts.
+    Value *WholeNum =
+        getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, Args[0]);
+    Value *Fract = getBuilder()->CreateFSub(Args[0], WholeNum);
+    Value *Result = UndefValue::get(transType(ExtInst->getType()));
+    Result = getBuilder()->CreateInsertValue(Result, Fract, 0);
+    Result = getBuilder()->CreateInsertValue(Result, WholeNum, 1);
+    return Result;
+  }
+
+  case GLSLstd450FMin:
+  case GLSLstd450NMin: {
+    // FMin: FP minimum (undefined result for NaN)
+    // NMin: FP minimum (preserve NaN)
+    FastMathFlags FMF = getBuilder()->getFastMathFlags();
+    FMF.setNoNaNs(ExtInst->getExtOp() == GLSLstd450FMin);
+    getBuilder()->setFastMathFlags(FMF);
+    return getBuilder()->CreateFMin(Args[0], Args[1]);
+  }
+
+  case GLSLstd450UMin: {
+    // Unsigned integer minimum
+    Value *Cmp = getBuilder()->CreateICmpULT(Args[1], Args[0]);
+    return getBuilder()->CreateSelect(Cmp, Args[1], Args[0]);
+  }
+
+  case GLSLstd450SMin: {
+    // Signed integer minimum
+    Value *Cmp = getBuilder()->CreateICmpSLT(Args[1], Args[0]);
+    return getBuilder()->CreateSelect(Cmp, Args[1], Args[0]);
+  }
+
+  case GLSLstd450FMax:
+  case GLSLstd450NMax: {
+    // FMax: FP maximum (undefined result for NaN)
+    // NMax: FP maximum (preserve NaN)
+    FastMathFlags FMF = getBuilder()->getFastMathFlags();
+    FMF.setNoNaNs(ExtInst->getExtOp() == GLSLstd450FMax);
+    getBuilder()->setFastMathFlags(FMF);
+    return getBuilder()->CreateFMax(Args[0], Args[1]);
+  }
+
+  case GLSLstd450UMax: {
+    // Unsigned integer maximum
+    Value *Cmp = getBuilder()->CreateICmpULT(Args[1], Args[0]);
+    return getBuilder()->CreateSelect(Cmp, Args[0], Args[1]);
+  }
+
+  case GLSLstd450SMax: {
+    // Signed integer maximum
+    Value *Cmp = getBuilder()->CreateICmpSLT(Args[1], Args[0]);
+    return getBuilder()->CreateSelect(Cmp, Args[0], Args[1]);
+  }
+
+  case GLSLstd450FClamp:
+  case GLSLstd450NClamp: {
+    // FClamp: FP clamp with undefined result if any input is NaN
+    // NClamp: FP clamp with "avoid NaN" semantics
+    FastMathFlags PreservedFMF = getBuilder()->getFastMathFlags();
+    FastMathFlags ModifiedFMF = PreservedFMF;
+    ModifiedFMF.setNoNaNs(ExtInst->getExtOp() == GLSLstd450FClamp);
+    getBuilder()->setFastMathFlags(ModifiedFMF);
+    Value *Result = getBuilder()->CreateFClamp(Args[0], Args[1], Args[2]);
+    getBuilder()->setFastMathFlags(PreservedFMF);
+    return Result;
+  }
+
+  case GLSLstd450UClamp: {
+    // Unsigned integer clamp
+    Value *Cmp = getBuilder()->CreateICmpUGT(Args[1], Args[0]);
+    Value *Max1 = getBuilder()->CreateSelect(Cmp, Args[1], Args[0]);
+    Cmp = getBuilder()->CreateICmpULT(Args[2], Max1);
+    return getBuilder()->CreateSelect(Cmp, Args[2], Max1);
+  }
+
+  case GLSLstd450SClamp: {
+    // Signed integer clamp
+    Value *Cmp = getBuilder()->CreateICmpSGT(Args[1], Args[0]);
+    Value *Max1 = getBuilder()->CreateSelect(Cmp, Args[1], Args[0]);
+    Cmp = getBuilder()->CreateICmpSLT(Args[2], Max1);
+    return getBuilder()->CreateSelect(Cmp, Args[2], Max1);
+  }
+
+  case GLSLstd450FMix: {
+    // Linear blend
+    Value *X = Args[0];
+    Value *Y = Args[1];
+    Value *A = Args[2];
+    Value *Diff = getBuilder()->CreateFSub(Y, X);
+    return getBuilder()->CreateIntrinsic(Intrinsic::fmuladd, X->getType(),
+                                         {Diff, A, X});
+  }
+
+  case GLSLstd450Step: {
+    // x < edge ? 0.0 : 1.0
+    Value *Edge = Args[0];
+    Value *X = Args[1];
+    Value *Cmp = getBuilder()->CreateFCmpOLT(X, Edge);
+    return getBuilder()->CreateSelect(Cmp, Constant::getNullValue(X->getType()),
+                                      ConstantFP::get(X->getType(), 1.0));
+  }
+
+  case GLSLstd450SmoothStep:
+    // Smooth step operation
+    return getBuilder()->CreateSmoothStep(Args[0], Args[1], Args[2]);
+
+  case GLSLstd450Fma:
+    // Fused multiply and add
+    return getBuilder()->CreateFma(Args[0], Args[1], Args[2]);
+
+  case GLSLstd450Frexp:
+  case GLSLstd450FrexpStruct: {
+    // Split input into significand (mantissa) and exponent.
+    Value *Mant = getBuilder()->CreateExtractSignificand(Args[0]);
+    Value *Exp = getBuilder()->CreateExtractExponent(Args[0]);
+    if (ExtInst->getExtOp() == GLSLstd450FrexpStruct) {
+      // FrexpStruct: Return the two values as a struct.
+      Value *Result = UndefValue::get(transType(ExtInst->getType()));
+      Result = getBuilder()->CreateInsertValue(Result, Mant, 0);
+      Exp = getBuilder()->CreateSExtOrTrunc(
+          Exp, Result->getType()->getStructElementType(1));
+      Result = getBuilder()->CreateInsertValue(Result, Exp, 1);
+      return Result;
+    }
+    // Frexp: Store the exponent and return the mantissa.
+    Exp = getBuilder()->CreateSExtOrTrunc(
+        Exp, Args[1]->getType()->getPointerElementType());
+    getBuilder()->CreateStore(Exp, Args[1]);
+    return Mant;
+  }
+
+  case GLSLstd450Ldexp:
+    // Construct FP value from mantissa and exponent
+    return getBuilder()->CreateLdexp(Args[0], Args[1]);
+
   case GLSLstd450PackSnorm4x8: {
     // Convert <4 x float> into signed normalized <4 x i8> then pack into i32.
     Value *Val = getBuilder()->CreateFClamp(
@@ -9472,10 +9654,10 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
     Value *Val = getBuilder()->CreateFClamp(
         Args[0], Constant::getNullValue(Args[0]->getType()),
         ConstantFP::get(Args[0]->getType(), 1.0));
-    Val =
-        getBuilder()->CreateFMul(Val, ConstantFP::get(Args[0]->getType(), 255.0));
-    Val = getBuilder()->CreateFPToUI(Val,
-                                   VectorType::get(getBuilder()->getInt8Ty(), 4));
+    Val = getBuilder()->CreateFMul(Val,
+                                   ConstantFP::get(Args[0]->getType(), 255.0));
+    Val = getBuilder()->CreateFPToUI(
+        Val, VectorType::get(getBuilder()->getInt8Ty(), 4));
     return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
   }
 
@@ -9484,8 +9666,8 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
     Value *Val = getBuilder()->CreateFClamp(
         Args[0], ConstantFP::get(Args[0]->getType(), -1.0),
         ConstantFP::get(Args[0]->getType(), 1.0));
-    Val = getBuilder()->CreateFMul(Val,
-                                 ConstantFP::get(Args[0]->getType(), 32767.0));
+    Val = getBuilder()->CreateFMul(
+        Val, ConstantFP::get(Args[0]->getType(), 32767.0));
     Val = getBuilder()->CreateFPToSI(
         Val, VectorType::get(getBuilder()->getInt16Ty(), 2));
     return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
@@ -9497,8 +9679,8 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
     Value *Val = getBuilder()->CreateFClamp(
         Args[0], Constant::getNullValue(Args[0]->getType()),
         ConstantFP::get(Args[0]->getType(), 1.0));
-    Val = getBuilder()->CreateFMul(Val,
-                                 ConstantFP::get(Args[0]->getType(), 65535.0));
+    Val = getBuilder()->CreateFMul(
+        Val, ConstantFP::get(Args[0]->getType(), 65535.0));
     Val = getBuilder()->CreateFPToUI(
         Val, VectorType::get(getBuilder()->getInt16Ty(), 2));
     return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
@@ -9584,9 +9766,93 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
     return getBuilder()->CreateBitCast(
         Args[0], VectorType::get(getBuilder()->getInt32Ty(), 2));
 
-  default:
-    // Other instructions are handled the old way, by generating a call.
+  case GLSLstd450Length: {
+    // Get length of vector.
+    if (!isa<VectorType>(Args[0]->getType())) {
+      return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, Args[0]);
+    }
+    Value *Dot = getBuilder()->CreateDotProduct(Args[0], Args[0]);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, Dot);
+  }
+
+  case GLSLstd450Distance: {
+    // Get distance between two points.
+    Value *Diff = getBuilder()->CreateFSub(Args[0], Args[1]);
+    if (!isa<VectorType>(Diff->getType())) {
+      return getBuilder()->CreateUnaryIntrinsic(Intrinsic::fabs, Diff);
+    }
+    Value *Dot = getBuilder()->CreateDotProduct(Diff, Diff);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, Dot);
+  }
+
+  case GLSLstd450Cross:
+    // Vector cross product.
+    return getBuilder()->CreateCrossProduct(Args[0], Args[1]);
+
+  case GLSLstd450Normalize:
+    // Normalize vector to magnitude 1.
+    return getBuilder()->CreateNormalizeVector(Args[0]);
+
+  case GLSLstd450FaceForward:
+    // Face forward operation.
+    return getBuilder()->CreateFaceForward(Args[0], Args[1], Args[2]);
+
+  case GLSLstd450Reflect:
+    // Reflect operation.
+    return getBuilder()->CreateReflect(Args[0], Args[1]);
+
+  case GLSLstd450Refract:
+    // Refract operation.
+    return getBuilder()->CreateRefract(Args[0], Args[1], Args[2]);
+
+  case GLSLstd450FindILsb: {
+    // Find integer least-significant 1-bit. 0 input gives -1 result.
+    // The spec claims that the result must be the same type as the input, but I
+    // have seen SPIR-V that does not do that.
+    Value *IsZero = getBuilder()->CreateICmpEQ(
+        Args[0], Constant::getNullValue(Args[0]->getType()));
+    Value *Result = getBuilder()->CreateBinaryIntrinsic(
+        Intrinsic::cttz, Args[0], getBuilder()->getTrue());
+    Result = getBuilder()->CreateSelect(
+        IsZero, Constant::getAllOnesValue(Result->getType()), Result);
+    return getBuilder()->CreateSExtOrTrunc(Result,
+                                           transType(ExtInst->getType()));
+  }
+
+  case GLSLstd450FindSMsb: {
+    // Find signed integer most-significant bit. 0 or -1 input gives -1 result.
+    Value *Result = getBuilder()->CreateFindSMsb(Args[0]);
+    // TODO: According to the SPIR-V spec, FindSMsb expects the input value and result to have both the
+    // same number of components and the same component width. But glslang violates this rule. Thus,
+    // we have a workaround here for this mismatch.
+    return getBuilder()->CreateSExtOrTrunc(Result,
+                                           transType(ExtInst->getType()));
+  }
+
+  case GLSLstd450FindUMsb: {
+    // Find unsigned integer most-significant 1-bit. 0 input gives -1 result.
+    // The spec claims that the result must be the same type as the input, but I
+    // have seen SPIR-V that does not do that.
+    Value *Result = getBuilder()->CreateBinaryIntrinsic(
+        Intrinsic::ctlz, Args[0], getBuilder()->getFalse());
+    Result = getBuilder()->CreateSub(
+        ConstantInt::get(
+            Result->getType(),
+            Result->getType()->getScalarType()->getPrimitiveSizeInBits() - 1),
+        Result);
+    return getBuilder()->CreateSExtOrTrunc(Result,
+                                           transType(ExtInst->getType()));
+  }
+
+  case GLSLstd450InterpolateAtCentroid:
+  case GLSLstd450InterpolateAtSample:
+  case GLSLstd450InterpolateAtOffset:
+    // These InterpolateAt* instructions are handled the old way, by generating
+    // a call.
     return transGLSLBuiltinFromExtInst(ExtInst, BB);
+
+  default:
+    llvm_unreachable("Unrecognized GLSLstd450 extended instruction");
   }
 }
 

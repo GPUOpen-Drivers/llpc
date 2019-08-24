@@ -22,13 +22,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} double @_Z4modfdPd(double %{{.*}}, double addrspace(5)* %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x double> @_Z4modfDv3_dPDv3_d(<3 x double> %{{.*}}, <3 x double> addrspace(5)* %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call double @llvm.trunc.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fsub double %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = call double @llvm.trunc.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fsub double %{{.*}}, %{{.*}}
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.trunc.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract double %{{.*}}, %{{.*}}
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract <3 x double> @llvm.trunc.v3f64(<3 x double> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract <3 x double> %{{.*}}, %{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

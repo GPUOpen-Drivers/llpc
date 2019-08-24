@@ -78,6 +78,7 @@ public:
         CubeFaceIndex,
         QuantizeToFp16,
         SMod,
+        Fma,
         Tan,
         ASin,
         ACos,
@@ -93,12 +94,28 @@ public:
         Exp,
         Log,
         InverseSqrt,
+        SAbs,
+        FSign,
+        SSign,
+        Fract,
+        SmoothStep,
+        Ldexp,
+        ExtractSignificand,
+        ExtractExponent,
+        CrossProduct,
+        NormalizeVector,
+        FaceForward,
+        Reflect,
+        Refract,
         FClamp,
+        FMin,
+        FMax,
         FMin3,
         FMax3,
         FMid3,
         InsertBitField,
         ExtractBitField,
+        FindSMsb,
 
         // Descriptor
         LoadBufferDesc,
@@ -226,6 +243,9 @@ public:
     // Create signed integer modulo operation.
     Value* CreateSMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
 
+    // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
+    Value* CreateFma(Value* pA, Value* pB, Value* pC, const Twine& instName = "") override final;
+
     // Trig and exponent operations.
     Value* CreateTan(Value* pX, const Twine& instName = "") override final;
     Value* CreateASin(Value* pX, const Twine& instName = "") override final;
@@ -243,8 +263,27 @@ public:
     Value* CreateLog(Value* pX, const Twine& instName = "") override final;
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
 
+    // General arithmetic operations.
+    Value* CreateSAbs(Value* pX, const Twine& instName = "") override final;
+    Value* CreateFSign(Value* pX, const Twine& instName = "") override final;
+    Value* CreateSSign(Value* pX, const Twine& instName = "") override final;
+    Value* CreateFract(Value* pX, const Twine& instName = "") override final;
+    Value* CreateSmoothStep(Value* pEdge0, Value* pEdge1, Value* pXValue, const Twine& instName = "") override final;
+    Value* CreateLdexp(Value* pX, Value* pExp, const Twine& instName = "") override final;
+    Value* CreateExtractSignificand(Value* pValue, const Twine& instName = "") override final;
+    Value* CreateExtractExponent(Value* pValue, const Twine& instName = "") override final;
+    Value* CreateCrossProduct(Value* pX, Value* pY, const Twine& instName = "") override final;
+    Value* CreateNormalizeVector(Value* pX, const Twine& instName = "") override final;
+    Value* CreateFaceForward(Value* pN, Value* pI, Value* pNref, const Twine& instName = "") override final;
+    Value* CreateReflect(Value* pI, Value* pN, const Twine& instName = "") override final;
+    Value* CreateRefract(Value* pI, Value* pN, Value* pEta, const Twine& instName = "") override final;
+
     // Create "fclamp" operation.
     Value* CreateFClamp(Value* pX, Value* pMinVal, Value* pMaxVal, const Twine& instName = "") override final;
+
+    // FP min/max
+    Value* CreateFMin(Value* pValue1, Value* pValue2, const Twine& instName = "") override final;
+    Value* CreateFMax(Value* pValue1, Value* pValue2, const Twine& instName = "") override final;
 
     // Methods for trinary min/max/mid.
     Value* CreateFMin3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
@@ -267,6 +306,9 @@ public:
                                  Value*        pCount,
                                  bool          isSigned,
                                  const Twine&  instName = "") override final;
+
+    // Create "find MSB" operation for a (vector of) signed int.
+    Value* CreateFindSMsb(Value* pValue, const Twine& instName = "") override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Descriptor operations

@@ -1,3 +1,0 @@
-# Common Functions
-genI8Type sabs genI8Type x : llpc.sabs.i8 #0
-genI8Type ssign genI8Type x : llpc.ssign.i8 #0

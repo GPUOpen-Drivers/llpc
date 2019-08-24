@@ -382,20 +382,6 @@ void SpirvLowerAlgebraTransform::visitCallInst(
         {
             DisableFastMath(pValueWritten);
         }
-
-        if (m_pContext->GetGfxIpVersion().major <= 8)
-        {
-            // NOTE: For pre-GFX9, MIN, MAX, CLAMP are out of float control.
-            if (pCallee->isIntrinsic() &&
-                ((pCallee->getIntrinsicID() == Intrinsic::minnum) || (pCallee->getIntrinsicID() == Intrinsic::maxnum)))
-            {
-                forceFMul = true;
-            }
-            else if (pCallee->getName().startswith("_Z6fclamp") || pCallee->getName().startswith("_Z6nclamp"))
-            {
-                forceFMul = true;
-            }
-        }
     }
 
     // TODO: Check floating-point controls and insert a MUL to force denormal flush. This ought to

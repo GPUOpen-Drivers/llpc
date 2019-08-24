@@ -17,7 +17,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} { double, i32 } @_Z11frexpStructd(double %{{.*}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @llpc.call.extract.significand.f64(double
+; SHADERTEST: = call i32 (...) @llpc.call.extract.exponent.i32(double
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
