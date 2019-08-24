@@ -17,16 +17,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <2 x float> @_Z14unpackHalf2x16i(i32 %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = bitcast <2 x i32> %{{.*}} to i64
-; SHADERTEST: %{{[0-9]*}} = trunc i32 %{{.*}} to i16
-; SHADERTEST: %{{[0-9]*}} = lshr i32 %{{.*}}, 16
-; SHADERTEST: %{{[0-9]*}} = trunc i32 %{{.*}} to i16
-; SHADERTEST: %{{[0-9]*}} = bitcast i16 %{{.*}} to half
-; SHADERTEST: %{{[0-9]*}} = bitcast i16 %{{.*}} to half
-; SHADERTEST: %{{[0-9]*}} = fpext half %{{.*}} to float
-; SHADERTEST: %{{[0-9]*}} = fpext half %{{.*}} to float
+; SHADERTEST: %[[BITCAST:.*]] = bitcast i32 %{{.*}} to <2 x half>
+; SHADERTEST: = fpext <2 x half> %[[BITCAST]] to <2 x float>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -130,6 +130,9 @@ public:
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
     Value* CreateFSign(Value* pX, const Twine& instName = ""); // TODO add override final
 
+    // Create "fclamp" operation.
+    Value* CreateFClamp(Value* pX, Value* pMinVal, Value* pMaxVal, const Twine& instName = "") override final;
+
     // Methods for trinary min/max/mid.
     Value* CreateFMin3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
     Value* CreateFMax3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;

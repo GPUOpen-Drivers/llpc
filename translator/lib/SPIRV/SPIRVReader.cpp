@@ -364,6 +364,7 @@ public:
   uint32_t calcShaderBlockSize(SPIRVType *BT, uint32_t BlockSize, uint32_t MatrixStride, bool IsRowMajor);
   Instruction *transOCLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
   Value *transGLSLExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
+  Value *flushDenorm(Value *Val);
   Value *transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst, BasicBlock *BB);
   Value *transGLSLBuiltinFromExtInst(SPIRVExtInst *BC, BasicBlock *BB);
   std::vector<Value *> transValue(const std::vector<SPIRVValue *> &,
@@ -9453,10 +9454,149 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
     // Inverse of square matrix
     return getBuilder()->CreateMatrixInverse(Args[0]);
 
+  case GLSLstd450PackSnorm4x8: {
+    // Convert <4 x float> into signed normalized <4 x i8> then pack into i32.
+    Value *Val = getBuilder()->CreateFClamp(
+        Args[0], ConstantFP::get(Args[0]->getType(), -1.0),
+        ConstantFP::get(Args[0]->getType(), 1.0));
+    Val = getBuilder()->CreateFMul(Val,
+                                   ConstantFP::get(Args[0]->getType(), 127.0));
+    Val = getBuilder()->CreateUnaryIntrinsic(Intrinsic::rint, Val);
+    Val = getBuilder()->CreateFPToSI(
+        Val, VectorType::get(getBuilder()->getInt8Ty(), 4));
+    return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
+  }
+
+  case GLSLstd450PackUnorm4x8: {
+    // Convert <4 x float> into unsigned normalized <4 x i8> then pack into i32.
+    Value *Val = getBuilder()->CreateFClamp(
+        Args[0], Constant::getNullValue(Args[0]->getType()),
+        ConstantFP::get(Args[0]->getType(), 1.0));
+    Val =
+        getBuilder()->CreateFMul(Val, ConstantFP::get(Args[0]->getType(), 255.0));
+    Val = getBuilder()->CreateFPToUI(Val,
+                                   VectorType::get(getBuilder()->getInt8Ty(), 4));
+    return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
+  }
+
+  case GLSLstd450PackSnorm2x16: {
+    // Convert <2 x float> into signed normalized <2 x i16> then pack into i32.
+    Value *Val = getBuilder()->CreateFClamp(
+        Args[0], ConstantFP::get(Args[0]->getType(), -1.0),
+        ConstantFP::get(Args[0]->getType(), 1.0));
+    Val = getBuilder()->CreateFMul(Val,
+                                 ConstantFP::get(Args[0]->getType(), 32767.0));
+    Val = getBuilder()->CreateFPToSI(
+        Val, VectorType::get(getBuilder()->getInt16Ty(), 2));
+    return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
+  }
+
+  case GLSLstd450PackUnorm2x16: {
+    // Convert <2 x float> into unsigned normalized <2 x i16> then pack into
+    // i32.
+    Value *Val = getBuilder()->CreateFClamp(
+        Args[0], Constant::getNullValue(Args[0]->getType()),
+        ConstantFP::get(Args[0]->getType(), 1.0));
+    Val = getBuilder()->CreateFMul(Val,
+                                 ConstantFP::get(Args[0]->getType(), 65535.0));
+    Val = getBuilder()->CreateFPToUI(
+        Val, VectorType::get(getBuilder()->getInt16Ty(), 2));
+    return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
+  }
+
+  case GLSLstd450PackHalf2x16: {
+    // Convert <2 x float> into <2 x half> then pack into i32.
+    Value *Val = getBuilder()->CreateFPTrunc(
+        Args[0], VectorType::get(getBuilder()->getHalfTy(), 2));
+    return getBuilder()->CreateBitCast(Val, getBuilder()->getInt32Ty());
+  }
+
+  case GLSLstd450PackDouble2x32:
+    // Cast <2 x i32> to double.
+    return getBuilder()->CreateBitCast(Args[0], getBuilder()->getDoubleTy());
+
+  case GLSLstd450UnpackSnorm2x16: {
+    // Unpack i32 into <2 x i16> then treat as signed normalized and convert to
+    // <2 x float>.
+    Value *Val = getBuilder()->CreateBitCast(
+        Args[0], VectorType::get(getBuilder()->getInt16Ty(), 2));
+    Val = getBuilder()->CreateSIToFP(
+        Val, VectorType::get(getBuilder()->getFloatTy(), 2));
+    Value *Multiplier =
+        getBuilder()->GetOneOverPower2MinusOne(Val->getType(), 15); // 1/32767
+    Val = getBuilder()->CreateFMul(Val, Multiplier);
+    return getBuilder()->CreateFClamp(Val,
+                                   ConstantFP::get(Val->getType(), -1.0),
+                                   ConstantFP::get(Val->getType(), 1.0));
+  }
+
+  case GLSLstd450UnpackUnorm2x16: {
+    // Unpack i32 into <2 x i16> then treat as unsigned normalized and convert
+    // to <2 x float>.
+    Value *Val = getBuilder()->CreateBitCast(
+        Args[0], VectorType::get(getBuilder()->getInt16Ty(), 2));
+    Val = getBuilder()->CreateUIToFP(
+        Val, VectorType::get(getBuilder()->getFloatTy(), 2));
+    Value *Multiplier =
+        getBuilder()->GetOneOverPower2MinusOne(Val->getType(), 16); // 1/65535
+    return getBuilder()->CreateFMul(Val, Multiplier);
+  }
+
+  case GLSLstd450UnpackHalf2x16: {
+    // Unpack <2 x half> from i32 and convert to <2 x float>.
+    // This is required to flush denorm to zero if that mode is enabled.
+    Value *Val = getBuilder()->CreateBitCast(
+        Args[0], VectorType::get(getBuilder()->getHalfTy(), 2));
+    Val = flushDenorm(Val);
+    return getBuilder()->CreateFPExt(
+        Val, VectorType::get(getBuilder()->getFloatTy(), 2));
+  }
+
+  case GLSLstd450UnpackSnorm4x8: {
+    // Unpack i32 into <4 x i8> then treat as signed normalized and convert to
+    // <4 x float>.
+    Value *Val = getBuilder()->CreateBitCast(
+        Args[0], VectorType::get(getBuilder()->getInt8Ty(), 4));
+    Val = getBuilder()->CreateSIToFP(
+        Val, VectorType::get(getBuilder()->getFloatTy(), 4));
+    Value *Multiplier =
+        getBuilder()->GetOneOverPower2MinusOne(Val->getType(), 7); // 1/127
+    Val = getBuilder()->CreateFMul(Val, Multiplier);
+    return getBuilder()->CreateFClamp(Val,
+                                   ConstantFP::get(Val->getType(), -1.0),
+                                   ConstantFP::get(Val->getType(), 1.0));
+  }
+
+  case GLSLstd450UnpackUnorm4x8: {
+    // Unpack i32 into <4 x i8> then treat as unsigned normalized and convert to
+    // <4 x float>.
+    Value *Val = getBuilder()->CreateBitCast(
+        Args[0], VectorType::get(getBuilder()->getInt8Ty(), 4));
+    Val = getBuilder()->CreateUIToFP(
+        Val, VectorType::get(getBuilder()->getFloatTy(), 4));
+    Value *Multiplier =
+        getBuilder()->GetOneOverPower2MinusOne(Val->getType(), 8); // 1/255
+    return getBuilder()->CreateFMul(Val, Multiplier);
+  }
+
+  case GLSLstd450UnpackDouble2x32:
+    // Cast double to <2 x i32>.
+    return getBuilder()->CreateBitCast(
+        Args[0], VectorType::get(getBuilder()->getInt32Ty(), 2));
+
   default:
     // Other instructions are handled the old way, by generating a call.
     return transGLSLBuiltinFromExtInst(ExtInst, BB);
   }
+}
+
+// =============================================================================
+// Flush denorm to zero if DenormFlushToZero is set in the shader
+Value *SPIRVToLLVM::flushDenorm(Value *Val) {
+  if ((FpControlFlags.DenormFlushToZero * 8) &
+      Val->getType()->getScalarType()->getPrimitiveSizeInBits())
+    Val = getBuilder()->CreateUnaryIntrinsic(Intrinsic::canonicalize, Val);
+  return Val;
 }
 
 // =============================================================================

@@ -17,29 +17,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} i32 @_Z12packSnorm4x8Dv4_f(<4 x float> %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 1.270000e+02
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.rint.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fptosi float %{{.*}} to i32
-; SHADERTEST: %{{[0-9]*}} = and i32 %{{.*}}, 255
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 1.270000e+02
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.rint.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fptosi float %{{.*}} to i32
-; SHADERTEST: %{{[0-9]*}} = shl i32 %{{.*}}, 8
-; SHADERTEST: %{{[0-9]*}} = and i32 %{{.*}}, 65280
-; SHADERTEST: %{{[0-9]*}} = or i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 1.270000e+02
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.rint.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fptosi float %{{.*}} to i32
-; SHADERTEST: %{{[0-9]*}} = shl i32 %{{.*}}, 16
-; SHADERTEST: %{{[0-9]*}} = and i32 %{{.*}}, 16711680
-; SHADERTEST: %{{[0-9]*}} = or i32 %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 1.270000e+02
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.rint.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fptosi float %{{.*}} to i32
-; SHADERTEST: %{{[0-9]*}} = shl i32 %{{.*}}, 24
-; SHADERTEST: %{{[0-9]*}} = or i32 %{{.*}}, %{{.*}}
+; SHADERTEST: %[[CLAMP:.*]] = call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.fclamp.v4f32(<4 x float> %{{.*}}, <4 x float> <float -1.000000e+00, float -1.000000e+00, float -1.000000e+00, float -1.000000e+00>, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>)
+; SHADERTEST: %[[SCALE:.*]] = fmul reassoc nnan nsz arcp contract <4 x float> %[[CLAMP]], <float 1.270000e+02, float 1.270000e+02, float 1.270000e+02, float 1.270000e+02>
+; SHADERTEST: %[[RINT:.*]] = call reassoc nnan nsz arcp contract <4 x float> @llvm.rint.v4f32(<4 x float> %[[SCALE]])
+; SHADERTEST: %[[CONV:.*]] = fptosi <4 x float> %[[RINT]] to <4 x i8>
+; SHADERTEST: = bitcast <4 x i8> %[[CONV]] to i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

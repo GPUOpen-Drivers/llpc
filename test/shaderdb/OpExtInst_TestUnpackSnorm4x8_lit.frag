@@ -17,17 +17,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z14unpackSnorm4x8i(i32 %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = lshr i32 %{{.*}}, 8
-; SHADERTEST: %{{.*}} = shl i32 %{{.*}}, 24
-; SHADERTEST: %{{[0-9]*}} = ashr exact i32 %{{.*}}, 24
-; SHADERTEST: %{{.*}} = shl i32 %{{.*}}, 24
-; SHADERTEST: %{{[0-9]*}} = ashr exact i32 %{{.*}}, 24
-; SHADERTEST: %{{[0-9]*}} = sitofp i32 %{{.*}} to float
-; SHADERTEST: %{{[0-9]*}} = sitofp i32 %{{.*}} to float
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 0x3F80204080000000
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 0x3F80204080000000
+; SHADERTEST: %[[BITCAST:.*]] = bitcast i32 %1 to <4 x i8>
+; SHADERTEST: %[[CONV:.*]] = sitofp <4 x i8> %[[BITCAST]] to <4 x float>
+; SHADERTEST: %[[SCALE:.*]] = fmul reassoc nnan nsz arcp contract <4 x float> %[[CONV]], <float 0x3F80204080000000, float 0x3F80204080000000, float 0x3F80204080000000, float 0x3F80204080000000>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.fclamp.v4f32(<4 x float> %[[SCALE]], <4 x float> <float -1.000000e+00, float -1.000000e+00, float -1.000000e+00, float -1.000000e+00>, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

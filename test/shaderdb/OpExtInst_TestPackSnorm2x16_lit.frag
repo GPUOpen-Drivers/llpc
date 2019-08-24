@@ -17,15 +17,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} i32 @_Z13packSnorm2x16Dv2_f(<2 x float> %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 3.276700e+04
-; SHADERTEST: %{{[0-9]*}} = fptosi float %{{.*}} to i32
-; SHADERTEST: %{{[0-9]*}} = shl i32 %{{.*}}, 16
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 3.276700e+04
-; SHADERTEST: %{{[0-9]*}} = fptosi float %{{.*}} to i32
-; SHADERTEST: %{{[0-9]*}} = and i32 %{{.*}}, 65535
-; SHADERTEST: %{{[0-9]*}} = or i32 %{{.*}}, %{{.*}}
+; SHADERTEST: %[[CLAMP:.*]] = call reassoc nnan nsz arcp contract <2 x float> (...) @llpc.call.fclamp.v2f32(<2 x float> %{{.*}}, <2 x float> <float -1.000000e+00, float -1.000000e+00>, <2 x float> <float 1.000000e+00, float 1.000000e+00>)
+; SHADERTEST: %[[SCALE:.*]] = fmul reassoc nnan nsz arcp contract <2 x float> %[[CLAMP]], <float 3.276700e+04, float 3.276700e+04>
+; SHADERTEST: %[[CONV:.*]] = fptosi <2 x float> %[[SCALE]] to <2 x i16>
+; SHADERTEST: = bitcast <2 x i16> %[[CONV]] to i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

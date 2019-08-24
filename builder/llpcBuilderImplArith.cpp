@@ -529,6 +529,55 @@ Value* BuilderImplArith::CreateFSign(
 }
 
 // =====================================================================================================================
+// Create "fclamp" operation, returning min(max(x, minVal), maxVal). Result is undefined if minVal > maxVal.
+// This honors the fast math flags; clear "nnan" in fast math flags in order to obtain the "NaN avoiding
+// semantics" for the min and max where, if one input is NaN, it returns the other one.
+// It also honors the shader's FP mode being "flush denorm".
+Value* BuilderImplArith::CreateFClamp(
+    Value*        pX,         // [in] Value to clamp
+    Value*        pMinVal,    // [in] Minimum of clamp range
+    Value*        pMaxVal,    // [in] Maximum of clamp range
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    // For float, and for half on GFX9+, we can use the fmed3 instruction.
+    // But we can only do this if we do not need NaN preservation.
+    Value* pResult = nullptr;
+    if (getFastMathFlags().noNaNs() && (pX->getType()->getScalarType()->isFloatTy() ||
+        ((getContext().GetGfxIpVersion().major >= 9) && pX->getType()->getScalarType()->isHalfTy())))
+    {
+        pResult = Scalarize(pX,
+                            pMinVal,
+                            pMaxVal,
+                            [this](Value* pX, Value* pMinVal, Value* pMaxVal)
+                            {
+                               return CreateIntrinsic(Intrinsic::amdgcn_fmed3,
+                                                      pX->getType(),
+                                                      { pX, pMinVal, pMaxVal });
+                            });
+        pResult->setName(instName);
+    }
+    else
+    {
+        // For half on GFX8 or earlier, or for double, use a combination of fmin and fmax.
+        CallInst* pMax = CreateMaxNum(pX, pMinVal);
+        pMax->setFastMathFlags(getFastMathFlags());
+        CallInst* pMin = CreateMinNum(pMax, pMaxVal, instName);
+        pMin->setFastMathFlags(getFastMathFlags());
+        pResult = pMin;
+    }
+
+    // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
+    // canonicalize the result here.
+    if (getContext().GetGfxIpVersion().major < 9)
+    {
+        pResult = Canonicalize(pResult);
+    }
+
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
 // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
 // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
 // It also honors the shader's FP mode being "flush denorm".

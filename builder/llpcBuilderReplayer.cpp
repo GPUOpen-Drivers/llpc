@@ -361,6 +361,11 @@ Value* BuilderReplayer::ProcessCall(
                                                 cast<ConstantInt>(args[2])->getZExtValue());  // isFine
         }
 
+    case BuilderRecorder::Opcode::FClamp:
+        {
+            return m_pBuilder->CreateFClamp(args[0], args[1], args[2]);
+        }
+
     case BuilderRecorder::Opcode::FMin3:
         {
             return m_pBuilder->CreateFMin3(args[0], args[1], args[2]);
