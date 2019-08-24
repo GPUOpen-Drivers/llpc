@@ -449,41 +449,6 @@ define spir_func {<4 x double>, <4 x i32>} @_Z11frexpStructDv4_d(
 }
 
 ; =====================================================================================================================
-; >>>  Floating-point Pack and Unpack Functions
-; =====================================================================================================================
-
-; GLSL: double packDouble2x32(uvec2)
-define double @_Z14packDouble2x32Dv2_i(<2 x i32> %v) #0
-{
-    %v0 =  extractelement <2 x i32> %v, i32 0
-    %v1 =  extractelement <2 x i32> %v, i32 1
-
-    %itgm =  zext i32 %v1 to i64
-    %itgshf = shl i64 %itgm, 32
-    %itgl =  zext i32 %v0 to i64
-    %itg64 = or i64 %itgshf,%itgl
-    %end = bitcast i64 %itg64 to double
-
-    ret double %end
-}
-
-; GLSL: uvec2 unpackDouble2x32(double)
-define <2 x i32> @_Z16unpackDouble2x32d(double %v) #0
-{
-    %itg64 = bitcast double %v to i64
-    %il = trunc i64 %itg64 to i32
-    %im0 = lshr i64 %itg64, 32
-    %im = trunc i64 %im0 to i32
-    %vec2ptr = alloca <2 x i32>, addrspace(5)
-    %vec2 = load <2 x i32>, <2 x i32> addrspace(5)* %vec2ptr
-
-    %vec20 = insertelement <2 x i32> %vec2, i32 %il, i32 0
-    %vec21 = insertelement <2 x i32> %vec20, i32 %im, i32 1
-
-    ret <2 x i32> %vec21
-}
-
-; =====================================================================================================================
 ; >>>  Geometric Functions
 ; =====================================================================================================================
 ; GLSL: double length(double)

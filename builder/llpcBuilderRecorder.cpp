@@ -87,6 +87,8 @@ StringRef BuilderRecorder::GetCallName(
         return "log";
     case InverseSqrt:
         return "inverse.sqrt";
+    case Opcode::FClamp:
+        return "fclamp";
     case Opcode::FMin3:
         return "fmin3";
     case Opcode::FMax3:
@@ -624,6 +626,17 @@ Value* BuilderRecorder::CreateDerivative(
     const Twine&  instName)     // [in] Name to give instruction(s)
 {
     return Record(Opcode::Derivative, pValue->getType(), { pValue, getInt1(isDirectionY), getInt1(isFine) }, instName);
+}
+
+// =====================================================================================================================
+// Create "fclamp" operation.
+Value* BuilderRecorder::CreateFClamp(
+    Value*        pX,         // [in] Value to clamp
+    Value*        pMinVal,    // [in] Minimum of clamp range
+    Value*        pMaxVal,    // [in] Maximum of clamp range
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FClamp, pX->getType(), { pX, pMinVal, pMaxVal }, instName);
 }
 
 // =====================================================================================================================

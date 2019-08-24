@@ -541,6 +541,35 @@ Constant* Builder::Get180OverPi(
 }
 
 // =====================================================================================================================
+// Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
+Constant* Builder::GetOneOverPower2MinusOne(
+    Type*     pTy,  // [in] FP scalar or vector type
+    uint32_t  n)    // Power of two to use
+{
+    // We could calculate this here, using knowledge that 1(2^n - 1) in binary has a repeating bit pattern
+    // of {n-1 zeros, 1 one}. But instead we just special case the values of n that we know are
+    // used from the frontend.
+    uint64_t bits = 0;
+    switch (n) {
+    case 7: // 1/127
+        bits = 0x3F80204081020408;
+        break;
+    case 8: // 1/255
+        bits = 0x3F70101010101010;
+        break;
+    case 15: // 1/32767
+        bits = 0x3F00002000400080;
+        break;
+    case 16: // 1/65535
+        bits = 0x3EF0001000100010;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+    }
+    return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, bits)));
+}
+
+// =====================================================================================================================
 // Create a call to the specified intrinsic with one operand, mangled on its type.
 // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
 // flags from the Builder if none are specified by pFmfSource.

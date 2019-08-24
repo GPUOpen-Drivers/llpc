@@ -253,6 +253,9 @@ public:
     // Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
     Constant* Get180OverPi(Type* pTy);
 
+    // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
+    Constant* GetOneOverPower2MinusOne(Type* pTy, uint32_t n);
+
     // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
     // the given cube map texture coordinates. Returns <2 x float>.
     virtual Value* CreateCubeFaceCoord(
@@ -359,6 +362,16 @@ public:
     // Create an inverse square root operation for a scalar or vector FP type
     virtual Value* CreateInverseSqrt(
         Value*        pX,                   // [in] Input value X
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fclamp" operation, returning min(max(x, minVal), maxVal). Result is undefined if minVal > maxVal.
+    // This honors the fast math flags; clear "nnan" in fast math flags in order to obtain the "NaN avoiding
+    // semantics" for the min and max where, if one input is NaN, it returns the other one.
+    // It also honors the shader's FP mode being "flush denorm".
+    virtual Value* CreateFClamp(
+        Value*        pX,                   // [in] Value to clamp
+        Value*        pMinVal,              // [in] Minimum of clamp range
+        Value*        pMaxVal,              // [in] Maximum of clamp range
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
     // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.

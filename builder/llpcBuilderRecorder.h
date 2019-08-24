@@ -93,6 +93,7 @@ public:
         Exp,
         Log,
         InverseSqrt,
+        FClamp,
         FMin3,
         FMax3,
         FMid3,
@@ -241,6 +242,9 @@ public:
     Value* CreateExp(Value* pX, const Twine& instName = "") override final;
     Value* CreateLog(Value* pX, const Twine& instName = "") override final;
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
+
+    // Create "fclamp" operation.
+    Value* CreateFClamp(Value* pX, Value* pMinVal, Value* pMaxVal, const Twine& instName = "") override final;
 
     // Methods for trinary min/max/mid.
     Value* CreateFMin3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;

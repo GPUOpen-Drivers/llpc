@@ -148,59 +148,6 @@ bool SpirvLowerAlgebraTransform::runOnModule(
                     m_changed = true;
                     continue;
                 }
-
-                if (isa<CallInst>(pInst))
-                {
-                    CallInst* pCallInst = cast<CallInst>(pInst);
-                    // LLVM inline pass will do constant folding for _Z14unpackHalf2x16i.
-                    // To support floating control correctly, we have to do it by ourselves.
-                    if (fp16Control.denormFlushToZero &&
-                        (pCallInst->getCalledFunction()->getName() == "_Z14unpackHalf2x16i"))
-                    {
-                        auto pSrc = pCallInst->getOperand(0);
-                        if (isa<ConstantInt>(pSrc))
-                        {
-                            auto pConst = cast<ConstantInt>(pSrc);
-                            uint64_t constVal = pConst->getZExtValue();
-                            APFloat fVal0(APFloat::IEEEhalf(), APInt(16, constVal & 0xFFFF));
-                            APFloat fVal1(APFloat::IEEEhalf(), APInt(16, (constVal >> 16) & 0xFFFF));
-
-                            // Flush denorm input value to zero
-                            if (fVal0.isDenormal())
-                            {
-                                fVal0 = APFloat(APFloat::IEEEhalf(), 0);
-                            }
-
-                            if (fVal1.isDenormal())
-                            {
-                                fVal1 = APFloat(APFloat::IEEEhalf(), 0);
-                            }
-
-                            bool looseInfo = false;
-                            fVal0.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
-                            fVal1.convert(APFloat::IEEEsingle(), APFloatBase::rmTowardZero, &looseInfo);
-
-                            Constant* constVals[] =
-                            {
-                                ConstantFP::get(m_pContext->FloatTy(), fVal0.convertToFloat()),
-                                ConstantFP::get(m_pContext->FloatTy(), fVal1.convertToFloat())
-                            };
-
-                            Constant* pConstVals = ConstantVector::get(constVals);
-                            pInst->replaceAllUsesWith(pConstVals);
-                            LLVM_DEBUG(dbgs() << "Algebriac transform: constant folding: " << *pConstVals << " from: "
-                                << *pInst  << '\n');
-
-                            if (isInstructionTriviallyDead(pInst, &targetLibInfo))
-                            {
-                                pInst->eraseFromParent();
-                            }
-
-                            m_changed = true;
-                            continue;
-                        }
-                    }
-                }
             }
         }
     }

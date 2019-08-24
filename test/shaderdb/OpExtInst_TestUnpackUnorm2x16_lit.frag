@@ -17,14 +17,9 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <2 x float> @_Z15unpackUnorm2x16i(i32 %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = and i32 %{{.*}}, 65535
-; SHADERTEST: %{{[0-9]*}} = uitofp i32 %{{.*}} to float
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 0x3EF0001000000000
-; SHADERTEST: %{{[0-9]*}} = lshr i32 %{{.*}}, 16
-; SHADERTEST: %{{[0-9]*}} = uitofp i32 %{{.*}} to float
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 0x3EF0001000000000
+; SHADERTEST: %[[BITCAST:.*]] = bitcast i32 %1 to <2 x i16>
+; SHADERTEST: %[[CONV:.*]] = uitofp <2 x i16> %[[BITCAST]] to <2 x float>
+; SHADERTEST: = fmul reassoc nnan nsz arcp contract <2 x float> %[[CONV]], <float 0x3EF0001000000000, float 0x3EF0001000000000>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
