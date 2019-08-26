@@ -922,7 +922,7 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadSwapHorizontal(
     }
     else
     {
-        return CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(2, 3, 0, 1));
+        return CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(1, 0, 3, 2));
     }
 }
 
@@ -938,7 +938,7 @@ Value* BuilderImplSubgroup::CreateSubgroupQuadSwapVertical(
     }
     else
     {
-        return CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(1, 0, 3, 2));
+        return CreateDsSwizzle(pValue, GetDsSwizzleQuadMode(2, 3, 0, 1));
     }
 }
 
