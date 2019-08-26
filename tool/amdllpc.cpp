@@ -166,7 +166,7 @@ static cl::opt<uint32_t> NggCompactionMode(
              "0: Compaction is based on the whole sub-group\n"
              "1: Compaction is based on vertices"),
     cl::value_desc("mode"),
-    cl::init(static_cast<uint32_t>(NggCompactSubgroup)));
+    cl::init(static_cast<uint32_t>(NggCompactVertices)));
 
 // -ngg-enable-fast-launch-rate: enable the hardware to launch subgroups of work at a faster rate (NGG)
 static cl::opt<bool> NggEnableFastLaunchRate(
