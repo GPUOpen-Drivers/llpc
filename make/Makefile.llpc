@@ -393,7 +393,10 @@ endif
 # MetroHash
 # If define METROHASH_PATH, llpc use the external single Metrohash.
 # Otherwise build the imported Metrohash copy.
-ifndef METROHASH_PATH
+ifdef METROHASH_PATH
+    LCXXINCS += -I$(METROHASH_DEPTH)/src
+    LCXXDEFS += -DSINGLE_EXTERNAL_METROHASH
+else
     METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
     include $(METROHASH_DEPTH)/make/Makefile.metrohash
 endif
