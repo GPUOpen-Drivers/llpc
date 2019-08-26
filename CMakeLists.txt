@@ -27,7 +27,10 @@ project(LLPC C CXX)
 
 ### Create LLPC Library ################################################################################################
 add_library(llpc STATIC "")
-add_dependencies(llpc LLVMCore)
+
+if(ICD_BUILD_LLPC)
+    add_dependencies(llpc LLVMCore)
+endif()
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_VEGA20   "LLPC support for Vega20?"   ON)
@@ -36,10 +39,11 @@ option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
 #if VKI_BUILD_GFX10
 option(LLPC_BUILD_GFX10   "LLPC support for GFX10?"   OFF)
 #endif
-option(LLPC_BUILD_METROHASH   "LLPC build imported metrohash copy"   ON)
 # None
 
-set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+if(ICD_BUILD_LLPC)
+    set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+endif()
 
 ### Compiler Options ###################################################################################################
 if(UNIX)
@@ -144,17 +148,18 @@ if (LLPC_BUILD_RAVEN2)
 endif()
 
 ### Defines/Includes/Sources ###########################################################################################
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm)
-include(LLVMConfig)
-message(STATUS "LLVM execuables: " ${LLVM_TOOLS_BINARY_DIR})
-message(STATUS "LLVM libraries: " ${LLVM_BUILD_LIBRARY_DIR})
-execute_process(
-    COMMAND ${LLVM_TOOLS_BINARY_DIR}/llvm-config --libs amdgpu analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils
-    OUTPUT_VARIABLE LLVM_LINK_FLAGS
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-message(STATUS "LLVM link options:" ${LLVM_LINK_FLAGS})
-
+if(ICD_BUILD_LLPC)
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm)
+    include(LLVMConfig)
+    message(STATUS "LLVM execuables: " ${LLVM_TOOLS_BINARY_DIR})
+    message(STATUS "LLVM libraries: " ${LLVM_BUILD_LIBRARY_DIR})
+    execute_process(
+        COMMAND ${LLVM_TOOLS_BINARY_DIR}/llvm-config --libs amdgpu analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils
+        OUTPUT_VARIABLE LLVM_LINK_FLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    message(STATUS "LLVM link options:" ${LLVM_LINK_FLAGS})
+endif()
 target_compile_definitions(llpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 target_compile_definitions(llpc PRIVATE _SPIRV_LLVM_API)
 target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
@@ -176,8 +181,10 @@ if(LLPC_BUILD_GFX10)
 endif()
 #endif
 
-if(XGL_LLVM_UPSTREAM)
-    target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
+if(ICD_BUILD_LLPC)
+    if(XGL_LLVM_UPSTREAM)
+        target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM=1)
+    endif()
 endif()
 
 if(WIN32)
@@ -221,142 +228,152 @@ if(WIN32)
     target_compile_definitions(llpc PRIVATE VKI_SDK_1_1=1)
 endif()
 
+if(ICD_BUILD_LLPC)
 # llpc/builder
-target_sources(llpc PRIVATE
-    builder/llpcBuilder.cpp
-    builder/llpcBuilderImpl.cpp
-    builder/llpcBuilderImplDesc.cpp
-    builder/llpcBuilderImplImage.cpp
-    builder/llpcBuilderImplInOut.cpp
-    builder/llpcBuilderImplMatrix.cpp
-    builder/llpcBuilderImplMisc.cpp
-    builder/llpcBuilderImplSubgroup.cpp
-    builder/llpcBuilderRecorder.cpp
-    builder/llpcBuilderReplayer.cpp
-    builder/llpcPipelineState.cpp
-)
+    target_sources(llpc PRIVATE
+        builder/llpcBuilder.cpp
+        builder/llpcBuilderImpl.cpp
+        builder/llpcBuilderImplDesc.cpp
+        builder/llpcBuilderImplImage.cpp
+        builder/llpcBuilderImplInOut.cpp
+        builder/llpcBuilderImplMatrix.cpp
+        builder/llpcBuilderImplMisc.cpp
+        builder/llpcBuilderImplSubgroup.cpp
+        builder/llpcBuilderRecorder.cpp
+        builder/llpcBuilderReplayer.cpp
+        builder/llpcPipelineState.cpp
+    )
 
 # llpc/context
-target_sources(llpc PRIVATE
-    context/llpcCompiler.cpp
-    context/llpcContext.cpp
-    context/llpcComputeContext.cpp
-    context/llpcGraphicsContext.cpp
-    context/llpcShaderCache.cpp
-    context/llpcPipelineContext.cpp
-    context/llpcShaderCacheManager.cpp
-)
+    target_sources(llpc PRIVATE
+        context/llpcCompiler.cpp
+        context/llpcContext.cpp
+        context/llpcComputeContext.cpp
+        context/llpcGraphicsContext.cpp
+        context/llpcShaderCache.cpp
+        context/llpcPipelineContext.cpp
+        context/llpcShaderCacheManager.cpp
+    )
 
 # llpc/lower
-target_sources(llpc PRIVATE
-    lower/llpcSpirvLower.cpp
-    lower/llpcSpirvLowerAccessChain.cpp
-    lower/llpcSpirvLowerAlgebraTransform.cpp
-    lower/llpcSpirvLowerConstImmediateStore.cpp
-    lower/llpcSpirvLowerGlobal.cpp
-    lower/llpcSpirvLowerInstMetaRemove.cpp
-    lower/llpcSpirvLowerLoopUnrollControl.cpp
-    lower/llpcSpirvLowerMemoryOp.cpp
-    lower/llpcSpirvLowerResourceCollect.cpp
-    lower/llpcSpirvLowerTranslator.cpp
-)
+    target_sources(llpc PRIVATE
+        lower/llpcSpirvLower.cpp
+        lower/llpcSpirvLowerAccessChain.cpp
+        lower/llpcSpirvLowerAlgebraTransform.cpp
+        lower/llpcSpirvLowerConstImmediateStore.cpp
+        lower/llpcSpirvLowerGlobal.cpp
+        lower/llpcSpirvLowerInstMetaRemove.cpp
+        lower/llpcSpirvLowerLoopUnrollControl.cpp
+        lower/llpcSpirvLowerMemoryOp.cpp
+        lower/llpcSpirvLowerResourceCollect.cpp
+        lower/llpcSpirvLowerTranslator.cpp
+    )
 
 # llpc/patch
-target_sources(llpc PRIVATE
-    patch/gfx6/chip/llpcGfx6Chip.cpp
-    patch/gfx6/chip/llpcGfx6ConfigBuilder.cpp
-    patch/gfx9/chip/llpcGfx9Chip.cpp
-    patch/gfx9/chip/llpcGfx9ConfigBuilder.cpp
-    patch/gfx9/llpcShaderMerger.cpp
-    patch/llpcCodeGenManager.cpp
-    patch/llpcConfigBuilderBase.cpp
-    patch/llpcFragColorExport.cpp
-    patch/llpcPatch.cpp
-    patch/llpcPatchBufferOp.cpp
-    patch/llpcPatchCopyShader.cpp
-    patch/llpcPatchDescriptorLoad.cpp
-    patch/llpcPatchEntryPointMutate.cpp
-    patch/llpcPatchInOutImportExport.cpp
-    patch/llpcPatchLlvmIrInclusion.cpp
-    patch/llpcPatchLoopUnrollInfoRectify.cpp
-    patch/llpcPatchNullFragShader.cpp
-    patch/llpcPatchPeepholeOpt.cpp
-    patch/llpcPatchPreparePipelineAbi.cpp
-    patch/llpcPatchPushConstOp.cpp
-    patch/llpcPatchResourceCollect.cpp
-    patch/llpcPatchSetupTargetFeatures.cpp
-    patch/llpcSystemValues.cpp
-    patch/llpcVertexFetch.cpp
-)
-#if VKI_BUILD_GFX10
-if(LLPC_BUILD_GFX10)
     target_sources(llpc PRIVATE
-        patch/gfx9/llpcNggLdsManager.cpp
-        patch/gfx9/llpcNggPrimShader.cpp
+        patch/gfx6/chip/llpcGfx6Chip.cpp
+        patch/gfx6/chip/llpcGfx6ConfigBuilder.cpp
+        patch/gfx9/chip/llpcGfx9Chip.cpp
+        patch/gfx9/chip/llpcGfx9ConfigBuilder.cpp
+        patch/gfx9/llpcShaderMerger.cpp
+        patch/llpcCodeGenManager.cpp
+        patch/llpcConfigBuilderBase.cpp
+        patch/llpcFragColorExport.cpp
+        patch/llpcPatch.cpp
+        patch/llpcPatchBufferOp.cpp
+        patch/llpcPatchCopyShader.cpp
+        patch/llpcPatchDescriptorLoad.cpp
+        patch/llpcPatchEntryPointMutate.cpp
+        patch/llpcPatchInOutImportExport.cpp
+        patch/llpcPatchLlvmIrInclusion.cpp
+        patch/llpcPatchLoopUnrollInfoRectify.cpp
+        patch/llpcPatchNullFragShader.cpp
+        patch/llpcPatchPeepholeOpt.cpp
+        patch/llpcPatchPreparePipelineAbi.cpp
+        patch/llpcPatchPushConstOp.cpp
+        patch/llpcPatchResourceCollect.cpp
+        patch/llpcPatchSetupTargetFeatures.cpp
+        patch/llpcSystemValues.cpp
+        patch/llpcVertexFetch.cpp
     )
-endif()
+#if VKI_BUILD_GFX10
+    if(LLPC_BUILD_GFX10)
+        target_sources(llpc PRIVATE
+            patch/gfx9/llpcNggLdsManager.cpp
+            patch/gfx9/llpcNggPrimShader.cpp
+        )
+    endif()
 #endif
 
 # llpc/translator
-target_sources(llpc PRIVATE
-    translator/lib/SPIRV/OCL20To12.cpp
-    translator/lib/SPIRV/OCL20ToSPIRV.cpp
-    translator/lib/SPIRV/OCL21ToSPIRV.cpp
-    translator/lib/SPIRV/OCLTypeToSPIRV.cpp
-    translator/lib/SPIRV/OCLUtil.cpp
-    translator/lib/SPIRV/SPIRVLowerBool.cpp
-    translator/lib/SPIRV/SPIRVLowerConstExpr.cpp
-    translator/lib/SPIRV/SPIRVLowerMemmove.cpp
-    translator/lib/SPIRV/SPIRVLowerOCLBlocks.cpp
-    translator/lib/SPIRV/SPIRVReader.cpp
-    translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
-    translator/lib/SPIRV/SPIRVToOCL20.cpp
-    translator/lib/SPIRV/SPIRVUtil.cpp
-    translator/lib/SPIRV/SPIRVWriter.cpp
-    translator/lib/SPIRV/SPIRVWriterPass.cpp
-    translator/lib/SPIRV/TransOCLMD.cpp
-)
+    target_sources(llpc PRIVATE
+        translator/lib/SPIRV/OCL20To12.cpp
+        translator/lib/SPIRV/OCL20ToSPIRV.cpp
+        translator/lib/SPIRV/OCL21ToSPIRV.cpp
+        translator/lib/SPIRV/OCLTypeToSPIRV.cpp
+        translator/lib/SPIRV/OCLUtil.cpp
+        translator/lib/SPIRV/SPIRVLowerBool.cpp
+        translator/lib/SPIRV/SPIRVLowerConstExpr.cpp
+        translator/lib/SPIRV/SPIRVLowerMemmove.cpp
+        translator/lib/SPIRV/SPIRVLowerOCLBlocks.cpp
+        translator/lib/SPIRV/SPIRVReader.cpp
+        translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
+        translator/lib/SPIRV/SPIRVToOCL20.cpp
+        translator/lib/SPIRV/SPIRVUtil.cpp
+        translator/lib/SPIRV/SPIRVWriter.cpp
+        translator/lib/SPIRV/SPIRVWriterPass.cpp
+        translator/lib/SPIRV/TransOCLMD.cpp
+    )
 
-target_sources(llpc PRIVATE
-    translator/lib/SPIRV/libSPIRV/SPIRVBasicBlock.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVDebug.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVDecorate.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVEntry.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVFunction.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVInstruction.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVModule.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVStream.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVType.cpp
-    translator/lib/SPIRV/libSPIRV/SPIRVValue.cpp
-)
+    target_sources(llpc PRIVATE
+        translator/lib/SPIRV/libSPIRV/SPIRVBasicBlock.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVDebug.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVDecorate.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVEntry.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVFunction.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVInstruction.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVModule.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVStream.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVType.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVValue.cpp
+    )
 
-target_sources(llpc PRIVATE
-    translator/lib/SPIRV/Mangler/FunctionDescriptor.cpp
-    translator/lib/SPIRV/Mangler/Mangler.cpp
-    translator/lib/SPIRV/Mangler/ManglingUtils.cpp
-    translator/lib/SPIRV/Mangler/ParameterType.cpp
-)
+    target_sources(llpc PRIVATE
+        translator/lib/SPIRV/Mangler/FunctionDescriptor.cpp
+        translator/lib/SPIRV/Mangler/Mangler.cpp
+        translator/lib/SPIRV/Mangler/ManglingUtils.cpp
+        translator/lib/SPIRV/Mangler/ParameterType.cpp
+    )
 
 # llpc/util
-target_sources(llpc PRIVATE
-    util/llpcDebug.cpp
-    util/llpcElfReader.cpp
-    util/llpcElfWriter.cpp
-    util/llpcEmuLib.cpp
-    util/llpcInternal.cpp
-    util/llpcFile.cpp
-    util/llpcPassDeadFuncRemove.cpp
-    util/llpcPassExternalLibLink.cpp
-    util/llpcPassLoopInfoCollect.cpp
-    util/llpcPassManager.cpp
-    util/llpcPipelineDumper.cpp
-    util/llpcPipelineShaders.cpp
-    util/llpcStartStopTimer.cpp
-    util/llpcUtil.cpp
-)
+    target_sources(llpc PRIVATE
+        util/llpcDebug.cpp
+        util/llpcElfReader.cpp
+        util/llpcElfWriter.cpp
+        util/llpcEmuLib.cpp
+        util/llpcInternal.cpp
+        util/llpcFile.cpp
+        util/llpcPassDeadFuncRemove.cpp
+        util/llpcPassExternalLibLink.cpp
+        util/llpcPassLoopInfoCollect.cpp
+        util/llpcPassManager.cpp
+        util/llpcPipelineDumper.cpp
+        util/llpcPipelineShaders.cpp
+        util/llpcStartStopTimer.cpp
+        util/llpcUtil.cpp
+    )
+else()
+    target_sources(llpc PRIVATE
+        util/llpcElfReader.cpp
+        util/llpcPipelineDumper.cpp
+        util/llpcUtil.cpp
+        patch/gfx6/chip/llpcGfx6Chip.cpp
+        patch/gfx9/chip/llpcGfx9Chip.cpp
+    )
+endif()
 
 # llpc/imported/metrohash
-if(LLPC_BUILD_METROHASH)
+if(NOT TARGET metrohash)
     add_subdirectory(imported/metrohash)
     target_link_libraries(llpc PRIVATE llpc_metrohash)
 else()
@@ -365,6 +382,7 @@ else()
 endif()
 
 ### LLPC Auto-generated Files ##########################################################################################
+if(ICD_BUILD_LLPC)
 set(OP_EMU_LIB_GEN_DIR ${PROJECT_SOURCE_DIR}/patch/generate)
 set(GEN_GLSL_OP_EMU_LIB_SCRIPT ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py)
 
@@ -428,7 +446,7 @@ add_custom_command(
 )
 
 add_dependencies(llpc RunHeapGlslOpEmuLibGenerator)
-
+endif()
 ### Link Libraries #####################################################################################################
 # CMAKE-TODO: LLVM_LIB_DIR should probably be set in the op level CMake?
 # Maybe add XGL_LLVM_PATH?
@@ -438,6 +456,7 @@ add_dependencies(llpc RunHeapGlslOpEmuLibGenerator)
 target_vs_filters(llpc)
 
 ### VFX library for Standalone Compiler ###################################################################################
+if(ICD_BUILD_LLPC)
 add_library(vfx STATIC "")
 
 target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
@@ -499,8 +518,9 @@ if(UNIX)
         message(FATAL_ERROR "Using unknown compiler.")
     endif()
 endif()
-
+endif()
 ### Create Standalone Compiler ############################################################################################
+if(ICD_BUILD_LLPC)
 add_executable(amdllpc
     tool/amdllpc.cpp
     tool/llpcAutoLayout.cpp
@@ -513,9 +533,8 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(amdllpc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
     target_compile_definitions(amdllpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
-if(ICD_BUILD_LLPC)
-    target_compile_definitions(amdllpc PRIVATE ICD_BUILD_LLPC)
-endif()
+
+target_compile_definitions(amdllpc PRIVATE ICD_BUILD_LLPC)
 
 target_include_directories(amdllpc
 PUBLIC
@@ -590,20 +609,19 @@ elseif(WIN32)
 endif()
     llvm_map_components_to_libnames(llvm_libs amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})
-
+endif()
 ### Add Subdirectories #################################################################################################
-
+if(ICD_BUILD_LLPC)
 # SPVGEN
 set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../spvgen CACHE PATH "Specify the path to SPVGEN.")
 
-if(ICD_BUILD_LLPC)
-    if(EXISTS ${XGL_SPVGEN_PATH})
-        add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
-    endif()
+if(EXISTS ${XGL_SPVGEN_PATH})
+    add_subdirectory(${XGL_SPVGEN_PATH} ${CMAKE_BINARY_DIR}/spvgen EXCLUDE_FROM_ALL)
 endif()
 
 # Lit tests
-if(ICD_BUILD_LLPC AND LLPC_BUILD_LIT)
+if(LLPC_BUILD_LIT)
     add_subdirectory(test)
+endif()
 endif()
 
