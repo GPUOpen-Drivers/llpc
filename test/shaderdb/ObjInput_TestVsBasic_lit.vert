@@ -21,7 +21,7 @@ void main()
 ; SHADERTEST-DAG: call i32 @llpc.input.import.generic{{.*}}
 ; SHADERTEST-DAG: call <4 x float> @llpc.input.import.generic.v4f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-COUNT-3: call <4 x i32> @llvm.amdgcn.struct.tbuffer.load.v4i32
+; SHADERTEST-COUNT-3: call {{.*}} @llvm.amdgcn.struct.tbuffer.load
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
