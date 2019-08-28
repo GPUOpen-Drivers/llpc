@@ -15,7 +15,8 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: store <4 x i32> <i32 1, i32 0, i32 1, i32 0>,
-; SHADERTEST-COUNT-2: call {{.*}} i32 @{{.*}}all{{.*}}(<4 x i32> %{{[0-9]*}})
+; SHADERTEST-COUNT-6: = and i1
+; SHADERTEST: = or i1
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
