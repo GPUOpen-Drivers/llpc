@@ -1046,13 +1046,22 @@ Value* BuilderImplArith::FDivFast(
 }
 
 // =====================================================================================================================
+// Create "isInfinite" operation: return true if the supplied FP (or vector) value is infinity
+Value* BuilderImplArith::CreateIsInf(
+    Value*        pX,         // [in] Input value X
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return CreateCallAmdgcnClass(pX, CmpClass::NegativeInfinity | CmpClass::PositiveInfinity, instName);
+}
+
+// =====================================================================================================================
 // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
 Value* BuilderImplArith::CreateIsNaN(
-    Value*        pX,         // [in] Input value
+    Value*        pX,         // [in] Input value X
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     // 0x001: signaling NaN, 0x002: quiet NaN
-    return CreateCallAmdgcnClass(pX, 0x003, instName);
+    return CreateCallAmdgcnClass(pX, CmpClass::SignalingNaN | CmpClass::QuietNaN, instName);
 }
 
 // =====================================================================================================================

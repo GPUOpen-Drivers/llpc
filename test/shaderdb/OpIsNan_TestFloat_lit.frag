@@ -15,7 +15,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: <4 x i1> @_Z5isnanDv4_f
+; SHADERTEST: = call <4 x i1> (...) @llpc.call.isnan.v4i1(<4 x float>
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

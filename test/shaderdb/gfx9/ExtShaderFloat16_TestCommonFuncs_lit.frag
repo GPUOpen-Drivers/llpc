@@ -62,8 +62,8 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fclamp.v3f16(<3 x half>
 ; SHADERTEST: = call <3 x half> @llvm.fmuladd.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.smooth.step.v3f16(<3 x half>
-; SHADERTEST: %{{.*}} = call {{.*}} <3 x i1> @_Z5isnanDv3_Dh(<3 x half> %{{.*}})
-; SHADERTEST: %{{.*}} = call {{.*}} <3 x i1> @_Z5isinfDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: = call <3 x i1> (...) @llpc.call.isnan.v3i1(<3 x half>
+; SHADERTEST: = call <3 x i1> (...) @llpc.call.isinf.v3i1(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fma.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.extract.significand.v3f16(<3 x half>
 ; SHADERTEST: = call <3 x i16> (...) @llpc.call.extract.exponent.v3i16(<3 x half>

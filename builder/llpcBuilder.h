@@ -522,6 +522,16 @@ public:
         Value*        pValue3,              // [in] Third value
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
+    // Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
+    virtual Value* CreateIsInf(
+        Value*        pX,                   // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+    virtual Value* CreateIsNaN(
+        Value*        pX,                   // [in] Input value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
     // Create an "insert bitfield" operation for a (vector of) integer type.
     // Returns a value where the "pCount" bits starting at bit "pOffset" come from the least significant "pCount"
     // bits in "pInsert", and remaining bits come from "pBase". The result is undefined if "pCount"+"pOffset" is

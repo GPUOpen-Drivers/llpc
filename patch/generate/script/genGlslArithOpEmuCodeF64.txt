@@ -1,3 +1,0 @@
-# Common Functions
-genBType isinf genDType value : llpc.isinf.f64 #0
-genBType isnan genDType value : llpc.isnan.f64 #0
