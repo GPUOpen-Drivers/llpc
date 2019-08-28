@@ -22,11 +22,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-COUNT-2: call spir_func <4 x float> @_Z4fmodDv4_fDv4_f
+; SHADERTEST-COUNT-2: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.fmod.v4f32(<4 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: fdiv float
-; SHADERTEST: call float @llvm.floor.f32
-; SHADERTEST: fsub float
+; SHADERTEST: fdiv reassoc nnan nsz arcp contract float
+; SHADERTEST: call reassoc nnan nsz arcp contract float @llvm.floor.f32
+; SHADERTEST: fsub reassoc nnan nsz arcp contract float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

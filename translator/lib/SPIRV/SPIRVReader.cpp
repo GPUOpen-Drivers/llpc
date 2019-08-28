@@ -5933,46 +5933,16 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                                          BV->getName(), BB));
   }
   case OpSMod: {
-    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    SPIRVBinary *BC = static_cast<SPIRVBinary *>(BV);
     Value *Val0 = transValue(BC->getOperand(0), F, BB);
     Value *Val1 = transValue(BC->getOperand(1), F, BB);
     return mapValue(BC, getBuilder()->CreateSMod(Val0, Val1));
   }
   case OpFMod: {
-    // translate OpFMod(a, b) to copysign(frem(a, b), b)
-    SPIRVFMod *FMod = static_cast<SPIRVFMod *>(BV);
-    if (!IsKernel) {
-      return mapValue(BV, transBuiltinFromInst(
-        "fmod", static_cast<SPIRVInstruction *>(BV), BB));
-    }
-    auto Dividend = transValue(FMod->getDividend(), F, BB);
-    auto Divisor = transValue(FMod->getDivisor(), F, BB);
-    auto FRem = BinaryOperator::CreateFRem(Dividend, Divisor, "frem.res", BB);
-    setFastMathFlags(FRem);
-
-    std::string UnmangledName = OCLExtOpMap::map(OpenCLLIB::Copysign);
-    std::string MangledName = "copysign";
-
-    std::vector<Type *> ArgTypes;
-    ArgTypes.push_back(FRem->getType());
-    ArgTypes.push_back(Divisor->getType());
-    mangleOpenClBuiltin(UnmangledName, ArgTypes, MangledName);
-
-    auto FT = FunctionType::get(transType(BV->getType()), ArgTypes, false);
-    auto Func =
-        Function::Create(FT, GlobalValue::ExternalLinkage, MangledName, M);
-    Func->setCallingConv(CallingConv::SPIR_FUNC);
-    if (isFuncNoUnwind())
-      Func->addFnAttr(Attribute::NoUnwind);
-
-    std::vector<Value *> Args;
-    Args.push_back(FRem);
-    Args.push_back(Divisor);
-
-    auto Call = CallInst::Create(Func, Args, "copysign", BB);
-    setCallingConv(Call);
-    addFnAttr(Context, Call, Attribute::NoUnwind);
-    return mapValue(BV, Call);
+    SPIRVFMod *BC = static_cast<SPIRVFMod *>(BV);
+    Value *Val0 = transValue(BC->getDividend(), F, BB);
+    Value *Val1 = transValue(BC->getDivisor(), F, BB);
+    return mapValue(BC, getBuilder()->CreateFMod(Val0, Val1));
   }
   case OpFNegate: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);

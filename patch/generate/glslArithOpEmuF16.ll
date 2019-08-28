@@ -433,17 +433,6 @@ define spir_func <4 x half> @_Z17convert_half4_rteDv4_d(<4 x double> %x) #0
 ; >>>  Common Functions
 ; =====================================================================================================================
 
-; GLSL: float16_t mod(float16_t, float16_t)
-define half @llpc.mod.f16(half %x, half %y) #0
-{
-    %1 = fdiv half 1.0,%y
-    %2 = fmul half %x, %1
-    %3 = call half @llvm.floor.f16(half %2)
-    %4 = fmul half %y, %3
-    %5 = fsub half %x, %4
-    ret half %5
-}
-
 ; GLSL: bool isinf(float16_t)
 define i1 @llpc.isinf.f16(half %x) #0
 {

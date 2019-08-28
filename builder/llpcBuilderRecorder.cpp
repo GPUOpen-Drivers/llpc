@@ -57,6 +57,8 @@ StringRef BuilderRecorder::GetCallName(
         return "quantize.to.fp16";
     case Opcode::SMod:
         return "smod";
+    case Opcode::FMod:
+        return "fmod";
     case Opcode::Fma:
         return "fma";
     case Tan:
@@ -806,6 +808,17 @@ Value* BuilderRecorder::CreateSMod(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     return Record(Opcode::SMod, pDividend->getType(), { pDividend, pDivisor }, instName);
+}
+
+// =====================================================================================================================
+// Create FP modulo operation, where the sign of the result (if not zero) is the same as the sign
+// of the divisor.
+Value* BuilderRecorder::CreateFMod(
+    Value*        pDividend,  // [in] Dividend value
+    Value*        pDivisor,   // [in] Divisor value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMod, pDividend->getType(), { pDividend, pDivisor }, instName);
 }
 
 // =====================================================================================================================

@@ -149,6 +149,19 @@ Value* BuilderImplArith::CreateSMod(
 }
 
 // =====================================================================================================================
+// Create FP modulo operation, where the sign of the result (if not zero) is the same as the sign
+// of the divisor.
+Value* BuilderImplArith::CreateFMod(
+    Value*        pDividend,  // [in] Dividend value
+    Value*        pDivisor,   // [in] Divisor value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    Value* pQuotient = CreateFMul(CreateFDiv(ConstantFP::get(pDivisor->getType(), 1.0), pDivisor), pDividend);
+    Value* pFloor = CreateUnaryIntrinsic(Intrinsic::floor, pQuotient);
+    return CreateFSub(pDividend, CreateFMul(pDivisor, pFloor), instName);
+}
+
+// =====================================================================================================================
 // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
 Value* BuilderImplArith::CreateFma(
     Value*        pA,         // [in] One value to multiply

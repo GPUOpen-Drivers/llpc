@@ -13,12 +13,12 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call spir_func float @_Z4fmodff
+; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.fmod.f32(float
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: fdiv float
-; SHADERTEST: fmul float
-; SHADERTEST: call float @llvm.floor.f32
-; SHADERTEST: fsub float
+; SHADERTEST: fdiv reassoc nnan nsz arcp contract float
+; SHADERTEST: fmul reassoc nnan nsz arcp contract float
+; SHADERTEST: call reassoc nnan nsz arcp contract float @llvm.floor.f32
+; SHADERTEST: fsub reassoc nnan nsz arcp contract float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

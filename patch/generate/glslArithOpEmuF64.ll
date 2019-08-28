@@ -29,17 +29,6 @@ target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:3
 ; >>>  Common Functions
 ; =====================================================================================================================
 
-; GLSL: double mod(double, double)
-define double @llpc.mod.f64(double %x, double %y) #0
-{
-    %1 = fdiv double 1.0,%y
-    %2 = fmul double %x, %1
-    %3 = call double @llvm.floor.f64(double %2)
-    %4 = fmul double %y, %3
-    %5 = fsub double %x, %4
-    ret double %5
-}
-
 ; GLSL: bool isinf(double)
 define i1 @llpc.isinf.f64(double %x) #0
 {

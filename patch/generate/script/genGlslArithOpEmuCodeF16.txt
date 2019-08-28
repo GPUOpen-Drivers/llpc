@@ -1,5 +1,4 @@
 # Common Functions
-genF16Type fmod genF16Type x genF16Type y : llpc.mod.f16 #0
 genBType isinf genF16Type value : llpc.isinf.f16 #0
 genBType isnan genF16Type value : llpc.isnan.f16 #0
 
