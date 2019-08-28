@@ -22,10 +22,8 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} { i32, i32 } @_Z9IAddCarryii
-; SHADERTEST: call {{.*}} { <3 x i32>, <3 x i32> } @_Z9IAddCarryDv3_iDv3_i
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST-COUNT-4: call { i32, i1 } @llvm.uadd.with.overflow.i32
+; SHADERTEST: = call { i32, i1 } @llvm.uadd.with.overflow.i32(i32
+; SHADERTEST: = call { <3 x i32>, <3 x i1> } @llvm.uadd.with.overflow.v3i32(<3 x i32>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

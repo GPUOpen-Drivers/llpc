@@ -6022,6 +6022,66 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BC, Result);
   }
 
+  case OpIAddCarry: {
+    SPIRVBinary *BC = static_cast<SPIRVBinary *>(BV);
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Val1 = transValue(BC->getOperand(1), F, BB);
+    Value *Add = getBuilder()->CreateIntrinsic(Intrinsic::uadd_with_overflow,
+                                               Val0->getType(), {Val0, Val1});
+    Value *Result = UndefValue::get(transType(BC->getType()));
+    Result = getBuilder()->CreateInsertValue(
+        Result, getBuilder()->CreateExtractValue(Add, 0), 0);
+    Result = getBuilder()->CreateInsertValue(
+        Result,
+        getBuilder()->CreateZExt(getBuilder()->CreateExtractValue(Add, 1),
+                                 Val0->getType()),
+        1);
+    return mapValue(BC, Result);
+  }
+
+  case OpISubBorrow: {
+    SPIRVBinary *BC = static_cast<SPIRVBinary *>(BV);
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Val1 = transValue(BC->getOperand(1), F, BB);
+    Value *Sub = getBuilder()->CreateIntrinsic(Intrinsic::usub_with_overflow,
+                                               Val0->getType(), {Val0, Val1});
+    Value *Result = UndefValue::get(transType(BC->getType()));
+    Result = getBuilder()->CreateInsertValue(
+        Result, getBuilder()->CreateExtractValue(Sub, 0), 0);
+    Result = getBuilder()->CreateInsertValue(
+        Result,
+        getBuilder()->CreateZExt(getBuilder()->CreateExtractValue(Sub, 1),
+                                 Val0->getType()),
+        1);
+    return mapValue(BC, Result);
+  }
+
+  case OpUMulExtended:
+  case OpSMulExtended: {
+    SPIRVBinary *BC = static_cast<SPIRVBinary *>(BV);
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Val1 = transValue(BC->getOperand(1), F, BB);
+    Type *InTy = Val0->getType();
+    Type *ExtendedTy = Llpc::Builder::GetConditionallyVectorizedTy(
+        getBuilder()->getInt64Ty(), Val0->getType());
+    if (OC == OpUMulExtended) {
+      Val0 = getBuilder()->CreateZExt(Val0, ExtendedTy);
+      Val1 = getBuilder()->CreateZExt(Val1, ExtendedTy);
+    } else {
+      Val0 = getBuilder()->CreateSExt(Val0, ExtendedTy);
+      Val1 = getBuilder()->CreateSExt(Val1, ExtendedTy);
+    }
+    Value *Mul = getBuilder()->CreateMul(Val0, Val1);
+    Value *LoResult = getBuilder()->CreateTrunc(Mul, InTy);
+    Value *HiResult = getBuilder()->CreateTrunc(
+        getBuilder()->CreateLShr(Mul, ConstantInt::get(Mul->getType(), 32)),
+        InTy);
+    Value *Result = UndefValue::get(transType(BC->getType()));
+    Result = getBuilder()->CreateInsertValue(Result, LoResult, 0);
+    Result = getBuilder()->CreateInsertValue(Result, HiResult, 1);
+    return mapValue(BC, Result);
+  }
+
   case OpIsInf: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     Value *Val0 = transValue(BC->getOperand(0), F, BB);
