@@ -695,8 +695,8 @@ private:
   Instruction *transOCLAllAny(SPIRVInstruction *BI, BasicBlock *BB);
   Instruction *transOCLRelational(SPIRVInstruction *BI, BasicBlock *BB);
 
-  CallInst *transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
-                            SPIRVWord MemSema, SPIRVWord MemScope);
+  Instruction *transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
+                               SPIRVWord MemSema, SPIRVWord MemScope);
 
   Instruction *transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,
                              SPIRVWord MemScope);
@@ -10041,20 +10041,15 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
   return Call;
 }
 
-CallInst *SPIRVToLLVM::transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
-                                       SPIRVWord MemSema, SPIRVWord MemScope) {
+Instruction *SPIRVToLLVM::transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
+                                          SPIRVWord MemSema,
+                                          SPIRVWord MemScope) {
   SPIRVWord Ver = 0;
   BM->getSourceLanguage(&Ver);
-
-  Type *Int32Ty = Type::getInt32Ty(*Context);
-  Type *VoidTy = Type::getVoidTy(*Context);
 
   std::string FuncName;
   SmallVector<Type *, 2> ArgTy;
   SmallVector<Value *, 2> Arg;
-
-  Constant *MemFenceFlags =
-      ConstantInt::get(Int32Ty, rmapBitMask<OCLMemFenceMap>(MemSema));
 
   if (!IsKernel) {
     AtomicOrdering Ordering = AtomicOrdering::NotAtomic;
@@ -10099,35 +10094,7 @@ CallInst *SPIRVToLLVM::transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
     }
   }
 
-  FuncName = (ExecScope == ScopeWorkgroup) ? kOCLBuiltinName::WorkGroupBarrier
-                                           : kOCLBuiltinName::SubGroupBarrier;
-
-  if (ExecScope == ScopeWorkgroup && Ver > 0 && Ver <= kOCLVer::CL12) {
-    FuncName = kOCLBuiltinName::Barrier;
-    ArgTy.push_back(Int32Ty);
-    Arg.push_back(MemFenceFlags);
-  } else {
-    Constant *Scope = ConstantInt::get(
-        Int32Ty, OCLMemScopeMap::rmap(static_cast<spv::Scope>(MemScope)));
-
-    ArgTy.append(2, Int32Ty);
-    Arg.push_back(MemFenceFlags);
-    Arg.push_back(Scope);
-  }
-
-  std::string MangledName;
-
-  mangleOpenClBuiltin(FuncName, ArgTy, MangledName);
-  Function *Func = M->getFunction(MangledName);
-  if (!Func) {
-    FunctionType *FT = FunctionType::get(VoidTy, ArgTy, false);
-    Func = Function::Create(FT, GlobalValue::ExternalLinkage, MangledName, M);
-    Func->setCallingConv(CallingConv::SPIR_FUNC);
-    if (isFuncNoUnwind())
-      Func->addFnAttr(Attribute::NoUnwind);
-  }
-
-  return CallInst::Create(Func, Arg, "", BB);
+  return getBuilder()->CreateBarrier();
 }
 
 Instruction *SPIRVToLLVM::transOCLMemFence(BasicBlock *BB, SPIRVWord MemSema,

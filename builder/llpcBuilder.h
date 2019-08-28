@@ -1164,6 +1164,9 @@ public:
     virtual Instruction* CreateEndPrimitive(
         uint32_t                      streamId) = 0;      // Stream number, 0 if only one stream is present
 
+    // Create a workgroup control barrier.
+    virtual Instruction* CreateBarrier() = 0;
+
     // Create a "kill". Only allowed in a fragment shader.
     virtual Instruction* CreateKill(
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
