@@ -278,6 +278,11 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateSMod(args[0], args[1]);
         }
 
+    case BuilderRecorder::FMod:
+        {
+            return m_pBuilder->CreateFMod(args[0], args[1]);
+        }
+
     case BuilderRecorder::Fma:
         {
             return m_pBuilder->CreateFma(args[0], args[1], args[2]);

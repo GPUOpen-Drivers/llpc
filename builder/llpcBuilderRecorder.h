@@ -78,6 +78,7 @@ public:
         CubeFaceIndex,
         QuantizeToFp16,
         SMod,
+        FMod,
         Fma,
         Tan,
         ASin,
@@ -241,8 +242,9 @@ public:
     // Create quantize operation.
     Value* CreateQuantizeToFp16(Value* pValue, const Twine& instName = "") override final;
 
-    // Create signed integer modulo operation.
+    // Create signed integer or FP modulo operation.
     Value* CreateSMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
+    Value* CreateFMod(Value* pDividend, Value* pDivisor, const Twine& instName = "") override final;
 
     // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
     Value* CreateFma(Value* pA, Value* pB, Value* pC, const Twine& instName = "") override final;

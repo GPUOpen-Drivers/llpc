@@ -1,4 +1,3 @@
 # Common Functions
-genType fmod genType x genType y : llpc.mod.f32 #0
 genBType isinf genType value : llpc.isinf.f32 #0
 genBType isnan genType value : llpc.isnan.f32 #0

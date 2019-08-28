@@ -280,9 +280,16 @@ public:
         Value*        pValue,               // [in] Input value (float or float vector)
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
-    // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as the sign
-    // of the divisor.
+    // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as
+    // the sign of the divisor. The result is undefined if pDivisor is zero.
     virtual Value* CreateSMod(
+        Value*        pDividend,            // [in] Dividend value
+        Value*        pDivisor,             // [in] Divisor value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create FP modulo operation, where the sign of the result (if not zero) is the same as
+    // the sign of the divisor. The result is undefined if pDivisor is zero.
+    virtual Value* CreateFMod(
         Value*        pDividend,            // [in] Dividend value
         Value*        pDivisor,             // [in] Divisor value
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)

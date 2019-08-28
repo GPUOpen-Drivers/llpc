@@ -30,17 +30,6 @@ target triple = "spir64-unknown-unknown"
 ; >>>  Common Functions
 ; =====================================================================================================================
 
-; GLSL: float mod(float, float)
-define float @llpc.mod.f32(float %x, float %y) #0
-{
-    %1 = fdiv float 1.0,%y
-    %2 = fmul float %x, %1
-    %3 = call float @llvm.floor.f32(float %2)
-    %4 = fmul float %y, %3
-    %5 = fsub float %x, %4
-    ret float %5
-}
-
 ; GLSL: bool isinf(float)
 define i1 @llpc.isinf.f32(float %x) #0
 {

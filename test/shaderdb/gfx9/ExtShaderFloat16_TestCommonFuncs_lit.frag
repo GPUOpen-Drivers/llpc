@@ -56,9 +56,7 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.rint.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.ceil.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fract.v3f16(<3 x half>
-; SHADERTEST: = fdiv half 0xH3C00,
-; SHADERTEST: = fmul half
-; SHADERTEST: = call half @llvm.floor.f16(half %{{[0-9]*}})
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmod.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.trunc.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmin.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fclamp.v3f16(<3 x half>
