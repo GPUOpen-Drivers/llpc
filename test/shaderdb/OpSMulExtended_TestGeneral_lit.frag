@@ -22,10 +22,6 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: { i32, i32 } @_Z12SMulExtendedii
-; SHADERTEST: { <3 x i32>, <3 x i32> } @_Z12SMulExtendedDv3_iDv3_i
-
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: mul nsw i64 %{{[0-9]*}}, %{{[0-9]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS

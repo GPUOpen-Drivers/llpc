@@ -15,10 +15,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call spir_func { i32, i32 } @_Z9IAddCarryii
-; SHADERTEST: call spir_func { <4 x i32>, <4 x i32> } @_Z9IAddCarryDv4_iDv4_i
-; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST-COUNT-4: call { i32, i1 } @llvm.uadd.with.overflow.i32
+; SHADERTEST: = call { i32, i1 } @llvm.uadd.with.overflow.i32(i32
+; SHADERTEST: = call { <4 x i32>, <4 x i1> } @llvm.uadd.with.overflow.v4i32(<4 x i32>
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST: call { <4 x i32>, <4 x i1> } @llvm.uadd.with.overflow.v4i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
