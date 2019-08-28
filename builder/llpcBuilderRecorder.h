@@ -114,6 +114,8 @@ public:
         FMin3,
         FMax3,
         FMid3,
+        IsInf,
+        IsNaN,
         InsertBitField,
         ExtractBitField,
         FindSMsb,
@@ -295,6 +297,12 @@ public:
 
     // Create derivative calculation on float or vector of float or half
     Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;
+
+    // Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
+    Value* CreateIsInf(Value* pX, const Twine& instName = "") override final;
+
+    // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+    Value* CreateIsNaN(Value* pX, const Twine& instName = "") override final;
 
     // Create an "insert bitfield" operation for a (vector of) integer type.
     Value* CreateInsertBitField(Value*        pBase,

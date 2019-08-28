@@ -15,7 +15,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: i1 @_Z5isinfd
+; SHADERTEST: = call i1 (...) @llpc.call.isinf.i1(double
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i1 @llvm.amdgcn.class.f64(double %{{[0-9]*}}, i32 516)

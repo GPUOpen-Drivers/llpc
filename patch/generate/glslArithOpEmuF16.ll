@@ -429,26 +429,6 @@ define spir_func <4 x half> @_Z17convert_half4_rteDv4_d(<4 x double> %x) #0
     ret <4 x half> %2
 }
 
-; =====================================================================================================================
-; >>>  Common Functions
-; =====================================================================================================================
-
-; GLSL: bool isinf(float16_t)
-define i1 @llpc.isinf.f16(half %x) #0
-{
-    ; 0x004: negative infinity; 0x200: positive infinity
-    %1 = call i1 @llvm.amdgcn.class.f16(half %x, i32 516)
-    ret i1 %1
-}
-
-; GLSL: bool isnan(float16_t)
-define i1 @llpc.isnan.f16(half %x) #0
-{
-    ; 0x001: signaling NaN, 0x002: quiet NaN
-    %1 = call i1 @llvm.amdgcn.class.f16(half %x, i32 3)
-    ret i1 %1
-}
-
 declare half @llvm.trunc.f16(half) #0
 declare half @llvm.fabs.f16(half) #0
 declare half @llvm.sqrt.f16(half) #0

@@ -160,6 +160,12 @@ public:
     Value* CreateFMax3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
     Value* CreateFMid3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
 
+    // Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
+    Value* CreateIsInf(Value* pX, const Twine& instName = "") override final;
+
+    // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+    Value* CreateIsNaN(Value* pX, const Twine& instName = "") override final;
+
     // Create an "insert bitfield" operation for a (vector of) integer type.
     Value* CreateInsertBitField(Value*        pBase,
                                 Value*        pInsert,
@@ -180,9 +186,6 @@ public:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplArith)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplArith)
-
-    // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
-    Value* CreateIsNaN(Value* pX, const Twine& instName = "");
 
     // Common code for asin and acos
     Value* ASinACosCommon(Value* pX, Constant* pCoefP0, Constant* pCoefP1);

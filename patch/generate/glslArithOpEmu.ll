@@ -27,26 +27,6 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 target triple = "spir64-unknown-unknown"
 
 ; =====================================================================================================================
-; >>>  Common Functions
-; =====================================================================================================================
-
-; GLSL: bool isinf(float)
-define i1 @llpc.isinf.f32(float %x) #0
-{
-    ; 0x004: negative infinity; 0x200: positive infinity
-    %1 = call i1 @llvm.amdgcn.class.f32(float %x, i32 516)
-    ret i1 %1
-}
-
-; GLSL: bool isnan(float)
-define i1 @llpc.isnan.f32(float %x) #0
-{
-    ; 0x001: signaling NaN, 0x002: quiet NaN
-    %1 = call i1 @llvm.amdgcn.class.f32(float %x, i32 3)
-    ret i1 %1
-}
-
-; =====================================================================================================================
 ; >>>  Vector Relational Functions
 ; =====================================================================================================================
 

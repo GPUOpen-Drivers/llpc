@@ -693,7 +693,6 @@ private:
   template <class Source, class Func> bool foreachFuncCtlMask(Source, Func);
   llvm::GlobalValue::LinkageTypes transLinkageType(const SPIRVValue *V);
   Instruction *transOCLAllAny(SPIRVInstruction *BI, BasicBlock *BB);
-  Instruction *transOCLRelational(SPIRVInstruction *BI, BasicBlock *BB);
 
   Instruction *transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
                                SPIRVWord MemSema, SPIRVWord MemScope);
@@ -6009,13 +6008,23 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV,
                     transOCLAllAny(static_cast<SPIRVInstruction *>(BV), BB));
 
-  case OpIsFinite:
-  case OpIsInf:
-  case OpIsNan:
-  case OpIsNormal:
-  case OpSignBitSet:
-    return mapValue(
-        BV, transOCLRelational(static_cast<SPIRVInstruction *>(BV), BB));
+  case OpIsInf: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Result = getBuilder()->CreateIsInf(Val0);
+    // ZExt to cope with vector of bool being represented by <N x i32>
+    return mapValue(BV,
+                    getBuilder()->CreateZExt(Result, transType(BC->getType())));
+  }
+
+  case OpIsNan: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val0 = transValue(BC->getOperand(0), F, BB);
+    Value *Result = getBuilder()->CreateIsNaN(Val0);
+    // ZExt to cope with vector of bool being represented by <N x i32>
+    return mapValue(BV,
+                    getBuilder()->CreateZExt(Result, transType(BC->getType())));
+  }
 
   case OpDPdx:
   case OpDPdxCoarse:
@@ -10353,33 +10362,6 @@ Instruction *SPIRVToLLVM::transOCLAllAny(SPIRVInstruction *I, BasicBlock *BB) {
              [=](CallInst *NewCI) -> Instruction * {
                return CastInst::CreateTruncOrBitCast(
                    NewCI, Type::getInt1Ty(*Context), "", NewCI->getNextNode());
-             },
-             &Attrs)));
-}
-
-Instruction *SPIRVToLLVM::transOCLRelational(SPIRVInstruction *I,
-                                             BasicBlock *BB) {
-  CallInst *CI = cast<CallInst>(transSPIRVBuiltinFromInst(I, BB));
-  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
-  return cast<Instruction>(mapValue(
-      I, mutateCallInstOCL(
-             M, CI,
-             [=](CallInst *, std::vector<Value *> &Args, llvm::Type *&RetTy) {
-               RetTy = Type::getInt1Ty(*Context);
-               if (CI->getType()->isVectorTy())
-                 RetTy =
-                     VectorType::get(Type::getInt1Ty(*Context),
-                                     CI->getType()->getVectorNumElements());
-               return CI->getCalledFunction()->getName();
-             },
-             [=](CallInst *NewCI) -> Instruction * {
-               Type *RetTy = Type::getInt1Ty(*Context);
-               if (NewCI->getType()->isVectorTy())
-                 RetTy =
-                     VectorType::get(Type::getInt1Ty(*Context),
-                                     NewCI->getType()->getVectorNumElements());
-               return CastInst::CreateTruncOrBitCast(NewCI, RetTy, "",
-                                                     NewCI->getNextNode());
              },
              &Attrs)));
 }

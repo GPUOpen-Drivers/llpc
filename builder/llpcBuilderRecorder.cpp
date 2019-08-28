@@ -129,6 +129,10 @@ StringRef BuilderRecorder::GetCallName(
         return "fmax3";
     case Opcode::FMid3:
         return "fmid3";
+    case Opcode::IsInf:
+        return "isinf";
+    case Opcode::IsNaN:
+        return "isnan";
     case Opcode::InsertBitField:
         return "insert.bit.field";
     case Opcode::ExtractBitField:
@@ -905,6 +909,24 @@ Value* BuilderRecorder::CreateFMid3(
     const Twine&  instName)             // [in] Name to give instruction(s)
 {
     return Record(Opcode::FMid3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
+}
+
+// =====================================================================================================================
+// Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
+Value* BuilderRecorder::CreateIsInf(
+    Value*        pX,         // [in] Input value X
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::IsInf, GetConditionallyVectorizedTy(getInt1Ty(), pX->getType()), pX, instName);
+}
+
+// =====================================================================================================================
+// Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+Value* BuilderRecorder::CreateIsNaN(
+    Value*        pX,         // [in] Input value X
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::IsNaN, GetConditionallyVectorizedTy(getInt1Ty(), pX->getType()), pX, instName);
 }
 
 // =====================================================================================================================

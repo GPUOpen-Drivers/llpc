@@ -465,6 +465,16 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateFMid3(args[0], args[1], args[2]);
         }
 
+    case BuilderRecorder::Opcode::IsInf:
+        {
+            return m_pBuilder->CreateIsInf(args[0]);
+        }
+
+    case BuilderRecorder::Opcode::IsNaN:
+        {
+            return m_pBuilder->CreateIsNaN(args[0]);
+        }
+
     case BuilderRecorder::Opcode::InsertBitField:
         {
             return m_pBuilder->CreateInsertBitField(args[0], args[1], args[2], args[3]);
