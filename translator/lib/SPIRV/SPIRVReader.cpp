@@ -692,7 +692,6 @@ private:
                                       std::string &Name);
   template <class Source, class Func> bool foreachFuncCtlMask(Source, Func);
   llvm::GlobalValue::LinkageTypes transLinkageType(const SPIRVValue *V);
-  Instruction *transOCLAllAny(SPIRVInstruction *BI, BasicBlock *BB);
 
   Instruction *transOCLBarrier(BasicBlock *BB, SPIRVWord ExecScope,
                                SPIRVWord MemSema, SPIRVWord MemScope);
@@ -6004,9 +6003,24 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   case OpAll:
-  case OpAny:
-    return mapValue(BV,
-                    transOCLAllAny(static_cast<SPIRVInstruction *>(BV), BB));
+  case OpAny: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val = transValue(BC->getOperand(0), F, BB);
+    if (!isa<VectorType>(Val->getType()))
+      return Val;
+    Value *Result = getBuilder()->CreateExtractElement(Val, uint64_t(0));
+    for (unsigned I = 1, E = Val->getType()->getVectorNumElements(); I != E;
+         ++I) {
+      Value *Elem = getBuilder()->CreateExtractElement(Val, I);
+      if (OC == OpAny)
+        Result = getBuilder()->CreateOr(Result, Elem);
+      else
+        Result = getBuilder()->CreateAnd(Result, Elem);
+    }
+    // Vector of bool is <N x i32>, but single bool result needs to be i1.
+    Result = getBuilder()->CreateTrunc(Result, transType(BC->getType()));
+    return mapValue(BC, Result);
+  }
 
   case OpIsInf: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
@@ -10340,30 +10354,6 @@ SPIRVToLLVM::transLinkageType(const SPIRVValue *V) {
     }
     return GlobalValue::ExternalLinkage;
   }
-}
-
-Instruction *SPIRVToLLVM::transOCLAllAny(SPIRVInstruction *I, BasicBlock *BB) {
-  CallInst *CI = cast<CallInst>(transSPIRVBuiltinFromInst(I, BB));
-  AttributeList Attrs = CI->getCalledFunction()->getAttributes();
-  return cast<Instruction>(mapValue(
-      I, mutateCallInstOCL(
-             M, CI,
-             [=](CallInst *, std::vector<Value *> &Args, llvm::Type *&RetTy) {
-               Type *Int32Ty = Type::getInt32Ty(*Context);
-               auto OldArg = CI->getOperand(0);
-               auto NewArgTy = VectorType::get(
-                   Int32Ty, OldArg->getType()->getVectorNumElements());
-               auto NewArg =
-                   CastInst::CreateSExtOrBitCast(OldArg, NewArgTy, "", CI);
-               Args[0] = NewArg;
-               RetTy = Int32Ty;
-               return CI->getCalledFunction()->getName();
-             },
-             [=](CallInst *NewCI) -> Instruction * {
-               return CastInst::CreateTruncOrBitCast(
-                   NewCI, Type::getInt1Ty(*Context), "", NewCI->getNextNode());
-             },
-             &Attrs)));
 }
 
 } // namespace SPIRV
