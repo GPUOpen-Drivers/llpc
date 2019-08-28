@@ -185,6 +185,8 @@ StringRef BuilderRecorder::GetCallName(
         return "emit.vertex";
     case Opcode::EndPrimitive:
         return "end.primitive";
+    case Opcode::Barrier:
+        return "barrier";
     case Opcode::Kill:
         return "kill";
     case Opcode::ReadClock:
@@ -362,6 +364,13 @@ Instruction* BuilderRecorder::CreateEndPrimitive(
     uint32_t                streamId)           // Stream number, 0 if only one stream is present
 {
     return Record(Opcode::EndPrimitive, nullptr, getInt32(streamId), "");
+}
+
+// =====================================================================================================================
+// Create a workgroup control barrier.
+Instruction* BuilderRecorder::CreateBarrier()
+{
+    return Record(Opcode::Barrier, nullptr, {}, "");
 }
 
 // =====================================================================================================================

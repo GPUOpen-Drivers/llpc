@@ -675,6 +675,9 @@ public:
     // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
     Instruction* CreateEndPrimitive(uint32_t streamId) override final;
 
+    // Create a workgroup control barrier.
+    Instruction* CreateBarrier() override final;
+
     // Create a "kill". Only allowed in a fragment shader.
     Instruction* CreateKill(const Twine& instName) override final;
 

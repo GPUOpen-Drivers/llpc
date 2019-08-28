@@ -784,6 +784,11 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateEndPrimitive(cast<ConstantInt>(args[0])->getZExtValue());
         }
 
+    case BuilderRecorder::Opcode::Barrier:
+        {
+            return m_pBuilder->CreateBarrier();
+        }
+
     case BuilderRecorder::Opcode::Kill:
         {
             return m_pBuilder->CreateKill();
