@@ -275,6 +275,14 @@ public:
         Value*        pCoord,             // [in] Input coordinate <3 x float>
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
+    // Create scalar or vector FP truncate operation with the given rounding mode.
+    // Currently the rounding mode is only implemented for float/double -> half conversion.
+    virtual Value* CreateFpTruncWithRounding(
+        Value*                                pValue,             // [in] Input value
+        Type*                                 pDestTy,            // [in] Type to convert to
+        ConstrainedFPIntrinsic::RoundingMode  roundingMode,       // Rounding mode
+        const Twine&                          instName = "") = 0; // [in] Name to give instruction(s)
+
     // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
     virtual Value* CreateQuantizeToFp16(
         Value*        pValue,               // [in] Input value (float or float vector)

@@ -5950,6 +5950,38 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, FNeg);
   }
 
+  case OpFConvert: {
+    SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
+    Value *Val = transValue(BC->getOperand(0), F, BB);
+    Type *DestTy = transType(BC->getType());
+    if (Val->getType()->getScalarType()->getPrimitiveSizeInBits() <=
+        DestTy->getScalarType()->getPrimitiveSizeInBits())
+      return mapValue(BV, getBuilder()->CreateFPExt(Val, DestTy));
+
+    ConstrainedFPIntrinsic::RoundingMode RM = ConstrainedFPIntrinsic::rmDynamic;
+    SPIRVFPRoundingModeKind Rounding;
+    if (BC->hasFPRoundingMode(&Rounding)) {
+      switch (Rounding) {
+      case FPRoundingModeRTE:
+        RM = ConstrainedFPIntrinsic::rmToNearest;
+        break;
+      case FPRoundingModeRTZ:
+        RM = ConstrainedFPIntrinsic::rmTowardZero;
+        break;
+      case FPRoundingModeRTP:
+        RM = ConstrainedFPIntrinsic::rmUpward;
+        break;
+      case FPRoundingModeRTN:
+        RM = ConstrainedFPIntrinsic::rmDownward;
+        break;
+      default:
+        llvm_unreachable("");
+      }
+      return mapValue(BV, getBuilder()->CreateFpTruncWithRounding(Val, DestTy, RM));
+    }
+    return mapValue(BV, getBuilder()->CreateFPTrunc(Val, DestTy));
+  }
+
   case OpBitCount: {
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     Value *Val = transValue(BC->getOperand(0), F, BB);

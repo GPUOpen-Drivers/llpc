@@ -322,6 +322,47 @@ Value* BuilderImplBase::Scalarize(
 }
 
 // =====================================================================================================================
+// Helper method to scalarize in pairs a possibly vector unary operation. The callback function is called
+// with vec2 input, even if the input here is scalar.
+Value* BuilderImplBase::ScalarizeInPairs(
+    Value*                        pValue,     // [in] Input value
+    std::function<Value*(Value*)> callback)   // [in] Callback function
+{
+    if (auto pVecTy = dyn_cast<VectorType>(pValue->getType()))
+    {
+        Value* pInComps = CreateShuffleVector(pValue, pValue, { 0, 1 });
+        Value* pResultComps = callback(pInComps);
+        Value* pResult = UndefValue::get(VectorType::get(pResultComps->getType()->getScalarType(),
+                                                         pVecTy->getNumElements()));
+        pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, uint64_t(0)), uint64_t(0));
+        if (pVecTy->getNumElements() > 1)
+        {
+            pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, 1), 1);
+        }
+
+        for (uint32_t idx = 2, end = pVecTy->getNumElements(); idx < end; idx += 2)
+        {
+            uint32_t indices[2] = { idx, idx + 1 };
+            pInComps = CreateShuffleVector(pValue, pValue, indices);
+            pResultComps = callback(pInComps);
+            pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, uint64_t(0)), idx);
+            if (idx + 1 < end)
+            {
+                pResult = CreateInsertElement(pResult, CreateExtractElement(pResultComps, 1), idx + 1);
+            }
+        }
+        return pResult;
+    }
+
+    // For the scalar case, we need to create a vec2.
+    Value* pInComps = UndefValue::get(VectorType::get(pValue->getType(), 2));
+    pInComps = CreateInsertElement(pInComps, pValue, uint64_t(0));
+    pInComps = CreateInsertElement(pInComps, Constant::getNullValue(pValue->getType()), 1);
+    Value* pResult = callback(pInComps);
+    return CreateExtractElement(pResult, uint64_t(0));
+}
+
+// =====================================================================================================================
 // Helper method to scalarize a possibly vector binary operation
 Value* BuilderImplBase::Scalarize(
     Value*                                pValue0,    // [in] Input value 0
