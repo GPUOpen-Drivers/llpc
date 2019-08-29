@@ -320,13 +320,7 @@ endif
 
     GEN_GLSL_EMU_LIB_SCRIPT = $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py
 
-    GEN_GLSL_EMU_LIB_DEPS = $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmu.ll                   \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuF16.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuF64.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI8.ll                 \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI16.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslArithOpEmuI64.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslBufferOpEmu.ll                  \
+    GEN_GLSL_EMU_LIB_DEPS = $(GEN_GLSL_EMU_LIB_DIR)/glslBufferOpEmu.ll                  \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslBuiltInVarEmu.ll                \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslInlineConstOpEmu.ll             \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslPushConstOpEmu.ll               \
@@ -337,16 +331,6 @@ endif
                             \
                             $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslSpecialOpEmu.ll            \
                             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmu.ll              \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx9/glslArithOpEmuF16.ll           \
-                            \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCode.py     \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCode.txt    \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeF16.txt \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeF64.txt \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI8.txt  \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI16.txt \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslArithOpEmuCodeI64.txt \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py             \
                             $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
 

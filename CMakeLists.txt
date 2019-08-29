@@ -397,12 +397,6 @@ elseif(WIN32)
 endif()
 
 set(GEN_GLSL_EMU_LIB_DEPS
-    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuI8.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuI16.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuI64.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF16.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslArithOpEmuF64.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
@@ -412,14 +406,6 @@ set(GEN_GLSL_EMU_LIB_DEPS
     ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
     ${OP_EMU_LIB_GEN_DIR}/llvmIntrinsicEmu.ll
     ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx9/glslArithOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCode.txt
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI8.txt
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI16.txt
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeI64.txt
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF16.txt
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslArithOpEmuCodeF64.txt
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
     ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
 )
