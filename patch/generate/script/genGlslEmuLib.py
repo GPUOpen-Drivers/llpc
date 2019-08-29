@@ -29,8 +29,6 @@ import re
 import subprocess
 import sys
 
-import genGlslArithOpEmuCode
-
 def bin2hex(libFile, hFile):
   print(">>>  (LL-bin2hex) " + libFile + "  ==>  " + hFile)
   fBin = open(libFile, "rb")
@@ -97,23 +95,6 @@ print("")
 # =====================================================================================================================
 # Generate GFX-independent LLVM emulation library
 # =====================================================================================================================
-
-# Generate .ll files
-print("*******************************************************************************")
-print("                 Generate LLVM Emulation IR (GLSL Arithmetic)                  ")
-print("*******************************************************************************")
-genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCode.txt"),
-                           OUTPUT_DIR, "std32")
-genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeF16.txt"),
-                           OUTPUT_DIR, "float16")
-genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeF64.txt"),
-                           OUTPUT_DIR, "float64")
-genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI8.txt"),
-                           OUTPUT_DIR, "int8")
-genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI16.txt"),
-                           OUTPUT_DIR, "int16")
-genGlslArithOpEmuCode.main(os.path.join(INPUT_DIR, "script/genGlslArithOpEmuCodeI64.txt"),
-                           OUTPUT_DIR, "int64")
 
 # Generate .lib file
 print("*******************************************************************************")
