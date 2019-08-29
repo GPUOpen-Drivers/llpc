@@ -75,6 +75,10 @@ protected:
     // Helper method to scalarize a possibly vector unary operation
     Value* Scalarize(Value* pValue, std::function<Value*(Value*)> callback);
 
+    // Helper method to scalarize in pairs a possibly vector unary operation.
+    Value* ScalarizeInPairs(Value*                        pValue,
+                            std::function<Value*(Value*)> callback);
+
     // Helper method to scalarize a possibly vector binary operation
     Value* Scalarize(Value*                                 pValue0,
                      Value*                                 pValue1,
@@ -105,6 +109,12 @@ public:
     // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
     // the given cube map texture coordinates.
     Value* CreateCubeFaceIndex(Value* pCoord, const Twine& instName = "") override final;
+
+    // Create scalar or vector FP truncate operation with rounding mode.
+    Value* CreateFpTruncWithRounding(Value*                                pValue,
+                                     Type*                                 pDestTy,
+                                     ConstrainedFPIntrinsic::RoundingMode  roundingMode,
+                                     const Twine&                          instName = "") override final;
 
     // Create quantize operation.
     Value* CreateQuantizeToFp16(Value* pValue, const Twine& instName = "") override final;

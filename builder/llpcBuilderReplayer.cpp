@@ -268,6 +268,13 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateCubeFaceIndex(args[0]);
         }
 
+    case BuilderRecorder::FpTruncWithRounding:
+        {
+            auto roundingMode = static_cast<ConstrainedFPIntrinsic::RoundingMode>(
+                                  cast<ConstantInt>(args[1])->getZExtValue());
+            return m_pBuilder->CreateFpTruncWithRounding(args[0], pCall->getType(), roundingMode);
+        }
+
     case BuilderRecorder::QuantizeToFp16:
         {
             return m_pBuilder->CreateQuantizeToFp16(args[0]);

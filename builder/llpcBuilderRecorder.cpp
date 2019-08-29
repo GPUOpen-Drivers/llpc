@@ -53,6 +53,8 @@ StringRef BuilderRecorder::GetCallName(
         return "cube.face.coord";
     case Opcode::CubeFaceIndex:
         return "cube.face.index";
+    case Opcode::FpTruncWithRounding:
+        return "fp.trunc.with.rounding";
     case Opcode::QuantizeToFp16:
         return "quantize.to.fp16";
     case Opcode::SMod:
@@ -792,6 +794,18 @@ Value* BuilderRecorder::CreateRefract(
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
     return Record(Opcode::Refract, pN->getType(), { pI, pN, pEta }, instName);
+}
+
+// =====================================================================================================================
+// Create scalar or vector FP truncate operation with the given rounding mode.
+// Currently only implemented for float/double -> half conversion.
+Value* BuilderRecorder::CreateFpTruncWithRounding(
+    Value*                                pValue,             // [in] Input value
+    Type*                                 pDestTy,            // [in] Type to convert to
+    ConstrainedFPIntrinsic::RoundingMode  roundingMode,       // Rounding mode
+    const Twine&                          instName)           // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FpTruncWithRounding, pDestTy, { pValue, getInt32(roundingMode) }, instName);
 }
 
 // =====================================================================================================================

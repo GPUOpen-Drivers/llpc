@@ -79,6 +79,115 @@ Value* BuilderImplArith::CreateCubeFaceIndex(
 }
 
 // =====================================================================================================================
+// Create scalar or vector FP truncate operation with the given rounding mode.
+// Currently the rounding mode is only implemented for float/double -> half conversion.
+Value* BuilderImplArith::CreateFpTruncWithRounding(
+    Value*                                pValue,             // [in] Input value
+    Type*                                 pDestTy,            // [in] Type to convert to
+    ConstrainedFPIntrinsic::RoundingMode  roundingMode,       // Rounding mode
+    const Twine&                          instName)           // [in] Name to give instruction(s)
+{
+    if (pValue->getType()->getScalarType()->isDoubleTy())
+    {
+        pValue = CreateFPTrunc(pValue, GetConditionallyVectorizedTy(getFloatTy(), pDestTy));
+    }
+
+    if (pValue->getType() == pDestTy)
+    {
+        return pValue;
+    }
+
+    LLPC_ASSERT(pValue->getType()->getScalarType()->isFloatTy() && pDestTy->getScalarType()->isHalfTy());
+
+    // RTZ: Use cvt_pkrtz instruction.
+    // TODO: We also use this for RTP and RTN for now.
+    if (roundingMode != ConstrainedFPIntrinsic::rmToNearest)
+    {
+        Value* pResult = ScalarizeInPairs(pValue,
+                                          [this](Value* pInVec2)
+                                          {
+                                              Value* pInVal0 = CreateExtractElement(pInVec2, uint64_t(0));
+                                              Value* pInVal1 = CreateExtractElement(pInVec2, 1);
+                                              return CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz,
+                                                                     {},
+                                                                     { pInVal0, pInVal1 });
+                                          });
+        pResult->setName(instName);
+        return pResult;
+    }
+
+    // RTE.
+    // float32: sign = [31], exponent = [30:23], mantissa = [22:0]
+    // float16: sign = [15], exponent = [14:10], mantissa = [9:0]
+    Value* pBits32 = CreateBitCast(pValue, GetConditionallyVectorizedTy(getInt32Ty(), pValue->getType()));
+
+    // sign16 = (bits32 >> 16) & 0x8000
+    Value* pSign16 = CreateAnd(CreateLShr(pBits32, ConstantInt::get(pBits32->getType(), 16)),
+                               ConstantInt::get(pBits32->getType(), 0x8000));
+
+    // exp32 = (bits32 >> 23) & 0xFF
+    Value* pExp32 = CreateAnd(CreateLShr(pBits32, ConstantInt::get(pBits32->getType(), 23)),
+                              ConstantInt::get(pBits32->getType(), 0xFF));
+
+    // exp16 = exp32 - 127 + 15
+    Value* pExp16 = CreateSub(pExp32, ConstantInt::get(pExp32->getType(), (127 - 15)));
+
+    // mant32 = bits32 & 0x7FFFFF
+    Value* pMant32 = CreateAnd(pBits32, 0x7FFFFF);
+
+    Value* pIsNanInf = CreateICmpEQ(pExp32, ConstantInt::get(pExp32->getType(), 0xFF));
+    Value* pIsNan = CreateAnd(pIsNanInf, CreateICmpNE(pMant32, Constant::getNullValue(pMant32->getType())));
+
+    // inf16 = sign16 | 0x7C00
+    Value* pInf16 = CreateOr(pSign16, ConstantInt::get(pSign16->getType(), 0x7C00));
+
+    // nan16 = sign16 | 0x7C00 | (mant32 >> 13) | 1
+    Value* pNan16 = CreateOr(CreateOr(pInf16, CreateLShr(pMant32, ConstantInt::get(pMant32->getType(), 13))),
+                             ConstantInt::get(pMant32->getType(), 1));
+
+    Value* pIsTooSmall = CreateICmpSLT(pExp16, ConstantInt::get(pExp16->getType(), -10));
+    Value* pIsDenorm = CreateICmpSLE(pExp16, Constant::getNullValue(pExp16->getType()));
+
+    // Calculate how many bits to discard from end of mantissa. Normally 13, but (14 - exp16) if denorm.
+    // Also explicitly set implicit top set bit in mantissa if it is denorm.
+    Value* pNumBitsToDiscard = CreateSelect(pIsDenorm,
+                                            CreateSub(ConstantInt::get(pExp16->getType(), 14), pExp16),
+                                            ConstantInt::get(pExp16->getType(), 13));
+    pMant32 = CreateSelect(pIsDenorm, CreateOr(pMant32, ConstantInt::get(pMant32->getType(), 0x800000)), pMant32);
+
+    // Ensure tiebreak-to-even by adding lowest nondiscarded bit to input mantissa.
+    Constant* pOne = ConstantInt::get(pMant32->getType(), 1);
+    pMant32 = CreateAdd(pMant32, CreateAnd(CreateLShr(pMant32, pNumBitsToDiscard), pOne));
+
+    // Calculate amount to add to do rounding: ((1 << numBitsToDiscard) - 1) >> 1)
+    Value* pRounder = CreateLShr(CreateSub(CreateShl(pOne, pNumBitsToDiscard), pOne), pOne);
+
+    // Add rounder amount and discard bits.
+    Value* pMant16 = CreateLShr(CreateAdd(pMant32, pRounder), pNumBitsToDiscard);
+
+    // Combine exponent. Do this with an add, so that, if the rounding overflowed, the exponent automatically
+    // gets incremented.
+    pExp16 = CreateSelect(pIsDenorm, Constant::getNullValue(pExp16->getType()), pExp16);
+    Value* pCombined16 = CreateAdd(pMant16, CreateShl(pExp16, ConstantInt::get(pMant16->getType(), 10)));
+
+    // Zero if underflow.
+    pCombined16 = CreateSelect(pIsTooSmall, Constant::getNullValue(pCombined16->getType()), pCombined16);
+
+    // Check if the exponent is now too big.
+    pIsNanInf = CreateOr(pIsNanInf, CreateICmpUGE(pCombined16, ConstantInt::get(pCombined16->getType(), 0x7C00)));
+
+    // Combine in the sign. This gives the final result for zero, normals and denormals.
+    pCombined16 = CreateOr(pCombined16, pSign16);
+
+    // Select in inf or nan as appropriate.
+    pCombined16 = CreateSelect(pIsNanInf, pInf16, pCombined16);
+    pCombined16 = CreateSelect(pIsNan, pNan16, pCombined16);
+
+    // Return as (vector of) half.
+    return CreateBitCast(CreateTrunc(pCombined16, GetConditionallyVectorizedTy(getInt16Ty(), pDestTy)), pDestTy, instName);
+}
+
+// =====================================================================================================================
 // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
 Value* BuilderImplArith::CreateQuantizeToFp16(
     Value*        pValue,     // [in] Input value (float or float vector)
