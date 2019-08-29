@@ -234,6 +234,7 @@ if(ICD_BUILD_LLPC)
         builder/llpcBuilder.cpp
         builder/llpcBuilderImpl.cpp
         builder/llpcBuilderImplDesc.cpp
+        builder/llpcBuilderImplArith.cpp
         builder/llpcBuilderImplImage.cpp
         builder/llpcBuilderImplInOut.cpp
         builder/llpcBuilderImplMatrix.cpp
