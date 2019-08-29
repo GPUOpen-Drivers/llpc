@@ -93,6 +93,10 @@ StringRef BuilderRecorder::GetCallName(
         return "matrix.times.matrix";
     case Opcode::OuterProduct:
         return "outer.product";
+    case Opcode::Determinant:
+        return "determinant";
+    case Opcode::MatrixInverse:
+        return "matrix.inverse";
     case Opcode::EmitVertex:
         return "emit.vertex";
     case Opcode::EndPrimitive:
@@ -348,6 +352,27 @@ Value* BuilderRecorder::CreateOuterProduct(
     const uint32_t colCount = pVector2->getType()->getVectorNumElements();
     Type* const pResultTy = ArrayType::get(pVector1->getType(), colCount);
     return Record(Opcode::OuterProduct, pResultTy, { pVector1, pVector2 }, instName);
+}
+
+// =====================================================================================================================
+// Create calculation of matrix determinant
+Value* BuilderRecorder::CreateDeterminant(
+    Value* const pMatrix,             // [in] Matrix
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    return Record(Determinant,
+                  pMatrix->getType()->getArrayElementType()->getVectorElementType(),
+                  pMatrix,
+                  instName);
+}
+
+// =====================================================================================================================
+// Create calculation of matrix inverse
+Value* BuilderRecorder::CreateMatrixInverse(
+    Value* const pMatrix,             // [in] Matrix
+    const Twine& instName)            // [in] Name to give instruction(s)
+{
+    return Record(MatrixInverse, pMatrix->getType(), pMatrix, instName);
 }
 
 // =====================================================================================================================

@@ -485,9 +485,25 @@ public:
                               Value* const pVector2,
                               const Twine& instName = "") override final;
 
+    // Create matrix determinant operation.
+    Value* CreateDeterminant(Value* const pMatrix, const Twine& instName = "") override final;
+
+    // Create matrix inverse operation.
+    Value* CreateMatrixInverse(Value* const pMatrix, const Twine& instName = "") override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMatrix)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplMatrix)
+
+    // Helper function for determinant calculation
+    Value* Determinant(ArrayRef<Value*> elements, uint32_t order);
+
+    // Get submatrix by deleting specified row and column
+    void GetSubmatrix(ArrayRef<Value*>        matrix,
+                      MutableArrayRef<Value*> submatrix,
+                      uint32_t                order,
+                      uint32_t                rowToDelete,
+                      uint32_t                columnToDelete);
 };
 
 // =====================================================================================================================

@@ -166,7 +166,7 @@ static cl::opt<uint32_t> NggCompactionMode(
              "0: Compaction is based on the whole sub-group\n"
              "1: Compaction is based on vertices"),
     cl::value_desc("mode"),
-    cl::init(static_cast<uint32_t>(NggCompactSubgroup)));
+    cl::init(static_cast<uint32_t>(NggCompactVertices)));
 
 // -ngg-enable-fast-launch-rate: enable the hardware to launch subgroups of work at a faster rate (NGG)
 static cl::opt<bool> NggEnableFastLaunchRate(
@@ -374,9 +374,10 @@ static Result Init(
             "-pragma-unroll-threshold",            "-pragma-unroll-threshold=1000",
             "-unroll-allow-partial",               "-unroll-allow-partial",
             "-simplifycfg-sink-common",            "-simplifycfg-sink-common=false",
-            "-amdgpu-vgpr-index-mode",             "-amdgpu-vgpr-index-mode",         // force VGPR indexing on GFX8
-            "-amdgpu-atomic-optimizations",        "-amdgpu-atomic-optimizations",    // enable atomic optimizations
-            "-filetype",                           "-filetype=obj",   // target = obj, ELF binary; target = asm, ISA assembly text
+            "-amdgpu-vgpr-index-mode",             "-amdgpu-vgpr-index-mode",         // Force VGPR indexing on GFX8
+            "-amdgpu-atomic-optimizations",        "-amdgpu-atomic-optimizations",    // Enable atomic optimizations
+            "-use-gpu-divergence-analysis",        "-use-gpu-divergence-analysis",    // Use new divergence analysis
+            "-filetype",                           "-filetype=obj",   // Target = obj, ELF binary; target = asm, ISA assembly text
         };
 
         // Build new arguments, starting with those supplied in command line

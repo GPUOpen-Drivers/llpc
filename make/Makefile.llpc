@@ -317,9 +317,6 @@ ifeq ($(ICD_BUILD_LLPC), 1)
                             $(GEN_GLSL_EMU_LIB_DIR)/glslBufferOpEmu.ll                  \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslBuiltInVarEmu.ll                \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslInlineConstOpEmu.ll             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmu.ll                  \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmuF16.ll               \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslMatrixOpEmuF64.ll               \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslPushConstOpEmu.ll               \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslSharedVarOpEmu.ll               \
                             $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmu.ll                 \
@@ -386,7 +383,10 @@ endif
 # MetroHash
 # If define METROHASH_PATH, llpc use the external single Metrohash.
 # Otherwise build the imported Metrohash copy.
-ifndef METROHASH_PATH
+ifdef METROHASH_PATH
+    LCXXINCS += -I$(METROHASH_DEPTH)/src
+    LCXXDEFS += -DSINGLE_EXTERNAL_METROHASH
+else
     METROHASH_DEPTH = $(LLPC_DEPTH)/imported/metrohash
     include $(METROHASH_DEPTH)/make/Makefile.metrohash
 endif

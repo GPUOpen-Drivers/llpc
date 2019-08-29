@@ -113,6 +113,13 @@ ifeq ($(ICD_PLATFORM), win)
     LCXXOPTS += /Gd
 endif
 
+ifdef METROHASH_PATH
+    LCXXINCS += -I$(METROHASH_DEPTH)/src
+    LLLIBS += -Wl,--whole-archive \
+              ../../../../imported/metrohash/$(BUILD_DIR)/icdimportedmetrohash$(LIB_EXT) \
+              -Wl,--no-whole-archive
+endif
+
 LLLIBS += ../../$(BUILD_DIR)/icdapillpc$(LIB_EXT) \
           ../../tool/vfx/$(BUILD_DIR)/icdapillpctoolvfx$(LIB_EXT) \
 	      ../../../../imported/llvm/$(BUILD_DIR)/icdimportedllvm$(LIB_EXT)
