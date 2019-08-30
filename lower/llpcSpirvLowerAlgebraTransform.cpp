@@ -411,16 +411,25 @@ void SpirvLowerAlgebraTransform::visitCallInst(
     }
     else
     {
-        // Disable fast math for gl_Position
+        // Disable fast math for gl_Position.
+        // TODO: Having this here is not good, as it requires us to know implementation details of Builder.
+        // We need to find a neater way to do it.
         auto calleeName = pCallee->getName();
+        uint32_t builtIn = InvalidValue;
+        Value* pValueWritten = nullptr;
         if (calleeName.startswith(LlpcName::OutputExportBuiltIn))
         {
-            uint32_t value = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-            if (value == BuiltInPosition)
-            {
-                Value* pOutput = callInst.getOperand(callInst.getNumArgOperands() - 1);
-                DisableFastMath(pOutput);
-            }
+            builtIn = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+            pValueWritten = callInst.getOperand(callInst.getNumArgOperands() - 1);
+        }
+        else if (calleeName.startswith("llpc.call.write.builtin"))
+        {
+            builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+            pValueWritten = callInst.getOperand(0);
+        }
+        if (builtIn == BuiltInPosition)
+        {
+            DisableFastMath(pValueWritten);
         }
 
         if (m_pContext->GetGfxIpVersion().major <= 8)
