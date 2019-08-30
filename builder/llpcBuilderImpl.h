@@ -585,8 +585,11 @@ private:
     // Mark fragment output type
     void MarkFsOutputType(Type* pOutputTy, uint32_t location, InOutInfo outputInfo);
 
-    // Modify aux interp value according to custom interp mode
+    // Modify aux interp value according to custom interp mode, and its helper functions.
     Value* ModifyAuxInterpValue(Value* pAuxInterpValue, InOutInfo inputInfo);
+    Value* EvalIJOffsetNoPersp(Value* pOffset);
+    Value* EvalIJOffsetSmooth(Value* pOffset);
+    Value* AdjustIJ(Value* pValue, Value* pOffset);
 
     // Read (part of) a built-in value
     Value* ReadBuiltIn(bool         isOutput,
@@ -595,6 +598,9 @@ private:
                        Value*       pVertexIndex,
                        Value*       pIndex,
                        const Twine& instName);
+
+    // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
+    Type* GetBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
     // Get name of built-in
     StringRef GetBuiltInName(BuiltInKind builtIn);
@@ -615,7 +621,6 @@ private:
     // Determine whether a built-in is an output for a particular shader stage.
     bool IsBuiltInOutput(BuiltInKind builtIn);
 #endif // NDEBUG
-
 };
 
 // =====================================================================================================================

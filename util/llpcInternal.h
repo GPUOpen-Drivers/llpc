@@ -118,7 +118,6 @@ namespace LlpcName
     const static char OutputExportGeneric[]           = "llpc.output.export.generic.";
     const static char OutputExportBuiltIn[]           = "llpc.output.export.builtin.";
     const static char OutputExportXfb[]               = "llpc.output.export.xfb.";
-    const static char InputInterpEval[]               = "llpc.input.interpolate.evalij.";
     const static char BufferCallPrefix[]              = "llpc.buffer.";
     const static char BufferAtomic[]                  = "llpc.buffer.atomic.";
     const static char BufferLoad[]                    = "llpc.buffer.load.";
