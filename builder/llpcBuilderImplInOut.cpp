@@ -37,6 +37,11 @@
 using namespace Llpc;
 using namespace llvm;
 
+// Internal built-in IDs
+static const auto BuiltInInterpLinearCenter = static_cast<Builder::BuiltInKind>(spv::BuiltInInterpLinearCenter);
+static const auto BuiltInInterpPullMode = static_cast<Builder::BuiltInKind>(spv::BuiltInInterpPullMode);
+static const auto BuiltInSamplePosOffset = static_cast<Builder::BuiltInKind>(spv::BuiltInSamplePosOffset);
+
 // =====================================================================================================================
 // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
 // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
@@ -504,56 +509,84 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
                 pResUsage->builtInUsage.fs.smooth = true;
                 pResUsage->builtInUsage.fs.centroid = true;
             }
+
+            pAuxInterpValue = EmitCall(GetInsertBlock()->getModule(),
+                                       evalInstName,
+                                       VectorType::get(getFloatTy(), 2),
+                                       evalArgs,
+                                       Attribute::ReadOnly,
+                                       &*GetInsertPoint());
         }
         else
         {
-            evalInstName = LlpcName::InputInterpEval;
-            std::string suffix;
-
-            if (inputInfo.GetInterpLoc() == InOutInfo::InterpLocCenter)
+            // Generate code to evaluate the I,J coordinates.
+            if (inputInfo.GetInterpLoc() == InOutInfo::InterpLocSample)
             {
-                evalInstName += "offset";
-                evalArgs.push_back(pAuxInterpValue);
-
-                // NOTE: Here we add suffix to differentiate the type of "offset" (could be 16-bit or 32-bit
-                // floating-point type)
-                suffix = "." + GetTypeName(pAuxInterpValue->getType());
+                pAuxInterpValue = ReadBuiltIn(false, BuiltInSamplePosOffset, {}, pAuxInterpValue, nullptr, "");
             }
-            else
-            {
-                evalInstName += "sample";
-                evalArgs.push_back(pAuxInterpValue);
-                pResUsage->builtInUsage.fs.runAtSampleRate = true;
-            }
-
             if (inputInfo.GetInterpMode() == InOutInfo::InterpModeNoPersp)
             {
-                evalInstName += ".noperspective";
-                pResUsage->builtInUsage.fs.noperspective = true;
-                pResUsage->builtInUsage.fs.center = true;
+                pAuxInterpValue = EvalIJOffsetNoPersp(pAuxInterpValue);
             }
             else
             {
-                pResUsage->builtInUsage.fs.smooth = true;
-                pResUsage->builtInUsage.fs.pullMode = true;
+                pAuxInterpValue = EvalIJOffsetSmooth(pAuxInterpValue);
             }
-
-            evalInstName += suffix;
         }
-
-        auto pIJ = EmitCall(GetInsertBlock()->getModule(),
-                            evalInstName,
-                            VectorType::get(getFloatTy(), 2),
-                            evalArgs,
-                            Attribute::ReadOnly,
-                            &*GetInsertPoint());
-        pAuxInterpValue = pIJ;
     }
     else
     {
         LLPC_ASSERT(inputInfo.GetInterpMode() == InOutInfo::InterpModeCustom);
     }
     return pAuxInterpValue;
+}
+
+// =====================================================================================================================
+// Evaluate I,J for interpolation: center offset, linear (no perspective) version
+Value* BuilderImplInOut::EvalIJOffsetNoPersp(
+    Value*  pOffset)    // [in] Offset value, <2 x float> or <2 x half>
+{
+    Value* pCenter = ReadBuiltIn(false, BuiltInInterpLinearCenter, {}, nullptr, nullptr, "");
+    return AdjustIJ(pCenter, pOffset);
+}
+
+// =====================================================================================================================
+// Evaluate I,J for interpolation: center offset, smooth (perspective) version
+Value* BuilderImplInOut::EvalIJOffsetSmooth(
+    Value*  pOffset)    // [in] Offset value, <2 x float> or <2 x half>
+{
+    // Get <I/W, J/W, 1/W>
+    Value* pPullModel = ReadBuiltIn(false, BuiltInInterpPullMode, {}, nullptr, nullptr, "");
+    // Adjust each coefficient by offset.
+    Value* pAdjusted = AdjustIJ(pPullModel, pOffset);
+    // Extract <I,J> part of that, and divide by W.
+    Value* pIJ = CreateShuffleVector(pAdjusted, pAdjusted, { 0, 1 });
+    Value* pRcpW = CreateExtractElement(pAdjusted, 2);
+    pRcpW = CreateVectorSplat(2, pRcpW);
+    return CreateFMul(pIJ, pRcpW);
+}
+
+// =====================================================================================================================
+// Adjust I,J values by offset.
+// This adjusts pValue by its X and Y derivatives times the X and Y components of pOffset.
+// If pValue is a vector, this is done component-wise.
+Value* BuilderImplInOut::AdjustIJ(
+    Value*  pValue,     // [in] Value to adjust, float or vector of float
+    Value*  pOffset)    // [in] Offset to adjust by, <2 x float> or <2 x half>
+{
+    pOffset = CreateFPExt(pOffset, VectorType::get(getFloatTy(), 2));
+    Value* pOffsetX = CreateExtractElement(pOffset, uint64_t(0));
+    Value* pOffsetY = CreateExtractElement(pOffset, 1);
+    if (auto pVecTy = dyn_cast<VectorType>(pValue->getType()))
+    {
+        pOffsetX = CreateVectorSplat(pVecTy->getNumElements(), pOffsetX);
+        pOffsetY = CreateVectorSplat(pVecTy->getNumElements(), pOffsetY);
+    }
+    Value* pDerivX = CreateDerivative(pValue, /*isY=*/false, /*isFine=*/true);
+    Value* pDerivY = CreateDerivative(pValue, /*isY=*/true, /*isFine=*/true);
+    Value* pAdjustX = CreateFAdd(pValue, CreateFMul(pDerivX, pOffsetX));
+    Value* pAdjustY = CreateFAdd(pAdjustX, CreateFMul(pDerivY, pOffsetY));
+    return pAdjustY;
 }
 
 // =====================================================================================================================
@@ -680,6 +713,8 @@ Value* BuilderImplInOut::ReadBuiltIn(
     BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
     InOutInfo     inOutInfo,          // Extra input/output info (shader-defined array size)
     Value*        pVertexIndex,       // [in] For TCS/TES/GS per-vertex input: vertex index, else nullptr
+                                      //    Special case for FS BuiltInSamplePosOffset: sample number. That special
+                                      //    case only happens when ReadBuiltIn is called from ModifyAuxInterpValue.
     Value*        pIndex,             // [in] Array or vector index to access part of an input, else nullptr
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
@@ -729,6 +764,17 @@ Value* BuilderImplInOut::ReadBuiltIn(
     case ShaderStageGeometry:
         LLPC_ASSERT(pIndex == nullptr);
         args.push_back((pVertexIndex != nullptr) ? pVertexIndex : getInt32(InvalidValue));
+        break;
+    case ShaderStageFragment:
+        if (builtIn == BuiltInSamplePosOffset)
+        {
+            // Special case for BuiltInSamplePosOffset: pVertexIndex is the sample number.
+            // That special case only happens when ReadBuiltIn is called from ModifyAuxInterpValue.
+            Value* pSampleNum = pVertexIndex;
+            pVertexIndex = nullptr;
+            args.push_back(pSampleNum);
+        }
+        LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
         break;
     default:
         LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
@@ -849,16 +895,43 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
 }
 
 // =====================================================================================================================
+// Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
+Type* BuilderImplInOut::GetBuiltInTy(
+    BuiltInKind   builtIn,            // Built-in kind
+    InOutInfo     inOutInfo)          // Extra input/output info (shader-defined array size)
+{
+    switch (static_cast<uint32_t>(builtIn))
+    {
+    case BuiltInSamplePosOffset:
+    case BuiltInInterpLinearCenter:
+        return VectorType::get(getFloatTy(), 2);
+    case BuiltInInterpPullMode:
+        return VectorType::get(getFloatTy(), 3);
+    default:
+        return Builder::GetBuiltInTy(builtIn, inOutInfo);
+    }
+}
+
+// =====================================================================================================================
 // Get name of built-in
 StringRef BuilderImplInOut::GetBuiltInName(
     BuiltInKind   builtIn)            // Built-in type, one of the BuiltIn* constants
 {
-    switch (builtIn)
+    switch (static_cast<uint32_t>(builtIn))
     {
 #define BUILTIN(name, number, out, in, type) \
     case BuiltIn ## name: return # name;
 #include "llpcBuilderBuiltIns.h"
 #undef BUILTIN
+
+    // Internal built-ins.
+    case BuiltInSamplePosOffset:
+        return "SamplePosOffset";
+    case BuiltInInterpLinearCenter:
+        return "InterpLinearCenter";
+    case BuiltInInterpPullMode:
+        return "InterpPullMode";
+
     default:
         LLPC_NEVER_CALLED();
         return "unknown";
@@ -963,7 +1036,7 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
 
     case ShaderStageFragment:
         {
-            switch (builtIn)
+            switch (static_cast<uint32_t>(builtIn))
             {
             case BuiltInFragCoord: pUsage.fs.fragCoord = true; break;
             case BuiltInFrontFacing: pUsage.fs.frontFacing = true; break;
@@ -1003,6 +1076,18 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
             case BuiltInBaryCoordSmoothCentroid: pUsage.fs.baryCoordSmoothCentroid = true; break;
             case BuiltInBaryCoordSmoothSample: pUsage.fs.baryCoordSmoothSample = true; break;
             case BuiltInBaryCoordPullModel: pUsage.fs.baryCoordPullModel = true; break;
+
+            // Internal built-ins.
+            case BuiltInInterpLinearCenter:
+                pUsage.fs.noperspective = true;
+                pUsage.fs.center = true;
+                break;
+            case BuiltInInterpPullMode:
+                pUsage.fs.smooth = true;
+                pUsage.fs.pullMode = true;
+                break;
+            case BuiltInSamplePosOffset: pUsage.fs.runAtSampleRate = true; break;
+
             default: break;
             }
             break;
