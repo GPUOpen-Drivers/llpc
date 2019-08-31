@@ -3068,6 +3068,7 @@ void Compiler::BuildShaderCacheHash(
     MetroHash64 nonFragmentHasher;
     auto stageMask = pContext->GetShaderStageMask();
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+    auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
 
     // Build hash per shader stage
     for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))
@@ -3126,6 +3127,22 @@ void Compiler::BuildShaderCacheHash(
     // Add addtional pipeline state to final hasher
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
+        // Add pipeline options to fragment hash
+        fragmentHasher.Update(pPipelineOptions->includeDisassembly);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
+        fragmentHasher.Update(pPipelineOptions->autoLayoutDesc);
+#endif
+        fragmentHasher.Update(pPipelineOptions->scalarBlockLayout);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+        fragmentHasher.Update(pPipelineOptions->reconfigWorkgroupLayout);
+#endif
+        fragmentHasher.Update(pPipelineOptions->includeIr);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+        fragmentHasher.Update(pPipelineOptions->robustBufferAccess);
+#endif
+#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
+        fragmentHasher.Update(pPipelineOptions->includeIrBinary);
+#endif
         PipelineDumper::UpdateHashForFragmentState(pPipelineInfo, &fragmentHasher);
         fragmentHasher.Finalize(pFragmentHash->bytes);
     }
