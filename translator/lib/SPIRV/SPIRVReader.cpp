@@ -558,6 +558,8 @@ private:
   DenseMap<std::pair<SPIRVType*, uint32_t>, Type *> OverlappingStructTypeWorkaroundMap;
   const ShaderModuleInfo* ModuleData;
 
+  Llpc::Builder *getBuilder() const { return m_pBuilder; }
+
   Type *mapType(SPIRVType *BT, Type *T) {
     SPIRVDBG(dbgs() << *T << '\n';)
     TypeMap[BT] = T;
@@ -585,7 +587,7 @@ private:
   }
 
   Type *getPadType(uint32_t bytes) {
-    return ArrayType::get(m_pBuilder->getInt8Ty(), bytes);
+    return ArrayType::get(getBuilder()->getInt8Ty(), bytes);
   }
 
   Type *recordTypeWithPad(Type* const T, bool isMatrixRow = false) {
@@ -917,11 +919,11 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(
 {
     if (isParentPointer)
     {
-        return m_pBuilder->getInt32Ty();
+        return getBuilder()->getInt32Ty();
     }
     else
     {
-        return m_pBuilder->getInt1Ty();
+        return getBuilder()->getInt1Ty();
     }
 }
 
@@ -1070,29 +1072,29 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
                     // Pointer to multisampled image is represented by a struct containing pointer to
                     // normal image descriptor and pointer to fmask descriptor.
                     return StructType::get(*Context,
-                                           { m_pBuilder->GetImageDescPtrTy(), m_pBuilder->GetFmaskDescPtrTy() });
+                                           { getBuilder()->GetImageDescPtrTy(), getBuilder()->GetFmaskDescPtrTy() });
                 }
                 if (static_cast<SPIRVTypeImage*>(pSpvElementType)->getDescriptor().Dim == DimBuffer)
                 {
-                    return m_pBuilder->GetTexelBufferDescPtrTy();
+                    return getBuilder()->GetTexelBufferDescPtrTy();
                 }
-                return m_pBuilder->GetImageDescPtrTy();
+                return getBuilder()->GetImageDescPtrTy();
             }
         case OpTypeSampler:
             {
-                return m_pBuilder->GetSamplerDescPtrTy();
+                return getBuilder()->GetSamplerDescPtrTy();
             }
         case OpTypeSampledImage:
             {
                 // Pointer to sampled image is represented by a struct containing pointer to image and pointer to
                 // sampler. But if the image is multisampled, then it itself is another struct, as above.
-                Type* pImagePtrTy = m_pBuilder->GetImageDescPtrTy();
+                Type* pImagePtrTy = getBuilder()->GetImageDescPtrTy();
                 if (static_cast<SPIRVTypeSampledImage*>(pSpvElementType)->getImageType()->getDescriptor().MS)
                 {
                     pImagePtrTy = StructType::get(*Context,
-                                                  { m_pBuilder->GetImageDescPtrTy(), m_pBuilder->GetFmaskDescPtrTy() });
+                                                  { getBuilder()->GetImageDescPtrTy(), getBuilder()->GetFmaskDescPtrTy() });
                 }
-                return StructType::get(*Context, { pImagePtrTy, m_pBuilder->GetSamplerDescPtrTy() });
+                return StructType::get(*Context, { pImagePtrTy, getBuilder()->GetSamplerDescPtrTy() });
             }
         default:
             {
@@ -1379,26 +1381,26 @@ Type *SPIRVToLLVM::transType(
       // A multisampled image is represented by a struct containing both the
       // image descriptor and the fmask descriptor.
       return mapType(T,
-                     StructType::get(*Context, {m_pBuilder->GetImageDescTy(),
-                                                m_pBuilder->GetFmaskDescTy()}));
+                     StructType::get(*Context, {getBuilder()->GetImageDescTy(),
+                                                getBuilder()->GetFmaskDescTy()}));
     }
     if (ST->getDescriptor().Dim == DimBuffer)
     {
         // A buffer image is represented by a texel buffer descriptor.
-        return mapType(T, m_pBuilder->GetTexelBufferDescTy());
+        return mapType(T, getBuilder()->GetTexelBufferDescTy());
     }
     // Otherwise, an image is represented by an image descriptor.
-    return mapType(T, m_pBuilder->GetImageDescTy());
+    return mapType(T, getBuilder()->GetImageDescTy());
   }
   case OpTypeSampler:
-    return mapType(T, m_pBuilder->GetSamplerDescTy());
+    return mapType(T, getBuilder()->GetSamplerDescTy());
   case OpTypeSampledImage: {
     // A sampledimage is represented by a struct containing the image descriptor
     // and the sampler descriptor.
     auto SIT = static_cast<SPIRVTypeSampledImage *>(T);
     return mapType(T,
                    StructType::get(*Context, {transType(SIT->getImageType()),
-                                              m_pBuilder->GetSamplerDescTy()}));
+                                              getBuilder()->GetSamplerDescTy()}));
   }
 
 #define HANDLE_OPCODE(op) case (op): {                                         \
@@ -1824,7 +1826,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                 Instruction* const pInst = dyn_cast<Instruction>(pValue);
                 LLPC_ASSERT(pInst != nullptr);
 
-                m_pBuilder->SetInsertPoint(pInst);
+                getBuilder()->SetInsertPoint(pInst);
 
                 // Remember to remove the instruction later.
                 valuesToRemove.push_back(pInst);
@@ -1879,28 +1881,28 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     else if (pRemappedValue->getType()->isPointerTy())
                     {
                         // If the value is a pointer type, we are indexing into the original matrix.
-                        Value* const pRemappedValueSplat = m_pBuilder->CreateVectorSplat(rowCount, pRemappedValue);
-                        Value* pRowSplat = UndefValue::get(VectorType::get(m_pBuilder->getInt32Ty(), rowCount));
+                        Value* const pRemappedValueSplat = getBuilder()->CreateVectorSplat(rowCount, pRemappedValue);
+                        Value* pRowSplat = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), rowCount));
 
                         for (uint32_t i = 0; i < rowCount; i++)
                         {
-                            pRowSplat = m_pBuilder->CreateInsertElement(pRowSplat, m_pBuilder->getInt32(i), i);
+                            pRowSplat = getBuilder()->CreateInsertElement(pRowSplat, getBuilder()->getInt32(i), i);
                         }
 
-                        Value* const pColumnSplat = m_pBuilder->CreateVectorSplat(rowCount, indices[1]);
+                        Value* const pColumnSplat = getBuilder()->CreateVectorSplat(rowCount, indices[1]);
 
-                        Value* const pNewGetElemPtr = m_pBuilder->CreateGEP(pRemappedValueSplat,
+                        Value* const pNewGetElemPtr = getBuilder()->CreateGEP(pRemappedValueSplat,
                                                                          {
-                                                                             m_pBuilder->getInt32(0),
+                                                                             getBuilder()->getInt32(0),
                                                                              pRowSplat,
-                                                                             m_pBuilder->getInt32(0),
+                                                                             getBuilder()->getInt32(0),
                                                                              pColumnSplat
                                                                          });
 
                         // Check if we are loading a scalar element of the matrix or not.
                         if (indices.size() > 2)
                         {
-                            valueMap[pGetElemPtr] = m_pBuilder->CreateExtractElement(pNewGetElemPtr, indices[2]);
+                            valueMap[pGetElemPtr] = getBuilder()->CreateExtractElement(pNewGetElemPtr, indices[2]);
                         }
                         else
                         {
@@ -1912,7 +1914,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         // If we get here it means we are doing a subsequent GEP on a matrix row.
                         LLPC_ASSERT(pRemappedValue->getType()->isVectorTy());
                         LLPC_ASSERT(pRemappedValue->getType()->getVectorElementType()->isPointerTy());
-                        valueMap[pGetElemPtr] = m_pBuilder->CreateExtractElement(pRemappedValue, indices[1]);
+                        valueMap[pGetElemPtr] = getBuilder()->CreateExtractElement(pRemappedValue, indices[1]);
                     }
 
                     // Add all the users of this GEP to the worklist for processing.
@@ -1941,9 +1943,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                         for (uint32_t i = 0; i < pPointerType->getVectorNumElements(); i++)
                         {
-                            Value* const pPointerElem = m_pBuilder->CreateExtractElement(pPointer, i);
+                            Value* const pPointerElem = getBuilder()->CreateExtractElement(pPointer, i);
 
-                            LoadInst* const pNewLoadElem = m_pBuilder->CreateLoad(pPointerElem, pLoad->isVolatile());
+                            LoadInst* const pNewLoadElem = getBuilder()->CreateLoad(pPointerElem, pLoad->isVolatile());
                             pNewLoadElem->setOrdering(pLoad->getOrdering());
                             pNewLoadElem->setAlignment(pLoad->getAlignment());
                             pNewLoadElem->setSyncScopeID(pLoad->getSyncScopeID());
@@ -1953,7 +1955,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                 transNonTemporalMetadata(pNewLoadElem);
                             }
 
-                            pNewLoad = m_pBuilder->CreateInsertElement(pNewLoad, pNewLoadElem, i);
+                            pNewLoad = getBuilder()->CreateInsertElement(pNewLoad, pNewLoadElem, i);
                         }
 
                         pLoad->replaceAllUsesWith(pNewLoad);
@@ -1967,11 +1969,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         // If we are loading a full row major matrix, need to load the rows and then transpose.
                         for (uint32_t i = 0; i < rowCount; i++)
                         {
-                            Value* pPointerElem = m_pBuilder->CreateGEP(pPointer,
+                            Value* pPointerElem = getBuilder()->CreateGEP(pPointer,
                                                                      {
-                                                                        m_pBuilder->getInt32(0),
-                                                                        m_pBuilder->getInt32(i),
-                                                                        m_pBuilder->getInt32(0)
+                                                                        getBuilder()->getInt32(0),
+                                                                        getBuilder()->getInt32(i),
+                                                                        getBuilder()->getInt32(0)
                                                                      });
                             Type* pCastType = pPointerElem->getType()->getPointerElementType();
                             LLPC_ASSERT(pCastType->isArrayTy());
@@ -1979,9 +1981,9 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                         pCastType->getArrayNumElements());
                             const uint32_t addrSpace = pPointerElem->getType()->getPointerAddressSpace();
                             pCastType = pCastType->getPointerTo(addrSpace);
-                            pPointerElem = m_pBuilder->CreateBitCast(pPointerElem, pCastType);
+                            pPointerElem = getBuilder()->CreateBitCast(pPointerElem, pCastType);
 
-                            LoadInst* const pNewLoadElem = m_pBuilder->CreateLoad(pPointerElem, pLoad->isVolatile());
+                            LoadInst* const pNewLoadElem = getBuilder()->CreateLoad(pPointerElem, pLoad->isVolatile());
                             pNewLoadElem->setOrdering(pLoad->getOrdering());
                             pNewLoadElem->setAlignment(pLoad->getAlignment());
                             pNewLoadElem->setSyncScopeID(pLoad->getSyncScopeID());
@@ -1991,15 +1993,15 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                 transNonTemporalMetadata(pNewLoadElem);
                             }
 
-                            pNewLoad = m_pBuilder->CreateInsertValue(pNewLoad, pNewLoadElem, i);
+                            pNewLoad = getBuilder()->CreateInsertValue(pNewLoad, pNewLoadElem, i);
                         }
 
-                        pLoad->replaceAllUsesWith(m_pBuilder->CreateTransposeMatrix(pNewLoad));
+                        pLoad->replaceAllUsesWith(getBuilder()->CreateTransposeMatrix(pNewLoad));
                     }
                     else
                     {
                         // Otherwise we are loading a single element and it's a simple load.
-                        LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pPointer, pLoad->isVolatile());
+                        LoadInst* const pNewLoad = getBuilder()->CreateLoad(pPointer, pLoad->isVolatile());
                         pNewLoad->setOrdering(pLoad->getOrdering());
                         pNewLoad->setAlignment(pLoad->getAlignment());
                         pNewLoad->setSyncScopeID(pLoad->getSyncScopeID());
@@ -2034,16 +2036,16 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                             if (pStoreValueElem->getType()->isArrayTy())
                             {
-                                pStoreValueElem = m_pBuilder->CreateExtractValue(pStoreValueElem, i);
+                                pStoreValueElem = getBuilder()->CreateExtractValue(pStoreValueElem, i);
                             }
                             else
                             {
-                                pStoreValueElem = m_pBuilder->CreateExtractElement(pStoreValueElem, i);
+                                pStoreValueElem = getBuilder()->CreateExtractElement(pStoreValueElem, i);
                             }
 
-                            Value* const pPointerElem = m_pBuilder->CreateExtractElement(pPointer, i);
+                            Value* const pPointerElem = getBuilder()->CreateExtractElement(pPointer, i);
 
-                            StoreInst* const pNewStoreElem = m_pBuilder->CreateStore(pStoreValueElem,
+                            StoreInst* const pNewStoreElem = getBuilder()->CreateStore(pStoreValueElem,
                                                                                   pPointerElem,
                                                                                   pStore->isVolatile());
                             pNewStoreElem->setOrdering(pStore->getOrdering());
@@ -2079,26 +2081,26 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                                 for (uint32_t row = 0; row < rowCount; row++)
                                 {
-                                    Value* const pElement = m_pBuilder->CreateExtractValue(pStoreValue, { column, row });
-                                    pColumn = m_pBuilder->CreateInsertElement(pColumn, pElement, row);
+                                    Value* const pElement = getBuilder()->CreateExtractValue(pStoreValue, { column, row });
+                                    pColumn = getBuilder()->CreateInsertElement(pColumn, pElement, row);
                                 }
 
-                                pMatrix = m_pBuilder->CreateInsertValue(pMatrix, pColumn, column);
+                                pMatrix = getBuilder()->CreateInsertValue(pMatrix, pColumn, column);
                             }
 
                             pStoreValue = pMatrix;
                         }
 
-                        pStoreValue = m_pBuilder->CreateTransposeMatrix(pStoreValue);
+                        pStoreValue = getBuilder()->CreateTransposeMatrix(pStoreValue);
 
                         // If we are storing a full row major matrix, need to transpose then store the rows.
                         for (uint32_t i = 0; i < rowCount; i++)
                         {
-                            Value* pPointerElem = m_pBuilder->CreateGEP(pPointer,
+                            Value* pPointerElem = getBuilder()->CreateGEP(pPointer,
                                                                      {
-                                                                        m_pBuilder->getInt32(0),
-                                                                        m_pBuilder->getInt32(i),
-                                                                        m_pBuilder->getInt32(0)
+                                                                        getBuilder()->getInt32(0),
+                                                                        getBuilder()->getInt32(i),
+                                                                        getBuilder()->getInt32(0)
                                                                      });
                             Type* pCastType = pPointerElem->getType()->getPointerElementType();
                             LLPC_ASSERT(pCastType->isArrayTy());
@@ -2106,11 +2108,11 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                         pCastType->getArrayNumElements());
                             const uint32_t addrSpace = pPointerElem->getType()->getPointerAddressSpace();
                             pCastType = pCastType->getPointerTo(addrSpace);
-                            pPointerElem = m_pBuilder->CreateBitCast(pPointerElem, pCastType);
+                            pPointerElem = getBuilder()->CreateBitCast(pPointerElem, pCastType);
 
-                            Value* const pStoreValueElem = m_pBuilder->CreateExtractValue(pStoreValue, i);
+                            Value* const pStoreValueElem = getBuilder()->CreateExtractValue(pStoreValue, i);
 
-                            StoreInst* const pNewStoreElem = m_pBuilder->CreateStore(pStoreValueElem,
+                            StoreInst* const pNewStoreElem = getBuilder()->CreateStore(pStoreValueElem,
                                                                                   pPointerElem,
                                                                                   pStore->isVolatile());
                             pNewStoreElem->setOrdering(pStore->getOrdering());
@@ -2126,7 +2128,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                     else
                     {
                         // Otherwise we are storing a single element and it's a simple store.
-                        StoreInst* const pNewStore = m_pBuilder->CreateStore(pStore->getValueOperand(),
+                        StoreInst* const pNewStore = getBuilder()->CreateStore(pStore->getValueOperand(),
                                                                           pPointer,
                                                                           pStore->isVolatile());
                         pNewStore->setOrdering(pStore->getOrdering());
@@ -2501,7 +2503,7 @@ DebugLoc SPIRVToLLVM::getDebugLoc(SPIRVInstruction *BI, Function *F) {
 void SPIRVToLLVM::updateBuilderDebugLoc(SPIRVValue *BV, Function *F) {
   if (BV->isInst()) {
     SPIRVInstruction *BI = static_cast<SPIRVInstruction*>(BV);
-    m_pBuilder->SetCurrentDebugLocation(getDebugLoc(BI, F));
+    getBuilder()->SetCurrentDebugLocation(getDebugLoc(BI, F));
   }
 }
 
@@ -2533,7 +2535,7 @@ Value* SPIRVToLLVM::createLaunderRowMajorMatrix(
                                                      GlobalValue::ExternalLinkage,
                                                      SpirvLaunderRowMajor,
                                                      M);
-    return m_pBuilder->CreateCall(pRowMajorFunc, pPointerToMatrix);
+    return getBuilder()->CreateCall(pRowMajorFunc, pPointerToMatrix);
 }
 
 // =====================================================================================================================
@@ -2556,7 +2558,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         pLoadType = pLoadPointer->getType()->getPointerElementType();
     }
 
-    Constant* const pZero = m_pBuilder->getInt32(0);
+    Constant* const pZero = getBuilder()->getInt32(0);
 
     if (pLoadType->isStructTy() && (pSpvType->getOpCode() != OpTypeSampledImage) &&
         (pSpvType->getOpCode() != OpTypeImage))
@@ -2571,10 +2573,10 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         {
             const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
 
-            Value* pMemberLoadPointer = m_pBuilder->CreateGEP(pLoadPointer,
+            Value* pMemberLoadPointer = getBuilder()->CreateGEP(pLoadPointer,
                                                            {
                                                                 pZero,
-                                                                m_pBuilder->getInt32(memberIndex)
+                                                                getBuilder()->getInt32(memberIndex)
                                                            });
 
             // If the struct member was one which overlapped another member (as is common with HLSL cbuffer layout), we
@@ -2584,7 +2586,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
             {
                 Type* const pType = OverlappingStructTypeWorkaroundMap[pair]->getPointerTo(
                     pMemberLoadPointer->getType()->getPointerAddressSpace());
-                pMemberLoadPointer = m_pBuilder->CreateBitCast(pMemberLoadPointer, pType);
+                pMemberLoadPointer = getBuilder()->CreateBitCast(pMemberLoadPointer, pType);
             }
 
             Value* const pMemberLoad = addLoadInstRecursively(pSpvType->getStructMemberType(i),
@@ -2601,7 +2603,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 
         for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
-            pLoad = m_pBuilder->CreateInsertValue(pLoad, memberLoads[i], i);
+            pLoad = getBuilder()->CreateInsertValue(pLoad, memberLoads[i], i);
         }
 
         return pLoad;
@@ -2623,21 +2625,21 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         {
             SmallVector<Value*, 3> indices;
             indices.push_back(pZero);
-            indices.push_back(m_pBuilder->getInt32(i));
+            indices.push_back(getBuilder()->getInt32(i));
 
             if (needsPad)
             {
                 indices.push_back(pZero);
             }
 
-            Value* pElementLoadPointer = m_pBuilder->CreateGEP(pLoadPointer, indices);
+            Value* pElementLoadPointer = getBuilder()->CreateGEP(pLoadPointer, indices);
 
             Value* const pElementLoad = addLoadInstRecursively(pSpvElementType,
                                                                pElementLoadPointer,
                                                                isVolatile,
                                                                isCoherent,
                                                                isNonTemporal);
-            pLoad = m_pBuilder->CreateInsertValue(pLoad, pElementLoad, i);
+            pLoad = getBuilder()->CreateInsertValue(pLoad, pElementLoad, i);
         }
 
         return pLoad;
@@ -2651,9 +2653,9 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         {
             Type* const pVectorType = transType(pSpvType, 0, false, true, false);
             Type* const pCastType = pVectorType->getPointerTo(pLoadPointer->getType()->getPointerAddressSpace());
-            pLoadPointer = m_pBuilder->CreateBitCast(pLoadPointer, pCastType);
+            pLoadPointer = getBuilder()->CreateBitCast(pLoadPointer, pCastType);
 
-            const bool scalarBlockLayout = m_pBuilder->getContext().GetTargetMachinePipelineOptions()->scalarBlockLayout;
+            const bool scalarBlockLayout = getBuilder()->getContext().GetTargetMachinePipelineOptions()->scalarBlockLayout;
 
             if (scalarBlockLayout == false)
             {
@@ -2661,7 +2663,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
             }
         }
 
-        LoadInst* const pLoad = m_pBuilder->CreateLoad(pLoadPointer, isVolatile);
+        LoadInst* const pLoad = getBuilder()->CreateLoad(pLoadPointer, isVolatile);
         pLoad->setAlignment(M->getDataLayout().getABITypeAlignment(pAlignmentType));
 
         if (isCoherent)
@@ -2678,7 +2680,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         if (pSpvType->isTypeBool() ||
            (pSpvType->isTypeVector() && pSpvType->getVectorComponentType()->isTypeBool()))
         {
-            return m_pBuilder->CreateTruncOrBitCast(pLoad, transType(pSpvType));
+            return getBuilder()->CreateTruncOrBitCast(pLoad, transType(pSpvType));
         }
         else
         {
@@ -2720,7 +2722,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
                                                                       pStorePointer->getType(),
                                                                       cast<Constant>(pStoreValue));
 
-        StoreInst* const pStore = m_pBuilder->CreateStore(pConstStoreValue, pStorePointer, isVolatile);
+        StoreInst* const pStore = getBuilder()->CreateStore(pConstStoreValue, pStorePointer, isVolatile);
         pStore->setAlignment(alignment);
 
         if (isCoherent)
@@ -2736,7 +2738,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
         return;
     }
 
-    Constant* const pZero = m_pBuilder->getInt32(0);
+    Constant* const pZero = getBuilder()->getInt32(0);
 
     if (pStoreType->isStructTy() && (pSpvType->getOpCode() != OpTypeSampledImage) &&
         (pSpvType->getOpCode() != OpTypeImage))
@@ -2747,12 +2749,12 @@ void SPIRVToLLVM::addStoreInstRecursively(
         for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
             const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
-            Value* const pMemberStorePointer = m_pBuilder->CreateGEP(pStorePointer,
+            Value* const pMemberStorePointer = getBuilder()->CreateGEP(pStorePointer,
                                                                   {
                                                                       pZero,
-                                                                      m_pBuilder->getInt32(memberIndex)
+                                                                      getBuilder()->getInt32(memberIndex)
                                                                   });
-            Value* const pMemberStoreValue = m_pBuilder->CreateExtractValue(pStoreValue, i);
+            Value* const pMemberStoreValue = getBuilder()->CreateExtractValue(pStoreValue, i);
             addStoreInstRecursively(pSpvType->getStructMemberType(i),
                                     pMemberStorePointer,
                                     pMemberStoreValue,
@@ -2774,15 +2776,15 @@ void SPIRVToLLVM::addStoreInstRecursively(
         {
             SmallVector<Value*, 3> indices;
             indices.push_back(pZero);
-            indices.push_back(m_pBuilder->getInt32(i));
+            indices.push_back(getBuilder()->getInt32(i));
 
             if (needsPad)
             {
                 indices.push_back(pZero);
             }
 
-            Value* const pElementStorePointer = m_pBuilder->CreateGEP(pStorePointer, indices);
-            Value* const pElementStoreValue = m_pBuilder->CreateExtractValue(pStoreValue, i);
+            Value* const pElementStorePointer = getBuilder()->CreateGEP(pStorePointer, indices);
+            Value* const pElementStoreValue = getBuilder()->CreateExtractValue(pStoreValue, i);
             addStoreInstRecursively(pSpvElementType,
                                     pElementStorePointer,
                                     pElementStoreValue,
@@ -2801,7 +2803,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
         if (pSpvType->isTypeBool() ||
            (pSpvType->isTypeVector() && pSpvType->getVectorComponentType()->isTypeBool()))
         {
-            pStoreValue = m_pBuilder->CreateZExtOrBitCast(pStoreValue, pStorePointer->getType()->getPointerElementType());
+            pStoreValue = getBuilder()->CreateZExtOrBitCast(pStoreValue, pStorePointer->getType()->getPointerElementType());
             pStoreType = pStoreValue->getType();
         }
         else
@@ -2813,9 +2815,9 @@ void SPIRVToLLVM::addStoreInstRecursively(
         if (pSpvType->isTypeVector())
         {
             Type* const pCastType = pStoreType->getPointerTo(pStorePointer->getType()->getPointerAddressSpace());
-            pStorePointer = m_pBuilder->CreateBitCast(pStorePointer, pCastType);
+            pStorePointer = getBuilder()->CreateBitCast(pStorePointer, pCastType);
 
-            const bool scalarBlockLayout = m_pBuilder->getContext().GetTargetMachinePipelineOptions()->scalarBlockLayout;
+            const bool scalarBlockLayout = getBuilder()->getContext().GetTargetMachinePipelineOptions()->scalarBlockLayout;
 
             if (scalarBlockLayout == false)
             {
@@ -2823,7 +2825,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
             }
         }
 
-        StoreInst* const pStore = m_pBuilder->CreateStore(pStoreValue, pStorePointer, isVolatile);
+        StoreInst* const pStore = getBuilder()->CreateStore(pStoreValue, pStorePointer, isVolatile);
         pStore->setAlignment(M->getDataLayout().getABITypeAlignment(pAlignmentType));
 
         if (isCoherent)
@@ -2850,7 +2852,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
 
     const uint32_t addrSpace = pStorePointerType->getPointerAddressSpace();
 
-    Constant* const pZero = m_pBuilder->getInt32(0);
+    Constant* const pZero = getBuilder()->getInt32(0);
 
     if (pStoreType->isStructTy() && (pSpvType->getOpCode() != OpTypeSampledImage) &&
         (pSpvType->getOpCode() != OpTypeImage))
@@ -2870,7 +2872,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
         for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
             const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
-            const std::array<Constant*, 2> indices = { pZero, m_pBuilder->getInt32(memberIndex) };
+            const std::array<Constant*, 2> indices = { pZero, getBuilder()->getInt32(memberIndex) };
             Type* const pMemberStoreType = GetElementPtrInst::getIndexedType(pStoreType, indices);
             constMembers[memberIndex] = buildConstStoreRecursively(pSpvType->getStructMemberType(i),
                                                                    pMemberStoreType->getPointerTo(addrSpace),
@@ -2895,7 +2897,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
         {
             SmallVector<Value*, 3> indices;
             indices.push_back(pZero);
-            indices.push_back(m_pBuilder->getInt32(i));
+            indices.push_back(getBuilder()->getInt32(i));
 
             if (needsPad)
             {
@@ -3019,13 +3021,13 @@ Value* SPIRVToLLVM::transAtomicRMW(
         static_cast<SPIRVConstant*>(pSpvAtomicInst->getOpValue(2)), true);
 
     Value* const pAtomicPointer = transValue(pSpvAtomicInst->getOpValue(0),
-                                             m_pBuilder->GetInsertBlock()->getParent(),
-                                             m_pBuilder->GetInsertBlock());
+                                             getBuilder()->GetInsertBlock()->getParent(),
+                                             getBuilder()->GetInsertBlock());
     Value* const pAtomicValue = transValue(pSpvAtomicInst->getOpValue(3),
-                                           m_pBuilder->GetInsertBlock()->getParent(),
-                                           m_pBuilder->GetInsertBlock());
+                                           getBuilder()->GetInsertBlock()->getParent(),
+                                           getBuilder()->GetInsertBlock());
 
-    return m_pBuilder->CreateAtomicRMW(binOp, pAtomicPointer, pAtomicValue, ordering, scope);
+    return getBuilder()->CreateAtomicRMW(binOp, pAtomicPointer, pAtomicValue, ordering, scope);
 }
 
 // =====================================================================================================================
@@ -3037,7 +3039,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     SPIRVAtomicLoad* const pSpvAtomicLoad = static_cast<SPIRVAtomicLoad*>(pSpvValue);
@@ -3047,10 +3049,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
         static_cast<SPIRVConstant*>(pSpvAtomicLoad->getOpValue(2)), false);
 
     Value* const pLoadPointer = transValue(pSpvAtomicLoad->getOpValue(0),
-                                           m_pBuilder->GetInsertBlock()->getParent(),
-                                           m_pBuilder->GetInsertBlock());
+                                           getBuilder()->GetInsertBlock()->getParent(),
+                                           getBuilder()->GetInsertBlock());
 
-    LoadInst* const pLoad = m_pBuilder->CreateLoad(pLoadPointer);
+    LoadInst* const pLoad = getBuilder()->CreateLoad(pLoadPointer);
 
     const uint32_t loadAlignment = static_cast<uint32_t>(M->getDataLayout().getTypeSizeInBits(pLoad->getType()) / 8);
     pLoad->setAlignment(loadAlignment);
@@ -3068,7 +3070,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     SPIRVAtomicStore* const pSpvAtomicStore = static_cast<SPIRVAtomicStore*>(pSpvValue);
@@ -3078,13 +3080,13 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
         static_cast<SPIRVConstant*>(pSpvAtomicStore->getOpValue(2)), false);
 
     Value* const pStorePointer = transValue(pSpvAtomicStore->getOpValue(0),
-                                            m_pBuilder->GetInsertBlock()->getParent(),
-                                            m_pBuilder->GetInsertBlock());
+                                            getBuilder()->GetInsertBlock()->getParent(),
+                                            getBuilder()->GetInsertBlock());
     Value* const pStoreValue = transValue(pSpvAtomicStore->getOpValue(3),
-                                          m_pBuilder->GetInsertBlock()->getParent(),
-                                          m_pBuilder->GetInsertBlock());
+                                          getBuilder()->GetInsertBlock()->getParent(),
+                                          getBuilder()->GetInsertBlock());
 
-    StoreInst* const pStore = m_pBuilder->CreateStore(pStoreValue, pStorePointer);
+    StoreInst* const pStore = getBuilder()->CreateStore(pStoreValue, pStorePointer);
 
     const uint64_t storeSizeInBits = M->getDataLayout().getTypeSizeInBits(pStoreValue->getType());
     const uint32_t storeAlignment = static_cast<uint32_t>(storeSizeInBits / 8);
@@ -3103,7 +3105,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicExchange>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Xchg);
@@ -3118,7 +3120,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIAdd>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Add);
@@ -3133,7 +3135,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicISub>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Sub);
@@ -3148,7 +3150,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMin>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Min);
@@ -3163,7 +3165,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMin>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::UMin);
@@ -3178,7 +3180,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicSMax>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Max);
@@ -3193,7 +3195,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicUMax>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::UMax);
@@ -3208,7 +3210,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicAnd>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::And);
@@ -3223,7 +3225,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicOr>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Or);
@@ -3238,7 +3240,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicXor>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transAtomicRMW(pSpvValue, AtomicRMWInst::Xor);
@@ -3253,7 +3255,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     SPIRVAtomicInstBase* const pSpvAtomicInst = static_cast<SPIRVAtomicInstBase*>(pSpvValue);
@@ -3263,12 +3265,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(
         static_cast<SPIRVConstant*>(pSpvAtomicInst->getOpValue(2)), true);
 
     Value* const pAtomicPointer = transValue(pSpvAtomicInst->getOpValue(0),
-                                             m_pBuilder->GetInsertBlock()->getParent(),
-                                             m_pBuilder->GetInsertBlock());
+                                             getBuilder()->GetInsertBlock()->getParent(),
+                                             getBuilder()->GetInsertBlock());
 
     Value* const pOne = ConstantInt::get(pAtomicPointer->getType()->getPointerElementType(), 1);
 
-    return m_pBuilder->CreateAtomicRMW(AtomicRMWInst::Add, pAtomicPointer, pOne, ordering, scope);
+    return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Add, pAtomicPointer, pOne, ordering, scope);
 }
 
 // =====================================================================================================================
@@ -3280,7 +3282,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     SPIRVAtomicInstBase* const pSpvAtomicInst = static_cast<SPIRVAtomicInstBase*>(pSpvValue);
@@ -3290,12 +3292,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(
         static_cast<SPIRVConstant*>(pSpvAtomicInst->getOpValue(2)), true);
 
     Value* const pAtomicPointer = transValue(pSpvAtomicInst->getOpValue(0),
-                                             m_pBuilder->GetInsertBlock()->getParent(),
-                                             m_pBuilder->GetInsertBlock());
+                                             getBuilder()->GetInsertBlock()->getParent(),
+                                             getBuilder()->GetInsertBlock());
 
     Value* const pOne = ConstantInt::get(pAtomicPointer->getType()->getPointerElementType(), 1);
 
-    return m_pBuilder->CreateAtomicRMW(AtomicRMWInst::Sub, pAtomicPointer, pOne, ordering, scope);
+    return getBuilder()->CreateAtomicRMW(AtomicRMWInst::Sub, pAtomicPointer, pOne, ordering, scope);
 }
 
 // =====================================================================================================================
@@ -3307,7 +3309,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     SPIRVAtomicInstBase* const pSpvAtomicInst = static_cast<SPIRVAtomicInstBase*>(pSpvValue);
@@ -3319,16 +3321,16 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
         static_cast<SPIRVConstant*>(pSpvAtomicInst->getOpValue(3)), true);
 
     Value* const pAtomicPointer = transValue(pSpvAtomicInst->getOpValue(0),
-                                             m_pBuilder->GetInsertBlock()->getParent(),
-                                             m_pBuilder->GetInsertBlock());
+                                             getBuilder()->GetInsertBlock()->getParent(),
+                                             getBuilder()->GetInsertBlock());
     Value* const pExchangeValue = transValue(pSpvAtomicInst->getOpValue(4),
-                                             m_pBuilder->GetInsertBlock()->getParent(),
-                                             m_pBuilder->GetInsertBlock());
+                                             getBuilder()->GetInsertBlock()->getParent(),
+                                             getBuilder()->GetInsertBlock());
     Value* const pCompareValue = transValue(pSpvAtomicInst->getOpValue(5),
-                                            m_pBuilder->GetInsertBlock()->getParent(),
-                                            m_pBuilder->GetInsertBlock());
+                                            getBuilder()->GetInsertBlock()->getParent(),
+                                            getBuilder()->GetInsertBlock());
 
-    AtomicCmpXchgInst* const pAtomicCmpXchg = m_pBuilder->CreateAtomicCmpXchg(pAtomicPointer,
+    AtomicCmpXchgInst* const pAtomicCmpXchg = getBuilder()->CreateAtomicCmpXchg(pAtomicPointer,
                                                                            pCompareValue,
                                                                            pExchangeValue,
                                                                            successOrdering,
@@ -3336,7 +3338,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
                                                                            scope);
 
     // LLVM cmpxchg returns { <ty>, i1 }, for SPIR-V we only care about the <ty>.
-    return m_pBuilder->CreateExtractValue(pAtomicCmpXchg, 0);
+    return getBuilder()->CreateExtractValue(pAtomicCmpXchg, 0);
 }
 
 // =====================================================================================================================
@@ -3348,7 +3350,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchangeWeak>
     if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
     {
         return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               m_pBuilder->GetInsertBlock());
+                                               getBuilder()->GetInsertBlock());
     }
 
     return transValueWithOpcode<OpAtomicCompareExchange>(pSpvValue);
@@ -3424,8 +3426,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
     bool isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
 
     Value* const pLoadPointer = transValue(pSpvCopyMemory->getSource(),
-                                           m_pBuilder->GetInsertBlock()->getParent(),
-                                           m_pBuilder->GetInsertBlock());
+                                           getBuilder()->GetInsertBlock()->getParent(),
+                                           getBuilder()->GetInsertBlock());
 
     SPIRVType* const pSpvLoadType = pSpvCopyMemory->getSource()->getType();
 
@@ -3436,8 +3438,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(
                                                 isNonTemporal);
 
     Value* const pStorePointer = transValue(pSpvCopyMemory->getTarget(),
-                                            m_pBuilder->GetInsertBlock()->getParent(),
-                                            m_pBuilder->GetInsertBlock());
+                                            getBuilder()->GetInsertBlock()->getParent(),
+                                            getBuilder()->GetInsertBlock());
 
     SPIRVType* const pSpvStoreType = pSpvCopyMemory->getTarget()->getType();
     isNonTemporal = pSpvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
@@ -3507,8 +3509,8 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
     const bool isNonTemporal = pSpvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
     Value* const pLoadPointer = transValue(pSpvLoad->getSrc(),
-                                           m_pBuilder->GetInsertBlock()->getParent(),
-                                           m_pBuilder->GetInsertBlock());
+                                           getBuilder()->GetInsertBlock()->getParent(),
+                                           getBuilder()->GetInsertBlock());
 
     SPIRVType* const pSpvLoadType = pSpvLoad->getSrc()->getType();
 
@@ -3535,9 +3537,9 @@ Value* SPIRVToLLVM::transLoadImage(
         Value* pSamplerPtr = pBase;
         if (typeOpcode == OpTypeSampledImage)
         {
-            pSamplerPtr = m_pBuilder->CreateExtractValue(pBase, 1);
+            pSamplerPtr = getBuilder()->CreateExtractValue(pBase, 1);
         }
-        pSampler = m_pBuilder->CreateLoadDescFromPtr(pSamplerPtr);
+        pSampler = getBuilder()->CreateLoadDescFromPtr(pSamplerPtr);
     }
 
     // Load the image.
@@ -3548,7 +3550,7 @@ Value* SPIRVToLLVM::transLoadImage(
         Value* pImagePtr = pBase;
         if (typeOpcode == OpTypeSampledImage)
         {
-            pImagePtr = m_pBuilder->CreateExtractValue(pBase, uint64_t(0));
+            pImagePtr = getBuilder()->CreateExtractValue(pBase, uint64_t(0));
             multisampled = static_cast<SPIRVTypeSampledImage*>(pSpvLoadedType)->getImageType()->getDescriptor().MS;
         }
         else
@@ -3560,17 +3562,17 @@ Value* SPIRVToLLVM::transLoadImage(
         {
             // For a multisampled image, the pointer is in fact a struct containing a normal image descriptor
             // pointer and an fmask descriptor pointer.
-            pImage = m_pBuilder->CreateLoadDescFromPtr(m_pBuilder->CreateExtractValue(pImagePtr, uint64_t(0)));
-            Value* pFmask = m_pBuilder->CreateLoadDescFromPtr(m_pBuilder->CreateExtractValue(pImagePtr, 1));
-            pImage = m_pBuilder->CreateInsertValue(
+            pImage = getBuilder()->CreateLoadDescFromPtr(getBuilder()->CreateExtractValue(pImagePtr, uint64_t(0)));
+            Value* pFmask = getBuilder()->CreateLoadDescFromPtr(getBuilder()->CreateExtractValue(pImagePtr, 1));
+            pImage = getBuilder()->CreateInsertValue(
                           UndefValue::get(StructType::get(*Context, { pImage->getType(), pFmask->getType() })),
                           pImage,
                           uint64_t(0));
-            pImage = m_pBuilder->CreateInsertValue(pImage, pFmask, 1);
+            pImage = getBuilder()->CreateInsertValue(pImage, pFmask, 1);
         }
         else
         {
-            pImage = m_pBuilder->CreateLoadDescFromPtr(pImagePtr);
+            pImage = getBuilder()->CreateLoadDescFromPtr(pImagePtr);
         }
     }
 
@@ -3585,8 +3587,8 @@ Value* SPIRVToLLVM::transLoadImage(
     }
 
     Value* pResult = UndefValue::get(StructType::get(*Context, { pImage->getType(), pSampler->getType() }));
-    pResult = m_pBuilder->CreateInsertValue(pResult, pImage, uint64_t(0));
-    pResult = m_pBuilder->CreateInsertValue(pResult, pSampler, 1);
+    pResult = getBuilder()->CreateInsertValue(pResult, pImage, uint64_t(0));
+    pResult = getBuilder()->CreateInsertValue(pResult, pSampler, 1);
     return pResult;
 }
 
@@ -3598,7 +3600,7 @@ Value* SPIRVToLLVM::transImagePointer(
     if ((pSpvImagePtr->getOpCode() != OpVariable) ||
         (static_cast<SPIRVTypePointer*>(pSpvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant))
     {
-        return transValue(pSpvImagePtr, m_pBuilder->GetInsertBlock()->getParent(), m_pBuilder->GetInsertBlock());
+        return transValue(pSpvImagePtr, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
     }
 
     // For an image/sampler/sampledimage pointer that is a UniformConstant OpVariable, we need to materialize it by
@@ -3616,7 +3618,7 @@ Value* SPIRVToLLVM::transImagePointer(
 
     if (pSpvImageTy->getOpCode() == OpTypeSampler)
     {
-        return m_pBuilder->CreateGetSamplerDescPtr(descriptorSet, binding);
+        return getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
     }
 
     bool isSampledImage = (pSpvImageTy->getOpCode() == OpTypeSampledImage);
@@ -3629,39 +3631,39 @@ Value* SPIRVToLLVM::transImagePointer(
     auto pDesc = &static_cast<SPIRVTypeImage*>(pSpvImageTy)->getDescriptor();
     if (pDesc->Dim == DimBuffer)
     {
-        pDescPtr = m_pBuilder->CreateGetTexelBufferDescPtr(descriptorSet, binding);
+        pDescPtr = getBuilder()->CreateGetTexelBufferDescPtr(descriptorSet, binding);
     }
     else
     {
-        pDescPtr = m_pBuilder->CreateGetImageDescPtr(descriptorSet, binding);
+        pDescPtr = getBuilder()->CreateGetImageDescPtr(descriptorSet, binding);
     }
 
     if (pDesc->MS)
     {
         // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-        Value* pFmaskDescPtr = m_pBuilder->CreateGetFmaskDescPtr(descriptorSet, binding);
-        pDescPtr = m_pBuilder->CreateInsertValue(UndefValue::get(StructType::get(*Context,
+        Value* pFmaskDescPtr = getBuilder()->CreateGetFmaskDescPtr(descriptorSet, binding);
+        pDescPtr = getBuilder()->CreateInsertValue(UndefValue::get(StructType::get(*Context,
                                                                                  {
                                                                                     pDescPtr->getType(),
                                                                                     pFmaskDescPtr->getType()
                                                                                  })),
                                                  pDescPtr,
                                                  uint64_t(0));
-        pDescPtr = m_pBuilder->CreateInsertValue(pDescPtr, pFmaskDescPtr, 1);
+        pDescPtr = getBuilder()->CreateInsertValue(pDescPtr, pFmaskDescPtr, 1);
     }
 
     if (isSampledImage)
     {
         // A sampledimage pointer is a struct containing the image pointer and the sampler desc pointer.
-        Value* pSamplerDescPtr = m_pBuilder->CreateGetSamplerDescPtr(descriptorSet, binding);
-        pDescPtr = m_pBuilder->CreateInsertValue(UndefValue::get(StructType::get(*Context,
+        Value* pSamplerDescPtr = getBuilder()->CreateGetSamplerDescPtr(descriptorSet, binding);
+        pDescPtr = getBuilder()->CreateInsertValue(UndefValue::get(StructType::get(*Context,
                                                                                  {
                                                                                     pDescPtr->getType(),
                                                                                     pSamplerDescPtr->getType()
                                                                                  })),
                                                  pDescPtr,
                                                  uint64_t(0));
-        pDescPtr = m_pBuilder->CreateInsertValue(pDescPtr, pSamplerDescPtr, 1);
+        pDescPtr = getBuilder()->CreateInsertValue(pDescPtr, pSamplerDescPtr, 1);
     }
 
     return pDescPtr;
@@ -3709,12 +3711,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
     const bool isNonTemporal = pSpvStore->SPIRVMemoryAccess::isNonTemporal(false);
 
     Value* const pStorePointer = transValue(pSpvStore->getDst(),
-                                            m_pBuilder->GetInsertBlock()->getParent(),
-                                            m_pBuilder->GetInsertBlock());
+                                            getBuilder()->GetInsertBlock()->getParent(),
+                                            getBuilder()->GetInsertBlock());
 
     Value* const pStoreValue = transValue(pSpvStore->getSrc(),
-                                          m_pBuilder->GetInsertBlock()->getParent(),
-                                          m_pBuilder->GetInsertBlock());
+                                          getBuilder()->GetInsertBlock()->getParent(),
+                                          getBuilder()->GetInsertBlock());
 
     SPIRVType* const pSpvStoreType = pSpvStore->getDst()->getType();
 
@@ -3734,7 +3736,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpStore>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndPrimitive>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    return m_pBuilder->CreateEndPrimitive(0);
+    return getBuilder()->CreateEndPrimitive(0);
 }
 
 // =====================================================================================================================
@@ -3744,7 +3746,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpEndStreamPrimitive>(
 {
     uint32_t streamId = static_cast<SPIRVConstant*>(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0))->
           getZExtIntValue();
-    return m_pBuilder->CreateEndPrimitive(streamId);
+    return getBuilder()->CreateEndPrimitive(streamId);
 }
 
 // =====================================================================================================================
@@ -3756,24 +3758,24 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
     SPIRVValue* const pSpvStruct = pSpvArrayLength->getStruct();
     LLPC_ASSERT(pSpvStruct->getType()->isTypePointer());
 
-    Value* const pStruct = transValue(pSpvStruct, m_pBuilder->GetInsertBlock()->getParent(), m_pBuilder->GetInsertBlock());
+    Value* const pStruct = transValue(pSpvStruct, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
     LLPC_ASSERT(pStruct->getType()->isPointerTy() && pStruct->getType()->getPointerElementType()->isStructTy());
 
     const uint32_t memberIndex = pSpvArrayLength->getMemberIndex();
     const uint32_t remappedMemberIndex = lookupRemappedTypeElements(pSpvStruct->getType()->getPointerElementType(),
                                                                     memberIndex);
 
-    Value* const pBufferLength = m_pBuilder->CreateGetBufferDescLength(pStruct);
+    Value* const pBufferLength = getBuilder()->CreateGetBufferDescLength(pStruct);
 
     StructType* const pStructType = cast<StructType>(pStruct->getType()->getPointerElementType());
     const StructLayout* const pStructLayout = M->getDataLayout().getStructLayout(pStructType);
     const uint32_t offset = static_cast<uint32_t>(pStructLayout->getElementOffset(remappedMemberIndex));
-    Value* const pOffset = m_pBuilder->getInt32(offset);
+    Value* const pOffset = getBuilder()->getInt32(offset);
 
     Type* const pMemberType = pStructType->getStructElementType(remappedMemberIndex)->getArrayElementType();
     const uint32_t stride = static_cast<uint32_t>(M->getDataLayout().getTypeSizeInBits(pMemberType) / 8);
 
-    return m_pBuilder->CreateUDiv(m_pBuilder->CreateSub(pBufferLength, pOffset), m_pBuilder->getInt32(stride));
+    return getBuilder()->CreateUDiv(getBuilder()->CreateSub(pBufferLength, pOffset), getBuilder()->getInt32(stride));
 }
 
 // =====================================================================================================================
@@ -3807,13 +3809,13 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
 
     // Non-image-related handling.
     Value* const pBase = transValue(pSpvAccessChain->getBase(),
-                                    m_pBuilder->GetInsertBlock()->getParent(),
-                                    m_pBuilder->GetInsertBlock());
+                                    getBuilder()->GetInsertBlock()->getParent(),
+                                    getBuilder()->GetInsertBlock());
     auto indices = transValue(pSpvAccessChain->getIndices(),
-                              m_pBuilder->GetInsertBlock()->getParent(),
-                              m_pBuilder->GetInsertBlock());
+                              getBuilder()->GetInsertBlock()->getParent(),
+                              getBuilder()->GetInsertBlock());
 
-    truncConstantIndex(indices, m_pBuilder->GetInsertBlock());
+    truncConstantIndex(indices, getBuilder()->GetInsertBlock());
 
     if (pSpvAccessChain->hasPtrIndex() == false)
     {
@@ -3866,7 +3868,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
                         const uint64_t remappedMemberIndex = lookupRemappedTypeElements(pSpvAccessType, memberIndex);
 
                         // Replace the original index with the new remapped one.
-                        indices[i] = m_pBuilder->getInt32(remappedMemberIndex);
+                        indices[i] = getBuilder()->getInt32(remappedMemberIndex);
                     }
 
                     // If the struct member was actually overlapping another struct member, we need a split here.
@@ -3889,7 +3891,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
                 {
                     // If we have padding in an array, we inserted a struct to add that
                     // padding, and so we need an extra constant 0 index.
-                    indices.insert(indices.begin() + i + 1, m_pBuilder->getInt32(0));
+                    indices.insert(indices.begin() + i + 1, getBuilder()->getInt32(0));
 
                     // Skip past the new idx we just added.
                     i++;
@@ -3917,7 +3919,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
                 else if (pIndexedType->getArrayElementType()->isStructTy())
                 {
                     // If the type of the element is a struct we had to add padding to align, so need a further index.
-                    indices.insert(indices.begin() + i + 1, m_pBuilder->getInt32(0));
+                    indices.insert(indices.begin() + i + 1, getBuilder()->getInt32(0));
 
                     // Skip past the new idx we just added.
                     i++;
@@ -3968,11 +3970,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
             // Get the pointer to our row major matrix first.
             if (pSpvAccessChain->isInBounds())
             {
-                pNewBase = m_pBuilder->CreateInBoundsGEP(pNewBase, frontIndices);
+                pNewBase = getBuilder()->CreateInBoundsGEP(pNewBase, frontIndices);
             }
             else
             {
-                pNewBase = m_pBuilder->CreateGEP(pNewBase, frontIndices);
+                pNewBase = getBuilder()->CreateGEP(pNewBase, frontIndices);
             }
 
             // Matrix splits are identified by having a nullptr as the .second of the pair.
@@ -3983,14 +3985,14 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
             else
             {
                 Type* const pBitCastType = split.second->getPointerTo(pNewBase->getType()->getPointerAddressSpace());
-                pNewBase = m_pBuilder->CreateBitCast(pNewBase, pBitCastType);
+                pNewBase = getBuilder()->CreateBitCast(pNewBase, pBitCastType);
             }
 
             // Lastly we remove the indices that we have already processed from the list of indices.
             uint32_t index = 0;
 
             // Always need at least a single index in back.
-            indices[index++] = m_pBuilder->getInt32(0);
+            indices[index++] = getBuilder()->getInt32(0);
 
             for (Value* const pIndex : indexArray.slice(split.first))
             {
@@ -4003,22 +4005,22 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
         // Do the final index if we have one.
         if (pSpvAccessChain->isInBounds())
         {
-            return m_pBuilder->CreateInBoundsGEP(pNewBase, indices);
+            return getBuilder()->CreateInBoundsGEP(pNewBase, indices);
         }
         else
         {
-            return m_pBuilder->CreateGEP(pNewBase, indices);
+            return getBuilder()->CreateGEP(pNewBase, indices);
         }
     }
     else
     {
         if (pSpvAccessChain->isInBounds())
         {
-            return m_pBuilder->CreateInBoundsGEP(pBase, indices);
+            return getBuilder()->CreateInBoundsGEP(pBase, indices);
         }
         else
         {
-            return m_pBuilder->CreateGEP(pBase, indices);
+            return getBuilder()->CreateGEP(pBase, indices);
         }
     }
 }
@@ -4039,22 +4041,22 @@ Value* SPIRVToLLVM::transOpAccessChainForImage(
     }
 
     bool isNonUniform = spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
-    Value* pIndex = transValue(spvIndices[0], m_pBuilder->GetInsertBlock()->getParent(), m_pBuilder->GetInsertBlock());
+    Value* pIndex = transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
     spvIndices = spvIndices.slice(1);
     pSpvElementType = pSpvElementType->getArrayElementType();
 
     while (pSpvElementType->getOpCode() == OpTypeArray)
     {
-        pIndex = m_pBuilder->CreateMul(pIndex,
-                                       m_pBuilder->getInt32(static_cast<SPIRVTypeArray*>(pSpvElementType)
+        pIndex = getBuilder()->CreateMul(pIndex,
+                                       getBuilder()->getInt32(static_cast<SPIRVTypeArray*>(pSpvElementType)
                                                                 ->getLength()->getZExtIntValue()));
         if (spvIndices.empty() == false)
         {
             isNonUniform |= spvIndices[0]->hasDecorate(DecorationNonUniformEXT);
-            pIndex = m_pBuilder->CreateAdd(pIndex,
+            pIndex = getBuilder()->CreateAdd(pIndex,
                                            transValue(spvIndices[0],
-                                                      m_pBuilder->GetInsertBlock()->getParent(),
-                                                      m_pBuilder->GetInsertBlock()));
+                                                      getBuilder()->GetInsertBlock()->getParent(),
+                                                      getBuilder()->GetInsertBlock()));
             spvIndices = spvIndices.slice(1);
         }
         pSpvElementType = pSpvElementType->getArrayElementType();
@@ -4081,8 +4083,8 @@ Value* SPIRVToLLVM::indexDescPtr(
             ((typeOpcode == OpTypeImage) && static_cast<SPIRVTypeImage*>(pSpvElementType)->getDescriptor().MS))
         {
             // These are the two cases that the pointer is in fact a structure containing two pointers.
-            Value* pPtr0 = m_pBuilder->CreateExtractValue(pBase, uint64_t(0));
-            Value* pPtr1 = m_pBuilder->CreateExtractValue(pBase, 1);
+            Value* pPtr0 = getBuilder()->CreateExtractValue(pBase, uint64_t(0));
+            Value* pPtr1 = getBuilder()->CreateExtractValue(pBase, 1);
             SPIRVType* pSpvElementType0 = nullptr;
             if (typeOpcode == OpTypeSampledImage)
             {
@@ -4096,13 +4098,13 @@ Value* SPIRVToLLVM::indexDescPtr(
                                  pIndex,
                                  isNonUniform,
                                  nullptr);
-            pBase = m_pBuilder->CreateInsertValue(UndefValue::get(pBase->getType()), pPtr0, uint64_t(0));
-            pBase = m_pBuilder->CreateInsertValue(pBase, pPtr1, 1);
+            pBase = getBuilder()->CreateInsertValue(UndefValue::get(pBase->getType()), pPtr0, uint64_t(0));
+            pBase = getBuilder()->CreateInsertValue(pBase, pPtr1, 1);
             return pBase;
         }
     }
 
-    return m_pBuilder->CreateIndexDescPtr(pBase, pIndex, isNonUniform);
+    return getBuilder()->CreateIndexDescPtr(pBase, pIndex, isNonUniform);
 }
 
 // =====================================================================================================================
@@ -4135,9 +4137,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpImage>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     Value* pSampledImage = transValue(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0),
-                                      m_pBuilder->GetInsertBlock()->getParent(),
-                                      m_pBuilder->GetInsertBlock());
-    return m_pBuilder->CreateExtractValue(pSampledImage, uint64_t(0));
+                                      getBuilder()->GetInsertBlock()->getParent(),
+                                      getBuilder()->GetInsertBlock());
+    return getBuilder()->CreateExtractValue(pSampledImage, uint64_t(0));
 }
 
 // =====================================================================================================================
@@ -4146,15 +4148,15 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
     Value* pImage = transValue(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(0),
-                               m_pBuilder->GetInsertBlock()->getParent(),
-                               m_pBuilder->GetInsertBlock());
+                               getBuilder()->GetInsertBlock()->getParent(),
+                               getBuilder()->GetInsertBlock());
     Value* pSampler = transValue(static_cast<SPIRVInstTemplateBase*>(pSpvValue)->getOpValue(1),
-                                 m_pBuilder->GetInsertBlock()->getParent(),
-                                 m_pBuilder->GetInsertBlock());
+                                 getBuilder()->GetInsertBlock()->getParent(),
+                                 getBuilder()->GetInsertBlock());
 
     Value* pResult = UndefValue::get(StructType::get(*Context, { pImage->getType(), pSampler->getType() }));
-    pResult = m_pBuilder->CreateInsertValue(pResult, pImage, uint64_t(0));
-    pResult = m_pBuilder->CreateInsertValue(pResult, pSampler, 1);
+    pResult = getBuilder()->CreateInsertValue(pResult, pImage, uint64_t(0));
+    pResult = getBuilder()->CreateInsertValue(pResult, pSampler, 1);
     return pResult;
 }
 
@@ -4163,19 +4165,19 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    Value* const pKill = m_pBuilder->CreateKill();
+    Value* const pKill = getBuilder()->CreateKill();
 
     // NOTE: In SPIR-V, "OpKill" is considered as a valid instruction to terminate blocks. But in LLVM, we have to
     // insert a dummy "return" instruction as block terminator.
-    if (m_pBuilder->getCurrentFunctionReturnType()->isVoidTy())
+    if (getBuilder()->getCurrentFunctionReturnType()->isVoidTy())
     {
         // No return value
-        m_pBuilder->CreateRetVoid();
+        getBuilder()->CreateRetVoid();
     }
     else
     {
         // Function returns value
-        m_pBuilder->CreateRet(UndefValue::get(m_pBuilder->getCurrentFunctionReturnType()));
+        getBuilder()->CreateRet(UndefValue::get(getBuilder()->getCurrentFunctionReturnType()));
     }
 
     return pKill;
@@ -4191,13 +4193,13 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
     const spv::Scope scope = static_cast<spv::Scope>(pSpvScope->getZExtIntValue());
     LLPC_ASSERT((scope == spv::ScopeDevice) || (scope == spv::ScopeWorkgroup));
 
-    Value* const pReadClock = m_pBuilder->CreateReadClock(scope == spv::ScopeDevice);
+    Value* const pReadClock = getBuilder()->CreateReadClock(scope == spv::ScopeDevice);
 
     SPIRVType* const pSpvType = pSpvInst->getType();
     if (pSpvType->isTypeVectorInt(32))
     {
         LLPC_ASSERT(pSpvType->getVectorComponentCount() == 2); // Must be uvec2
-        return m_pBuilder->CreateBitCast(pReadClock, transType(pSpvType)); // uint64 -> uvec2
+        return getBuilder()->CreateBitCast(pReadClock, transType(pSpvType)); // uint64 -> uvec2
     }
     else
     {
@@ -4215,10 +4217,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAll>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate);
+    return getBuilder()->CreateSubgroupAll(pPredicate);
 }
 
 // =====================================================================================================================
@@ -4230,10 +4232,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAny>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate);
+    return getBuilder()->CreateSubgroupAny(pPredicate);
 }
 
 // =====================================================================================================================
@@ -4245,11 +4247,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupBroadcast>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pId = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBroadcast(pValue, pId);
+    return getBuilder()->CreateSubgroupBroadcast(pValue, pId);
 }
 
 // =====================================================================================================================
@@ -4321,7 +4323,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupFMax>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    return m_pBuilder->CreateSubgroupElect();
+    return getBuilder()->CreateSubgroupElect();
 }
 
 // =====================================================================================================================
@@ -4333,10 +4335,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
+    return getBuilder()->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4348,10 +4350,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
+    return getBuilder()->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4363,10 +4365,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
+    return getBuilder()->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4378,11 +4380,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pIndex = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBroadcast(pValue, pIndex);
+    return getBuilder()->CreateSubgroupBroadcast(pValue, pIndex);
 }
 
 // =====================================================================================================================
@@ -4394,10 +4396,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFi
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBroadcastFirst(pValue);
+    return getBuilder()->CreateSubgroupBroadcastFirst(pValue);
 }
 
 // =====================================================================================================================
@@ -4409,10 +4411,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBallot(pPredicate);
+    return getBuilder()->CreateSubgroupBallot(pPredicate);
 }
 
 // =====================================================================================================================
@@ -4424,10 +4426,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBall
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupInverseBallot(pValue);
+    return getBuilder()->CreateSubgroupInverseBallot(pValue);
 }
 
 // =====================================================================================================================
@@ -4439,11 +4441,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitEx
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pIndex = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBallotBitExtract(pValue, pIndex);
+    return getBuilder()->CreateSubgroupBallotBitExtract(pValue, pIndex);
 }
 
 // =====================================================================================================================
@@ -4455,18 +4457,18 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCo
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[2], pFunc, pBlock);
 
     switch (static_cast<SPIRVConstant*>(spvOperands[1])->getZExtIntValue())
     {
     case GroupOperationReduce:
-        return m_pBuilder->CreateSubgroupBallotBitCount(pValue);
+        return getBuilder()->CreateSubgroupBallotBitCount(pValue);
     case GroupOperationInclusiveScan:
-        return m_pBuilder->CreateSubgroupBallotInclusiveBitCount(pValue);
+        return getBuilder()->CreateSubgroupBallotInclusiveBitCount(pValue);
     case GroupOperationExclusiveScan:
-        return m_pBuilder->CreateSubgroupBallotExclusiveBitCount(pValue);
+        return getBuilder()->CreateSubgroupBallotExclusiveBitCount(pValue);
     default:
         LLPC_NEVER_CALLED();
         return nullptr;
@@ -4482,10 +4484,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindL
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBallotFindLsb(pValue);
+    return getBuilder()->CreateSubgroupBallotFindLsb(pValue);
 }
 
 // =====================================================================================================================
@@ -4497,10 +4499,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindM
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBallotFindMsb(pValue);
+    return getBuilder()->CreateSubgroupBallotFindMsb(pValue);
 }
 
 // =====================================================================================================================
@@ -4512,11 +4514,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pIndex = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupShuffle(pValue, pIndex);
+    return getBuilder()->CreateSubgroupShuffle(pValue, pIndex);
 }
 
 // =====================================================================================================================
@@ -4528,11 +4530,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pMask = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupShuffleXor(pValue, pMask);
+    return getBuilder()->CreateSubgroupShuffleXor(pValue, pMask);
 }
 
 // =====================================================================================================================
@@ -4544,11 +4546,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pDelta = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupShuffleUp(pValue, pDelta);
+    return getBuilder()->CreateSubgroupShuffleUp(pValue, pDelta);
 }
 
 // =====================================================================================================================
@@ -4560,11 +4562,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pDelta = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupShuffleDown(pValue, pDelta);
+    return getBuilder()->CreateSubgroupShuffleDown(pValue, pDelta);
 }
 
 // =====================================================================================================================
@@ -4577,21 +4579,21 @@ Value* SPIRVToLLVM::transGroupArithOp(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
 
     Value* const pValue = transValue(spvOperands[2], pFunc, pBlock);
 
     switch (static_cast<SPIRVConstant*>(spvOperands[1])->getZExtIntValue())
     {
     case GroupOperationReduce:
-        return m_pBuilder->CreateSubgroupClusteredReduction(groupArithOp, pValue, m_pBuilder->CreateGetSubgroupSize());
+        return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, pValue, getBuilder()->CreateGetSubgroupSize());
     case GroupOperationInclusiveScan:
-        return m_pBuilder->CreateSubgroupClusteredInclusive(groupArithOp, pValue, m_pBuilder->CreateGetSubgroupSize());
+        return getBuilder()->CreateSubgroupClusteredInclusive(groupArithOp, pValue, getBuilder()->CreateGetSubgroupSize());
     case GroupOperationExclusiveScan:
-        return m_pBuilder->CreateSubgroupClusteredExclusive(groupArithOp, pValue, m_pBuilder->CreateGetSubgroupSize());
+        return getBuilder()->CreateSubgroupClusteredExclusive(groupArithOp, pValue, getBuilder()->CreateGetSubgroupSize());
     case GroupOperationClusteredReduce:
-        return m_pBuilder->CreateSubgroupClusteredReduction(groupArithOp,
+        return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp,
                                                          pValue,
                                                          transValue(spvOperands[3], pFunc, pBlock));
     default:
@@ -4737,11 +4739,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadBroadca
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
     Value* const pIndex = transValue(spvOperands[2], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupQuadBroadcast(pValue, pIndex);
+    return getBuilder()->CreateSubgroupQuadBroadcast(pValue, pIndex);
 }
 
 // =====================================================================================================================
@@ -4753,18 +4755,18 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadSwap>(
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[1], pFunc, pBlock);
 
     switch (static_cast<SPIRVConstant*>(spvOperands[2])->getZExtIntValue())
     {
     case 0:
-        return m_pBuilder->CreateSubgroupQuadSwapHorizontal(pValue);
+        return getBuilder()->CreateSubgroupQuadSwapHorizontal(pValue);
     case 1:
-        return m_pBuilder->CreateSubgroupQuadSwapVertical(pValue);
+        return getBuilder()->CreateSubgroupQuadSwapVertical(pValue);
     case 2:
-        return m_pBuilder->CreateSubgroupQuadSwapDiagonal(pValue);
+        return getBuilder()->CreateSubgroupQuadSwapDiagonal(pValue);
     default:
         LLPC_NEVER_CALLED();
         return nullptr;
@@ -4779,10 +4781,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupBallotKHR>(
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBallot(pPredicate);
+    return getBuilder()->CreateSubgroupBallot(pPredicate);
 }
 
 // =====================================================================================================================
@@ -4793,10 +4795,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupFirstInvocationKHR
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBroadcastFirst(pValue);
+    return getBuilder()->CreateSubgroupBroadcastFirst(pValue);
 }
 
 // =====================================================================================================================
@@ -4807,10 +4809,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
+    return getBuilder()->CreateSubgroupAll(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4821,10 +4823,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pPredicate = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
+    return getBuilder()->CreateSubgroupAny(pPredicate, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4835,10 +4837,10 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[0], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
+    return getBuilder()->CreateSubgroupAllEqual(pValue, ModuleData->useHelpInvocation);
 }
 
 // =====================================================================================================================
@@ -4849,11 +4851,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupReadInvocationKHR>
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pValue = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pIndex = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateSubgroupBroadcast(pValue, pIndex);
+    return getBuilder()->CreateSubgroupBroadcast(pValue, pIndex);
 }
 
 // =====================================================================================================================
@@ -4928,7 +4930,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
     SPIRVExtInst* const pSpvExtInst = static_cast<SPIRVExtInst*>(pSpvValue);
     std::vector<SPIRVValue*> spvArgValues = pSpvExtInst->getArgumentValues();
 
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
     Function* const pFunc = pBlock->getParent();
 
     switch (BM->getBuiltinSet(pSpvExtInst->getExtSetId()))
@@ -4937,17 +4939,17 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         switch (pSpvExtInst->getExtOp())
         {
         case SwizzleInvocationsAMD:
-            return m_pBuilder->CreateSubgroupSwizzleQuad(transValue(spvArgValues[0], pFunc, pBlock),
+            return getBuilder()->CreateSubgroupSwizzleQuad(transValue(spvArgValues[0], pFunc, pBlock),
                                                       transValue(spvArgValues[1], pFunc, pBlock));
         case SwizzleInvocationsMaskedAMD:
-            return m_pBuilder->CreateSubgroupSwizzleMask(transValue(spvArgValues[0], pFunc, pBlock),
+            return getBuilder()->CreateSubgroupSwizzleMask(transValue(spvArgValues[0], pFunc, pBlock),
                                                       transValue(spvArgValues[1], pFunc, pBlock));
         case WriteInvocationAMD:
-            return m_pBuilder->CreateSubgroupWriteInvocation(transValue(spvArgValues[0], pFunc, pBlock),
+            return getBuilder()->CreateSubgroupWriteInvocation(transValue(spvArgValues[0], pFunc, pBlock),
                                                           transValue(spvArgValues[1], pFunc, pBlock),
                                                           transValue(spvArgValues[2], pFunc, pBlock));
         case MbcntAMD:
-            return m_pBuilder->CreateSubgroupMbcnt(transValue(spvArgValues[0], pFunc, pBlock));
+            return getBuilder()->CreateSubgroupMbcnt(transValue(spvArgValues[0], pFunc, pBlock));
         default:
             LLPC_NEVER_CALLED();
             return nullptr;
@@ -5096,13 +5098,13 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
     if (storageClass == StorageClassFunction)
     {
-        LLPC_ASSERT(m_pBuilder->GetInsertBlock() != nullptr);
+        LLPC_ASSERT(getBuilder()->GetInsertBlock() != nullptr);
 
-        Value* const pVar = m_pBuilder->CreateAlloca(pVarType, nullptr, pSpvVar->getName());
+        Value* const pVar = getBuilder()->CreateAlloca(pVarType, nullptr, pSpvVar->getName());
 
         if (pInitializer != nullptr)
         {
-            m_pBuilder->CreateStore(pInitializer, pVar);
+            getBuilder()->CreateStore(pInitializer, pVar);
         }
 
         return pVar;
@@ -5207,9 +5209,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
     SPIRVInstTemplateBase* const pSpvTranpose = static_cast<SPIRVInstTemplateBase*>(pSpvValue);
 
     Value* const pMatrix = transValue(pSpvTranpose->getOpValue(0),
-                                      m_pBuilder->GetInsertBlock()->getParent(),
-                                      m_pBuilder->GetInsertBlock());
-    return m_pBuilder->CreateTransposeMatrix(pMatrix);
+                                      getBuilder()->GetInsertBlock()->getParent(),
+                                      getBuilder()->GetInsertBlock());
+    return getBuilder()->CreateTransposeMatrix(pMatrix);
 }
 
 // =====================================================================================================================
@@ -5219,11 +5221,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pMatrix = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pScalar = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateMatrixTimesScalar(pMatrix, pScalar);
+    return getBuilder()->CreateMatrixTimesScalar(pMatrix, pScalar);
 }
 
 // =====================================================================================================================
@@ -5233,11 +5235,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVectorTimesMatrix>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pVector = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pMatrix = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateVectorTimesMatrix(pVector, pMatrix);
+    return getBuilder()->CreateVectorTimesMatrix(pVector, pMatrix);
 }
 
 // =====================================================================================================================
@@ -5247,11 +5249,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesVector>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pMatrix = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pVector = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateMatrixTimesVector(pMatrix, pVector);
+    return getBuilder()->CreateMatrixTimesVector(pMatrix, pVector);
 }
 
 // =====================================================================================================================
@@ -5261,11 +5263,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesMatrix>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pMatrix1 = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pMatrix2 = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateMatrixTimesMatrix(pMatrix1, pMatrix2);
+    return getBuilder()->CreateMatrixTimesMatrix(pMatrix1, pMatrix2);
 }
 
 // =====================================================================================================================
@@ -5275,11 +5277,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pVector1 = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pVector2 = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateOuterProduct(pVector1, pVector2);
+    return getBuilder()->CreateOuterProduct(pVector1, pVector2);
 }
 
 // =====================================================================================================================
@@ -5289,11 +5291,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDot>(
 {
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
-    BasicBlock* const pBlock = m_pBuilder->GetInsertBlock();
-    Function* const pFunc = m_pBuilder->GetInsertBlock()->getParent();
+    BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
+    Function* const pFunc = getBuilder()->GetInsertBlock()->getParent();
     Value* const pVector1 = transValue(spvOperands[0], pFunc, pBlock);
     Value* const pVector2 = transValue(spvOperands[1], pFunc, pBlock);
-    return m_pBuilder->CreateDotProduct(pVector1, pVector2);
+    return getBuilder()->CreateDotProduct(pVector1, pVector2);
 }
 
 /// For instructions, this function assumes they are created in order
@@ -5309,6 +5311,11 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDot>(
 Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                                                 BasicBlock *BB,
                                                 bool CreatePlaceHolder) {
+
+  if (BB) {
+    getBuilder()->SetInsertPoint(BB);
+    updateBuilderDebugLoc(BV, F);
+  }
 
   auto OC = BV->getOpCode();
   IntBoolOpMap::rfind(OC, &OC);
@@ -5456,8 +5463,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, BasicBlock::Create(*Context, BV->getName(), F));
 
 #define HANDLE_OPCODE(op) case (op): \
-  m_pBuilder->SetInsertPoint(BB); \
-  updateBuilderDebugLoc(BV, F); \
   return mapValue(BV, transValueWithOpcode<op>(BV))
 
   HANDLE_OPCODE(OpVariable);
@@ -5864,8 +5869,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   case OpFunctionCall: {
-    m_pBuilder->SetInsertPoint(BB);
-    updateBuilderDebugLoc(BV, F);
     SPIRVFunctionCall *BC = static_cast<SPIRVFunctionCall *>(BV);
     SmallVector<Value *, 8> Args;
     for (SPIRVValue *BArg : BC->getArgumentValues()) {
@@ -6052,24 +6055,21 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
             BB));
 
   case OpImageSparseTexelsResident: {
-    m_pBuilder->SetInsertPoint(BB);
-    updateBuilderDebugLoc(BV, F);
     SPIRVImageSparseTexelsResident *BI = static_cast<SPIRVImageSparseTexelsResident *>(BV);
     auto ResidentCode = transValue(BI->getResidentCode(), F, BB);
-    return mapValue(BV, m_pBuilder->CreateICmpEQ(ResidentCode, m_pBuilder->getInt32(0)));
+    return mapValue(BV, getBuilder()->CreateICmpEQ(ResidentCode, getBuilder()->getInt32(0)));
   }
 #if SPV_VERSION >= 0x10400
   case OpPtrDiff: {
     SPIRVBinary *const BI = static_cast<SPIRVBinary *>(BV);
     Value *const Op1 = transValue(BI->getOpValue(0),
-                                  m_pBuilder->GetInsertBlock()->getParent(),
-                                  m_pBuilder->GetInsertBlock());
+                                  getBuilder()->GetInsertBlock()->getParent(),
+                                  getBuilder()->GetInsertBlock());
     Value *const Op2 = transValue(BI->getOpValue(1),
-                                  m_pBuilder->GetInsertBlock()->getParent(),
-                                  m_pBuilder->GetInsertBlock());
+                                  getBuilder()->GetInsertBlock()->getParent(),
+                                  getBuilder()->GetInsertBlock());
 
-    m_pBuilder->SetInsertPoint(BB);
-    Value *PtrDiff = m_pBuilder->CreatePtrDiff(Op1, Op2);
+    Value *PtrDiff = getBuilder()->CreatePtrDiff(Op1, Op2);
 
     auto DestType = dyn_cast<IntegerType>(transType(BV->getType()));
     auto PtrDiffType = dyn_cast<IntegerType>(PtrDiff->getType());
@@ -6084,7 +6084,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return nullptr;
 
 #define HANDLE_OPCODE(op) case (op): \
-  m_pBuilder->SetInsertPoint(BB); \
+  getBuilder()->SetInsertPoint(BB); \
   updateBuilderDebugLoc(BV, F); \
   return mapValue(BV, transValueWithOpcode<op>(BV))
 
@@ -6796,7 +6796,7 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
     if (isa<StructType>(Info->ImageDesc->getType())) {
       // Extract image descriptor from struct containing image+fmask descs.
       Info->ImageDesc =
-          m_pBuilder->CreateExtractValue(Info->ImageDesc, uint64_t(0));
+          getBuilder()->CreateExtractValue(Info->ImageDesc, uint64_t(0));
     }
     // We also need to trace back to the OpVariable or OpFunctionParam to find
     // the coherent and volatile decorations.
@@ -6838,15 +6838,15 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
 
   // Get the IR value for the image/sampledimage.
   Value *Desc =
-      transValue(BImageInst, m_pBuilder->GetInsertBlock()->getParent(),
-                 m_pBuilder->GetInsertBlock());
+      transValue(BImageInst, getBuilder()->GetInsertBlock()->getParent(),
+                 getBuilder()->GetInsertBlock());
 
   SPIRVType *BImageTy = BImageInst->getType();
   if (BImageTy->getOpCode() == OpTypeSampledImage) {
     // For a sampledimage, the IR value is a struct containing the image and the
     // sampler.
-    Info->SamplerDesc = m_pBuilder->CreateExtractValue(Desc, 1);
-    Desc = m_pBuilder->CreateExtractValue(Desc, uint64_t(0));
+    Info->SamplerDesc = getBuilder()->CreateExtractValue(Desc, 1);
+    Desc = getBuilder()->CreateExtractValue(Desc, uint64_t(0));
     BImageTy = static_cast<SPIRVTypeSampledImage *>(BImageTy)->getImageType();
   }
   assert(BImageTy->getOpCode() == OpTypeImage);
@@ -6856,8 +6856,8 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
   if (Info->Desc->MS) {
     // For a multisampled image, the IR value is a struct containing the image
     // descriptor and the fmask descriptor.
-    Info->FmaskDesc = m_pBuilder->CreateExtractValue(Desc, 1);
-    Desc = m_pBuilder->CreateExtractValue(Desc, uint64_t(0));
+    Info->FmaskDesc = getBuilder()->CreateExtractValue(Desc, 1);
+    Desc = getBuilder()->CreateExtractValue(Desc, uint64_t(0));
   }
   Info->ImageDesc = Desc;
 }
@@ -6884,14 +6884,14 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
   // Also handle the extra projective component if any.
   Value *Coord = Addr[Llpc::Builder::ImageAddressIdxCoordinate];
   if (auto CoordVecTy = dyn_cast<VectorType>(Coord->getType())) {
-    unsigned NumCoords = m_pBuilder->GetImageNumCoords(ImageInfo->Dim);
+    unsigned NumCoords = getBuilder()->GetImageNumCoords(ImageInfo->Dim);
     if (HasProj) {
       Addr[Llpc::Builder::ImageAddressIdxProjective] =
-          m_pBuilder->CreateExtractElement(Coord, NumCoords);
+          getBuilder()->CreateExtractElement(Coord, NumCoords);
     }
     if (NumCoords < CoordVecTy->getNumElements()) {
       static const unsigned Indexes[] = {0, 1, 2, 3};
-      Coord = m_pBuilder->CreateShuffleVector(
+      Coord = getBuilder()->CreateShuffleVector(
           Coord, Coord, ArrayRef<unsigned>(Indexes).slice(0, NumCoords));
       Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
     }
@@ -6899,7 +6899,7 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *BI,
 
   // Extra image operands. These need to be in ascending order so they take
   // their operands in the right order.
-  BasicBlock *BB = m_pBuilder->GetInsertBlock();
+  BasicBlock *BB = getBuilder()->GetInsertBlock();
   ArrayRef<SPIRVWord> ImageOpnds =
       ArrayRef<SPIRVWord>(
           static_cast<SPIRVInstTemplateBase *>(BI)->getOpWords())
@@ -7036,17 +7036,17 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
   if (auto Offset = Addr[Llpc::Builder::ImageAddressIdxOffset]) {
     if (isa<VectorType>(Coord->getType())) {
       if (!isa<VectorType>(Offset->getType())) {
-        Offset = m_pBuilder->CreateInsertElement(
+        Offset = getBuilder()->CreateInsertElement(
             Constant::getNullValue(Coord->getType()), Offset, uint64_t(0));
       } else if (Coord->getType()->getVectorNumElements() !=
                  Offset->getType()->getVectorNumElements()) {
-        Offset = m_pBuilder->CreateShuffleVector(
+        Offset = getBuilder()->CreateShuffleVector(
             Offset, Constant::getNullValue(Offset->getType()),
             ArrayRef<unsigned>({0, 1, 2, 3})
                 .slice(0, Coord->getType()->getVectorNumElements()));
       }
     }
-    Coord = m_pBuilder->CreateAdd(Coord, Offset);
+    Coord = getBuilder()->CreateAdd(Coord, Offset);
   }
 
   if (ImageInfo->Desc->Dim == DimSubpassData) {
@@ -7067,14 +7067,14 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
   if (ImageInfo->Dim == Llpc::Builder::DimCubeArray) {
     SmallVector<Value *, 4> Components;
     for (unsigned I = 0; I != 3; ++I)
-      Components.push_back(m_pBuilder->CreateExtractElement(Coord, I));
+      Components.push_back(getBuilder()->CreateExtractElement(Coord, I));
     Components.push_back(
-        m_pBuilder->CreateUDiv(Components[2], m_pBuilder->getInt32(6)));
+        getBuilder()->CreateUDiv(Components[2], getBuilder()->getInt32(6)));
     Components[2] =
-        m_pBuilder->CreateURem(Components[2], m_pBuilder->getInt32(6));
-    Coord = UndefValue::get(VectorType::get(m_pBuilder->getInt32Ty(), 4));
+        getBuilder()->CreateURem(Components[2], getBuilder()->getInt32(6));
+    Coord = UndefValue::get(VectorType::get(getBuilder()->getInt32Ty(), 4));
     for (unsigned I = 0; I != 4; ++I)
-      Coord = m_pBuilder->CreateInsertElement(Coord, Components[I], I);
+      Coord = getBuilder()->CreateInsertElement(Coord, Components[I], I);
   }
 
   Addr[Llpc::Builder::ImageAddressIdxCoordinate] = Coord;
@@ -7085,9 +7085,6 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *BI,
 // Translate OpFragmentFetchAMD to LLVM IR
 Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
                                                     BasicBlock *BB) {
-
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
 
   // Get image type descriptor and load resource descriptor.
   ExtractedImageInfo ImageInfo = {BB};
@@ -7113,19 +7110,19 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
   // we must supply as an extra coordinate.
   Value *FragId = transValue(BII->getOpValue(2), BB->getParent(), BB);
   Value *NewCoord = UndefValue::get(
-      VectorType::get(m_pBuilder->getInt32Ty(), 3 + ImageInfo.Desc->Arrayed));
+      VectorType::get(getBuilder()->getInt32Ty(), 3 + ImageInfo.Desc->Arrayed));
   for (unsigned i = 0; i != 2 + ImageInfo.Desc->Arrayed; ++i) {
-    NewCoord = m_pBuilder->CreateInsertElement(
-        NewCoord, m_pBuilder->CreateExtractElement(Coord, i), i);
+    NewCoord = getBuilder()->CreateInsertElement(
+        NewCoord, getBuilder()->CreateExtractElement(Coord, i), i);
   }
-  Coord = m_pBuilder->CreateInsertElement(NewCoord, FragId,
+  Coord = getBuilder()->CreateInsertElement(NewCoord, FragId,
                                           2 + ImageInfo.Desc->Arrayed);
 
   // Get the return type for the Builder method.
   Type *ResultTy = transType(BII->getType());
 
   // Create the image load.
-  return m_pBuilder->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
+  return getBuilder()->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
                                      ImageInfo.ImageDesc, Coord, nullptr);
 }
 
@@ -7133,9 +7130,6 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
 // Translate OpFragmentMaskFetchAMD to LLVM IR
 Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *BI,
                                                         BasicBlock *BB) {
-
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
 
   // Get image type descriptor and fmask descriptor.
   ExtractedImageInfo ImageInfo = {BB};
@@ -7163,18 +7157,15 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *BI,
 
   // Create the image load.
   Value *Result =
-      m_pBuilder->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
+      getBuilder()->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
                                   ImageInfo.FmaskDesc, Coord, nullptr);
-  return m_pBuilder->CreateExtractElement(Result, uint64_t(0));
+  return getBuilder()->CreateExtractElement(Result, uint64_t(0));
 }
 
 // =============================================================================
 // Translate SPIR-V image atomic operations to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
                                                     BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Parse the operands.
   unsigned OpndIdx = 0;
   auto BIT = static_cast<SPIRVInstTemplateBase *>(BI);
@@ -7210,7 +7201,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
 
   // For a multi-sampled image, put the sample ID on the end.
   if (ImageInfo.Desc->MS) {
-    SampleNum = m_pBuilder->CreateInsertElement(
+    SampleNum = getBuilder()->CreateInsertElement(
         UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
     SmallVector<unsigned, 4> Idxs;
     Idxs.push_back(0);
@@ -7218,7 +7209,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
     if (ImageInfo.Desc->Arrayed)
       Idxs.push_back(2);
     Idxs.push_back(Coord->getType()->getVectorNumElements());
-    Coord = m_pBuilder->CreateShuffleVector(Coord, SampleNum, Idxs);
+    Coord = getBuilder()->CreateShuffleVector(Coord, SampleNum, Idxs);
   }
 
   // Handle fetch/read/write/atomic aspects of coordinate. (This separates the
@@ -7254,7 +7245,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
   switch (BI->getOpCode()) {
   case OpAtomicCompareExchange:
   case OpAtomicCompareExchangeWeak:
-    Result = m_pBuilder->CreateImageAtomicCompareSwap(
+    Result = getBuilder()->CreateImageAtomicCompareSwap(
         ImageInfo.Dim, ImageInfo.Flags, Ordering, ImageInfo.ImageDesc, Coord,
         InputData, Comparator);
     break;
@@ -7265,15 +7256,15 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
     break;
   case OpAtomicLoad:
     AtomicOp = Llpc::Builder::ImageAtomicAdd;
-    InputData = m_pBuilder->getInt32(0);
+    InputData = getBuilder()->getInt32(0);
     break;
   case OpAtomicIIncrement:
     AtomicOp = Llpc::Builder::ImageAtomicAdd;
-    InputData = m_pBuilder->getInt32(1);
+    InputData = getBuilder()->getInt32(1);
     break;
   case OpAtomicIDecrement:
     AtomicOp = Llpc::Builder::ImageAtomicSub;
-    InputData = m_pBuilder->getInt32(1);
+    InputData = getBuilder()->getInt32(1);
     break;
   case OpAtomicIAdd:
     AtomicOp = Llpc::Builder::ImageAtomicAdd;
@@ -7309,7 +7300,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
   }
 
   if (!Result) {
-    Result = m_pBuilder->CreateImageAtomic(
+    Result = getBuilder()->CreateImageAtomic(
         AtomicOp, ImageInfo.Dim, ImageInfo.Flags, Ordering, ImageInfo.ImageDesc,
         Coord, InputData);
   }
@@ -7320,9 +7311,6 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
 // Translate image sample to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
                                                   BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource and sampler descriptors.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
@@ -7335,7 +7323,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
   Type *ResultTy = OrigResultTy;
   if (auto StructResultTy = dyn_cast<StructType>(ResultTy)) {
     ResultTy = StructType::get(
-        m_pBuilder->getContext(),
+        getBuilder()->getContext(),
         {StructResultTy->getElementType(1), StructResultTy->getElementType(0)});
   }
 
@@ -7382,17 +7370,17 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
   setupImageAddressOperands(BII, OpndIdx, HasProj, Addr, &ImageInfo, nullptr);
 
   // Create the image sample call.
-  Value *Result = m_pBuilder->CreateImageSample(
+  Value *Result = getBuilder()->CreateImageSample(
       ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
       ImageInfo.SamplerDesc, Addr);
 
   // For a sparse sample, swap the struct elements back again.
   if (ResultTy != OrigResultTy) {
-    Value *SwappedResult = m_pBuilder->CreateInsertValue(
+    Value *SwappedResult = getBuilder()->CreateInsertValue(
         UndefValue::get(OrigResultTy),
-        m_pBuilder->CreateExtractValue(Result, 1), unsigned(0));
-    SwappedResult = m_pBuilder->CreateInsertValue(
-        SwappedResult, m_pBuilder->CreateExtractValue(Result, unsigned(0)), 1);
+        getBuilder()->CreateExtractValue(Result, 1), unsigned(0));
+    SwappedResult = getBuilder()->CreateInsertValue(
+        SwappedResult, getBuilder()->CreateExtractValue(Result, unsigned(0)), 1);
     Result = SwappedResult;
   }
   return Result;
@@ -7402,9 +7390,6 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
 // Translate image gather to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
                                                   BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource and sampler descriptors.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
@@ -7426,7 +7411,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
   Type *ResultTy = OrigResultTy;
   if (auto StructResultTy = dyn_cast<StructType>(ResultTy)) {
     ResultTy = StructType::get(
-        m_pBuilder->getContext(),
+        getBuilder()->getContext(),
         {StructResultTy->getElementType(1), StructResultTy->getElementType(0)});
   }
 
@@ -7463,7 +7448,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
     // A gather with no lod, bias or derivatives is done with lod 0, not
     // implicit lod.
     Addr[Llpc::Builder::ImageAddressIdxLod] =
-        Constant::getNullValue(m_pBuilder->getFloatTy());
+        Constant::getNullValue(getBuilder()->getFloatTy());
   }
 
   Value *Result = nullptr;
@@ -7476,39 +7461,39 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
       Result = UndefValue::get(cast<StructType>(ResultTy)->getElementType(0));
     for (int Idx = 3; Idx >= 0; --Idx) {
       Addr[Llpc::Builder::ImageAddressIdxOffset] =
-          m_pBuilder->CreateExtractValue(ConstOffsets, Idx);
-      Value *SingleResult = m_pBuilder->CreateImageGather(
+          getBuilder()->CreateExtractValue(ConstOffsets, Idx);
+      Value *SingleResult = getBuilder()->CreateImageGather(
           ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
           ImageInfo.SamplerDesc, Addr);
       if (ResultTy != OrigResultTy) {
         // Handle sparse.
-        Residency = m_pBuilder->CreateExtractValue(SingleResult, 1);
-        SingleResult = m_pBuilder->CreateExtractValue(SingleResult, 0);
+        Residency = getBuilder()->CreateExtractValue(SingleResult, 1);
+        SingleResult = getBuilder()->CreateExtractValue(SingleResult, 0);
       }
-      Result = m_pBuilder->CreateInsertElement(
-          Result, m_pBuilder->CreateExtractElement(SingleResult, 3), Idx);
+      Result = getBuilder()->CreateInsertElement(
+          Result, getBuilder()->CreateExtractElement(SingleResult, 3), Idx);
     }
     if (ResultTy != OrigResultTy) {
       // Handle sparse.
-      Result = m_pBuilder->CreateInsertValue(UndefValue::get(OrigResultTy),
+      Result = getBuilder()->CreateInsertValue(UndefValue::get(OrigResultTy),
                                              Result, 1);
-      Result = m_pBuilder->CreateInsertValue(Result, Residency, 0);
+      Result = getBuilder()->CreateInsertValue(Result, Residency, 0);
     }
     return Result;
   }
 
   // Create the image gather call.
-  Result = m_pBuilder->CreateImageGather(ResultTy, ImageInfo.Dim,
+  Result = getBuilder()->CreateImageGather(ResultTy, ImageInfo.Dim,
                                          ImageInfo.Flags, ImageInfo.ImageDesc,
                                          ImageInfo.SamplerDesc, Addr);
 
   // For a sparse gather, swap the struct elements back again.
   if (ResultTy != OrigResultTy) {
-    Value *SwappedResult = m_pBuilder->CreateInsertValue(
+    Value *SwappedResult = getBuilder()->CreateInsertValue(
         UndefValue::get(OrigResultTy),
-        m_pBuilder->CreateExtractValue(Result, 1), unsigned(0));
-    SwappedResult = m_pBuilder->CreateInsertValue(
-        SwappedResult, m_pBuilder->CreateExtractValue(Result, unsigned(0)), 1);
+        getBuilder()->CreateExtractValue(Result, 1), unsigned(0));
+    SwappedResult = getBuilder()->CreateInsertValue(
+        SwappedResult, getBuilder()->CreateExtractValue(Result, unsigned(0)), 1);
     Result = SwappedResult;
   }
   return Result;
@@ -7518,9 +7503,6 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
 // Translate image fetch/read to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
                                                      BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource descriptor.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
@@ -7533,7 +7515,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
   Type *ResultTy = OrigResultTy;
   if (auto StructResultTy = dyn_cast<StructType>(ResultTy)) {
     ResultTy = StructType::get(
-        m_pBuilder->getContext(),
+        getBuilder()->getContext(),
         {StructResultTy->getElementType(1), StructResultTy->getElementType(0)});
   }
 
@@ -7559,7 +7541,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
       // This is an OpImageFetch with sample, or an OpImageRead with sample and
       // subpass data dimension. We need to use the fmask variant of the builder
       // method. First we need to get the fmask descriptor.
-      Result = m_pBuilder->CreateImageLoadWithFmask(
+      Result = getBuilder()->CreateImageLoadWithFmask(
           ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
           ImageInfo.FmaskDesc, Coord, SampleNum);
     } else {
@@ -7567,9 +7549,9 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
       // Append the sample onto the coordinate.
       assert(ImageInfo.Dim == Llpc::Builder::Dim2DMsaa ||
              ImageInfo.Dim == Llpc::Builder::Dim2DArrayMsaa);
-      SampleNum = m_pBuilder->CreateInsertElement(
+      SampleNum = getBuilder()->CreateInsertElement(
           UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
-      Coord = m_pBuilder->CreateShuffleVector(
+      Coord = getBuilder()->CreateShuffleVector(
           Coord, SampleNum,
           ArrayRef<unsigned>({0, 1, 2, 3})
               .slice(0,
@@ -7581,17 +7563,17 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
     // We did not do the "load with fmask" above. Do the normal image load now.
     Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
     Result =
-        m_pBuilder->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
+        getBuilder()->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
                                     ImageInfo.ImageDesc, Coord, Lod);
   }
 
   // For a sparse read/fetch, swap the struct elements back again.
   if (ResultTy != OrigResultTy) {
-    Value *SwappedResult = m_pBuilder->CreateInsertValue(
+    Value *SwappedResult = getBuilder()->CreateInsertValue(
         UndefValue::get(OrigResultTy),
-        m_pBuilder->CreateExtractValue(Result, 1), unsigned(0));
-    SwappedResult = m_pBuilder->CreateInsertValue(
-        SwappedResult, m_pBuilder->CreateExtractValue(Result, unsigned(0)), 1);
+        getBuilder()->CreateExtractValue(Result, 1), unsigned(0));
+    SwappedResult = getBuilder()->CreateInsertValue(
+        SwappedResult, getBuilder()->CreateExtractValue(Result, unsigned(0)), 1);
     Result = SwappedResult;
   }
   return Result;
@@ -7601,9 +7583,6 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
 // Translate image write to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
                                                  BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource descriptor.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
@@ -7628,9 +7607,9 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
     // Append the sample onto the coordinate.
     assert(ImageInfo.Dim == Llpc::Builder::Dim2DMsaa ||
            ImageInfo.Dim == Llpc::Builder::Dim2DArrayMsaa);
-    SampleNum = m_pBuilder->CreateInsertElement(
+    SampleNum = getBuilder()->CreateInsertElement(
         UndefValue::get(Coord->getType()), SampleNum, uint64_t(0));
-    Coord = m_pBuilder->CreateShuffleVector(
+    Coord = getBuilder()->CreateShuffleVector(
         Coord, SampleNum,
         ArrayRef<unsigned>({0, 1, 2, 3})
             .slice(0,
@@ -7639,7 +7618,7 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
 
   // Do the image store.
   Value *Lod = Addr[Llpc::Builder::ImageAddressIdxLod];
-  return m_pBuilder->CreateImageStore(Texel, ImageInfo.Dim, ImageInfo.Flags,
+  return getBuilder()->CreateImageStore(Texel, ImageInfo.Dim, ImageInfo.Flags,
                                       ImageInfo.ImageDesc, Coord, Lod);
 }
 
@@ -7647,16 +7626,13 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *BI,
 // Translate OpImageQueryLevels to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQueryLevelsFromInst(SPIRVInstruction *BI,
                                                        BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource descriptor.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
   getImageDesc(BII->getOpValue(0), &ImageInfo);
 
   // Generate the operation.
-  return m_pBuilder->CreateImageQueryLevels(ImageInfo.Dim, ImageInfo.Flags,
+  return getBuilder()->CreateImageQueryLevels(ImageInfo.Dim, ImageInfo.Flags,
                                             ImageInfo.ImageDesc);
 }
 
@@ -7664,16 +7640,13 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLevelsFromInst(SPIRVInstruction *BI,
 // Translate OpImageQuerySamples to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQuerySamplesFromInst(SPIRVInstruction *BI,
                                                         BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource descriptor.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
   getImageDesc(BII->getOpValue(0), &ImageInfo);
 
   // Generate the operation.
-  return m_pBuilder->CreateImageQuerySamples(ImageInfo.Dim, ImageInfo.Flags,
+  return getBuilder()->CreateImageQuerySamples(ImageInfo.Dim, ImageInfo.Flags,
                                              ImageInfo.ImageDesc);
 }
 
@@ -7681,19 +7654,16 @@ Value *SPIRVToLLVM::transSPIRVImageQuerySamplesFromInst(SPIRVInstruction *BI,
 // Translate OpImageQuerySize/OpImageQuerySizeLod to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQuerySizeFromInst(SPIRVInstruction *BI,
                                                      BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource descriptor.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
   getImageDesc(BII->getOpValue(0), &ImageInfo);
 
   // Generate the operation.
-  Value *Lod = m_pBuilder->getInt32(0);
+  Value *Lod = getBuilder()->getInt32(0);
   if (BII->getOpCode() == OpImageQuerySizeLod)
     Lod = transValue(BII->getOpValue(1), BB->getParent(), BB);
-  return m_pBuilder->CreateImageQuerySize(ImageInfo.Dim, ImageInfo.Flags,
+  return getBuilder()->CreateImageQuerySize(ImageInfo.Dim, ImageInfo.Flags,
                                           ImageInfo.ImageDesc, Lod);
 }
 
@@ -7701,9 +7671,6 @@ Value *SPIRVToLLVM::transSPIRVImageQuerySizeFromInst(SPIRVInstruction *BI,
 // Translate OpImageQueryLod to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *BI,
                                                     BasicBlock *BB) {
-  m_pBuilder->SetInsertPoint(BB);
-  updateBuilderDebugLoc(BI, BB->getParent());
-
   // Get image type descriptor and load resource and sampler descriptors.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
@@ -7711,7 +7678,7 @@ Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *BI,
 
   // Generate the operation.
   Value *Coord = transValue(BII->getOpValue(1), BB->getParent(), BB);
-  return m_pBuilder->CreateImageGetLod(ImageInfo.Dim, ImageInfo.Flags,
+  return getBuilder()->CreateImageGetLod(ImageInfo.Dim, ImageInfo.Flags,
                                        ImageInfo.ImageDesc,
                                        ImageInfo.SamplerDesc, Coord);
 }
@@ -9276,11 +9243,11 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
 
   case GLSLstd450Determinant:
     // Determinant of square matrix
-    return m_pBuilder->CreateDeterminant(Args[0]);
+    return getBuilder()->CreateDeterminant(Args[0]);
 
   case GLSLstd450MatrixInverse:
     // Inverse of square matrix
-    return m_pBuilder->CreateMatrixInverse(Args[0]);
+    return getBuilder()->CreateMatrixInverse(Args[0]);
 
   default:
     // Other instructions are handled the old way, by generating a call.
