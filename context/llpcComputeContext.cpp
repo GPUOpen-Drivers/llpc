@@ -123,18 +123,13 @@ uint32_t ComputeContext::GetShaderWaveSize(
         const ShaderModuleData* pModuleData =
             reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
 
-        if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize)
-        {
+        if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-            if (m_pPipelineInfo->cs.options.allowVaryWaveSize)
-            {
-                waveSize = m_pGpuProperty->waveSize;
-            }
-            else
+         && (m_pPipelineInfo->cs.options.allowVaryWaveSize == false)
 #endif
-            {
-                waveSize = cl::SubgroupSize;
-            }
+           )
+        {
+            waveSize = cl::SubgroupSize;
         }
 
         LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
