@@ -1443,19 +1443,13 @@ uint32_t GraphicsContext::GetShaderWaveSize(
             const ShaderModuleData* pModuleData =
                 reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
 
-            if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize)
-            {
+            if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-                // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
-                if ((i != ShaderStageGeometry) && pShaderInfo->options.allowVaryWaveSize)
-                {
-                    waveSize = m_pGpuProperty->waveSize;
-                }
-                else
+             && (pShaderInfo->options.allowVaryWaveSize == false)
 #endif
-                {
-                    waveSize = cl::SubgroupSize;
-                }
+               )
+            {
+                waveSize = cl::SubgroupSize;
                 break;
             }
         }
