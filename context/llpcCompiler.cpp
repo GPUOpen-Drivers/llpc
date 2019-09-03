@@ -168,8 +168,8 @@ extern opt<std::string> LogFileOuts;
 namespace Llpc
 {
 
-llvm::sys::Mutex      Compiler::m_contextPoolMutex;
-std::vector<Context*> Compiler::m_contextPool;
+llvm::sys::Mutex       Compiler::m_contextPoolMutex;
+std::vector<Context*>* Compiler::m_pContextPool = nullptr;
 
 // Enumerates modes used in shader replacement
 enum ShaderReplaceMode
@@ -596,6 +596,13 @@ Compiler::Compiler(
 
         // LLVM fatal error handler only can be installed once.
         install_fatal_error_handler(FatalErrorHandler);
+
+        // Initiailze m_pContextPool.
+        {
+            MutexGuard lock(m_contextPoolMutex);
+
+            m_pContextPool = new std::vector<Context*>();
+        }
     }
 
     // Initialize shader cache
@@ -635,7 +642,7 @@ Compiler::~Compiler()
 
         // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
         // compiler next time.
-        for (auto it = m_contextPool.begin(); it != m_contextPool.end();)
+        for (auto it = m_pContextPool->begin(); it != m_pContextPool->end();)
         {
             auto   pContext             = *it;
             size_t maxResidentContexts  = 0;
@@ -649,9 +656,9 @@ Compiler::~Compiler()
                 maxResidentContexts = strtoul(pMaxResidentContexts, nullptr, 0);
             }
 
-            if ((pContext->IsInUse() == false) && (m_contextPool.size() > maxResidentContexts))
+            if ((pContext->IsInUse() == false) && (m_pContextPool->size() > maxResidentContexts))
             {
-                it = m_contextPool.erase(it);
+                it = m_pContextPool->erase(it);
                 delete pContext;
             }
             else
@@ -693,6 +700,8 @@ Compiler::~Compiler()
     {
         ShaderCacheManager::Shutdown();
         llvm_shutdown();
+        delete m_pContextPool;
+        m_pContextPool = nullptr;
     }
 }
 
@@ -2443,7 +2452,7 @@ Context* Compiler::AcquireContext() const
     MutexGuard lock(m_contextPoolMutex);
 
     // Try to find a free context from pool first
-    for (auto pContext : m_contextPool)
+    for (auto pContext : *m_pContextPool)
     {
         GfxIpVersion gfxIpVersion = pContext->GetGfxIpVersion();
 
@@ -2463,7 +2472,7 @@ Context* Compiler::AcquireContext() const
         // Create a new one if we fail to find an available one
         pFreeContext = new Context(m_gfxIp, &m_gpuWorkarounds);
         pFreeContext->SetInUse(true);
-        m_contextPool.push_back(pFreeContext);
+        m_pContextPool->push_back(pFreeContext);
     }
 
     LLPC_ASSERT(pFreeContext != nullptr);
