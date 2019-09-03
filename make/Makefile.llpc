@@ -121,6 +121,7 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcPatchEntryPointMutate.cpp       \
         llpcPatchInOutImportExport.cpp      \
         llpcPatchLlvmIrInclusion.cpp        \
+        llpcPatchLoadScalarizer.cpp         \
         llpcPatchLoopUnrollInfoRectify.cpp  \
         llpcPatchNullFragShader.cpp         \
         llpcPatchPeepholeOpt.cpp            \

@@ -308,6 +308,7 @@ void Patch::AddOptimizationPasses(
         passMgr.add(createSimpleLoopUnrollPass(optLevel));
         passMgr.add(CreatePatchPeepholeOpt());
         passMgr.add(createScalarizerPass());
+        passMgr.add(CreatePatchLoadScalarizer());
         passMgr.add(createInstSimplifyLegacyPass());
         passMgr.add(createMergedLoadStoreMotionPass());
         passMgr.add(createGVNPass(disableGvnLoadPre));
