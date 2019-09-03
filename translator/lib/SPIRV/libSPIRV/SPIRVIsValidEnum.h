@@ -419,6 +419,7 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNonUniformEXT:
   case DecorationHlslCounterBufferGOOGLE:
   case DecorationHlslSemanticGOOGLE:
+  case DecorationUserTypeGOOGLE:
     return true;
   default:
     return false;

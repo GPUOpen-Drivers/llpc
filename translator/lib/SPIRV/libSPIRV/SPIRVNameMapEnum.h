@@ -352,6 +352,7 @@ template <> inline void SPIRVMap<Decoration, std::string>::init() {
 #endif
   add(DecorationHlslCounterBufferGOOGLE, "HlslCounterBufferGOOGLE");
   add(DecorationHlslSemanticGOOGLE, "HlslSemanticGOOGLE");
+  add(DecorationUserTypeGOOGLE, "UserTypeGOOGLE");
 }
 SPIRV_DEF_NAMEMAP(Decoration, SPIRVDecorationNameMap)
 
