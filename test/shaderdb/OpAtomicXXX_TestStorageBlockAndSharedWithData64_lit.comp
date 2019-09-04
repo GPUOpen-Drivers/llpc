@@ -83,8 +83,7 @@ void main ()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: atomicrmw umin i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw umax i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw and i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
@@ -97,6 +96,31 @@ void main ()
 ; SHADERTEST: atomicrmw xor i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw add i64 addrspace({{.*}})* %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
 ; SHADERTEST: cmpxchg i64 addrspace({{.*}})* %{{[0-9]*}}, i64 78187493520, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umin i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 0), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umax i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 1), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 2), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 3), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 4), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw min i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 5), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw max i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 6), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 7), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw or i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 8), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw xor i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 9), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw add i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 10), i64 %{{[0-9]*}} monotonic
+; SHADERTEST: cmpxchg i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 12), i64 78187493520, i64 %{{[0-9]*}} monotonic
+
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.umin.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.umax.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 8, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.and.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 16, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.or.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 24, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.xor.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 32, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.smin.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 40, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.smax.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 48, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.and.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 56, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.or.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 64, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.xor.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 72, i32 0, i32 0)
+; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.add.i64(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 80, i32 0, i32 0)
 ; SHADERTEST: atomicrmw umin i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 0), i64 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw umax i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 1), i64 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw and i64 addrspace(3)* getelementptr inbounds ({ i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 }, { i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64 } addrspace(3)* @{{.*}}, i32 0, i32 2), i64 %{{[0-9]*}} monotonic

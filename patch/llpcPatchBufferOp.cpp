@@ -302,8 +302,8 @@ void PatchBufferOp::visitAtomicRMWInst(
     Value* const pBaseIndex = m_pBuilder->CreatePtrToInt(m_replacementMap[pPointer].second, m_pBuilder->getInt32Ty());
     CopyMetadata(pBaseIndex, &atomicRmwInst);
 
-    // If our buffer descriptor is divergent or is not a 32-bit integer, need to handle it differently.
-    if ((m_divergenceSet.count(pBufferDesc) > 0) || (pStoreType->isIntegerTy(32) == false))
+    // If our buffer descriptor is divergent, need to handle it differently.
+    if (m_divergenceSet.count(pBufferDesc) > 0)
     {
         Value* const pBaseAddr = GetBaseAddressFromBufferDesc(pBufferDesc);
 
@@ -387,7 +387,7 @@ void PatchBufferOp::visitAtomicRMWInst(
         }
 
         Value* const pAtomicCall = m_pBuilder->CreateIntrinsic(intrinsic,
-                                                               m_pBuilder->getInt32Ty(),
+                                                               cast<IntegerType>(pStoreType),
                                                                {
                                                                    atomicRmwInst.getValOperand(),
                                                                    pBufferDesc,
