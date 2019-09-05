@@ -80,11 +80,11 @@ PatchDescriptorLoad::PatchDescriptorLoad()
 
 // =====================================================================================================================
 // Create a non-strided, non-swizzled buffer descriptor.
-Value* PatchDescriptorLoad::buildBufferDescriptor(
-    Value* pBaseAddr, // [in] (i64) base address of the descriptor (top 16 bits are ignored); for convenience, an
-                      // <N x i32> is also accepted (using the low 48 bits)
-    Value* pBufSize, // [in] (i32) size of the referenced buffer in bytes
-    Instruction* pInsertPoint) // [in] instructions are inserted before pInsertPoint
+Value* PatchDescriptorLoad::BuildBufferDescriptor(
+    Value*       pBaseAddr,    // [in] Base address of the descriptor (top 16 bits are ignored); for convenience, an
+                               //      <N x i32> is also accepted (using the low 48 bits)
+    Value*       pBufSize,     // [in] Size of the referenced buffer in bytes
+    Instruction* pInsertPoint) // [in] Instructions are inserted before pInsertPoint
 {
     IRBuilder<> builder(pInsertPoint);
     Value* pBufDesc = UndefValue::get(m_pContext->Int32x4Ty());
@@ -92,24 +92,27 @@ Value* PatchDescriptorLoad::buildBufferDescriptor(
     Value* pElem0 = nullptr;
     Value* pElem1 = nullptr;
 
-    if (pBaseAddr->getType() == m_pContext->Int64Ty()) {
+    if (pBaseAddr->getType() == m_pContext->Int64Ty())
+    {
         pElem0 = builder.CreateTrunc(pBaseAddr, m_pContext->Int32Ty());
         pElem1 = builder.CreateLShr(pBaseAddr, 32, "", true);
         pElem1 = builder.CreateTrunc(pElem1, m_pContext->Int32Ty());
-    } else {
-        pElem0 = builder.CreateExtractElement(pBaseAddr, (uint64_t)0);
-        pElem1 = builder.CreateExtractElement(pBaseAddr, (uint64_t)1);
+    }
+    else
+    {
+        pElem0 = builder.CreateExtractElement(pBaseAddr, uint64_t(0));
+        pElem1 = builder.CreateExtractElement(pBaseAddr, 1);
     }
 
     // DWORD0
-    pBufDesc = builder.CreateInsertElement(pBufDesc, pElem0, (uint64_t)0);
+    pBufDesc = builder.CreateInsertElement(pBufDesc, pElem0, uint64_t(0));
 
     // DWORD1
     pElem1 = builder.CreateAnd(pElem1, builder.getInt32(UINT16_MAX));
-    pBufDesc = builder.CreateInsertElement(pBufDesc, pElem1, (uint64_t)1);
+    pBufDesc = builder.CreateInsertElement(pBufDesc, pElem1, 1);
 
     // DWORD2
-    pBufDesc = builder.CreateInsertElement(pBufDesc, pBufSize, (uint64_t)2);
+    pBufDesc = builder.CreateInsertElement(pBufDesc, pBufSize, 2);
 
     // DWORD3
 #if LLPC_BUILD_GFX10
@@ -126,7 +129,7 @@ Value* PatchDescriptorLoad::buildBufferDescriptor(
         sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
         LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
 
-        pBufDesc = builder.CreateInsertElement(pBufDesc, builder.getInt32(sqBufRsrcWord3.u32All), (uint64_t)3);
+        pBufDesc = builder.CreateInsertElement(pBufDesc, builder.getInt32(sqBufRsrcWord3.u32All), 3);
     }
 #if LLPC_BUILD_GFX10
     else if (gfxIp.major == 10)
@@ -141,7 +144,7 @@ Value* PatchDescriptorLoad::buildBufferDescriptor(
         sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
         LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
 
-        pBufDesc = builder.CreateInsertElement(pBufDesc, builder.getInt32(sqBufRsrcWord3.u32All), (uint64_t)3);
+        pBufDesc = builder.CreateInsertElement(pBufDesc, builder.getInt32(sqBufRsrcWord3.u32All), 3);
     }
     else
     {
@@ -478,8 +481,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 // Extract compact buffer descriptor
                 if (descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t))
                 {
-                    pDesc = buildBufferDescriptor(pDesc, builder.getInt32(UINT32_MAX),
-                                                  pInsertPoint);
+                    pDesc = BuildBufferDescriptor(pDesc, builder.getInt32(UINT32_MAX), pInsertPoint);
                 }
             }
             else
@@ -523,9 +525,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 Value* pBaseAddr = builder.CreateInsertElement(pDescTableAddr, pDescElem0, (uint64_t)0);
 
                 // Build buffer descriptor from inline constant buffer address
-                pDesc = buildBufferDescriptor(pBaseAddr,
-                                              builder.getInt32(UINT32_MAX),
-                                              pInsertPoint);
+                pDesc = BuildBufferDescriptor(pBaseAddr, builder.getInt32(UINT32_MAX), pInsertPoint);
             }
         }
         else
