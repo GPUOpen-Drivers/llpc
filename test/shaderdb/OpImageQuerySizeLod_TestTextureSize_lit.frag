@@ -13,7 +13,8 @@ layout(location = 2) out ivec3 i3;
 
 void main()
 {
-    i3.xy  = textureSize(samp2D[index], 3);
+    i3 = ivec3(0);
+    i3.xy += textureSize(samp2D[index], 3);
     i3.xy += textureSize(samp2DShadow, 4);
     i3    += textureSize(samp3D, 5);
 }

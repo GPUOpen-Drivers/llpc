@@ -14,7 +14,8 @@ layout(location = 0) out ivec3 i3;
 
 void main()
 {
-    i3.xy  = textureSize(samp2DRect);
+    i3 = ivec3(0);
+    i3.xy += textureSize(samp2DRect);
     i3.x  += textureSize(samp2DBuffer[index]);
     i3.xy += textureSize(samp2DMS);
     i3    += textureSize(samp2DMSArray[index]);
