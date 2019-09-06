@@ -46,7 +46,7 @@ void main()
     oColor += vec4(sizeCubeS.x, sizeCubeS.y, 0, 0);
 
     ivec3 sizeCubeA = textureSize(sampCubeA, 0);
-    oColor += vec4(sizeCubeA.x, sizeCubeA.y, 0, 0);
+    oColor += vec4(sizeCubeA.x, sizeCubeA.y, sizeCubeA.z, 0);
 
     ivec3 sizeCubeAS = textureSize(sampCubeAS, 0);
     oColor += vec4(sizeCubeAS.x, sizeCubeAS.y, sizeCubeAS.z, 0);
@@ -118,8 +118,8 @@ void main()
 ; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1d.f32.i32(i32 1, i32 0,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.cube.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.getresinfo.cube.v4f32.i32(i32 15, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.getresinfo.cube.v4f32.i32(i32 15, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <{{3|4}} x float> @llvm.amdgcn.image.getresinfo.cube.v{{3|4}}f32.i32(i32 {{7|15}}, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <{{3|4}} x float> @llvm.amdgcn.image.getresinfo.cube.v{{3|4}}f32.i32(i32 {{7|15}}, i32 0,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.1darray.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
