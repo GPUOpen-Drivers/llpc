@@ -36,6 +36,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llpcPatchLoadScalarizer.h"
+#include "llpcPipelineShaders.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -76,18 +77,51 @@ PatchLoadScalarizer::PatchLoadScalarizer()
 }
 
 // =====================================================================================================================
+// Get the analysis usage of this pass.
+void PatchLoadScalarizer::getAnalysisUsage(
+    AnalysisUsage& analysisUsage    // [out] The analysis usage.
+    ) const
+{
+    analysisUsage.addRequired<PipelineShaders>();
+    analysisUsage.addPreserved<PipelineShaders>();
+}
+
+// =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 bool PatchLoadScalarizer::runOnFunction(
     Function& function)     // [in,out] Function that will run this optimization.
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
-    if (cl::EnableScalarLoad == false)
+    bool enableLoadScalarizerPerShader = false;
+
+    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
+    auto shaderStage = pPipelineShaders->GetShaderStage(&function);
+
+    // If the function is not a valid shader stage, bail.
+    if (shaderStage == ShaderStageInvalid)
     {
         return false;
     }
 
     m_pContext = static_cast<Context*>(&function.getContext());
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+    if (m_pContext->GetPipelineContext() != nullptr)
+    {
+        auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(shaderStage)->options);
+        if (pShaderOptions->enableLoadScalarizer)
+        {
+            enableLoadScalarizerPerShader = true;
+        }
+    }
+#endif
+
+    if ((cl::EnableScalarLoad == false) && (enableLoadScalarizerPerShader == false))
+    {
+        return false;
+    }
+
     m_pBuilder.reset(new IRBuilder<>(*m_pContext));
 
     visit(function);

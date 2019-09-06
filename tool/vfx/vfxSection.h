@@ -1181,6 +1181,9 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
 #endif
