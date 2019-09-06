@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
 //* |     32.0 | Add ShdaerModuleOptions in ShaderModuleBuildInfo                                                      |
 //* |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
 //* |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
@@ -296,6 +297,10 @@ struct PipelineShaderOptions
     uint32_t  forceLoopUnrollCount;
 #endif
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+    /// Enable LLPC load scalarizer optimization.
+    bool enableLoadScalarizer;
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
     bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
 #elif VKI_EXT_SUBGROUP_SIZE_CONTROL

@@ -635,6 +635,9 @@ void PipelineDumper::DumpPipelineShaderInfo(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     dumpFile << "options.useSiScheduler = " << pShaderInfo->options.useSiScheduler << "\n";
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+    dumpFile << "options.enableLoadScalarizer = " << pShaderInfo->options.enableLoadScalarizer << "\n";
+#endif
     dumpFile << "\n";
 }
 
@@ -1192,6 +1195,9 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
             pHasher->Update(options.useSiScheduler);
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+            pHasher->Update(options.enableLoadScalarizer);
 #endif
         }
     }

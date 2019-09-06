@@ -47,6 +47,7 @@ class PatchLoadScalarizer final:
 public:
     explicit PatchLoadScalarizer();
 
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override;
     bool runOnFunction(llvm::Function& function) override;
 
     void visitLoadInst(llvm::LoadInst& loadInst);
