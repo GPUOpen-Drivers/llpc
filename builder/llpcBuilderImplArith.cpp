@@ -556,7 +556,7 @@ Value* BuilderImplArith::CreateFMed3(
     pMax1->setFastMathFlags(fastMathFlags);
     CallInst* pMin2 = CreateMinNum(pMax1, pValue3);
     pMin2->setFastMathFlags(fastMathFlags);
-    CallInst* pMax2 = CreateMinNum(pMin1, pMin2, instName);
+    CallInst* pMax2 = CreateMaxNum(pMin1, pMin2, instName);
     pMax2->setFastMathFlags(fastMathFlags);
     return pMax2;
 }
