@@ -130,8 +130,10 @@ public:
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
     Value* CreateFSign(Value* pX, const Twine& instName = ""); // TODO add override final
 
-    // Create "fmed3" operation, returning the middle one of three float values.
-    Value* CreateFMed3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
+    // Methods for trinary min/max/mid.
+    Value* CreateFMin3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
+    Value* CreateFMax3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
+    Value* CreateFMid3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
 
     // Create an "insert bitfield" operation for a (vector of) integer type.
     Value* CreateInsertBitField(Value*        pBase,
@@ -211,6 +213,9 @@ private:
     {
         return ConstantFP::get(pTy, 0.000030517578125);
     }
+
+    // Ensure result is canonicalized if the shader's FP mode is flush denorms.
+    Value* Canonicalize(Value* pValue);
 };
 
 // =====================================================================================================================

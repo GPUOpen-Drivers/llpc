@@ -361,8 +361,28 @@ public:
         Value*        pX,                   // [in] Input value X
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
-    // Create "fmed3" operation, returning the middle one of three scalar or vector float or half values.
-    virtual Value* CreateFMed3(
+    // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
+    // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+    // It also honors the shader's FP mode being "flush denorm".
+    virtual Value* CreateFMin3(
+        Value*        pValue1,              // [in] First value
+        Value*        pValue2,              // [in] Second value
+        Value*        pValue3,              // [in] Third value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fmax3" operation, returning the maximum of three scalar or vector float or half values.
+    // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+    // It also honors the shader's FP mode being "flush denorm".
+    virtual Value* CreateFMax3(
+        Value*        pValue1,              // [in] First value
+        Value*        pValue2,              // [in] Second value
+        Value*        pValue3,              // [in] Third value
+        const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
+
+    // Create "fmid3" operation, returning the middle one of three scalar or vector float or half values.
+    // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+    // It also honors the shader's FP mode being "flush denorm".
+    virtual Value* CreateFMid3(
         Value*        pValue1,              // [in] First value
         Value*        pValue2,              // [in] Second value
         Value*        pValue3,              // [in] Third value

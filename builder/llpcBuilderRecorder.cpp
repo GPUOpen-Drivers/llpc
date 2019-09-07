@@ -87,8 +87,12 @@ StringRef BuilderRecorder::GetCallName(
         return "log";
     case InverseSqrt:
         return "inverse.sqrt";
-    case Opcode::FMed3:
-        return "fmed3";
+    case Opcode::FMin3:
+        return "fmin3";
+    case Opcode::FMax3:
+        return "fmax3";
+    case Opcode::FMid3:
+        return "fmid3";
     case Opcode::InsertBitField:
         return "insert.bit.field";
     case Opcode::ExtractBitField:
@@ -623,14 +627,36 @@ Value* BuilderRecorder::CreateDerivative(
 }
 
 // =====================================================================================================================
-// Create "fmed3" operation, returning the middle one of three float values.
-Value* BuilderRecorder::CreateFMed3(
+// Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
+Value* BuilderRecorder::CreateFMin3(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    Value*        pValue3,    // [in] Third value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMin3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
+}
+
+// =====================================================================================================================
+// Create "fmax3" operation, returning the maximum of three scalar or vector float or half values.
+Value* BuilderRecorder::CreateFMax3(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    Value*        pValue3,    // [in] Third value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    return Record(Opcode::FMax3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
+}
+
+// =====================================================================================================================
+// Create "fmid3" operation, returning the middle one of three float values.
+Value* BuilderRecorder::CreateFMid3(
     Value*        pValue1,              // [in] First value
     Value*        pValue2,              // [in] Second value
     Value*        pValue3,              // [in] Third value
     const Twine&  instName)             // [in] Name to give instruction(s)
 {
-    return Record(Opcode::FMed3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
+    return Record(Opcode::FMid3, pValue1->getType(), { pValue1, pValue2, pValue3 }, instName);
 }
 
 // =====================================================================================================================

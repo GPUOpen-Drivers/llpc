@@ -26,16 +26,14 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call nnan <3 x half> @llvm.minnum.v3f16(<3 x half>
-; SHADERTEST: = call nnan <3 x half> @llvm.minnum.v3f16(<3 x half>
-; SHADERTEST: = call nnan <3 x half> @llvm.maxnum.v3f16(<3 x half>
-; SHADERTEST: = call nnan <3 x half> @llvm.maxnum.v3f16(<3 x half>
-; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmed3.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmin3.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmax3.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.fmid3.v3f16(<3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: = call nnan <3 x half> @llvm.minnum.v3f16(<3 x half>
-; SHADERTEST: = call nnan <3 x half> @llvm.minnum.v3f16(<3 x half>
-; SHADERTEST: = call nnan <3 x half> @llvm.maxnum.v3f16(<3 x half>
-; SHADERTEST: = call nnan <3 x half> @llvm.maxnum.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.minnum.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.minnum.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.maxnum.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.maxnum.v3f16(<3 x half>
 ; SHADERTEST: = call half @llvm.amdgcn.fmed3.f16(half
 ; SHADERTEST: = call half @llvm.amdgcn.fmed3.f16(half
 ; SHADERTEST: = call half @llvm.amdgcn.fmed3.f16(half

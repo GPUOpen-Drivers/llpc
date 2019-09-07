@@ -529,41 +529,108 @@ Value* BuilderImplArith::CreateFSign(
 }
 
 // =====================================================================================================================
-// Create "fmed3" operation, returning the middle one of three scalar or vector float or half values.
-Value* BuilderImplArith::CreateFMed3(
+// Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
+// This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+// It also honors the shader's FP mode being "flush denorm".
+Value* BuilderImplArith::CreateFMin3(
     Value*        pValue1,    // [in] First value
     Value*        pValue2,    // [in] Second value
     Value*        pValue3,    // [in] Third value
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    // For float, and for half on GFX9+, we can use the fmed3 instruction. We need to scalarize this ourselves.
-    if (pValue1->getType()->getScalarType()->isFloatTy() || (getContext().GetGfxIpVersion().major >= 9))
+    CallInst* pMin1 = CreateMinNum(pValue1, pValue2);
+    pMin1->setFastMathFlags(getFastMathFlags());
+    CallInst* pMin2 = CreateMinNum(pMin1, pValue3);
+    pMin2->setFastMathFlags(getFastMathFlags());
+    Value* pResult = pMin2;
+
+    // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
+    // canonicalize the result here.
+    if (getContext().GetGfxIpVersion().major < 9)
     {
-        Value* pResult = Scalarize(pValue1,
-                                   pValue2,
-                                   pValue3,
-                                   [this](Value* pValue1, Value* pValue2, Value* pValue3)
-                                   {
-                                      return CreateIntrinsic(Intrinsic::amdgcn_fmed3,
-                                                             pValue1->getType(),
-                                                             { pValue1, pValue2, pValue3 });
-                                   });
-        pResult->setName(instName);
-        return pResult;
+        pResult = Canonicalize(pResult);
     }
 
-    // For half on GFX8 or earlier, use a combination of fmin and fmax.
-    FastMathFlags fastMathFlags;
-    fastMathFlags.setNoNaNs();
-    CallInst* pMin1 = CreateMinNum(pValue1, pValue2);
-    pMin1->setFastMathFlags(fastMathFlags);
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "fmax3" operation, returning the maximum of three scalar or vector float or half values.
+// This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+// It also honors the shader's FP mode being "flush denorm".
+Value* BuilderImplArith::CreateFMax3(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    Value*        pValue3,    // [in] Third value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
     CallInst* pMax1 = CreateMaxNum(pValue1, pValue2);
-    pMax1->setFastMathFlags(fastMathFlags);
-    CallInst* pMin2 = CreateMinNum(pMax1, pValue3);
-    pMin2->setFastMathFlags(fastMathFlags);
-    CallInst* pMax2 = CreateMaxNum(pMin1, pMin2, instName);
-    pMax2->setFastMathFlags(fastMathFlags);
-    return pMax2;
+    pMax1->setFastMathFlags(getFastMathFlags());
+    CallInst* pMax2 = CreateMaxNum(pMax1, pValue3);
+    pMax2->setFastMathFlags(getFastMathFlags());
+    Value* pResult = pMax2;
+
+    // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
+    // canonicalize the result here.
+    if (getContext().GetGfxIpVersion().major < 9)
+    {
+        pResult = Canonicalize(pResult);
+    }
+
+    pResult->setName(instName);
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create "fmid3" operation, returning the middle one of three scalar or vector float or half values.
+// This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+// It also honors the shader's FP mode being "flush denorm".
+Value* BuilderImplArith::CreateFMid3(
+    Value*        pValue1,    // [in] First value
+    Value*        pValue2,    // [in] Second value
+    Value*        pValue3,    // [in] Third value
+    const Twine&  instName)   // [in] Name to give instruction(s)
+{
+    // For float, and for half on GFX9+, we can use the fmed3 instruction.
+    // But we can only do this if we do not need NaN preservation.
+    Value* pResult = nullptr;
+    if (getFastMathFlags().noNaNs() && (pValue1->getType()->getScalarType()->isFloatTy() ||
+        ((getContext().GetGfxIpVersion().major >= 9) && pValue1->getType()->getScalarType()->isHalfTy())))
+    {
+        pResult = Scalarize(pValue1,
+                            pValue2,
+                            pValue3,
+                            [this](Value* pValue1, Value* pValue2, Value* pValue3)
+                            {
+                               return CreateIntrinsic(Intrinsic::amdgcn_fmed3,
+                                                      pValue1->getType(),
+                                                      { pValue1, pValue2, pValue3 });
+                            });
+    }
+    else
+    {
+        // For half on GFX8 or earlier, use a combination of fmin and fmax.
+        CallInst* pMin1 = CreateMinNum(pValue1, pValue2);
+        pMin1->setFastMathFlags(getFastMathFlags());
+        CallInst* pMax1 = CreateMaxNum(pValue1, pValue2);
+        pMax1->setFastMathFlags(getFastMathFlags());
+        CallInst* pMin2 = CreateMinNum(pMax1, pValue3);
+        pMin2->setFastMathFlags(getFastMathFlags());
+        CallInst* pMax2 = CreateMaxNum(pMin1, pMin2, instName);
+        pMax2->setFastMathFlags(getFastMathFlags());
+        pResult = pMax2;
+    }
+
+    // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
+    // canonicalize the result here.
+    if (getContext().GetGfxIpVersion().major < 9)
+    {
+        pResult = Canonicalize(pResult);
+    }
+
+    pResult->setName(instName);
+    return pResult;
 }
 
 // =====================================================================================================================
@@ -723,5 +790,27 @@ Value* BuilderImplArith::CreateExtractBitField(
     }
     Value* pIsZeroCount = CreateICmpEQ(pCount, Constant::getNullValue(pCount->getType()));
     return CreateSelect(pIsZeroCount, pCount, pResult, instName);
+}
+
+// =====================================================================================================================
+// Ensure result is canonicalized if the shader's FP mode is flush denorms. This is called on an FP result of an
+// instruction that does not honor the hardware's FP mode, such as fmin/fmax/fmed on GFX8 and earlier.
+Value* BuilderImplArith::Canonicalize(
+    Value*  pValue)   // [in] Value to canonicalize
+{
+    auto pContext = &getContext();
+    auto fp16Control = pContext->GetShaderFloatControl(m_shaderStage, 16);
+    auto fp32Control = pContext->GetShaderFloatControl(m_shaderStage, 32);
+    auto fp64Control = pContext->GetShaderFloatControl(m_shaderStage, 64);
+
+    auto pDestTy = pValue->getType();
+    if ((pDestTy->getScalarType()->isHalfTy() && fp16Control.denormFlushToZero) ||
+        (pDestTy->getScalarType()->isFloatTy() && fp32Control.denormFlushToZero) ||
+        (pDestTy->getScalarType()->isDoubleTy() && fp64Control.denormFlushToZero))
+    {
+        // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
+        pValue = CreateUnaryIntrinsic(Intrinsic::canonicalize, pValue);
+    }
+    return pValue;
 }
 
