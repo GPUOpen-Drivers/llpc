@@ -235,6 +235,16 @@ Value* BuilderReplayer::ProcessCall(
     uint32_t  opcode,   // The builder call opcode
     CallInst* pCall)    // [in] The builder call to process
 {
+    // Set builder fast math flags from the recorded call.
+    if (isa<FPMathOperator>(pCall))
+    {
+        m_pBuilder->setFastMathFlags(pCall->getFastMathFlags());
+    }
+    else
+    {
+        m_pBuilder->clearFastMathFlags();
+    }
+
     // Get the args.
     auto args = ArrayRef<Use>(&pCall->getOperandList()[0], pCall->getNumArgOperands());
 
