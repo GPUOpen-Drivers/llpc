@@ -9468,32 +9468,27 @@ Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst,
   switch (ExtInst->getExtOp()) {
 
   case FMin3AMD: {
-    // Minimum of three FP values. Undefined result if any NaNs.
-    FastMathFlags FMF;
+    // Middle of three FP values. Undefined result if any NaNs.
+    FastMathFlags FMF = getBuilder()->getFastMathFlags();
     FMF.setNoNaNs();
     getBuilder()->setFastMathFlags(FMF);
-    CallInst *Min1 = getBuilder()->CreateMinNum(Args[0], Args[1]);
-    setFastMathFlags(Min1);
-    CallInst *Min2 = getBuilder()->CreateMinNum(Min1, Args[2]);
-    setFastMathFlags(Min2);
-    return Min2;
+    return getBuilder()->CreateFMin3(Args[0], Args[1], Args[2]);
   }
 
   case FMax3AMD: {
-    // Maximum of three FP values. Undefined result if any NaNs.
-    FastMathFlags FMF;
+    // Middle of three FP values. Undefined result if any NaNs.
+    FastMathFlags FMF = getBuilder()->getFastMathFlags();
     FMF.setNoNaNs();
     getBuilder()->setFastMathFlags(FMF);
-    CallInst *Max1 = getBuilder()->CreateMaxNum(Args[0], Args[1]);
-    setFastMathFlags(Max1);
-    CallInst *Max2 = getBuilder()->CreateMaxNum(Max1, Args[2]);
-    setFastMathFlags(Max2);
-    return Max2;
+    return getBuilder()->CreateFMax3(Args[0], Args[1], Args[2]);
   }
 
   case FMid3AMD: {
     // Middle of three FP values. Undefined result if any NaNs.
-    return getBuilder()->CreateFMed3(Args[0], Args[1], Args[2]);
+    FastMathFlags FMF = getBuilder()->getFastMathFlags();
+    FMF.setNoNaNs();
+    getBuilder()->setFastMathFlags(FMF);
+    return getBuilder()->CreateFMid3(Args[0], Args[1], Args[2]);
   }
 
   case UMin3AMD: {

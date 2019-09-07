@@ -361,9 +361,19 @@ Value* BuilderReplayer::ProcessCall(
                                                 cast<ConstantInt>(args[2])->getZExtValue());  // isFine
         }
 
-    case BuilderRecorder::Opcode::FMed3:
+    case BuilderRecorder::Opcode::FMin3:
         {
-            return m_pBuilder->CreateFMed3(args[0], args[1], args[2]);
+            return m_pBuilder->CreateFMin3(args[0], args[1], args[2]);
+        }
+
+    case BuilderRecorder::Opcode::FMax3:
+        {
+            return m_pBuilder->CreateFMax3(args[0], args[1], args[2]);
+        }
+
+    case BuilderRecorder::Opcode::FMid3:
+        {
+            return m_pBuilder->CreateFMid3(args[0], args[1], args[2]);
         }
 
     case BuilderRecorder::Opcode::InsertBitField:

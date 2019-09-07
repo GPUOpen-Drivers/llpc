@@ -93,7 +93,9 @@ public:
         Exp,
         Log,
         InverseSqrt,
-        FMed3,
+        FMin3,
+        FMax3,
+        FMid3,
         InsertBitField,
         ExtractBitField,
 
@@ -240,8 +242,10 @@ public:
     Value* CreateLog(Value* pX, const Twine& instName = "") override final;
     Value* CreateInverseSqrt(Value* pX, const Twine& instName = "") override final;
 
-    // Create fmed3 operation.
-    Value* CreateFMed3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
+    // Methods for trinary min/max/mid.
+    Value* CreateFMin3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
+    Value* CreateFMax3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
+    Value* CreateFMid3(Value* pValue1, Value* pValue2, Value* pValue3, const Twine& instName = "") override final;
 
     // Create derivative calculation on float or vector of float or half
     Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;
