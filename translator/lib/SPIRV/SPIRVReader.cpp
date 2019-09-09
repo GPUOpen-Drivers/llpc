@@ -7538,9 +7538,14 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
       !Addr[Llpc::Builder::ImageAddressIdxLodBias] &&
       !Addr[Llpc::Builder::ImageAddressIdxDerivativeX]) {
     // A gather with no lod, bias or derivatives is done with lod 0, not
-    // implicit lod.
-    Addr[Llpc::Builder::ImageAddressIdxLod] =
-        Constant::getNullValue(getBuilder()->getFloatTy());
+    // implicit lod. Except that does not happen if there is no lod clamp, and
+    // this is a fragment shader, and CapabilityImageGatherBiasLodAMD was
+    // declared.
+    if (Addr[Llpc::Builder::ImageAddressIdxLodClamp] ||
+        !EnableGatherLodNz) {
+      Addr[Llpc::Builder::ImageAddressIdxLod] =
+          Constant::getNullValue(getBuilder()->getFloatTy());
+    }
   }
 
   Value *Result = nullptr;
