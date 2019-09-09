@@ -36,20 +36,20 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = fmul <3 x half> %{{.*}}, <half 0xH2478, half 0xH2478, half 0xH2478>
-; SHADERTEST: = fmul <3 x half> %{{.*}}, <half 0xH5329, half 0xH5329, half 0xH5329>
+; SHADERTEST: = fmul reassoc nnan nsz arcp contract <3 x half> %{{.*}}, <half 0xH2478, half 0xH2478, half 0xH2478>
+; SHADERTEST: = fmul reassoc nnan nsz arcp contract <3 x half> %{{.*}}, <half 0xH5329, half 0xH5329, half 0xH5329>
 ; SHADERTEST: = call <3 x half> @llvm.sin.v3f16(
 ; SHADERTEST: = call <3 x half> @llvm.cos.v3f16(
-; SHADERTEST: = call <3 x half> (...) @llpc.call.tan.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.asin.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.acos.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.atan2.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.sinh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.cosh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.tanh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.asinh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.acosh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.atanh.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.tan.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.asin.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.acos.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.atan2.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.sinh.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.cosh.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.tanh.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.asinh.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.acosh.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.atanh.v3f16(<3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-COUNT-3: call half @llvm.sin.f16(half
 ; SHADERTEST-COUNT-3: call half @llvm.cos.f16(half

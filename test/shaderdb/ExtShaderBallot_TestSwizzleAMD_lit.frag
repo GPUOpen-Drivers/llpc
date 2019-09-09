@@ -29,10 +29,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.swizzle.quad.v2i32(<2 x i32> %{{[0-9]*}}, <4 x i32> <i32 0, i32 1, i32 2, i32 3>)
 ; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.swizzle.quad.v3i32(<3 x i32> %{{[0-9]*}}, <4 x i32> <i32 3, i32 2, i32 1, i32 0>)
-; SHADERTEST: call <4 x float> (...) @llpc.call.subgroup.swizzle.quad.v4f32(<4 x float> %{{[0-9]*}}, <4 x i32> <i32 1, i32 0, i32 3, i32 2>)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.subgroup.swizzle.quad.v4f32(<4 x float> %{{[0-9]*}}, <4 x i32> <i32 1, i32 0, i32 3, i32 2>)
 ; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.swizzle.mask.v2i32(<2 x i32> %{{[0-9]*}}, <3 x i32> <i32 16, i32 2, i32 8>)
 ; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.swizzle.mask.v3i32(<3 x i32> %{{[0-9]*}}, <3 x i32> <i32 14, i32 28, i32 7>)
-; SHADERTEST: call <4 x float> (...) @llpc.call.subgroup.swizzle.mask.v4f32(<4 x float> %{{[0-9]*}}, <3 x i32> <i32 3, i32 15, i32 6>)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.subgroup.swizzle.mask.v4f32(<4 x float> %{{[0-9]*}}, <3 x i32> <i32 3, i32 15, i32 6>)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

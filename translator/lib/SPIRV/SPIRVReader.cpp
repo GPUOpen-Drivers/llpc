@@ -2563,9 +2563,6 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
 {
     LLPC_ASSERT(pLoadPointer->getType()->isPointerTy());
 
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     Type* pLoadType = pLoadPointer->getType()->getPointerElementType();
 
     if (isTypeWithPadRowMajorMatrix(pLoadType))
@@ -3542,9 +3539,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpLoad>(
 Value* SPIRVToLLVM::transLoadImage(
     SPIRVValue* pSpvImageLoadPtr)  // [in] The image/sampler/sampledimage pointer
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVType* pSpvLoadedType = pSpvImageLoadPtr->getType()->getPointerElementType();
     Value* pBase = transImagePointer(pSpvImageLoadPtr);
 
@@ -4262,9 +4256,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupAny>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupBroadcast>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
@@ -4398,9 +4389,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
@@ -4417,9 +4405,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     LLPC_ASSERT(static_cast<SPIRVConstant*>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
@@ -4820,9 +4805,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupBallotKHR>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupFirstInvocationKHR>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
@@ -4879,9 +4861,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpSubgroupReadInvocationKHR>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
 
@@ -4970,9 +4949,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
     switch (BM->getBuiltinSet(pSpvExtInst->getExtSetId()))
     {
     case SPIRVEIS_ShaderBallotAMD:
-        // TODO: Remove this and fix lit tests to cope with fast math flags.
-        getBuilder()->clearFastMathFlags();
-
         switch (pSpvExtInst->getExtOp())
         {
         case SwizzleInvocationsAMD:
@@ -4998,9 +4974,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpExtInst>(
         return transGLSLBuiltinFromExtInst(pSpvExtInst, pBlock);
 
     case SPIRVEIS_GcnShaderAMD:
-        // TODO: Remove this and fix lit tests to cope with fast math flags.
-        getBuilder()->clearFastMathFlags();
-
         switch (pSpvExtInst->getExtOp())
         {
         case CubeFaceCoordAMD:
@@ -5262,9 +5235,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstTemplateBase* const pSpvTranpose = static_cast<SPIRVInstTemplateBase*>(pSpvValue);
 
     Value* const pMatrix = transValue(pSpvTranpose->getOpValue(0),
@@ -5278,9 +5248,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpTranspose>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
@@ -5295,9 +5262,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVectorTimesMatrix>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
@@ -5312,9 +5276,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVectorTimesMatrix>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesVector>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
@@ -5329,9 +5290,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesVector>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesMatrix>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
@@ -5346,9 +5304,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesMatrix>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
@@ -5363,9 +5318,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(
 template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDot>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
 {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVInstruction* const pSpvInst = static_cast<SPIRVInstruction*>(pSpvValue);
     std::vector<SPIRVValue*> spvOperands = pSpvInst->getOperands();
     BasicBlock* const pBlock = getBuilder()->GetInsertBlock();
@@ -6067,9 +6019,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   case OpQuantizeToF16: {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     Value *Val = transValue(BC->getOperand(0), F, BB);
     Value *Result = getBuilder()->CreateQuantizeToFp16(Val);
@@ -6100,9 +6049,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpDPdx:
   case OpDPdxCoarse:
   case OpDPdxFine: {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     bool IsFine = OC == OpDPdxFine;
     Value *Val0 = transValue(BC->getOperand(0), F, BB);
@@ -6113,9 +6059,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpDPdy:
   case OpDPdyCoarse:
   case OpDPdyFine: {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     bool IsFine = OC == OpDPdyFine;
     Value *Val0 = transValue(BC->getOperand(0), F, BB);
@@ -6126,9 +6069,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpFwidth:
   case OpFwidthCoarse:
   case OpFwidthFine: {
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     SPIRVUnary *BC = static_cast<SPIRVUnary *>(BV);
     bool IsFine = OC == OpFwidthFine;
     Value *Val0 = transValue(BC->getOperand(0), F, BB);
@@ -7287,9 +7227,6 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *BI,
   // Get the return type for the Builder method.
   Type *ResultTy = transType(BII->getType());
 
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
-
   // Create the image load.
   return getBuilder()->CreateImageLoad(ResultTy, ImageInfo.Dim, ImageInfo.Flags,
                                      ImageInfo.ImageDesc, Coord, nullptr);
@@ -7323,9 +7260,6 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *BI,
   // Get the return type for the Builder method. It returns v4f32, then we
   // extract just the R channel.
   Type *ResultTy = VectorType::get(transType(BI->getType()), 4);
-
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
 
   // Create the image load.
   Value *Result =
@@ -7541,9 +7475,6 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *BI,
 
   setupImageAddressOperands(BII, OpndIdx, HasProj, Addr, &ImageInfo, nullptr);
 
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
-
   // Create the image sample call.
   Value *Result = getBuilder()->CreateImageSample(
       ResultTy, ImageInfo.Dim, ImageInfo.Flags, ImageInfo.ImageDesc,
@@ -7631,9 +7562,6 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
     }
   }
 
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
-
   Value *Result = nullptr;
   if (ConstOffsets) {
     // A gather with non-standard offsets is done as four separate gathers. If
@@ -7711,9 +7639,6 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *BI,
   Value *SampleNum = nullptr;
   setupImageAddressOperands(BII, OpndIdx, /*HasProj=*/false, Addr, &ImageInfo,
                             &SampleNum);
-
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
 
   // Handle fetch/read/write aspects of coordinate.
   handleImageFetchReadWriteCoord(BI, &ImageInfo, Addr);
@@ -7857,9 +7782,6 @@ Value *SPIRVToLLVM::transSPIRVImageQuerySizeFromInst(SPIRVInstruction *BI,
 // Translate OpImageQueryLod to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *BI,
                                                     BasicBlock *BB) {
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
-
   // Get image type descriptor and load resource and sampler descriptors.
   ExtractedImageInfo ImageInfo = {BB};
   auto BII = static_cast<SPIRVImageInstBase *>(BI);
@@ -9426,9 +9348,6 @@ Instruction *SPIRVToLLVM::transOCLBuiltinFromExtInst(SPIRVExtInst *BC,
 // Translate GLSL.std.450 extended instruction
 Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
                                            BasicBlock *BB) {
-  // TODO: Remove this and fix lit tests to cope with fast math flags.
-  getBuilder()->clearFastMathFlags();
-
   auto BArgs = ExtInst->getArguments();
   auto Args = transValue(ExtInst->getValues(BArgs), BB->getParent(), BB);
   switch (static_cast<GLSLExtOpKind>(ExtInst->getExtOp())) {
@@ -9579,9 +9498,6 @@ Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst,
 
   case FMid3AMD: {
     // Middle of three FP values. Undefined result if any NaNs.
-    // TODO: Remove this and fix lit tests to cope with fast math flags.
-    getBuilder()->clearFastMathFlags();
-
     return getBuilder()->CreateFMed3(Args[0], Args[1], Args[2]);
   }
 

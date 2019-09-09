@@ -15,7 +15,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %[[SQRT4:[^ ,]*]] = call <4 x float> @llvm.sqrt.v4f32(<4 x float>
-; SHADERTEST: = fdiv <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %[[SQRT4]]
+; SHADERTEST: = fdiv reassoc nnan nsz arcp contract <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %[[SQRT4]]
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

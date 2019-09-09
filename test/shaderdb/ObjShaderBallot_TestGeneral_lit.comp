@@ -45,7 +45,7 @@ void main()
 ; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
 ; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
 ; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
-; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.first.f32(
+; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.subgroup.broadcast.first.f32(
 ; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.broadcast.first.v2i32(
 ; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.broadcast.first.v3i32(
 
