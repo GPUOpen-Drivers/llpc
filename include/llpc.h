@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 32
+#define LLPC_INTERFACE_MAJOR_VERSION 33
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
