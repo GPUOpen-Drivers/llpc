@@ -748,6 +748,57 @@ Value* BuilderImplInOut::ReadBuiltIn(
         }
     }
 
+    // Handle the subgroup mask built-ins directly.
+    if ((builtIn == BuiltInSubgroupEqMask)            ||
+        (builtIn == BuiltInSubgroupGeMask)            ||
+        (builtIn == BuiltInSubgroupGtMask)            ||
+        (builtIn == BuiltInSubgroupLeMask)            ||
+        (builtIn == BuiltInSubgroupLtMask))
+    {
+        Value* pResult = nullptr;
+        Value* pLocalInvocationId = ReadBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
+        if (getContext().GetShaderWaveSize(m_shaderStage) == 64)
+        {
+            pLocalInvocationId = CreateZExt(pLocalInvocationId, getInt64Ty());
+        }
+
+        switch (builtIn)
+        {
+        case BuiltInSubgroupEqMask:
+            pResult = CreateShl(ConstantInt::get(pLocalInvocationId->getType(), 1), pLocalInvocationId);
+            break;
+        case BuiltInSubgroupGeMask:
+            pResult = CreateShl(ConstantInt::get(pLocalInvocationId->getType(), -1), pLocalInvocationId);
+            break;
+        case BuiltInSubgroupGtMask:
+            pResult = CreateShl(ConstantInt::get(pLocalInvocationId->getType(), -2), pLocalInvocationId);
+            break;
+        case BuiltInSubgroupLeMask:
+            pResult = CreateSub(CreateShl(ConstantInt::get(pLocalInvocationId->getType(), 2), pLocalInvocationId),
+                                ConstantInt::get(pLocalInvocationId->getType(), 1));
+            break;
+        case BuiltInSubgroupLtMask:
+            pResult = CreateSub(CreateShl(ConstantInt::get(pLocalInvocationId->getType(), 1), pLocalInvocationId),
+                                ConstantInt::get(pLocalInvocationId->getType(), 1));
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+        }
+        if (getContext().GetShaderWaveSize(m_shaderStage) == 64)
+        {
+            pResult = CreateInsertElement(Constant::getNullValue(VectorType::get(getInt64Ty(), 2)),
+                                          pResult,
+                                          uint64_t(0));
+            pResult = CreateBitCast(pResult, pResultTy);
+        }
+        else
+        {
+            pResult = CreateInsertElement(ConstantInt::getNullValue(pResultTy), pResult, uint64_t(0));
+        }
+        pResult->setName(instName);
+        return pResult;
+    }
+
     // For now, this just generates a call to llpc.input.import.builtin. A future commit will
     // change it to generate IR more directly here.
     // A vertex index is valid only in TCS, TES, GS.
@@ -779,18 +830,6 @@ Value* BuilderImplInOut::ReadBuiltIn(
     default:
         LLPC_ASSERT((pIndex == nullptr) && (pVertexIndex == nullptr));
         break;
-    }
-
-    if ((builtIn == BuiltInSubgroupLocalInvocationId) ||
-        (builtIn == BuiltInSubgroupEqMask)            ||
-        (builtIn == BuiltInSubgroupGeMask)            ||
-        (builtIn == BuiltInSubgroupGtMask)            ||
-        (builtIn == BuiltInSubgroupLeMask)            ||
-        (builtIn == BuiltInSubgroupLtMask))
-    {
-        // These built-ins are stage independent and are currently implemented in the .ll library. We
-        // need to cut back to just one argument, otherwise it will fail to link.
-        args.resize(1);
     }
 
     std::string callName = isOutput ? LlpcName::OutputImportBuiltIn : LlpcName::InputImportBuiltIn;

@@ -50,12 +50,6 @@ void main()
 ; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.broadcast.first.v3i32(
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLtMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLeMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupGtMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupGeMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupEqMask.v4i32.i32
-; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32
 ; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} pipeline patching results

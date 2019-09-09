@@ -41,12 +41,6 @@ void main(void)
 ; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.subgroup.broadcast.f32(
 ; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.subgroup.broadcast.first.f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLtMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLeMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupGtMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupGeMask.v4i32.i32
-; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupEqMask.v4i32.i32
-; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupSize.i32.i32
 ; SHADERTEST: call i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32
 
 ; SHADERTEST: AMDLLPC SUCCESS
