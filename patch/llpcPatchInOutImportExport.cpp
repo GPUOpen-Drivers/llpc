@@ -5919,8 +5919,8 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     //     %4 = mul i32 %tfOffset, 4
     //     %5 = add i32 %3, %4
     //     %6 = add i32 %tfBufferBase, %5
-    //     call void @llvm.amdgcn.buffer.store.f32(
-    //         float %tfValue, <4 x i32> %tfBufferDesc, i32 0, i32 %6, i1 true, i1 false)
+    //     call void @llvm.amdgcn.raw.buffer.store.f32(
+    //         float %tfValue, <4 x i32> %tfBufferDesc, i32 %6, i32 0, i32 1)
     //     br label %.end
     //
     // .end:
@@ -5987,12 +5987,11 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     std::vector<Value*> args;
     args.push_back(pTfValue);                                       // vdata
     args.push_back(pTfBufferDesc);                                  // rsrc
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));     // vindex
     args.push_back(pTfBufferOffset);                                // offset
-    args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // glc
-    args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // slc
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));     // soffset
+    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));     // cachepolicy: glc = 1
 
-    EmitCall(m_pModule, "llvm.amdgcn.buffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pBranch);
+    EmitCall(m_pModule, "llvm.amdgcn.raw.buffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pBranch);
 
     // Create entry block
     BasicBlock* pEntryBlock = BasicBlock::Create(*m_pContext, "", pFunc, pTfStoreBlock);
