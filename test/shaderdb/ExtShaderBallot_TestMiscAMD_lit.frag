@@ -33,7 +33,7 @@ void main()
 ; SHADERTEST: call i32 (...) @llpc.call.subgroup.mbcnt.i32(
 ; SHADERTEST: call <2 x i32> (...) @llpc.call.subgroup.write.invocation.v2i32(
 ; SHADERTEST: call <3 x i32> (...) @llpc.call.subgroup.write.invocation.v3i32(
-; SHADERTEST: call <4 x float> (...) @llpc.call.subgroup.write.invocation.v4f32(
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.subgroup.write.invocation.v4f32(
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -20,17 +20,13 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call float (...) @llpc.call.tan.f32(float
-; SHADERTEST: = call <3 x float> (...) @llpc.call.tan.v3f32(<3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @llpc.call.tan.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.tan.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.cos.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fdiv float 1.000000e+00, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.sin.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.cos.f32(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = fdiv float 1.000000e+00, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, %{{.*}}
+; SHADERTEST: %{{[0-9]*}} = call <3 x float> @llvm.sin.v3f32(<3 x float>
+; SHADERTEST: %{{[0-9]*}} = call <3 x float> @llvm.cos.v3f32(<3 x float>
+; SHADERTEST: %{{[0-9]*}} = fdiv reassoc nnan nsz arcp contract <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>,
+; SHADERTEST: %{{[0-9]*}} = fmul reassoc nnan nsz arcp contract <3 x float>
 ; SHADERTEST: %{{[0-9]*}} = fcmp one float %{{.*}}, %{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */

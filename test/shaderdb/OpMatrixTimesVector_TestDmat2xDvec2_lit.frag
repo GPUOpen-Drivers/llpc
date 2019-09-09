@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: <2 x double> (...) @llpc.call.matrix.times.vector.v2f64
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: fmul double
-; SHADERTEST: fadd double
+; SHADERTEST: fmul reassoc nnan nsz arcp contract double
+; SHADERTEST: fadd reassoc nnan nsz arcp contract double
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -33,7 +33,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <4 x float> (...) @llpc.call.image.load.v4f32(i32 6, i32 0,
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.load.v4f32(i32 6, i32 0,
 ; SHADERTEST: call <4 x i32> (...) @llpc.call.image.load.v4i32(i32 2, i32 0,
 ; SHADERTEST: call <4 x i32> (...) @llpc.call.image.load.v4i32(i32 7, i32 0,
 ; SHADERTEST: call <4 x i32> (...) @llpc.call.image.load.v4i32(i32 1, i32 32,

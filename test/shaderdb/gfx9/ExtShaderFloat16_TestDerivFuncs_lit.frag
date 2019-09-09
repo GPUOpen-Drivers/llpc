@@ -30,27 +30,27 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
 ; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
 ; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
-; SHADERTEST: = fadd <3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
+; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
 ; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
 ; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
-; SHADERTEST: = fadd <3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
 ; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
 ; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
-; SHADERTEST: = fadd <3 x half>
+; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

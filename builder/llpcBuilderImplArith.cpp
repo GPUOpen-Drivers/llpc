@@ -466,6 +466,11 @@ Value* BuilderImplArith::CreatePower(
     Value*        pY,         // [in] Input value Y
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
+    if (pX == ConstantFP::get(pX->getType(), 2.0))
+    {
+        return CreateUnaryIntrinsic(Intrinsic::exp2, pY, nullptr, instName);
+    }
+
     // llvm.pow only works with (vector of) float.
     if (pX->getType()->getScalarType()->isFloatTy())
     {

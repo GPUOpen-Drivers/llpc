@@ -38,8 +38,8 @@ void main(void)
 ; SHADERTEST: call <4 x i32> (...) @llpc.call.subgroup.ballot.v4i32(
 ; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.i32(
 ; SHADERTEST: call i32 (...) @llpc.call.subgroup.broadcast.first.i32(
-; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.f32(
-; SHADERTEST: call float (...) @llpc.call.subgroup.broadcast.first.f32(
+; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.subgroup.broadcast.f32(
+; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.subgroup.broadcast.first.f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLtMask.v4i32.i32
 ; SHADERTEST: call <4 x i32> @llpc.input.import.builtin.SubgroupLeMask.v4i32.i32

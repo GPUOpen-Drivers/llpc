@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @"llpc.call.get.image.desc.ptr{{.*}}(i32 0, i32 0
 ; SHADERTEST: call {{.*}} @"llpc.call.get.sampler.desc.ptr{{.*}}(i32 0, i32 0
-; SHADERTEST: call <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, {{.*}}, i32 37, {{.*}}, i32 1, float 0.000000e+00)
+; SHADERTEST: call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.image.gather.v4f32(i32 1, i32 0, {{.*}}, i32 37, {{.*}}, i32 1, float 0.000000e+00)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 2,{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)

@@ -15,21 +15,21 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 true, i1 false)
 ; SHADERTEST: = call <3 x float> @llvm.fabs.v3f32(
 ; SHADERTEST: = call <3 x float> @llvm.fabs.v3f32(
-; SHADERTEST: = fadd <3 x float>
-; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 true)
-; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 true, i1 true)
+; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 true)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 true, i1 true)
 ; SHADERTEST: = call <3 x float> @llvm.fabs.v3f32(
 ; SHADERTEST: = call <3 x float> @llvm.fabs.v3f32(
-; SHADERTEST: = fadd <3 x float>
-; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
-; SHADERTEST: = call <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 true, i1 false)
+; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 false, i1 false)
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.derivative.v3f32(<3 x float> %{{.*}}, i1 true, i1 false)
 ; SHADERTEST: = call <3 x float> @llvm.fabs.v3f32(
 ; SHADERTEST: = call <3 x float> @llvm.fabs.v3f32(
-; SHADERTEST: = fadd <3 x float>
+; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x float>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
