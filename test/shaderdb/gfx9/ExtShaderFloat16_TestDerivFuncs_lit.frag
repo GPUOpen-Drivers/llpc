@@ -38,18 +38,18 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
-; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
-; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(
 ; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 true)
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 true)
-; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
-; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(
 ; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 false, i1 false)
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.derivative.v3f16(<3 x half> %{{.*}}, i1 true, i1 false)
-; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
-; SHADERTEST: = call <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.fabs.v3f16(
 ; SHADERTEST: = fadd reassoc nnan nsz arcp contract <3 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

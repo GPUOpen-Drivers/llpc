@@ -36,10 +36,10 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.power.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.exp.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> (...) @llpc.call.log.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> @llvm.exp2.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> @llvm.log2.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> @llvm.sqrt.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> @llvm.sqrt.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.exp2.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.log2.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.sqrt.v3f16(<3 x half>
+; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.sqrt.v3f16(<3 x half>
 ; SHADERTEST: = fdiv reassoc nnan nsz arcp contract <3 x half> <half 0xH3C00, half 0xH3C00, half 0xH3C00>,
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
