@@ -26,9 +26,9 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @llpc.call.log.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.log.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call float @llvm.log2.f32(float
-; SHADERTEST: = call float @llvm.log2.f32(float
-; SHADERTEST-NOT: = call float @llvm.log2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.log2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.log2.f32(float
+; SHADERTEST-NOT: = call{{.*}} @llvm.log2.f32(float
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
 ; SHADERTEST: AMDLLPC SUCCESS
 */

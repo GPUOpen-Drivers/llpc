@@ -212,6 +212,27 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
 
+    // Create a call to the specified intrinsic with one operand, mangled on its type.
+    // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+    // flags from the Builder if none are specified by pFmfSource.
+    CallInst* CreateUnaryIntrinsic(
+        Intrinsic::ID id,                   // Intrinsic ID
+        Value*        pValue,               // [in] Input value
+        Instruction*  pFmfSource = nullptr, // [in] Instruction to copy fast math flags from; nullptr to get
+                                            //    from Builder
+        const Twine&  instName = "");       // [in] Name to give instruction
+
+    // Create a call to the specified intrinsic with two operands of the same type, mangled on that type.
+    // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+    // flags from the Builder if none are specified by pFmfSource.
+    CallInst* CreateBinaryIntrinsic(
+        Intrinsic::ID id,                   // Intrinsic ID
+        Value*        pValue1,              // [in] Input value 1
+        Value*        pValue2,              // [in] Input value 2
+        Instruction*  pFmfSource = nullptr, // [in] Instruction to copy fast math flags from; nullptr to get
+                                            //    from Builder
+        const Twine&  name = "");           // [in] Name to give instruction
+
     // Create vector dot product operation. The two vectors must be the same floating point vector type.
     // Returns a value whose type is the element type of the vectors.
     virtual Value* CreateDotProduct(

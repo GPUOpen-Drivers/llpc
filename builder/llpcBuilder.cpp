@@ -540,3 +540,49 @@ Constant* Builder::Get180OverPi(
     return GetFpConstant(pTy, APFloat(APFloat::IEEEdouble(), APInt(64, 0x404CA5DC20000000)));
 }
 
+// =====================================================================================================================
+// Create a call to the specified intrinsic with one operand, mangled on its type.
+// This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+// flags from the Builder if none are specified by pFmfSource.
+CallInst* Builder::CreateUnaryIntrinsic(
+    Intrinsic::ID id,           // Intrinsic ID
+    Value*        pValue,       // [in] Input value
+    Instruction*  pFmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
+    const Twine&  instName)     // [in] Name to give instruction
+{
+    CallInst* pResult = IRBuilder<>::CreateUnaryIntrinsic(id, pValue, pFmfSource, instName);
+    if ((pFmfSource == nullptr) && isa<FPMathOperator>(pResult))
+    {
+        // There are certain intrinsics with an FP result that we do not want FMF on.
+        switch (id)
+        {
+        case Intrinsic::amdgcn_wqm:
+        case Intrinsic::amdgcn_wwm:
+            break;
+        default:
+            pResult->setFastMathFlags(getFastMathFlags());
+            break;
+        }
+    }
+    return pResult;
+}
+
+// =====================================================================================================================
+// Create a call to the specified intrinsic with two operands of the same type, mangled on that type.
+// This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+// flags from the Builder if none are specified by pFmfSource.
+CallInst* Builder::CreateBinaryIntrinsic(
+    Intrinsic::ID id,           // Intrinsic ID
+    Value*        pValue1,      // [in] Input value 1
+    Value*        pValue2,      // [in] Input value 2
+    Instruction*  pFmfSource,   // [in] Instruction to copy fast math flags from; nullptr to get from Builder
+    const Twine&  name)         // [in] Name to give instruction
+{
+    CallInst* pResult = IRBuilder<>::CreateBinaryIntrinsic(id, pValue1, pValue2, pFmfSource, name);
+    if ((pFmfSource == nullptr) && isa<FPMathOperator>(pResult))
+    {
+        pResult->setFastMathFlags(getFastMathFlags());
+    }
+    return pResult;
+}
+

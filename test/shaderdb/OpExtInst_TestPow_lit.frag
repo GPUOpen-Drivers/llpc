@@ -23,8 +23,8 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract float (...) @llpc.call.power.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x float> (...) @llpc.call.power.v3f32(<3 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

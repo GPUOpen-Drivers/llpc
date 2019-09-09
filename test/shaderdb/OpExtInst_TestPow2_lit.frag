@@ -18,7 +18,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: = call float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
-; SHADERTEST: = call float @llvm.exp2.f32(float
+; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.exp2.f32(float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

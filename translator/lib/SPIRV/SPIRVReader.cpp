@@ -9364,13 +9364,11 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
 
   case GLSLstd450Sin:
     // sin operation
-    return getBuilder()->CreateIntrinsic(Intrinsic::sin, Args[0]->getType(),
-                                       Args[0]);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sin, Args[0]);
 
   case GLSLstd450Cos:
     // cos operation
-    return getBuilder()->CreateIntrinsic(Intrinsic::cos, Args[0]->getType(),
-                                       Args[0]);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::cos, Args[0]);
 
   case GLSLstd450Tan:
     // tan operation
@@ -9430,24 +9428,21 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
 
   case GLSLstd450Exp2:
     // Base 2 exponent: 2^x
-    return getBuilder()->CreateIntrinsic(Intrinsic::exp2, Args[0]->getType(),
-                                       Args[0]);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::exp2, Args[0]);
 
   case GLSLstd450Log2:
     // Base 2 logarithm: log2(x)
-    return getBuilder()->CreateIntrinsic(Intrinsic::log2, Args[0]->getType(),
-                                       Args[0]);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::log2, Args[0]);
 
   case GLSLstd450Sqrt:
     // Square root
-    return getBuilder()->CreateIntrinsic(Intrinsic::sqrt, Args[0]->getType(),
-                                       Args[0]);
+    return getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, Args[0]);
 
   case GLSLstd450InverseSqrt: {
     // Inverse square root
-    Value *Sqrt = getBuilder()->CreateIntrinsic(Intrinsic::sqrt,
-                                              Args[0]->getType(), Args[0]);
-    return getBuilder()->CreateFDiv(ConstantFP::get(Sqrt->getType(), 1.0), Sqrt);
+    Value *Sqrt = getBuilder()->CreateUnaryIntrinsic(Intrinsic::sqrt, Args[0]);
+    return getBuilder()->CreateFDiv(ConstantFP::get(Sqrt->getType(), 1.0),
+                                    Sqrt);
   }
 
   case GLSLstd450Determinant:
