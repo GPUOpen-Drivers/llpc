@@ -3315,6 +3315,21 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
             pInput = ConstantInt::get(m_pContext->Int32Ty(), numSubgroups);
             break;
         }
+    case BuiltInGlobalInvocationId:
+        {
+            pInput = GetGlobalInvocationId(pInputTy, pInsertPos);
+            break;
+        }
+    case BuiltInLocalInvocationIndex:
+        {
+            pInput = GetLocalInvocationIndex(pInputTy, pInsertPos);
+            break;
+        }
+    case BuiltInSubgroupId:
+        {
+            pInput = GetSubgroupId(pInputTy, pInsertPos);
+            break;
+        }
     default:
         {
             LLPC_NEVER_CALLED();
@@ -3323,6 +3338,54 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     }
 
     return pInput;
+}
+
+// =====================================================================================================================
+// Get GlobalInvocationId
+Value* PatchInOutImportExport::GetGlobalInvocationId(
+    Type*         pInputTy,   // [in] Type of GlobalInvocationId
+    Instruction*  pInsertPos) // [in] Insert position
+{
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(pInsertPos);
+    Value* pWorkgroupSize = PatchCsBuiltInInputImport(pInputTy, BuiltInWorkgroupSize, pInsertPos);
+    Value* pWorkgroupId = PatchCsBuiltInInputImport(pInputTy, BuiltInWorkgroupId, pInsertPos);
+    Value* pLocalInvocationId = PatchCsBuiltInInputImport(pInputTy, BuiltInLocalInvocationId, pInsertPos);
+    Value* pInput = builder.CreateMul(pWorkgroupSize, pWorkgroupId);
+    pInput = builder.CreateAdd(pInput, pLocalInvocationId);
+    return pInput;
+}
+
+// =====================================================================================================================
+// Get LocalInvocationIndex
+Value* PatchInOutImportExport::GetLocalInvocationIndex(
+    Type*         pInputTy,   // [in] Type of LocalInvocationIndex
+    Instruction*  pInsertPos) // [in] Insert position
+{
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(pInsertPos);
+    Value* pWorkgroupSize = PatchCsBuiltInInputImport(pInputTy, BuiltInWorkgroupSize, pInsertPos);
+    Value* pLocalInvocationId = PatchCsBuiltInInputImport(pInputTy, BuiltInLocalInvocationId, pInsertPos);
+    Value* pInput = builder.CreateMul(builder.CreateExtractElement(pWorkgroupSize, 1),
+                                      builder.CreateExtractElement(pLocalInvocationId, 2));
+    pInput = builder.CreateAdd(pInput, builder.CreateExtractElement(pLocalInvocationId, 1));
+    pInput = builder.CreateMul(builder.CreateExtractElement(pWorkgroupSize, uint64_t(0)), pInput);
+    pInput = builder.CreateAdd(pInput, builder.CreateExtractElement(pLocalInvocationId, uint64_t(0)));
+    return pInput;
+}
+
+// =====================================================================================================================
+// Get SubgroupId
+Value* PatchInOutImportExport::GetSubgroupId(
+    Type*         pInputTy,   // [in] Type of LocalInvocationIndex
+    Instruction*  pInsertPos) // [in] Insert position
+{
+    // gl_SubgroupID = gl_LocationInvocationIndex / gl_SubgroupSize
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(pInsertPos);
+    Value* pLocalInvocationIndex = PatchCsBuiltInInputImport(pInputTy, BuiltInLocalInvocationIndex, pInsertPos);
+    uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    return builder.CreateLShr(pLocalInvocationIndex, builder.getInt32(Log2_32(subgroupSize)));
 }
 
 // =====================================================================================================================
