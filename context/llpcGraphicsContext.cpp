@@ -180,6 +180,12 @@ const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
     ShaderStage shaderStage // Shader stage
     ) const
 {
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        // Treat copy shader as part of geometry shader
+        shaderStage = ShaderStageGeometry;
+    }
+
     LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
 
     const PipelineShaderInfo* pShaderInfo = nullptr;
