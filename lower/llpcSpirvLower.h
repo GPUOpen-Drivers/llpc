@@ -105,7 +105,8 @@ public:
     }
 
     // Add per-shader lowering passes to pass manager
-    static void AddPasses(ShaderStage                 stage,
+    static void AddPasses(Context*                    pContext,
+                          ShaderStage                 stage,
                           llvm::legacy::PassManager&  passMgr,
                           llvm::Timer*                pLowerTimer,
                           uint32_t                    forceLoopUnrollCount,

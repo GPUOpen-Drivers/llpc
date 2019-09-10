@@ -905,7 +905,8 @@ Result Compiler::BuildShaderModule(
                     }
 
                     // Per-shader SPIR-V lowering passes.
-                    SpirvLower::AddPasses(static_cast<ShaderStage>(entryNames[i].stage),
+                    SpirvLower::AddPasses(pContext,
+                        static_cast<ShaderStage>(entryNames[i].stage),
                         lowerPassMgr,
                         TimePassesIsEnabled ? &lowerTimer : nullptr,
                         cl::ForceLoopUnrollCount,
@@ -1232,7 +1233,9 @@ Result Compiler::BuildPipelineInternal(
 
             pContext->GetBuilder()->SetShaderStage(pShaderInfo->entryStage);
             PassManager lowerPassMgr(&passIndex);
-            SpirvLower::AddPasses(pShaderInfo->entryStage,
+
+            SpirvLower::AddPasses(pContext,
+                                    pShaderInfo->entryStage,
                                     lowerPassMgr,
                                     TimePassesIsEnabled ? &lowerTimer : nullptr,
                                     forceLoopUnrollCount,
@@ -1349,6 +1352,9 @@ Result Compiler::BuildPipelineInternal(
         // manager.
         PassManager patchPassMgr(&passIndex);
         patchPassMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
+
+        // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+        AddTargetLibInfo(pContext, &patchPassMgr);
 
         ElfPackage partialPipelineElf;
 

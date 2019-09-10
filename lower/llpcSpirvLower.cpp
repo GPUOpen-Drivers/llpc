@@ -79,6 +79,7 @@ namespace Llpc
 // =====================================================================================================================
 // Add per-shader lowering passes to pass manager
 void SpirvLower::AddPasses(
+    Context*              pContext,               // [in] LLPC context
     ShaderStage           stage,                  // Shader stage
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
     llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
@@ -86,6 +87,9 @@ void SpirvLower::AddPasses(
     bool*                 pNeedDynamicLoopUnroll) // [out] nullptr or where to store flag of whether dynamic loop
                                                   // unrolling is needed
 {
+    // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+    AddTargetLibInfo(pContext, &passMgr);
+
     // Start timer for lowering passes.
     if (pLowerTimer != nullptr)
     {

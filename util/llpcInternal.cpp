@@ -749,4 +749,30 @@ bool IsIsaText(
     return (dataSize != 0) && ((reinterpret_cast<const char*>(pData))[0] == '\t');
 }
 
+// =====================================================================================================================
+// Manually add a target-aware TLI pass, so middle-end optimizations do not think that we have library functions.
+void AddTargetLibInfo(
+    Context*              pContext,   // [in] LLPC context
+    legacy::PassManager*  pPassMgr)   // [in/out] Pass manager
+{
+    TargetLibraryInfoImpl targetLibInfo(pContext->GetTargetMachine()->getTargetTriple());
+
+    // Adjust it to allow memcpy and memset.
+    // TODO: Investigate why the latter is necessary. I found that
+    // test/shaderdb/ObjStorageBlock_TestMemCpyInt32.comp
+    // got unrolled far too much, and at too late a stage for the descriptor loads to be commoned up. It might
+    // be an unfortunate interaction between LoopIdiomRecognize and fat pointer laundering.
+    targetLibInfo.setAvailable(LibFunc_memcpy);
+    targetLibInfo.setAvailable(LibFunc_memset);
+
+    // Also disallow tan functions.
+    // TODO: This can be removed once we have LLVM fix D67406.
+    targetLibInfo.setUnavailable(LibFunc_tan);
+    targetLibInfo.setUnavailable(LibFunc_tanf);
+    targetLibInfo.setUnavailable(LibFunc_tanl);
+
+    auto pTargetLibInfoPass = new TargetLibraryInfoWrapperPass(targetLibInfo);
+    pPassMgr->add(pTargetLibInfoPass);
+}
+
 } // Llpc
