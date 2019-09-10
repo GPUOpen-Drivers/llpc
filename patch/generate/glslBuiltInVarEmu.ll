@@ -229,41 +229,6 @@ define i32 @llpc.input.import.builtin.SubgroupId.i32.i32(i32 %builtInId) #0
     ret i32 %3
 }
 
-; =====================================================================================================================
-; >>>  Fragment Shader Built-in Variables
-; =====================================================================================================================
-
-; Gets the offset of sample position relative to the pixel center for the specified sample ID
-define <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 %builtInId, i32 %sampleId) #0
-{
-    ; BuiltInNumSamples (268435464 = 0x10000008)
-    %1 = call i32 @llpc.input.import.builtin.NumSamples.i32.i32(i32 268435464)
-    ; BuiltInSamplePatternIdx (268435465 = 0x10000009)
-    %2 = call i32 @llpc.input.import.builtin.SamplePatternIdx.i32.i32(i32 268435465)
-    %3 = add i32 %2, %sampleId
-
-    ; offset = (sampleCount > sampleId) ? (samplePatternOffset + sampleId) : 0
-    %4 = icmp ugt i32 %1, %sampleId
-    %5 = select i1 %4, i32 %3, i32 0
-
-    ; Load sample position descriptor (GlobalTable (268435456 = 0x10000000), SAMPLEPOS (12))
-    %6 = shl i32 %5, 4
-    %7 = call <4 x i32> @llpc.descriptor.load.buffer(i32 268435456, i32 12, i32 0, i1 0)
-    %8 = call <8 x i8> @llpc.buffer.load.v8i8(<4 x i32> %7, i32 %6, i1 1, i32 0, i1 0)
-    %9 = bitcast <8 x i8> %8 to <2 x float>
-    ret <2 x float> %9
-}
-
-; GLSL: in vec2 gl_SamplePosition
-define <2 x float> @llpc.input.import.builtin.SamplePosition.v2f32.i32(i32 %builtInId) #0
-{
-    %1 = call i32 @llpc.input.import.builtin.SampleId.i32.i32(i32 18)
-    ; BuiltInSamplePosOffset (268435463 = 0x10000007)
-    %2 = call <2 x float> @llpc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(i32 268435463, i32 %1) #0
-    %3 = fadd <2 x float> %2, <float 0.5, float 0.5>
-    ret <2 x float> %3
-}
-
 declare i32 @llpc.input.import.builtin.SubgroupLocalInvocationId.i32.i32(i32) #0
 declare <3 x i32> @llpc.input.import.builtin.WorkgroupSize.v3i32.i32(i32) #0
 declare <3 x i32> @llpc.input.import.builtin.WorkgroupId.v3i32.i32(i32) #0

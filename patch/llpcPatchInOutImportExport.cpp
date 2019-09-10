@@ -30,6 +30,7 @@
  */
 #define DEBUG_TYPE "llpc-patch-in-out-import-export"
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -467,7 +468,12 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageFragment:
                 {
-                    pInput = PatchFsBuiltInInputImport(pInputTy, builtInId, &callInst);
+                    Value* pSampleId = nullptr;
+                    if (callInst.getNumArgOperands() >= 2)
+                    {
+                        pSampleId = callInst.getArgOperand(1);
+                    }
+                    pInput = PatchFsBuiltInInputImport(pInputTy, builtInId, pSampleId, &callInst);
                     break;
                 }
             case ShaderStageCompute:
@@ -2817,6 +2823,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
 Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     Type*        pInputTy,      // [in] Type of input value
     uint32_t     builtInId,     // ID of the built-in variable
+    Value*       pSampleId,     // [in] Sample ID; only needed for BuiltInSamplePosOffset
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
     Value* pInput = UndefValue::get(pInputTy);
@@ -3172,6 +3179,16 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                                       pInsertPos);
             break;
         }
+    case BuiltInSamplePosOffset:
+        {
+            pInput = GetSamplePosOffset(pInputTy, pSampleId, pInsertPos);
+            break;
+        }
+    case BuiltInSamplePosition:
+        {
+            pInput = GetSamplePosition(pInputTy, pInsertPos);
+            break;
+        }
     default:
         {
             LLPC_NEVER_CALLED();
@@ -3180,6 +3197,57 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
     }
 
     return pInput;
+}
+
+// =====================================================================================================================
+// Generate code to read BuiltInSamplePosOffset
+Value* PatchInOutImportExport::GetSamplePosOffset(
+    Type*         pInputTy,     // [in] Type of BuiltInSamplePosOffset
+    Value*        pSampleId,    // [in] Sample ID
+    Instruction*  pInsertPos)   // [in] Insert position
+{
+    // Gets the offset of sample position relative to the pixel center for the specified sample ID
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(pInsertPos);
+    Value* pNumSamples = PatchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInNumSamples, nullptr, pInsertPos);
+    Value* pPatternIdx = PatchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInSamplePatternIdx, nullptr, pInsertPos);
+    Value* pValidOffset = builder.CreateAdd(pPatternIdx, pSampleId);
+    // offset = (sampleCount > sampleId) ? (samplePatternOffset + sampleId) : 0
+    Value* pSampleValid = builder.CreateICmpUGT(pNumSamples, pSampleId);
+    Value* pOffset = builder.CreateSelect(pSampleValid, pValidOffset, builder.getInt32(0));
+    // Load sample position descriptor.
+    auto pDesc = EmitCall(m_pModule,
+                          LlpcName::DescriptorLoadBuffer,
+                          VectorType::get(builder.getInt32Ty(), 4),
+                          {
+                              builder.getInt32(InternalResourceTable),
+                              builder.getInt32(SI_DRV_TABLE_SAMPLEPOS),
+                              builder.getInt32(0),
+                          },
+                          NoAttrib,
+                          pInsertPos);
+    pOffset = builder.CreateShl(pOffset, builder.getInt32(4));
+    return builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load,
+                                   pInputTy,
+                                   {
+                                      pDesc,
+                                      pOffset,
+                                      builder.getInt32(0),
+                                      builder.getInt32(0)
+                                   });
+}
+
+// =====================================================================================================================
+// Generate code to read BuiltInSamplePosition
+Value* PatchInOutImportExport::GetSamplePosition(
+    Type*         pInputTy,   // [in] Type of BuiltInSamplePosition
+    Instruction*  pInsertPos) // [in] Insert position
+{
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(pInsertPos);
+    Value* pSampleId = PatchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInSampleId, nullptr, pInsertPos);
+    Value* pInput = PatchFsBuiltInInputImport(pInputTy, BuiltInSamplePosOffset, pSampleId, pInsertPos);
+    return builder.CreateFAdd(pInput, ConstantFP::get(pInputTy, 0.5));
 }
 
 // =====================================================================================================================
