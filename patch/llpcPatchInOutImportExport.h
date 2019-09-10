@@ -160,6 +160,9 @@ private:
     llvm::Value* GetSamplePosOffset(llvm::Type* pInputTy, llvm::Value* pSampleId, llvm::Instruction* pInsertPos);
     llvm::Value* GetSamplePosition(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
     llvm::Value* PatchCsBuiltInInputImport(llvm::Type* pInputTy, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    llvm::Value* GetGlobalInvocationId(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
+    llvm::Value* GetLocalInvocationIndex(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
+    llvm::Value* GetSubgroupId(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
 
     llvm::Value* PatchTcsBuiltInOutputImport(llvm::Type*        pOutputTy,
                                              uint32_t           builtInId,
