@@ -125,7 +125,7 @@ Value* BuilderImplArith::CreateSMod(
             if (pDivisorConst->getZExtValue() <= 0xFFFF)
             {
                 // Get a non-constant 0 value. (We know the top 17 bits of the 64-bit PC is always zero.)
-                Value* pPc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, getInt64Ty(), {});
+                Value* pPc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
                 Value* pPcHi = CreateExtractElement(CreateBitCast(pPc, VectorType::get(getInt32Ty(), 2)), 1);
                 Value* pNonConstantZero = CreateLShr(pPcHi, getInt32(15));
                 if (auto pVecTy = dyn_cast<VectorType>(pDivisor->getType()))
