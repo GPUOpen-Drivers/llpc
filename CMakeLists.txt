@@ -356,7 +356,6 @@ if(ICD_BUILD_LLPC)
         util/llpcInternal.cpp
         util/llpcFile.cpp
         util/llpcPassDeadFuncRemove.cpp
-        util/llpcPassExternalLibLink.cpp
         util/llpcPassLoopInfoCollect.cpp
         util/llpcPassManager.cpp
         util/llpcPipelineDumper.cpp
@@ -397,46 +396,12 @@ elseif(WIN32)
     set(BUILD_OS win)
 endif()
 
-set(GEN_GLSL_EMU_LIB_DEPS
-    ${OP_EMU_LIB_GEN_DIR}/glslBufferOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslBuiltInVarEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslInlineConstOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslPushConstOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslSharedVarOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/glslSpecialOpEmuD16.ll
-    ${OP_EMU_LIB_GEN_DIR}/llvmIntrinsicEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/glslSpecialOpEmu.ll
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslEmuLib.py
-    ${OP_EMU_LIB_GEN_DIR}/script/genGlslOpEmuCodeUtil.py
-)
-
-set(GEN_GLSL_EMU_LIB_OUTPUTS
-    ${OP_EMU_LIB_GEN_DIR}/g_llpcGlslEmuLib.h
-    ${OP_EMU_LIB_GEN_DIR}/gfx8/g_llpcGlslEmuLibGfx8.h
-    ${OP_EMU_LIB_GEN_DIR}/gfx9/g_llpcGlslEmuLibGfx9.h
-)
-
 if(UNIX)
     set(LLVM_BIN_DIR ${XGL_LLVM_BUILD_PATH}/bin/)
 elseif(WIN32)
     set(LLVM_BIN_DIR ${XGL_LLVM_BUILD_PATH}/\$\(Configuration\)/bin/)
 endif()
 
-add_custom_target(
-    RunHeapGlslOpEmuLibGenerator
-    DEPENDS ${GEN_GLSL_EMU_LIB_OUTPUTS}
-)
-
-add_custom_command(
-    OUTPUT ${GEN_GLSL_EMU_LIB_OUTPUTS}
-    COMMAND ${PYTHON_CMD} ${GEN_GLSL_OP_EMU_LIB_SCRIPT} ${LLVM_BIN_DIR}  ${LLVM_BIN_DIR}  ${BUILD_OS}
-    COMMENT "Re-generating GLSL emulation library"
-    DEPENDS ${GEN_GLSL_EMU_LIB_DEPS}
-    DEPENDS llvm-ar llvm-link llvm-as opt
-)
-
-add_dependencies(llpc RunHeapGlslOpEmuLibGenerator)
 endif()
 ### Link Libraries #####################################################################################################
 # CMAKE-TODO: LLVM_LIB_DIR should probably be set in the op level CMake?

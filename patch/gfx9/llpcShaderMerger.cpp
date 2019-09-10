@@ -39,7 +39,6 @@
 #include "llpcNggPrimShader.h"
 #endif
 #include "llpcPassDeadFuncRemove.h"
-#include "llpcPassExternalLibLink.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
 #include "llpcShaderMerger.h"
