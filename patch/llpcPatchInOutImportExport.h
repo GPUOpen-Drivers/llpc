@@ -153,7 +153,12 @@ private:
                                            uint32_t           builtInId,
                                            llvm::Value*       pVertexIdx,
                                            llvm::Instruction* pInsertPos);
-    llvm::Value* PatchFsBuiltInInputImport(llvm::Type* pInputTy, uint32_t builtInId, llvm::Instruction* pInsertPos);
+    llvm::Value* PatchFsBuiltInInputImport(llvm::Type*        pInputTy,
+                                           uint32_t           builtInId,
+                                           Value*             pSampleId,
+                                           llvm::Instruction* pInsertPos);
+    llvm::Value* GetSamplePosOffset(llvm::Type* pInputTy, llvm::Value* pSampleId, llvm::Instruction* pInsertPos);
+    llvm::Value* GetSamplePosition(llvm::Type* pInputTy, llvm::Instruction* pInsertPos);
     llvm::Value* PatchCsBuiltInInputImport(llvm::Type* pInputTy, uint32_t builtInId, llvm::Instruction* pInsertPos);
 
     llvm::Value* PatchTcsBuiltInOutputImport(llvm::Type*        pOutputTy,
