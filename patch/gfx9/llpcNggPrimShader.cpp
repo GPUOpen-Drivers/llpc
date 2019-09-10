@@ -44,7 +44,6 @@
 #include "llpcNggLdsManager.h"
 #include "llpcNggPrimShader.h"
 #include "llpcPassDeadFuncRemove.h"
-#include "llpcPassExternalLibLink.h"
 #include "llpcPassManager.h"
 #include "llpcShaderMerger.h"
 

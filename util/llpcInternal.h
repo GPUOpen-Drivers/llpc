@@ -93,7 +93,6 @@ namespace Llpc
 {
 
 llvm::ModulePass* CreatePassDeadFuncRemove();
-llvm::ModulePass* CreatePassExternalLibLink(bool nativeOnly);
 llvm::ModulePass* CreateStartStopTimer(llvm::Timer* pTimer, bool starting);
 
 // Initialize helper passes
@@ -101,7 +100,6 @@ inline static void InitializeUtilPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
     initializePassDeadFuncRemovePass(passRegistry);
-    initializePassExternalLibLinkPass(passRegistry);
     initializePassLoopInfoCollectPass(passRegistry);
     initializePipelineShadersPass(passRegistry);
 }

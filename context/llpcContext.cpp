@@ -59,22 +59,6 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-const uint8_t Context::GlslEmuLib[]=
-{
-    #include "./generate/g_llpcGlslEmuLib.h"
-};
-
-const uint8_t Context::GlslEmuLibGfx8[] =
-{
-    #include "./generate/gfx8/g_llpcGlslEmuLibGfx8.h"
-};
-
-const uint8_t Context::GlslEmuLibGfx9[]=
-{
-    #include "./generate/gfx9/g_llpcGlslEmuLibGfx9.h"
-};
-
-// =====================================================================================================================
 Context::Context(
     GfxIpVersion gfxIp,                     // Graphics IP version info
     const WorkaroundFlags* pGpuWorkarounds) // GPU workarounds
@@ -113,20 +97,6 @@ Context::Context(
     m_metaIds.invariantLoad = getMDKindID("invariant.load");
     m_metaIds.range         = getMDKindID("range");
     m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
-
-    // Load external LLVM libraries, in search order.
-    if (gfxIp.major >= 9)
-    {
-        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx9),
-                sizeof(GlslEmuLibGfx9)), "GlslEmuLibGfx9"));
-    }
-    if (gfxIp.major >= 8)
-    {
-        m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLibGfx8),
-                sizeof(GlslEmuLibGfx8)), "GlslEmuLibGfx8"));
-    }
-    m_glslEmuLib.AddArchive(MemoryBufferRef(StringRef(reinterpret_cast<const char*>(GlslEmuLib),
-            sizeof(GlslEmuLib)), "GlslEmuLib"));
 
     Reset();
 }

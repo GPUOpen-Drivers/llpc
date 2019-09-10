@@ -184,7 +184,6 @@ endif
         llpcFile.cpp                        \
         llpcInternal.cpp                    \
         llpcPassDeadFuncRemove.cpp          \
-        llpcPassExternalLibLink.cpp         \
         llpcPassLoopInfoCollect.cpp         \
         llpcPassManager.cpp                 \
         llpcPipelineDumper.cpp              \
@@ -310,33 +309,6 @@ endif
         llpcShaderCache.o: .FORCE
     endif
 
-    # Pre-build operations, generate external LLVM library
-    ifeq ($(LLPC_PLATFORM), win)
-        PYTHON = $(DK_ROOT)/python/3.6/python.exe
-    else
-        PYTHON = python3
-    endif
-
-    GEN_GLSL_EMU_LIB_DIR = $(SRCPATH)/patch/generate
-
-    GEN_GLSL_EMU_LIB_SCRIPT = $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py
-
-    GEN_GLSL_EMU_LIB_DEPS = $(GEN_GLSL_EMU_LIB_DIR)/glslBufferOpEmu.ll                  \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslBuiltInVarEmu.ll                \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslInlineConstOpEmu.ll             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslPushConstOpEmu.ll               \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslSharedVarOpEmu.ll               \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmu.ll                 \
-                            $(GEN_GLSL_EMU_LIB_DIR)/glslSpecialOpEmuD16.ll              \
-                            $(GEN_GLSL_EMU_LIB_DIR)/llvmIntrinsicEmu.ll                 \
-                            \
-                            $(GEN_GLSL_EMU_LIB_DIR)/gfx8/glslSpecialOpEmu.ll            \
-                            \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslEmuLib.py             \
-                            $(GEN_GLSL_EMU_LIB_DIR)/script/genGlslOpEmuCodeUtil.py
-
-    PRE_TARGETS = $(GEN_GLSL_EMU_LIB_DIR)/g_llpcGlslEmuLib.h
-
 else
 
     vpath %.cpp $(LLPC_DEPTH)/patch/gfx6
@@ -382,7 +354,4 @@ else
 endif
 
 .FORCE:
-
-$(GEN_GLSL_EMU_LIB_DIR)/g_llpcGlslEmuLib.h : $(GEN_GLSL_EMU_LIB_DEPS)
-	$(PYTHON) $(GEN_GLSL_EMU_LIB_SCRIPT) $(LLVM_BIN_DIR) $(LLVM_BIN_DIR) $(LLPC_PLATFORM)
 

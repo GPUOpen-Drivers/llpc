@@ -152,10 +152,6 @@ void Patch::AddPasses(
     // Patch push constant loading (should be done before external library link)
     passMgr.add(CreatePatchPushConstOp());
 
-    // Link external libraries and remove dead functions after it
-    passMgr.add(CreatePassExternalLibLink(false)); // Not native only
-    passMgr.add(CreatePassDeadFuncRemove());
-
     // Function inlining and remove dead functions after it
     passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(CreatePassDeadFuncRemove());
@@ -188,10 +184,6 @@ void Patch::AddPasses(
     if (cl::DisablePatchOpt == false)
     {
         AddOptimizationPasses(pContext, passMgr);
-
-        // Link external libraries to solve LLVM functions after it
-        passMgr.add(CreatePassExternalLibLink(false));
-        passMgr.add(CreatePassDeadFuncRemove());
     }
 
     // Stop timer for optimization passes and restart timer for patching passes.
@@ -219,7 +211,6 @@ void Patch::AddPasses(
         }
 
         // Extra optimizations after NGG primitive shader creation
-        passMgr.add(CreatePassExternalLibLink(false)); // Not native only
         passMgr.add(createAlwaysInlinerLegacyPass());
         passMgr.add(CreatePassDeadFuncRemove());
         passMgr.add(createGlobalDCEPass());

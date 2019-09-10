@@ -289,11 +289,6 @@ public:
     // Sets triple and data layout in specified module from the context's target machine.
     void SetModuleTargetMachine(llvm::Module* pModule);
 
-    EmuLib* GetGlslEmuLib()
-    {
-        return &m_glslEmuLib;
-    }
-
     // Sets external resource usage.
     void SetResUsage(ResourceUsage* pResUsage)
     {
@@ -352,15 +347,6 @@ private:
         uint32_t range;           // "range"
         uint32_t uniform;         // "amdgpu.uniform"
     } m_metaIds;
-
-    // GLSL emulation libraries
-    static const uint8_t GlslEmuLib[];
-    static const uint8_t GlslEmuLibGfx8[];
-    static const uint8_t GlslEmuLibGfx9[];
-
-#if LLPC_BUILD_GFX10
-    static const uint8_t GlslEmuLibWaDisableI32ModToI16Mod[];
-#endif
 };
 
 } // Llpc
