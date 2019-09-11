@@ -1279,10 +1279,16 @@ void OutputText(
         // text print will be incorrect.
         uint8_t lastChar = pData[endPos - 1];
         const_cast<uint8_t*>(pData)[endPos - 1] = '\0';
-
+        const char* pEnd = reinterpret_cast<const char*>(&(pData)[endPos]);
         // Output text
         const char* pText = reinterpret_cast<const char*>(pData + startPos);
-        out << pText;
+        while (pText != pEnd)
+        {
+            out << pText;
+            pText += strlen(pText);
+            pText++;
+        }
+
         if (lastChar != 0)
         {
             out << static_cast<char>(lastChar);
@@ -1658,7 +1664,16 @@ OStream& operator<<(
                 if (symIdx < symbols.size())
                 {
                     out << "    " << symbols[symIdx].pSymName
-                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size << ")\n";
+                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
+                    MetroHash::Hash hash = {};
+                    MetroHash64::Hash(
+                        reinterpret_cast<const uint8_t*>(
+                            VoidPtrInc(pSection->pData, static_cast<size_t>(symbols[symIdx].value))),
+                        symbols[symIdx].size,
+                        hash.bytes);
+                    uint64_t hashCode64 = MetroHash::Compact64(&hash);
+                    snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+                    out << formatBuf;
                 }
                 ++symIdx;
                 startPos = endPos;
@@ -1701,7 +1716,16 @@ OStream& operator<<(
                     if (symIdx < symbols.size())
                     {
                         out << "    " << symbols[symIdx].pSymName
-                            << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size << ")\n";
+                            << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
+                        MetroHash::Hash hash = {};
+                        MetroHash64::Hash(
+                            reinterpret_cast<const uint8_t*>(
+                                VoidPtrInc(pSection->pData, static_cast<size_t>(symbols[symIdx].value))),
+                            symbols[symIdx].size,
+                            hash.bytes);
+                        uint64_t hashCode64 = MetroHash::Compact64(&hash);
+                        snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+                        out << formatBuf;
                     }
                     ++symIdx;
                     startPos = endPos;
@@ -1744,7 +1768,17 @@ OStream& operator<<(
                 if (symIdx < symbols.size())
                 {
                     out << "    " << symbols[symIdx].pSymName
-                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size << ")\n";
+                        << " (offset = " << symbols[symIdx].value << "  size = " << symbols[symIdx].size;
+
+                    MetroHash::Hash hash = {};
+                    MetroHash64::Hash(
+                        reinterpret_cast<const uint8_t*>(
+                            VoidPtrInc(pSection->pData, static_cast<size_t>(symbols[symIdx].value))),
+                        symbols[symIdx].size,
+                        hash.bytes);
+                    uint64_t hashCode64 = MetroHash::Compact64(&hash);
+                    snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+                    out << formatBuf;
                 }
                 ++symIdx;
                 startPos = endPos;
