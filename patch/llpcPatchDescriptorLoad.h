@@ -89,8 +89,6 @@ private:
 
     void PatchWaterfallLastUseCalls();
 
-    llvm::Value* BuildBufferDescriptor(llvm::Value* pBaseAddr, llvm::Value* pBufSize, llvm::Instruction* pInsertPoint);
-
     // -----------------------------------------------------------------------------------------------------------------
 
     // Descriptor size
