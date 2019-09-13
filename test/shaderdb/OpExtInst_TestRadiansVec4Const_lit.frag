@@ -13,11 +13,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = fmul <4 x float> %{{.*}}, <float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z7radiansDv4_f(<4 x float> %{{.*}})
 ; SHADERTEST: store float 0x3F9ACEEA00000000, float addrspace(5)* %{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = fmul <4 x float> %{{.*}}, <float undef, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
-; SHADERTEST: = insertelement <4 x float> %{{.*}}, float 0x3F9ACEEA00000000, i32 0
+; SHADERTEST: %{{[0-9]*}} = fmul <4 x float> %{{.*}}, <float undef, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000, float 0x3F91DF46A0000000>
+; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float 0x3F9ACEEA00000000, i32 0
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{.*}} = fmul float %{{.*}}, 0x3F91DF46A0000000
 ; SHADERTEST: %{{.*}} = fmul float %{{.*}}, 0x3F91DF46A0000000

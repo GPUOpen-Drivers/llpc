@@ -36,23 +36,23 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = fmul <3 x half> %{{.*}}, <half 0xH2478, half 0xH2478, half 0xH2478>
-; SHADERTEST: = fmul <3 x half> %{{.*}}, <half 0xH5329, half 0xH5329, half 0xH5329>
-; SHADERTEST: = call <3 x half> @llvm.sin.v3f16(
-; SHADERTEST: = call <3 x half> @llvm.cos.v3f16(
-; SHADERTEST: = call <3 x half> (...) @llpc.call.tan.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.asin.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.acos.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.atan2.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.sinh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.cosh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.tanh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.asinh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.acosh.v3f16(<3 x half>
-; SHADERTEST: = call <3 x half> (...) @llpc.call.atanh.v3f16(<3 x half>
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z7radiansDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z7degreesDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z3sinDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z3cosDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z3tanDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4asinDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4acosDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z5atan2Dv3_DhDv3_Dh(<3 x half> %{{.*}}, <3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4sinhDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z4coshDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z5asinhDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z5acoshDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x half> @_Z5atanhDv3_Dh(<3 x half> %{{.*}})
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-COUNT-3: call half @llvm.sin.f16(half %{{[0-9]*}})
+; SHADERTEST-COUNT-3: call half @llvm.cos.f16(half %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-COUNT-3: call half @llvm.sin.f16(half
-; SHADERTEST-COUNT-3: call half @llvm.cos.f16(half
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

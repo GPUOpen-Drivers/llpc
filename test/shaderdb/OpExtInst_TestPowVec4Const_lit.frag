@@ -14,16 +14,18 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call <4 x float> (...) @llpc.call.power.v4f32(<4 x float>
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @_Z3powDv4_fDv4_f(<4 x float> %{{.*}}, <4 x float> %{{.*}})
 ; SHADERTEST: store float 1.200000e+01, float addrspace(5)* %{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: = call <4 x float> @llvm.pow.v4f32(<4 x float>
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = insertelement <4 x float> <float 1.200000e+01, float undef, float undef, float undef>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call float @llvm.pow.f32(float
-; SHADERTEST: = call float @llvm.pow.f32(float
-; SHADERTEST: = call float @llvm.pow.f32(float
-; SHADERTEST-NOT: = call float @llvm.pow.f32(float
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.pow.f32(float %{{.*}}, float %{{.*}})
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
