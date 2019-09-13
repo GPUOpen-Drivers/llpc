@@ -1,3 +1,27 @@
+# Angle and Trigonometry Functions
+genF16Type sin genF16Type angle : llvm.sin.f16
+genF16Type cos genF16Type angle : llvm.cos.f16
+genF16Type tan genF16Type angle : llpc.tan.f16
+genF16Type asin genF16Type x : llpc.asin.f16
+genF16Type acos genF16Type x : llpc.acos.f16
+genF16Type atan genF16Type x : llpc.atan.f16
+genF16Type atan2 genF16Type y genF16Type x  : llpc.atan2.f16
+genF16Type sinh genF16Type x : llpc.sinh.f16
+genF16Type cosh genF16Type x : llpc.cosh.f16
+genF16Type tanh genF16Type x : llpc.tanh.f16
+genF16Type asinh genF16Type x : llpc.asinh.f16
+genF16Type acosh genF16Type x : llpc.acosh.f16
+genF16Type atanh genF16Type x : llpc.atanh.f16
+
+# Exponential Functions
+genF16Type pow genF16Type x genF16Type y : llpc.pow.f16
+genF16Type exp genF16Type x : llpc.exp.f16
+genF16Type log genF16Type x : llpc.log.f16
+genF16Type exp2 genF16Type x : llvm.exp2.f16
+genF16Type log2 genF16Type x : llvm.log2.f16
+genF16Type sqrt genF16Type x : llvm.sqrt.f16 #0
+genF16Type inverseSqrt genF16Type x : llpc.inverseSqrt.f16 #0
+
 # Common Functions
 genF16Type fabs genF16Type x : llvm.fabs.f16 #0
 genF16Type fsign genF16Type x : llpc.fsign.f16 #0
