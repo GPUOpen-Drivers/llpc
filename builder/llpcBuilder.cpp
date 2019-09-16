@@ -117,32 +117,36 @@ void Builder::SetUserDataNodes(
 // =====================================================================================================================
 // Base implementation of linking shader modules into a pipeline module.
 Module* Builder::Link(
-    ArrayRef<Module*> modules)     // Array of modules indexed by shader stage, with nullptr entry
-                                   //  for any stage not present in the pipeline
+    ArrayRef<Module*> modules,               // Array of modules indexed by shader stage, with nullptr entry
+                                             // for any stage not present in the pipeline
+    bool              linkNativeStages)      // Whether to link native shader stage modules
 {
     // Add IR metadata for the shader stage to each function in each shader, and rename the entrypoint to
     // ensure there is no clash on linking.
-    uint32_t metaKindId = getContext().getMDKindID(LlpcName::ShaderStageMetadata);
-    for (uint32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
+    if (linkNativeStages)
     {
-        Module* pModule = modules[stage];
-        if (pModule == nullptr)
+        uint32_t metaKindId = getContext().getMDKindID(LlpcName::ShaderStageMetadata);
+        for (uint32_t stage = 0; stage < modules.size(); ++stage)
         {
-            continue;
-        }
-
-        auto pStageMetaNode = MDNode::get(getContext(), { ConstantAsMetadata::get(getInt32(stage)) });
-        for (Function& func : *pModule)
-        {
-            if (func.isDeclaration() == false)
+            Module* pModule = modules[stage];
+            if (pModule == nullptr)
             {
-                func.setMetadata(metaKindId, pStageMetaNode);
-                if (func.getLinkage() != GlobalValue::InternalLinkage)
+                continue;
+            }
+
+            auto pStageMetaNode = MDNode::get(getContext(), { ConstantAsMetadata::get(getInt32(stage)) });
+            for (Function& func : *pModule)
+            {
+                if (func.isDeclaration() == false)
                 {
-                    func.setName(Twine(LlpcName::EntryPointPrefix) +
-                                 GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true) +
-                                 "." +
-                                 func.getName());
+                    func.setMetadata(metaKindId, pStageMetaNode);
+                    if (func.getLinkage() != GlobalValue::InternalLinkage)
+                    {
+                        func.setName(Twine(LlpcName::EntryPointPrefix) +
+                                     GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true) +
+                                     "." +
+                                     func.getName());
+                    }
                 }
             }
         }
@@ -188,13 +192,13 @@ Module* Builder::Link(
             m_pPipelineState->RecordState(pPipelineModule);
         }
 
-        for (int32_t stage = 0; stage < ShaderStageNativeStageCount; ++stage)
+        for (int32_t shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
         {
-            if (modules[stage] != nullptr)
+            if (modules[shaderIndex] != nullptr)
             {
                 // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
                 // linked into pipeline module.
-                if (linker.linkInModule(std::unique_ptr<Module>(modules[stage])))
+                if (linker.linkInModule(std::unique_ptr<Module>(modules[shaderIndex])))
                 {
                     result = false;
                 }

@@ -205,8 +205,9 @@ public:
     // entrypoint, then all other functions with internal linkage.
     // Returns the pipeline module, or nullptr on link failure.
     virtual Module* Link(
-        ArrayRef<Module*> modules);     // Array of modules indexed by shader stage, with nullptr entry
-                                                    //  for any stage not present in the pipeline
+        ArrayRef<Module*> modules,   // Array of modules indexed by shader stage, with nullptr entry
+                                     //  for any stage not present in the pipeline
+        bool linkNativeStages);      // Whether to link native shader stage modules
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations

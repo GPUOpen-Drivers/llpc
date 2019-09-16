@@ -890,6 +890,7 @@ Result Compiler::BuildShaderModule(
                     shaderInfo.pEntryTarget = entryNames[i].pName;
                     lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
+                    lowerPassMgr.add(CreateSpirvLowerResourceCollect());
                     if (EnableOuts())
                     {
                         lowerPassMgr.add(createPrintModulePass(outs(), "\n"
@@ -1033,7 +1034,7 @@ Result Compiler::BuildPipelineInternal(
     ElfPackage*                         pPipelineElf,               // [out] Output Elf package
     bool*                               pDynamicLoopUnroll)         // [out] Need dynamic loop unroll or not
 {
-    Result          result    = Result::Success;
+    Result          result = Result::Success;
 
     if ((forceLoopUnrollCount != 0) || (cl::EnableDynamicLoopUnroll == false))
     {
@@ -1093,7 +1094,7 @@ Result Compiler::BuildPipelineInternal(
     if (pPipelineModule == nullptr)
     {
         // Create empty modules and set target machine in each.
-        Module* modules[ShaderStageNativeStageCount] = {};
+        std::vector<Module*> modules(shaderInfo.size());
         uint32_t stageSkipMask = 0;
         for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
         {
@@ -1124,7 +1125,7 @@ Result Compiler::BuildPipelineInternal(
                 for (uint32_t i = 0; i < pModuleData->moduleInfo.entryCount; ++i)
                 {
                     auto pEntry = &pModuleData->moduleInfo.entries[i];
-                    if ((pEntry->stage == stage) &&
+                    if ((pEntry->stage == pShaderInfo->entryStage) &&
                         (memcmp(pEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
                     {
                         // LLVM bitcode
@@ -1136,7 +1137,7 @@ Result Compiler::BuildPipelineInternal(
                             VoidPtrInc(pModuleData->binCode.pCode, pEntry->entryOffset + pEntry->entrySize));
                         std::string resUsageBuf(pResUsagePtr, pEntry->resUsageSize);
                         std::istringstream resUsageStrem(resUsageBuf);
-                        resUsageStrem >> *(pContext->GetShaderResourceUsage(pEntry->stage));
+                        resUsageStrem >> *(pContext->GetShaderResourceUsage(static_cast<ShaderStage>(stage)));
                         break;
                     }
                 }
@@ -1158,7 +1159,7 @@ Result Compiler::BuildPipelineInternal(
             }
             else
             {
-                pModule = new Module((Twine("llpc") + GetShaderStageName(static_cast<ShaderStage>(stage))).str(),
+                pModule = new Module((Twine("llpc") + GetShaderStageName(pShaderInfo->entryStage)).str(),
                                      *pContext);
             }
 
@@ -1175,7 +1176,7 @@ Result Compiler::BuildPipelineInternal(
             const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
-                (stageSkipMask & ShaderStageToMask(static_cast<ShaderStage>(stage))))
+                (stageSkipMask & ShaderStageToMask(pShaderInfo->entryStage)))
             {
                 continue;
             }
@@ -1183,7 +1184,7 @@ Result Compiler::BuildPipelineInternal(
             PassManager lowerPassMgr(&passIndex);
 
             // Set the shader stage in the Builder.
-            pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(stage));
+            pContext->GetBuilder()->SetShaderStage(pShaderInfo->entryStage);
 
             // Start timer for translate.
             if (TimePassesIsEnabled)
@@ -1192,12 +1193,15 @@ Result Compiler::BuildPipelineInternal(
             }
 
             // SPIR-V translation, then dump the result.
-            lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(stage), pShaderInfo));
+            lowerPassMgr.add(CreateSpirvLowerTranslator(pShaderInfo->entryStage, pShaderInfo));
             if (EnableOuts())
             {
                 lowerPassMgr.add(createPrintModulePass(outs(), "\n"
                             "===============================================================================\n"
                             "// LLPC SPIRV-to-LLVM translation results\n"));
+            }
+            {
+                lowerPassMgr.add(CreateSpirvLowerResourceCollect());
             }
 
             // Stop timer for translate.
@@ -1206,12 +1210,33 @@ Result Compiler::BuildPipelineInternal(
                 lowerPassMgr.add(CreateStartStopTimer(&translateTimer, false));
             }
 
+            // Run the passes.
+            bool success = RunPasses(&lowerPassMgr, modules[stage]);
+            if (success == false)
+            {
+                LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+                result = Result::ErrorInvalidShader;
+            }
+        }
+
+        for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+        {
             // Per-shader SPIR-V lowering passes.
-            SpirvLower::AddPasses(static_cast<ShaderStage>(stage),
-                                  lowerPassMgr,
-                                  TimePassesIsEnabled ? &lowerTimer : nullptr,
-                                  forceLoopUnrollCount,
-                                  pDynamicLoopUnroll);
+            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+            if ((pShaderInfo == nullptr) ||
+                (pShaderInfo->pModuleData == nullptr) ||
+                (stageSkipMask & ShaderStageToMask(pShaderInfo->entryStage)))
+            {
+                continue;
+            }
+
+            pContext->GetBuilder()->SetShaderStage(pShaderInfo->entryStage);
+            PassManager lowerPassMgr(&passIndex);
+            SpirvLower::AddPasses(pShaderInfo->entryStage,
+                                    lowerPassMgr,
+                                    TimePassesIsEnabled ? &lowerTimer : nullptr,
+                                    forceLoopUnrollCount,
+                                    pDynamicLoopUnroll);
 
             // Run the passes.
             bool success = RunPasses(&lowerPassMgr, modules[stage]);
@@ -1223,7 +1248,7 @@ Result Compiler::BuildPipelineInternal(
         }
 
         // Link the shader modules into a single pipeline module.
-        pPipelineModule = pContext->GetBuilder()->Link(modules);
+        pPipelineModule = pContext->GetBuilder()->Link(modules, true);
         if (pPipelineModule == nullptr)
         {
             LLPC_ERRS("Failed to link shader modules into pipeline module\n");
@@ -1240,7 +1265,7 @@ Result Compiler::BuildPipelineInternal(
                                  prePatchPassMgr,
                                  TimePassesIsEnabled ? &patchTimer : nullptr);
 
-	bool success = RunPasses(&prePatchPassMgr, pPipelineModule);
+        bool success = RunPasses(&prePatchPassMgr, pPipelineModule);
         if (success == false)
         {
             result = Result::ErrorInvalidShader;
@@ -1953,7 +1978,7 @@ void Compiler::TranslateSpirvToLlvm(
     if (readSpirv(pContext->GetBuilder(),
                   pShaderInfo->pModuleData,
                   spirvStream,
-                  static_cast<spv::ExecutionModel>(pShaderInfo->entryStage),
+                  ConvertToExecModel(pShaderInfo->entryStage),
                   pShaderInfo->pEntryTarget,
                   specConstMap,
                   pModule,
@@ -2601,7 +2626,7 @@ Result Compiler::CollectInfoFromSpirvBinary(
                 ShaderEntryName entry = {};
                 // The fourth word is start of the name string of the entry-point
                 entry.pName = reinterpret_cast<const char*>(&pCodePos[3]);
-                entry.stage = static_cast<ShaderStage>(pCodePos[1]);
+                entry.stage = ConvertToStageShage(pCodePos[1]);
                 shaderEntryNames.push_back(entry);
                 break;
             }

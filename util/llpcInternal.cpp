@@ -270,8 +270,6 @@ ShaderStage GetShaderStageFromModule(
 ShaderStage GetShaderStageFromFunction(
     Function* pFunc)  // [in] LLVM function
 {
-    ShaderStage stage = ShaderStageInvalid;
-
     // First check for the metadata that is added by the builder. This works in the patch phase.
     MDNode* pStageMetaNode = pFunc->getMetadata(LlpcName::ShaderStageMetadata);
     if (pStageMetaNode != nullptr)
@@ -286,35 +284,78 @@ ShaderStage GetShaderStageFromFunction(
         return ShaderStageInvalid;
     }
     auto execModel = mdconst::dyn_extract<ConstantInt>(pExecModelNode->getOperand(0))->getZExtValue();
+    return ConvertToStageShage(execModel);
+}
 
+// =====================================================================================================================
+// Set the shader stage to the specified LLVM module entry function.
+void SetShaderStageToModule(
+    Module*     pModule,        // [in] LLVM module to set shader stage
+    ShaderStage shaderStage)    // Shader stage
+{
+    LLVMContext& context = pModule->getContext();
+    Function* pFunc = GetEntryPoint(pModule);
+    auto execModel = ConvertToExecModel(shaderStage);
+    std::vector<Metadata*> execModelMeta =
+    {
+        ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), execModel))
+    };
+    auto pExecModelMetaNode = MDNode::get(context, execModelMeta);
+    pFunc->setMetadata(gSPIRVMD::ExecutionModel, pExecModelMetaNode);
+}
+
+// =====================================================================================================================
+// Converts the SPIR-V execution model to the shader stage
+ShaderStage ConvertToStageShage(
+    uint32_t execModel)  // SPIR-V execution model
+{
     switch (execModel)
     {
-    case ExecutionModelVertex:
-        stage = ShaderStageVertex;
-        break;
-    case ExecutionModelTessellationControl:
-        stage = ShaderStageTessControl;
-        break;
-    case ExecutionModelTessellationEvaluation:
-        stage = ShaderStageTessEval;
-        break;
-    case ExecutionModelGeometry:
-        stage = ShaderStageGeometry;
-        break;
-    case ExecutionModelFragment:
-        stage = ShaderStageFragment;
-        break;
-    case ExecutionModelGLCompute:
-        stage = ShaderStageCompute;
-        break;
-    case ExecutionModelCopyShader:
-        stage = ShaderStageCopyShader;
-        break;
-    default:
-        stage = ShaderStageInvalid;
-        break;
+    case spv::ExecutionModelVertex:
+    case spv::ExecutionModelTessellationControl:
+    case spv::ExecutionModelTessellationEvaluation:
+    case spv::ExecutionModelGeometry:
+    case spv::ExecutionModelFragment:
+    case spv::ExecutionModelGLCompute:
+        {
+            return static_cast<ShaderStage>(execModel);
+        }
+    case spv::ExecutionModelCopyShader:
+        {
+            return ShaderStageCopyShader;
+        }
     }
-    return stage;
+
+    LLPC_NEVER_CALLED();
+    return ShaderStageInvalid;
+}
+
+// =====================================================================================================================
+// Converts the shader stage to the SPIR-V execution model
+spv::ExecutionModel ConvertToExecModel(
+    ShaderStage shaderStage)  // Shader stage
+{
+    switch (shaderStage)
+    {
+    case ShaderStageVertex:
+    case ShaderStageTessControl:
+    case ShaderStageTessEval:
+    case ShaderStageGeometry:
+    case ShaderStageFragment:
+    case ShaderStageCompute:
+        {
+            return static_cast<spv::ExecutionModel>(shaderStage);
+        }
+    case ShaderStageCopyShader:
+        {
+            return spv::ExecutionModelCopyShader;
+        }
+    default:
+        {
+            LLPC_NEVER_CALLED();
+            return static_cast <spv::ExecutionModel>(0);
+        }
+    }
 }
 
 // =====================================================================================================================
@@ -477,7 +518,7 @@ uint32_t GetStageMaskFromSpirvBinary(
                 if (strcmp(pEntryName, pName) == 0)
                 {
                     // An matching entry-point is found
-                    stageMask |= ShaderStageToMask(static_cast<ShaderStage>(pCodePos[1]));
+                    stageMask |= ShaderStageToMask(ConvertToStageShage(pCodePos[1]));
                 }
             }
 
