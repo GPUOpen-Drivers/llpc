@@ -193,7 +193,7 @@ public:
     // Link the individual shader modules into a single pipeline module.
     // This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
     // set shader stage consistently.
-    Module* Link(ArrayRef<Module*> modules) override final;
+    Module* Link(ArrayRef<Module*> modules, bool linkNativeStages) override final;
 #endif
 
     // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.

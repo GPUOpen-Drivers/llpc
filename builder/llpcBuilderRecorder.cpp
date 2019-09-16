@@ -261,22 +261,26 @@ Builder* Builder::CreateBuilderRecorder(
 // This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
 // set shader stage consistently.
 Module* BuilderRecorder::Link(
-    ArrayRef<Module*> modules)    // Shader stage modules to link
+    ArrayRef<Module*> modules,           // Shader stage modules to link
+    bool              linkNativeStages)  // Whether to link native shader stage modules
 {
-    for (uint32_t stage = 0; stage != ShaderStageNativeStageCount; ++stage)
+    if (linkNativeStages)
     {
-        if (Module* pModule = modules[stage])
+        for (uint32_t stage = 0; stage != modules.size(); ++stage)
         {
-            for (auto& func : *pModule)
+            if (Module* pModule = modules[stage])
             {
-                if (func.isDeclaration() == false)
+                for (auto& func : *pModule)
                 {
-                    CheckFuncShaderStage(&func, static_cast<ShaderStage>(stage));
+                    if (func.isDeclaration() == false)
+                    {
+                        CheckFuncShaderStage(&func, static_cast<ShaderStage>(stage));
+                    }
                 }
             }
         }
     }
-    return Builder::Link(modules);
+    return Builder::Link(modules, linkNativeStages);
 }
 #endif
 
@@ -1606,7 +1610,7 @@ void BuilderRecorder::CheckFuncShaderStage(
     Function*   pFunc,        // [in] Function to check
     ShaderStage shaderStage)  // Shader stage frontend says it is in
 {
-    LLPC_ASSERT(shaderStage < ShaderStageNativeStageCount);
+    LLPC_ASSERT(shaderStage < ShaderStageCount);
     if (pFunc != m_pEnclosingFunc)
     {
         // The "function shader stage map" is in fact a vector of pairs of WeakVH (giving the function)

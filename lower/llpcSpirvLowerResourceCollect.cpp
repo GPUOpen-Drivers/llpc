@@ -273,13 +273,16 @@ const Type* SpirvLowerResourceCollect::GetFlattenArrayElementType(
 // Collects the usage of execution modes from entry-point metadata.
 void SpirvLowerResourceCollect::CollectExecutionModeUsage()
 {
-    const auto execModel = static_cast<ExecutionModel>(m_shaderStage);
+    const auto execModel = ConvertToExecModel(m_shaderStage);
     std::string execModeMetaName = gSPIRVMD::ExecutionMode + std::string(".") + getName(execModel);
 
     ShaderExecModeMetadata execModeMeta = {};
 
     auto pEntryMetaNodes = m_pModule->getNamedMetadata(gSPIRVMD::EntryPoints);
-    LLPC_ASSERT(pEntryMetaNodes != nullptr);
+    if (pEntryMetaNodes == nullptr)
+    {
+        return;
+    }
 
     for (uint32_t entryIdx = 0, entryCount = pEntryMetaNodes->getNumOperands(); entryIdx < entryCount; ++entryIdx)
     {

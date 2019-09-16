@@ -99,9 +99,6 @@ void SpirvLower::AddPasses(
         passMgr.add(new PassLoopInfoCollect(pNeedDynamicLoopUnroll));
     }
 
-    // Lower SPIR-V resource collecting
-    passMgr.add(CreateSpirvLowerResourceCollect());
-
     // Link external native library for constant folding
     passMgr.add(CreatePassExternalLibLink(true)); // Native only
     passMgr.add(CreatePassDeadFuncRemove());
