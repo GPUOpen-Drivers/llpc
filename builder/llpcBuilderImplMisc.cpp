@@ -174,6 +174,7 @@ Value* BuilderImplMisc::CreateDerivative(
                                                                      getInt32(15),
                                                                      getTrue()
                                                                   });
+                               pFirstVal = CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, pFirstVal);
                                pFirstVal = CreateZExtOrTrunc(pFirstVal, getIntNTy(pValTy->getPrimitiveSizeInBits()));
                                pFirstVal = CreateBitCast(pFirstVal, pValTy);
                                Value* pSecondVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp,
@@ -185,10 +186,10 @@ Value* BuilderImplMisc::CreateDerivative(
                                                                       getInt32(15),
                                                                       getTrue()
                                                                    });
+                               pSecondVal = CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, pSecondVal);
                                pSecondVal = CreateZExtOrTrunc(pSecondVal, getIntNTy(pValTy->getPrimitiveSizeInBits()));
                                pSecondVal = CreateBitCast(pSecondVal, pValTy);
-                               Value* pResult = CreateFSub(pFirstVal, pSecondVal);
-                               return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, pResult);
+                               return CreateFSub(pFirstVal, pSecondVal);
                             });
     }
     else
@@ -222,15 +223,16 @@ Value* BuilderImplMisc::CreateDerivative(
                                Value* pFirstVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle,
                                                                   {},
                                                                   { pValue, getInt32(perm1)});
+                               pFirstVal = CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, pFirstVal);
                                pFirstVal = CreateZExtOrTrunc(pFirstVal, getIntNTy(pValTy->getPrimitiveSizeInBits()));
                                pFirstVal = CreateBitCast(pFirstVal, pValTy);
                                Value* pSecondVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle,
                                                                    {},
                                                                    { pValue, getInt32(perm2) });
+                               pSecondVal = CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, pSecondVal);
                                pSecondVal = CreateZExtOrTrunc(pSecondVal, getIntNTy(pValTy->getPrimitiveSizeInBits()));
                                pSecondVal = CreateBitCast(pSecondVal, pValTy);
-                               Value* pResult = CreateFSub(pFirstVal, pSecondVal);
-                               return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, pResult);
+                               return CreateFSub(pFirstVal, pSecondVal);
                             });
     }
     pResult->setName(instName);
