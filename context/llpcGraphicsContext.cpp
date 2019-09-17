@@ -1129,9 +1129,25 @@ void GraphicsContext::SetNggControl()
 
     const auto& nggState = m_pPipelineInfo->nggState;
 
-    // TODO: If transform feedback is enabled, disable NGG.
-    m_nggControl.enableNgg                  = (nggState.enableNgg && (enableXfb == false) &&
-                                              ((hasGs == false) || nggState.enableGsUse));
+    bool enableNgg = nggState.enableNgg;
+    if (enableXfb)
+    {
+        // TODO: If transform feedback is enabled, disable NGG.
+        enableNgg = false;
+    }
+
+    if (hasGs && (nggState.enableGsUse == false))
+    {
+        // NOTE: NGG used on GS is disabled by default
+        enableNgg = false;
+    }
+
+    if (m_pGpuWorkarounds->gfx10.waNggDisabled)
+    {
+        enableNgg = false;
+    }
+
+    m_nggControl.enableNgg                  = enableNgg;
     m_nggControl.alwaysUsePrimShaderTable   = nggState.alwaysUsePrimShaderTable;
     m_nggControl.compactMode                = nggState.compactMode;
 
