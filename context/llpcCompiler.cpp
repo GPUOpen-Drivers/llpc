@@ -1075,7 +1075,7 @@ Result Compiler::BuildPipelineInternal(
     // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
     // whole pipeline.
     bool IsLlvmBc = false;
-    const PipelineShaderInfo* pShaderInfo = shaderInfo[0];
+    const PipelineShaderInfo* pShaderInfo = (shaderInfo[0] != nullptr) ? shaderInfo[0] : shaderInfo.back();
     if (pShaderInfo != nullptr)
     {
         const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
