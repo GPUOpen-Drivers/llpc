@@ -1521,6 +1521,7 @@ static Result ProcessPipeline(
                 compileInfo.spirvBin[shaderStage].codeSize = bitcodeBuf.size();
                 compileInfo.spirvBin[shaderStage].pCode = pCode;
                 compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(shaderStage));
+                compileInfo.doAutoLayout = false;
             }
         }
         else
