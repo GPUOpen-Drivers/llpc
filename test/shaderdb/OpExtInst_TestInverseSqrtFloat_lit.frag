@@ -20,8 +20,10 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z11inverseSqrtf(float %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <3 x float> @_Z11inverseSqrtDv3_f(<3 x float> %{{.*}})
+; SHADERTEST: %[[SQRT:[^ ,]*]] = call float @llvm.sqrt.f32(float
+; SHADERTEST: = fdiv float 1.000000e+00, %[[SQRT]]
+; SHADERTEST: %[[SQRT3:[^ ,]*]] = call <3 x float> @llvm.sqrt.v3f32(<3 x float>
+; SHADERTEST: = fdiv <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, %[[SQRT3]]
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
