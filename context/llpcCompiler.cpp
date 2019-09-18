@@ -2215,11 +2215,6 @@ void Compiler::InitGpuProperty()
             LLPC_ASSERT((cl::NativeWaveSize == 32) || (cl::NativeWaveSize == 64));
             m_gpuProperty.waveSize = cl::NativeWaveSize;
         }
-        else if ((m_gfxIp.major == 10) && (m_gfxIp.minor == 0))
-        {
-            // Due to hardware issue, wave32 is not enabled in LLVM backend for gfx1000
-            m_gpuProperty.waveSize = 64;
-        }
         else
         {
             m_gpuProperty.waveSize = 32;
@@ -2310,8 +2305,7 @@ void Compiler::InitGpuProperty()
             m_gpuProperty.supportSpiPrefPriority = true; // For GFX10.1+
         }
 
-        if ((m_gfxIp.minor == 0) ||
-            ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF)))
+        if ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF))
         {
             m_gpuProperty.tessFactorBufferSizePerSe = 0x80;
         }
@@ -2405,8 +2399,7 @@ void Compiler::InitGpuWorkaround()
         // Hardware workarounds for GFX10 based GPU's:
         m_gpuWorkarounds.gfx10.disableI32ModToI16Mod = 1;
 
-        if ((m_gfxIp.minor == 0) ||
-            ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF)))
+        if ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF))
         {
             m_gpuWorkarounds.gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow = 1;
         }
