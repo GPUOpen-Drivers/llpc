@@ -6151,6 +6151,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto ResidentCode = transValue(BI->getResidentCode(), F, BB);
     return mapValue(BV, getBuilder()->CreateICmpEQ(ResidentCode, getBuilder()->getInt32(0)));
   }
+  case OpImageTexelPointer:
+    return nullptr;
 #if SPV_VERSION >= 0x10400
   case OpPtrDiff: {
     SPIRVBinary *const BI = static_cast<SPIRVBinary *>(BV);
@@ -6172,8 +6174,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, PtrDiff);
   }
 #endif
-  case OpImageTexelPointer:
-    return nullptr;
 
 #define HANDLE_OPCODE(op) case (op): \
   getBuilder()->SetInsertPoint(BB); \
@@ -6829,7 +6829,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
                           : Llpc::Builder::Dim2DArrayMsaa;
   }
   if (!Desc->Arrayed) {
-    switch (Desc->Dim) {
+    switch (static_cast<uint32_t>(Desc->Dim)) {
     case Dim1D:
       return Llpc::Builder::Dim1D;
     case DimBuffer:
@@ -6848,7 +6848,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
       break;
     }
   } else {
-    switch (Desc->Dim) {
+    switch (static_cast<uint32_t>(Desc->Dim)) {
     case Dim1D:
       return Llpc::Builder::Dim1DArray;
     case DimBuffer:
@@ -6951,6 +6951,7 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
     Info->FmaskDesc = getBuilder()->CreateExtractValue(Desc, 1);
     Desc = getBuilder()->CreateExtractValue(Desc, uint64_t(0));
   }
+
   Info->ImageDesc = Desc;
 }
 

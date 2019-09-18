@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST-COUNT-1: fsub reassoc nnan nsz arcp contract <2 x double>
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST-COUNT-1: fsub reassoc nnan nsz arcp contract float
-; SHADERTEST-COUNT-2: fsub double
+; SHADERTEST-COUNT-2: fsub reassoc nnan nsz arcp contract double
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

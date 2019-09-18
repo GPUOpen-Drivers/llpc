@@ -1415,7 +1415,6 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
                                                m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
 
-
             Builder::InOutInfo inOutInfo;
             if (pLocOffset == nullptr)
             {
