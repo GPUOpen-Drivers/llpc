@@ -2118,6 +2118,7 @@ Value* PatchBufferOp::ReplaceICmp(
     LLPC_ASSERT(pBufferDescTy->isVectorTy());
     LLPC_ASSERT(pBufferDescTy->getVectorNumElements() == 4);
     LLPC_ASSERT(pBufferDescTy->getVectorElementType()->isIntegerTy(32));
+    LLPC_UNUSED(pBufferDescTy);
     LLPC_ASSERT((pICmpInst->getPredicate() == ICmpInst::ICMP_EQ) || (pICmpInst->getPredicate() == ICmpInst::ICMP_NE));
 
     Value* pBufferDescICmp = m_pBuilder->getFalse();
