@@ -12,7 +12,7 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call float (...) @llpc.call.tanh.f32(float
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z4tanhf(float %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %{{[0-9]*}} = fmul float %{{.*}}, 0x3FF7154760000000
 ; SHADERTEST: %{{[0-9]*}} = fsub float 0.000000e+00, %{{.*}}

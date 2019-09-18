@@ -1,3 +1,27 @@
+# Angle and Trigonometry Functions
+genType sin genType angle : llvm.sin.f32
+genType cos genType angle : llvm.cos.f32
+genType tan genType angle : llpc.tan.f32
+genType asin genType x : llpc.asin.f32
+genType acos genType x : llpc.acos.f32
+genType atan genType x : llpc.atan.f32
+genType atan2 genType y genType x  : llpc.atan2.f32
+genType sinh genType x : llpc.sinh.f32
+genType cosh genType x : llpc.cosh.f32
+genType tanh genType x : llpc.tanh.f32
+genType asinh genType x : llpc.asinh.f32
+genType acosh genType x : llpc.acosh.f32
+genType atanh genType x : llpc.atanh.f32
+
+# Exponential Functions
+genType pow genType x genType y : llvm.pow.f32
+genType exp genType x : llpc.exp.f32
+genType log genType x : llpc.log.f32
+genType exp2 genType x : llvm.exp2.f32
+genType log2 genType x : llvm.log2.f32
+genType sqrt genType x : llvm.sqrt.f32
+genType inverseSqrt genType x : llpc.inverseSqrt.f32
+
 # Common Functions
 genType fabs genType x : llvm.fabs.f32 #0
 genIType sabs genIType x : llpc.sabs.i32 #0

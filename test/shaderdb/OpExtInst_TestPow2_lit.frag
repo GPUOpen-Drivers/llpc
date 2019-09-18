@@ -14,11 +14,11 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call float (...) @llpc.call.power.f32(float 2.000000e+00, float
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @_Z3powff(float 2.000000e+00, float %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: = call float @llvm.amdgcn.frexp.mant.f32(float
-; SHADERTEST: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
-; SHADERTEST: = call float @ldexpf(float 1.000000e+00, i32
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.frexp.mant.f32(float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.ldexp.f32(float 1.000000e+00, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

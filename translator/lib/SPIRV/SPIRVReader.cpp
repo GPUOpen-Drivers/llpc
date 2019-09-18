@@ -6151,6 +6151,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     auto ResidentCode = transValue(BI->getResidentCode(), F, BB);
     return mapValue(BV, getBuilder()->CreateICmpEQ(ResidentCode, getBuilder()->getInt32(0)));
   }
+  case OpImageTexelPointer:
+    return nullptr;
 #if SPV_VERSION >= 0x10400
   case OpPtrDiff: {
     SPIRVBinary *const BI = static_cast<SPIRVBinary *>(BV);
@@ -6172,8 +6174,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
     return mapValue(BV, PtrDiff);
   }
 #endif
-  case OpImageTexelPointer:
-    return nullptr;
 
 #define HANDLE_OPCODE(op) case (op): \
   getBuilder()->SetInsertPoint(BB); \
@@ -6829,7 +6829,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
                           : Llpc::Builder::Dim2DArrayMsaa;
   }
   if (!Desc->Arrayed) {
-    switch (Desc->Dim) {
+    switch (static_cast<uint32_t>(Desc->Dim)) {
     case Dim1D:
       return Llpc::Builder::Dim1D;
     case DimBuffer:
@@ -6848,7 +6848,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *Desc) {
       break;
     }
   } else {
-    switch (Desc->Dim) {
+    switch (static_cast<uint32_t>(Desc->Dim)) {
     case Dim1D:
       return Llpc::Builder::Dim1DArray;
     case DimBuffer:
@@ -6951,6 +6951,7 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *BImageInst,
     Info->FmaskDesc = getBuilder()->CreateExtractValue(Desc, 1);
     Desc = getBuilder()->CreateExtractValue(Desc, uint64_t(0));
   }
+
   Info->ImageDesc = Desc;
 }
 
@@ -7538,9 +7539,14 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *BI,
       !Addr[Llpc::Builder::ImageAddressIdxLodBias] &&
       !Addr[Llpc::Builder::ImageAddressIdxDerivativeX]) {
     // A gather with no lod, bias or derivatives is done with lod 0, not
-    // implicit lod.
-    Addr[Llpc::Builder::ImageAddressIdxLod] =
-        Constant::getNullValue(getBuilder()->getFloatTy());
+    // implicit lod. Except that does not happen if there is no lod clamp, and
+    // this is a fragment shader, and CapabilityImageGatherBiasLodAMD was
+    // declared.
+    if (Addr[Llpc::Builder::ImageAddressIdxLodClamp] ||
+        !EnableGatherLodNz) {
+      Addr[Llpc::Builder::ImageAddressIdxLod] =
+          Constant::getNullValue(getBuilder()->getFloatTy());
+    }
   }
 
   Value *Result = nullptr;
@@ -9332,104 +9338,6 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *ExtInst,
   auto BArgs = ExtInst->getArguments();
   auto Args = transValue(ExtInst->getValues(BArgs), BB->getParent(), BB);
   switch (static_cast<GLSLExtOpKind>(ExtInst->getExtOp())) {
-
-  case GLSLstd450Radians:
-    // Convert from degrees to radians
-    return getBuilder()->CreateFMul(Args[0],
-                                  getBuilder()->GetPiOver180(Args[0]->getType()));
-
-  case GLSLstd450Degrees:
-    // Convert from radians to degrees
-    return getBuilder()->CreateFMul(Args[0],
-                                  getBuilder()->Get180OverPi(Args[0]->getType()));
-
-  case GLSLstd450Sin:
-    // sin operation
-    return getBuilder()->CreateIntrinsic(Intrinsic::sin, Args[0]->getType(),
-                                       Args[0]);
-
-  case GLSLstd450Cos:
-    // cos operation
-    return getBuilder()->CreateIntrinsic(Intrinsic::cos, Args[0]->getType(),
-                                       Args[0]);
-
-  case GLSLstd450Tan:
-    // tan operation
-    return getBuilder()->CreateTan(Args[0]);
-
-  case GLSLstd450Asin:
-    // arcsin operation
-    return getBuilder()->CreateASin(Args[0]);
-
-  case GLSLstd450Acos:
-    // arccos operation
-    return getBuilder()->CreateACos(Args[0]);
-
-  case GLSLstd450Atan:
-    // arctan operation
-    return getBuilder()->CreateATan(Args[0]);
-
-  case GLSLstd450Sinh:
-    // hyperbolic sin operation
-    return getBuilder()->CreateSinh(Args[0]);
-
-  case GLSLstd450Cosh:
-    // hyperbolic cos operation
-    return getBuilder()->CreateCosh(Args[0]);
-
-  case GLSLstd450Tanh:
-    // hyperbolic tan operation
-    return getBuilder()->CreateTanh(Args[0]);
-
-  case GLSLstd450Asinh:
-    // hyperbolic arcsin operation
-    return getBuilder()->CreateASinh(Args[0]);
-
-  case GLSLstd450Acosh:
-    // hyperbolic arccos operation
-    return getBuilder()->CreateACosh(Args[0]);
-
-  case GLSLstd450Atanh:
-    // hyperbolic arctan operation
-    return getBuilder()->CreateATanh(Args[0]);
-
-  case GLSLstd450Atan2:
-    // arctan operation with Y/X input
-    return getBuilder()->CreateATan2(Args[0], Args[1]);
-
-  case GLSLstd450Pow:
-    // Power: x^y
-    return getBuilder()->CreatePower(Args[0], Args[1]);
-
-  case GLSLstd450Exp:
-    // Exponent: e^x
-    return getBuilder()->CreateExp(Args[0]);
-
-  case GLSLstd450Log:
-    // Natural logarithm: log(x)
-    return getBuilder()->CreateLog(Args[0]);
-
-  case GLSLstd450Exp2:
-    // Base 2 exponent: 2^x
-    return getBuilder()->CreateIntrinsic(Intrinsic::exp2, Args[0]->getType(),
-                                       Args[0]);
-
-  case GLSLstd450Log2:
-    // Base 2 logarithm: log2(x)
-    return getBuilder()->CreateIntrinsic(Intrinsic::log2, Args[0]->getType(),
-                                       Args[0]);
-
-  case GLSLstd450Sqrt:
-    // Square root
-    return getBuilder()->CreateIntrinsic(Intrinsic::sqrt, Args[0]->getType(),
-                                       Args[0]);
-
-  case GLSLstd450InverseSqrt: {
-    // Inverse square root
-    Value *Sqrt = getBuilder()->CreateIntrinsic(Intrinsic::sqrt,
-                                              Args[0]->getType(), Args[0]);
-    return getBuilder()->CreateFDiv(ConstantFP::get(Sqrt->getType(), 1.0), Sqrt);
-  }
 
   case GLSLstd450Determinant:
     // Determinant of square matrix

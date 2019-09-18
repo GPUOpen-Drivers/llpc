@@ -552,6 +552,7 @@ void DoAutoLayoutDesc(
                                      (pNode->type == ResourceMappingNodeType::DescriptorResource) ||
                                      (pNode->type == ResourceMappingNodeType::DescriptorTexelBuffer) ||
                                      (pNode->type == ResourceMappingNodeType::DescriptorSampler)));
+
                         pNode->type = ResourceMappingNodeType::DescriptorCombinedTexture;
                         sizeInDwords = 12 * arraySize;
                     }

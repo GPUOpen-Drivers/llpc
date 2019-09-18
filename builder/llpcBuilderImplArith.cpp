@@ -98,7 +98,7 @@ Value* BuilderImplArith::CreateQuantizeToFp16(
     Value* pIsDenorm = CreateAnd(pIsLessThanMin, pIsNotZero);
     Value* pResult = CreateSelect(pIsDenorm, pZero, pExt);
 
-    // Check NaN. 
+    // Check NaN.
     Value* pIsNan = CreateIsNaN(pValue);
     return CreateSelect(pIsNan, pValue, pResult, instName);
 }
@@ -125,7 +125,7 @@ Value* BuilderImplArith::CreateSMod(
             if (pDivisorConst->getZExtValue() <= 0xFFFF)
             {
                 // Get a non-constant 0 value. (We know the top 17 bits of the 64-bit PC is always zero.)
-                Value* pPc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, getInt64Ty(), {});
+                Value* pPc = CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
                 Value* pPcHi = CreateExtractElement(CreateBitCast(pPc, VectorType::get(getInt32Ty(), 2)), 1);
                 Value* pNonConstantZero = CreateLShr(pPcHi, getInt32(15));
                 if (auto pVecTy = dyn_cast<VectorType>(pDivisor->getType()))
@@ -175,7 +175,7 @@ Value* BuilderImplArith::CreateASin(
         pX = CreateFPExt(pX, pExtTy);
     }
 
-    // asin coefficient p0 = 0.08656672 
+    // asin coefficient p0 = 0.08656672
     auto pCoefP0 = GetFpConstant(pX->getType(), APFloat(APFloat::IEEEdouble(), APInt(64, 0x3FB6293CA0000000)));
     // asin coefficient p1 = -0.03102955
     auto pCoefP1 = GetFpConstant(pX->getType(), APFloat(APFloat::IEEEdouble(), APInt(64, 0xBF9FC635E0000000)));

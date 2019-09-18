@@ -206,7 +206,6 @@ public:
                             Value* const pVector2,
                             const Twine& instName = "") override final;
 
-
     // -----------------------------------------------------------------------------------------------------------------
     // Arithmetic operations
 

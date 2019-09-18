@@ -233,8 +233,8 @@ if(ICD_BUILD_LLPC)
     target_sources(llpc PRIVATE
         builder/llpcBuilder.cpp
         builder/llpcBuilderImpl.cpp
-        builder/llpcBuilderImplDesc.cpp
         builder/llpcBuilderImplArith.cpp
+        builder/llpcBuilderImplDesc.cpp
         builder/llpcBuilderImplImage.cpp
         builder/llpcBuilderImplInOut.cpp
         builder/llpcBuilderImplMatrix.cpp
@@ -382,6 +382,8 @@ else()
     target_link_libraries(llpc PRIVATE metrohash)
     target_compile_definitions(llpc PRIVATE SINGLE_EXTERNAL_METROHASH)
 endif()
+
+target_link_libraries(llpc PRIVATE cwpack)
 
 ### LLPC Auto-generated Files ##########################################################################################
 if(ICD_BUILD_LLPC)
@@ -611,6 +613,7 @@ elseif(WIN32)
 endif()
     llvm_map_components_to_libnames(llvm_libs amdgpucodegen amdgpuinfo amdgpuasmparser amdgpudisassembler LTO ipo analysis bitreader bitwriter codegen irreader linker mc passes support target transformutils coroutines aggressiveinstcombine)
 target_link_libraries(amdllpc PRIVATE ${llvm_libs})
+target_link_libraries(amdllpc PRIVATE cwpack)
 endif()
 ### Add Subdirectories #################################################################################################
 if(ICD_BUILD_LLPC)

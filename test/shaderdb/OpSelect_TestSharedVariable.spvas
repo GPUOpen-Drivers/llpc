@@ -1,0 +1,76 @@
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 40
+; Schema: 0
+               OpCapability Shader
+               OpCapability VariablePointers
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %1 "main" %gl_GlobalInvocationID %3 %4 %5 %6
+               OpExecutionMode %1 LocalSize 1 1 1
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpMemberDecorate %_struct_7 0 Offset 0
+               OpMemberDecorate %_struct_7 1 Offset 4
+               OpMemberDecorate %_struct_8 0 Offset 0
+               OpMemberDecorate %_struct_8 1 Offset 8
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpDecorate %_runtimearr__struct_8 ArrayStride 16
+               OpDecorate %_struct_11 Block
+               OpMemberDecorate %_struct_11 0 Offset 0
+               OpDecorate %_struct_12 Block
+               OpMemberDecorate %_struct_12 0 Offset 0
+               OpDecorate %3 DescriptorSet 0
+               OpDecorate %3 Binding 0
+               OpDecorate %6 DescriptorSet 0
+               OpDecorate %6 Binding 1
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+     %uint_2 = OpConstant %uint 2
+     %v3uint = OpTypeVector %uint 3
+  %_struct_7 = OpTypeStruct %uint %uint
+  %_struct_8 = OpTypeStruct %_struct_7 %_struct_7
+%_runtimearr__struct_8 = OpTypeRuntimeArray %_struct_8
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+ %_struct_12 = OpTypeStruct %_runtimearr__struct_8
+ %_struct_11 = OpTypeStruct %_runtimearr_uint
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+%_ptr_StorageBuffer__struct_11 = OpTypePointer StorageBuffer %_struct_11
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+%_ptr_StorageBuffer__struct_12 = OpTypePointer StorageBuffer %_struct_12
+%_ptr_StorageBuffer__struct_8 = OpTypePointer StorageBuffer %_struct_8
+          %3 = OpVariable %_ptr_StorageBuffer__struct_11 StorageBuffer
+%_ptr_Workgroup__struct_8 = OpTypePointer Workgroup %_struct_8
+          %4 = OpVariable %_ptr_Workgroup__struct_8 Workgroup
+          %5 = OpVariable %_ptr_Workgroup__struct_8 Workgroup
+          %6 = OpVariable %_ptr_StorageBuffer__struct_12 StorageBuffer
+         %26 = OpConstantComposite %_struct_7 %uint_1 %uint_1
+         %27 = OpConstantComposite %_struct_7 %uint_2 %uint_2
+         %28 = OpConstantComposite %_struct_8 %26 %26
+         %29 = OpConstantComposite %_struct_8 %27 %27
+         %30 = OpTypeFunction %void
+          %1 = OpFunction %void None %30
+         %31 = OpLabel
+         %32 = OpLoad %v3uint %gl_GlobalInvocationID
+         %33 = OpCompositeExtract %uint %32 0
+               OpStore %4 %28
+               OpStore %5 %29
+         %34 = OpAccessChain %_ptr_StorageBuffer_uint %3 %uint_0 %33
+         %35 = OpLoad %uint %34
+         %36 = OpIEqual %bool %35 %uint_0
+         %37 = OpSelect %_ptr_Workgroup__struct_8 %36 %4 %5
+         %38 = OpAccessChain %_ptr_StorageBuffer__struct_8 %6 %uint_0 %33
+         %39 = OpLoad %_struct_8 %37
+               OpStore %38 %39
+               OpReturn
+               OpFunctionEnd

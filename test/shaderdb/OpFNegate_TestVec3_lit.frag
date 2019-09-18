@@ -20,7 +20,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: fsub reassoc nnan nsz arcp contract <3 x float> <float -0.000000e+00, float -0.000000e+00, float -0.000000e+00>
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST-COUNT-3: fsub float -0.000000e+00
+; SHADERTEST-COUNT-3: fsub reassoc nnan nsz arcp contract float -0.000000e+00
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

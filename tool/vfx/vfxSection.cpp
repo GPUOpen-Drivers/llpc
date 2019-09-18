@@ -247,7 +247,7 @@ bool Section::GetMemberType(
     bool result = false;
     for (uint32_t i = 0; i < m_tableSize; ++i)
     {
-        if (strcmp(pMemberName, m_pMemberTable[i].pMemberName) == 0)
+        if ((m_pMemberTable[i].pMemberName != nullptr) && strcmp(pMemberName, m_pMemberTable[i].pMemberName) == 0)
         {
             result = true;
 
@@ -281,7 +281,7 @@ bool Section::IsSection(
 
     for (uint32_t i = 0; i < m_tableSize; ++i)
     {
-        if (strcmp(pMemberName, m_pMemberTable[i].pMemberName) == 0)
+        if ((m_pMemberTable[i].pMemberName != nullptr) && strcmp(pMemberName, m_pMemberTable[i].pMemberName) == 0)
         {
             result = true;
             if (pOutput != nullptr)
@@ -316,6 +316,10 @@ void Section::PrintSelf(
         printf("[%s]\n", m_pSectionName);
         for (uint32_t i = 0; i < m_tableSize; ++i)
         {
+            if (m_pMemberTable[i].pMemberName != nullptr)
+            {
+                continue;
+            }
             for (uint32_t arrayIndex = 0; arrayIndex < m_pMemberTable[i].arrayMaxSize; ++arrayIndex)
             {
                 if (m_pMemberTable[i].isSection)
