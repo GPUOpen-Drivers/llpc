@@ -266,7 +266,7 @@ ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
 void SetShaderStageToModule(llvm::Module* pModule, ShaderStage shaderStage);
 
 // Gets the shader stage from the specified LLVM function.
-ShaderStage GetShaderStageFromFunction(llvm::Function* pFunc);
+ShaderStage GetShaderStageFromFunction(const llvm::Function* pFunc);
 
 // Gets the shader stage from the specified calling convention.
 ShaderStage GetShaderStageFromCallingConv(uint32_t stageMask, llvm::CallingConv::ID callConv);
