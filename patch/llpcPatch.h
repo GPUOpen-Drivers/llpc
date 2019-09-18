@@ -50,6 +50,7 @@ class PassManager;
 } // legacy
 
 void initializePatchBufferOpPass(PassRegistry&);
+void initializePatchCheckShaderCachePass(PassRegistry&);
 void initializePatchCopyShaderPass(PassRegistry&);
 void initializePatchDescriptorLoadPass(PassRegistry&);
 void initializePatchEntryPointMutatePass(PassRegistry&);
@@ -68,11 +69,16 @@ void initializePatchSetupTargetFeaturesPass(PassRegistry&);
 namespace Llpc
 {
 
+using namespace llvm;
+
+class PatchCheckShaderCache;
+
 // Initialize passes for patching
 inline static void InitializePatchPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
   initializePatchBufferOpPass(passRegistry);
+  initializePatchCheckShaderCachePass(passRegistry);
   initializePatchCopyShaderPass(passRegistry);
   initializePatchDescriptorLoadPass(passRegistry);
   initializePatchEntryPointMutatePass(passRegistry);
@@ -87,6 +93,7 @@ inline static void InitializePatchPasses(
 }
 
 llvm::FunctionPass* CreatePatchBufferOp();
+PatchCheckShaderCache* CreatePatchCheckShaderCache();
 llvm::ModulePass* CreatePatchCopyShader();
 llvm::ModulePass* CreatePatchDescriptorLoad();
 llvm::ModulePass* CreatePatchEntryPointMutate();
@@ -95,7 +102,7 @@ llvm::ModulePass* CreatePatchLlvmIrInclusion();
 llvm::FunctionPass* CreatePatchLoadScalarizer();
 llvm::ModulePass* CreatePatchNullFragShader();
 llvm::FunctionPass* CreatePatchPeepholeOpt(bool enableDiscardOpt = false);
-llvm::ModulePass* CreatePatchPreparePipelineAbi(bool onlySetCallingConvs, uint32_t skipStageMask);
+llvm::ModulePass* CreatePatchPreparePipelineAbi(bool onlySetCallingConvs);
 llvm::ModulePass* CreatePatchPushConstOp();
 llvm::ModulePass* CreatePatchResourceCollect();
 llvm::ModulePass* CreatePatchSetupTargetFeatures();
@@ -119,15 +126,12 @@ public:
     }
     virtual ~Patch() {}
 
-    static void AddPrePatchPasses(Context*                   pContext,
-                                  llvm::legacy::PassManager& passMgr,
-                                  llvm::Timer*               pPatchTimer);
-
     static void AddPasses(Context*                    pContext,
                           llvm::legacy::PassManager&  passMgr,
-                          uint32_t                    skipStageMask,
                           llvm::Timer*                pPatchTimer,
-                          llvm::Timer*                pOptTimer);
+                          llvm::Timer*                pOptTimer,
+                          std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
+                                                      checkShaderCacheFunc);
 
     static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
 

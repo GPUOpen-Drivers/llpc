@@ -1170,108 +1170,27 @@ Result Compiler::BuildPipelineInternal(
         }
     }
 
-    // Run necessary patch pass to prepare per shader stage cache
-    PassManager prePatchPassMgr(&passIndex);
-    if (result == Result::Success)
+    // Set up function to check shader cache.
+    GraphicsShaderCacheChecker graphicsShaderCacheChecker(this, pContext);
+
+    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)> checkShaderCacheFunc =
+            [&graphicsShaderCacheChecker](
+        const Module*               pModule,      // [in] Module
+        uint32_t                    stageMask,    // Shader stage mask
+        ArrayRef<ArrayRef<uint8_t>> stageHashes)  // Per-stage hash of in/out usage
     {
-        // Patching.
-        Patch::AddPrePatchPasses(pContext, prePatchPassMgr, timerProfiler.GetTimer(TimerPatch));
-
-        bool success = RunPasses(&prePatchPassMgr, pPipelineModule);
-        if (success == false)
-        {
-            result = Result::ErrorInvalidShader;
-        }
-    }
-
-    ShaderEntryState fragmentCacheEntryState = ShaderEntryState::New;
-    ShaderEntryState nonFragmentCacheEntryState = ShaderEntryState::New;
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-    constexpr uint32_t ShaderCacheCount = 2;
-    ShaderCache* pFragmentShaderCache[ShaderCacheCount] = { nullptr, nullptr };
-    CacheEntryHandle hFragmentEntry[ShaderCacheCount] = { nullptr, nullptr };
-    ShaderCache* pNonFragmentShaderCache[ShaderCacheCount] = { nullptr, nullptr };
-    CacheEntryHandle hNonFragmentEntry[ShaderCacheCount] = { nullptr, nullptr };
-#else
-    CacheEntryHandle hFragmentEntry = nullptr;
-    CacheEntryHandle hNonFragmentEntry = nullptr;
-#endif
-    BinaryData fragmentElf = {};
-    BinaryData nonFragmentElf = {};
-
-    uint32_t stageMask = pContext->GetShaderStageMask();
+        return graphicsShaderCacheChecker.Check(pModule, stageMask, stageHashes);
+    };
 
     // Only enable per stage cache for full graphic pipeline
-    bool checkPerStageCache = cl::EnablePerStageCache &&
-                              pContext->IsGraphics() &&
-                              (stageMask & ShaderStageToMask(ShaderStageVertex)) &&
-                              (stageMask & ShaderStageToMask(ShaderStageFragment));
-
-    if (checkPerStageCache && (result == Result::Success))
+    bool checkPerStageCache = cl::EnablePerStageCache && pContext->IsGraphics() &&
+                              (pContext->GetShaderStageMask() &
+                               (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment)));
+    if (checkPerStageCache == false)
     {
-        // Check per stage shader cache
-        MetroHash::Hash fragmentHash = {};
-        MetroHash::Hash nonFragmentHash = {};
-        BuildShaderCacheHash(pContext, &fragmentHash, &nonFragmentHash);
-
-        // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
-        // is used in non-fragment shader stages.
-        for (ShaderStage stage = ShaderStageVertex; stage < ShaderStageFragment; stage = static_cast<ShaderStage>(stage + 1))
-        {
-            if (stageMask & ShaderStageToMask(stage))
-            {
-                auto pResUsage = pContext->GetShaderResourceUsage(stage);
-                if (pResUsage->globalConstant)
-                {
-                    checkPerStageCache = false;
-                    break;
-                }
-            }
-        }
-
-        if (checkPerStageCache)
-        {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-            if (stageMask & ShaderStageToMask(ShaderStageFragment))
-            {
-                fragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
-                                                             &fragmentHash,
-                                                             &fragmentElf,
-                                                             pFragmentShaderCache,
-                                                             hFragmentEntry);
-            }
-
-            if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
-            {
-                nonFragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
-                                                                &nonFragmentHash,
-                                                                &nonFragmentElf,
-                                                                pNonFragmentShaderCache,
-                                                                hNonFragmentEntry);
-            }
-#else
-            if (stageMask & ShaderStageToMask(ShaderStageFragment))
-            {
-                fragmentCacheEntryState = LookUpShaderCache(&fragmentHash,
-                                                             &fragmentElf,
-                                                             &hFragmentEntry);
-            }
-
-            if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
-            {
-                nonFragmentCacheEntryState = LookUpShaderCache(&nonFragmentHash,
-                                                                &nonFragmentElf,
-                                                                &hNonFragmentEntry);
-            }
-#endif
-        }
+        checkShaderCacheFunc = nullptr;
     }
 
-    if ((checkPerStageCache == false) ||
-        (fragmentCacheEntryState == ShaderEntryState::Compiling) ||
-        (nonFragmentCacheEntryState == ShaderEntryState::Compiling))
     {
         // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
         //
@@ -1285,31 +1204,16 @@ Result Compiler::BuildPipelineInternal(
         // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
         AddTargetLibInfo(pContext, &patchPassMgr);
 
-        ElfPackage partialPipelineElf;
-
-        // Store result to partialPipelineElf for partial pipeline compile
-        bool partialCompile = (fragmentCacheEntryState == ShaderEntryState::Ready) || (nonFragmentCacheEntryState == ShaderEntryState::Ready);
-        raw_svector_ostream elfStream(partialCompile ? partialPipelineElf : *pPipelineElf);
-
-        uint32_t skipStageMask = 0;
-        if (fragmentCacheEntryState == ShaderEntryState::Ready)
-        {
-            skipStageMask = ShaderStageToMask(ShaderStageFragment);
-        }
-
-        if (nonFragmentCacheEntryState == ShaderEntryState::Ready)
-        {
-            skipStageMask = pContext->GetShaderStageMask() & ~ShaderStageToMask(ShaderStageFragment);
-        }
+        raw_svector_ostream elfStream(*pPipelineElf);
 
         if (result == Result::Success)
         {
             // Patching.
             Patch::AddPasses(pContext,
                              patchPassMgr,
-                             skipStageMask,
                              timerProfiler.GetTimer(TimerPatch),
-                             timerProfiler.GetTimer(TimerOpt));
+                             timerProfiler.GetTimer(TimerOpt),
+                             checkShaderCacheFunc);
         }
 
         // At this point, we have finished with the Builder. No patch pass should be using Builder.
@@ -1358,98 +1262,12 @@ Result Compiler::BuildPipelineInternal(
                 result = Result::ErrorInvalidShader;
             }
         }
-
-        // Only non-fragment shaders are compiled
-        if ((fragmentCacheEntryState == ShaderEntryState::Ready) &&
-            (nonFragmentCacheEntryState == ShaderEntryState::Compiling))
-        {
-            BinaryData pipelineElf = {};
-            if (result == Result::Success)
-            {
-                BinaryData nonFragmentPipelineElf = {};
-                nonFragmentPipelineElf.pCode = partialPipelineElf.data();
-                nonFragmentPipelineElf.codeSize = partialPipelineElf.size();
-
-                MergeElfBinary(pContext, &fragmentElf, &nonFragmentPipelineElf, pPipelineElf);
-
-                pipelineElf.codeSize = pPipelineElf->size();
-                pipelineElf.pCode = pPipelineElf->data();
-            }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-            UpdateShaderCaches(result == Result::Success,
-                               &pipelineElf,
-                               pNonFragmentShaderCache,
-                               hNonFragmentEntry,
-                               ShaderCacheCount);
-#else
-            UpdateShaderCache(result == Result::Success,
-                               &pipelineElf,
-                               hNonFragmentEntry);
-#endif
-        }
-
-        // Only fragment shader is compiled
-        if ((nonFragmentCacheEntryState == ShaderEntryState::Ready) &&
-            (fragmentCacheEntryState == ShaderEntryState::Compiling))
-        {
-            BinaryData pipelineElf = {};
-            if (result == Result::Success)
-            {
-                BinaryData fragmentPipelineElf = {};
-                fragmentPipelineElf.pCode = partialPipelineElf.data();
-                fragmentPipelineElf.codeSize = partialPipelineElf.size();
-
-                MergeElfBinary(pContext, &fragmentPipelineElf, &nonFragmentElf, pPipelineElf);
-
-                pipelineElf.codeSize = pPipelineElf->size();
-                pipelineElf.pCode = pPipelineElf->data();
-            }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-            UpdateShaderCaches(result == Result::Success,
-                               &pipelineElf,
-                               pFragmentShaderCache,
-                               hFragmentEntry,
-                               ShaderCacheCount);
-#else
-            UpdateShaderCache(result == Result::Success,
-                               &pipelineElf,
-                               hFragmentEntry);
-#endif
-        }
-
-        // Whole pipeline is compiled
-        if ((fragmentCacheEntryState == ShaderEntryState::Compiling) &&
-            (nonFragmentCacheEntryState == ShaderEntryState::Compiling))
-        {
-            BinaryData pipelineElf = {};
-            pipelineElf.codeSize = pPipelineElf->size();
-            pipelineElf.pCode = pPipelineElf->data();
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-            UpdateShaderCaches((result == Result::Success),
-                               &pipelineElf,
-                               pFragmentShaderCache,
-                               hFragmentEntry,
-                               ShaderCacheCount);
-
-            UpdateShaderCaches(result == Result::Success,
-                               &pipelineElf,
-                               pNonFragmentShaderCache,
-                               hNonFragmentEntry,
-                               ShaderCacheCount);
-#else
-            UpdateShaderCache(result == Result::Success,
-                               &pipelineElf,
-                               hFragmentEntry);
-
-            UpdateShaderCache(result == Result::Success,
-                               &pipelineElf,
-                               hNonFragmentEntry);
-#endif
-        }
     }
-    else
+
+    if (checkPerStageCache)
     {
-        MergeElfBinary(pContext, &fragmentElf, &nonFragmentElf, pPipelineElf);
+        // For graphics, update shader caches with results of compile, and merge ELF outputs if necessary.
+        graphicsShaderCacheChecker.UpdateAndMerge(result, pPipelineElf);
     }
 
     pContext->setDiagnosticHandlerCallBack(nullptr);
@@ -1458,6 +1276,191 @@ Result Compiler::BuildPipelineInternal(
     pPipelineModule = nullptr;
 
     return result;
+}
+
+// =====================================================================================================================
+// Check shader cache for graphics pipeline, returning mask of which shader stages we want to keep in this compile.
+// This is called from the PatchCheckShaderCache pass (via a lambda in BuildPipelineInternal), to remove
+// shader stages that we don't want because there was a shader cache hit.
+uint32_t GraphicsShaderCacheChecker::Check(
+    const Module*               pModule,      // [in] Module
+    uint32_t                    stageMask,    // Shader stage mask
+    ArrayRef<ArrayRef<uint8_t>> stageHashes)  // Per-stage hash of in/out usage
+{
+    // Check per stage shader cache
+    MetroHash::Hash fragmentHash = {};
+    MetroHash::Hash nonFragmentHash = {};
+    Compiler::BuildShaderCacheHash(m_pContext, stageMask, stageHashes, &fragmentHash, &nonFragmentHash);
+
+    // NOTE: Global constant are added to the end of pipeline binary. we can't merge ELF binaries if global constant
+    // is used in non-fragment shader stages.
+    for (auto& global : pModule->globals())
+    {
+        if (auto pGlobalVar = dyn_cast<GlobalVariable>(&global))
+        {
+            if (pGlobalVar->isConstant())
+            {
+                SmallVector<const Value*, 4> vals;
+                vals.push_back(pGlobalVar);
+                for (uint32_t i = 0; i != vals.size(); ++i)
+                {
+                    for (auto pUser : vals[i]->users())
+                    {
+                        if (isa<Constant>(pUser))
+                        {
+                            vals.push_back(pUser);
+                            continue;
+                        }
+                        if (GetShaderStageFromFunction(cast<Instruction>(pUser)->getFunction()) != ShaderStageFragment)
+                        {
+                            return stageMask;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+    if (stageMask & ShaderStageToMask(ShaderStageFragment))
+    {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+        m_fragmentCacheEntryState = m_pCompiler->LookUpShaderCaches(pPipelineInfo->pShaderCache,
+                                                                    &fragmentHash,
+                                                                    &m_fragmentElf,
+                                                                    m_pFragmentShaderCache,
+                                                                    m_hFragmentEntry);
+#else
+        m_fragmentCacheEntryState = m_pCompiler->LookUpShaderCache(&fragmentHash,
+                                                                   &m_fragmentElf,
+                                                                   &m_hFragmentEntry);
+#endif
+    }
+
+    if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+    {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+        m_nonFragmentCacheEntryState = m_pCompiler->LookUpShaderCaches(pPipelineInfo->pShaderCache,
+                                                                       &nonFragmentHash,
+                                                                       &m_nonFragmentElf,
+                                                                       m_pNonFragmentShaderCache,
+                                                                       m_hNonFragmentEntry);
+#else
+        m_fragmentCacheEntryState = m_pCompiler->LookUpShaderCache(&nonFragmentHash,
+                                                                   &m_nonFragmentElf,
+                                                                   &m_hNonFragmentEntry);
+#endif
+    }
+
+    if (m_nonFragmentCacheEntryState != ShaderEntryState::Compiling)
+    {
+        // Remove non-fragment shader stages.
+        stageMask &= ShaderStageToMask(ShaderStageFragment);
+    }
+    if (m_fragmentCacheEntryState != ShaderEntryState::Compiling)
+    {
+        // Remove fragment shader stages.
+        stageMask &= ~ShaderStageToMask(ShaderStageFragment);
+    }
+
+    return stageMask;
+}
+
+// =====================================================================================================================
+// Update shader caches for graphics pipeline from compile result, and merge ELF outputs if necessary.
+void GraphicsShaderCacheChecker::UpdateAndMerge(
+    Result            result,         // Result of compile
+    ElfPackage*       pPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
+{
+    // Only non-fragment shaders were compiled
+    if ((m_fragmentCacheEntryState == ShaderEntryState::Ready) &&
+        (m_nonFragmentCacheEntryState == ShaderEntryState::Compiling))
+    {
+        ElfPackage partialPipelineElf = *pPipelineElf;
+        pPipelineElf->clear();
+        BinaryData pipelineElf = {};
+        if (result == Result::Success)
+        {
+            BinaryData nonFragmentPipelineElf = {};
+            nonFragmentPipelineElf.pCode = partialPipelineElf.data();
+            nonFragmentPipelineElf.codeSize = partialPipelineElf.size();
+
+            m_pCompiler->MergeElfBinary(m_pContext, &m_fragmentElf, &nonFragmentPipelineElf, pPipelineElf);
+
+            pipelineElf.codeSize = pPipelineElf->size();
+            pipelineElf.pCode = pPipelineElf->data();
+        }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+        Compiler::UpdateShaderCaches(result == Result::Success,
+                                     &pipelineElf,
+                                     m_pNonFragmentShaderCache,
+                                     m_hNonFragmentEntry,
+                                     ShaderCacheCount);
+#else
+        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
+#endif
+    }
+
+    // Only fragment shader is compiled
+    else if ((m_nonFragmentCacheEntryState == ShaderEntryState::Ready) &&
+             (m_fragmentCacheEntryState == ShaderEntryState::Compiling))
+    {
+        ElfPackage partialPipelineElf = *pPipelineElf;
+        pPipelineElf->clear();
+        BinaryData pipelineElf = {};
+        if (result == Result::Success)
+        {
+            BinaryData fragmentPipelineElf = {};
+            fragmentPipelineElf.pCode = partialPipelineElf.data();
+            fragmentPipelineElf.codeSize = partialPipelineElf.size();
+
+            m_pCompiler->MergeElfBinary(m_pContext, &fragmentPipelineElf, &m_nonFragmentElf, pPipelineElf);
+
+            pipelineElf.codeSize = pPipelineElf->size();
+            pipelineElf.pCode = pPipelineElf->data();
+        }
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+        Compiler::UpdateShaderCaches(result == Result::Success,
+                                     &pipelineElf,
+                                     m_pFragmentShaderCache,
+                                     m_hFragmentEntry,
+                                     ShaderCacheCount);
+#else
+        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hFragmentEntry);
+#endif
+    }
+
+    // Both shaders hit the shader cache.
+    else if ((m_fragmentCacheEntryState == ShaderEntryState::Ready) &&
+        (m_nonFragmentCacheEntryState == ShaderEntryState::Ready))
+    {
+        m_pCompiler->MergeElfBinary(m_pContext, &m_fragmentElf, &m_nonFragmentElf, pPipelineElf);
+    }
+
+    // Whole pipeline is compiled
+    else
+    {
+        BinaryData pipelineElf = {};
+        pipelineElf.codeSize = pPipelineElf->size();
+        pipelineElf.pCode = pPipelineElf->data();
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+        Compiler::UpdateShaderCaches((result == Result::Success),
+                                     &pipelineElf,
+                                     m_pFragmentShaderCache,
+                                     m_hFragmentEntry,
+                                     ShaderCacheCount);
+        Compiler::UpdateShaderCaches(result == Result::Success,
+                                     &pipelineElf,
+                                     m_pNonFragmentShaderCache,
+                                     m_hNonFragmentEntry,
+                                     ShaderCacheCount);
+#else
+        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hFragmentEntry);
+        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
+#endif
+    }
 }
 
 // =====================================================================================================================
@@ -2815,13 +2818,14 @@ void Compiler::UpdateShaderCache(
 // =====================================================================================================================
 // Builds hash code from input context for per shader stage cache
 void Compiler::BuildShaderCacheHash(
-    Context*         pContext,           // [in] Acquired context
-    MetroHash::Hash* pFragmentHash,      // [out] Hash code of fragment shader
-    MetroHash::Hash* pNonFragmentHash)   // [out] Hash code of all non-fragment shader
+    Context*                    pContext,           // [in] Acquired context
+    uint32_t                    stageMask,          // Shader stage mask
+    ArrayRef<ArrayRef<uint8_t>> stageHashes,        // Per-stage hash of in/out usage
+    MetroHash::Hash*            pFragmentHash,      // [out] Hash code of fragment shader
+    MetroHash::Hash*            pNonFragmentHash)   // [out] Hash code of all non-fragment shader
 {
     MetroHash64 fragmentHasher;
     MetroHash64 nonFragmentHasher;
-    auto stageMask = pContext->GetShaderStageMask();
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
 
@@ -2834,29 +2838,14 @@ void Compiler::BuildShaderCacheHash(
         }
 
         auto pShaderInfo = pContext->GetPipelineShaderInfo(stage);
-        auto pResUsage = pContext->GetShaderResourceUsage(stage);
         MetroHash64 hasher;
 
         // Update common shader info
         PipelineDumper::UpdateHashForPipelineShaderInfo(stage, pShaderInfo, true, &hasher);
         hasher.Update(pPipelineInfo->iaState.deviceIndex);
 
-        // Update input/output usage
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.inputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.outputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchInputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchOutputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.builtInInputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.builtInOutputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInInputLocMap, &hasher);
-        PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.perPatchBuiltInOutputLocMap, &hasher);
-
-        if (stage == ShaderStageGeometry)
-        {
-            // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to
-            // locations of generic outputs). We have to add it to shader hash calculation.
-            PipelineDumper::UpdateHashForMap(pResUsage->inOutUsage.gs.builtInOutLocs, &hasher);
-        }
+        // Update input/output usage (provided by middle-end caller of this callback).
+        hasher.Update(stageHashes[stage].data(), stageHashes[stage].size());
 
         // Update vertex input state
         if (stage == ShaderStageVertex)

@@ -56,6 +56,7 @@
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
+#include "llpcPatchCheckShaderCache.h"
 #include "SPIRVInternal.h"
 
 #define DEBUG_TYPE "llpc-patch"
@@ -89,11 +90,15 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Add patch passes to pass manager for per stage cache
-void Patch::AddPrePatchPasses(
-    Context*             pContext,     // [in] LLPC context
-    legacy::PassManager& passMgr,      // [in/out] Pass manager to add passes to
-    llvm::Timer*         pPatchTimer)  // [in] Timer to time patch passes with, nullptr if not timing
+// Add whole-pipeline patch passes to pass manager
+void Patch::AddPasses(
+    Context*              pContext,      // [in] LLPC context
+    legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
+    llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
+    llvm::Timer*          pOptTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
+    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
+                          checkShaderCacheFunc)
+                                         // Callback function to check shader cache
 {
     // Start timer for patching passes.
     if (pPatchTimer != nullptr)
@@ -121,28 +126,6 @@ void Patch::AddPrePatchPasses(
     // Patch resource collecting, remove inactive resources (should be the first preliminary pass)
     passMgr.add(CreatePatchResourceCollect());
 
-    // Stop timer for optimization passes and restart timer for patching passes.
-    if (pPatchTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, false));
-    }
-}
-
-// =====================================================================================================================
-// Add whole-pipeline patch passes to pass manager
-void Patch::AddPasses(
-    Context*              pContext,      // [in] LLPC context
-    legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
-    uint32_t              skipStageMask, // Mask indicating which shader stages should be skipped in processing
-    llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
-    llvm::Timer*          pOptTimer)     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
-{
-    // Start timer for patching passes.
-    if (pPatchTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pPatchTimer, true));
-    }
-
     // Generate copy shader if necessary.
     passMgr.add(CreatePatchCopyShader());
 
@@ -166,6 +149,11 @@ void Patch::AddPasses(
     passMgr.add(createAlwaysInlinerLegacyPass());
     passMgr.add(CreatePassDeadFuncRemove());
 
+    // Check shader cache
+    auto pCheckShaderCachePass = CreatePatchCheckShaderCache();
+    passMgr.add(pCheckShaderCachePass);
+    pCheckShaderCachePass->SetCallbackFunction(checkShaderCacheFunc);
+
     // Stop timer for patching passes and start timer for optimization passes.
     if (pPatchTimer != nullptr)
     {
@@ -174,7 +162,7 @@ void Patch::AddPasses(
     }
 
     // Prepare pipeline ABI but only set the calling conventions to AMDGPU ones for now.
-    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */true, skipStageMask));
+    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */true));
 
     // Add some optimization passes
 
@@ -198,7 +186,7 @@ void Patch::AddPasses(
     passMgr.add(createInstructionCombiningPass(false));
 
     // Fully prepare the pipeline ABI (must be after optimizations)
-    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false, skipStageMask));
+    passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
 #if LLPC_BUILD_GFX10
     if (pContext->IsGraphics() && pContext->GetNggControl()->enableNgg)
