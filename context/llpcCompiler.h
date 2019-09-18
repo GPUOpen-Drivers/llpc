@@ -42,6 +42,7 @@ namespace Llpc
 
 // Forward declaration
 class Builder;
+class Compiler;
 class ComputeContext;
 class Context;
 class GraphicsContext;
@@ -211,6 +212,55 @@ struct PipelineStatistics
 };
 
 // =====================================================================================================================
+// Object to manage checking and updating shader cache for graphics pipeline.
+class GraphicsShaderCacheChecker
+{
+public:
+    GraphicsShaderCacheChecker(Compiler* pCompiler, Context* pContext) :
+        m_pCompiler(pCompiler), m_pContext(pContext)
+    {}
+
+    // Check shader caches, returning mask of which shader stages we want to keep in this compile.
+    uint32_t Check(const llvm::Module*                     pModule,
+                   uint32_t                                stageMask,
+                   llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes);
+
+    // Get cache results.
+    ShaderEntryState GetNonFragmentCacheEntryState() { return m_nonFragmentCacheEntryState; }
+    ShaderEntryState GetFragmentCacheEntryState() { return m_fragmentCacheEntryState; }
+
+    // Update shader caches with results of compile, and merge ELF outputs if necessary.
+    void UpdateAndMerge(Result result, ElfPackage* pPipelineElf);
+
+private:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    static constexpr uint32_t ShaderCacheCount = 2;
+#endif
+    Compiler* m_pCompiler;
+    Context*  m_pContext;
+
+    ShaderEntryState m_nonFragmentCacheEntryState = ShaderEntryState::New;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    ShaderCache* m_pNonFragmentShaderCache[ShaderCacheCount] = {};
+    CacheEntryHandle m_hNonFragmentEntry[ShaderCacheCount] = {};
+#else
+    ShaderCache* m_pNonFragmentShaderCache = nullptr;
+    CacheEntryHandle m_hNonFragmentEntry = {};
+#endif
+    BinaryData m_nonFragmentElf = {};
+
+    ShaderEntryState m_fragmentCacheEntryState = ShaderEntryState::New;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    ShaderCache* m_pFragmentShaderCache[ShaderCacheCount] = {};
+    CacheEntryHandle m_hFragmentEntry[ShaderCacheCount] = {};
+#else
+    ShaderCache* m_pFragmentShaderCache = nullptr
+    CacheEntryHandle m_hFragmentEntry = {};
+#endif
+    BinaryData m_fragmentElf = {};
+};
+
+// =====================================================================================================================
 // Represents LLPC pipeline compiler.
 class Compiler: public ICompiler
 {
@@ -261,6 +311,38 @@ public:
     static void TranslateSpirvToLlvm(const PipelineShaderInfo*    pShaderInfo,
                                      llvm::Module*                pModule);
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
+                                        MetroHash::Hash*    pCacheHash,
+                                        BinaryData*         pElfBin,
+                                        ShaderCache**       ppShaderCache,
+                                        CacheEntryHandle*   phEntry);
+
+    static void UpdateShaderCaches(bool                insert,
+                                   const BinaryData*   pElfBin,
+                                   ShaderCache**       ppShaderCache,
+                                   CacheEntryHandle*   phEntry,
+                                   uint32_t            shaderCacheCount);
+#else
+    ShaderEntryState LookUpShaderCache(MetroHash::Hash*    pCacheHash,
+                                       BinaryData*         pElfBin,
+                                       CacheEntryHandle*   phEntry);
+
+    static void UpdateShaderCache(bool                insert,
+                                  const BinaryData*   pElfBin,
+                                  CacheEntryHandle    phEntry);
+#endif
+    static void BuildShaderCacheHash(Context*                                 pContext,
+                                     uint32_t                                 stageMask,
+                                     llvm::ArrayRef<llvm::ArrayRef<uint8_t>>  stageHashes,
+                                     MetroHash::Hash*                         pFragmentHash,
+                                     MetroHash::Hash*                         pNonFragmentHash);
+
+    void MergeElfBinary(Context*          pContext,
+                        const BinaryData* pFragmentElf,
+                        const BinaryData* pNonFragmentElf,
+                        ElfPackage*       pPipelineElf);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Compiler);
@@ -289,33 +371,6 @@ private:
                                PipelineStatistics*     pPipelineStats) const;
 
     bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
-    ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
-                                        MetroHash::Hash*    pCacheHash,
-                                        BinaryData*         pElfBin,
-                                        ShaderCache**       ppShaderCache,
-                                        CacheEntryHandle*   phEntry);
-
-    void UpdateShaderCaches(bool                insert,
-                            const BinaryData*   pElfBin,
-                            ShaderCache**       ppShaderCache,
-                            CacheEntryHandle*   phEntry,
-                            uint32_t            shaderCacheCount);
-#else
-    ShaderEntryState LookUpShaderCache(MetroHash::Hash*    pCacheHash,
-                                       BinaryData*         pElfBin,
-                                       CacheEntryHandle*   phEntry);
-
-    void UpdateShaderCache(bool                insert,
-                           const BinaryData*   pElfBin,
-                           CacheEntryHandle   phEntry);
-#endif
-    void BuildShaderCacheHash(Context* pContext, MetroHash::Hash* pFragmentHash, MetroHash::Hash* pNonFragmentHash);
-
-    void MergeElfBinary(Context*          pContext,
-                        const BinaryData* pFragmentElf,
-                        const BinaryData* pNonFragmentElf,
-                        ElfPackage*       pPipelineElf);
     // -----------------------------------------------------------------------------------------------------------------
 
     std::vector<std::string>      m_options;          // Compilation options

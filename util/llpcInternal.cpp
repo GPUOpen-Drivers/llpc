@@ -267,7 +267,7 @@ ShaderStage GetShaderStageFromModule(
 // =====================================================================================================================
 // Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if not shader entrypoint.
 ShaderStage GetShaderStageFromFunction(
-    Function* pFunc)  // [in] LLVM function
+    const Function* pFunc)  // [in] LLVM function
 {
     // First check for the metadata that is added by the builder. This works in the patch phase.
     MDNode* pStageMetaNode = pFunc->getMetadata(LlpcName::ShaderStageMetadata);

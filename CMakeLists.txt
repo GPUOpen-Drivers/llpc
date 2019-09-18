@@ -282,6 +282,7 @@ if(ICD_BUILD_LLPC)
         patch/llpcFragColorExport.cpp
         patch/llpcPatch.cpp
         patch/llpcPatchBufferOp.cpp
+        patch/llpcPatchCheckShaderCache.cpp
         patch/llpcPatchCopyShader.cpp
         patch/llpcPatchDescriptorLoad.cpp
         patch/llpcPatchEntryPointMutate.cpp

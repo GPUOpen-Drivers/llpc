@@ -124,6 +124,7 @@ endif
         llpcFragColorExport.cpp             \
         llpcPatch.cpp                       \
         llpcPatchBufferOp.cpp               \
+        llpcPatchCheckShaderCache.cpp       \
         llpcPatchCopyShader.cpp             \
         llpcPatchDescriptorLoad.cpp         \
         llpcPatchEntryPointMutate.cpp       \

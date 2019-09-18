@@ -54,12 +54,10 @@ class PatchPreparePipelineAbi final : public Patch
 public:
     static char ID;
     PatchPreparePipelineAbi(
-        bool    onlySetCallingConvs = false,
-        uint32_t skipStageMask = 0)
+        bool    onlySetCallingConvs = false)
         :
         Patch(ID),
-        m_onlySetCallingConvs(onlySetCallingConvs),
-        m_skipStageMask(skipStageMask)
+        m_onlySetCallingConvs(onlySetCallingConvs)
     {
         initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
         initializePatchPreparePipelineAbiPass(*PassRegistry::getPassRegistry());
@@ -102,7 +100,6 @@ private:
     GfxIpVersion      m_gfxIp;               // Graphics IP version info
 
     const bool        m_onlySetCallingConvs; // Whether to only set the calling conventions
-    const uint32_t    m_skipStageMask;       // Mask indicating which shader stages should be skipped in processing
 };
 
 char PatchPreparePipelineAbi::ID = 0;
@@ -112,10 +109,9 @@ char PatchPreparePipelineAbi::ID = 0;
 // =====================================================================================================================
 // Create pass to prepare the pipeline ABI
 ModulePass* Llpc::CreatePatchPreparePipelineAbi(
-    bool     onlySetCallingConvs, // Should we only set the calling conventions, or do the full prepare.
-    uint32_t skipStageMask)       // Mask of stages to be skipped
+    bool     onlySetCallingConvs) // Should we only set the calling conventions, or do the full prepare.
 {
-    return new PatchPreparePipelineAbi(onlySetCallingConvs, skipStageMask);
+    return new PatchPreparePipelineAbi(onlySetCallingConvs);
 }
 
 // =====================================================================================================================
@@ -354,15 +350,7 @@ void PatchPreparePipelineAbi::SetCallingConv(
     auto pEntryPoint = m_pPipelineShaders->GetEntryPoint(shaderStage);
     if (pEntryPoint != nullptr)
     {
-        if (m_skipStageMask & ShaderStageToMask(shaderStage))
-        {
-            pEntryPoint->setLinkage(GlobalValue::InternalLinkage);
-            pEntryPoint->setCallingConv(CallingConv::C);
-        }
-        else
-        {
-            pEntryPoint->setCallingConv(callingConv);
-        }
+        pEntryPoint->setCallingConv(callingConv);
     }
 }
 
