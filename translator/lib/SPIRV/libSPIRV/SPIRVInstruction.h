@@ -403,6 +403,7 @@ public:
     bool HasBothMasks = TheMemoryAccess.size() > DestMaskCount ? true : false;
     const unsigned MaxMaskCount = HasBothMasks ? 8 : 4;
     assert((TheMemoryAccess.size() <= MaxMaskCount) && "Invalid count of memory access operands");
+    (void)MaxMaskCount;
 
     for (unsigned I = 0; I < 2; ++I) {
       unsigned MaskIdx = HasBothMasks ? (I * DestMaskCount) : 0;
