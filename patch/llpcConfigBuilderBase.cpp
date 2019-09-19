@@ -147,12 +147,19 @@ msgpack::MapDocNode ConfigBuilderBase::GetHwShaderNode(
 // =====================================================================================================================
 // Set an API shader's hash in metadata
 void ConfigBuilderBase::SetShaderHash(
-    ShaderStage apiStage, // API shader stage
-    uint64_t    hash64)   // Its hash
+    ShaderStage   apiStage, // API shader stage
+    ShaderHash    hash)     // Its hash
 {
     auto hashNode = GetApiShaderNode(uint32_t(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
-    hashNode[0] = hashNode.getDocument()->getNode(hash64);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
+    // 128-bit hash
+    hashNode[0] = hashNode.getDocument()->getNode(hash.lower);
+    hashNode[1] = hashNode.getDocument()->getNode(hash.upper);
+#else
+    // 64-bit hash
+    hashNode[0] = hashNode.getDocument()->getNode(hash);
     hashNode[1] = hashNode.getDocument()->getNode(0U);
+#endif
 }
 
 // =====================================================================================================================
@@ -163,7 +170,6 @@ void ConfigBuilderBase::SetNumAvailSgprs(
 {
     auto hwShaderNode = GetHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
- 
 }
 
 // =====================================================================================================================

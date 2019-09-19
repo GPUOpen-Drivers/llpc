@@ -48,7 +48,7 @@ namespace Llpc
 // Header data that is stored with each shader in the cache.
 struct ShaderHeader
 {
-    ShaderHash  key;    // Compacted hash key used to identify shaders
+    uint64_t    key;    // Compacted hash key used to identify shaders
     uint64_t    crc;    // CRC of the shader cache entry, used to detect data corruption.
     size_t      size;   // Total size of the shader data in the storage file
 };
@@ -81,7 +81,8 @@ struct ShaderIndex
     void*                       pDataBlob;   // Serialized data blob representing a cached RelocatableShader object.
 };
 
-typedef std::unordered_map<ShaderHash, ShaderIndex*> ShaderIndexMap;
+// The key in hash map is a 64-bit compacted Shader Hash
+typedef std::unordered_map<uint64_t, ShaderIndex*> ShaderIndexMap;
 
 // Specifies auxiliary info necessary to create a shader cache object.
 struct ShaderCacheAuxCreateInfo

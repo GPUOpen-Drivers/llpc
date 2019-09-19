@@ -806,7 +806,7 @@ public:
     uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_pipelineHash); }
     uint64_t GetCacheHashCode() const { return MetroHash::Compact64(&m_cacheHash); }
 
-    virtual uint64_t GetShaderHashCode(ShaderStage stage) const;
+    virtual ShaderHash GetShaderHashCode(ShaderStage stage) const;
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;

@@ -253,7 +253,7 @@ Result ShaderCache::Merge(
 
         for (auto it : pSrcCache->m_shaderIndexMap)
         {
-            ShaderHash key = it.first;
+            uint64_t key = it.first;
 
             auto indexMap = m_shaderIndexMap.find(key);
             if (indexMap == m_shaderIndexMap.end())
@@ -464,7 +464,7 @@ ShaderEntryState ShaderCache::FindShader(
 
     bool readOnlyLock = (allocateOnMiss == false);
     LockCacheMap(readOnlyLock);
-    ShaderHash hashKey = MetroHash::Compact64(&hash);
+    uint64_t hashKey = MetroHash::Compact64(&hash);
     auto indexMap = m_shaderIndexMap.find(hashKey);
     if (indexMap != m_shaderIndexMap.end())
     {

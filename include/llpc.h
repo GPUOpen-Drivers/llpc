@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 35
+#define LLPC_INTERFACE_MAJOR_VERSION 36
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
 //* |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
 //* |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
 //* |     32.0 | Add ShaderModuleOptions in ShaderModuleBuildInfo                                                      |
@@ -258,9 +259,26 @@ struct PipelineDumpOptions
                                            ///  numeric suffix attached
 };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
+/// ShaderHash represents a 128-bit client-specified hash key which uniquely identifies a shader program.
+struct ShaderHash
+{
+    uint64_t lower;  ///< Lower 64 bits of hash key.
+    uint64_t upper;  ///< Upper 64 bits of hash key.
+};
+#else
+typedef uint64_t ShaderHash;
+#endif
+
 /// Represents per shader stage options.
 struct PipelineShaderOptions
 {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
+    ShaderHash clientHash;   ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
+                             ///  calculate its own hash. This hash is used for dumping, shader replacement, SPP, etc.
+                             ///  If the client provides this hash, they are responsible for ensuring it is as stable
+                             ///  as possible.
+#endif
     bool   trapPresent;  ///< Indicates a trap handler will be present when this pipeline is executed,
                          ///  and any trap conditions encountered in this shader should call the trap
                          ///  handler. This could include an arithmetic exception, an explicit trap
@@ -520,13 +538,11 @@ struct PipelineBuildInfo
     const GraphicsPipelineBuildInfo*   pGraphicsInfo;    // Graphic pipeline create info
 };
 
-typedef uint64_t ShaderHash;
-
 /// Defines callback function used to lookup shader cache info in an external cache
-typedef Result (*ShaderCacheGetValue)(const void* pClientData, ShaderHash hash, void* pValue, size_t* pValueLen);
+typedef Result (*ShaderCacheGetValue)(const void* pClientData, uint64_t hash, void* pValue, size_t* pValueLen);
 
 /// Defines callback function used to store shader cache info in an external cache
-typedef Result (*ShaderCacheStoreValue)(const void* pClientData, ShaderHash hash, const void* pValue, size_t valueLen);
+typedef Result (*ShaderCacheStoreValue)(const void* pClientData, uint64_t hash, const void* pValue, size_t valueLen);
 
 /// Specifies all information necessary to create a shader cache object.
 struct ShaderCacheCreateInfo
