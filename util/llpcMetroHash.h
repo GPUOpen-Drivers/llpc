@@ -77,5 +77,18 @@ inline uint32_t Compact32(uint64_t hash)
     return static_cast<uint32_t>(hash) ^ static_cast<uint32_t>(hash >> 32);
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
+// Compacts a 128-bit hash into a 32-bit one by XOR'ing each 32-bit chunk together.
+//
+// Takes input parameter ShaderHash, which is a struct consisting of 2 quad words to be compacted.
+//
+// Returns 32-bit hash value based on the input 128-bit hash.
+inline uint32_t Compact32(Llpc::ShaderHash hash)
+{
+    return (static_cast<uint32_t>(hash.lower) ^ static_cast<uint32_t>(hash.lower >> 32)
+        ^ static_cast<uint32_t>(hash.upper) ^ static_cast<uint32_t>(hash.upper >> 32));
+}
+#endif
+
 } // MetroHash
 

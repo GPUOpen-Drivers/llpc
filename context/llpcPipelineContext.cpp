@@ -244,17 +244,37 @@ void PipelineContext::InitShaderInterfaceData(
 
 // =====================================================================================================================
 // Gets the hash code of input shader with specified shader stage.
-uint64_t PipelineContext::GetShaderHashCode(
+ShaderHash PipelineContext::GetShaderHashCode(
     ShaderStage stage       // Shader stage
 ) const
 {
     auto pShaderInfo = GetPipelineShaderInfo(stage);
     LLPC_ASSERT(pShaderInfo != nullptr);
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
+    if((pShaderInfo->options.clientHash.upper != 0) &&
+       (pShaderInfo->options.clientHash.lower != 0))
+    {
+        return pShaderInfo->options.clientHash;
+    }
+    else
+    {
+        ShaderHash hash = {};
+        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+
+        if(pModuleData != nullptr)
+        {
+            hash.lower = MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash));
+            hash.upper = 0;
+        }
+        return hash;
+    }
+#else
     const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
 
     return (pModuleData == nullptr) ? 0 :
         MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash));
+#endif
 }
 
 // =====================================================================================================================

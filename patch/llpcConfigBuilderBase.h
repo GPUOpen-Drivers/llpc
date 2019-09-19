@@ -55,7 +55,7 @@ protected:
                                  uint32_t           fsHwShader,
                                  uint32_t           csHwShader);
 
-    void SetShaderHash(ShaderStage apiStage, uint64_t hash64);
+    void SetShaderHash(ShaderStage apiStage, ShaderHash hash);
     void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetUsesViewportArrayIndex(bool useViewportIndex);

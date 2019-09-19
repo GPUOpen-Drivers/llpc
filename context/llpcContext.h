@@ -281,7 +281,7 @@ public:
         return m_pPipelineContext->GetCacheHashCode();
     }
 
-    uint64_t GetShaderHashCode(ShaderStage shaderStage) const
+    ShaderHash GetShaderHashCode(ShaderStage shaderStage) const
     {
         return m_pPipelineContext->GetShaderHashCode(shaderStage);
     }
