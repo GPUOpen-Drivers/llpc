@@ -267,16 +267,20 @@ void SPIRVEntry::addDecorate(Decoration Kind, SPIRVWord Literal) {
 void SPIRVEntry::eraseDecorate(Decoration Dec) { Decorates.erase(Dec); }
 
 void SPIRVEntry::takeDecorates(SPIRVEntry *E) {
+  assert(E);
   Decorates = std::move(E->Decorates);
   SPIRVDBG(spvdbgs() << "[takeDecorates] " << Id << '\n';)
 }
 
 void SPIRVEntry::setLine(const std::shared_ptr<const SPIRVLine> &L) {
   Line = L;
-  SPIRVDBG(spvdbgs() << "[setLine] " << *L << '\n';)
+  SPIRVDBG(spvdbgs() << "[setLine] ";
+           if (L) spvdbgs() << *L << '\n';
+           else spvdbgs() << "<nullptr> \n";)
 }
 
 void SPIRVEntry::addMemberDecorate(const SPIRVMemberDecorate *Dec){
+  assert(Dec);
   assert(canHaveMemberDecorates());
   MemberDecorates[Dec->getPair()] = Dec;
   Module->addDecorate(Dec);
@@ -297,11 +301,13 @@ void SPIRVEntry::eraseMemberDecorate(SPIRVWord MemberNumber, Decoration Dec) {
 }
 
 void SPIRVEntry::takeMemberDecorates(SPIRVEntry *E) {
+  assert(E);
   MemberDecorates = std::move(E->MemberDecorates);
   SPIRVDBG(spvdbgs() << "[takeMemberDecorates] " << Id << '\n';)
 }
 
 void SPIRVEntry::takeAnnotations(SPIRVForward *E) {
+  assert(E);
   Module->setName(this, E->getName());
   takeDecorates(E);
   takeMemberDecorates(E);
