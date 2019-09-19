@@ -201,6 +201,10 @@ StringRef BuilderRecorder::GetCallName(
         return "read.clock";
     case Opcode::Derivative:
         return "derivative";
+    case Opcode::DemoteToHelperInvocation:
+        return "demote.to.helper.invocation";
+    case Opcode::IsHelperInvocation:
+        return "is.helper.invocation";
     case Opcode::ImageLoad:
         return "image.load";
     case Opcode::ImageLoadWithFmask:
@@ -859,6 +863,22 @@ Value* BuilderRecorder::CreateDerivative(
     const Twine&  instName)     // [in] Name to give instruction(s)
 {
     return Record(Opcode::Derivative, pValue->getType(), { pValue, getInt1(isDirectionY), getInt1(isFine) }, instName);
+}
+
+// =====================================================================================================================
+// Create a demote to helper invocation.
+Instruction* BuilderRecorder::CreateDemoteToHelperInvocation(
+    const Twine& instName)   // [in] Name to give final instruction
+{
+    return Record(Opcode::DemoteToHelperInvocation, nullptr, {}, instName);
+}
+
+// =====================================================================================================================
+// Create a helper invocation query.
+Value* BuilderRecorder::CreateIsHelperInvocation(
+    const Twine& instName)   // [in] Name to give final instruction
+{
+    return Record(Opcode::IsHelperInvocation, getInt1Ty(), {}, instName);
 }
 
 // =====================================================================================================================

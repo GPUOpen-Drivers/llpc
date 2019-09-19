@@ -1210,6 +1210,14 @@ public:
                                             //   locations to calculate.
         const Twine&  instName = "") = 0;   // [in] Name to give instruction(s)
 
+    // Create a demote to helper invocation operation. Only allowed in a fragment shader.
+    virtual Instruction* CreateDemoteToHelperInvocation(
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
+    // Create a helper invocation query. Only allowed in a fragment shader.
+    virtual Value* CreateIsHelperInvocation(
+        const llvm::Twine&  instName = "") = 0; // [in] Name to give instruction(s)
+
     // -----------------------------------------------------------------------------------------------------------------
     // Subgroup operations
 

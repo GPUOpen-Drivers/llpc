@@ -637,6 +637,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityInputAttachmentArrayNonUniformIndexingEXT:
   case CapabilityUniformTexelBufferArrayNonUniformIndexingEXT:
   case CapabilityStorageTexelBufferArrayNonUniformIndexingEXT:
+  case CapabilityDemoteToHelperInvocationEXT:
     return true;
   default:
     return false;
@@ -1022,6 +1023,8 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupBlockWriteINTEL:
   case OpSubgroupImageBlockReadINTEL:
   case OpSubgroupImageBlockWriteINTEL:
+  case OpDemoteToHelperInvocationEXT:
+  case OpIsHelperInvocationEXT:
     return true;
   default:
     return false;
