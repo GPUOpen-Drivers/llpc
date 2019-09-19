@@ -4198,6 +4198,22 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpKill>(
 }
 
 // =====================================================================================================================
+// Handle OpDemoteToHelperInvocationEXT.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpDemoteToHelperInvocationEXT>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    return getBuilder()->CreateDemoteToHelperInvocation();
+}
+
+// =====================================================================================================================
+// Handle OpIsHelperInvocationEXT.
+template<> Value* SPIRVToLLVM::transValueWithOpcode<OpIsHelperInvocationEXT>(
+    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
+{
+    return getBuilder()->CreateIsHelperInvocation();
+}
+
+// =====================================================================================================================
 // Handle OpReadClockKHR.
 template<> Value* SPIRVToLLVM::transValueWithOpcode<spv::OpReadClockKHR>(
     SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
@@ -6293,6 +6309,8 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpMatrixTimesMatrix);
   HANDLE_OPCODE(OpOuterProduct);
   HANDLE_OPCODE(OpDot);
+  HANDLE_OPCODE(OpDemoteToHelperInvocationEXT);
+  HANDLE_OPCODE(OpIsHelperInvocationEXT);
 
 #undef HANDLE_OPCODE
 

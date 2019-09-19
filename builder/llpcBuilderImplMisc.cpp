@@ -101,6 +101,27 @@ Instruction* BuilderImplMisc::CreateKill(
 }
 
 // =====================================================================================================================
+// Create a demote to helper invocation operation. Only allowed in a fragment shader.
+Instruction* BuilderImplMisc::CreateDemoteToHelperInvocation(
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
+    auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
+    pResUsage->builtInUsage.fs.discard = true;
+
+    return CreateIntrinsic(Intrinsic::amdgcn_wqm_demote, {}, getFalse(), nullptr, instName);
+}
+
+// =====================================================================================================================
+// Create a helper invocation query. Only allowed in a fragment shader.
+Value* BuilderImplMisc::CreateIsHelperInvocation(
+    const Twine& instName) // [in] Name to give instruction(s)
+{
+    auto pIsNotHelper = CreateIntrinsic(Intrinsic::amdgcn_wqm_helper, {}, {}, nullptr, instName);
+    return CreateNot(pIsNotHelper);
+}
+
+// =====================================================================================================================
 // Create a "readclock".
 Instruction* BuilderImplMisc::CreateReadClock(
     bool         realtime,  // Whether to read real-time clock counter

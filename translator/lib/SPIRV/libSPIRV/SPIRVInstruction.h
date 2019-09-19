@@ -852,6 +852,7 @@ protected:
 typedef SPIRVInstNoOperand<OpReturn> SPIRVReturn;
 typedef SPIRVInstNoOperand<OpUnreachable> SPIRVUnreachable;
 typedef SPIRVInstNoOperand<OpKill> SPIRVKill;
+typedef SPIRVInstNoOperand<OpDemoteToHelperInvocationEXT> SPIRVDemoteToHelperInvocationEXT;
 
 class SPIRVReturnValue : public SPIRVInstruction {
 public:
@@ -2739,6 +2740,7 @@ _SPIRV_OP(SubgroupAllKHR, true, 4, false)
 _SPIRV_OP(SubgroupAnyKHR, true, 4, false)
 _SPIRV_OP(SubgroupAllEqualKHR, true, 4, false)
 _SPIRV_OP(ReadClockKHR, true, 4)
+_SPIRV_OP(IsHelperInvocationEXT, true, 3)
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase:public SPIRVInstTemplateBase {
 protected:

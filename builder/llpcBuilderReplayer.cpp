@@ -709,6 +709,14 @@ Value* BuilderReplayer::ProcessCall(
             bool realtime = (cast<ConstantInt>(args[0])->getZExtValue() != 0);
             return m_pBuilder->CreateReadClock(realtime);
         }
+    case BuilderRecorder::Opcode::DemoteToHelperInvocation:
+        {
+            return m_pBuilder->CreateDemoteToHelperInvocation();
+        }
+    case BuilderRecorder::Opcode::IsHelperInvocation:
+        {
+            return m_pBuilder->CreateIsHelperInvocation();
+        }
     case BuilderRecorder::Opcode::TransposeMatrix:
         {
             return m_pBuilder->CreateTransposeMatrix(args[0]);
