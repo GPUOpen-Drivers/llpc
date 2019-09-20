@@ -412,27 +412,28 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
     if (SupportDpp())
     {
         // Start the WWM section by setting the inactive lanes.
-        Value* pResult = CreateSetInactive(pValue, CreateGroupArithmeticIdentity(groupArithOp, pValue->getType()));
+        Value* const pIdentity = CreateGroupArithmeticIdentity(groupArithOp, pValue->getType());
+        Value* pResult = CreateSetInactive(pValue, pIdentity);
 
         // Perform The group arithmetic operation between adjacent lanes in the subgroup, with all masks and rows enabled (0xF).
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(2)),
             CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppMov(pResult, DppCtrl::DppQuadPerm1032, 0xF, 0xF, 0)), pResult);
+                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppQuadPerm1032, 0xF, 0xF, 0)), pResult);
 
         // Perform The group arithmetic operation between N <-> N+2 lanes in the subgroup, with all masks and rows enabled (0xF).
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(4)),
             CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppMov(pResult, DppCtrl::DppQuadPerm2301, 0xF, 0xF, 0)), pResult);
+                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppQuadPerm2301, 0xF, 0xF, 0)), pResult);
 
         // Use a row half mirror to make all values in a cluster of 8 the same, with all masks and rows enabled (0xF).
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(8)),
             CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppMov(pResult, DppCtrl::DppRowHalfMirror, 0xF, 0xF, 0)), pResult);
+                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowHalfMirror, 0xF, 0xF, 0)), pResult);
 
         // Use a row mirror to make all values in a cluster of 16 the same, with all masks and rows enabled (0xF).
         pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(16)),
             CreateGroupArithmeticOperation(groupArithOp, pResult,
-                CreateDppMov(pResult, DppCtrl::DppRowMirror, 0xF, 0xF, 0)), pResult);
+                CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowMirror, 0xF, 0xF, 0)), pResult);
 
 #if LLPC_BUILD_GFX10
         if (SupportPermLaneDpp())
@@ -456,13 +457,13 @@ Value* BuilderImplSubgroup::CreateSubgroupClusteredReduction(
             // set to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.
             pResult = CreateSelect(CreateICmpUGE(pClusterSize, getInt32(32)),
                 CreateGroupArithmeticOperation(groupArithOp, pResult,
-                    CreateDppMov(pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
+                    CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast15, 0xA, 0xF, 0)), pResult);
 
             // Use a row broadcast to move the 31st element from the lower cluster of 32 to the upper cluster. The row
             // mask is set to 0x8 (0b1000) so that only the upper cluster of 32 perform the calculation.
             pResult = CreateSelect(CreateICmpEQ(pClusterSize, getInt32(64)),
                 CreateGroupArithmeticOperation(groupArithOp, pResult,
-                    CreateDppMov(pResult, DppCtrl::DppRowBcast31, 0x8, 0xF, 0)), pResult);
+                    CreateDppUpdate(pIdentity, pResult, DppCtrl::DppRowBcast31, 0x8, 0xF, 0)), pResult);
 
             Value* const pBroadcast31 = CreateSubgroupBroadcast(pResult, getInt32(31), instName);
             Value* const pBroadcast63 = CreateSubgroupBroadcast(pResult, getInt32(63), instName);
