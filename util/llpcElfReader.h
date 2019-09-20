@@ -40,9 +40,7 @@
 #include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "palPipelineAbi.h"
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
 #include "g_palPipelineAbiMetadata.h"
-#endif
 
 namespace llvm
 {
@@ -486,7 +484,6 @@ public:
         return (pEntry != m_map.end()) ? pEntry->second : InvalidValue;
     }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
     void InitMsgPackDocument(const void* pBuffer, uint32_t sizeInBytes);
 
     bool GetNextMsgNode();
@@ -496,7 +493,6 @@ public:
     MsgPackIteratorStatus GetMsgIteratorStatus() const;
 
     uint32_t GetMsgMapLevel() const;
-#endif
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ElfReader);
@@ -513,11 +509,9 @@ private:
     int32_t   m_relocSecIdx;    // Index of relocation section
     int32_t   m_strtabSecIdx;   // Index of string table section
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
     llvm::msgpack::Document      m_document;         // MsgPack document
     std::vector<MsgPackIterator> m_iteratorStack;    // MsgPack iterator stack
     uint32_t                     m_msgPackMapLevel;  // The map level of current message item
-#endif
     friend class ElfWriter<Elf>;
 };
 

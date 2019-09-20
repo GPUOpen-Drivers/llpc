@@ -88,12 +88,8 @@ bool PatchLlvmIrInclusion::runOnModule(
                                       false);
     LLPC_ASSERT(pGlobal != nullptr);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 464
     std::string namePrefix = Util::Abi::AmdGpuCommentName;
     pGlobal->setSection(namePrefix + "llvmir");
-#else
-    pGlobal->setSection(".AMDGPU.comment.llvmir");
-#endif
 
     return true;
 }
