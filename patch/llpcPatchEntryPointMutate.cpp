@@ -498,6 +498,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
+    case ShaderStageTessControl:
         {
             if (enableMultiView)
             {
@@ -516,12 +517,22 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 availUserDataCount -= 1;
             }
 
-            if (builtInUsage.vs.baseVertex || builtInUsage.vs.baseInstance)
+            // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
+            // The user data count of tessellation control shader should be same as vertex shader.
+            auto pCurrResUsage = pResUsage;
+            if ((m_pContext->GetGfxIpVersion().major >= 9) &&
+                (m_shaderStage == ShaderStageTessControl) &&
+                (m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
+            {
+                pCurrResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+            }
+
+            if (pCurrResUsage->builtInUsage.vs.baseVertex || pCurrResUsage->builtInUsage.vs.baseInstance)
             {
                 availUserDataCount -= 2;
             }
 
-            if (builtInUsage.vs.drawIndex)
+            if (pCurrResUsage->builtInUsage.vs.drawIndex)
             {
                 availUserDataCount -= 1;
             }
@@ -587,7 +598,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             break;
         }
-    case ShaderStageTessControl:
     case ShaderStageFragment:
         {
             // Do nothing
@@ -781,7 +791,21 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     switch (m_shaderStage)
     {
     case ShaderStageVertex:
+    case ShaderStageTessControl:
         {
+	    // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
+	    // The user data count of tessellation control shader should be same as vertex shader.
+            auto pCurrIntfData = pIntfData;
+            auto pCurrResUsage = pResUsage;
+
+            if ((m_pContext->GetGfxIpVersion().major >= 9) &&
+                (m_shaderStage == ShaderStageTessControl) &&
+                (m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
+            {
+                pCurrIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+                pCurrResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+            }
+
             // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
             // merged shader, we place it prior to any other special user data.
             if (enableMultiView)
@@ -789,7 +813,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 argTys.push_back(m_pContext->Int32Ty()); // View Index
                 entryArgIdxs.vs.viewIndex = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
-                pIntfData->userDataUsage.vs.viewIndex = userDataIdx;
+                pCurrIntfData->userDataUsage.vs.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
 
@@ -797,7 +821,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 argTys.push_back(m_pContext->Int32Ty());
                 *pInRegMask |= (1ull << (argIdx++));
-                pIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
+                pCurrIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
 
@@ -808,10 +832,10 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     argTys.push_back(m_pContext->Int32Ty());
                     LLPC_ASSERT(pNode->sizeInDwords == 1);
-                    pIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
-                    pIntfData->entryArgIdxs.vs.vbTablePtr = argIdx;
+                    pCurrIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
+                    pCurrIntfData->entryArgIdxs.vs.vbTablePtr = argIdx;
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                    pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
+                    pCurrIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
 #endif
                     *pInRegMask |= (1ull << (argIdx++));
                     ++userDataIdx;
@@ -819,27 +843,27 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 }
             }
 
-            if (builtInUsage.vs.baseVertex || builtInUsage.vs.baseInstance)
+            if (pCurrResUsage->builtInUsage.vs.baseVertex || pCurrResUsage->builtInUsage.vs.baseInstance)
             {
                 argTys.push_back(m_pContext->Int32Ty()); // Base vertex
                 entryArgIdxs.vs.baseVertex = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
-                pIntfData->userDataUsage.vs.baseVertex = userDataIdx;
+                pCurrIntfData->userDataUsage.vs.baseVertex = userDataIdx;
                 ++userDataIdx;
 
                 argTys.push_back(m_pContext->Int32Ty()); // Base instance
                 entryArgIdxs.vs.baseInstance = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
-                pIntfData->userDataUsage.vs.baseInstance = userDataIdx;
+                pCurrIntfData->userDataUsage.vs.baseInstance = userDataIdx;
                 ++userDataIdx;
             }
 
-            if (builtInUsage.vs.drawIndex)
+            if (pCurrResUsage->builtInUsage.vs.drawIndex)
             {
                 argTys.push_back(m_pContext->Int32Ty()); // Draw index
                 entryArgIdxs.vs.drawIndex = argIdx;
                 *pInRegMask |= (1ull << (argIdx++));
-                pIntfData->userDataUsage.vs.drawIndex = userDataIdx;
+                pCurrIntfData->userDataUsage.vs.drawIndex = userDataIdx;
                 ++userDataIdx;
             }
 
@@ -914,7 +938,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             }
             break;
         }
-    case ShaderStageTessControl:
     case ShaderStageFragment:
         {
             // Do nothing
