@@ -49,7 +49,6 @@ constexpr uint32_t InvalidMetadataValue = 0xBAADBEEF;
 
 // The note record types of PAL metadata, for use by the ELF dumper. We have our own definitions
 // here to maintain compatibility with different PAL versions.
-constexpr Util::Abi::PipelineAbiNoteType LegacyMetadata = static_cast<Util::Abi::PipelineAbiNoteType>(12);
 constexpr Util::Abi::PipelineAbiNoteType PalMetadataOld = static_cast<Util::Abi::PipelineAbiNoteType>(13);
 constexpr Util::Abi::PipelineAbiNoteType PalMetadata = static_cast<Util::Abi::PipelineAbiNoteType>(32);
 
@@ -83,13 +82,8 @@ DEF_META(API_CS_HASH_DWORD0, ApiCsHashDword0)
 DEF_META(API_CS_HASH_DWORD1, ApiCsHashDword1)
 DEF_META(API_CS_HASH_DWORD2, ApiCsHashDword2)
 DEF_META(API_CS_HASH_DWORD3, ApiCsHashDword3)
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 460
-DEF_META(PIPELINE_HASH_LO, PipelineHashLo)
-DEF_META(PIPELINE_HASH_HI, PipelineHashHi)
-#else
 DEF_META(PIPELINE_HASH_LO, InternalPipelineHashDword0)
 DEF_META(PIPELINE_HASH_HI, InternalPipelineHashDword1)
-#endif
 DEF_META(USER_DATA_LIMIT, UserDataLimit)
 DEF_META(HS_MAX_TESS_FACTOR, HsMaxTessFactor)
 DEF_META(PS_USES_UAVS, PsUsesUavs)
@@ -137,10 +131,6 @@ DEF_META(GS_SCRATCH_BYTE_SIZE, GsScratchByteSize)
 DEF_META(VS_SCRATCH_BYTE_SIZE, VsScratchByteSize)
 DEF_META(PS_SCRATCH_BYTE_SIZE, PsScratchByteSize)
 DEF_META(CS_SCRATCH_BYTE_SIZE, CsScratchByteSize)
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-DEF_META(STREAM_OUT_TABLE_ENTRY, StreamOutTableEntry)
-DEF_META(INDIRECT_TABLE_ENTRY, IndirectTableEntryLow)
-#endif
 DEF_META(ES_GS_LDS_BYTE_SIZE, EsGsLdsByteSize)
 DEF_META(USES_VIEWPORT_ARRAY_INDEX, UsesViewportArrayIndex)
 DEF_META(PIPELINE_NAME_INDEX, PipelineNameIndex)
@@ -153,10 +143,8 @@ DEF_META(GS_PERFORMANCE_DATA_BUFFER_SIZE, GsPerformanceDataBufferSize)
 DEF_META(VS_PERFORMANCE_DATA_BUFFER_SIZE, VsPerformanceDataBufferSize)
 DEF_META(PS_PERFORMANCE_DATA_BUFFER_SIZE, PsPerformanceDataBufferSize)
 DEF_META(CS_PERFORMANCE_DATA_BUFFER_SIZE, CsPerformanceDataBufferSize)
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 456
 DEF_META(PS_WRITES_UAVS, PsWritesUavs)
 DEF_META(PS_WRITES_DEPTH, PsWritesDepth)
-#endif
 #if LLPC_BUILD_GFX10
 DEF_META(CALC_WAVE_BREAK_SIZE_AT_DRAW_TIME, CalcWaveBreakSizeAtDrawTime)
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495

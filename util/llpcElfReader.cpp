@@ -381,7 +381,6 @@ ElfNote ElfReader<Elf>::GetNote(
     return noteNode;
 }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
 // =====================================================================================================================
 // Initialize MsgPack document and related visitor iterators
 template<class Elf>
@@ -581,8 +580,6 @@ MsgPackIteratorStatus ElfReader<Elf>::GetMsgIteratorStatus() const
 {
     return m_iteratorStack.back().status;
 }
-
-#endif
 
 // Explicit instantiations for ELF utilities
 template class ElfReader<Elf64>;

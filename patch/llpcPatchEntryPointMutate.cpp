@@ -431,12 +431,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                         reserveVbTable = true;
                     }
                 }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                if (reserveVbTable)
-                {
-                    pIntfData->vbTable.resNodeIdx = pNode->offsetInDwords + 1;
-                }
-#endif
                 continue;
             }
 
@@ -459,12 +453,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                         reserveStreamOutTable = true;
                     }
                 }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                if (reserveStreamOutTable)
-                {
-                    pIntfData->streamOutTable.resNodeIdx = pNode->offsetInDwords + 1;
-                }
-#endif
                 continue;
             }
 
@@ -673,9 +661,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                         break;
                     }
                 }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                pIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
-#endif
                 *pInRegMask |= (1ull << (argIdx++));
                 ++userDataIdx;
                 break;
@@ -834,9 +819,6 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     LLPC_ASSERT(pNode->sizeInDwords == 1);
                     pCurrIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
                     pCurrIntfData->entryArgIdxs.vs.vbTablePtr = argIdx;
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-                    pCurrIntfData->userDataMap[userDataIdx] = pNode->offsetInDwords;
-#endif
                     *pInRegMask |= (1ull << (argIdx++));
                     ++userDataIdx;
                     break;

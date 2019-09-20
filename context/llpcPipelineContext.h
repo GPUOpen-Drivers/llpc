@@ -559,18 +559,6 @@ struct InterfaceData
         uint32_t                offsetInDwords;                   // Start offset of Spill table
     } spillTable;
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    struct
-    {
-        uint32_t                resNodeIdx;                     // Resource node index for vertex buffer table
-    } vbTable;
-
-    struct
-    {
-        uint32_t               resNodeIdx;                             // Resource node index for stream-out table
-    } streamOutTable;
-#endif
-
     // Usage of user data registers for internal-use variables
     struct
     {

@@ -1412,45 +1412,6 @@ OStream& operator<<(
                     out << "        minor = " << pCodeVersion->minorVersion << "\n";
                     break;
                 }
-
-                case static_cast<uint32_t>(LegacyMetadata):
-                {
-                    out << "    PalMetadata                  (name = "
-                        << pNode->name << "  size = " << pNode->descSize << ")\n";
-
-                    const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
-                    auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
-                        pSection->pData + offset + noteHeaderSize + noteNameSize);
-
-                    std::map<uint32_t, uint32_t> sortedConfigs;
-                    for (uint32_t i = 0; i < configCount; ++i)
-                    {
-                        sortedConfigs[pConfig[i].key] = pConfig[i].value;
-                    }
-
-                    for (auto config : sortedConfigs)
-                    {
-                        const char* pRegName = nullptr;
-                        if (gfxIp.major <= 8)
-                        {
-                            pRegName = Gfx6::GetRegisterNameString(gfxIp, config.first * 4);
-                        }
-                        else
-                        {
-                            pRegName = Gfx9::GetRegisterNameString(gfxIp, config.first * 4);
-                        }
-                        auto length = snprintf(formatBuf,
-                            sizeof(formatBuf),
-                            "        %-45s = 0x%08X\n",
-                            pRegName,
-                            config.second);
-                        LLPC_UNUSED(length);
-                        out << formatBuf;
-                    }
-                    break;
-                }
-
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
                 case static_cast<uint32_t>(PalMetadataOld):
                 case static_cast<uint32_t>(PalMetadata):
                 {
@@ -1570,7 +1531,6 @@ OStream& operator<<(
                     out << "\n";
                     break;
                 }
-#endif
                 default:
                 {
                     if (static_cast<uint32_t>(pNode->type) == NT_AMD_AMDGPU_ISA)
@@ -1679,11 +1639,7 @@ OStream& operator<<(
                 startPos = endPos;
             }
         }
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 464
         else if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentName, sizeof(Util::Abi::AmdGpuCommentName) - 1) == 0)
-#else
-        else if (strncmp(pSection->pName, ".AMDGPU.comment.", sizeof(".AMDGPU.comment.") - 1) == 0)
-#endif
         {
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 475
             if (strncmp(pSection->pName, Util::Abi::AmdGpuCommentAmdIlName, sizeof(Util::Abi::AmdGpuCommentAmdIlName) - 1) == 0)

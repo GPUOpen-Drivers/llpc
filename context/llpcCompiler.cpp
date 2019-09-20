@@ -2766,39 +2766,8 @@ void Compiler::GetPipelineStatistics(
             while (offset < pSection->secHead.sh_size)
             {
                 const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
-                if (strncmp(pNode->name, "AMD", pNode->nameSize) == 0 &&
-                    (pNode->type == Util::Abi::PipelineAbiNoteType::LegacyMetadata))
-                {
-                    const uint32_t configCount = pNode->descSize / sizeof(Util::Abi::PalMetadataNoteEntry);
-                    auto pConfig = reinterpret_cast<const Util::Abi::PalMetadataNoteEntry*>(
-                                   pSection->pData + offset +
-                                     noteHeaderSize + Pow2Align(pNode->nameSize, sizeof(uint32_t)));
-                    for (uint32_t i = 0; i < configCount; ++i)
-                    {
-                        uint32_t regId = pConfig[i].key;
-                        switch (regId)
-                        {
-                        case mmPS_NUM_USED_VGPRS:
-                            pPipelineStats->numUsedVgprs= pConfig[i].value;
-                            break;
-                        case mmCS_NUM_USED_VGPRS:
-                            isCompute = true;
-                            pPipelineStats->numUsedVgprs = pConfig[i].value;
-                            break;
-                        case mmPS_SCRATCH_BYTE_SIZE:
-                        case mmCS_SCRATCH_BYTE_SIZE:
-                            pPipelineStats->useScratchBuffer = (pConfig[i].value > 0);
-                            break;
-                        case mmPS_NUM_AVAIL_VGPRS:
-                        case mmCS_NUM_AVAIL_VGPRS:
-                            pPipelineStats->numAvailVgprs = pConfig[i].value;
-                        default:
-                            break;
-                        }
-                    }
-                }
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-                else if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
+                if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
                 {
                     // Msgpack metadata.
                     msgpack::Document document;
@@ -3396,28 +3365,14 @@ void Compiler::MergeElfBinary(
 
     // Merge PAL metadata
     ElfNote nonFragmentMetaNote = {};
-    ElfNote nonFragmentLegacyMetaNote = {};
     nonFragmentMetaNote = writer.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-    nonFragmentLegacyMetaNote = writer.GetNote(Util::Abi::PipelineAbiNoteType::LegacyMetadata);
 
-    if (nonFragmentLegacyMetaNote.pData != nullptr)
-    {
-        LLPC_ASSERT(nonFragmentMetaNote.pData == nullptr);
-        ElfNote fragmentLegacyMetaNote = {};
-        ElfNote newLegacyMetaNote = {};
-        fragmentLegacyMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::LegacyMetadata);
-        writer.MergeLegacyMetaNote(pContext, &nonFragmentLegacyMetaNote, &fragmentLegacyMetaNote, &newLegacyMetaNote);
-        writer.SetNote(&newLegacyMetaNote);
-    }
-    else
-    {
-        LLPC_ASSERT(nonFragmentMetaNote.pData != nullptr);
-        ElfNote fragmentMetaNote = {};
-        ElfNote newMetaNote = {};
-        fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-        writer.MergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
-        writer.SetNote(&newMetaNote);
-    }
+    LLPC_ASSERT(nonFragmentMetaNote.pData != nullptr);
+    ElfNote fragmentMetaNote = {};
+    ElfNote newMetaNote = {};
+    fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    writer.MergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
+    writer.SetNote(&newMetaNote);
 
     writer.WriteToBuffer(pPipelineElf);
 }

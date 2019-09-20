@@ -63,11 +63,6 @@ public:
                              const char*          pPrefixString2,
                              SectionBuffer*       pNewSection);
 
-    static void MergeLegacyMetaNote(Context*       pContext,
-                                    const ElfNote* pNote1,
-                                    const ElfNote* pNote2,
-                                    ElfNote*       pNewNote);
-
     static void MergeMetaNote(Context*       pContext,
                               const ElfNote* pNote1,
                               const ElfNote* pNote2,
@@ -98,8 +93,6 @@ public:
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ElfWriter);
-
-    static void MergeMapItem(std::map<uint32_t, uint32_t>& destMap, std::map<uint32_t, uint32_t>& srcMap, uint32_t key);
 
     static void MergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, uint32_t key);
 

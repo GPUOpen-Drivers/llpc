@@ -55,10 +55,6 @@ protected:
                                  uint32_t           fsHwShader,
                                  uint32_t           csHwShader);
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    void SetIndirectTableEntry(uint32_t value);
-    void SetStreamOutTableEntry(uint32_t value);
-#endif
     void SetShaderHash(ShaderStage apiStage, uint64_t hash64);
     void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
@@ -93,13 +89,7 @@ protected:
     uint32_t                        m_userDataLimit;      // User data limit for shaders seen so far
     uint32_t                        m_spillThreshold;     // Spill threshold for shaders seen so far
 
-    llvm::SmallVector<uint32_t, 8>  m_pseudoRegisters;    // PAL metadata pseudo-registers
-
 private:
-    // Set pseudo-register in PAL metadata
-    void SetPseudoRegister(uint32_t reg, uint32_t value);
-    // Return whether we are generating MsgPack
-    bool GeneratingMsgPack() const { return m_document ? true : false; }
     // Get the MsgPack map node for the specified API shader in the ".shaders" map
     llvm::msgpack::MapDocNode GetApiShaderNode(uint32_t apiStage);
     // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map

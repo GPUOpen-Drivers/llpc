@@ -62,18 +62,13 @@ ConfigBuilderBase::ConfigBuilderBase(
     // from 13 to 32 at that point, and not using MsgPack metadata before that avoids some compatibility
     // problems.
     m_document = std::make_unique<msgpack::Document>();
+#else
+    LLPC_NEVER_CALLED();
 #endif
 
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
+    m_pipelineNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
                                               .getArray(true)[0].getMap(true);
-    }
 
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-    // Ensure we have a STREAM_OUT_TABLE_ENTRY, even if it is 0.
-    SetStreamOutTableEntry(0);
-#endif
 
     SetApiName("Vulkan"); // TODO: Client API name should be from ICD.
 }
@@ -94,90 +89,34 @@ void ConfigBuilderBase::BuildApiHwShaderMapping(
     uint32_t           fsHwShader,    // Hardware shader mapping for fragment shader
     uint32_t           csHwShader)    // Hardware shader mapping for compute shader
 {
-    if (GeneratingMsgPack())
+    uint32_t hwStageMappings[] =
     {
-        uint32_t hwStageMappings[] =
-        {
-            // In ShaderStage order:
-            vsHwShader,
-            tcsHwShader,
-            tesHwShader,
-            gsHwShader,
-            fsHwShader,
-            csHwShader
-        };
+        // In ShaderStage order:
+        vsHwShader,
+        tcsHwShader,
+        tesHwShader,
+        gsHwShader,
+        fsHwShader,
+        csHwShader
+    };
 
-        for (uint32_t apiStage = 0; apiStage < ShaderStageNativeStageCount; ++apiStage)
+    for (uint32_t apiStage = 0; apiStage < ShaderStageNativeStageCount; ++apiStage)
+    {
+        uint32_t hwStageMapping = hwStageMappings[apiStage];
+        if (hwStageMapping != 0)
         {
-            uint32_t hwStageMapping = hwStageMappings[apiStage];
-            if (hwStageMapping != 0)
+            auto hwMappingNode = GetApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
+                                    .getArray(true);
+            for (uint32_t hwStage = 0; hwStage < uint32_t(Util::Abi::HardwareStage::Count); ++hwStage)
             {
-                auto hwMappingNode = GetApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
-                                      .getArray(true);
-                for (uint32_t hwStage = 0; hwStage < uint32_t(Util::Abi::HardwareStage::Count); ++hwStage)
+                if ((hwStageMapping & (1 << hwStage)) != 0)
                 {
-                    if ((hwStageMapping & (1 << hwStage)) != 0)
-                    {
-                        hwMappingNode.push_back(m_document->getNode(HwStageNames[hwStage]));
-                    }
+                    hwMappingNode.push_back(m_document->getNode(HwStageNames[hwStage]));
                 }
             }
         }
     }
-    else
-    {
-        Util::Abi::ApiHwShaderMapping apiHwShaderMapping = {};
-
-        apiHwShaderMapping.apiShaders[static_cast<uint32_t>(Util::Abi::ApiShaderType::Cs)] = csHwShader;
-        apiHwShaderMapping.apiShaders[static_cast<uint32_t>(Util::Abi::ApiShaderType::Vs)] = vsHwShader;
-        apiHwShaderMapping.apiShaders[static_cast<uint32_t>(Util::Abi::ApiShaderType::Hs)] = tcsHwShader;
-        apiHwShaderMapping.apiShaders[static_cast<uint32_t>(Util::Abi::ApiShaderType::Ds)] = tesHwShader;
-        apiHwShaderMapping.apiShaders[static_cast<uint32_t>(Util::Abi::ApiShaderType::Gs)] = gsHwShader;
-        apiHwShaderMapping.apiShaders[static_cast<uint32_t>(Util::Abi::ApiShaderType::Ps)] = fsHwShader;
-
-        SetPseudoRegister(Util::Abi::PipelineMetadataBase |
-                                uint32_t(Util::Abi::PipelineMetadataType::ApiHwShaderMappingLo),
-                              apiHwShaderMapping.u32Lo);
-        SetPseudoRegister(Util::Abi::PipelineMetadataBase |
-                                uint32_t(Util::Abi::PipelineMetadataType::ApiHwShaderMappingHi),
-                              apiHwShaderMapping.u32Hi);
-    }
 }
-
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION < 473
-// =====================================================================================================================
-// Set INDIRECT_TABLE_ENTRY
-void ConfigBuilderBase::SetIndirectTableEntry(
-    uint32_t value)   // Value to set
-{
-    if (GeneratingMsgPack())
-    {
-        auto array = m_pipelineNode[Util::Abi::PipelineMetadataKey::IndirectUserDataTableAddresses].getArray(true);
-        array[0] = array.getDocument()->getNode(value);
-        array[1] = array.getDocument()->getNode(0U);
-        array[2] = array.getDocument()->getNode(0U);
-    }
-    else
-    {
-        SetPseudoRegister(mmINDIRECT_TABLE_ENTRY, value);
-    }
-}
-
-// =====================================================================================================================
-// Set STREAM_OUT_TABLE_ENTRY
-void ConfigBuilderBase::SetStreamOutTableEntry(
-    uint32_t value)   // Value to set
-{
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::StreamOutTableAddress] = m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmSTREAM_OUT_TABLE_ENTRY, value);
-    }
-}
-#endif
 
 // =====================================================================================================================
 // Get the MsgPack map node for the specified API shader in the ".shaders" map
@@ -211,27 +150,9 @@ void ConfigBuilderBase::SetShaderHash(
     ShaderStage apiStage, // API shader stage
     uint64_t    hash64)   // Its hash
 {
-    if (GeneratingMsgPack())
-    {
-        auto hashNode = GetApiShaderNode(uint32_t(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
-        hashNode[0] = hashNode.getDocument()->getNode(hash64);
-        hashNode[1] = hashNode.getDocument()->getNode(0U);
-    }
-    else
-    {
-        static const uint32_t hashKeys[] =
-        {
-            // In ShaderStage order
-            mmAPI_VS_HASH_DWORD0,
-            mmAPI_HS_HASH_DWORD0,
-            mmAPI_DS_HASH_DWORD0,
-            mmAPI_GS_HASH_DWORD0,
-            mmAPI_PS_HASH_DWORD0,
-            mmAPI_CS_HASH_DWORD0
-        };
-        SetPseudoRegister(hashKeys[apiStage], uint32_t(hash64));
-        SetPseudoRegister(hashKeys[apiStage] + 1, uint32_t(hash64 >> 32));
-    }
+    auto hashNode = GetApiShaderNode(uint32_t(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
+    hashNode[0] = hashNode.getDocument()->getNode(hash64);
+    hashNode[1] = hashNode.getDocument()->getNode(0U);
 }
 
 // =====================================================================================================================
@@ -240,26 +161,9 @@ void ConfigBuilderBase::SetNumAvailSgprs(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
     uint32_t value)                   // Number of available SGPRs
 {
-    if (GeneratingMsgPack())
-    {
-        auto hwShaderNode = GetHwShaderNode(hwStage);
-        hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
-    }
-    else
-    {
-        static const uint32_t availSgprsKeys[] =
-        {
-            // In Util::Abi::HardwareStage order
-            mmLS_NUM_AVAIL_SGPRS,
-            mmHS_NUM_AVAIL_SGPRS,
-            mmES_NUM_AVAIL_SGPRS,
-            mmGS_NUM_AVAIL_SGPRS,
-            mmVS_NUM_AVAIL_SGPRS,
-            mmPS_NUM_AVAIL_SGPRS,
-            mmCS_NUM_AVAIL_SGPRS
-        };
-        SetPseudoRegister(availSgprsKeys[uint32_t(hwStage)], value);
-    }
+    auto hwShaderNode = GetHwShaderNode(hwStage);
+    hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = hwShaderNode.getDocument()->getNode(value);
+ 
 }
 
 // =====================================================================================================================
@@ -268,26 +172,8 @@ void ConfigBuilderBase::SetNumAvailVgprs(
     Util::Abi::HardwareStage hwStage, // Hardware shader stage
     uint32_t value)                   // Number of available VGPRs
 {
-    if (GeneratingMsgPack())
-    {
-        auto hwShaderNode = GetHwShaderNode(hwStage);
-        hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = hwShaderNode.getDocument()->getNode(value);
-    }
-    else
-    {
-        static const uint32_t availVgprsKeys[] =
-        {
-            // In Util::Abi::HardwareStage order
-            mmLS_NUM_AVAIL_VGPRS,
-            mmHS_NUM_AVAIL_VGPRS,
-            mmES_NUM_AVAIL_VGPRS,
-            mmGS_NUM_AVAIL_VGPRS,
-            mmVS_NUM_AVAIL_VGPRS,
-            mmPS_NUM_AVAIL_VGPRS,
-            mmCS_NUM_AVAIL_VGPRS
-        };
-        SetPseudoRegister(availVgprsKeys[uint32_t(hwStage)], value);
-    }
+    auto hwShaderNode = GetHwShaderNode(hwStage);
+    hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = hwShaderNode.getDocument()->getNode(value);
 }
 
 // =====================================================================================================================
@@ -300,14 +186,7 @@ void ConfigBuilderBase::SetUsesViewportArrayIndex(
         return; // Optional
     }
 
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmUSES_VIEWPORT_ARRAY_INDEX, value);
-    }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesViewportArrayIndex] = m_document->getNode(value);
 }
 
 // =====================================================================================================================
@@ -320,15 +199,8 @@ void ConfigBuilderBase::SetPsUsesUavs(
         return; // Optional
     }
 
-    if (GeneratingMsgPack())
-    {
-        GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
-                  m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmPS_USES_UAVS, value);
-    }
+    GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::UsesUavs] =
+        m_document->getNode(value);
 }
 
 // =====================================================================================================================
@@ -341,15 +213,9 @@ void ConfigBuilderBase::SetPsWritesUavs(
         return; // Optional
     }
 
-    if (GeneratingMsgPack())
-    {
-        GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
-                  m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmPS_WRITES_UAVS, value);
-    }
+    GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesUavs] =
+        m_document->getNode(value);
+
 }
 
 // =====================================================================================================================
@@ -362,15 +228,8 @@ void ConfigBuilderBase::SetPsWritesDepth(
         return; // Optional
     }
 
-    if (GeneratingMsgPack())
-    {
-        GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =
-                  m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmPS_WRITES_DEPTH, value);
-    }
+    GetHwShaderNode(Util::Abi::HardwareStage::Ps)[Util::Abi::HardwareStageMetadataKey::WritesDepth] =
+        m_document->getNode(value);
 }
 
 // =====================================================================================================================
@@ -378,14 +237,7 @@ void ConfigBuilderBase::SetPsWritesDepth(
 void ConfigBuilderBase::SetEsGsLdsByteSize(
     uint32_t value)   // Value to set
 {
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmES_GS_LDS_BYTE_SIZE, value);
-    }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
 }
 
 #if LLPC_BUILD_GFX10
@@ -394,14 +246,7 @@ void ConfigBuilderBase::SetEsGsLdsByteSize(
 void ConfigBuilderBase::SetCalcWaveBreakSizeAtDrawTime(
     bool value)   // Value to set
 {
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
-    }
-    else
-    {
-        SetPseudoRegister(mmCALC_WAVE_BREAK_SIZE_AT_DRAW_TIME, value);
-    }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::CalcWaveBreakSizeAtDrawTime] = m_document->getNode(value);
 }
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 495
@@ -411,7 +256,6 @@ void ConfigBuilderBase::SetWaveFrontSize(
     Util::Abi::HardwareStage hwStage,   // Hardware shader stage
     uint32_t                 value)     // Value to set
 {
-    LLPC_ASSERT(GeneratingMsgPack());
     auto hwShaderNode = GetHwShaderNode(hwStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = m_document->getNode(value);
 }
@@ -424,10 +268,7 @@ void ConfigBuilderBase::SetWaveFrontSize(
 void ConfigBuilderBase::SetApiName(
     const char* pValue) // [in] Value to set
 {
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = m_document->getNode(pValue);
-    }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::Api] = m_document->getNode(pValue);
 }
 
 // =====================================================================================================================
@@ -435,37 +276,34 @@ void ConfigBuilderBase::SetApiName(
 void ConfigBuilderBase::SetPipelineType(
     Util::Abi::PipelineType value) // Value to set
 {
-    if (GeneratingMsgPack())
+    const char* pValue = "";
+    switch (value)
     {
-        const char* pValue = "";
-        switch (value)
-        {
-        case Util::Abi::VsPs:
-            pValue = "VsPs";
-            break;
-        case Util::Abi::Gs:
-            pValue = "Gs";
-            break;
-        case Util::Abi::Cs:
-            pValue = "Cs";
-            break;
-        case Util::Abi::Ngg:
-            pValue = "Ngg";
-            break;
-        case Util::Abi::Tess:
-            pValue = "Tess";
-            break;
-        case Util::Abi::GsTess:
-            pValue = "GsTess";
-            break;
-        case Util::Abi::NggTess:
-            pValue = "NggTess";
-            break;
-        default:
-            break;
-        }
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(pValue);
+    case Util::Abi::VsPs:
+        pValue = "VsPs";
+        break;
+    case Util::Abi::Gs:
+        pValue = "Gs";
+        break;
+    case Util::Abi::Cs:
+        pValue = "Cs";
+        break;
+    case Util::Abi::Ngg:
+        pValue = "Ngg";
+        break;
+    case Util::Abi::Tess:
+        pValue = "Tess";
+        break;
+    case Util::Abi::GsTess:
+        pValue = "GsTess";
+        break;
+    case Util::Abi::NggTess:
+        pValue = "NggTess";
+        break;
+    default:
+        break;
     }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(pValue);
 }
 
 // =====================================================================================================================
@@ -479,39 +317,22 @@ void ConfigBuilderBase::SetLdsSizeByteSize(
         return; // Optional
     }
 
-    if (GeneratingMsgPack())
-    {
-        auto hwShaderNode = GetHwShaderNode(hwStage);
-        hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = hwShaderNode.getDocument()->getNode(value);
-    }
+    auto hwShaderNode = GetHwShaderNode(hwStage);
+    hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = hwShaderNode.getDocument()->getNode(value);
 }
 
 // =====================================================================================================================
 // Set USER_DATA_LIMIT (called once for the whole pipeline)
 void ConfigBuilderBase::SetUserDataLimit()
 {
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit] = m_document->getNode(m_userDataLimit);
-    }
-    else
-    {
-        SetPseudoRegister(mmUSER_DATA_LIMIT, m_userDataLimit);
-    }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit] = m_document->getNode(m_userDataLimit);
 }
 
 // =====================================================================================================================
 // Set SPILL_THRESHOLD (called once for the whole pipeline)
 void ConfigBuilderBase::SetSpillThreshold()
 {
-    if (GeneratingMsgPack())
-    {
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold] = m_document->getNode(m_spillThreshold);
-    }
-    else
-    {
-        SetPseudoRegister(mmSPILL_THRESHOLD, m_spillThreshold);
-    }
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold] = m_document->getNode(m_spillThreshold);
 }
 
 // =====================================================================================================================
@@ -519,28 +340,10 @@ void ConfigBuilderBase::SetSpillThreshold()
 void ConfigBuilderBase::SetPipelineHash()
 {
     auto hash64 = m_pContext->GetPiplineHashCode();
-    if (GeneratingMsgPack())
-    {
-        auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-        pipelineHashNode[0] = m_document->getNode(hash64);
-        pipelineHashNode[1] = m_document->getNode(0U);
-    }
-    else
-    {
-        SetPseudoRegister(mmPIPELINE_HASH_LO, uint32_t(hash64));
-        SetPseudoRegister(mmPIPELINE_HASH_HI, uint32_t(hash64 >> 32));
-    }
-}
 
-// =====================================================================================================================
-// Set pseudo-register in PAL metadata (assuming not generating MsgPack)
-void ConfigBuilderBase::SetPseudoRegister(
-    uint32_t reg,     // Register number
-    uint32_t value)   // Value to set
-{
-    LLPC_ASSERT(GeneratingMsgPack() == false);
-    m_pseudoRegisters.push_back(reg);
-    m_pseudoRegisters.push_back(value);
+    auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+    pipelineHashNode[0] = m_document->getNode(hash64);
+    pipelineHashNode[1] = m_document->getNode(0U);
 }
 
 // =====================================================================================================================
@@ -552,85 +355,44 @@ void ConfigBuilderBase::WritePalMetadata()
     SetSpillThreshold();
     SetPipelineHash();
 
-    if (GeneratingMsgPack())
+    // Generating MsgPack metadata.
+    // Set the pipeline hashes.
+    auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+    pipelineHashNode[0] = m_document->getNode(m_pContext->GetPiplineHashCode());
+    pipelineHashNode[1] = m_document->getNode(m_pContext->GetCacheHashCode());
+
+    // Add the register values to the MsgPack document.
+    msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
+    size_t sizeInDword = m_configSize / sizeof(uint32_t);
+    // Configs are composed of DWORD key/value pair, the size should be even
+    LLPC_ASSERT((sizeInDword % 2) == 0);
+    for (size_t i = 0; i < sizeInDword; i += 2)
     {
-        // Generating MsgPack metadata.
-        // Set the pipeline hashes.
-        auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-        pipelineHashNode[0] = m_document->getNode(m_pContext->GetPiplineHashCode());
-        pipelineHashNode[1] = m_document->getNode(m_pContext->GetCacheHashCode());
-
-        // Add the register values to the MsgPack document.
-        msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
-        size_t sizeInDword = m_configSize / sizeof(uint32_t);
-        // Configs are composed of DWORD key/value pair, the size should be even
-        LLPC_ASSERT((sizeInDword % 2) == 0);
-        for (size_t i = 0; i < sizeInDword; i += 2)
+        auto key   = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i]);
+        auto value = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i + 1]);
+        // Don't export invalid metadata key and value
+        if (key.getUInt() == InvalidMetadataKey)
         {
-            auto key   = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i]);
-            auto value = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i + 1]);
-            // Don't export invalid metadata key and value
-            if (key.getUInt() == InvalidMetadataKey)
-            {
-                LLPC_ASSERT(value.getUInt() == InvalidMetadataValue);
-            }
-            else
-            {
-                registers[key] = value;
-            }
+            LLPC_ASSERT(value.getUInt() == InvalidMetadataValue);
         }
-
-        // Add the metadata version number.
-        auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version]
-                                .getArray(true);
-        versionNode[0] = m_document->getNode(Util::Abi::PipelineMetadataMajorVersion);
-        versionNode[1] = m_document->getNode(Util::Abi::PipelineMetadataMinorVersion);
-
-        // Write the MsgPack document into an IR metadata node.
-        std::string blob;
-        m_document->writeToBlob(blob);
-        auto pAbiMetaString = MDString::get(m_pModule->getContext(), blob);
-        auto pAbiMetaNode = MDNode::get(m_pModule->getContext(), pAbiMetaString);
-        auto pNamedMeta = m_pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
-        pNamedMeta->addOperand(pAbiMetaNode);
+        else
+        {
+            registers[key] = value;
+        }
     }
-    else
-    {
-        // Generating legacy format metadata.
-        // Set the pipeline hash.
-        auto hash64 = m_pContext->GetPiplineHashCode();
-        SetPseudoRegister(mmPIPELINE_HASH_LO, uint32_t(hash64));
-        SetPseudoRegister(mmPIPELINE_HASH_HI, uint32_t(hash64 >> 32));
 
-        // Write the metadata into an IR metadata node.
-        std::vector<Metadata*> abiMeta;
-        size_t sizeInDword = m_configSize / sizeof(uint32_t);
-        // Configs are composed of DWORD key/value pair, the size should be even
-        LLPC_ASSERT((sizeInDword % 2) == 0);
-        for (size_t i = 0; i < sizeInDword; i += 2)
-        {
-            uint32_t key   = (reinterpret_cast<uint32_t*>(m_pConfig))[i];
-            uint32_t value = (reinterpret_cast<uint32_t*>(m_pConfig))[i + 1];
-            // Don't export invalid metadata key and value
-            if (key == InvalidMetadataKey)
-            {
-                LLPC_ASSERT(value == InvalidMetadataValue);
-            }
-            else
-            {
-                abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), key, false)));
-                abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), value, false)));
-            }
-        }
+    // Add the metadata version number.
+    auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version]
+                            .getArray(true);
+    versionNode[0] = m_document->getNode(Util::Abi::PipelineMetadataMajorVersion);
+    versionNode[1] = m_document->getNode(Util::Abi::PipelineMetadataMinorVersion);
 
-        for (uint32_t value : m_pseudoRegisters)
-        {
-            abiMeta.push_back(ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), value, false)));
-        }
-
-        auto pAbiMetaTuple = MDTuple::get(*m_pContext, abiMeta);
-        auto pAbiMetaNode = m_pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata");
-        pAbiMetaNode->addOperand(pAbiMetaTuple);
-    }
+    // Write the MsgPack document into an IR metadata node.
+    std::string blob;
+    m_document->writeToBlob(blob);
+    auto pAbiMetaString = MDString::get(m_pModule->getContext(), blob);
+    auto pAbiMetaNode = MDNode::get(m_pModule->getContext(), pAbiMetaString);
+    auto pNamedMeta = m_pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
+    pNamedMeta->addOperand(pAbiMetaNode);
 }
 
