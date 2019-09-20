@@ -404,99 +404,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 // Extract compact buffer descriptor
                 if (descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t))
                 {
-                    // Extract compact buffer descriptor
-                    Value* pDescElem0 = ExtractElementInst::Create(pDesc,
-                        ConstantInt::get(m_pContext->Int32Ty(), 0),
-                        "",
-                        pInsertPoint);
-
-                    Value* pDescElem1 = ExtractElementInst::Create(pDesc,
-                        ConstantInt::get(m_pContext->Int32Ty(), 1),
-                        "",
-                        pInsertPoint);
-
-                    // Build normal buffer descriptor
-                    auto pBufDescTy = m_pContext->Int32x4Ty();
-                    Value* pBufDesc = UndefValue::get(pBufDescTy);
-
-                    // DWORD0
-                    pBufDesc = InsertElementInst::Create(pBufDesc,
-                        pDescElem0,
-                        ConstantInt::get(m_pContext->Int32Ty(), 0),
-                        "",
-                        pInsertPoint);
-
-                    // DWORD1
-                    SqBufRsrcWord1 sqBufRsrcWord1 = {};
-                    sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
-
-                    pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
-                        ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
-                        "",
-                        pInsertPoint);
-                    pBufDesc = InsertElementInst::Create(pBufDesc,
-                        pDescElem1,
-                        ConstantInt::get(m_pContext->Int32Ty(), 1),
-                        "",
-                        pInsertPoint);
-
-                    // DWORD2
-                    SqBufRsrcWord2 sqBufRsrcWord2 = {};
-                    sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
-
-                    pBufDesc = InsertElementInst::Create(pBufDesc,
-                        ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
-                        ConstantInt::get(m_pContext->Int32Ty(), 2),
-                        "",
-                        pInsertPoint);
-
-                    // DWORD3
-#if LLPC_BUILD_GFX10
-                    const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-                    if (gfxIp.major < 10)
-#endif
-                    {
-                        SqBufRsrcWord3 sqBufRsrcWord3 = {};
-                        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                        sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
-                        sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
-                        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
-
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                            ConstantInt::get(m_pContext->Int32Ty(), 3),
-                            "",
-                            &callInst);
-                    }
-#if LLPC_BUILD_GFX10
-                    else if (gfxIp.major == 10)
-                    {
-                        SqBufRsrcWord3 sqBufRsrcWord3 = {};
-                        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
-                        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
-                        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
-                        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
-                        sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
-                        sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
-                        sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
-                        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
-
-                        pBufDesc = InsertElementInst::Create(pBufDesc,
-                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                            ConstantInt::get(m_pContext->Int32Ty(), 3),
-                            "",
-                            &callInst);
-                    }
-                    else
-                    {
-                        LLPC_NOT_IMPLEMENTED();
-                    }
-#endif
-
-                    pDesc = pBufDesc;
+                    pDesc = BuildBufferCompactDesc(pDesc, pInsertPoint);
                 }
 
             }
@@ -638,6 +546,12 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             if (LoadInst *LI = dyn_cast<LoadInst>(pDesc))
               LI->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
             cast<LoadInst>(pDesc)->setAlignment(16);
+
+            if (foundNodeType == ResourceMappingNodeType::DescriptorBufferCompact)
+            {
+                LLPC_ASSERT(descSizeInDword == DescriptorSizeBufferCompact / sizeof(uint32_t));
+                pDesc = BuildBufferCompactDesc(pDesc, pInsertPoint);
+            }
         }
     }
 
@@ -677,6 +591,104 @@ Constant* PatchDescriptorLoad::GetDescriptorRangeValue(
         }
     }
     return nullptr;
+}
+
+// =====================================================================================================================
+// Build buffer compact descriptor
+Value* PatchDescriptorLoad::BuildBufferCompactDesc(
+    Value*       pDesc,          // [in] The buffer descriptor base to build for the buffer compact descriptor
+    Instruction* pInsertPoint)   // [in] Insert point
+{
+    // Extract compact buffer descriptor
+    Value* pDescElem0 = ExtractElementInst::Create(pDesc,
+                                                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                    "",
+                                                    pInsertPoint);
+
+    Value* pDescElem1 = ExtractElementInst::Create(pDesc,
+                                                    ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                    "",
+                                                    pInsertPoint);
+
+    // Build normal buffer descriptor
+    auto pBufDescTy = m_pContext->Int32x4Ty();
+    Value* pBufDesc = UndefValue::get(pBufDescTy);
+
+    // DWORD0
+    pBufDesc = InsertElementInst::Create(pBufDesc,
+                                        pDescElem0,
+                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                        "",
+                                        pInsertPoint);
+
+    // DWORD1
+    SqBufRsrcWord1 sqBufRsrcWord1 = {};
+    sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
+
+    pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
+                                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
+                                            "",
+                                            pInsertPoint);
+
+    pBufDesc = InsertElementInst::Create(pBufDesc,
+                                        pDescElem1,
+                                        ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                        "",
+                                        pInsertPoint);
+
+    // DWORD2
+    SqBufRsrcWord2 sqBufRsrcWord2 = {};
+    sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
+
+    pBufDesc = InsertElementInst::Create(pBufDesc,
+                                        ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
+                                        ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                        "",
+                                        pInsertPoint);
+
+    // DWORD3
+    const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+    if (gfxIp.major < 10)
+    {
+        SqBufRsrcWord3 sqBufRsrcWord3 = {};
+        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+        sqBufRsrcWord3.gfx6.NUM_FORMAT = BUF_NUM_FORMAT_UINT;
+        sqBufRsrcWord3.gfx6.DATA_FORMAT = BUF_DATA_FORMAT_32;
+        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
+
+        pBufDesc = InsertElementInst::Create(pBufDesc,
+                                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                                            ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                            "",
+                                            pInsertPoint);
+    }
+    else if (gfxIp.major == 10)
+    {
+        SqBufRsrcWord3 sqBufRsrcWord3 = {};
+        sqBufRsrcWord3.bits.DST_SEL_X = BUF_DST_SEL_X;
+        sqBufRsrcWord3.bits.DST_SEL_Y = BUF_DST_SEL_Y;
+        sqBufRsrcWord3.bits.DST_SEL_Z = BUF_DST_SEL_Z;
+        sqBufRsrcWord3.bits.DST_SEL_W = BUF_DST_SEL_W;
+        sqBufRsrcWord3.gfx10.FORMAT = BUF_FORMAT_32_UINT;
+        sqBufRsrcWord3.gfx10.RESOURCE_LEVEL = 1;
+        sqBufRsrcWord3.gfx10.OOB_SELECT = 2;
+        LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
+
+        pBufDesc = InsertElementInst::Create(pBufDesc,
+                                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
+                                            ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                            "",
+                                            pInsertPoint);
+    }
+    else
+    {
+        LLPC_NOT_IMPLEMENTED();
+    }
+
+    return pBufDesc;
 }
 
 // =====================================================================================================================
@@ -776,11 +788,14 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                 case ResourceMappingNodeType::DescriptorTexelBuffer:
                 case ResourceMappingNodeType::DescriptorBuffer:
                 case ResourceMappingNodeType::PushConst:
+                case ResourceMappingNodeType::DescriptorBufferCompact:
                     {
                         if ((pNode->set == descSet) &&
                             (pNode->binding == binding) &&
                             ((nodeType1 == pNode->type) ||
-                             (nodeType2 == pNode->type)))
+                             (nodeType2 == pNode->type) ||
+                             ((nodeType1 == ResourceMappingNodeType::DescriptorBuffer) &&
+                             (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact))))
                         {
                             exist = true;
                             foundNodeType = pNode->type;
@@ -801,6 +816,11 @@ ResourceMappingNodeType PatchDescriptorLoad::CalcDescriptorOffsetAndSize(
                                 *pSize = DescriptorSizeResource;
                             }
                             else if (pNode->type == ResourceMappingNodeType::PushConst)
+                            {
+                                *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
+                                *pSize = pNode->sizeInDwords * sizeof(uint32_t);
+                            }
+                            else if (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact)
                             {
                                 *pOffset = pNode->offsetInDwords * sizeof(uint32_t);
                                 *pSize = pNode->sizeInDwords * sizeof(uint32_t);

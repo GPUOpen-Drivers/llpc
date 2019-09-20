@@ -89,6 +89,8 @@ private:
 
     void PatchWaterfallLastUseCalls();
 
+    llvm::Value* BuildBufferCompactDesc(llvm::Value* pDesc, llvm::Instruction* pInsertPoint);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     // Descriptor size
