@@ -28,10 +28,12 @@
  * @brief LLPC source file: BuilderRecorder implementation
  ***********************************************************************************************************************
  */
+#include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
+#include "llpcPipeline.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
@@ -301,53 +303,13 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(
 }
 
 // =====================================================================================================================
-// Create a BuilderRecorder
-Builder* Builder::CreateBuilderRecorder(
-    LLVMContext&  context,    // [in] LLVM context
-    bool          wantReplay) // TRUE to make CreateBuilderReplayer return a replayer pass
+BuilderRecorder::BuilderRecorder(
+    BuilderContext* pBuilderContext,// [in] Builder context
+    Pipeline*       pPipeline)      // [in] PipelineState, or nullptr for shader compile
+    : Builder(pBuilderContext),
+      BuilderRecorderMetadataKinds(pBuilderContext->GetContext()),
+      m_pPipelineState(reinterpret_cast<PipelineState*>(pPipeline))
 {
-    return new BuilderRecorder(context, wantReplay);
-}
-
-#ifndef NDEBUG
-// =====================================================================================================================
-// Link the individual shader modules into a single pipeline module.
-// This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
-// set shader stage consistently.
-Module* BuilderRecorder::Link(
-    ArrayRef<Module*> modules,           // Shader stage modules to link
-    bool              linkNativeStages)  // Whether to link native shader stage modules
-{
-    if (linkNativeStages)
-    {
-        for (uint32_t stage = 0; stage != modules.size(); ++stage)
-        {
-            if (Module* pModule = modules[stage])
-            {
-                for (auto& func : *pModule)
-                {
-                    if (func.isDeclaration() == false)
-                    {
-                        CheckFuncShaderStage(&func, static_cast<ShaderStage>(stage));
-                    }
-                }
-            }
-        }
-    }
-    return Builder::Link(modules, linkNativeStages);
-}
-#endif
-
-// =====================================================================================================================
-// This is a BuilderRecorder. If it was created with wantReplay=true, create the BuilderReplayer pass.
-ModulePass* BuilderRecorder::CreateBuilderReplayer()
-{
-    if (m_wantReplay)
-    {
-        // Create a new BuilderImpl to replay the recorded Builder calls in.
-        return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(getContext()));
-    }
-    return nullptr;
 }
 
 // =====================================================================================================================
@@ -1896,11 +1858,6 @@ Instruction* BuilderRecorder::Record(
     const Twine&                  instName,     // [in] Name to give instruction
     ArrayRef<Attribute::AttrKind> attribs)      // Attributes to give the function declaration
 {
-#ifndef NDEBUG
-    // In a debug build, check that each enclosing function is consistently in the same shader stage.
-    CheckFuncShaderStage(GetInsertBlock()->getParent(), m_shaderStage);
-#endif
-
     // Create mangled name of builder call. This only needs to be mangled on return type.
     std::string mangledName;
     {
@@ -1941,32 +1898,4 @@ Instruction* BuilderRecorder::Record(
 
     return pCall;
 }
-
-#ifndef NDEBUG
-// =====================================================================================================================
-// Check that the frontend is consistently telling us which shader stage a function is in.
-void BuilderRecorder::CheckFuncShaderStage(
-    Function*   pFunc,        // [in] Function to check
-    ShaderStage shaderStage)  // Shader stage frontend says it is in
-{
-    LLPC_ASSERT(shaderStage < ShaderStageCount);
-    if (pFunc != m_pEnclosingFunc)
-    {
-        // The "function shader stage map" is in fact a vector of pairs of WeakVH (giving the function)
-        // and shader stage. It is done that way because a function can disappear through inlining during the
-        // lifetime of the BuilderRecorder, and then another function could potentially be allocated at the
-        // same address.
-        m_pEnclosingFunc = pFunc;
-        for (const auto& mapEntry : m_funcShaderStageMap)
-        {
-            if (mapEntry.first == pFunc)
-            {
-                LLPC_ASSERT((mapEntry.second == shaderStage) && "Inconsistent use of Builder::SetShaderStage");
-                return;
-            }
-        }
-        m_funcShaderStageMap.push_back({ pFunc, shaderStage });
-    }
-}
-#endif
 

@@ -49,7 +49,7 @@
 namespace Llpc
 {
 
-class Builder;
+class Pipeline;
 
 // Enumerates types of descriptor.
 enum class DescriptorType : uint32_t
@@ -795,8 +795,8 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
 
-    // Set pipeline state in Builder
-    void SetBuilderPipelineState(Builder* pBuilder) const;
+    // Set pipeline state in Pipeline object for middle-end
+    void SetPipelineState(Pipeline* pPipeline) const;
 
     static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
 

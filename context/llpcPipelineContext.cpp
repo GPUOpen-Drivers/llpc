@@ -38,6 +38,7 @@
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcPipelineContext.h"
+#include "llpcPipeline.h"
 
 using namespace llvm;
 
@@ -280,9 +281,9 @@ ShaderHash PipelineContext::GetShaderHashCode(
 }
 
 // =====================================================================================================================
-// Set pipeline state in Builder
-void PipelineContext::SetBuilderPipelineState(
-    Builder*          pBuilder) const   // [in] The builder
+// Set pipeline state in Pipeline object for middle-end
+void PipelineContext::SetPipelineState(
+    Pipeline*    pPipeline) const   // [in/out] Pipeline object
 {
     // Give the user data nodes and descriptor range values to the Builder.
     // The user data nodes have been merged so they are the same in each shader stage. Get them from
@@ -296,7 +297,7 @@ void PipelineContext::SetBuilderPipelineState(
                                                 pShaderInfo->userDataNodeCount);
     ArrayRef<DescriptorRangeValue> descriptorRangeValues(pShaderInfo->pDescriptorRangeValues,
                                                          pShaderInfo->descriptorRangeValueCount);
-    pBuilder->SetUserDataNodes(userDataNodes, descriptorRangeValues);
+    pPipeline->SetUserDataNodes(userDataNodes, descriptorRangeValues);
 }
 
 } // Llpc

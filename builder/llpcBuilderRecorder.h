@@ -35,10 +35,22 @@
 #include "llvm/IR/ValueHandle.h"
 #endif
 
+namespace llvm
+{
+
+class ModulePass;
+class PassRegistry;
+
+void initializeBuilderReplayerPass(PassRegistry&);
+
+} // llvm
+
 namespace Llpc
 {
 
 using namespace llvm;
+
+class PipelineState;
 
 // Prefix of all recorded calls.
 static const char BuilderCallPrefix[] = "llpc.call.";
@@ -63,6 +75,8 @@ public:
 // later on.
 class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds
 {
+    friend BuilderContext;
+
 public:
     // llpc.call.* opcodes
     enum Opcode : uint32_t
@@ -210,21 +224,7 @@ public:
     // Given an opcode, get the call name (without the "llpc.call." prefix)
     static StringRef GetCallName(Opcode opcode);
 
-    BuilderRecorder(LLVMContext& context, bool wantReplay)
-        : Builder(context), BuilderRecorderMetadataKinds(context), m_wantReplay(wantReplay)
-    {}
-
     ~BuilderRecorder() {}
-
-#ifndef NDEBUG
-    // Link the individual shader modules into a single pipeline module.
-    // This is overridden by BuilderRecorder only on a debug build so it can check that the frontend
-    // set shader stage consistently.
-    Module* Link(ArrayRef<Module*> modules, bool linkNativeStages) override final;
-#endif
-
-    // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
-    ModulePass* CreateBuilderReplayer() override;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
@@ -654,6 +654,8 @@ private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderRecorder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderRecorder)
 
+    BuilderRecorder(BuilderContext* pBuilderContext, Pipeline* pPipeline);
+
     // Record one Builder call
     Instruction* Record(Opcode                        opcode,
                         Type*                         pReturnTy,
@@ -661,21 +663,12 @@ private:
                         const Twine&                  instName,
                         ArrayRef<Attribute::AttrKind> attribs = {});
 
-#ifndef NDEBUG
-    // Check that the frontend is consistently telling us which shader stage a function is in.
-    void CheckFuncShaderStage(Function* pFunc, ShaderStage shaderStage);
-#endif
-
     // -----------------------------------------------------------------------------------------------------------------
 
-    bool            m_wantReplay;                             // true to make CreateBuilderReplayer return a replayer
-                                                              //   pass
-#ifndef NDEBUG
-    // Only used in a debug build to ensure SetShaderStage is being used consistently.
-    std::vector<std::pair<WeakVH, ShaderStage>> m_funcShaderStageMap;       // Map from function to shader stage
-    Function*                                   m_pEnclosingFunc = nullptr; // Last function written with current
-                                                                            //   shader stage
-#endif
+    PipelineState*            m_pPipelineState;           // PipelineState; nullptr for shader compile
 };
+
+// Create BuilderReplayer pass
+ModulePass* CreateBuilderReplayer(Pipeline* pPipeline);
 
 } // Llpc

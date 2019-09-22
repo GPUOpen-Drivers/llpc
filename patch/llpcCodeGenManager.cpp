@@ -267,14 +267,12 @@ void CodeGenManager::SetupTargetFeatures(
 
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-Result CodeGenManager::AddTargetPasses(
+void CodeGenManager::AddTargetPasses(
     Context*              pContext,      // [in] LLPC context
     PassManager&          passMgr,       // [in/out] pass manager to add passes to
-    llvm::Timer*          pCodeGenTimer, // [in] Timer to time target passes with, nullptr if not timing
+    Timer*                pCodeGenTimer, // [in] Timer to time target passes with, nullptr if not timing
     raw_pwrite_stream&    outStream)     // [out] Output stream
 {
-    Result result = Result::Success;
-
     // Start timer for codegen passes.
     if (pCodeGenTimer != nullptr)
     {
@@ -304,30 +302,16 @@ Result CodeGenManager::AddTargetPasses(
 
     auto pTargetMachine = pContext->GetTargetMachine();
 
-#if LLPC_ENABLE_EXCEPTION
-    try
-#endif
+    if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
     {
-        if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
-        {
-            LLPC_ERRS("Target machine cannot emit a file of this type\n");
-            result = Result::ErrorInvalidValue;
-        }
+        report_fatal_error("Target machine cannot emit a file of this type");
     }
-#if LLPC_ENABLE_EXCEPTION
-    catch (const char*)
-    {
-        result = Result::ErrorInvalidValue;
-    }
-#endif
 
     // Stop timer for codegen passes.
     if (pCodeGenTimer != nullptr)
     {
         passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
     }
-
-    return result;
 }
 
 } // Llpc

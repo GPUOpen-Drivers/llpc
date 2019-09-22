@@ -94,10 +94,10 @@ namespace Llpc
 void Patch::AddPasses(
     Context*              pContext,      // [in] LLPC context
     legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
+    ModulePass*           pReplayerPass, // [in] BuilderReplayer pass, or nullptr if not needed
     llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
     llvm::Timer*          pOptTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
-    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
-                          checkShaderCacheFunc)
+    Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
     // Start timer for patching passes.
@@ -107,10 +107,9 @@ void Patch::AddPasses(
     }
 
     // If using BuilderRecorder rather than BuilderImpl, replay the Builder calls now
-    auto pBuilderReplayer = pContext->GetBuilder()->CreateBuilderReplayer();
-    if (pBuilderReplayer != nullptr)
+    if (pReplayerPass != nullptr)
     {
-        passMgr.add(pBuilderReplayer);
+        passMgr.add(pReplayerPass);
     }
 
     if (EnableOuts())

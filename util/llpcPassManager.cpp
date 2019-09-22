@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  llpcPassManager.cpp
- * @brief LLPC source file: contains implementation of class Llpc::PassManager.
+ * @brief LLPC source file: contains implementation of class Llpc::PassManagerImpl.
  ***********************************************************************************************************************
  */
 #include "llvm/Analysis/CFGPrinter.h"
@@ -60,9 +60,36 @@ static cl::list<uint32_t> DisablePassIndices("disable-pass-indices", cl::ZeroOrM
 
 } // llvm
 
+using namespace Llpc;
 using namespace llvm;
-namespace Llpc
+
+namespace
 {
+
+// =====================================================================================================================
+// LLPC's legacy::PassManager override.
+// This is the implementation subclass of the PassManager class declared in llpcPassManager.h
+class PassManagerImpl final :
+    public Llpc::PassManager
+{
+public:
+    PassManagerImpl();
+    ~PassManagerImpl() override {}
+
+    void SetPassIndex(uint32_t* pPassIndex) override { m_pPassIndex = pPassIndex; }
+    void add(llvm::Pass* pPass) override;
+    void stop() override;
+
+private:
+    bool              m_stopped = false;         // Whether we have already stopped adding new passes.
+    llvm::AnalysisID  m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
+    llvm::AnalysisID  m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
+    llvm::AnalysisID  m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
+    uint32_t*         m_pPassIndex = nullptr;    // Pass Index
+};
+
+} // anonymous
+
 // =====================================================================================================================
 // Get the PassInfo for a registered pass given short name
 static const PassInfo* GetPassInfo(
@@ -93,11 +120,16 @@ static AnalysisID GetPassIdFromName(
 }
 
 // =====================================================================================================================
-// Constructor
-PassManager::PassManager(
-    uint32_t* pPassIndex)   // [in,out] Pointer of PassIndex
+// Create a PassManagerImpl
+Llpc::PassManager* Llpc::PassManager::Create()
+{
+    return new PassManagerImpl;
+}
+
+// =====================================================================================================================
+PassManagerImpl::PassManagerImpl()
     :
-    m_pPassIndex(pPassIndex)
+    PassManager()
 {
     if (cl::DumpCfgAfter.empty() == false)
     {
@@ -110,7 +142,7 @@ PassManager::PassManager(
 
 // =====================================================================================================================
 // Add a pass to the pass manager.
-void PassManager::add(
+void PassManagerImpl::add(
     Pass* pPass)    // [in] Pass to add to the pass manager
 {
     // Do not add any passes after calling stop(), except immutable passes.
@@ -127,7 +159,7 @@ void PassManager::add(
         return;
     }
 
-    if (passId != m_printModule)
+    if ((passId != m_printModule) && (m_pPassIndex != nullptr))
     {
         uint32_t passIndex = (*m_pPassIndex)++;
 
@@ -164,9 +196,8 @@ void PassManager::add(
 
 // =====================================================================================================================
 // Stop adding passes to the pass manager, except immutable ones.
-void PassManager::stop()
+void PassManagerImpl::stop()
 {
     m_stopped = true;
 }
 
-} // Llpc
