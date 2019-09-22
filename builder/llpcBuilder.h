@@ -37,23 +37,14 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/AtomicOrdering.h"
 
-namespace llvm
-{
-
-class ModulePass;
-class PassRegistry;
-
-void initializeBuilderReplayerPass(PassRegistry&);
-
-} // llvm
-
 namespace Llpc
 {
 
 using namespace llvm;
 
+class BuilderContext;
 class Context;
-class PipelineState;
+class Pipeline;
 
 // =====================================================================================================================
 // Class that represents extra information on an input or output.
@@ -129,14 +120,6 @@ private:
 };
 
 // =====================================================================================================================
-// Initialize the pass that gets created by a Builder
-inline static void InitializeBuilderPasses(
-    PassRegistry& passRegistry)   // Pass registry
-{
-    initializeBuilderReplayerPass(passRegistry);
-}
-
-// =====================================================================================================================
 // Builder is the part of the LLPC middle-end interface used by the front-end to build IR. It is a subclass
 // of llvm::IRBuilder<>, so the front-end can use its methods to create IR instructions at the set insertion
 // point. In addition it has its own Create* methods to create graphics-specific IR constructs.
@@ -163,21 +146,7 @@ public:
         Xor
     };
 
-    virtual ~Builder();
-
-    // Create the BuilderImpl. In this implementation, each Builder call writes its IR immediately.
-    static Builder* CreateBuilderImpl(LLVMContext& context);
-
-    // Create the BuilderRecorder. In this implementation, each Builder call gets recorded (by inserting
-    // an llpc.call.* call). The user then replays the Builder calls by running the pass created by
-    // CreateBuilderReplayer. Setting wantReplay=false makes CreateBuilderReplayer return nullptr.
-    static Builder* CreateBuilderRecorder(LLVMContext& context, bool wantReplay);
-
-    // Create the BuilderImpl or BuilderRecorder, depending on -use-builder-recorder option
-    static Builder* Create(LLVMContext& context);
-
-    // If this is a BuilderRecorder, create the BuilderReplayer pass, otherwise return nullptr.
-    virtual ModulePass* CreateBuilderReplayer() { return nullptr; }
+    virtual ~Builder() {}
 
     // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
     // is a vector type.
@@ -186,32 +155,11 @@ public:
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
-    // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
-    // supplied to the shader as a hierarchical table (max two levels) of descriptors.
-    // "immutableDescs" contains descriptors (currently limited to samplers), whose values are hard
-    // coded by the application. Each one is a duplicate of one in "nodes". A use of one of these immutable
-    // descriptors in the applicable Create* method is converted directly to the constant value.
-    //
-    // If using a BuilderImpl, this method must be called before any Create* methods.
-    // If using a BuilderRecorder, it can be delayed until after linking.
-    void SetUserDataNodes(
-        ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
-        ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
+    // Get the BuilderContext
+    BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }
 
     // Set the current shader stage.
     void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
-
-    // Link the individual shader modules into a single pipeline module. The frontend must have
-    // finished calling Builder::Create* methods and finished building the IR. In the case that
-    // there are multiple shader modules, they are all freed by this call, and the linked pipeline
-    // module is returned. If there is a single shader module, this might instead just return that.
-    // Before calling this, each shader module needs to have one global function for the shader
-    // entrypoint, then all other functions with internal linkage.
-    // Returns the pipeline module, or nullptr on link failure.
-    virtual Module* Link(
-        ArrayRef<Module*> modules,   // Array of modules indexed by shader stage, with nullptr entry
-                                     //  for any stage not present in the pipeline
-        bool linkNativeStages);      // Whether to link native shader stage modules
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
@@ -1324,15 +1272,14 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
 
 protected:
-    Builder(LLVMContext& context);
+    Builder(BuilderContext* pBuilderContext);
 
     // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
     Constant* GetFpConstant(Type* pTy, APFloat value);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    ShaderStage     m_shaderStage     = ShaderStageInvalid; // Current shader stage being built.
-    PipelineState*  m_pPipelineState  = nullptr;            // Pipeline state
+    ShaderStage                     m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
 
     Type* GetTransposedMatrixTy(
         Type* const pMatrixType) const; // [in] The matrix type to tranpose
@@ -1349,9 +1296,10 @@ protected:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)
-};
 
-// Create BuilderReplayer pass
-ModulePass* CreateBuilderReplayer(Builder* pBuilder);
+    // -----------------------------------------------------------------------------------------------------------------
+
+    BuilderContext* m_pBuilderContext;      // Builder context
+};
 
 } // Llpc

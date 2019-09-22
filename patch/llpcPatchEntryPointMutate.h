@@ -79,7 +79,7 @@ private:
     bool    m_hasTs;    // Whether the pipeline has tessllation shader
     bool    m_hasGs;    // Whether the pipeline has geometry shader
     PipelineState*  m_pPipelineState = nullptr;
-                        // PipelineState from PipelineStateWrapper pass
+                        // Pipeline state from PipelineStateWrapper pass
 };
 
 } // Llpc

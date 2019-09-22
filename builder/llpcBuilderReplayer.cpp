@@ -31,6 +31,7 @@
 #include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPipelineState.h"
 
 #include "llvm/Support/Debug.h"
 
@@ -48,7 +49,12 @@ class BuilderReplayer final : public ModulePass, BuilderRecorderMetadataKinds
 {
 public:
     BuilderReplayer() : ModulePass(ID) {}
-    BuilderReplayer(Builder* pBuilder);
+    BuilderReplayer(Pipeline* pPipeline);
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineStateWrapper>();
+    }
 
     bool runOnModule(Module& module) override;
 
@@ -65,7 +71,6 @@ private:
 
     std::unique_ptr<Builder>                m_pBuilder;                         // The LLPC builder that the builder
                                                                                 //  calls are being replayed on.
-    Module*                                 m_pModule;                          // Module that the pass is being run on
     std::map<Function*, ShaderStage>        m_shaderStageMap;                   // Map function -> shader stage
     llvm::Function*                         m_pEnclosingFunc = nullptr;         // Last function written with current
                                                                                 //  shader stage
@@ -78,19 +83,18 @@ char BuilderReplayer::ID = 0;
 // =====================================================================================================================
 // Create BuilderReplayer pass
 ModulePass* Llpc::CreateBuilderReplayer(
-    Builder* pBuilder)    // [in] Builder to replay Builder calls on. The BuilderReplayer takes ownership of this.
+    Pipeline*  pPipeline)     // [in] Pipeline object
 {
-    return new BuilderReplayer(pBuilder);
+    return new BuilderReplayer(pPipeline);
 }
 
 // =====================================================================================================================
 // Constructor
 BuilderReplayer::BuilderReplayer(
-    Builder* pBuilder)      // [in] Builder to replay calls into
+    Pipeline*  pPipeline)       // [in] Pipeline object
     :
     ModulePass(ID),
-    BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pBuilder->getContext())),
-    m_pBuilder(pBuilder)
+    BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pPipeline->GetContext()))
 {
     initializeBuilderReplayerPass(*PassRegistry::getPassRegistry());
 }
@@ -102,9 +106,13 @@ bool BuilderReplayer::runOnModule(
 {
     LLVM_DEBUG(dbgs() << "Running the pass of replaying LLPC builder calls\n");
 
-    m_pModule = &module;
+    // Set up the pipeline state from the specified linked IR module.
+    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    pPipelineState->ReadState(&module);
 
-    bool changed = false;
+    // Create the BuilderImpl to replay into, passing it the PipelineState
+    BuilderContext* pBuilderContext = pPipelineState->GetBuilderContext();
+    m_pBuilder.reset(pBuilderContext->CreateBuilder(pPipelineState, /*useBuilderRecorder=*/false));
 
     SmallVector<Function*, 8> funcsToRemove;
 
@@ -129,9 +137,6 @@ bool BuilderReplayer::runOnModule(
         const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
         uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
 
-        // If we got here we are definitely changing the module.
-        changed = true;
-
         SmallVector<CallInst*, 8> callsToRemove;
 
         while (func.use_empty() == false)
@@ -152,7 +157,7 @@ bool BuilderReplayer::runOnModule(
         pFunc->eraseFromParent();
     }
 
-    return changed;
+    return true;
 }
 
 // =====================================================================================================================

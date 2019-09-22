@@ -189,7 +189,7 @@ void SpirvLower::AddPasses(
     uint32_t              forceLoopUnrollCount)   // 0 or force loop unroll count
 {
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-    AddTargetLibInfo(pContext, &passMgr);
+    pContext->GetBuilderContext()->PreparePassManager(&passMgr);
 
     // Start timer for lowering passes.
     if (pLowerTimer != nullptr)

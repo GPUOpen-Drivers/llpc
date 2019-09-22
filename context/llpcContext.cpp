@@ -38,7 +38,6 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
@@ -47,6 +46,7 @@
 
 #include "SPIRVInternal.h"
 
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcMetroHash.h"
@@ -110,6 +110,20 @@ void Context::Reset()
 {
     m_pPipelineContext = nullptr;
     m_pResUsage = nullptr;
+    delete m_pBuilder;
+    m_pBuilder = nullptr;
+}
+
+// =====================================================================================================================
+// Get (create if necessary) BuilderContext
+BuilderContext* Context::GetBuilderContext()
+{
+    if (!m_builderContext)
+    {
+        // First time: Create the BuilderContext.
+        m_builderContext.reset(BuilderContext::Create(*this));
+    }
+    return &*m_builderContext;
 }
 
 // =====================================================================================================================

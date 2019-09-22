@@ -35,6 +35,7 @@
 #include "llpc.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcPipeline.h"
 
 namespace llvm
 {
@@ -126,12 +127,12 @@ public:
     }
     virtual ~Patch() {}
 
-    static void AddPasses(Context*                    pContext,
-                          llvm::legacy::PassManager&  passMgr,
-                          llvm::Timer*                pPatchTimer,
-                          llvm::Timer*                pOptTimer,
-                          std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
-                                                      checkShaderCacheFunc);
+    static void AddPasses(Context*                        pContext,
+                          llvm::legacy::PassManager&      passMgr,
+                          llvm::ModulePass*               pReplayerPass,
+                          llvm::Timer*                    pPatchTimer,
+                          llvm::Timer*                    pOptTimer,
+                          Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc);
 
     static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
 

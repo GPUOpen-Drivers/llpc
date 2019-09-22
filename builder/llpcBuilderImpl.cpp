@@ -30,9 +30,27 @@
  */
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
+
+// =====================================================================================================================
+BuilderImpl::BuilderImpl(
+    BuilderContext* pBuilderContext,  // [in] BuilderContext
+    Pipeline*       pPipeline)        // [in] PipelineState (as public superclass Pipeline)
+    : BuilderImplBase(pBuilderContext),
+      BuilderImplArith(pBuilderContext),
+      BuilderImplDesc(pBuilderContext),
+      BuilderImplImage(pBuilderContext),
+      BuilderImplInOut(pBuilderContext),
+      BuilderImplMatrix(pBuilderContext),
+      BuilderImplMisc(pBuilderContext),
+      BuilderImplSubgroup(pBuilderContext)
+{
+    m_pPipelineState = reinterpret_cast<PipelineState*>(pPipeline);
+    m_pPipelineState->SetNoReplayer();
+}
 
 // =====================================================================================================================
 // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.

@@ -107,8 +107,8 @@ private:
     // Map from descriptor range value to global variables modeling related descriptors (act as immediate constants)
     std::unordered_map<const DescriptorRangeValue*, llvm::GlobalVariable*> m_descs;
 
-    PipelineState*                      m_pPipelineState = nullptr;
-                                                              // PipelineState from PipelineStateWrapper pass
+    PipelineState*                  m_pPipelineState = nullptr;
+                                                              // Pipeline state from PipelineStateWrapper pass
 };
 
 } // Llpc
