@@ -41,6 +41,14 @@ namespace llvm
 
 class ModulePass;
 class PassRegistry;
+class Timer;
+
+namespace legacy
+{
+
+class PassManager;
+
+}
 
 void initializeBuilderReplayerPass(PassRegistry&);
 
@@ -91,7 +99,7 @@ inline static void InitializeBuilderPasses(
 //      for LLPC operations.
 //    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
 //      pipeline module.
-//    * Run middle-end passes on it.
+//    * Run middle-end and back-end passes on it (Builder::Generate()).
 //
 // 2. BuilderRecorder with full pipeline state
 //
@@ -108,9 +116,9 @@ inline static void InitializeBuilderPasses(
 //      for LLPC operations.
 //    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
 //      pipeline module.
-//    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
-//      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
-//      module).
+//    * Run middle-end and back-end passes on it (Builder::Generate()). Builder::Generate internally
+//      arranges to run BuilderReplayer to replay all the recorded Builder::Create* calls into its
+//      own instance of BuilderImpl (but with the single pipeline IR module).
 //
 //    With this scheme, the intention is that the whole-pipeline IR module after linking is a
 //    representation of the pipeline. For testing purposes, the IR module could be output to a .ll
@@ -133,9 +141,9 @@ inline static void InitializeBuilderPasses(
 //    * Then, later on, bring the shader IR modules together, and link them with Builder::Link()
 //      into a single pipeline IR module.
 //    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Run middle-end passes on it, starting with BuilderReplayer to replay all the recorded
-//      Builder::Create* calls into its own instance of BuilderImpl (but with a single pipeline IR
-//      module).
+//    * Run middle-end and back-end passes on it (Builder::Generate()). Builder::Generate internally
+//      arranges to run BuilderReplayer to replay all the recorded Builder::Create* calls into its
+//      own instance of BuilderImpl (but with the single pipeline IR module).
 //
 class Builder : public IRBuilder<>
 {
@@ -182,6 +190,17 @@ public:
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 
+    // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
+    // think that we have library functions.
+    void PreparePassManager(
+        legacy::PassManager*  pPassMgr);  // [in/out] Pass manager
+
+    // Set the current shader stage.
+    void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Methods to set pipeline state
+
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.
     // "immutableDescs" contains descriptors (currently limited to samplers), whose values are hard
@@ -194,8 +213,8 @@ public:
         ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
         ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
 
-    // Set the current shader stage.
-    void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
+    // -----------------------------------------------------------------------------------------------------------------
+    // Methods to link and generate pipeline
 
     // Link the individual shader modules into a single pipeline module. The frontend must have
     // finished calling Builder::Create* methods and finished building the IR. In the case that
@@ -208,6 +227,26 @@ public:
         ArrayRef<Module*> modules,   // Array of modules indexed by shader stage, with nullptr entry
                                      //  for any stage not present in the pipeline
         bool linkNativeStages);      // Whether to link native shader stage modules
+
+    // Typedef of function passed in to Generate to check the shader cache.
+    // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
+    // that got a hit in the cache.
+    typedef std::function<uint32_t(
+        const Module*               pModule,      // [in] Module
+        uint32_t                    stageMask,    // Shader stage mask
+        ArrayRef<ArrayRef<uint8_t>> stageHashes   // Per-stage hash of in/out usage
+    )> CheckShaderCacheFunc;
+
+    // Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
+    // The output is normally ELF, but IR disassembly if an option is used to stop compilation early.
+    // Output is written to outStream.
+    // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
+    // a diagnostic handler with LLVMContext::setDiagnosticHandler.
+    void Generate(
+        std::unique_ptr<Module>   pipelineModule,       // IR pipeline module
+        raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
+        CheckShaderCacheFunc      checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
+        ArrayRef<Timer*>          timers);              // Timers for: patch passes, llvm optimizations, codegen
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations

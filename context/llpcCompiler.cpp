@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-compiler"
 
-#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
@@ -996,7 +995,7 @@ Result Compiler::BuildPipelineInternal(
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext, pContext->GetPipelineContext()->GetPipelineOptions());
 
-    Module* pPipelineModule = nullptr;
+    std::unique_ptr<Module> pipelineModule;
 
     // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
     // whole pipeline.
@@ -1008,7 +1007,7 @@ Result Compiler::BuildPipelineInternal(
         if ((pModuleData != nullptr) && (pModuleData->binType == BinaryType::LlvmBc))
         {
             IsLlvmBc = true;
-            pPipelineModule = pContext->LoadLibary(&pModuleData->binCode).release();
+            pipelineModule.reset(pContext->LoadLibary(&pModuleData->binCode).release());
         }
     }
 
@@ -1017,7 +1016,7 @@ Result Compiler::BuildPipelineInternal(
 
     // If not IR input, run the per-shader passes, including SPIR-V translation, and then link the modules
     // into a single pipeline module.
-    if (pPipelineModule == nullptr)
+    if (pipelineModule == nullptr)
     {
         // Create empty modules and set target machine in each.
         std::vector<Module*> modules(shaderInfo.size());
@@ -1162,8 +1161,8 @@ Result Compiler::BuildPipelineInternal(
         }
 
         // Link the shader modules into a single pipeline module.
-        pPipelineModule = pContext->GetBuilder()->Link(modules, true);
-        if (pPipelineModule == nullptr)
+        pipelineModule.reset(pContext->GetBuilder()->Link(modules, true));
+        if (pipelineModule == nullptr)
         {
             LLPC_ERRS("Failed to link shader modules into pipeline module\n");
             result = Result::ErrorInvalidShader;
@@ -1173,7 +1172,7 @@ Result Compiler::BuildPipelineInternal(
     // Set up function to check shader cache.
     GraphicsShaderCacheChecker graphicsShaderCacheChecker(this, pContext);
 
-    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)> checkShaderCacheFunc =
+    Builder::CheckShaderCacheFunc checkShaderCacheFunc =
             [&graphicsShaderCacheChecker](
         const Module*               pModule,      // [in] Module
         uint32_t                    stageMask,    // Shader stage mask
@@ -1191,78 +1190,34 @@ Result Compiler::BuildPipelineInternal(
         checkShaderCacheFunc = nullptr;
     }
 
+    // Generate pipeline.
+    raw_svector_ostream elfStream(*pPipelineElf);
+
+    if (result == Result::Success)
     {
-        // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
-        //
-        // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
-        // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
-        // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
-        // manager.
-        PassManager patchPassMgr(&passIndex);
-        patchPassMgr.add(createTargetTransformInfoWrapperPass(pContext->GetTargetMachine()->getTargetIRAnalysis()));
-
-        // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-        AddTargetLibInfo(pContext, &patchPassMgr);
-
-        raw_svector_ostream elfStream(*pPipelineElf);
-
-        if (result == Result::Success)
-        {
-            // Patching.
-            Patch::AddPasses(pContext,
-                             patchPassMgr,
-                             timerProfiler.GetTimer(TimerPatch),
-                             timerProfiler.GetTimer(TimerOpt),
-                             checkShaderCacheFunc);
-        }
-
-        // At this point, we have finished with the Builder. No patch pass should be using Builder.
-        delete pContext->GetBuilder();
-        pContext->SetBuilder(nullptr);
-
-        // Run the "whole pipeline" passes, excluding the target backend.
-        if (result == Result::Success)
-        {
-            bool success = RunPasses(&patchPassMgr, pPipelineModule);
-            if (success)
-            {
-#if LLPC_BUILD_GFX10
-                // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
-                // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
-                // we do target feature setup here.
+        result = Result::ErrorInvalidShader;
+#if LLPC_ENABLE_EXCEPTION
+        try
 #endif
-                CodeGenManager::SetupTargetFeatures(pPipelineModule);
-            }
-            else
-            {
-                LLPC_ERRS("Fails to run whole pipeline passes\n");
-                result = Result::ErrorInvalidShader;
-            }
-        }
-
-        // A separate "whole pipeline" pass manager for code generation.
-        PassManager codeGenPassMgr(&passIndex);
-
-        if (result == Result::Success)
         {
-            // Code generation.
-            result = CodeGenManager::AddTargetPasses(pContext,
-                                                     codeGenPassMgr,
-                                                     timerProfiler.GetTimer(TimerCodeGen),
-                                                     elfStream);
-        }
+            Timer* timers[] = {
+                timerProfiler.GetTimer(TimerPatch),
+                timerProfiler.GetTimer(TimerOpt),
+                timerProfiler.GetTimer(TimerCodeGen),
+            };
 
-        // Run the target backend codegen passes.
-        if (result == Result::Success)
-        {
-            bool success = RunPasses(&codeGenPassMgr, pPipelineModule);
-            if (success == false)
-            {
-                LLPC_ERRS("Fails to generate GPU ISA codes\n");
-                result = Result::ErrorInvalidShader;
-            }
+            pContext->GetBuilder()->Generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
+            result = Result::Success;
         }
+#if LLPC_ENABLE_EXCEPTION
+        catch (const char*)
+        {
+        }
+#endif
     }
+
+    delete pContext->GetBuilder();
+    pContext->SetBuilder(nullptr);
 
     if (checkPerStageCache)
     {
@@ -1271,9 +1226,6 @@ Result Compiler::BuildPipelineInternal(
     }
 
     pContext->setDiagnosticHandlerCallBack(nullptr);
-
-    delete pPipelineModule;
-    pPipelineModule = nullptr;
 
     return result;
 }
