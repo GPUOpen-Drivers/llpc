@@ -30,11 +30,17 @@
  */
 #include "llpcBuilderImpl.h"
 #include "llpcPipelineState.h"
+#include "llpcCodeGenManager.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPassManager.h"
+#include "llpcPatch.h"
 
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Timer.h"
 
 #include <set>
 
@@ -213,6 +219,87 @@ Module* Builder::Link(
     }
 
     return pPipelineModule;
+}
+
+// =====================================================================================================================
+// Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
+// The output is normally ELF, but IR disassembly if an option is used to stop compilation early.
+// Output is written to outStream.
+// Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
+// a diagnostic handler with LLVMContext::setDiagnosticHandler.
+void Builder::Generate(
+    std::unique_ptr<Module>         pipelineModule,       // IR pipeline module
+    raw_pwrite_stream&              outStream,            // [in/out] Stream to write ELF or IR disassembly output
+    Builder::CheckShaderCacheFunc   checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
+    ArrayRef<Timer*>                timers)               // Timers for: patch passes, llvm optimizations, codegen
+{
+    uint32_t passIndex = 1000;
+    Timer* pPatchTimer = (timers.size() >= 1) ? timers[0] : nullptr;
+    Timer* pOptTimer = (timers.size() >= 2) ? timers[1] : nullptr;
+    Timer* pCodeGenTimer = (timers.size() >= 3) ? timers[2] : nullptr;
+
+    // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
+    //
+    // TODO: The "whole pipeline" passes are supposed to include code generation passes. However, there is a CTS issue.
+    // In the case "dEQP-VK.spirv_assembly.instruction.graphics.16bit_storage.struct_mixed_types.uniform_geom", GS gets
+    // unrolled to such a size that backend compilation takes too long. Thus, we put code generation in its own pass
+    // manager.
+    PassManager patchPassMgr(&passIndex);
+    patchPassMgr.add(createTargetTransformInfoWrapperPass(getContext().GetTargetMachine()->getTargetIRAnalysis()));
+
+    // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
+    PreparePassManager(&patchPassMgr);
+
+    // Patching.
+    Patch::AddPasses(&getContext(),
+                     patchPassMgr,
+                     pPatchTimer,
+                     pOptTimer,
+                     checkShaderCacheFunc);
+
+    // Run the "whole pipeline" passes, excluding the target backend.
+    patchPassMgr.run(*pipelineModule);
+#if LLPC_BUILD_GFX10
+    // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
+    // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
+    // we do target feature setup here.
+#endif
+    CodeGenManager::SetupTargetFeatures(&*pipelineModule);
+
+    // A separate "whole pipeline" pass manager for code generation.
+    PassManager codeGenPassMgr(&passIndex);
+
+    // Code generation.
+    CodeGenManager::AddTargetPasses(&getContext(), codeGenPassMgr, pCodeGenTimer, outStream);
+
+    // Run the target backend codegen passes.
+    codeGenPassMgr.run(*pipelineModule);
+}
+
+// =====================================================================================================================
+// Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not think that
+// we have library functions.
+void Builder::PreparePassManager(
+    legacy::PassManager*  pPassMgr)   // [in/out] Pass manager
+{
+    TargetLibraryInfoImpl targetLibInfo(getContext().GetTargetMachine()->getTargetTriple());
+
+    // Adjust it to allow memcpy and memset.
+    // TODO: Investigate why the latter is necessary. I found that
+    // test/shaderdb/ObjStorageBlock_TestMemCpyInt32.comp
+    // got unrolled far too much, and at too late a stage for the descriptor loads to be commoned up. It might
+    // be an unfortunate interaction between LoopIdiomRecognize and fat pointer laundering.
+    targetLibInfo.setAvailable(LibFunc_memcpy);
+    targetLibInfo.setAvailable(LibFunc_memset);
+
+    // Also disallow tan functions.
+    // TODO: This can be removed once we have LLVM fix D67406.
+    targetLibInfo.setUnavailable(LibFunc_tan);
+    targetLibInfo.setUnavailable(LibFunc_tanf);
+    targetLibInfo.setUnavailable(LibFunc_tanl);
+
+    auto pTargetLibInfoPass = new TargetLibraryInfoWrapperPass(targetLibInfo);
+    pPassMgr->add(pTargetLibInfoPass);
 }
 
 // =====================================================================================================================

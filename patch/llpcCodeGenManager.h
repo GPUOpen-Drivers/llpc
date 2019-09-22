@@ -83,10 +83,10 @@ public:
 
     static void SetupTargetFeatures(llvm::Module* pModule);
 
-    static Result AddTargetPasses(Context*                    pContext,
-                                  PassManager&                passMgr,
-                                  llvm::Timer*                pCodeGenTimer,
-                                  llvm::raw_pwrite_stream&    outStream);
+    static void AddTargetPasses(Context*                    pContext,
+                                PassManager&                passMgr,
+                                llvm::Timer*                pCodeGenTimer,
+                                llvm::raw_pwrite_stream&    outStream);
 
     static Result Run(llvm::Module*               pModule,
                       llvm::legacy::PassManager&  passMgr);

@@ -55,8 +55,7 @@ public:
     // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output
     // usage checksums, and it returns the shader stage mask with bits removed for shader stages that it wants
     // removed.
-    void SetCallbackFunction(
-        std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)> callbackFunc)
+    void SetCallbackFunction(Builder::CheckShaderCacheFunc callbackFunc)
     {
         m_callbackFunc = callbackFunc;
     }
@@ -70,7 +69,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>   m_callbackFunc;
+    Builder::CheckShaderCacheFunc   m_callbackFunc;
 };
 
 } // Llpc

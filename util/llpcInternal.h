@@ -32,9 +32,7 @@
 
 #include <unordered_set>
 
-#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 
 #include "spirvExt.h"
@@ -78,13 +76,6 @@ void initializePassDeadFuncRemovePass(PassRegistry&);
 void initializePassExternalLibLinkPass(PassRegistry&);
 void initializePipelineShadersPass(PassRegistry&);
 void initializeStartStopTimerPass(PassRegistry&);
-
-namespace legacy
-{
-
-class PassManager;
-
-} // legacy
 
 } // llvm
 
@@ -312,8 +303,5 @@ bool IsElfBinary(const void* pData, size_t dataSize);
 
 // Checks whether the output data is actually ISA assembler text
 bool IsIsaText(const void* pData, size_t dataSize);
-
-// Manually add a target-aware TLI pass, so middle-end optimizations do not think that we have library functions.
-void AddTargetLibInfo(Context* pContext, llvm::legacy::PassManager* pPassMgr);
 
 } // Llpc

@@ -33,6 +33,7 @@
 #include "llvm/Pass.h"
 
 #include "llpc.h"
+#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 
@@ -130,8 +131,7 @@ public:
                           llvm::legacy::PassManager&  passMgr,
                           llvm::Timer*                pPatchTimer,
                           llvm::Timer*                pOptTimer,
-                          std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
-                                                      checkShaderCacheFunc);
+                          Builder::CheckShaderCacheFunc checkShaderCacheFunc);
 
     static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
 

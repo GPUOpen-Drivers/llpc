@@ -96,8 +96,7 @@ void Patch::AddPasses(
     legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
     llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
     llvm::Timer*          pOptTimer,     // [in] Timer to time LLVM optimization passes with, nullptr if not timing
-    std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
-                          checkShaderCacheFunc)
+    Builder::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
     // Start timer for patching passes.
