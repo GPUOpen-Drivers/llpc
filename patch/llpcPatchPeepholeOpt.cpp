@@ -582,6 +582,12 @@ void PatchPeepholeOpt::visitPHINode(
 
             pResult = InsertElementInst::Create(pResult, pNewPhiNode, pElementIndex, "", pInsertPos);
 
+            // Make sure the same incoming blocks have identical incoming values.
+            // If we have already inserted an incoming arc for a basic block,
+            // reuse the same value in the future incoming arcs from the same block.
+            SmallDenseMap<BasicBlock*, Value*, 8> incomingPairMap;
+            incomingPairMap.reserve(numIncomings);
+
             // Loop through each incoming edge to the PHI node.
             for (uint32_t incomingIndex = 0; incomingIndex < numIncomings; incomingIndex++)
             {
@@ -591,17 +597,28 @@ void PatchPeepholeOpt::visitPHINode(
 
                 if (Instruction* const pInst = dyn_cast<Instruction>(pIncoming))
                 {
-                    ExtractElementInst* const pExtractElement = ExtractElementInst::Create(
-                        pIncoming, pElementIndex);
+                    Value* pNewIncomingValue = nullptr;
+                    auto it = incomingPairMap.find(pBasicBlock);
+                    if (it != incomingPairMap.end())
+                    {
+                        pNewIncomingValue = it->second;
+                    }
+                    else
+                    {
+                        ExtractElementInst* const pExtractElement =
+                            ExtractElementInst::Create(pIncoming, pElementIndex);
 
-                    insertAfter(*pExtractElement, *pInst);
+                        insertAfter(*pExtractElement, *pInst);
+                        pNewIncomingValue = pExtractElement;
+                        incomingPairMap.insert({pBasicBlock, pNewIncomingValue});
+                    }
 
-                    pNewPhiNode->addIncoming(pExtractElement, pBasicBlock);
+                    pNewPhiNode->addIncoming(pNewIncomingValue, pBasicBlock);
                 }
                 else if (Constant* const pConstant = dyn_cast<Constant>(pIncoming))
                 {
                     Constant* const pExtractElement = ConstantExpr::getExtractElement(pConstant, pElementIndex);
-
+                    incomingPairMap.insert({pBasicBlock, pExtractElement});
                     pNewPhiNode->addIncoming(pExtractElement, pBasicBlock);
                 }
                 else
