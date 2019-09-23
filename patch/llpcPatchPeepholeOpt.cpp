@@ -655,7 +655,8 @@ void PatchPeepholeOpt::visitPHINode(
         }
     }
 
-    if (pPrevIncomingInst != nullptr)
+    // Do not clone allocas -- we don't want to potentially introduce them in the middle of the function.
+    if ((pPrevIncomingInst != nullptr) && (isa<AllocaInst>(pPrevIncomingInst) == false))
     {
         Instruction* const pNewInst = pPrevIncomingInst->clone();
         insertAfter(*pNewInst, phiNode);
