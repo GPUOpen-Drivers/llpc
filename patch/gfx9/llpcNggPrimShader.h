@@ -161,6 +161,8 @@ private:
                 m_pNggControl->enableCullDistanceCulling);
     }
 
+    llvm::BasicBlock* CreateBlock(llvm::Function* pParent, const llvm::Twine& blockName = "");
+
     // -----------------------------------------------------------------------------------------------------------------
 
     Context*        m_pContext; // LLPC context

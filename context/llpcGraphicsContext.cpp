@@ -1214,6 +1214,17 @@ void GraphicsContext::SetNggControl()
                 // NGG runs in pass-through mode for non-fill polygon mode
                 m_nggControl.passthroughMode = true;
             }
+
+            if (hasGs)
+            {
+                const auto& builtInUsage = GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+                if (builtInUsage.outputPrimitive != OutputTriangleStrip)
+                {
+                    // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
+                    // (actual no culling) mode
+                    m_nggControl.passthroughMode = true;
+                }
+            }
         }
 
         // Build NGG culling-control registers

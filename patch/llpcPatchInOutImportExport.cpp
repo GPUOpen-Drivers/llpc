@@ -5025,7 +5025,6 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         // Call buffer store intrinsic or LDS store
         const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
         Value* pEsGsOffset = nullptr;
-        Value* pEsGsRingBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetEsGsRingBufDesc();
         if (m_shaderStage == ShaderStageVertex)
         {
             pEsGsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.vs.esGsOffset);
@@ -5038,7 +5037,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
 
         auto pRingOffset = CalcEsGsRingOffsetForOutput(location, compIdx, pEsGsOffset, pInsertPos);
 
-        if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+        if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
         {
             std::vector<Value*> idxs;
             idxs.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
@@ -5049,6 +5048,8 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         }
         else
         {
+            Value* pEsGsRingBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetEsGsRingBufDesc();
+
             // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit control
             // of soffset. This is required by swizzle enabled mode when address range checking should be complied with.
             std::vector<Value*> args;

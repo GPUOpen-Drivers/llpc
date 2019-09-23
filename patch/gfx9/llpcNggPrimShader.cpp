@@ -258,9 +258,12 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
 
     auto pArg = pEntryPoint->arg_begin();
 
+    Value* pUserDataAddrLow         = (pArg + EsGsSysValueUserDataAddrLow);
+    Value* pUserDataAddrHigh        = (pArg + EsGsSysValueUserDataAddrHigh);
     Value* pMergedGroupInfo         = (pArg + EsGsSysValueMergedGroupInfo);
     Value* pMergedWaveInfo          = (pArg + EsGsSysValueMergedWaveInfo);
     Value* pOffChipLdsBase          = (pArg + EsGsSysValueOffChipLdsBase);
+    Value* pSharedScratchOffset     = (pArg + EsGsSysValueSharedScratchOffset);
     Value* pPrimShaderTableAddrLow  = (pArg + EsGsSysValuePrimShaderTableAddrLow);
     Value* pPrimShaderTableAddrHigh = (pArg + EsGsSysValuePrimShaderTableAddrHigh);
 
@@ -284,27 +287,41 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
     Value* pVsPrimitiveId = (pArg + 7);
     Value* pInstanceId    = (pArg + 8);
 
+    pUserDataAddrLow->setName("userDataAddrLow");
+    pUserDataAddrHigh->setName("userDataAddrHigh");
+    pMergedGroupInfo->setName("mergedGroupInfo");
+    pMergedWaveInfo->setName("mergedWaveInfo");
+    pOffChipLdsBase->setName("offChipLdsBase");
+    pSharedScratchOffset->setName("sharedScratchOffset");
+    pPrimShaderTableAddrLow->setName("primShaderTableAddrLow");
+    pPrimShaderTableAddrHigh->setName("primShaderTableAddrHigh");
+
+    pUserData->setName("userData");
+    pEsGsOffsets01->setName("esGsOffsets01");
+    pEsGsOffsets23->setName("esGsOffsets23");
+    pGsPrimitiveId->setName("gsPrimitiveId");
+    pInvocationId->setName("invocationId");
+    pEsGsOffsets45->setName("esGsOffsets45");
+
+    if (m_hasTes)
+    {
+        pTessCoordX->setName("tessCoordX");
+        pTessCoordY->setName("tessCoordY");
+        pRelPatchId->setName("relPatchId");
+        pPatchId->setName("patchId");
+    }
+    else
+    {
+        pVertexId->setName("vertexId");
+        pRelVertexId->setName("relVertexId");
+        pVsPrimitiveId->setName("vsPrimitiveId");
+        pInstanceId->setName("instanceId");
+    }
+
     if (m_hasGs)
     {
         // GS is present in primitive shader (ES-GS merged shader)
         const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
-
-        // TODO: Remove unused variables once GS support in NGG is completed.
-        LLPC_UNUSED(pGsPrimitiveId);
-        LLPC_UNUSED(pInvocationId);
-        LLPC_UNUSED(pPatchId);
-        LLPC_UNUSED(pRelVertexId);
-        LLPC_UNUSED(calcFactor);
-        LLPC_UNUSED(pVertexId);
-        LLPC_UNUSED(pUserData);
-        LLPC_UNUSED(pOffChipLdsBase);
-        LLPC_UNUSED(pVsPrimitiveId);
-        LLPC_UNUSED(pTessCoordX);
-        LLPC_UNUSED(pRelPatchId);
-        LLPC_UNUSED(pTessCoordY);
-        LLPC_UNUSED(pInstanceId);
-
-        LLPC_NOT_IMPLEMENTED();
     }
     else
     {
@@ -408,31 +425,31 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
             // }
 
             // Define basic blocks
-            auto pEndExpVertBlock  = BasicBlock::Create(*m_pContext, ".endExpVert", pEntryPoint);
-            auto pExpVertBlock     = BasicBlock::Create(*m_pContext, ".expVert", pEntryPoint, pEndExpVertBlock);
-            auto pEndExpPrimBlock  = BasicBlock::Create(*m_pContext, ".endExpPrim", pEntryPoint, pExpVertBlock);
-            auto pExpPrimBlock     = BasicBlock::Create(*m_pContext, ".expPrim", pEntryPoint, pEndExpPrimBlock);
-            auto pEndAllocReqBlock = BasicBlock::Create(*m_pContext, ".endAllocReq", pEntryPoint, pExpPrimBlock);
-            auto pAllocReqBlock    = BasicBlock::Create(*m_pContext, ".allocReq", pEntryPoint, pEndAllocReqBlock);
-            auto pEntryBlock       = BasicBlock::Create(*m_pContext, ".entry", pEntryPoint, pAllocReqBlock);
+            auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");
 
             // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-            BasicBlock* pWritePrimIdBlock       = nullptr;
-            BasicBlock* pEndWritePrimIdBlock    = nullptr;
-            BasicBlock* pReadPrimIdBlock        = nullptr;
-            BasicBlock* pEndReadPrimIdBlock     = nullptr;
+            BasicBlock* pWritePrimIdBlock = nullptr;
+            BasicBlock* pEndWritePrimIdBlock = nullptr;
+            BasicBlock* pReadPrimIdBlock = nullptr;
+            BasicBlock* pEndReadPrimIdBlock = nullptr;
 
             if (distributePrimId)
             {
-                pEndReadPrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".endReadPrimId", pEntryPoint, pAllocReqBlock);
-                pReadPrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".readPrimId", pEntryPoint, pEndReadPrimIdBlock);
-                pEndWritePrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".endWritePrimId", pEntryPoint, pReadPrimIdBlock);
-                pWritePrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".writePrimId", pEntryPoint, pEndWritePrimIdBlock);
+                pWritePrimIdBlock = CreateBlock(pEntryPoint, ".writePrimId");
+                pEndWritePrimIdBlock = CreateBlock(pEntryPoint, ".endWritePrimId");
+
+                pReadPrimIdBlock = CreateBlock(pEntryPoint, ".readPrimId");
+                pEndReadPrimIdBlock = CreateBlock(pEntryPoint, ".endReadPrimId");
             }
+
+            auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
+            auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
+
+            auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
+            auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
+
+            auto pExpVertBlock = CreateBlock(pEntryPoint, ".expVert");
+            auto pEndExpVertBlock = CreateBlock(pEntryPoint, ".endExpVert");
 
             // Construct ".entry" block
             {
@@ -882,92 +899,72 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                 m_pContext->GetGpuWorkarounds()->gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
 
             // Define basic blocks
-            auto pEndExpVertParamBlock = BasicBlock::Create(*m_pContext, ".endExpVertParam", pEntryPoint);
-            auto pExpVertParamBlock =
-                BasicBlock::Create(*m_pContext, ".expVertParam", pEntryPoint, pEndExpVertParamBlock);
-
-            auto pEndExpVertPosBlock =
-                BasicBlock::Create(*m_pContext, ".endExpVertPos", pEntryPoint, pExpVertParamBlock);
-            auto pExpVertPosBlock = BasicBlock::Create(*m_pContext, ".expVertPos", pEntryPoint, pEndExpVertPosBlock);
-
-            auto pEndExpPrimBlock = BasicBlock::Create(*m_pContext, ".endExpPrim", pEntryPoint, pExpVertPosBlock);
-            auto pExpPrimBlock = BasicBlock::Create(*m_pContext, ".expPrim", pEntryPoint, pEndExpPrimBlock);
-
-            auto pNoEarlyExitBlock = BasicBlock::Create(*m_pContext, ".noEarlyExit", pEntryPoint, pExpPrimBlock);
-            auto pEarlyExitBlock = BasicBlock::Create(*m_pContext, ".earlyExit", pEntryPoint, pNoEarlyExitBlock);
-
-            auto pEndAllocReqBlock = BasicBlock::Create(*m_pContext, ".endAllocReq", pEntryPoint, pEarlyExitBlock);
-            auto pAllocReqBlock = BasicBlock::Create(*m_pContext, ".allocReq", pEntryPoint, pEndAllocReqBlock);
-
-            // NOTE: Those basic blocks are conditionally created on the basis of actual NGG compaction mode.
-            BasicBlock* pWriteCompactDataBlock = nullptr;
-            BasicBlock* pEndReadThreadCountBlock = nullptr;
-            BasicBlock* pReadThreadCountBlock = nullptr;
-
-            if (vertexCompact)
-            {
-                pEndReadThreadCountBlock =
-                    BasicBlock::Create(*m_pContext, ".endReadThreadCount", pEntryPoint, pAllocReqBlock);
-                pWriteCompactDataBlock =
-                    BasicBlock::Create(*m_pContext, ".writeCompactData", pEntryPoint, pEndReadThreadCountBlock);
-                pReadThreadCountBlock =
-                    BasicBlock::Create(*m_pContext, ".readThreadCount", pEntryPoint, pWriteCompactDataBlock);
-            }
-            else
-            {
-                pEndReadThreadCountBlock =
-                    BasicBlock::Create(*m_pContext, ".endReadThreadCount", pEntryPoint, pAllocReqBlock);
-                pReadThreadCountBlock =
-                    BasicBlock::Create(*m_pContext, ".readThreadCount", pEntryPoint, pEndReadThreadCountBlock);
-            }
-
-            auto pEndAccThreadCountBlock =
-                BasicBlock::Create(*m_pContext, ".endAccThreadCount", pEntryPoint, pReadThreadCountBlock);
-            auto pAccThreadCountBlock =
-                BasicBlock::Create(*m_pContext, ".accThreadCount", pEntryPoint, pEndAccThreadCountBlock);
-
-            auto pEndWriteDrawFlagBlock =
-                BasicBlock::Create(*m_pContext, ".endWriteDrawFlag", pEntryPoint, pAccThreadCountBlock);
-            auto pWriteDrawFlagBlock =
-                BasicBlock::Create(*m_pContext, ".writeDrawFlag", pEntryPoint, pEndWriteDrawFlagBlock);
-
-            auto pEndCullingBlock = BasicBlock::Create(*m_pContext, ".endCulling", pEntryPoint, pWriteDrawFlagBlock);
-            auto pCullingBlock = BasicBlock::Create(*m_pContext, ".culling", pEntryPoint, pEndCullingBlock);
-
-            auto pEndWritePosDataBlock =
-                BasicBlock::Create(*m_pContext, ".endWritePosData", pEntryPoint, pCullingBlock);
-            auto pWritePosDataBlock =
-                BasicBlock::Create(*m_pContext, ".writePosData", pEntryPoint, pEndWritePosDataBlock);
-
-            auto pEndZeroDrawFlagBlock =
-                BasicBlock::Create(*m_pContext, ".endZeroDrawFlag", pEntryPoint, pWritePosDataBlock);
-            auto pZeroDrawFlagBlock =
-                BasicBlock::Create(*m_pContext, ".zeroDrawFlag", pEntryPoint, pEndZeroDrawFlagBlock);
-
-            auto pEndZeroThreadCountBlock =
-                BasicBlock::Create(*m_pContext, ".endZeroThreadCount", pEntryPoint, pZeroDrawFlagBlock);
-            auto pZeroThreadCountBlock =
-                BasicBlock::Create(*m_pContext, ".zeroThreadCount", pEntryPoint, pEndZeroThreadCountBlock);
-
-            auto pEntryBlock = BasicBlock::Create(*m_pContext, ".entry", pEntryPoint, pZeroThreadCountBlock);
+            auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");
 
             // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-            BasicBlock* pWritePrimIdBlock       = nullptr;
-            BasicBlock* pEndWritePrimIdBlock    = nullptr;
-            BasicBlock* pReadPrimIdBlock        = nullptr;
-            BasicBlock* pEndReadPrimIdBlock     = nullptr;
+            BasicBlock* pWritePrimIdBlock = nullptr;
+            BasicBlock* pEndWritePrimIdBlock = nullptr;
+            BasicBlock* pReadPrimIdBlock = nullptr;
+            BasicBlock* pEndReadPrimIdBlock = nullptr;
 
             if (distributePrimId)
             {
-                pEndReadPrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".endReadPrimId", pEntryPoint, pZeroThreadCountBlock);
-                pReadPrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".readPrimId", pEntryPoint, pEndReadPrimIdBlock);
-                pEndWritePrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".endWritePrimId", pEntryPoint, pReadPrimIdBlock);
-                pWritePrimIdBlock =
-                    BasicBlock::Create(*m_pContext, ".writePrimId", pEntryPoint, pEndWritePrimIdBlock);
+                pWritePrimIdBlock = CreateBlock(pEntryPoint, ".writePrimId");
+                pEndWritePrimIdBlock = CreateBlock(pEntryPoint, ".endWritePrimId");
+
+                pReadPrimIdBlock = CreateBlock(pEntryPoint, ".readPrimId");
+                pEndReadPrimIdBlock = CreateBlock(pEntryPoint, ".endReadPrimId");
             }
+
+            auto pZeroThreadCountBlock = CreateBlock(pEntryPoint, ".zeroThreadCount");
+            auto pEndZeroThreadCountBlock = CreateBlock(pEntryPoint, ".endZeroThreadCount");
+
+            auto pZeroDrawFlagBlock = CreateBlock(pEntryPoint, ".zeroDrawFlag");
+            auto pEndZeroDrawFlagBlock = CreateBlock(pEntryPoint, ".endZeroDrawFlag");
+
+            auto pWritePosDataBlock = CreateBlock(pEntryPoint, ".writePosData");
+            auto pEndWritePosDataBlock = CreateBlock(pEntryPoint, ".endWritePosData");
+
+            auto pCullingBlock = CreateBlock(pEntryPoint, ".culling");
+            auto pEndCullingBlock = CreateBlock(pEntryPoint, ".endCulling");
+
+            auto pWriteDrawFlagBlock = CreateBlock(pEntryPoint, ".writeDrawFlag");
+            auto pEndWriteDrawFlagBlock = CreateBlock(pEntryPoint, ".endWriteDrawFlag");
+
+            auto pAccThreadCountBlock = CreateBlock(pEntryPoint, ".accThreadCount");
+            auto pEndAccThreadCountBlock = CreateBlock(pEntryPoint, ".endAccThreadCount");
+
+            // NOTE: Those basic blocks are conditionally created on the basis of actual NGG compaction mode.
+            BasicBlock* pReadThreadCountBlock = nullptr;
+            BasicBlock* pWriteCompactDataBlock = nullptr;
+            BasicBlock* pEndReadThreadCountBlock = nullptr;
+
+            if (vertexCompact)
+            {
+                pReadThreadCountBlock = CreateBlock(pEntryPoint, ".readThreadCount");
+                pWriteCompactDataBlock = CreateBlock(pEntryPoint, ".writeCompactData");
+                pEndReadThreadCountBlock = CreateBlock(pEntryPoint, ".endReadThreadCount");
+            }
+            else
+            {
+                pReadThreadCountBlock = CreateBlock(pEntryPoint, ".readThreadCount");
+                pEndReadThreadCountBlock = CreateBlock(pEntryPoint, ".endReadThreadCount");
+            }
+
+            auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
+            auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
+
+            auto pEarlyExitBlock = CreateBlock(pEntryPoint, ".earlyExit");
+            auto pNoEarlyExitBlock = CreateBlock(pEntryPoint, ".noEarlyExit");
+
+            auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
+            auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
+
+            auto pExpVertPosBlock = CreateBlock(pEntryPoint, ".expVertPos");
+            auto pEndExpVertPosBlock = CreateBlock(pEntryPoint, ".endExpVertPos");
+
+            auto pExpVertParamBlock = CreateBlock(pEntryPoint, ".expVertParam");
+            auto pEndExpVertParamBlock = CreateBlock(pEntryPoint, ".endExpVertParam");
 
             // Construct ".entry" block
             {
@@ -2158,10 +2155,10 @@ void NggPrimShader::DoPrimitiveExport(
 
             auto pExpPrimBlock = m_pBuilder->GetInsertBlock();
 
-            auto pReadCompactIdBlock = BasicBlock::Create(*m_pContext, "readCompactId", pExpPrimBlock->getParent());
+            auto pReadCompactIdBlock = CreateBlock(pExpPrimBlock->getParent(), "readCompactId");
             pReadCompactIdBlock->moveAfter(pExpPrimBlock);
 
-            auto pExpPrimContBlock = BasicBlock::Create(*m_pContext, "expPrimCont", pExpPrimBlock->getParent());
+            auto pExpPrimContBlock = CreateBlock(pExpPrimBlock->getParent(), "expPrimCont");
             pExpPrimContBlock->moveAfter(pReadCompactIdBlock);
 
             m_pBuilder->CreateCondBr(pVertCulled, pReadCompactIdBlock, pExpPrimContBlock);
@@ -2257,10 +2254,10 @@ void NggPrimShader::DoEarlyExit(
 
         auto pEarlyExitBlock = m_pBuilder->GetInsertBlock();
 
-        auto pDummyExpBlock = BasicBlock::Create(*m_pContext, ".dummyExp", pEarlyExitBlock->getParent());
+        auto pDummyExpBlock = CreateBlock(pEarlyExitBlock->getParent(), ".dummyExp");
         pDummyExpBlock->moveAfter(pEarlyExitBlock);
 
-        auto pEndDummyExpBlock = BasicBlock::Create(*m_pContext, ".endDummyExp", pEarlyExitBlock->getParent());
+        auto pEndDummyExpBlock = CreateBlock(pEarlyExitBlock->getParent(), ".endDummyExp");
         pEndDummyExpBlock->moveAfter(pDummyExpBlock);
 
         // Continue to construct ".earlyExit" block
@@ -3212,11 +3209,11 @@ void NggPrimShader::CreateBackfaceCuller(
     Value* pPaClVportYscale = argIt++;
     pPaClVportYscale->setName("paClVportYscale");
 
-    auto pBackfaceEntryBlock = BasicBlock::Create(*m_pContext, ".backfaceEntry", pFunc);
-    auto pBackfaceCullBlock = BasicBlock::Create(*m_pContext, ".backfaceCull", pFunc);
-    auto pBackfaceExponentBlock = BasicBlock::Create(*m_pContext, ".backfaceExponent", pFunc);
-    auto pEndBackfaceCullBlock = BasicBlock::Create(*m_pContext, ".endBackfaceCull", pFunc);
-    auto pBackfaceExitBlock = BasicBlock::Create(*m_pContext, ".backfaceExit", pFunc);
+    auto pBackfaceEntryBlock = CreateBlock(pFunc, ".backfaceEntry");
+    auto pBackfaceCullBlock = CreateBlock(pFunc, ".backfaceCull");
+    auto pBackfaceExponentBlock = CreateBlock(pFunc, ".backfaceExponent");
+    auto pEndBackfaceCullBlock = CreateBlock(pFunc, ".endBackfaceCull");
+    auto pBackfaceExitBlock = CreateBlock(pFunc, ".backfaceExit");
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -3477,9 +3474,9 @@ void NggPrimShader::CreateFrustumCuller(
     Value* pPaClGbVertDiscAdj = argIt++;
     pPaClGbVertDiscAdj->setName("paClGbVertDiscAdj");
 
-    auto pFrustumEntryBlock = BasicBlock::Create(*m_pContext, ".frustumEntry", pFunc);
-    auto pFrustumCullBlock = BasicBlock::Create(*m_pContext, ".frustumCull", pFunc);
-    auto pFrustumExitBlock = BasicBlock::Create(*m_pContext, ".frustumExit", pFunc);
+    auto pFrustumEntryBlock = CreateBlock(pFunc, ".frustumEntry");
+    auto pFrustumCullBlock = CreateBlock(pFunc, ".frustumCull");
+    auto pFrustumExitBlock = CreateBlock(pFunc, ".frustumExit");
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -3743,9 +3740,9 @@ void NggPrimShader::CreateBoxFilterCuller(
     Value* pPaClGbVertDiscAdj = argIt++;
     pPaClGbVertDiscAdj->setName("paClGbVertDiscAdj");
 
-    auto pBoxFilterEntryBlock = BasicBlock::Create(*m_pContext, ".boxfilterEntry", pFunc);
-    auto pBoxFilterCullBlock = BasicBlock::Create(*m_pContext, ".boxfilterCull", pFunc);
-    auto pBoxFilterExitBlock = BasicBlock::Create(*m_pContext, ".boxfilterExit", pFunc);
+    auto pBoxFilterEntryBlock = CreateBlock(pFunc, ".boxfilterEntry");
+    auto pBoxFilterCullBlock = CreateBlock(pFunc, ".boxfilterCull");
+    auto pBoxFilterExitBlock = CreateBlock(pFunc, ".boxfilterExit");
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -3988,9 +3985,9 @@ void NggPrimShader::CreateSphereCuller(
     Value* pPaClGbVertDiscAdj = argIt++;
     pPaClGbVertDiscAdj->setName("paClGbVertDiscAdj");
 
-    auto pSphereEntryBlock = BasicBlock::Create(*m_pContext, ".sphereEntry", pFunc);
-    auto pSphereCullBlock = BasicBlock::Create(*m_pContext, ".sphereCull", pFunc);
-    auto pSphereExitBlock = BasicBlock::Create(*m_pContext, ".sphereExit", pFunc);
+    auto pSphereEntryBlock = CreateBlock(pFunc, ".sphereEntry");
+    auto pSphereCullBlock = CreateBlock(pFunc, ".sphereCull");
+    auto pSphereExitBlock = CreateBlock(pFunc, ".sphereExit");
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -4379,9 +4376,9 @@ void NggPrimShader::CreateSmallPrimFilterCuller(
     Value* pPaClVportYscale = argIt++;
     pPaClVportYscale->setName("paClVportYscale");
 
-    auto pSmallPrimFilterEntryBlock = BasicBlock::Create(*m_pContext, ".smallprimfilterEntry", pFunc);
-    auto pSmallPrimFilterCullBlock = BasicBlock::Create(*m_pContext, ".smallprimfilterCull", pFunc);
-    auto pSmallPrimFilterExitBlock = BasicBlock::Create(*m_pContext, ".smallprimfilterExit", pFunc);
+    auto pSmallPrimFilterEntryBlock = CreateBlock(pFunc, ".smallprimfilterEntry");
+    auto pSmallPrimFilterCullBlock = CreateBlock(pFunc, ".smallprimfilterCull");
+    auto pSmallPrimFilterExitBlock = CreateBlock(pFunc, ".smallprimfilterExit");
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -4666,9 +4663,9 @@ void NggPrimShader::CreateCullDistanceCuller(
     Value* pSignMask2 = argIt++;
     pSignMask2->setName("signMask2");
 
-    auto pCullDistanceEntryBlock = BasicBlock::Create(*m_pContext, ".culldistanceEntry", pFunc);
-    auto pCullDistanceCullBlock = BasicBlock::Create(*m_pContext, ".culldistanceCull", pFunc);
-    auto pCullDistanceExitBlock = BasicBlock::Create(*m_pContext, ".culldistanceExit", pFunc);
+    auto pCullDistanceEntryBlock = CreateBlock(pFunc, ".culldistanceEntry");
+    auto pCullDistanceCullBlock = CreateBlock(pFunc, ".culldistanceCull");
+    auto pCullDistanceExitBlock = CreateBlock(pFunc, ".culldistanceExit");
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -4741,7 +4738,7 @@ void NggPrimShader::CreateFetchCullingRegister(
     Value* pRegOffset = argIt++;
     pRegOffset->setName("regOffset");
 
-    BasicBlock* pEntryBlock = BasicBlock::Create(*m_pContext, "", pFunc); // Create entry block
+    BasicBlock* pEntryBlock = CreateBlock(pFunc); // Create entry block
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
@@ -4812,6 +4809,15 @@ Value* NggPrimShader::DoSubgroupBallot(
     }
 
     return pBallot;
+}
+
+// =====================================================================================================================
+// Creates a new basic block. Always insert it at the end of the parent function.
+BasicBlock* NggPrimShader::CreateBlock(
+    Function*    pParent,   // [in] Parent function to which the new block belongs
+    const Twine& blockName) // [in] Name of the new block
+{
+    return BasicBlock::Create(*m_pContext, blockName, pParent);
 }
 
 } // Llpc
