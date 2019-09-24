@@ -1097,9 +1097,9 @@ Result Compiler::BuildPipelineInternal(
         // Create empty modules and set target machine in each.
         std::vector<Module*> modules(shaderInfo.size());
         uint32_t stageSkipMask = 0;
-        for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+        for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+            const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
             if ((pShaderInfo == nullptr) || (pShaderInfo->pModuleData == nullptr))
             {
                 continue;
@@ -1138,7 +1138,7 @@ Result Compiler::BuildPipelineInternal(
                             VoidPtrInc(pModuleData->binCode.pCode, pEntry->entryOffset + pEntry->entrySize));
                         std::string resUsageBuf(pResUsagePtr, pEntry->resUsageSize);
                         std::istringstream resUsageStrem(resUsageBuf);
-                        resUsageStrem >> *(pContext->GetShaderResourceUsage(static_cast<ShaderStage>(stage)));
+                        resUsageStrem >> *(pContext->GetShaderResourceUsage(static_cast<ShaderStage>(shaderIndex)));
                         break;
                     }
                 }
@@ -1146,7 +1146,7 @@ Result Compiler::BuildPipelineInternal(
                 if (binCode.codeSize > 0)
                 {
                     pModule = pContext->LoadLibary(&binCode).release();
-                    stageSkipMask |= (1 << stage);
+                    stageSkipMask |= (1 << shaderIndex);
                 }
                 else
                 {
@@ -1160,11 +1160,11 @@ Result Compiler::BuildPipelineInternal(
             }
             else
             {
-                pModule = new Module((Twine("llpc") + GetShaderStageName(pShaderInfo->entryStage)).str(),
-                                     *pContext);
+                pModule = new Module((Twine("llpc") + GetShaderStageName(pShaderInfo->entryStage)).str() +
+                                     std::to_string(shaderIndex), *pContext);
             }
 
-            modules[stage] = pModule;
+            modules[shaderIndex] = pModule;
             pContext->SetModuleTargetMachine(pModule);
         }
 
@@ -1172,9 +1172,9 @@ Result Compiler::BuildPipelineInternal(
         // we could choose to delay this until after linking into a pipeline module.)
         pContext->GetPipelineContext()->SetBuilderPipelineState(pContext->GetBuilder());
 
-        for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+        for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+            const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(pShaderInfo->entryStage)))
@@ -1212,7 +1212,7 @@ Result Compiler::BuildPipelineInternal(
             }
 
             // Run the passes.
-            bool success = RunPasses(&lowerPassMgr, modules[stage]);
+            bool success = RunPasses(&lowerPassMgr, modules[shaderIndex]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
@@ -1220,10 +1220,10 @@ Result Compiler::BuildPipelineInternal(
             }
         }
 
-        for (uint32_t stage = 0; (stage < shaderInfo.size()) && (result == Result::Success); ++stage)
+        for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             // Per-shader SPIR-V lowering passes.
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+            const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(pShaderInfo->entryStage)))
@@ -1242,7 +1242,7 @@ Result Compiler::BuildPipelineInternal(
                                     pDynamicLoopUnroll);
 
             // Run the passes.
-            bool success = RunPasses(&lowerPassMgr, modules[stage]);
+            bool success = RunPasses(&lowerPassMgr, modules[shaderIndex]);
             if (success == false)
             {
                 LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
