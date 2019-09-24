@@ -321,7 +321,6 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
     if (m_hasGs)
     {
         // GS is present in primitive shader (ES-GS merged shader)
-        const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
     }
     else
     {
