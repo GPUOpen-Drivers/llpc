@@ -617,31 +617,13 @@ void PipelineDumper::DumpPipelineShaderInfo(
     }
 
     // Output pipeline shader options
-    dumpFile << "options.trapPresent = " << pShaderInfo->options.trapPresent << "\n";
-    dumpFile << "options.debugMode = " << pShaderInfo->options.debugMode << "\n";
-    dumpFile << "options.enablePerformanceData = " << pShaderInfo->options.enablePerformanceData << "\n";
-    dumpFile << "options.allowReZ = " << pShaderInfo->options.allowReZ << "\n";
-    dumpFile << "options.vgprLimit = " << pShaderInfo->options.vgprLimit << "\n";
-    dumpFile << "options.sgprLimit = " << pShaderInfo->options.sgprLimit << "\n";
-    dumpFile << "options.maxThreadGroupsPerComputeUnit = " << pShaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
-#if LLPC_BUILD_GFX10
-    dumpFile << "options.waveSize = " << pShaderInfo->options.waveSize << "\n";
-    dumpFile << "options.wgpMode = " << pShaderInfo->options.wgpMode << "\n";
-    dumpFile << "options.waveBreakSize = " << pShaderInfo->options.waveBreakSize << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-    dumpFile << "options.forceLoopUnrollCount = " << pShaderInfo->options.forceLoopUnrollCount << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-    dumpFile << "options.useSiScheduler = " << pShaderInfo->options.useSiScheduler << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-    dumpFile << "options.enableLoadScalarizer = " << pShaderInfo->options.enableLoadScalarizer << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-    dumpFile << "options.disableLicm = " << pShaderInfo->options.disableLicm << "\n";
-#endif
-
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field) dumpFile << "options." #field " = " << pShaderInfo->options.field << "\n";
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
     dumpFile << "\n";
 }
 
@@ -739,22 +721,13 @@ void PipelineDumper::DumpPipelineOptions(
     const PipelineOptions*   pOptions,  // [in] Pipeline options
     std::ostream&            dumpFile)  // [out] dump file
 {
-    dumpFile << "options.includeDisassembly = " << pOptions->includeDisassembly << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    dumpFile << "options.autoLayoutDesc = " << pOptions->autoLayoutDesc << "\n";
-#endif
-    dumpFile << "options.scalarBlockLayout = " << pOptions->scalarBlockLayout << "\n";
-    dumpFile << "options.includeIr = " << pOptions->includeIr << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-    dumpFile << "options.robustBufferAccess = " << pOptions->robustBufferAccess << "\n";
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    dumpFile << "options.includeIrBinary = " << pOptions->includeIrBinary << "\n";
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-    dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
-#endif
-
+#define PIPELINE_OPT(type, field) dumpFile << "options." #field " = " << pOptions->field << "\n";
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 }
 
 // =====================================================================================================================
@@ -813,25 +786,14 @@ void PipelineDumper::DumpGraphicsStateInfo(
         }
     }
 
-#if LLPC_BUILD_GFX10
-    dumpFile << "nggState.enableNgg = " << pPipelineInfo->nggState.enableNgg << "\n";
-    dumpFile << "nggState.enableGsUse = " << pPipelineInfo->nggState.enableGsUse << "\n";
-    dumpFile << "nggState.forceNonPassthrough = " << pPipelineInfo->nggState.forceNonPassthrough << "\n";
-    dumpFile << "nggState.alwaysUsePrimShaderTable = " << pPipelineInfo->nggState.alwaysUsePrimShaderTable << "\n";
-    dumpFile << "nggState.compactMode = " << pPipelineInfo->nggState.compactMode << "\n";
-    dumpFile << "nggState.enableFastLaunch = " << pPipelineInfo->nggState.enableFastLaunch << "\n";
-    dumpFile << "nggState.enableVertexReuse = " << pPipelineInfo->nggState.enableVertexReuse << "\n";
-    dumpFile << "nggState.enableBackfaceCulling = " << pPipelineInfo->nggState.enableBackfaceCulling << "\n";
-    dumpFile << "nggState.enableFrustumCulling = " << pPipelineInfo->nggState.enableFrustumCulling << "\n";
-    dumpFile << "nggState.enableBoxFilterCulling = " << pPipelineInfo->nggState.enableBoxFilterCulling << "\n";
-    dumpFile << "nggState.enableSphereCulling = " << pPipelineInfo->nggState.enableSphereCulling << "\n";
-    dumpFile << "nggState.enableSmallPrimFilter = " << pPipelineInfo->nggState.enableSmallPrimFilter << "\n";
-    dumpFile << "nggState.enableCullDistanceCulling = " << pPipelineInfo->nggState.enableCullDistanceCulling << "\n";
-    dumpFile << "nggState.backfaceExponent = " << pPipelineInfo->nggState.backfaceExponent << "\n";
-    dumpFile << "nggState.subgroupSizing = " << pPipelineInfo->nggState.subgroupSizing << "\n";
-    dumpFile << "nggState.primsPerSubgroup = " << pPipelineInfo->nggState.primsPerSubgroup << "\n";
-    dumpFile << "nggState.vertsPerSubgroup = " << pPipelineInfo->nggState.vertsPerSubgroup << "\n";
-#endif
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field) dumpFile << "nggState." #field " = " << pPipelineInfo->nggState.field << "\n";
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
+
     DumpPipelineOptions(&pPipelineInfo->options, dumpFile);
     dumpFile << "\n\n";
 
@@ -939,18 +901,14 @@ MetroHash::Hash PipelineDumper::GenerateHashForComputePipeline(
 
     UpdateHashForPipelineShaderInfo(ShaderStageCompute, &pPipeline->cs, isCacheHash, &hasher);
     hasher.Update(pPipeline->deviceIndex);
-    hasher.Update(pPipeline->options.includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    hasher.Update(pPipeline->options.autoLayoutDesc);
-#endif
-    hasher.Update(pPipeline->options.scalarBlockLayout);
-    hasher.Update(pPipeline->options.includeIr);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-    hasher.Update(pPipeline->options.robustBufferAccess);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    hasher.Update(pPipeline->options.includeIrBinary);
-#endif
+
+#define PIPELINE_OPT(type, field) hasher.Update(pPipeline->options.field);
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);
@@ -1038,41 +996,21 @@ void PipelineDumper::UpdateHashForNonFragmentState(
 
     if (isCacheHash)
     {
-#if LLPC_BUILD_GFX10
-        pHasher->Update(pNggState->enableNgg);
-        pHasher->Update(pNggState->enableGsUse);
-        pHasher->Update(pNggState->forceNonPassthrough);
-        pHasher->Update(pNggState->alwaysUsePrimShaderTable);
-        pHasher->Update(pNggState->compactMode);
-        pHasher->Update(pNggState->enableFastLaunch);
-        pHasher->Update(pNggState->enableVertexReuse);
-        pHasher->Update(pNggState->enableBackfaceCulling);
-        pHasher->Update(pNggState->enableFrustumCulling);
-        pHasher->Update(pNggState->enableBoxFilterCulling);
-        pHasher->Update(pNggState->enableSphereCulling);
-        pHasher->Update(pNggState->enableSmallPrimFilter);
-        pHasher->Update(pNggState->enableCullDistanceCulling);
-        pHasher->Update(pNggState->backfaceExponent);
-        pHasher->Update(pNggState->subgroupSizing);
-        pHasher->Update(pNggState->primsPerSubgroup);
-        pHasher->Update(pNggState->vertsPerSubgroup);
-#endif
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field) pHasher->Update(pNggState->field);
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 
-        pHasher->Update(pPipeline->options.includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        pHasher->Update(pPipeline->options.autoLayoutDesc);
-#endif
-        pHasher->Update(pPipeline->options.scalarBlockLayout);
-        pHasher->Update(pPipeline->options.includeIr);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        pHasher->Update(pPipeline->options.robustBufferAccess);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-        pHasher->Update(pPipeline->options.includeIrBinary);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        pHasher->Update(pPipeline->options.reconfigWorkgroupLayout);
-#endif
+#define PIPELINE_OPT(type, field) pHasher->Update(pPipeline->options.field);
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
     }
 }
 
@@ -1183,30 +1121,13 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
         if (isCacheHash)
         {
             auto& options = pShaderInfo->options;
-            pHasher->Update(options.trapPresent);
-            pHasher->Update(options.debugMode);
-            pHasher->Update(options.enablePerformanceData);
-            pHasher->Update(options.allowReZ);
-            pHasher->Update(options.sgprLimit);
-            pHasher->Update(options.vgprLimit);
-            pHasher->Update(options.maxThreadGroupsPerComputeUnit);
-#if LLPC_BUILD_GFX10
-            pHasher->Update(options.waveSize);
-            pHasher->Update(options.wgpMode);
-            pHasher->Update(options.waveBreakSize);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-            pHasher->Update(options.forceLoopUnrollCount);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-            pHasher->Update(options.useSiScheduler);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-            pHasher->Update(options.enableLoadScalarizer);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-            pHasher->Update(options.disableLicm);
-#endif
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field) pHasher->Update(options.field);
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
         }
     }
 }

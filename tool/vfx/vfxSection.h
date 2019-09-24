@@ -115,6 +115,13 @@ enum MemberType : uint32_t
 #if VKI_BUILD_GFX10
     MemberTypeNggState,                      // VFX member type: SectionNggState
 #endif
+
+    // Aliases for use when including llpcOptions.h:
+    MemberType_bool = MemberTypeBool,
+    MemberType_uint32_t = MemberTypeInt,
+    MemberType_WaveBreakSize = MemberTypeEnum,
+    MemberType_NggCompactMode = MemberTypeEnum,
+    MemberType_NggSubgroupSizingType = MemberTypeEnum,
 };
 
 // =====================================================================================================================
@@ -1118,32 +1125,23 @@ public:
     static void InitialAddrTable()
     {
         StrToMemberAddr* pTableItem = m_addrTable;
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeDisassembly, MemberTypeBool, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, autoLayoutDesc, MemberTypeBool, false);
-#endif
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIrBinary, MemberTypeBool, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, reconfigWorkgroupLayout, MemberTypeBool, false);
-#endif
+
+#define PIPELINE_OPT(type, field) \
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, field, MemberType_ ## type, false);
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
+
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-    static const uint32_t  MemberCount = 7;
-#else
-    static const uint32_t  MemberCount = 6;
-#endif
+    static const uint32_t  MemberCount = 8;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1165,34 +1163,15 @@ public:
     static void InitialAddrTable()
     {
         StrToMemberAddr* pTableItem = m_addrTable;
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, trapPresent, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, debugMode, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enablePerformanceData, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowReZ, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, vgprLimit, MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, sgprLimit, MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, maxThreadGroupsPerComputeUnit, MemberTypeInt, false);
-#if VKI_BUILD_GFX10
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveSize, MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, wgpMode, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, waveBreakSize, MemberTypeEnum, false);
-#endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
-#endif
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field) \
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, field, MemberType_ ## type, false);
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
@@ -1200,35 +1179,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-#if VKI_BUILD_GFX10
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 34
-        static const uint32_t  MemberCount = 15;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-         static const uint32_t  MemberCount = 14;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-         static const uint32_t  MemberCount = 13;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        static const uint32_t  MemberCount = 12;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-        static const uint32_t  MemberCount = 11;
-    #else
-        static const uint32_t  MemberCount = 10;
-    #endif
-#else
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 34
-        static const uint32_t  MemberCount = 12;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-        static const uint32_t  MemberCount = 11;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-        static const uint32_t  MemberCount = 10;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        static const uint32_t  MemberCount = 9;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-        static const uint32_t  MemberCount = 8;
-    #else
-        static const uint32_t  MemberCount = 7;
-    #endif
-#endif
+    static const uint32_t  MemberCount = 17;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1251,23 +1202,15 @@ public:
     static void InitialAddrTable()
     {
         StrToMemberAddr* pTableItem = m_addrTable;
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableNgg, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableGsUse, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, forceNonPassthrough, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, alwaysUsePrimShaderTable, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, compactMode, MemberTypeEnum, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFastLaunch, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableVertexReuse, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBackfaceCulling, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableFrustumCulling, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableBoxFilterCulling, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSphereCulling, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableSmallPrimFilter, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, enableCullDistanceCulling, MemberTypeBool, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, backfaceExponent, MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, subgroupSizing, MemberTypeEnum, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, primsPerSubgroup, MemberTypeInt, false);
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, vertsPerSubgroup, MemberTypeInt, false);
+
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field) \
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionNggState, field, MemberType_ ## type, false);
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }

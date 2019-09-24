@@ -192,26 +192,13 @@ struct BinaryData
 /// Represents per pipeline options.
 struct PipelineOptions
 {
-    bool includeDisassembly;       ///< If set, the disassembly for all compiled shaders will be included in
-                                   ///  the pipeline ELF.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-    bool autoLayoutDesc;           ///< If set, the LLPC standalone compiler is compiling individual shader(s)
-                                   ///  without pipeline info, so LLPC needs to do auto descriptor layout.
-#endif
-    bool scalarBlockLayout;        ///< If set, allows scalar block layout of types.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-    bool reconfigWorkgroupLayout;  ///< If set, allows automatic workgroup reconfigure to take place on compute shaders.
-#endif
-    bool includeIr;                ///< If set, the IR for all compiled shaders will be included in the pipeline ELF.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-    bool robustBufferAccess;       ///< If set, out of bounds accesses to buffer or private array will be handled.
-                                   ///  for now this option is used by LLPC shader and affects only the private array,
-                                   ///  the out of bounds accesses will be skipped with this setting.
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-    bool includeIrBinary;          ///< If set, the IR binary for all compiled shaders will be included in the pipeline
-                                   ///  ELF.
-#endif
+#define PIPELINE_OPT(type, field) type field;
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -261,60 +248,13 @@ struct PipelineDumpOptions
 /// Represents per shader stage options.
 struct PipelineShaderOptions
 {
-    bool   trapPresent;  ///< Indicates a trap handler will be present when this pipeline is executed,
-                         ///  and any trap conditions encountered in this shader should call the trap
-                         ///  handler. This could include an arithmetic exception, an explicit trap
-                         ///  request from the host, or a trap after every instruction when in debug
-                         ///  mode.
-    bool   debugMode;    ///< When set, this shader should cause the trap handler to be executed after
-                         ///  every instruction.  Only valid if trapPresent is set.
-    bool   enablePerformanceData; ///< Enables the compiler to generate extra instructions to gather
-                                  ///  various performance-related data.
-    bool   allowReZ;     ///< Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
-                         ///  to potentially kill PS waves before launch, and also issues a late-Z test
-                         ///  in case the PS kills pixels.  Only valid for pixel shaders.
-    /// Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
-    /// of this value and whatever the target GPU supports. To effectively disable this limit, set this to UINT_MAX.
-    uint32_t  vgprLimit;
-
-    /// Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
-    /// of this value and whatever the target GPU supports. To effectively disable this limit, set this to UINT_MAX.
-    uint32_t  sgprLimit;
-
-    /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
-    /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
-    /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
-    uint32_t  maxThreadGroupsPerComputeUnit;
-
-#if LLPC_BUILD_GFX10
-    uint32_t      waveSize;      ///< Control the number of threads per wavefront (GFX10+)
-    bool          wgpMode;       ///< Whether to choose WGP mode or CU mode (GFX10+)
-    WaveBreakSize waveBreakSize; ///< Size of region to force the end of a wavefront (GFX10+).
-                                 ///  Only valid for fragment shaders.
-#endif
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-    /// Force loop unroll count. "0" means using default value; "1" means disabling loop unroll.
-    uint32_t  forceLoopUnrollCount;
-#endif
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-    /// Enable LLPC load scalarizer optimization.
-    bool enableLoadScalarizer;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-    bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
-#elif VKI_EXT_SUBGROUP_SIZE_CONTROL
-    bool allowVaryWaveSize;      ///< If set, lets the pipeline vary the wave sizes.
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-    /// Use the LLVM backend's SI scheduler instead of the default scheduler.
-    bool      useSiScheduler;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
-    /// Disable the the LLVM backend's LICM pass.
-    bool      disableLicm;
-#endif
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field) type field;
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
@@ -392,34 +332,13 @@ struct GraphicsPipelineBuildOut
 /// Represents NGG tuning options
 struct NggState
 {
-    bool    enableNgg;                  ///< Enable NGG mode, use an implicit primitive shader
-    bool    enableGsUse;                ///< Enable NGG use on geometry shader
-    bool    forceNonPassthrough;        ///< Force NGG to run in non pass-through mode
-    bool    alwaysUsePrimShaderTable;   ///< Always use primitive shader table to fetch culling-control registers
-    NggCompactMode compactMode;         ///< Compaction mode after culling operations
-
-    bool    enableFastLaunch;           ///< Enable the hardware to launch subgroups of work at a faster rate
-    bool    enableVertexReuse;          ///< Enable optimization to cull duplicate vertices
-    bool    enableBackfaceCulling;      ///< Enable culling of primitives that don't meet facing criteria
-    bool    enableFrustumCulling;       ///< Enable discarding of primitives outside of view frustum
-    bool    enableBoxFilterCulling;     ///< Enable simpler frustum culler that is less accurate
-    bool    enableSphereCulling;        ///< Enable frustum culling based on a sphere
-    bool    enableSmallPrimFilter;      ///< Enable trivial sub-sample primitive culling
-    bool    enableCullDistanceCulling;  ///< Enable culling when "cull distance" exports are present
-
-    /// Following fields are used for NGG tuning
-    uint32_t backfaceExponent;          ///< Value from 1 to UINT32_MAX that will cause the backface culling
-                                        ///  algorithm to ignore area calculations that are less than
-                                        ///  (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
-                                        ///  Only valid if the NGG backface culler is enabled.
-                                        ///  A value of 0 will disable the threshold.
-
-    NggSubgroupSizingType subgroupSizing;   ///< NGG sub-group sizing type
-
-    uint32_t primsPerSubgroup;          ///< Preferred number of GS primitives to pack into a primitive shader
-                                        ///  sub-group
-
-    uint32_t vertsPerSubgroup;          ///< Preferred number of vertices consumed by a primitive shader sub-group
+#define PIPELINE_OPT(type, field)
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field) type field;
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
 };
 #endif
 

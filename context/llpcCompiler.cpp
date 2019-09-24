@@ -3035,21 +3035,13 @@ void Compiler::BuildShaderCacheHash(
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
         // Add pipeline options to fragment hash
-        fragmentHasher.Update(pPipelineOptions->includeDisassembly);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        fragmentHasher.Update(pPipelineOptions->autoLayoutDesc);
-#endif
-        fragmentHasher.Update(pPipelineOptions->scalarBlockLayout);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        fragmentHasher.Update(pPipelineOptions->reconfigWorkgroupLayout);
-#endif
-        fragmentHasher.Update(pPipelineOptions->includeIr);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        fragmentHasher.Update(pPipelineOptions->robustBufferAccess);
-#endif
-#if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 25) && (LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 27)
-        fragmentHasher.Update(pPipelineOptions->includeIrBinary);
-#endif
+#define PIPELINE_OPT(type, field) fragmentHasher.Update(pPipelineOptions->field);
+#define PIPELINESHADER_OPT(type, field)
+#define NGGSTATE_OPT(type, field)
+#include "llpcOptions.h"
+#undef PIPELINE_OPT
+#undef PIPELINESHADER_OPT
+#undef NGGSTATE_OPT
         PipelineDumper::UpdateHashForFragmentState(pPipelineInfo, &fragmentHasher);
         fragmentHasher.Finalize(pFragmentHash->bytes);
     }
