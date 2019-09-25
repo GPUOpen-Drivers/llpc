@@ -1181,13 +1181,15 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceLoopUnrollCount, MemberTypeInt, false);
 #endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
-#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
 #endif
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
+#endif
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
@@ -1195,7 +1197,13 @@ public:
 
 private:
 #if VKI_BUILD_GFX10
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 34
+        static const uint32_t  MemberCount = 15;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+         static const uint32_t  MemberCount = 14;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
+         static const uint32_t  MemberCount = 13;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         static const uint32_t  MemberCount = 12;
     #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         static const uint32_t  MemberCount = 11;
@@ -1203,7 +1211,13 @@ private:
         static const uint32_t  MemberCount = 10;
     #endif
 #else
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 34
+        static const uint32_t  MemberCount = 12;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+        static const uint32_t  MemberCount = 11;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
+        static const uint32_t  MemberCount = 10;
+    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
         static const uint32_t  MemberCount = 9;
     #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
         static const uint32_t  MemberCount = 8;

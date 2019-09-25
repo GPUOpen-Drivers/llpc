@@ -8101,8 +8101,8 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
   }
 
   postProcessRowMajorMatrix();
-
-  eraseUselessFunctions(M);
+  if (ModuleData->keepUnusedFunctions == false)
+    eraseUselessFunctions(M);
   DbgTran.finalize();
   return true;
 }
@@ -8183,7 +8183,7 @@ bool SPIRVToLLVM::transKernelMetadata() {
       continue;
     SPIRVExecutionModelKind ExecModel = EntryPoint->getExecModel();
 
-    if (ExecModel != ExecutionModelKernel) {
+    if ((ExecModel >= ExecutionModelVertex) && (ExecModel <= ExecutionModelGLCompute)) {
       NamedMDNode *EntryMDs =
           M->getOrInsertNamedMetadata(gSPIRVMD::EntryPoints);
       std::vector<llvm::Metadata *> EntryMD;

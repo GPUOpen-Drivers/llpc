@@ -87,6 +87,7 @@ struct ShaderModuleInfo
     bool                  useSubgroupSize;         // Whether gl_SubgroupSize is used
     bool                  useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
     bool                  useSpecConstant;         // Whether specializaton constant is used
+    bool                  keepUnusedFunctions;     // Whether to keep unused function
     uint32_t              entryCount;              // Entry count in the module
     ShaderModuleEntry     entries[1];              // Array of all entries
 };
@@ -229,7 +230,6 @@ public:
     virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pPipelineInfo,
                                         ComputePipelineBuildOut*        pPipelineOut,
                                         void*                           pPipelineDumpFile = nullptr);
-
     Result BuildGraphicsPipelineInternal(GraphicsContext*                           pGraphicsContext,
                                          llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
                                          uint32_t                                   forceLoopUnrollCount,
@@ -312,7 +312,6 @@ private:
                         const BinaryData* pFragmentElf,
                         const BinaryData* pNonFragmentElf,
                         ElfPackage*       pPipelineElf);
-
     // -----------------------------------------------------------------------------------------------------------------
 
     std::vector<std::string>      m_options;          // Compilation options

@@ -12,24 +12,24 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x i32> @_Z5ssignDv4_i(<4 x i32> %{{.*}})
+; SHADERTEST: %{{.*}} = call {{.*}} <4 x i32> @_Z5ssignDv4_i(<4 x i32> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, 1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, 1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, 1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: %{{[0-9]*}} = icmp slt i32 %{{.*}}, 1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
-; SHADERTEST: %{{[0-9]*}} = icmp sgt i32 %{{.*}}, -1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
-; SHADERTEST: %{{[0-9]*}} = icmp sgt i32 %{{.*}}, -1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
-; SHADERTEST: %{{[0-9]*}} = icmp sgt i32 %{{.*}}, -1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
-; SHADERTEST: %{{[0-9]*}} = icmp sgt i32 %{{.*}}, -1
-; SHADERTEST: %{{[0-9]*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
+; SHADERTEST: %{{.*}} = icmp slt i32 %{{.*}}, 1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
+; SHADERTEST: %{{.*}} = icmp slt i32 %{{.*}}, 1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
+; SHADERTEST: %{{.*}} = icmp slt i32 %{{.*}}, 1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
+; SHADERTEST: %{{.*}} = icmp slt i32 %{{.*}}, 1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 1
+; SHADERTEST: %{{.*}} = icmp sgt i32 %{{.*}}, -1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
+; SHADERTEST: %{{.*}} = icmp sgt i32 %{{.*}}, -1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
+; SHADERTEST: %{{.*}} = icmp sgt i32 %{{.*}}, -1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
+; SHADERTEST: %{{.*}} = icmp sgt i32 %{{.*}}, -1
+; SHADERTEST: %{{.*}} = select i1 %{{.*}}, i32 %{{.*}}, i32 -1
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

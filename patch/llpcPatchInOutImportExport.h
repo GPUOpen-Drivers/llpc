@@ -299,6 +299,8 @@ private:
     llvm::Value* GetSubgroupLocalInvocationId(llvm::Instruction* pInsertPos);
 
     llvm::Value* ReconfigWorkgroup(llvm::Value* pLocalInvocationId, llvm::Instruction* pInsertPos);
+    llvm::Value* GetWorkgroupSize();
+    llvm::Value* GetInLocalInvocationId(llvm::Instruction* pInsertPos);
 
     // -----------------------------------------------------------------------------------------------------------------
 

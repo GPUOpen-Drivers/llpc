@@ -93,6 +93,9 @@ LCXXOPTS +=                                \
         LCXXOPTS += -Wno-error=conditional-uninitialized
     endif
 
+    # LLVM headers require C++14 language features.
+    LCXXOPTS += -std=c++1y
+
 # Remove DEBUG macro definition as LLVM header files redefine it for a
 # different purpose.
 GCXXDEFS := $(filter-out -DDEBUG,$(GCXXDEFS))

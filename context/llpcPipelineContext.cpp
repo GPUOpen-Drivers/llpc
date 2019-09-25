@@ -274,7 +274,10 @@ void PipelineContext::SetBuilderPipelineState(
     // The user data nodes have been merged so they are the same in each shader stage. Get them from
     // the first active stage.
     uint32_t stageMask = GetShaderStageMask();
-    auto pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+    const PipelineShaderInfo* pShaderInfo = nullptr;
+    {
+        pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
+    }
     ArrayRef<ResourceMappingNode> userDataNodes(pShaderInfo->pUserDataNodes,
                                                 pShaderInfo->userDataNodeCount);
     ArrayRef<DescriptorRangeValue> descriptorRangeValues(pShaderInfo->pDescriptorRangeValues,

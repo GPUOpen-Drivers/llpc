@@ -68,7 +68,6 @@ void VsRegConfig::Init(
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_VS_3);
-
 #endif
 }
 
@@ -90,7 +89,6 @@ void LsHsRegConfig::Init(
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_LSHS_3);
-
 #endif
 }
 
@@ -129,7 +127,6 @@ void EsGsRegConfig::Init(
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_ESGS_3);
-
 #endif
 }
 
@@ -215,7 +212,6 @@ void PsRegConfig::Init(
     INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_USER_ACCUM_PS_3);
 
     INIT_REG_GFX10_1_PLUS(gfxIp.major, gfxIp.minor, GE_USER_VGPR_EN);
-
 #endif
 }
 
@@ -384,7 +380,6 @@ void CsRegConfig::Init(
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_1);
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_2);
     INIT_REG_GFX10_PLUS(gfxIp.major, COMPUTE_USER_ACCUM_3);
-
 #endif
 
 #if LLPC_BUILD_GFX10

@@ -312,17 +312,22 @@ const char LlvmIr[]         = ".ll";
 
 } // LlpcExt
 
+// Represents the module info for a shader module.
+struct ShaderModuleData
+{
+    ShaderStage                 shaderStage;  // Shader stage
+    BinaryData                  spirvBin;     // SPIR-V binary codes
+    ShaderModuleBuildInfo       shaderInfo;   // Info to build shader modules
+    ShaderModuleBuildOut        shaderOut;    // Output of building shader modules
+    void*                       shaderBuf;    // Allocation buffer of building shader modules
+};
+
 // Represents global compilation info of LLPC standalone tool (as tool context).
 struct CompileInfo
 {
     GfxIpVersion                gfxIp;                          // Graphics IP version info
     VkFlags                     stageMask;                      // Shader stage mask
-    BinaryData                  spirvBin[ShaderStageCount];     // SPIR-V binary codes
-
-    ShaderModuleBuildInfo       shaderInfo[ShaderStageCount];   // Info to build shader modules
-    ShaderModuleBuildOut        shaderOut[ShaderStageCount];    // Output of building shader modules
-    void*                       shaderBuf[ShaderStageCount];    // Allocation buffer of building shader modules
-
+    std::vector<ShaderModuleData> shaderModuleDatas;            // ShaderModule Data
     GraphicsPipelineBuildInfo   gfxPipelineInfo;                // Info to build graphics pipeline
     GraphicsPipelineBuildOut    gfxPipelineOut;                 // Output of building graphics pipeline
     ComputePipelineBuildInfo    compPipelineInfo;               // Info to build compute pipeline
@@ -549,18 +554,16 @@ static Result InitCompileInfo(
 static void CleanupCompileInfo(
     CompileInfo* pCompileInfo)  // [in,out] Compilation info of LLPC standalone tool
 {
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
     {
-        if (pCompileInfo->stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+        // NOTE: We do not have to free SPIR-V binary for pipeline info file.
+        // It will be freed when we close the VFX doc.
+        if (pCompileInfo->pPipelineInfoFile == nullptr)
         {
-            // NOTE: We do not have to free SPIR-V binary for pipeline info file.
-            // It will be freed when we close the VFX doc.
-            if (pCompileInfo->pPipelineInfoFile == nullptr)
-            {
-                delete[] reinterpret_cast<const char*>(pCompileInfo->spirvBin[stage].pCode);
-            }
-            free(pCompileInfo->shaderBuf[stage]);
+            delete[] reinterpret_cast<const char*>(pCompileInfo->shaderModuleDatas[i].spirvBin.pCode);
         }
+
+        free(pCompileInfo->shaderModuleDatas[i].shaderBuf);
     }
 
     free(pCompileInfo->pPipelineBuf);
@@ -932,26 +935,23 @@ static Result BuildShaderModules(
 {
     Result result = Result::Success;
 
-    for (uint32_t stage = 0; stage < ShaderStageCount; ++stage)
+    for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
     {
-        if (pCompileInfo->stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+        ShaderModuleBuildInfo* pShaderInfo = &(pCompileInfo->shaderModuleDatas[i].shaderInfo);
+        ShaderModuleBuildOut* pShaderOut = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
+
+        pShaderInfo->pInstance = nullptr; // Dummy, unused
+        pShaderInfo->pUserData = &(pCompileInfo->shaderModuleDatas[i].shaderBuf);
+        pShaderInfo->pfnOutputAlloc = AllocateBuffer;
+        pShaderInfo->shaderBin = pCompileInfo->shaderModuleDatas[i].spirvBin;
+
+        result = pCompiler->BuildShaderModule(pShaderInfo, pShaderOut);
+        if ((result != Result::Success) && (result != Result::Delayed))
         {
-            ShaderModuleBuildInfo* pShaderInfo = &pCompileInfo->shaderInfo[stage];
-            ShaderModuleBuildOut*  pShaderOut  = &pCompileInfo->shaderOut[stage];
-
-            pShaderInfo->pInstance      = nullptr; // Dummy, unused
-            pShaderInfo->pUserData      = &pCompileInfo->shaderBuf[stage];
-            pShaderInfo->pfnOutputAlloc = AllocateBuffer;
-            pShaderInfo->shaderBin      = pCompileInfo->spirvBin[stage];
-
-            result = pCompiler->BuildShaderModule(pShaderInfo, pShaderOut);
-            if ((result != Result::Success) && (result != Result::Delayed))
-            {
-                LLPC_ERRS("Fails to build "
-                          << GetShaderStageName(static_cast<ShaderStage>(stage))
-                          << " shader module:\n");
-                break;
-            }
+            LLPC_ERRS("Fails to build "
+                << GetShaderStageName(pCompileInfo->shaderModuleDatas[i].shaderStage)
+                << " shader module:\n");
+            break;
         }
     }
 
@@ -966,63 +966,61 @@ static Result BuildPipeline(
 {
     Result result = Result::Success;
 
-    bool isGraphics = (pCompileInfo->stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
+    bool isGraphics = (pCompileInfo->stageMask & (ShaderStageToMask(ShaderStageCompute) -1)) ? true : false;
     if (isGraphics)
     {
         // Build graphics pipeline
-        GraphicsPipelineBuildInfo* pGraphicsPipelineInfo = &pCompileInfo->gfxPipelineInfo;
+        GraphicsPipelineBuildInfo* pPipelineInfo = &pCompileInfo->gfxPipelineInfo;
         GraphicsPipelineBuildOut*  pPipelineOut  = &pCompileInfo->gfxPipelineOut;
 
         // Fill pipeline shader info
         PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
         {
-            &pGraphicsPipelineInfo->vs,
-            &pGraphicsPipelineInfo->tcs,
-            &pGraphicsPipelineInfo->tes,
-            &pGraphicsPipelineInfo->gs,
-            &pGraphicsPipelineInfo->fs,
+            &pPipelineInfo->vs,
+            &pPipelineInfo->tcs,
+            &pPipelineInfo->tes,
+            &pPipelineInfo->gs,
+            &pPipelineInfo->fs,
         };
 
         uint32_t userDataOffset = 0;
-        for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
+        for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
         {
-            if (pCompileInfo->stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
-            {
-                PipelineShaderInfo*         pShaderInfo = shaderInfo[stage];
-                const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderOut[stage];
 
-                if (pShaderInfo->pEntryTarget == nullptr)
-                {
-                    // If entry target is not specified, use the one from command line option
-                    pShaderInfo->pEntryTarget = EntryTarget.c_str();
-                }
-                pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+            PipelineShaderInfo*         pShaderInfo = shaderInfo[pCompileInfo->shaderModuleDatas[i].shaderStage];
+            const ShaderModuleBuildOut* pShaderOut  = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
+
+            if (pShaderInfo->pEntryTarget == nullptr)
+            {
+                // If entry target is not specified, use the one from command line option
+                pShaderInfo->pEntryTarget = EntryTarget.c_str();
+            }
+            pShaderInfo->pModuleData  = pShaderOut->pModuleData;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
-                pShaderInfo->entryStage = static_cast<ShaderStage>(stage);
+            pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
 #endif
-                // If not compiling from pipeline, lay out user data now.
-                if (pCompileInfo->doAutoLayout)
-                {
-                    DoAutoLayoutDesc(static_cast<ShaderStage>(stage),
-                                     pCompileInfo->spirvBin[stage],
-                                     pGraphicsPipelineInfo,
-                                     pShaderInfo,
-                                     userDataOffset);
-                }
+            // If not compiling from pipeline, lay out user data now.
+            if (pCompileInfo->doAutoLayout)
+            {
+                DoAutoLayoutDesc(pCompileInfo->shaderModuleDatas[i].shaderStage,
+                                    pCompileInfo->shaderModuleDatas[i].spirvBin,
+                                    pPipelineInfo,
+                                    pShaderInfo,
+                                    userDataOffset);
             }
         }
 
-        pGraphicsPipelineInfo->pInstance      = nullptr; // Dummy, unused
-        pGraphicsPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
-        pGraphicsPipelineInfo->pfnOutputAlloc = AllocateBuffer;
+        pPipelineInfo->pInstance      = nullptr; // Dummy, unused
+        pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
+        pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
 
         // NOTE: If number of patch control points is not specified, we set it to 3.
-        if (pGraphicsPipelineInfo->iaState.patchControlPoints == 0)
+        if (pPipelineInfo->iaState.patchControlPoints == 0)
         {
-            pGraphicsPipelineInfo->iaState.patchControlPoints = 3;
+            pPipelineInfo->iaState.patchControlPoints = 3;
         }
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        pGraphicsPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 #endif
 
         void* pPipelineDumpHandle = nullptr;
@@ -1035,7 +1033,7 @@ static Result BuildPipeline(
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             PipelineBuildInfo pipelineInfo = {};
-            pipelineInfo.pGraphicsInfo = pGraphicsPipelineInfo;
+            pipelineInfo.pGraphicsInfo = pPipelineInfo;
             pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
 #else
             pPipelineDumpHandle =
@@ -1045,13 +1043,13 @@ static Result BuildPipeline(
 
         if (TimePassesIsEnabled)
         {
-            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pGraphicsPipelineInfo);
+            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
                    << " Files: " << pCompileInfo->pFileNames << "\n";
             outs().flush();
         }
 
-        result = pCompiler->BuildGraphicsPipeline(pGraphicsPipelineInfo, pPipelineOut, pPipelineDumpHandle);
+        result = pCompiler->BuildGraphicsPipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
 
         if (result == Result::Success)
         {
@@ -1071,11 +1069,14 @@ static Result BuildPipeline(
     else
     {
         // Build compute pipeline
-        ComputePipelineBuildInfo* pComputePipelineInfo = &pCompileInfo->compPipelineInfo;
+        LLPC_ASSERT(pCompileInfo->shaderModuleDatas.size() == 1);
+        LLPC_ASSERT(pCompileInfo->shaderModuleDatas[0].shaderStage == ShaderStageCompute);
+
+        ComputePipelineBuildInfo* pPipelineInfo = &pCompileInfo->compPipelineInfo;
         ComputePipelineBuildOut*  pPipelineOut  = &pCompileInfo->compPipelineOut;
 
-        PipelineShaderInfo*         pShaderInfo = &pComputePipelineInfo->cs;
-        const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderOut[ShaderStageCompute];
+        PipelineShaderInfo*         pShaderInfo = &pPipelineInfo->cs;
+        const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderModuleDatas[0].shaderOut;
 
         if (pShaderInfo->pEntryTarget == nullptr)
         {
@@ -1092,17 +1093,17 @@ static Result BuildPipeline(
         {
             uint32_t userDataOffset = 0;
             DoAutoLayoutDesc(ShaderStageCompute,
-                             pCompileInfo->spirvBin[ShaderStageCompute],
+                             pCompileInfo->shaderModuleDatas[0].spirvBin,
                              nullptr,
                              pShaderInfo,
                              userDataOffset);
         }
 
-        pComputePipelineInfo->pInstance      = nullptr; // Dummy, unused
-        pComputePipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
-        pComputePipelineInfo->pfnOutputAlloc = AllocateBuffer;
+        pPipelineInfo->pInstance      = nullptr; // Dummy, unused
+        pPipelineInfo->pUserData      = &pCompileInfo->pPipelineBuf;
+        pPipelineInfo->pfnOutputAlloc = AllocateBuffer;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        pComputePipelineInfo->options.robustBufferAccess = RobustBufferAccess;
+        pPipelineInfo->options.robustBufferAccess = RobustBufferAccess;
 #endif
 
         void* pPipelineDumpHandle = nullptr;
@@ -1115,7 +1116,7 @@ static Result BuildPipeline(
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             PipelineBuildInfo pipelineInfo = {};
-            pipelineInfo.pComputeInfo = pComputePipelineInfo;
+            pipelineInfo.pComputeInfo = pPipelineInfo;
             pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
 #else
             pPipelineDumpHandle = Llpc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pComputePipelineInfo, nullptr);
@@ -1124,13 +1125,13 @@ static Result BuildPipeline(
 
         if (TimePassesIsEnabled)
         {
-            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pComputePipelineInfo);
+            auto hash = Llpc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
                    << " Files: " << pCompileInfo->pFileNames << "\n";
             outs().flush();
         }
 
-        result = pCompiler->BuildComputePipeline(pComputePipelineInfo, pPipelineOut, pPipelineDumpHandle);
+        result = pCompiler->BuildComputePipeline(pPipelineInfo, pPipelineOut, pPipelineDumpHandle);
 
         if (result == Result::Success)
         {
@@ -1350,7 +1351,10 @@ static Result ProcessPipeline(
                     {
                         if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
                         {
-                            compileInfo.spirvBin[stage] = spvBin;
+                            ShaderModuleData shaderModuleData = {};
+                            shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
+                            shaderModuleData.spirvBin = spvBin;
+                            compileInfo.shaderModuleDatas.push_back(shaderModuleData);
                             compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
                             break;
                         }
@@ -1424,9 +1428,13 @@ static Result ProcessPipeline(
                     {
                         if (pPipelineState->stages[stage].dataSize > 0)
                         {
-                            compileInfo.spirvBin[stage].codeSize = pPipelineState->stages[stage].dataSize;
-                            compileInfo.spirvBin[stage].pCode = pPipelineState->stages[stage].pData;
-                            compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(stage));
+                            ShaderModuleData shaderModuleData = {};
+                            shaderModuleData.spirvBin.codeSize = pPipelineState->stages[stage].dataSize;
+                            shaderModuleData.spirvBin.pCode = pPipelineState->stages[stage].pData;
+                            shaderModuleData.shaderStage = pPipelineState->stages[stage].stage;
+
+                            compileInfo.shaderModuleDatas.push_back(shaderModuleData);
+                            compileInfo.stageMask |= ShaderStageToMask(pPipelineState->stages[stage].stage);
 
                             if (spvDisassembleSpirv != nullptr)
                             {
@@ -1436,8 +1444,8 @@ static Result ProcessPipeline(
                                 LLPC_ASSERT(pSpvText != nullptr);
                                 memset(pSpvText, 0, textSize);
                                 LLPC_OUTS("\nSPIR-V disassembly for " <<
-                                          GetShaderStageName(static_cast<ShaderStage>(stage)) << " shader module:\n");
-                                spvDisassembleSpirv(binSize, compileInfo.spirvBin[stage].pCode, textSize, pSpvText);
+                                          GetShaderStageName(pPipelineState->stages[stage].stage) << " shader module:\n");
+                                spvDisassembleSpirv(binSize, shaderModuleData.spirvBin.pCode, textSize, pSpvText);
                                 LLPC_OUTS(pSpvText << "\n");
                                 delete[] pSpvText;
                             }
@@ -1446,9 +1454,9 @@ static Result ProcessPipeline(
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
                     bool isGraphics = (compileInfo.stageMask & ShaderStageToMask(ShaderStageCompute)) ? false : true;
-                    for (uint32_t i = 0; i < ShaderStageCount; ++i)
+                    for (uint32_t i = 0; i < compileInfo.shaderModuleDatas.size(); ++i)
                     {
-                        compileInfo.shaderInfo[i].options.pipelineOptions = isGraphics ?
+                        compileInfo.shaderModuleDatas[i].shaderInfo.options.pipelineOptions = isGraphics ?
                                                                             compileInfo.gfxPipelineInfo.options :
                                                                             compileInfo.compPipelineInfo.options;
                     }
@@ -1518,8 +1526,12 @@ static Result ProcessPipeline(
                 WriteBitcodeToFile(*pModule.get(), bitcodeStream);
                 void* pCode = new uint8_t[bitcodeBuf.size()];
                 memcpy(pCode, bitcodeBuf.data(), bitcodeBuf.size());
-                compileInfo.spirvBin[shaderStage].codeSize = bitcodeBuf.size();
-                compileInfo.spirvBin[shaderStage].pCode = pCode;
+
+                ShaderModuleData shaderModuledata = {};
+                shaderModuledata.spirvBin.codeSize = bitcodeBuf.size();
+                shaderModuledata.spirvBin.pCode = pCode;
+                shaderModuledata.shaderStage = shaderStage;
+                compileInfo.shaderModuleDatas.push_back(shaderModuledata);
                 compileInfo.stageMask |= ShaderStageToMask(static_cast<ShaderStage>(shaderStage));
             }
         }
@@ -1543,7 +1555,10 @@ static Result ProcessPipeline(
                 }
 
                 compileInfo.stageMask |= ShaderStageToMask(stage);
-                result = GetSpirvBinaryFromFile(spvBinFile, &compileInfo.spirvBin[stage]);
+                ShaderModuleData shaderModuleData = {};
+                result = GetSpirvBinaryFromFile(spvBinFile, &shaderModuleData.spirvBin);
+                shaderModuleData.shaderStage = stage;
+                compileInfo.shaderModuleDatas.push_back(shaderModuleData);
             }
         }
 

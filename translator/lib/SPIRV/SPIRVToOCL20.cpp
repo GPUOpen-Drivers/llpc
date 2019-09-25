@@ -145,8 +145,6 @@ bool SPIRVToOCL20::runOnModule(Module &Module) {
 
   translateMangledAtomicTypeName();
 
-  eraseUselessFunctions(&Module);
-
   LLVM_DEBUG(dbgs() << "After SPIRVToOCL20:\n" << *M);
 
   std::string Err;

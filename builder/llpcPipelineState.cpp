@@ -67,7 +67,7 @@ void PipelineState::SetUserDataNodes(
         }
     }
     LLPC_ASSERT(m_allocUserDataNodes == nullptr);
-    m_allocUserDataNodes = make_unique<ResourceNode[]>(nodeCount);
+    m_allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
 
     // Copy nodes in.
     ResourceNode* pDestTable = m_allocUserDataNodes.get();
@@ -265,7 +265,7 @@ void PipelineState::ReadUserDataNodes(
     // Prepare to read the resource nodes from the named MD node. We allocate a single buffer, with the
     // outer table at the start, and inner tables allocated from the end backwards.
     uint32_t totalNodeCount = pUserDataMetaNode->getNumOperands();
-    m_allocUserDataNodes = make_unique<ResourceNode[]>(totalNodeCount);
+    m_allocUserDataNodes = std::make_unique<ResourceNode[]>(totalNodeCount);
 
     ResourceNode* pNextOuterNode = m_allocUserDataNodes.get();
     ResourceNode* pNextNode = pNextOuterNode;

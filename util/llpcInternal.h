@@ -251,11 +251,20 @@ std::string GetTypeName(llvm::Type* pTy);
 // Gets the shader stage from the specified LLVM module.
 ShaderStage GetShaderStageFromModule(llvm::Module* pModule);
 
+// Set the shader stage to the specified LLVM module.
+void SetShaderStageToModule(llvm::Module* pModule, ShaderStage shaderStage);
+
 // Gets the shader stage from the specified LLVM function.
 ShaderStage GetShaderStageFromFunction(llvm::Function* pFunc);
 
 // Gets the shader stage from the specified calling convention.
 ShaderStage GetShaderStageFromCallingConv(uint32_t stageMask, llvm::CallingConv::ID callConv);
+
+// Convert shader stage to the SPIR-V execution model
+spv::ExecutionModel ConvertToExecModel(ShaderStage shaderStage);
+
+// Convert SPIR-V execution model to the shader stage
+ShaderStage ConvertToStageShage(uint32_t execModel);
 
 // Gets the argument from the specified function according to the argument index.
 llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx, const llvm::Twine& name = "");
