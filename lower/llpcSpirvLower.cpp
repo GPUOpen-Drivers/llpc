@@ -53,6 +53,7 @@
 #include "llpcPassLoopInfoCollect.h"
 #include "llpcPassManager.h"
 #include "llpcSpirvLower.h"
+#include "llpcTimerProfiler.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
 
@@ -82,7 +83,7 @@ void SpirvLower::AddPasses(
     Context*              pContext,               // [in] LLPC context
     ShaderStage           stage,                  // Shader stage
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
-    llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
+    TimerProfiler*        pTimerProfiler,         // [in/out] Timer profiler
     uint32_t              forceLoopUnrollCount,   // 0 or force loop unroll count
     bool*                 pNeedDynamicLoopUnroll) // [out] nullptr or where to store flag of whether dynamic loop
                                                   // unrolling is needed
@@ -91,10 +92,7 @@ void SpirvLower::AddPasses(
     AddTargetLibInfo(pContext, &passMgr);
 
     // Start timer for lowering passes.
-    if (pLowerTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pLowerTimer, true));
-    }
+    pTimerProfiler->AddTimerStartStopPass(&passMgr, TimerLower, true);
 
     // Check if this module needs dynamic loop unroll. Only do this check when caller has passed
     // in pNeedDynamicLoopUnroll, and this is the fragment shader.
@@ -151,10 +149,7 @@ void SpirvLower::AddPasses(
     passMgr.add(CreateSpirvLowerInstMetaRemove());
 
     // Stop timer for lowering passes.
-    if (pLowerTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pLowerTimer, false));
-    }
+    pTimerProfiler->AddTimerStartStopPass(&passMgr, TimerLower, false);
 
     // Dump the result
     if (EnableOuts())

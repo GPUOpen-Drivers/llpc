@@ -65,6 +65,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
+#include "llpcTimerProfiler.h"
 #include "llpcVertexFetch.h"
 #include <mutex>
 #include <set>
@@ -227,34 +228,6 @@ class LlpcDiagnosticHandler : public llvm::DiagnosticHandler
         return true;
     }
 };
-
-// =====================================================================================================================
-// Gets dummy TimeRecords.
-static const StringMap<TimeRecord>& GetDummyTimeRecords()
-{
-    static StringMap<TimeRecord> dummyTimeRecords;
-    if (TimePassesIsEnabled && dummyTimeRecords.empty())
-    {
-        // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
-        // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
-        // compile multiple pipelines. so we add a dummy record to force all fields is shown.
-        // But LLVM TimeRecord can't be initialized explicitly. We have to use HackedTimeRecord to force update the vaule
-        // in TimeRecord.
-        TimeRecord timeRecord;
-        struct HackedTimeRecord
-        {
-            double t1;
-            double t2;
-            double t3;
-            ssize_t m1;
-        } hackedTimeRecord = { 1e-100, 1e-100, 1e-100, 0 };
-        static_assert(sizeof(timeRecord) == sizeof(hackedTimeRecord), "Unexpected Size!");
-        memcpy(&timeRecord, &hackedTimeRecord, sizeof(TimeRecord));
-        dummyTimeRecords["DUMMY"] = timeRecord;
-    }
-
-    return dummyTimeRecords;
-}
 
 // =====================================================================================================================
 // Creates LLPC compiler from the specified info.
@@ -747,22 +720,9 @@ Result Compiler::BuildShaderModule(
 
     memcpy(moduleData.hash, &hash, sizeof(hash));
 
-    std::string hashString;
-    raw_string_ostream ostream(hashString);
-    ostream << format("0x%016" PRIX64, MetroHash::Compact64(&hash));
-    ostream.flush();
-
-    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ShaderModule") + hashString).str(), GetDummyTimeRecords());
-    Timer wholeTimer("llpc-total", (Twine("LLPC ShaderModule Total ") + hashString).str(), timerGroupTotal);
-
-    TimerGroup timerGroupPhases("llpc", (Twine("LLPC ShaderModule Phases ") + hashString).str(), GetDummyTimeRecords());
-    Timer translateTimer("llpc-translate", (Twine("LLPC ShaderModule Translate ") + hashString).str(), timerGroupPhases);
-    Timer lowerTimer("llpc-lower", (Twine("LLPC ShaderModule Lower ") + hashString).str(), timerGroupPhases);
-
-    if (TimePassesIsEnabled)
-    {
-        wholeTimer.startTimer();
-    }
+    TimerProfiler timerProfiler(MetroHash::Compact64(&hash),
+                                "LLPC ShaderModule",
+                                TimerProfiler::ShaderModuleTimerEnableMask);
 
     // Check the type of input shader binary
     if (IsSpirvBinary(&pShaderInfo->shaderBin))
@@ -878,10 +838,7 @@ Result Compiler::BuildShaderModule(
                     pContext->GetBuilder()->SetShaderStage(static_cast<ShaderStage>(entryNames[i].stage));
 
                     // Start timer for translate.
-                    if (TimePassesIsEnabled)
-                    {
-                        lowerPassMgr.add(CreateStartStopTimer(&translateTimer, true));
-                    }
+                    timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, true);
 
                     // SPIR-V translation, then dump the result.
                     PipelineShaderInfo shaderInfo = {};
@@ -899,18 +856,15 @@ Result Compiler::BuildShaderModule(
                     }
 
                     // Stop timer for translate.
-                    if (TimePassesIsEnabled)
-                    {
-                        lowerPassMgr.add(CreateStartStopTimer(&translateTimer, false));
-                    }
+                    timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, false);
 
                     // Per-shader SPIR-V lowering passes.
                     SpirvLower::AddPasses(pContext,
-                        static_cast<ShaderStage>(entryNames[i].stage),
-                        lowerPassMgr,
-                        TimePassesIsEnabled ? &lowerTimer : nullptr,
-                        cl::ForceLoopUnrollCount,
-                        nullptr);
+                                          static_cast<ShaderStage>(entryNames[i].stage),
+                                          lowerPassMgr,
+                                          &timerProfiler,
+                                          cl::ForceLoopUnrollCount,
+                                          nullptr);
 
                     lowerPassMgr.add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -1018,11 +972,6 @@ Result Compiler::BuildShaderModule(
         }
     }
 
-    if (TimePassesIsEnabled)
-    {
-        wholeTimer.stopTimer();
-    }
-
     return result;
 }
 
@@ -1043,28 +992,7 @@ Result Compiler::BuildPipelineInternal(
     }
 
     uint32_t passIndex = 0;
-
-    // Create the timer group and timers for -time-passes.
-    std::string hash;
-    raw_string_ostream ostream(hash);
-    ostream << format("0x%016" PRIX64, pContext->GetPipelineContext()->GetPiplineHashCode());
-    ostream.flush();
-
-    TimerGroup timerGroupTotal("llpc", (Twine("LLPC ") + hash).str(), GetDummyTimeRecords());
-    Timer wholeTimer("llpc-total", (Twine("LLPC Total ") + hash).str(), timerGroupTotal);
-
-    TimerGroup timerGroupPhases("llpc", (Twine("LLPC Phases ") + hash).str(), GetDummyTimeRecords());
-    Timer translateTimer("llpc-translate", (Twine("LLPC Translate ") + hash).str(), timerGroupPhases);
-    Timer lowerTimer("llpc-lower", (Twine("LLPC Lower ") + hash).str(), timerGroupPhases);
-    Timer loadTimer("llpc-load", (Twine("LLPC Load ") + hash).str(), timerGroupPhases);
-    Timer patchTimer("llpc-patch", (Twine("LLPC Patch ") + hash).str(), timerGroupPhases);
-    Timer optTimer("llpc-opt", (Twine("LLPC Optimization ") + hash).str(), timerGroupPhases);
-    Timer codeGenTimer("llpc-codegen", (Twine("LLPC CodeGen ") + hash).str(), timerGroupPhases);
-
-    if (TimePassesIsEnabled)
-    {
-        wholeTimer.startTimer();
-    }
+    TimerProfiler timerProfiler(pContext->GetPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
 
     pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
@@ -1110,10 +1038,7 @@ Result Compiler::BuildPipelineInternal(
             Module* pModule = nullptr;
             if (pModuleData->binType == BinaryType::MultiLlvmBc)
             {
-                if (TimePassesIsEnabled)
-                {
-                    loadTimer.startTimer();
-                }
+                timerProfiler.StartStopTimer(TimerLoadBc, true);
 
                 MetroHash::Hash entryNameHash = {};
 
@@ -1153,10 +1078,7 @@ Result Compiler::BuildPipelineInternal(
                     result = Result::ErrorInvalidShader;
                 }
 
-                if (TimePassesIsEnabled)
-                {
-                    loadTimer.stopTimer();
-                }
+                timerProfiler.StartStopTimer(TimerLoadBc, false);
             }
             else
             {
@@ -1188,10 +1110,7 @@ Result Compiler::BuildPipelineInternal(
             pContext->GetBuilder()->SetShaderStage(pShaderInfo->entryStage);
 
             // Start timer for translate.
-            if (TimePassesIsEnabled)
-            {
-                lowerPassMgr.add(CreateStartStopTimer(&translateTimer, true));
-            }
+            timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, true);
 
             // SPIR-V translation, then dump the result.
             lowerPassMgr.add(CreateSpirvLowerTranslator(pShaderInfo->entryStage, pShaderInfo));
@@ -1206,10 +1125,7 @@ Result Compiler::BuildPipelineInternal(
             }
 
             // Stop timer for translate.
-            if (TimePassesIsEnabled)
-            {
-                lowerPassMgr.add(CreateStartStopTimer(&translateTimer, false));
-            }
+            timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, false);
 
             // Run the passes.
             bool success = RunPasses(&lowerPassMgr, modules[stage]);
@@ -1235,11 +1151,11 @@ Result Compiler::BuildPipelineInternal(
             PassManager lowerPassMgr(&passIndex);
 
             SpirvLower::AddPasses(pContext,
-                                    pShaderInfo->entryStage,
-                                    lowerPassMgr,
-                                    TimePassesIsEnabled ? &lowerTimer : nullptr,
-                                    forceLoopUnrollCount,
-                                    pDynamicLoopUnroll);
+                                  pShaderInfo->entryStage,
+                                  lowerPassMgr,
+                                  &timerProfiler,
+                                  forceLoopUnrollCount,
+                                  pDynamicLoopUnroll);
 
             // Run the passes.
             bool success = RunPasses(&lowerPassMgr, modules[stage]);
@@ -1266,7 +1182,7 @@ Result Compiler::BuildPipelineInternal(
         // Patching.
         Patch::AddPrePatchPasses(pContext,
                                  prePatchPassMgr,
-                                 TimePassesIsEnabled ? &patchTimer : nullptr);
+                                 timerProfiler.GetTimer(TimerPatch));
 
         bool success = RunPasses(&prePatchPassMgr, pPipelineModule);
         if (success == false)
@@ -1379,8 +1295,8 @@ Result Compiler::BuildPipelineInternal(
             Patch::AddPasses(pContext,
                              patchPassMgr,
                              skipStageMask,
-                             TimePassesIsEnabled ? &patchTimer : nullptr,
-                             TimePassesIsEnabled ? &optTimer : nullptr);
+                             timerProfiler.GetTimer(TimerPatch),
+                             timerProfiler.GetTimer(TimerOpt));
         }
 
         // At this point, we have finished with the Builder. No patch pass should be using Builder.
@@ -1412,18 +1328,12 @@ Result Compiler::BuildPipelineInternal(
 
         if (result == Result::Success)
         {
-            if (TimePassesIsEnabled)
-            {
-                codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, true));
-            }
+            timerProfiler.AddTimerStartStopPass(&codeGenPassMgr, TimerCodeGen, true);
 
             // Code generation.
             result = CodeGenManager::AddTargetPasses(pContext, codeGenPassMgr, elfStream);
 
-            if (TimePassesIsEnabled)
-            {
-                codeGenPassMgr.add(CreateStartStopTimer(&codeGenTimer, false));
-            }
+            timerProfiler.AddTimerStartStopPass(&codeGenPassMgr, TimerCodeGen, false);
         }
 
         // Run the target backend codegen passes.
@@ -1511,11 +1421,6 @@ Result Compiler::BuildPipelineInternal(
     }
 
     pContext->setDiagnosticHandlerCallBack(nullptr);
-
-    if (TimePassesIsEnabled)
-    {
-        wholeTimer.stopTimer();
-    }
 
     delete pPipelineModule;
     pPipelineModule = nullptr;

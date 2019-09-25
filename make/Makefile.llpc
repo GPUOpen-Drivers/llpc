@@ -190,6 +190,7 @@ endif
         llpcPipelineDumper.cpp              \
         llpcPipelineShaders.cpp             \
         llpcStartStopTimer.cpp              \
+        llpcTimerProfiler.cpp               \
         llpcUtil.cpp
 
     #if LLPC_BUILD_GFX10

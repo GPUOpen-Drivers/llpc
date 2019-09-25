@@ -61,6 +61,8 @@ void initializeSpirvLowerTranslatorPass(PassRegistry&);
 namespace Llpc
 {
 
+class TimerProfiler;
+
 // Initialize passes for SPIR-V lowering
 inline static void InitializeLowerPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
@@ -107,7 +109,7 @@ public:
     static void AddPasses(Context*                    pContext,
                           ShaderStage                 stage,
                           llvm::legacy::PassManager&  passMgr,
-                          llvm::Timer*                pLowerTimer,
+                          TimerProfiler*              pTimerProfiler,
                           uint32_t                    forceLoopUnrollCount,
                           bool*                       pNeedDynamicLoopUnroll);
 
