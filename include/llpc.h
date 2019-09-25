@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 34
+#define LLPC_INTERFACE_MAJOR_VERSION 35
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,8 +51,9 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
 //* |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
-//* |     32.0 | Add ShdaerModuleOptions in ShaderModuleBuildInfo                                                      |
+//* |     32.0 | Add ShaderModuleOptions in ShaderModuleBuildInfo                                                      |
 //* |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
 //* |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
 //* |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
@@ -309,6 +310,10 @@ struct PipelineShaderOptions
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     /// Use the LLVM backend's SI scheduler instead of the default scheduler.
     bool      useSiScheduler;
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
+    /// Disable the the LLVM backend's LICM pass.
+    bool      disableLicm;
 #endif
 };
 

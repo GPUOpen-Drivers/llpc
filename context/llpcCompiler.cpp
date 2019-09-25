@@ -139,6 +139,9 @@ opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
                                 cl::desc("Enable translate & lower phase in shader module build."),
                                 init(false));
 
+// -disable-licm: annotate loops with metadata to disable the LLVM LICM pass
+opt<bool> DisableLicm("disable-licm", desc("Disable LLVM LICM pass"), init(false));
+
 #if LLPC_BUILD_GFX10
 // -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
 // final wave size base on it. Used in pre-silicon verification.

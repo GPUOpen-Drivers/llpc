@@ -1190,6 +1190,10 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
+#endif
+
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 

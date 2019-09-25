@@ -127,7 +127,7 @@ struct PipelineDumpFile
 };
 
 // =====================================================================================================================
-// Dumps SPIR-V shader binary to extenal file.
+// Dumps SPIR-V shader binary to external file.
 void VKAPI_CALL IPipelineDumper::DumpSpirvBinary(
     const char*                     pDumpDir,   // [in] Directory of pipeline dump
     const BinaryData*               pSpirvBin)  // [in] SPIR-V binary
@@ -638,11 +638,15 @@ void PipelineDumper::DumpPipelineShaderInfo(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
     dumpFile << "options.enableLoadScalarizer = " << pShaderInfo->options.enableLoadScalarizer << "\n";
 #endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
+    dumpFile << "options.disableLicm = " << pShaderInfo->options.disableLicm << "\n";
+#endif
+
     dumpFile << "\n";
 }
 
 // =====================================================================================================================
-// Dumps SPIR-V shader binary to extenal file
+// Dumps SPIR-V shader binary to external file
 void PipelineDumper::DumpSpirvBinary(
     const char*                     pDumpDir,     // [in] Directory of pipeline dump
     const BinaryData*               pSpirvBin,    // [in] SPIR-V binary
@@ -750,6 +754,7 @@ void PipelineDumper::DumpPipelineOptions(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     dumpFile << "options.reconfigWorkgroupLayout = " << pOptions->reconfigWorkgroupLayout << "\n";
 #endif
+
 }
 
 // =====================================================================================================================
@@ -1198,6 +1203,9 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 #endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
             pHasher->Update(options.enableLoadScalarizer);
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
+            pHasher->Update(options.disableLicm);
 #endif
         }
     }

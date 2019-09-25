@@ -130,7 +130,6 @@ endif
         llpcPatchInOutImportExport.cpp      \
         llpcPatchLlvmIrInclusion.cpp        \
         llpcPatchLoadScalarizer.cpp         \
-        llpcPatchLoopUnrollInfoRectify.cpp  \
         llpcPatchNullFragShader.cpp         \
         llpcPatchPeepholeOpt.cpp            \
         llpcPatchPreparePipelineAbi.cpp     \

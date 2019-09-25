@@ -288,7 +288,6 @@ if(ICD_BUILD_LLPC)
         patch/llpcPatchInOutImportExport.cpp
         patch/llpcPatchLlvmIrInclusion.cpp
         patch/llpcPatchLoadScalarizer.cpp
-        patch/llpcPatchLoopUnrollInfoRectify.cpp
         patch/llpcPatchNullFragShader.cpp
         patch/llpcPatchPeepholeOpt.cpp
         patch/llpcPatchPreparePipelineAbi.cpp

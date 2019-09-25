@@ -636,7 +636,7 @@ static bool IsSpirvBinaryFile(
 }
 
 // =====================================================================================================================
-// Checks whether the specified file name represents a LLPC piepline info file (.pipe).
+// Checks whether the specified file name represents a LLPC pipeline info file (.pipe).
 static bool IsPipelineInfoFile(
     const std::string& fileName) // [in] File name to check
 {
@@ -999,6 +999,7 @@ static Result BuildPipeline(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
             pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
 #endif
+
             // If not compiling from pipeline, lay out user data now.
             if (pCompileInfo->doAutoLayout)
             {

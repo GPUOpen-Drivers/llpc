@@ -65,6 +65,7 @@ amdllpc [<options>...] [<files>...]
 | `-disable-fp32-denormals`        | Disable target option fp32-denormals	      |                               |
 | `-disable-llvm-patch`	           | Disable the patch for LLVM back-end issues	      |                               |
 | `-disable-lower-opt`             | Disable optimization for SPIR-V lowering	      |                               |
+| `-disable-licm`                  | Disable LLVM LICM pass	      |                               |
 | `-ignore-color-attachment-formats`| Ignore color attachment formats	      |                               |
 | `-lower-dyn-index`	           | Lower SPIR-V dynamic (non-constant) index in access chain	      |                               |
 | `-vgpr-limit=<uint>`	           | Maximum VGPR limit for this shader	|0 |
