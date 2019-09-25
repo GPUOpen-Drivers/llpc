@@ -53,6 +53,7 @@ private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerLoopUnrollControl);
 
     uint32_t m_forceLoopUnrollCount;  // Forced loop unroll count
+    bool m_disableLicm; // Disable LLVM LICM pass
 };
 
 } // Llpc
