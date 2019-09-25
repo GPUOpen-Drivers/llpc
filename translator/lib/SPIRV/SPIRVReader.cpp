@@ -9608,7 +9608,7 @@ Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst,
   switch (ExtInst->getExtOp()) {
 
   case FMin3AMD: {
-    // Middle of three FP values. Undefined result if any NaNs.
+    // Minimum of three FP values. Undefined result if any NaNs.
     FastMathFlags FMF = getBuilder()->getFastMathFlags();
     FMF.setNoNaNs();
     getBuilder()->setFastMathFlags(FMF);
@@ -9616,7 +9616,7 @@ Value *SPIRVToLLVM::transTrinaryMinMaxExtInst(SPIRVExtInst *ExtInst,
   }
 
   case FMax3AMD: {
-    // Middle of three FP values. Undefined result if any NaNs.
+    // Maximum of three FP values. Undefined result if any NaNs.
     FastMathFlags FMF = getBuilder()->getFastMathFlags();
     FMF.setNoNaNs();
     getBuilder()->setFastMathFlags(FMF);
