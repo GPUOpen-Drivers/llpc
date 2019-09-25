@@ -362,6 +362,7 @@ if(ICD_BUILD_LLPC)
         util/llpcPipelineDumper.cpp
         util/llpcPipelineShaders.cpp
         util/llpcStartStopTimer.cpp
+        util/llpcTimerProfiler.cpp
         util/llpcUtil.cpp
     )
 else()
