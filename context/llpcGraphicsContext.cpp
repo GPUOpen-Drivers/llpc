@@ -584,6 +584,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
                 // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
                 // over-allocating LDS.
                 uint32_t maxVertOut = hasGs ? pGsResUsage->builtInUsage.gs.outputVertices : 1;
+
                 LLPC_ASSERT(maxVertOut >= primAmpFactor);
 
                 if ((gsPrimsPerSubgroup * maxVertOut) > Gfx9::NggMaxThreadsPerSubgroup)
@@ -801,8 +802,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
                                                                          gsVsRingItemSize;
 
 #if LLPC_BUILD_GFX10
-            if ((m_gfxIp.major == 10) && hasTs && (gsOnChip == false)
-                )
+            if ((m_gfxIp.major == 10) && hasTs && (gsOnChip == false))
             {
                 uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
                 uint32_t onChipGsLdsMagicSize = Pow2Align((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
@@ -961,7 +961,7 @@ void GraphicsContext::DoUserDataNodeMerge()
     if (allRangeValues.empty() == false)
     {
         // Create a new table with merged duplicates.
-        m_allocDescriptorRangeValues = make_unique<SmallVector<DescriptorRangeValue, 8>>();
+        m_allocDescriptorRangeValues = std::make_unique<SmallVector<DescriptorRangeValue, 8>>();
         auto &mergedRangeValues = *m_allocDescriptorRangeValues;
         ArrayRef<DescriptorRangeValue> rangeValues = allRangeValues;
 
@@ -1022,7 +1022,7 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
               });
 
     // Merge duplicates.
-    m_allocUserDataNodes.push_back(make_unique<SmallVector<ResourceMappingNode, 8>>());
+    m_allocUserDataNodes.push_back(std::make_unique<SmallVector<ResourceMappingNode, 8>>());
     auto& mergedNodes = *m_allocUserDataNodes.back();
     ArrayRef<ResourceMappingNode> nodes = allNodes;
 

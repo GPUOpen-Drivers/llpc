@@ -457,6 +457,7 @@ Type* Builder::GetBuiltInTy(
         v3i32,
         v4f32,
         v4i32,
+        a4v3f32
     };
 
     uint32_t arraySize = inOutInfo.GetArraySize();
@@ -491,6 +492,7 @@ Type* Builder::GetBuiltInTy(
     case TypeCode::v4f32: return VectorType::get(getFloatTy(), 4);
     case TypeCode::v3i32: return VectorType::get(getInt32Ty(), 3);
     case TypeCode::v4i32: return VectorType::get(getInt32Ty(), 4);
+    case TypeCode::a4v3f32: return ArrayType::get(VectorType::get(getFloatTy(), 3), 4);
     default:
         LLPC_NEVER_CALLED();
         return nullptr;

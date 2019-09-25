@@ -56,7 +56,6 @@ void initializeSpirvLowerInstMetaRemovePass(PassRegistry&);
 void initializeSpirvLowerLoopUnrollControlPass(PassRegistry&);
 void initializeSpirvLowerResourceCollectPass(PassRegistry&);
 void initializeSpirvLowerTranslatorPass(PassRegistry&);
-
 } // llvm
 
 namespace Llpc
@@ -67,14 +66,14 @@ inline static void InitializeLowerPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
     initializeSpirvLowerAccessChainPass(passRegistry);
-  initializeSpirvLowerAlgebraTransformPass(passRegistry);
-  initializeSpirvLowerConstImmediateStorePass(passRegistry);
-  initializeSpirvLowerMemoryOpPass(passRegistry);
-  initializeSpirvLowerGlobalPass(passRegistry);
-  initializeSpirvLowerInstMetaRemovePass(passRegistry);
-  initializeSpirvLowerLoopUnrollControlPass(passRegistry);
-  initializeSpirvLowerResourceCollectPass(passRegistry);
-  initializeSpirvLowerTranslatorPass(passRegistry);
+    initializeSpirvLowerAlgebraTransformPass(passRegistry);
+    initializeSpirvLowerConstImmediateStorePass(passRegistry);
+    initializeSpirvLowerMemoryOpPass(passRegistry);
+    initializeSpirvLowerGlobalPass(passRegistry);
+    initializeSpirvLowerInstMetaRemovePass(passRegistry);
+    initializeSpirvLowerLoopUnrollControlPass(passRegistry);
+    initializeSpirvLowerResourceCollectPass(passRegistry);
+    initializeSpirvLowerTranslatorPass(passRegistry);
 }
 
 class Context;

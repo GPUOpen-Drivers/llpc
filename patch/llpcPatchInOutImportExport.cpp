@@ -472,7 +472,10 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageCompute:
                 {
-                    pInput = PatchCsBuiltInInputImport(pInputTy, builtInId, &callInst);
+                    {
+                        pInput = PatchCsBuiltInInputImport(pInputTy, builtInId, &callInst);
+                    }
+
                     break;
                 }
             default:
@@ -3176,16 +3179,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
     {
     case BuiltInWorkgroupSize:
         {
-            auto pWorkgroupSizeX = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeX);
-            auto pWorkgroupSizeY = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeY);
-            auto pWorkgroupSizeZ = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeZ);
-
-            std::vector<Constant*> workgroupSizes;
-            workgroupSizes.push_back(pWorkgroupSizeX);
-            workgroupSizes.push_back(pWorkgroupSizeY);
-            workgroupSizes.push_back(pWorkgroupSizeZ);
-
-            pInput = ConstantVector::get(workgroupSizes);
+            pInput = GetWorkgroupSize();
             break;
         }
     case BuiltInNumWorkgroups:
@@ -3200,49 +3194,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInLocalInvocationId:
         {
-            pInput = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
-
-            auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
-
-            // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
-            // do the reconfiguration for this workgroup.
-            if ((workgroupLayout != WorkgroupLayout::Unknown) &&
-                (workgroupLayout != WorkgroupLayout::Linear))
-            {
-                pInput = ReconfigWorkgroup(pInput, pInsertPos);
-            }
-            else
-            {
-                if (builtInUsage.workgroupSizeZ > 1)
-                {
-                    // XYZ, do nothing
-                }
-                else if (builtInUsage.workgroupSizeY > 1)
-                {
-                    // XY
-                    pInput = InsertElementInst::Create(pInput,
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 2),
-                                                       "",
-                                                       pInsertPos);
-                }
-                else
-                {
-                    // X
-                    pInput = InsertElementInst::Create(pInput,
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                       "",
-                                                       pInsertPos);
-
-                    pInput = InsertElementInst::Create(pInput,
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 2),
-                                                       "",
-                                                       pInsertPos);
-                }
-            }
-
+            pInput = GetInLocalInvocationId(pInsertPos);
             break;
         }
     case BuiltInSubgroupSize:
@@ -7138,6 +7090,79 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
                                             pInsertPos);
 
     return pRemappedId;
+}
+
+// =====================================================================================================================
+// Get the value of compute shader built-in WorkgroupSize
+Value* PatchInOutImportExport::GetWorkgroupSize()
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
+
+    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+    auto pWorkgroupSizeX = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeX);
+    auto pWorkgroupSizeY = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeY);
+    auto pWorkgroupSizeZ = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeZ);
+
+    std::vector<Constant*> workgroupSizes;
+    workgroupSizes.push_back(pWorkgroupSizeX);
+    workgroupSizes.push_back(pWorkgroupSizeY);
+    workgroupSizes.push_back(pWorkgroupSizeZ);
+
+    return ConstantVector::get(workgroupSizes);
+}
+
+// =====================================================================================================================
+// Get the value of compute shader built-in LocalInvocationId
+Value* PatchInOutImportExport::GetInLocalInvocationId(
+    Instruction* pInsertPos) // [in] Where to insert instructions.
+{
+    LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
+
+    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
+    Value* pLocaInvocatioId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
+
+    auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
+
+    // If we do not need to configure our workgroup in linear layout and the layout info is not specified, we
+    // do the reconfiguration for this workgroup.
+    if ((workgroupLayout != WorkgroupLayout::Unknown) &&
+        (workgroupLayout != WorkgroupLayout::Linear))
+    {
+        pLocaInvocatioId = ReconfigWorkgroup(pLocaInvocatioId, pInsertPos);
+    }
+    else
+    {
+        if (builtInUsage.workgroupSizeZ > 1)
+        {
+            // XYZ, do nothing
+        }
+        else if (builtInUsage.workgroupSizeY > 1)
+        {
+            // XY
+            pLocaInvocatioId = InsertElementInst::Create(pLocaInvocatioId,
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                        "",
+                                                        pInsertPos);
+        }
+        else
+        {
+            // X
+            pLocaInvocatioId = InsertElementInst::Create(pLocaInvocatioId,
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                        "",
+                                                        pInsertPos);
+
+            pLocaInvocatioId = InsertElementInst::Create(pLocaInvocatioId,
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                        "",
+                                                        pInsertPos);
+        }
+    }
+    return pLocaInvocatioId;
 }
 
 } // Llpc

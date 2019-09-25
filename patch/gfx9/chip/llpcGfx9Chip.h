@@ -189,6 +189,12 @@ namespace Llpc
 // Sets register field value
 #define SET_REG_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.bits._field = (_val);
 
+// Gets register core field value
+#define GET_REG_CORE_FIELD(_stage, _reg, _field)        ((_stage)->_reg##_VAL.core._field)
+
+// Sets register core field value
+#define SET_REG_CORE_FIELD(_stage, _reg, _field, _val)  (_stage)->_reg##_VAL.core._field = (_val);
+
 // Gets GFX-dependent register field value
 #define GET_REG_GFX9_FIELD(_stage, _reg, _field)    ((_stage)->_reg##_VAL.gfx09._field)
 #if LLPC_BUILD_GFX10

@@ -72,7 +72,7 @@ if(UNIX)
         target_compile_options(llpc PRIVATE -fno-strict-aliasing)
 
         target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++0x
+            -std=c++14
             -fno-rtti
             -fPIC
         >)
@@ -88,7 +88,7 @@ if(UNIX)
             -Wno-missing-braces
         )
         target_compile_options(llpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++11
+            -std=c++14
             -fno-rtti
             -fPIC
         >)
@@ -499,7 +499,7 @@ PRIVATE
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         target_compile_options(vfx PRIVATE -fno-strict-aliasing)
-        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++0x -fno-rtti>)
+        target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++14 -fno-rtti>)
 
         target_compile_options(vfx PRIVATE -Wno-unused-parameter -Wno-shift-negative-value -Wno-type-limits -Wno-error=switch -Wno-error=sign-compare -Wno-error=parentheses -Wno-error=maybe-uninitialized -Wno-error=delete-non-virtual-dtor -Wno-sign-compare -Wno-error)
         target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
@@ -513,7 +513,7 @@ if(UNIX)
             -Werror
         )
         target_compile_options(vfx PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++11
+            -std=c++14
             -fno-rtti
         >)
         #message(STATUS "Configured compiler options for Clang.")
@@ -581,7 +581,7 @@ target_include_directories(amdllpc PRIVATE ${VULKAN_HEADER_PATH})
 if(UNIX)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         target_compile_options(amdllpc PRIVATE -fno-strict-aliasing)
-        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++0x -fno-rtti>)
+        target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++14 -fno-rtti>)
 
         target_compile_options(amdllpc PRIVATE -Wno-unused-parameter -Wno-shift-negative-value -Wno-type-limits -Wno-error=switch -Wno-error=sign-compare -Wno-error=parentheses -Wno-error=maybe-uninitialized -Wno-error=delete-non-virtual-dtor -Wno-sign-compare -Wno-error)
         target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused -Wno-unused-parameter -Wno-ignored-qualifiers -Wno-missing-field-initializers>)
@@ -596,7 +596,7 @@ if(UNIX)
             -Wno-missing-braces
         )
         target_compile_options(amdllpc PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
-            -std=c++11
+            -std=c++14
             -fno-rtti
         >)
         #message(STATUS "Configured compiler options for Clang.")

@@ -41,7 +41,6 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/MutexGuard.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/Timer.h"
@@ -67,6 +66,7 @@
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcVertexFetch.h"
+#include <mutex>
 #include <set>
 #include <unordered_set>
 
@@ -271,7 +271,7 @@ Result VKAPI_CALL ICompiler::Create(
 
     raw_null_ostream nullStream;
 
-    MutexGuard lock(*s_compilerMutex);
+    std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
     MetroHash::Hash optionHash = Compiler::GenerateHashForCompileOptions(optionCount, options);
 
     bool parseCmdOption = true;
@@ -599,7 +599,7 @@ Compiler::Compiler(
 
         // Initiailze m_pContextPool.
         {
-            MutexGuard lock(m_contextPoolMutex);
+            std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
             m_pContextPool = new std::vector<Context*>();
         }
@@ -638,7 +638,7 @@ Compiler::~Compiler()
     bool shutdown = false;
     {
         // Free context pool
-        MutexGuard lock(m_contextPoolMutex);
+        std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
         // Keep the max allowed count of contexts that reside in the pool so that we can speed up the creatoin of
         // compiler next time.
@@ -670,7 +670,7 @@ Compiler::~Compiler()
 
     // Restore default output
     {
-        MutexGuard lock(*s_compilerMutex);
+        std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
         -- m_outRedirectCount;
         if (m_outRedirectCount == 0)
         {
@@ -688,7 +688,7 @@ Compiler::~Compiler()
 
     {
         // s_compilerMutex is managed by ManagedStatic, it can't be accessed after llvm_shutdown
-        MutexGuard lock(*s_compilerMutex);
+        std::lock_guard<sys::Mutex> lock(*s_compilerMutex);
         -- m_instanceCount;
         if (m_instanceCount == 0)
         {
@@ -845,7 +845,7 @@ Result Compiler::BuildShaderModule(
             {
                 Context* pContext = AcquireContext();
 
-                pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
+                pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
                 pContext->SetBuilder(Builder::Create(*pContext));
                 CodeGenManager::CreateTargetMachine(pContext, pPipelineOptions);
 
@@ -1066,7 +1066,7 @@ Result Compiler::BuildPipelineInternal(
         wholeTimer.startTimer();
     }
 
-    pContext->setDiagnosticHandler(llvm::make_unique<LlpcDiagnosticHandler>());
+    pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
     // Create the AMDGPU TargetMachine.
     result = CodeGenManager::CreateTargetMachine(pContext, pContext->GetPipelineContext()->GetPipelineOptions());
@@ -2473,7 +2473,7 @@ Context* Compiler::AcquireContext() const
 {
     Context* pFreeContext = nullptr;
 
-    MutexGuard lock(m_contextPoolMutex);
+    std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
 
     // Try to find a free context from pool first
     for (auto pContext : *m_pContextPool)
@@ -2533,7 +2533,7 @@ void Compiler::ReleaseContext(
     Context* pContext    // [in] LLPC context
     ) const
 {
-    MutexGuard lock(m_contextPoolMutex);
+    std::lock_guard<sys::Mutex> lock(m_contextPoolMutex);
     pContext->Reset();
     pContext->SetInUse(false);
 }

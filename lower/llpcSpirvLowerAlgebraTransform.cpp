@@ -95,7 +95,7 @@ bool SpirvLowerAlgebraTransform::runOnModule(
         (fp16Control.denormFlushToZero || fp32Control.denormFlushToZero || fp64Control.denormFlushToZero))
     {
         // Do constant folding if we need flush denorm to zero.
-        auto& targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI();
+        auto& targetLibInfo = getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(*m_pEntryPoint);
         auto& dataLayout = m_pModule->getDataLayout();
 
         for (auto& block : *m_pEntryPoint)

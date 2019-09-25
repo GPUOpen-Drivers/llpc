@@ -61,7 +61,7 @@ ConfigBuilderBase::ConfigBuilderBase(
     // Only generate MsgPack PAL metadata for PAL client 477 onwards. PAL changed the .note record type
     // from 13 to 32 at that point, and not using MsgPack metadata before that avoids some compatibility
     // problems.
-    m_document = make_unique<msgpack::Document>();
+    m_document = std::make_unique<msgpack::Document>();
 #endif
 
     if (GeneratingMsgPack())

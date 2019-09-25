@@ -74,7 +74,9 @@ bool SpirvLowerResourceCollect::runOnModule(
 
     SpirvLower::Init(&module);
 
-    m_pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    ShaderStage shaderStage = m_shaderStage;
+
+    m_pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
 
     CollectExecutionModeUsage();
 
