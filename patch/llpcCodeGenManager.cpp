@@ -262,11 +262,18 @@ void CodeGenManager::SetupTargetFeatures(
 // =====================================================================================================================
 // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
 Result CodeGenManager::AddTargetPasses(
-    Context*              pContext,   // [in] LLPC context
-    PassManager&          passMgr,    // [in/out] pass manager to add passes to
-    raw_pwrite_stream&    outStream)  // [out] Output stream
+    Context*              pContext,      // [in] LLPC context
+    PassManager&          passMgr,       // [in/out] pass manager to add passes to
+    llvm::Timer*          pCodeGenTimer, // [in] Timer to time target passes with, nullptr if not timing
+    raw_pwrite_stream&    outStream)     // [out] Output stream
 {
     Result result = Result::Success;
+
+    // Start timer for codegen passes.
+    if (pCodeGenTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pCodeGenTimer, true));
+    }
 
     // Dump the module just before codegen.
     if (EnableOuts())
@@ -282,6 +289,10 @@ Result CodeGenManager::AddTargetPasses(
         // passes. We do it this way to ensure that we still get the immutable passes from
         // TargetMachine::addPassesToEmitFile, as they can affect LLVM middle-end optimizations.
         passMgr.add(createPrintModulePass(outStream));
+        if (pCodeGenTimer != nullptr)
+        {
+            passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
+        }
         passMgr.stop();
     }
 
@@ -303,6 +314,12 @@ Result CodeGenManager::AddTargetPasses(
         result = Result::ErrorInvalidValue;
     }
 #endif
+
+    // Stop timer for codegen passes.
+    if (pCodeGenTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
+    }
 
     return result;
 }
