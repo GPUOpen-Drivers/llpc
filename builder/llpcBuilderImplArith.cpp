@@ -697,7 +697,7 @@ Value* BuilderImplArith::CreateCrossProduct(
                                     CreateFMul(CreateExtractElement(pX, (idx + 1) % 3),
                                                CreateExtractElement(pY, (idx + 2) % 3)),
                                     idx);
-        pRight = CreateInsertElement(pLeft,
+        pRight = CreateInsertElement(pRight,
                                      CreateFMul(CreateExtractElement(pX, (idx + 2) % 3),
                                                 CreateExtractElement(pY, (idx + 1) % 3)),
                                      idx);
