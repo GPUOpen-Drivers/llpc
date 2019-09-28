@@ -28,6 +28,7 @@
  * @brief LLPC source file: BuilderRecorder implementation
  ***********************************************************************************************************************
  */
+#include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
@@ -303,10 +304,16 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(
 // =====================================================================================================================
 // Create a BuilderRecorder
 Builder* Builder::CreateBuilderRecorder(
-    LLVMContext&  context,    // [in] LLVM context
-    bool          wantReplay) // TRUE to make CreateBuilderReplayer return a replayer pass
+    BuilderContext* pBuilderContext)  // [in] Builder context
 {
-    return new BuilderRecorder(context, wantReplay);
+    return new BuilderRecorder(pBuilderContext);
+}
+
+// =====================================================================================================================
+BuilderRecorder::BuilderRecorder(
+    BuilderContext* pBuilderContext)  // [in] Builder context
+    : Builder(pBuilderContext), BuilderRecorderMetadataKinds(pBuilderContext->GetContext())
+{
 }
 
 #ifndef NDEBUG
@@ -339,15 +346,11 @@ Module* BuilderRecorder::Link(
 #endif
 
 // =====================================================================================================================
-// This is a BuilderRecorder. If it was created with wantReplay=true, create the BuilderReplayer pass.
+// This is a BuilderRecorder. Create the BuilderReplayer pass.
 ModulePass* BuilderRecorder::CreateBuilderReplayer()
 {
-    if (m_wantReplay)
-    {
-        // Create a new BuilderImpl to replay the recorded Builder calls in.
-        return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(getContext()));
-    }
-    return nullptr;
+    // Create a new BuilderImpl to replay the recorded Builder calls in.
+    return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(GetBuilderContext()));
 }
 
 // =====================================================================================================================

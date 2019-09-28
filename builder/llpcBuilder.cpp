@@ -49,45 +49,22 @@
 using namespace Llpc;
 using namespace llvm;
 
-// -use-builder-recorder
-static cl::opt<uint32_t> UseBuilderRecorder("use-builder-recorder",
-                                            cl::desc("Do lowering via recording and replaying LLPC builder:\n"
-                                                     "0: Generate IR directly; no recording\n"
-                                                     "1: Do lowering via recording and replaying LLPC builder (default)\n"
-                                                     "2: Do lowering via recording; no replaying"),
-                                            cl::init(1));
-
-// =====================================================================================================================
-// Create a Builder object
-// If -use-builder-recorder is 0, this creates a BuilderImpl. Otherwise, it creates a BuilderRecorder.
-Builder* Builder::Create(
-    LLVMContext& context) // [in] LLVM context
-{
-    if (UseBuilderRecorder == 0)
-    {
-        // -use-builder-recorder=0: generate LLVM IR directly without recording
-        return CreateBuilderImpl(context);
-    }
-    // -use-builder-recorder=1: record with BuilderRecorder and replay with BuilderReplayer
-    // -use-builder-recorder=2: record with BuilderRecorder and do not replay
-    return CreateBuilderRecorder(context, UseBuilderRecorder == 1 /*wantReplay*/);
-}
-
 // =====================================================================================================================
 // Create a BuilderImpl object
 Builder* Builder::CreateBuilderImpl(
-    LLVMContext& context) // [in] LLVM context
+    BuilderContext* pBuilderContext) // [in] Builder context
 {
-    return new BuilderImpl(context);
+    return new BuilderImpl(pBuilderContext);
 }
 
 // =====================================================================================================================
 Builder::Builder(
-    LLVMContext& context) // [in] LLPC context
+    BuilderContext* pBuilderContext) // [in] Builder context
     :
-    IRBuilder<>(context)
+    IRBuilder<>(pBuilderContext->GetContext()),
+    m_pBuilderContext(pBuilderContext)
 {
-    m_pPipelineState = new PipelineState(&context);
+    m_pPipelineState = new PipelineState(&getContext());
 }
 
 // =====================================================================================================================

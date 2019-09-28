@@ -39,6 +39,7 @@
 #include <unordered_set>
 #include "spirvExt.h"
 
+#include "llpcBuilderContext.h"
 #include "llpcEmuLib.h"
 #include "llpcPipelineContext.h"
 
@@ -73,8 +74,8 @@ public:
         return m_pPipelineContext;
     }
 
-    // Sets LLPC builder
-    void SetBuilder(Builder* pBuilder) { m_pBuilder = pBuilder; }
+    // Create LLPC builder
+    void CreateBuilder();
 
     // Gets LLPC builder
     Builder* GetBuilder() const { return m_pBuilder; }
@@ -306,6 +307,7 @@ private:
     EmuLib                        m_glslEmuLib;        // LLVM library for GLSL emulation
     volatile  bool                m_isInUse;           // Whether this context is in use
     Builder*                      m_pBuilder = nullptr; // LLPC builder object
+    std::unique_ptr<BuilderContext> m_pBuilderContext;  // Builder context
 
     ResourceUsage*                m_pResUsage;          // External resource usage
 

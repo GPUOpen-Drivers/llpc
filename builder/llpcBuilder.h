@@ -59,6 +59,7 @@ namespace Llpc
 
 using namespace llvm;
 
+class BuilderContext;
 class Context;
 class PipelineState;
 
@@ -73,77 +74,39 @@ inline static void InitializeBuilderPasses(
 // =====================================================================================================================
 // The LLPC Builder interface
 //
-// The Builder interface is used by the frontend to generate IR for LLPC-specific operations. It is
-// a subclass of llvm::IRBuilder, so it uses its concept of an insertion point with debug location,
-// and it exposes all the IRBuilder methods for building IR. However, unlike IRBuilder, LLPC's
+// Builder is the major part of the interface into the LLPC middle-end. Builder itself is used by the
+// front-end to set up pipeline state, generate IR for LLPC-specific operations, and then run middle-end
+// and back-end passes to generate to ISA.
+//
+// Builder is a subclass of llvm::IRBuilder, so it uses its concept of an insertion point with debug
+// location, and it exposes all the IRBuilder methods for building IR. However, unlike IRBuilder, LLPC's
 // Builder is designed to have a single instance that contains some other state used during the IR
 // building process.
 //
-// The frontend can use Builder in one of three ways:
-// 1. BuilderImpl-only with full pipeline state
-// 2. BuilderRecorder with full pipeline state
-// 3. Per-shader frontend compilation (This is proposed but currently unsupported and untested.)
+// The typical front-end flow to use the middle-end interface is as follows:
 //
-// 1. BuilderImpl-only with full pipeline state
+// 1. Create a BuilderContext using "new BuilderContext". A BuilderContext can, and should, be shared
+//    between multiple compiles, although not concurrent compiles. BuilderContext contains state that
+//    is shared between multiple compiles. Creating the BuilderContext is the point at which the
+//    front-end decides whether to use BuilderImpl (generate IR directly) or BuilderRecorder (record
+//    Builder calls and replay them at the start of middle-end passes).
 //
-//    This is used where the frontend has full pipeline state, and it wants to generate IR for LLPC
-//    operations directly, instead of recording it in the frontend and then replaying the recorded
-//    calls at the start of the middle-end.
+// 2. For a single compile, use BuilderContext::CreateBuilder to create the Builder object.
 //
-//    The frontend does this:
+// 3. Use Builder calls to specify the pipeline state:
+//      Builder::SetUserDataNodes
+//    Setting pipeline state can be deferred to just before pipeline linking if using BuilderRecorder.
+//    If using BuilderImpl, it must be done here before any Builder calls that generate IR.
 //
-//    * Create an instance of BuilderImpl.
-//    * Create an IR module per shader stage.
-//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
-//      for LLPC operations.
-//    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
-//      pipeline module.
-//    * Run middle-end and back-end passes on it (Builder::Generate()).
+// 4. For each shader stage, create or process an IR module, using Builder calls to generate new IR.
 //
-// 2. BuilderRecorder with full pipeline state
+// 5. Call Builder::Link to link the shader IR modules into a pipeline IR module. (This needs to be
+//    done even if the pipeline only has a single shader, such as a compute pipeline.)
 //
-//    This is also used where the frontend has full pipeline state, but it wants to record its
-//    Builder::Create* calls such that they get replayed (and generated into normal IR) as the first
-//    middle-end pass.
-//
-//    The frontend's actions are pretty much the same as in (1):
-//
-//    * Create an instance of BuilderRecorder.
-//    * Create an IR module per shader stage.
-//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
-//      for LLPC operations.
-//    * After finishing, call Builder::Link() to link the per-stage IR modules into a single
-//      pipeline module.
-//    * Run middle-end and back-end passes on it (Builder::Generate()). Builder::Generate internally
-//      arranges to run BuilderReplayer to replay all the recorded Builder::Create* calls into its
-//      own instance of BuilderImpl (but with the single pipeline IR module).
-//
-//    With this scheme, the intention is that the whole-pipeline IR module after linking is a
-//    representation of the pipeline. For testing purposes, the IR module could be output to a .ll
-//    file, and later read in and compiled through the middle-end passes and backend to ISA.
-//    However, that is not supported yet, as there is still some outside-IR state at that point.
-//
-// 3. Per-shader frontend compilation (This is proposed but currently unsupported and untested.)
-//
-//    The frontend can compile a single shader with no pipeline state available using
-//    BuilderRecorder, without linking at the end, giving a shader IR module containing recorded
-//    llpc.call.* calls but no pipeline state.
-//
-//    The frontend does this:
-//
-//    * Per shader:
-//      - Create an instance of BuilderRecorder.
-//      - Create an IR module per shader stage.
-//      - Populate the per-shader-stage IR modules, using Builder::Create* calls to generate the IR
-//        for LLPC operations.
-//    * Then, later on, bring the shader IR modules together, and link them with Builder::Link()
-//      into a single pipeline IR module.
-//    * Give the pipeline state to the Builder (Builder::SetUserDataNodes()).
-//    * Run middle-end and back-end passes on it (Builder::Generate()). Builder::Generate internally
-//      arranges to run BuilderReplayer to replay all the recorded Builder::Create* calls into its
-//      own instance of BuilderImpl (but with the single pipeline IR module).
+// 6. Call Builder::Generate to run middle-end and back-end passes and generate the ELF.
+//    (Global options such as -filetype and -emit-llvm cause the output to be something other than ELF.)
+//    The front-end can pass a call-back function into Builder::Generate to check a shader cache
+//    after input and output mapping, and elect to remove already-cached shaders from the pipeline.
 //
 class Builder : public IRBuilder<>
 {
@@ -169,14 +132,6 @@ public:
 
     virtual ~Builder();
 
-    // Create the BuilderImpl. In this implementation, each Builder call writes its IR immediately.
-    static Builder* CreateBuilderImpl(LLVMContext& context);
-
-    // Create the BuilderRecorder. In this implementation, each Builder call gets recorded (by inserting
-    // an llpc.call.* call). The user then replays the Builder calls by running the pass created by
-    // CreateBuilderReplayer. Setting wantReplay=false makes CreateBuilderReplayer return nullptr.
-    static Builder* CreateBuilderRecorder(LLVMContext& context, bool wantReplay);
-
     // Create the BuilderImpl or BuilderRecorder, depending on -use-builder-recorder option
     static Builder* Create(LLVMContext& context);
 
@@ -189,6 +144,9 @@ public:
 
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
+
+    // Get the BuilderContext
+    BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }
 
     // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
     // think that we have library functions.
@@ -1439,7 +1397,12 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
 
 protected:
-    Builder(LLVMContext& context);
+    Builder(BuilderContext* pBuilderContext);
+
+    friend BuilderContext;
+
+    static Builder* CreateBuilderImpl(BuilderContext* pBuilderContext);
+    static Builder* CreateBuilderRecorder(BuilderContext* pBuilderContext);
 
     // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
     Constant* GetFpConstant(Type* pTy, APFloat value);
@@ -1464,6 +1427,10 @@ protected:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Builder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(Builder)
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    BuilderContext* m_pBuilderContext;      // Builder context
 };
 
 // Create BuilderReplayer pass

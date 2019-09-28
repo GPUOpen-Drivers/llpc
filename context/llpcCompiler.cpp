@@ -809,7 +809,7 @@ Result Compiler::BuildShaderModule(
                 Context* pContext = AcquireContext();
 
                 pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
-                pContext->SetBuilder(Builder::Create(*pContext));
+                pContext->CreateBuilder();
                 CodeGenManager::CreateTargetMachine(pContext, pPipelineOptions);
 
                 for (uint32_t i = 0; i < entryNames.size(); ++i)
@@ -1216,9 +1216,6 @@ Result Compiler::BuildPipelineInternal(
 #endif
     }
 
-    delete pContext->GetBuilder();
-    pContext->SetBuilder(nullptr);
-
     if (checkPerStageCache)
     {
         // For graphics, update shader caches with results of compile, and merge ELF outputs if necessary.
@@ -1425,12 +1422,10 @@ Result Compiler::BuildGraphicsPipelineInternal(
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pGraphicsContext);
-    pContext->SetBuilder(Builder::Create(*pContext));
+    pContext->CreateBuilder();
 
     Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
 
-    delete pContext->GetBuilder();
-    pContext->SetBuilder(nullptr);
     ReleaseContext(pContext);
     return result;
 }
@@ -1569,7 +1564,7 @@ Result Compiler::BuildComputePipelineInternal(
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pComputeContext);
-    pContext->SetBuilder(Builder::Create(*pContext));
+    pContext->CreateBuilder();
 
     const PipelineShaderInfo* shaderInfo[ShaderStageNativeStageCount] =
     {
@@ -1583,8 +1578,6 @@ Result Compiler::BuildComputePipelineInternal(
 
     Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
 
-    delete pContext->GetBuilder();
-    pContext->SetBuilder(nullptr);
     ReleaseContext(pContext);
     return result;
 }

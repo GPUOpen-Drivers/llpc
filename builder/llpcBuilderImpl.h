@@ -42,7 +42,7 @@ using namespace llvm;
 class BuilderImplBase : public Builder
 {
 public:
-    BuilderImplBase(LLVMContext& context) : Builder(context) {}
+    BuilderImplBase(BuilderContext* pBuilderContext) : Builder(pBuilderContext) {}
 
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
@@ -100,7 +100,7 @@ private:
 class BuilderImplArith : virtual public BuilderImplBase
 {
 public:
-    BuilderImplArith(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplArith(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
     // the given cube map texture coordinates.
@@ -264,7 +264,7 @@ private:
 class BuilderImplDesc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplDesc(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplDesc(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a load of a buffer descriptor.
     Value* CreateLoadBufferDesc(uint32_t      descSet,
@@ -324,7 +324,7 @@ private:
 class BuilderImplImage : virtual public BuilderImplBase
 {
 public:
-    BuilderImplImage(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplImage(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create an image load.
     Value* CreateImageLoad(Type*             pResultTy,
@@ -496,7 +496,7 @@ private:
 class BuilderImplInOut : virtual public BuilderImplBase
 {
 public:
-    BuilderImplInOut(llvm::LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplInOut(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a read of (part of) a user input value.
     Value* CreateReadGenericInput(Type*         pResultTy,
@@ -628,7 +628,7 @@ private:
 class BuilderImplMatrix : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMatrix(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplMatrix(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a matrix transpose.
     Value* CreateTransposeMatrix(Value* const pMatrix,
@@ -685,7 +685,7 @@ private:
 class BuilderImplMisc : virtual public BuilderImplBase
 {
 public:
-    BuilderImplMisc(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplMisc(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
     // the current output primitive in the specified output-primitive stream.
@@ -722,7 +722,7 @@ private:
 class BuilderImplSubgroup : virtual public BuilderImplBase
 {
 public:
-    BuilderImplSubgroup(LLVMContext& context) : BuilderImplBase(context) {}
+    BuilderImplSubgroup(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext) {}
 
     // Create a get subgroup size query.
     Value* CreateGetSubgroupSize(const Twine& instName) override final;
@@ -954,14 +954,14 @@ class BuilderImpl final : public BuilderImplArith,
                                  BuilderImplSubgroup
 {
 public:
-    BuilderImpl(LLVMContext& context) : BuilderImplBase(context),
-                                        BuilderImplArith(context),
-                                        BuilderImplDesc(context),
-                                        BuilderImplImage(context),
-                                        BuilderImplInOut(context),
-                                        BuilderImplMatrix(context),
-                                        BuilderImplMisc(context),
-                                        BuilderImplSubgroup(context)
+    BuilderImpl(BuilderContext* pBuilderContext) : BuilderImplBase(pBuilderContext),
+                                                   BuilderImplArith(pBuilderContext),
+                                                   BuilderImplDesc(pBuilderContext),
+                                                   BuilderImplImage(pBuilderContext),
+                                                   BuilderImplInOut(pBuilderContext),
+                                                   BuilderImplMatrix(pBuilderContext),
+                                                   BuilderImplMisc(pBuilderContext),
+                                                   BuilderImplSubgroup(pBuilderContext)
     {}
     ~BuilderImpl() {}
 

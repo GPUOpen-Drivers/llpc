@@ -47,6 +47,7 @@
 
 #include "SPIRVInternal.h"
 
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcMetroHash.h"
@@ -58,6 +59,11 @@ using namespace llvm;
 namespace Llpc
 {
 
+// -use-builder-recorder
+static cl::opt<bool> UseBuilderRecorder("use-builder-recorder",
+                                        cl::desc("Do lowering via recording and replaying LLPC builder"),
+                                        cl::init(true));
+
 // =====================================================================================================================
 Context::Context(
     GfxIpVersion gfxIp,                     // Graphics IP version info
@@ -67,6 +73,8 @@ Context::Context(
     m_gfxIp(gfxIp),
     m_glslEmuLib(this)
 {
+    m_pBuilderContext = std::make_unique<BuilderContext>(*this, UseBuilderRecorder);
+
     std::vector<Metadata*> emptyMeta;
     m_pEmptyMetaNode = MDNode::get(*this, emptyMeta);
 
@@ -111,6 +119,16 @@ void Context::Reset()
 {
     m_pPipelineContext = nullptr;
     m_pResUsage = nullptr;
+    delete m_pBuilder;
+    m_pBuilder = nullptr;
+}
+
+// =====================================================================================================================
+// Create LLPC builder that will be returned by GetBuilder.
+void Context::CreateBuilder()
+{
+    LLPC_ASSERT(m_pBuilder == nullptr);
+    m_pBuilder = m_pBuilderContext->CreateBuilder();
 }
 
 // =====================================================================================================================

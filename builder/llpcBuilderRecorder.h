@@ -210,9 +210,7 @@ public:
     // Given an opcode, get the call name (without the "llpc.call." prefix)
     static StringRef GetCallName(Opcode opcode);
 
-    BuilderRecorder(LLVMContext& context, bool wantReplay)
-        : Builder(context), BuilderRecorderMetadataKinds(context), m_wantReplay(wantReplay)
-    {}
+    BuilderRecorder(BuilderContext* pBuilderContext);
 
     ~BuilderRecorder() {}
 
@@ -223,7 +221,7 @@ public:
     Module* Link(ArrayRef<Module*> modules, bool linkNativeStages) override final;
 #endif
 
-    // If this is a BuilderRecorder created with wantReplay=true, create the BuilderReplayer pass.
+    // If this is a BuilderRecorder, create the BuilderReplayer pass.
     ModulePass* CreateBuilderReplayer() override;
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -668,8 +666,6 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    bool            m_wantReplay;                             // true to make CreateBuilderReplayer return a replayer
-                                                              //   pass
 #ifndef NDEBUG
     // Only used in a debug build to ensure SetShaderStage is being used consistently.
     std::vector<std::pair<WeakVH, ShaderStage>> m_funcShaderStageMap;       // Map from function to shader stage
