@@ -286,12 +286,14 @@ void ElfWriter<Elf>::MergeMetaNote(
     uint32_t regCount = 0;
     uint32_t psInputCntlBase = 0;
     uint32_t psUserDataBase = 0;
+    uint32_t psUserDataCount = 0;
     if (gfxIp.major < 9)
     {
         gfx6PsConfig.Init();
         pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx6PsConfig);
         psInputCntlBase = gfx6PsConfig.GetPsInputCntlStart();
         psUserDataBase = gfx6PsConfig.GetPsUserDataStart();
+        psUserDataCount = 16;
         regCount = sizeof(gfx6PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
     }
     else
@@ -300,6 +302,7 @@ void ElfWriter<Elf>::MergeMetaNote(
         pRegEntry = reinterpret_cast<Util::Abi::PalMetadataNoteEntry*>(&gfx9PsConfig);
         psInputCntlBase = Gfx9::mmSPI_PS_INPUT_CNTL_0;
         psUserDataBase = Gfx9::mmSPI_SHADER_USER_DATA_PS_0;
+        psUserDataCount = 32;
         regCount = sizeof(gfx9PsConfig) / sizeof(Util::Abi::PalMetadataNoteEntry);
     }
 
@@ -317,7 +320,7 @@ void ElfWriter<Elf>::MergeMetaNote(
         MergeMapItem(destRegisters, srcRegisters, psInputCntlBase + i);
     }
 
-    for (uint32_t i = 0; i < pContext->GetGpuProperty()->maxUserDataCount; ++i)
+    for (uint32_t i = 0; i < psUserDataCount; ++i)
     {
         MergeMapItem(destRegisters, srcRegisters, psUserDataBase + i);
     }

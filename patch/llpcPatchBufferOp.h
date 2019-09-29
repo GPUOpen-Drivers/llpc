@@ -38,6 +38,8 @@
 namespace Llpc
 {
 
+class PipelineState;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for buffer operations
 class PatchBufferOp final:
@@ -100,6 +102,7 @@ private:
     llvm::SmallVector<llvm::Instruction*, 16>       m_postVisitInsts;      // The post process instruction set.
     std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;            // The IRBuilder.
     Context*                                        m_pContext;            // The LLPC Context.
+    PipelineState*                                  m_pPipelineState;      // The pipeline state.
 
     static constexpr uint32_t MinMemOpLoopBytes = 256;
 };

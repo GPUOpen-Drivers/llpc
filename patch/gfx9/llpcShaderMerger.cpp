@@ -41,6 +41,7 @@
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 #include "llpcShaderMerger.h"
 
 #define DEBUG_TYPE "llpc-shader-merger"
@@ -50,14 +51,16 @@ using namespace Llpc;
 
 // =====================================================================================================================
 ShaderMerger::ShaderMerger(
+    PipelineState*    pPipelineState,     // [in] Pipeline state
     Context*          pContext,           // [in] LLPC context
     PipelineShaders*  pPipelineShaders)   // [in] API shaders in the pipeline
     :
+    m_pPipelineState(pPipelineState),
     m_pContext(pContext),
-    m_gfxIp(m_pContext->GetGfxIpVersion()),
+    m_gfxIp(m_pPipelineState->GetGfxIpVersion()),
     m_pPipelineShaders(pPipelineShaders)
 #if LLPC_BUILD_GFX10
-    , m_primShader(pContext)
+    , m_primShader(pPipelineState, pContext)
 #endif
 {
     LLPC_ASSERT(m_gfxIp.major >= 9);
@@ -78,7 +81,7 @@ Function* ShaderMerger::BuildPrimShader(
     Function*  pGsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
     Function*  pCopyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 {
-    NggPrimShader primShader(m_pContext);
+    NggPrimShader primShader(m_pPipelineState, m_pContext);
     return primShader.Generate(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
 }
 #endif
@@ -124,7 +127,7 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
         {
             pVsIntfData->userDataUsage.spillTable = userDataCount;
             ++userDataCount;
-            LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+            LLPC_ASSERT(userDataCount <= m_pPipelineState->GetGpuProperty()->maxUserDataCount);
         }
     }
 
@@ -264,7 +267,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     auto pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
 #if LLPC_BUILD_GFX10
-    uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageTessControl);
+    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
     if (waveSize == 64)
 #endif
     {
@@ -300,7 +303,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     auto pHsVertCount = EmitCall(pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    auto pGpuWorkarounds = m_pPipelineState->GetGpuWorkarounds();
     if (pGpuWorkarounds->gfx9.fixLsVgprInput)
     {
         auto pNullHs = new ICmpInst(*pEntryBlock,
@@ -565,7 +568,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
             {
                 pTesIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+                LLPC_ASSERT(userDataCount <= m_pPipelineState->GetGpuProperty()->maxUserDataCount);
             }
         }
     }
@@ -580,7 +583,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
             {
                 pVsIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+                LLPC_ASSERT(userDataCount <= m_pPipelineState->GetGpuProperty()->maxUserDataCount);
             }
         }
     }
@@ -733,7 +736,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     auto pThreadId = EmitCall(pModule, "llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
 #if LLPC_BUILD_GFX10
-    uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     if (waveSize == 64)
 #endif
     {

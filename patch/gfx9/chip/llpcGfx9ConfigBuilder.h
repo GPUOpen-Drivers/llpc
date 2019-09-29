@@ -38,6 +38,7 @@ namespace Llpc
 
 class Context;
 struct ElfDataEntry;
+class PipelineState;
 struct ResourceUsage;
 
 namespace Gfx9
@@ -48,7 +49,7 @@ namespace Gfx9
 class ConfigBuilder : public ConfigBuilderBase
 {
 public:
-    ConfigBuilder(llvm::Module* pModule) : ConfigBuilderBase(pModule) {}
+    ConfigBuilder(PipelineState* pPipelineState) : ConfigBuilderBase(pPipelineState) {}
 
     void BuildPalMetadata();
 

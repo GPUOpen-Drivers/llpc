@@ -49,6 +49,7 @@ namespace Llpc
 {
 
 class Builder;
+class PipelineState;
 
 // Enumerates types of descriptor.
 enum class DescriptorType : uint32_t
@@ -727,8 +728,6 @@ class PipelineContext
 {
 public:
     PipelineContext(GfxIpVersion           gfxIp,
-                    const GpuProperty*     pGpuProp,
-                    const WorkaroundFlags* pGpuWorkarounds,
                     MetroHash::Hash*       pPipelineHash,
                     MetroHash::Hash*       pCacheHash);
     virtual ~PipelineContext();
@@ -764,7 +763,7 @@ public:
     virtual bool IsTessOffChip() const = 0;
 
     // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-    virtual bool CheckGsOnChipValidity() = 0;
+    virtual bool CheckGsOnChipValidity(PipelineState* pPipelineState) = 0;
 
     // Checks whether GS on-chip mode is enabled
     virtual bool IsGsOnChip() const = 0;
@@ -777,7 +776,7 @@ public:
 
 #if LLPC_BUILD_GFX10
     // Sets NGG control settings
-    virtual void SetNggControl() = 0;
+    virtual void SetNggControl(PipelineState* pPipelineState) = 0;
 
     // Gets NGG control settings
     virtual const NggControl* GetNggControl() const = 0;
@@ -790,17 +789,13 @@ public:
     virtual uint32_t GetVerticesPerPrimitive() const = 0;
 
     // Gets wave size for the specified shader stage
-    virtual uint32_t GetShaderWaveSize(ShaderStage stage) = 0;
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage, const GpuProperty& gpuProperty) = 0;
 
-    static const char* GetGpuNameString(GfxIpVersion gfxIp);
+    static void GetGpuNameString(GfxIpVersion gfxIp, std::string& gpuName);
     static const char* GetGpuNameAbbreviation(GfxIpVersion gfxIp);
 
     // Gets graphics IP version info
     GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
-
-    const GpuProperty* GetGpuProperty() const { return m_pGpuProperty; }
-
-    const WorkaroundFlags* GetGpuWorkarounds() const { return m_pGpuWorkarounds; }
 
     // Gets pipeline hash code
     uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_pipelineHash); }
@@ -832,8 +827,6 @@ protected:
     GfxIpVersion           m_gfxIp;         // Graphics IP version info
     MetroHash::Hash        m_pipelineHash;  // Pipeline hash code
     MetroHash::Hash        m_cacheHash;     // Cache hash code
-    const GpuProperty*     m_pGpuProperty;  // GPU Property
-    const WorkaroundFlags* m_pGpuWorkarounds;  // GPU workarounds
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);

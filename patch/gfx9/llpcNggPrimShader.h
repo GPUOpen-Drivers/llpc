@@ -41,6 +41,7 @@ namespace Llpc
 
 class Context;
 class NggLdsManager;
+class PipelineState;
 
 // Represents exported data used in "exp" instruction
 struct ExpData
@@ -56,7 +57,7 @@ struct ExpData
 class NggPrimShader
 {
 public:
-    NggPrimShader(Context* pContext);
+    NggPrimShader(PipelineState* pPipelineState, Context* pContext);
     ~NggPrimShader();
 
     llvm::Function* Generate(llvm::Function* pEsEntryPoint,
@@ -210,6 +211,7 @@ private:
 
     static const uint32_t NullPrim = (1u << 31); // Null primitive data (invalid)
 
+    PipelineState*  m_pPipelineState; // Pipeline state
     Context*        m_pContext; // LLPC context
     GfxIpVersion    m_gfxIp;    // Graphics IP version info
 

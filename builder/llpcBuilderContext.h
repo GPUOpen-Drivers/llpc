@@ -32,11 +32,16 @@
 
 #include "llpc.h"
 #include "llpcDebug.h"
+#include "llpcTargetInfo.h"
+
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Target/TargetMachine.h"
 
 namespace llvm
 {
 
 class LLVMContext;
+class Timer;
 
 } // llvm
 
@@ -46,6 +51,7 @@ namespace Llpc
 using namespace llvm;
 
 class Builder;
+class PassManager;
 class PipelineState;
 
 // =====================================================================================================================
@@ -58,19 +64,40 @@ public:
     // Get LLVM context
     LLVMContext& GetContext() const { return m_context; }
 
+    // Set target machine. Returns false on failure.
+    bool SetTargetMachine(
+        StringRef     gpuName);     // LLVM GPU name, e.g. "gfx900"
+
+    // Get target machine.
+    TargetMachine* GetTargetMachine() const
+    {
+        return &*m_pTargetMachine;
+    }
+
+    // Get target info
+    const TargetInfo& GetTargetInfo() const
+    {
+        return m_targetInfo;
+    }
+
     // Create a Builder object
     Builder* CreateBuilder();
 
     // Create a BuilderImpl object directly, passing in the PipelineState to use. This is used by BuilderReplayer.
     Builder* CreateBuilderImpl(PipelineState* pPipelineState);
 
+    // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
+    void AddTargetPasses(PassManager& passMgr, Timer* pCodeGenTimer, raw_pwrite_stream& outStream);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderContext)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderContext)
 
     // -----------------------------------------------------------------------------------------------------------------
-    LLVMContext&  m_context;              // LLVM context
-    bool          m_useBuilderRecorder;   // Whether to create BuilderRecorder or BuilderImpl
+    LLVMContext&                    m_context;              // LLVM context
+    bool                            m_useBuilderRecorder;   // Whether to create BuilderRecorder or BuilderImpl
+    std::unique_ptr<TargetMachine>  m_pTargetMachine;       // TargetMachine
+    TargetInfo                      m_targetInfo = {};      // Target info
 };
 
 } // Llpc

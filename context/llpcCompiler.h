@@ -349,9 +349,6 @@ private:
 
     Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
 
-    void InitGpuProperty();
-    void InitGpuWorkaround();
-
     Context* AcquireContext() const;
     void ReleaseContext(Context* pContext) const;
 
@@ -379,8 +376,6 @@ private:
     static uint32_t               m_instanceCount;    // The count of compiler instance
     static uint32_t               m_outRedirectCount; // The count of output redirect
     ShaderCachePtr                m_shaderCache;      // Shader cache
-    GpuProperty                   m_gpuProperty;      // GPU property
-    WorkaroundFlags               m_gpuWorkarounds;   // GPU workarounds;
     static llvm::sys::Mutex       m_contextPoolMutex; // Mutex for context pool access
     static std::vector<Context*>* m_pContextPool;      // Context pool
 };

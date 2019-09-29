@@ -43,6 +43,7 @@ namespace Llpc
 {
 
 class Context;
+class PipelineState;
 
 // Enumerates special system values for the LS-HS merged shader (the assigned numeric values are identical to SGPR
 // numbers defined by hardware).
@@ -88,7 +89,7 @@ enum EsGsSpecialSysValue
 class ShaderMerger
 {
 public:
-    ShaderMerger(Context* pContext, PipelineShaders* pPipelineShaders);
+    ShaderMerger(PipelineState* pPipelineState, Context* pContext, PipelineShaders* pPipelineShaders);
 
     llvm::Function* GenerateLsHsEntryPoint(llvm::Function* pLsEntryPoint, llvm::Function* pHsEntryPoint);
     llvm::Function* GenerateEsGsEntryPoint(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
@@ -107,6 +108,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
+    PipelineState*    m_pPipelineState;     // Pipeline state
     Context*          m_pContext;           // LLPC context
     GfxIpVersion      m_gfxIp;              // Graphics IP version info
     PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline

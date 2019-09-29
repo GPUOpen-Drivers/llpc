@@ -39,6 +39,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"
 #include "llpcPatch.h"
+#include "llpcPipelineState.h"
 #include "llpcPipelineShaders.h"
 
 using namespace Llpc;
@@ -55,6 +56,7 @@ public:
     static char ID;
     PatchCopyShader() : Patch(ID)
     {
+        initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
         initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
         initializePatchCopyShaderPass(*PassRegistry::getPassRegistry());
     }
@@ -63,6 +65,7 @@ public:
 
     void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
         // Pass does not preserve PipelineShaders as it adds a new shader.
     }
@@ -100,8 +103,8 @@ private:
     // Low part of global internal table pointer
     static const uint32_t EntryArgIdxInternalTablePtrLow = 0;
 
-    GlobalVariable*       m_pLds;                 // Global variable representing LDS
-    Value*                m_pGsVsRingBufDesc;   // Descriptor for GS-VS ring
+    GlobalVariable*       m_pLds;                     // Global variable representing LDS
+    Value*                m_pGsVsRingBufDesc;         // Descriptor for GS-VS ring
 };
 
 char PatchCopyShader::ID = 0;
@@ -123,6 +126,7 @@ bool PatchCopyShader::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
     Patch::Init(&module);
+    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     auto pGsEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
     if (pGsEntryPoint == nullptr)
@@ -184,7 +188,7 @@ bool PatchCopyShader::runOnModule(
 
     auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageCopyShader);
 
-    const auto gfxIp = m_pContext->GetGfxIpVersion();
+    const auto gfxIp = pPipelineState->GetGfxIpVersion();
 
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
     if (gfxIp.major <= 8)
@@ -208,7 +212,7 @@ bool PatchCopyShader::runOnModule(
 
     if (m_pContext->IsGsOnChip())
     {
-        m_pLds = Patch::GetLdsVariable(&module);
+        m_pLds = Patch::GetLdsVariable(pPipelineState);
     }
 
     uint32_t outputStreamCount = 0;

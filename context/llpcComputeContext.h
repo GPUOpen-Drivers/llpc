@@ -41,8 +41,6 @@ class ComputeContext: public PipelineContext
 {
 public:
     ComputeContext(GfxIpVersion                    gfxIp,
-                   const GpuProperty*              pGpuProp,
-                   const WorkaroundFlags*          pGpuWorkarounds,
                    const ComputePipelineBuildInfo* pPipelineInfo,
                    MetroHash::Hash*                pPipelineHash,
                    MetroHash::Hash*                pCacheHash);
@@ -68,7 +66,7 @@ public:
     virtual bool IsTessOffChip() const { LLPC_NEVER_CALLED(); return false; }
 
     // Determines whether GS on-chip mode is valid for this pipeline
-    virtual bool CheckGsOnChipValidity() { LLPC_NEVER_CALLED(); return false; }
+    virtual bool CheckGsOnChipValidity(PipelineState* pPipelineState) { LLPC_NEVER_CALLED(); return false; }
 
     // Checks whether GS on-chip mode is enabled
     virtual bool IsGsOnChip() const { LLPC_NEVER_CALLED(); return false; }
@@ -81,7 +79,7 @@ public:
 
 #if LLPC_BUILD_GFX10
     // Sets NGG control settings
-    virtual void SetNggControl() { LLPC_NEVER_CALLED(); }
+    virtual void SetNggControl(PipelineState* pPipelineState) { LLPC_NEVER_CALLED(); }
 
     // Gets NGG control settings
     virtual const NggControl* GetNggControl() const { LLPC_NEVER_CALLED(); return nullptr; }
@@ -98,7 +96,7 @@ public:
     virtual uint32_t GetVerticesPerPrimitive() const { LLPC_NEVER_CALLED(); return 0; }
 
     // Gets wave size for the specified shader stage
-    virtual uint32_t GetShaderWaveSize(ShaderStage stage);
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage, const GpuProperty& gpuProperty);
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }

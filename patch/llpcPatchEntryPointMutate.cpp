@@ -207,7 +207,7 @@ void PatchEntryPointMutate::ProcessShader()
         pResUsage->numVgprsAvailable = std::min(vgprLimit, pResUsage->numVgprsAvailable);
     }
     pResUsage->numVgprsAvailable = std::min(pResUsage->numVgprsAvailable,
-                                           m_pContext->GetGpuProperty()->maxVgprsAvailable);
+                                           m_pPipelineState->GetGpuProperty()->maxVgprsAvailable);
 
     if ((pShaderOptions->sgprLimit != 0) && (pShaderOptions->sgprLimit != UINT32_MAX))
     {
@@ -224,7 +224,7 @@ void PatchEntryPointMutate::ProcessShader()
         pResUsage->numSgprsAvailable = std::min(sgprLimit, pResUsage->numSgprsAvailable);
     }
     pResUsage->numSgprsAvailable = std::min(pResUsage->numSgprsAvailable,
-                                            m_pContext->GetGpuProperty()->maxSgprsAvailable);
+                                            m_pPipelineState->GetGpuProperty()->maxSgprsAvailable);
 
     if (pShaderOptions->maxThreadGroupsPerComputeUnit != 0)
     {
@@ -277,7 +277,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
     const ResourceUsage* pResUsage1 = m_pContext->GetShaderResourceUsage(m_shaderStage);
     const ResourceUsage* pResUsage2 = nullptr;
 
-    const auto gfxIp = m_pContext->GetGfxIpVersion();
+    const auto gfxIp = m_pPipelineState->GetGfxIpVersion();
     if (gfxIp.major >= 9)
     {
         // NOTE: For LS-HS/ES-GS merged shader, resource mapping nodes of the two shader stages are merged as a whole.
@@ -398,7 +398,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     entryArgIdxs.initialized = true;
 
     // Estimated available user data count
-    uint32_t maxUserDataCount = m_pContext->GetGpuProperty()->maxUserDataCount;
+    uint32_t maxUserDataCount = m_pPipelineState->GetGpuProperty()->maxUserDataCount;
     uint32_t availUserDataCount = maxUserDataCount - userDataIdx;
     uint32_t requiredRemappedUserDataCount = 0; // Maximum required user data
     uint32_t requiredUserDataCount = 0;         // Maximum required user data without remapping
@@ -421,7 +421,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     reserveVbTable = true;
                 }
-                else if (m_pContext->GetGfxIpVersion().major >= 9)
+                else if (m_pPipelineState->GetGfxIpVersion().major >= 9)
                 {
                     // On GFX9+, the shader stage that the vertex shader is merged in to needs a vertex buffer
                     // table, to ensure that the merged shader gets one.
@@ -443,7 +443,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     reserveStreamOutTable = true;
                 }
-                else if (m_pContext->GetGfxIpVersion().major >= 9)
+                else if (m_pPipelineState->GetGfxIpVersion().major >= 9)
                 {
                     // On GFX9+, the shader stage that the last shader is merged in to needs a stream out
                     // table, to ensure that the merged shader gets one.
@@ -508,7 +508,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // NOTE: On GFX9+, Vertex shader (LS) and tessellation control shader (HS) are merged into a single shader.
             // The user data count of tessellation control shader should be same as vertex shader.
             auto pCurrResUsage = pResUsage;
-            if ((m_pContext->GetGfxIpVersion().major >= 9) &&
+            if ((m_pPipelineState->GetGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
                 (m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
             {
@@ -527,7 +527,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
-            const auto gfxIp = m_pContext->GetGfxIpVersion();
+            const auto gfxIp = m_pPipelineState->GetGfxIpVersion();
             if (((gfxIp.major >= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
 #if LLPC_BUILD_GFX10
                 || (enableNgg && (m_hasTs == false))
@@ -783,7 +783,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             auto pCurrIntfData = pIntfData;
             auto pCurrResUsage = pResUsage;
 
-            if ((m_pContext->GetGfxIpVersion().major >= 9) &&
+            if ((m_pPipelineState->GetGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
                 (m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
             {

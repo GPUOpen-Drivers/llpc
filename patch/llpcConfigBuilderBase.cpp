@@ -36,26 +36,28 @@
 
 #include "llpcConfigBuilderBase.h"
 #include "llpcAbiMetadata.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
 
 // =====================================================================================================================
 ConfigBuilderBase::ConfigBuilderBase(
-    llvm::Module* pModule)  // [in/out] LLVM module
+    PipelineState*  pPipelineState) // [in] Pipeline state
     :
-    m_pModule(pModule),
+    m_pPipelineState(pPipelineState),
+    m_pModule(pPipelineState->GetModule()),
     m_userDataLimit(0),
     m_spillThreshold(UINT32_MAX)
 {
-    m_pContext = static_cast<Context*>(&pModule->getContext());
+    m_pContext = static_cast<Context*>(&m_pModule->getContext());
 
     m_hasVs  = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
     m_hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
     m_hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
     m_hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
-    m_gfxIp = m_pContext->GetGfxIpVersion();
+    m_gfxIp = m_pPipelineState->GetGfxIpVersion();
 
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 477
     // Only generate MsgPack PAL metadata for PAL client 477 onwards. PAL changed the .note record type

@@ -52,7 +52,7 @@ Value* BuilderImplSubgroup::CreateGetSubgroupSize(
 // Get the shader subgroup size for the current insertion block.
 uint32_t BuilderImplSubgroup::GetShaderSubgroupSize()
 {
-    return getContext().GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
+    return GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
 }
 
 // =====================================================================================================================

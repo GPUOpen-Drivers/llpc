@@ -133,7 +133,7 @@ public:
                           std::function<uint32_t(const Module*, uint32_t, ArrayRef<ArrayRef<uint8_t>>)>
                                                       checkShaderCacheFunc);
 
-    static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
+    static llvm::GlobalVariable* GetLdsVariable(PipelineState* pPipelineState);
 
 protected:
     void Init(llvm::Module* pModule);

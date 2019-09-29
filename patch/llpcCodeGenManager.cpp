@@ -30,15 +30,11 @@
  */
 #define DEBUG_TYPE "llpc-code-gen-manager"
 
-#include "llvm/CodeGen/CommandFlags.inc"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
 
 #include "spirvExt.h"
 #include "llpcCodeGenManager.h"
@@ -47,6 +43,7 @@
 #include "llpcFile.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
+#include "llpcPipelineState.h"
 
 namespace llvm
 {
@@ -66,11 +63,6 @@ static opt<bool> DisableFp32Denormals("disable-fp32-denormals",
                                       desc("Disable target option fp32-denormals"),
                                       init(false));
 
-// -emit-llvm: emit LLVM bitcode instead of ISA
-static opt<bool> EmitLlvm("emit-llvm",
-                          desc("Emit LLVM bitcode instead of AMD GPU ISA"),
-                          init(false));
-
 } // cl
 
 } // llvm
@@ -81,71 +73,11 @@ namespace Llpc
 {
 
 // =====================================================================================================================
-// Creates the TargetMachine if not already created, and stores it in the context. It then persists as long as
-// the context.
-Result CodeGenManager::CreateTargetMachine(
-    Context*               pContext,          // [in/out] Pipeline context
-    const PipelineOptions* pPipelineOptions)  // [in] Pipeline options
-{
-    if ((pContext->GetTargetMachine() != nullptr) &&
-        (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc) &&
-#endif
-        (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout) &&
-        (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        && (pPipelineOptions->robustBufferAccess == pContext->GetTargetMachinePipelineOptions()->robustBufferAccess)
-#endif
-        )
-    {
-        return Result::Success;
-    }
-
-    Result result = Result::ErrorInvalidShader;
-
-    std::string triple("amdgcn--amdpal");
-
-    std::string errMsg;
-    auto pTarget = TargetRegistry::lookupTarget(triple, errMsg);
-    if (pTarget != nullptr)
-    {
-        // TODO: We should probably be using InitTargetOptionsFromCodeGenFlags() here.
-        // Currently we are not, and it would give an "unused function" warning when compiled with
-        // CLANG. So we avoid the warning by referencing it here.
-        LLPC_UNUSED(&InitTargetOptionsFromCodeGenFlags);
-
-        TargetOptions targetOpts;
-        auto relocModel = Optional<Reloc::Model>();
-        std::string features = "";
-
-        // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)
-        targetOpts.NoSignedZerosFPMath = true;
-
-        auto pTargetMachine = pTarget->createTargetMachine(triple,
-                                                           pContext->GetGpuNameString(),
-                                                           features,
-                                                           targetOpts,
-                                                           relocModel);
-        if (pTargetMachine != nullptr)
-        {
-            pContext->SetTargetMachine(pTargetMachine, pPipelineOptions);
-            result = Result::Success;
-        }
-    }
-    if (result != Result::Success)
-    {
-        LLPC_ERRS("Fails to create AMDGPU target machine: " << errMsg << "\n");
-    }
-
-    return result;
-}
-
-// =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
 void CodeGenManager::SetupTargetFeatures(
-    Module* pModule)  // [in, out] LLVM module
+    PipelineState* pPipelineState)  // [in] Pipeline state
 {
+    Module* pModule = pPipelineState->GetModule();
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
 
@@ -207,7 +139,7 @@ void CodeGenManager::SetupTargetFeatures(
                 builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
             }
 
-            auto gfxIp = pContext->GetGfxIpVersion();
+            auto gfxIp = pPipelineState->GetGfxIpVersion();
             if (gfxIp.major >= 9)
             {
                 targetFeatures += ",+enable-scratch-bounds-checks";
@@ -217,7 +149,7 @@ void CodeGenManager::SetupTargetFeatures(
             if (gfxIp.major >= 10)
             {
                 // Setup wavefront size per shader stage
-                uint32_t waveSize = pContext->GetShaderWaveSize(shaderStage);
+                uint32_t waveSize = pPipelineState->GetShaderWaveSize(shaderStage);
 
                 targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 
@@ -253,55 +185,6 @@ void CodeGenManager::SetupTargetFeatures(
             AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
             pFunc->addAttributes(attribIdx, builder);
         }
-    }
-}
-
-// =====================================================================================================================
-// Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
-void CodeGenManager::AddTargetPasses(
-    Context*              pContext,      // [in] LLPC context
-    PassManager&          passMgr,       // [in/out] pass manager to add passes to
-    Timer*                pCodeGenTimer, // [in] Timer to time target passes with, nullptr if not timing
-    raw_pwrite_stream&    outStream)     // [out] Output stream
-{
-    // Start timer for codegen passes.
-    if (pCodeGenTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pCodeGenTimer, true));
-    }
-
-    // Dump the module just before codegen.
-    if (EnableOuts())
-    {
-        passMgr.add(createPrintModulePass(outs(),
-                    "===============================================================================\n"
-                    "// LLPC final pipeline module info\n"));
-    }
-
-    if (cl::EmitLlvm)
-    {
-        // For -emit-llvm, add a pass to output the LLVM IR, then tell the pass manager to stop adding
-        // passes. We do it this way to ensure that we still get the immutable passes from
-        // TargetMachine::addPassesToEmitFile, as they can affect LLVM middle-end optimizations.
-        passMgr.add(createPrintModulePass(outStream));
-        if (pCodeGenTimer != nullptr)
-        {
-            passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
-        }
-        passMgr.stop();
-    }
-
-    auto pTargetMachine = pContext->GetTargetMachine();
-
-    if (pTargetMachine->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
-    {
-        report_fatal_error("Target machine cannot emit a file of this type");
-    }
-
-    // Stop timer for codegen passes.
-    if (pCodeGenTimer != nullptr)
-    {
-        passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
     }
 }
 

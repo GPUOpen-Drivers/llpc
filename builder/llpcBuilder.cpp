@@ -256,18 +256,12 @@ void Builder::Generate(
 
     // Run the "whole pipeline" passes, excluding the target backend.
     patchPassMgr.run(*pipelineModule);
-#if LLPC_BUILD_GFX10
-    // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
-    // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
-    // we do target feature setup here.
-#endif
-    CodeGenManager::SetupTargetFeatures(&*pipelineModule);
 
     // A separate "whole pipeline" pass manager for code generation.
     PassManager codeGenPassMgr(&passIndex);
 
     // Code generation.
-    CodeGenManager::AddTargetPasses(&getContext(), codeGenPassMgr, pCodeGenTimer, outStream);
+    GetBuilderContext()->AddTargetPasses(codeGenPassMgr, pCodeGenTimer, outStream);
 
     // Run the target backend codegen passes.
     codeGenPassMgr.run(*pipelineModule);

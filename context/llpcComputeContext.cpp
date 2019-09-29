@@ -55,13 +55,11 @@ namespace Llpc
 // =====================================================================================================================
 ComputeContext::ComputeContext(
     GfxIpVersion                    gfxIp,            // Graphics Ip version info
-    const GpuProperty*              pGpuProp,         // [in] GPU Property
-    const WorkaroundFlags*          pGpuWorkarounds,  // [in] GPU workarounds
     const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
     MetroHash::Hash*                pPipelineHash,    // [in] Pipeline hash code
     MetroHash::Hash*                pCacheHash)       // [in] Cache hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pPipelineHash, pCacheHash),
+    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
     m_pPipelineInfo(pPipelineInfo)
 {
     InitShaderResourceUsage(ShaderStageCompute, GetShaderResourceUsage(ShaderStageCompute));
@@ -101,9 +99,10 @@ const PipelineShaderInfo* ComputeContext::GetPipelineShaderInfo(
 //
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
 uint32_t ComputeContext::GetShaderWaveSize(
-    ShaderStage stage)  // Shader stage
+    ShaderStage         stage,        // Shader stage
+    const GpuProperty&  gpuProperty)  // [in] GPU properties
 {
-    uint32_t waveSize = m_pGpuProperty->waveSize;
+    uint32_t waveSize = gpuProperty.waveSize;
 #if LLPC_BUILD_GFX10
     LLPC_ASSERT(stage == ShaderStageCompute);
 

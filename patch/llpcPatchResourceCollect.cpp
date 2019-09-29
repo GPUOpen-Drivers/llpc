@@ -38,6 +38,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchResourceCollect.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -65,6 +66,7 @@ PatchResourceCollect::PatchResourceCollect()
     m_hasDynIndexedOutput(false),
     m_pResUsage(nullptr)
 {
+    initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
     initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchResourceCollectPass(*PassRegistry::getPassRegistry());
 }
@@ -79,6 +81,7 @@ bool PatchResourceCollect::runOnModule(
     Patch::Init(&module);
 
     // Process each shader stage, in reverse order.
+    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
@@ -94,7 +97,7 @@ bool PatchResourceCollect::runOnModule(
     {
 #if LLPC_BUILD_GFX10
         // Set NGG control settings
-        m_pContext->SetNggControl();
+        m_pContext->SetNggControl(pPipelineState);
 #endif
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
@@ -107,7 +110,7 @@ bool PatchResourceCollect::runOnModule(
 
         if (checkGsOnChip)
         {
-            bool gsOnChip = m_pContext->CheckGsOnChipValidity();
+            bool gsOnChip = m_pContext->CheckGsOnChipValidity(pPipelineState);
             m_pContext->SetGsOnChip(gsOnChip);
         }
     }

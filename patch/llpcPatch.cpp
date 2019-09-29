@@ -57,6 +57,7 @@
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPatchCheckShaderCache.h"
+#include "llpcPipelineState.h"
 #include "SPIRVInternal.h"
 
 #define DEBUG_TYPE "llpc-patch"
@@ -368,8 +369,9 @@ void Patch::Init(
 // =====================================================================================================================
 // Get or create global variable for LDS.
 GlobalVariable* Patch::GetLdsVariable(
-    Module* pModule)  // [in/out] Module to get or create LDS in
+    PipelineState*  pPipelineState)   // [in] PipelineState
 {
+    Module* pModule = pPipelineState->GetModule();
     auto pContext = static_cast<Context*>(&pModule->getContext());
 
     // See if this module already has LDS.
@@ -381,7 +383,7 @@ GlobalVariable* Patch::GetLdsVariable(
     }
     // Now we can create LDS.
     // Construct LDS type: [ldsSize * i32], address space 3
-    auto ldsSize = pContext->GetGpuProperty()->ldsSizePerCu;
+    auto ldsSize = pPipelineState->GetGpuProperty()->ldsSizePerCu;
     auto pLdsTy = ArrayType::get(pContext->Int32Ty(), ldsSize / sizeof(uint32_t));
 
     auto pLds = new GlobalVariable(*pModule,

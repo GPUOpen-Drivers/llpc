@@ -46,12 +46,14 @@
 namespace Llpc
 {
 
+class PipelineState;
+
 // =====================================================================================================================
 // Represents LLPC context for pipeline compilation. Derived from the base class llvm::LLVMContext.
 class Context : public llvm::LLVMContext
 {
 public:
-    Context(GfxIpVersion gfxIp, const WorkaroundFlags* pGpuWorkarounds);
+    Context(GfxIpVersion gfxIp);
     ~Context();
 
     void Reset();
@@ -74,24 +76,14 @@ public:
         return m_pPipelineContext;
     }
 
-    // Create LLPC builder
-    void CreateBuilder();
+    // Create LLPC builder and set pipeline options in context
+    Result CreateBuilder(const PipelineOptions*);
 
     // Gets LLPC builder
     Builder* GetBuilder() const { return m_pBuilder; }
 
-    // Sets the target machine.
-    void SetTargetMachine(llvm::TargetMachine* pTargetMachine, const PipelineOptions* pPipelineOptions)
-    {
-        m_pTargetMachine.reset(pTargetMachine);
-        m_TargetMachineOptions = *pPipelineOptions;
-    }
-
     // Gets the target machine.
-    llvm::TargetMachine* GetTargetMachine()
-    {
-        return m_pTargetMachine.get();
-    }
+    llvm::TargetMachine* GetTargetMachine();
 
     // Gets pipeline debuging/tunning options
     const PipelineOptions* GetTargetMachinePipelineOptions() const
@@ -182,9 +174,9 @@ public:
         return m_pPipelineContext->GetNextShaderStage(shaderStage);
     }
 
-    const char* GetGpuNameString() const
+    void GetGpuNameString(std::string& gpuName) const
     {
-        return PipelineContext::GetGpuNameString(m_gfxIp);
+        PipelineContext::GetGpuNameString(m_gfxIp, gpuName);
     }
 
     const char* GetGpuNameAbbreviation() const
@@ -197,16 +189,6 @@ public:
         return m_gfxIp;
     }
 
-    const GpuProperty* GetGpuProperty() const
-    {
-        return m_pPipelineContext->GetGpuProperty();
-    }
-
-    const WorkaroundFlags* GetGpuWorkarounds() const
-    {
-        return m_pPipelineContext->GetGpuWorkarounds();
-    }
-
     llvm::MDNode* GetEmptyMetadataNode()
     {
         return m_pEmptyMetaNode;
@@ -217,9 +199,9 @@ public:
         return m_pPipelineContext->IsTessOffChip();
     }
 
-    bool CheckGsOnChipValidity()
+    bool CheckGsOnChipValidity(PipelineState* pPipelineState)
     {
-        return m_pPipelineContext->CheckGsOnChipValidity();
+        return m_pPipelineContext->CheckGsOnChipValidity(pPipelineState);
     };
 
     bool IsGsOnChip()
@@ -239,9 +221,9 @@ public:
 
 #if LLPC_BUILD_GFX10
     // Sets NGG control settings
-    void SetNggControl()
+    void SetNggControl(PipelineState* pPipelineState)
     {
-        return m_pPipelineContext->SetNggControl();
+        return m_pPipelineContext->SetNggControl(pPipelineState);
     }
 
     // Gets NGG control settings
@@ -267,9 +249,9 @@ public:
     }
 
     // Gets wave size for the specified shader stage
-    uint32_t GetShaderWaveSize(ShaderStage stage)
+    uint32_t GetShaderWaveSize(ShaderStage stage, const GpuProperty& gpuProperty)
     {
-        return m_pPipelineContext->GetShaderWaveSize(stage);
+        return m_pPipelineContext->GetShaderWaveSize(stage, gpuProperty);
     }
 
     uint64_t GetPiplineHashCode() const
@@ -311,7 +293,6 @@ private:
 
     ResourceUsage*                m_pResUsage;          // External resource usage
 
-    std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine
 
     llvm::MDNode*       m_pEmptyMetaNode;   // Empty metadata node

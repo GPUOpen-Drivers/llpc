@@ -108,9 +108,9 @@ bool PatchInOutImportExport::runOnModule(
 
     Patch::Init(&module);
 
-    m_gfxIp = m_pContext->GetGfxIpVersion();
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     m_pipelineSysValues.Initialize(m_pPipelineState);
+    m_gfxIp = m_pPipelineState->GetGfxIpVersion();
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
@@ -121,7 +121,7 @@ bool PatchInOutImportExport::runOnModule(
     // NOTE: ES -> GS ring is always on-chip on GFX9.
     if (m_hasTs || (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))))
     {
-        m_pLds = Patch::GetLdsVariable(m_pModule);
+        m_pLds = Patch::GetLdsVariable(m_pPipelineState);
     }
 
     // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
@@ -183,7 +183,7 @@ void PatchInOutImportExport::ProcessShader()
     else if (m_shaderStage == ShaderStageFragment)
     {
         // Create fragment color export manager
-        m_pFragColorExport = new FragColorExport(m_pModule);
+        m_pFragColorExport = new FragColorExport(m_pPipelineState);
     }
 
     // Initialize the output value for gl_PrimitiveID
@@ -2406,7 +2406,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2518,7 +2518,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2689,7 +2689,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2789,7 +2789,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3099,7 +3099,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3288,7 +3288,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3310,7 +3310,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
                                            builtInUsage.workgroupSizeZ;
 
             // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
-            const uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+            const uint32_t subgroupSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
             const uint32_t numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
 
             pInput = ConstantInt::get(m_pContext->Int32Ty(), numSubgroups);
@@ -3385,7 +3385,7 @@ Value* PatchInOutImportExport::GetSubgroupId(
     IRBuilder<> builder(*m_pContext);
     builder.SetInsertPoint(pInsertPos);
     Value* pLocalInvocationIndex = PatchCsBuiltInInputImport(pInputTy, BuiltInLocalInvocationIndex, pInsertPos);
-    uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    uint32_t subgroupSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
     return builder.CreateLShr(pLocalInvocationIndex, builder.getInt32(Log2_32(subgroupSize)));
 }
 
@@ -4665,7 +4665,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
         // Setup out-of-range value. GPU will drop stream-out buffer writing when the thread is invalid.
         uint32_t outofRangeValue = 0xFFFFFFFF;
         outofRangeValue /= xfbStride;
-        outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
+        outofRangeValue -= (m_pPipelineState->GetShaderWaveSize(m_shaderStage) - 1);
         Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
         pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
         BranchInst::Create(pStoreBlock, pEntryBlock);
@@ -6412,7 +6412,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     uint32_t tessFactorStride   // Stride of tessellation factors (DWORDs)
     ) const
 {
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
 
     // NOTE: The limit of thread count for tessellation control shader is 4 wavefronts per thread group.
     const uint32_t maxThreadCountPerThreadGroup = (4 * waveSize);
@@ -6425,7 +6425,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     // Compute the required LDS size per patch, always include the space for VS vertex out
     uint32_t ldsSizePerPatch = inPatchSize;
-    uint32_t patchCountLimitedByLds = (m_pContext->GetGpuProperty()->ldsSizePerThreadGroup / ldsSizePerPatch);
+    uint32_t patchCountLimitedByLds = (m_pPipelineState->GetGpuProperty()->ldsSizePerThreadGroup / ldsSizePerPatch);
 
     uint32_t patchCountPerThreadGroup = std::min(patchCountLimitedByThread, patchCountLimitedByLds);
 
@@ -6439,7 +6439,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     {
         auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
         auto tessOffChipPatchCountPerThreadGroup =
-            m_pContext->GetGpuProperty()->tessOffChipLdsBufferSize / outPatchLdsBufferSize;
+            m_pPipelineState->GetGpuProperty()->tessOffChipLdsBufferSize / outPatchLdsBufferSize;
         patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
     }
 
@@ -6448,11 +6448,11 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     // There is one TF Buffer per shader engine. We can do the below calculation on a per-SE basis.  It is also safe to
     // assume that one thread-group could at most utilize all of the TF Buffer.
-    const uint32_t tfBufferSizeInBytes = sizeof(uint32_t) * m_pContext->GetGpuProperty()->tessFactorBufferSizePerSe;
+    const uint32_t tfBufferSizeInBytes = sizeof(uint32_t) * m_pPipelineState->GetGpuProperty()->tessFactorBufferSizePerSe;
     uint32_t       tfBufferPatchCountLimit = tfBufferSizeInBytes / (tessFactorStride * sizeof(uint32_t));
 
 #if LLPC_BUILD_GFX10
-    const auto pWorkarounds = m_pContext->GetGpuWorkarounds();
+    const auto pWorkarounds = m_pPipelineState->GetGpuWorkarounds();
     if (pWorkarounds->gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow)
     {
         tfBufferPatchCountLimit /= 2;
@@ -6470,9 +6470,9 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     }
 
     // Adjust the patches-per-thread-group based on hardware workarounds.
-    if (m_pContext->GetGpuWorkarounds()->gfx6.miscLoadBalancePerWatt != 0)
+    if (m_pPipelineState->GetGpuWorkarounds()->gfx6.miscLoadBalancePerWatt != 0)
     {
-        const uint32_t waveSize = m_pContext->GetGpuProperty()->waveSize;
+        const uint32_t waveSize = m_pPipelineState->GetGpuProperty()->waveSize;
         // Load balance per watt is a mechanism which monitors HW utilization (num waves active, instructions issued
         // per cycle, etc.) to determine if the HW can handle the workload with fewer CUs enabled.  The SPI_LB_CU_MASK
         // register directs the SPI to stop launching waves to a CU so it will be clock-gated.  There is a bug in the
@@ -6929,7 +6929,7 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
                                                 &*pInsertPos);
 
 #if LLPC_BUILD_GFX10
-    uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
     if (waveSize == 64)
 #endif
     {

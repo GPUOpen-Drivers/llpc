@@ -37,6 +37,7 @@
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 #include "llpcShaderMerger.h"
 
 #define DEBUG_TYPE "llpc-patch-prepare-pipeline-abi"
@@ -59,6 +60,7 @@ public:
         Patch(ID),
         m_onlySetCallingConvs(onlySetCallingConvs)
     {
+        initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
         initializePipelineShadersPass(*llvm::PassRegistry::getPassRegistry());
         initializePatchPreparePipelineAbiPass(*PassRegistry::getPassRegistry());
     }
@@ -67,6 +69,7 @@ public:
 
     void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
     }
 
@@ -82,7 +85,7 @@ private:
 
     void SetAbiEntryNames(Module& module);
 
-    void AddAbiMetadata(Module& module);
+    void AddAbiMetadata();
 
     Result BuildGraphicsPipelineRegConfig(uint8_t** ppConfig, size_t* pConfigSize);
 
@@ -90,6 +93,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
+    PipelineState*    m_pPipelineState;      // Pipeline state
     PipelineShaders*  m_pPipelineShaders;    // API shaders in the pipeline
 
     bool              m_hasVs;               // Whether the pipeline has vertex shader
@@ -123,6 +127,7 @@ bool PatchPreparePipelineAbi::runOnModule(
 
     Patch::Init(&module);
 
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     m_pPipelineShaders = &getAnalysis<PipelineShaders>();
 
     m_hasVs  = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
@@ -130,7 +135,7 @@ bool PatchPreparePipelineAbi::runOnModule(
     m_hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
     m_hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
-    m_gfxIp = m_pContext->GetGfxIpVersion();
+    m_gfxIp = m_pPipelineState->GetGfxIpVersion();
 
     // If we've only to set the calling conventions, do that now.
     if (m_onlySetCallingConvs)
@@ -146,7 +151,7 @@ bool PatchPreparePipelineAbi::runOnModule(
 
         SetAbiEntryNames(module);
 
-        AddAbiMetadata(module);
+        AddAbiMetadata();
     }
 
     return true; // Modified the module.
@@ -210,7 +215,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 
     if (m_pContext->IsGraphics())
     {
-        ShaderMerger shaderMerger(m_pContext, m_pPipelineShaders);
+        ShaderMerger shaderMerger(m_pPipelineState, m_pContext, m_pPipelineShaders);
 #if LLPC_BUILD_GFX10
         const bool enableNgg = m_pContext->GetNggControl()->enableNgg;
 #endif
@@ -400,17 +405,16 @@ void PatchPreparePipelineAbi::SetAbiEntryNames(
 
 // =====================================================================================================================
 // Add ABI metadata
-void PatchPreparePipelineAbi::AddAbiMetadata(
-    Module& module)   // [in] LLVM module
+void PatchPreparePipelineAbi::AddAbiMetadata()
 {
     if (m_gfxIp.major <= 8)
     {
-        Gfx6::ConfigBuilder configBuilder(&module);
+        Gfx6::ConfigBuilder configBuilder(m_pPipelineState);
         configBuilder.BuildPalMetadata();
     }
     else
     {
-        Gfx9::ConfigBuilder configBuilder(&module);
+        Gfx9::ConfigBuilder configBuilder(m_pPipelineState);
         configBuilder.BuildPalMetadata();
     }
 }

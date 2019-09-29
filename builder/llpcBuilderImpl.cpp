@@ -30,6 +30,7 @@
  */
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -49,6 +50,14 @@ void BuilderImplBase::SetPipelineState(
 {
     LLPC_ASSERT(m_pAllocatedPipelineState == nullptr);
     m_pPipelineState = pPipelineState;
+}
+
+// =====================================================================================================================
+// Get the wave size for a shader stage
+uint32_t BuilderImplBase::GetShaderWaveSize(
+    ShaderStage stage) const    // Shader stage
+{
+    return m_pPipelineState->GetShaderWaveSize(stage);
 }
 
 // =====================================================================================================================
@@ -80,17 +89,17 @@ Value* BuilderImplBase::CreateDotProduct(
 // Get whether the context we are building in supports DPP operations.
 bool BuilderImplBase::SupportDpp() const
 {
-    return getContext().GetGfxIpVersion().major >= 8;
+    return GetPipelineState()->GetGfxIpVersion().major >= 8;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
 bool BuilderImplBase::SupportBPermute() const
 {
-    auto gfxIp = getContext().GetGfxIpVersion().major;
+    auto gfxIp = GetPipelineState()->GetGfxIpVersion().major;
     auto supportBPermute = (gfxIp == 8) || (gfxIp == 9);
 #if LLPC_BUILD_GFX10
-    auto waveSize = getContext().GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
+    auto waveSize = GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
     supportBPermute = supportBPermute || ((gfxIp == 10) && (waveSize == 32));
 #endif
     return supportBPermute;
@@ -101,7 +110,7 @@ bool BuilderImplBase::SupportBPermute() const
 // Get whether the context we are building in supports permute lane DPP operations.
 bool BuilderImplBase::SupportPermLaneDpp() const
 {
-    return getContext().GetGfxIpVersion().major >= 10;
+    return GetPipelineState()->GetGfxIpVersion().major >= 10;
 }
 #endif
 

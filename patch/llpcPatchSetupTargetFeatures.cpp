@@ -33,6 +33,7 @@
 
 #include "llpcCodeGenManager.h"
 #include "llpcPatch.h"
+#include "llpcPipelineState.h"
 
 #define DEBUG_TYPE "llpc-patch-setup-target-features"
 
@@ -50,7 +51,13 @@ public:
     static char ID;
     PatchSetupTargetFeatures() : Patch(ID)
     {
+        initializePipelineStateWrapperPass(*PassRegistry::getPassRegistry());
         initializePatchSetupTargetFeaturesPass(*PassRegistry::getPassRegistry());
+    }
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineStateWrapper>();
     }
 
     bool runOnModule(Module& module) override;
@@ -79,7 +86,8 @@ bool PatchSetupTargetFeatures::runOnModule(
 
     Patch::Init(&module);
 
-    CodeGenManager::SetupTargetFeatures(&module);
+    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    CodeGenManager::SetupTargetFeatures(pPipelineState);
 
     return true; // Modified the module.
 }

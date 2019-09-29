@@ -32,6 +32,7 @@
 
 #include "llpc.h"
 #include "llpcBuilderContext.h"
+#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
 #include "llvm/IR/IRBuilder.h"
@@ -49,6 +50,34 @@ static const char* const UserDataMetadataName = "llpc.user.data.nodes";
 LLVMContext& PipelineState::GetContext() const
 {
     return GetBuilderContext()->GetContext();
+}
+
+// =====================================================================================================================
+// Get TargetInfo
+const TargetInfo& PipelineState::GetTargetInfo() const
+{
+    return GetBuilderContext()->GetTargetInfo();
+}
+
+// =====================================================================================================================
+// Get GfxIpVersion
+GfxIpVersion PipelineState::GetGfxIpVersion() const
+{
+    return GetTargetInfo().gfxIp;
+}
+
+// =====================================================================================================================
+// Get GpuProperty
+const GpuProperty* PipelineState::GetGpuProperty() const
+{
+    return &GetTargetInfo().gpuProperty;
+}
+
+// =====================================================================================================================
+// Get GpuWorkarounds
+const WorkaroundFlags* PipelineState::GetGpuWorkarounds() const
+{
+    return &GetTargetInfo().gpuWorkarounds;
 }
 
 // =====================================================================================================================
@@ -432,6 +461,16 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
+}
+
+// =====================================================================================================================
+// Get wave size for the specified shader stage
+uint32_t PipelineState::GetShaderWaveSize(
+    ShaderStage stage)  // Shader stage
+{
+    // TODO: Move the logic of GetShaderWaveSize into here. But first we need to pass the pipeline build info
+    // into the middle-end in a clean way.
+    return reinterpret_cast<Context*>(&m_pModule->getContext())->GetShaderWaveSize(stage, *GetGpuProperty());
 }
 
 // =====================================================================================================================

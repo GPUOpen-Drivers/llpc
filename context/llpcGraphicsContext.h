@@ -43,8 +43,6 @@ class GraphicsContext: public PipelineContext
 {
 public:
     GraphicsContext(GfxIpVersion                     gfxIp,
-                    const GpuProperty*               pGpuProp,
-                    const WorkaroundFlags*           pGpuWorkarounds,
                     const GraphicsPipelineBuildInfo* pPipelineInfo,
                     MetroHash::Hash*                 pPipelineHash,
                     MetroHash::Hash*                 pCacheHash);
@@ -72,7 +70,7 @@ public:
     // Checks whether tessellation off-chip mode is enabled
     virtual bool IsTessOffChip() const { return m_tessOffchip; }
 
-    virtual bool CheckGsOnChipValidity();
+    virtual bool CheckGsOnChipValidity(PipelineState* pPipelineState);
 
     // Checks whether GS on-chip mode is enabled
 
@@ -88,7 +86,7 @@ public:
 
 #if LLPC_BUILD_GFX10
     // Sets NGG control settings
-    virtual void SetNggControl();
+    virtual void SetNggControl(PipelineState* pPipelineState);
 
     // Gets NGG control settings
     virtual const NggControl* GetNggControl() const { return &m_nggControl; }
@@ -101,7 +99,7 @@ public:
     virtual uint32_t GetVerticesPerPrimitive() const;
 
     // Gets wave size for the specified shader stage
-    virtual uint32_t GetShaderWaveSize(ShaderStage stage);
+    virtual uint32_t GetShaderWaveSize(ShaderStage stage, const GpuProperty& gpuProperty);
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }

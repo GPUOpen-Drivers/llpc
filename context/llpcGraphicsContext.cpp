@@ -37,11 +37,11 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
+#include "llpcInternal.h"
 #if LLPC_BUILD_GFX10
 #include "llpcNggLdsManager.h"
 #endif
-
-#include "llpcInternal.h"
+#include "llpcPipelineState.h"
 
 using namespace llvm;
 using namespace SPIRV;
@@ -76,13 +76,11 @@ namespace Llpc
 // =====================================================================================================================
 GraphicsContext::GraphicsContext(
     GfxIpVersion                     gfxIp,            // Graphics Ip version info
-    const GpuProperty*               pGpuProp,         // [in] GPU Property
-    const WorkaroundFlags*           pGpuWorkarounds,  // [in] GPU workarounds
     const GraphicsPipelineBuildInfo* pPipelineInfo,    // [in] Graphics pipeline build info
     MetroHash::Hash*                 pPipelineHash,    // [in] Pipeline hash code
     MetroHash::Hash*                 pCacheHash)       // [in] Cache hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pPipelineHash, pCacheHash),
+    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
     m_pPipelineInfo(pPipelineInfo),
     m_stageMask(0),
     m_activeStageCount(0),
@@ -292,8 +290,10 @@ void GraphicsContext::InitShaderInfoForNullFs()
 
 // =====================================================================================================================
 // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-bool GraphicsContext::CheckGsOnChipValidity()
+bool GraphicsContext::CheckGsOnChipValidity(
+    PipelineState*  pPipelineState)   // [in] Pipeline state
 {
+    const GpuProperty& gpuProperty = *pPipelineState->GetGpuProperty();
     bool gsOnChip = true;
 
     uint32_t stageMask = GetShaderStageMask();
@@ -352,7 +352,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
 
     if (m_gfxIp.major <= 8)
     {
-        uint32_t gsPrimsPerSubgroup = m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup;
+        uint32_t gsPrimsPerSubgroup = gpuProperty.gsOnChipDefaultPrimsPerSubgroup;
 
         const uint32_t esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
         const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
@@ -393,12 +393,12 @@ bool GraphicsContext::CheckGsOnChipValidity()
 
         // Total LDS use per subgroup aligned to the register granularity
         uint32_t gsOnChipLdsSize = Pow2Align((esGsLdsSize + gsVsLdsSize),
-                                             static_cast<uint32_t>((1 << m_pGpuProperty->ldsSizeDwordGranularityShift)));
+                                             static_cast<uint32_t>((1 << gpuProperty.ldsSizeDwordGranularityShift)));
 
         // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
         // reasonable default. The final amount must be 128-DWORD aligned.
 
-        uint32_t maxLdsSize = m_pGpuProperty->gsOnChipDefaultLdsSizePerSubgroup;
+        uint32_t maxLdsSize = gpuProperty.gsOnChipDefaultLdsSizePerSubgroup;
 
         // TODO: For BONAIRE A0, GODAVARI and KALINDI, set maxLdsSize to 1024 due to SPI barrier management bug
 
@@ -616,7 +616,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
 
             const uint32_t ldsSizeDwords =
                 Pow2Align(expectedEsLdsSize + expectedGsLdsSize,
-                          static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift));
+                          static_cast<uint32_t>(1 << gpuProperty.ldsSizeDwordGranularityShift));
 
             // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
             LLPC_ASSERT(ldsSizeDwords <= 16384);
@@ -639,11 +639,11 @@ bool GraphicsContext::CheckGsOnChipValidity()
         else
 #endif
         {
-            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pGpuProperty->ldsSizeDwordGranularityShift);
+            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << gpuProperty.ldsSizeDwordGranularityShift);
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
-            uint32_t gsPrimsPerSubgroup = std::min(m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup,
-                                                   GetShaderWaveSize(ShaderStageGeometry));
+            uint32_t gsPrimsPerSubgroup = std::min(gpuProperty.gsOnChipDefaultPrimsPerSubgroup,
+                                                   GetShaderWaveSize(ShaderStageGeometry, gpuProperty));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
             const uint32_t esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
@@ -808,7 +808,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
             {
                 uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
                 uint32_t onChipGsLdsMagicSize = Pow2Align((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
-                                                          static_cast<uint32_t>((1 << m_pGpuProperty->ldsSizeDwordGranularityShift)));
+                                                          static_cast<uint32_t>((1 << gpuProperty.ldsSizeDwordGranularityShift)));
 
                 // If the new size is greater than the size we previously set
                 // then we need to either increase the size or decrease the verts
@@ -1090,7 +1090,8 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
 // Sets NGG control settings
 //
 // NOTE: Need to be called before after LLVM preliminary patch work and LLVM main patch work.
-void GraphicsContext::SetNggControl()
+void GraphicsContext::SetNggControl(
+    PipelineState*  pPipelineState)   // [in] Pipeline state
 {
     // For GFX10+, initialize NGG control settings
     if (m_gfxIp.major < 10)
@@ -1143,7 +1144,7 @@ void GraphicsContext::SetNggControl()
         enableNgg = false;
     }
 
-    if (m_pGpuWorkarounds->gfx10.waNggDisabled)
+    if (pPipelineState->GetGpuWorkarounds()->gfx10.waNggDisabled)
     {
         enableNgg = false;
     }
@@ -1390,7 +1391,8 @@ uint32_t GraphicsContext::GetVerticesPerPrimitive() const
 //
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
 uint32_t GraphicsContext::GetShaderWaveSize(
-    ShaderStage stage)  // Shader stage
+    ShaderStage         stage,        // Shader stage
+    const GpuProperty&  gpuProperty)  // [in] GPU properties
 {
     if (stage == ShaderStageCopyShader)
     {
@@ -1400,7 +1402,7 @@ uint32_t GraphicsContext::GetShaderWaveSize(
 
     LLPC_ASSERT(stage < ShaderStageGfxCount);
 
-    uint32_t waveSize = m_pGpuProperty->waveSize;
+    uint32_t waveSize = gpuProperty.waveSize;
 
 #if LLPC_BUILD_GFX10
     if (m_gfxIp.major == 10)
@@ -1453,11 +1455,11 @@ uint32_t GraphicsContext::GetShaderWaveSize(
             }
             else if ((m_stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0)
             {
-                waveSize = GetShaderWaveSize(ShaderStageTessEval);
+                waveSize = GetShaderWaveSize(ShaderStageTessEval, gpuProperty);
             }
             else
             {
-                waveSize = GetShaderWaveSize(ShaderStageVertex);
+                waveSize = GetShaderWaveSize(ShaderStageVertex, gpuProperty);
             }
             break;
         case ShaderStageFragment:

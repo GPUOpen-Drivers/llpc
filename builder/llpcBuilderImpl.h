@@ -94,6 +94,9 @@ protected:
                      Value*                                        pValue2,
                      std::function<Value*(Value*, Value*, Value*)> callback);
 
+    // Forwarding methods to PipelineState
+    uint32_t GetShaderWaveSize(ShaderStage stage) const;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplBase)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplBase)

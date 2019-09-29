@@ -54,7 +54,11 @@ namespace Llpc
 
 using namespace llvm;
 
+class BuilderContext;
+struct GpuProperty;
 class PipelineState;
+struct TargetInfo;
+struct WorkaroundFlags;
 
 ModulePass* CreatePipelineStateClearer();
 
@@ -109,6 +113,12 @@ public:
     void SetModule(Module* pModule) { m_pModule = pModule; }
     Module* GetModule() const { return m_pModule; }
 
+    // Accessors for TargetInfo and its contents
+    const TargetInfo& GetTargetInfo() const;
+    GfxIpVersion GetGfxIpVersion() const;
+    const GpuProperty* GetGpuProperty() const;
+    const WorkaroundFlags* GetGpuWorkarounds() const;
+
     // Clear the pipeline state IR metadata.
     void Clear(Module* pModule);
 
@@ -122,6 +132,9 @@ public:
     void SetUserDataNodes(ArrayRef<ResourceMappingNode>   nodes,
                           ArrayRef<DescriptorRangeValue>  rangeValues);
     ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
+
+    // Get wave size for the specified shader stage
+    uint32_t GetShaderWaveSize(ShaderStage stage);
 
 private:
     // Type of immutable nodes map used in SetUserDataNodes

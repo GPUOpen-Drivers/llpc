@@ -37,6 +37,7 @@ namespace Llpc
 {
 
 class Context;
+class PipelineState;
 
 // Enumerates the source selection of each color channel in a color attachment format.
 enum class ChannelSwizzle : uint8_t
@@ -98,7 +99,7 @@ struct ColorFormatInfo
 class FragColorExport
 {
 public:
-    FragColorExport(llvm::Module* pModule);
+    FragColorExport(PipelineState* pPipelineState);
 
     llvm::Value* Run(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
 
@@ -134,7 +135,8 @@ private:
 
     static const ColorFormatInfo    m_colorFormatInfo[]; // Info table of fragment color format
 
-    const GraphicsPipelineBuildInfo* pPipelineInfo;   // Graphics pipeline build info
+    const GraphicsPipelineBuildInfo* pPipelineInfo;     // Graphics pipeline build info
+    PipelineState*                   m_pPipelineState;  // Pipeline state
 };
 
 } // Llpc

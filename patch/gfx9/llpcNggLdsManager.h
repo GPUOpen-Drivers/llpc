@@ -42,6 +42,7 @@ namespace Llpc
 
 class Context;
 class GraphicsContext;
+class PipelineState;
 
 // Enumerates the types of LDS regions used in NGG.
 enum NggLdsRegionType
@@ -94,7 +95,7 @@ static const uint32_t SizeOfDword = sizeof(uint32_t);
 class NggLdsManager
 {
 public:
-    NggLdsManager(llvm::Module* pModule, Context* pContext, llvm::IRBuilder<>* pBuilder);
+    NggLdsManager(PipelineState* pPipelineState, Context* pContext, llvm::IRBuilder<>* pBuilder);
 
     static uint32_t CalcEsExtraLdsSize(GraphicsContext* pContext);
     static uint32_t CalcGsExtraLdsSize(GraphicsContext* pContext);

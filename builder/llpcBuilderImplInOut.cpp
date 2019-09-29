@@ -757,7 +757,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
     {
         Value* pResult = nullptr;
         Value* pLocalInvocationId = ReadBuiltIn(false, BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr, "");
-        if (getContext().GetShaderWaveSize(m_shaderStage) == 64)
+        if (GetShaderWaveSize(m_shaderStage) == 64)
         {
             pLocalInvocationId = CreateZExt(pLocalInvocationId, getInt64Ty());
         }
@@ -784,7 +784,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
         default:
             LLPC_NEVER_CALLED();
         }
-        if (getContext().GetShaderWaveSize(m_shaderStage) == 64)
+        if (GetShaderWaveSize(m_shaderStage) == 64)
         {
             pResult = CreateInsertElement(Constant::getNullValue(VectorType::get(getInt64Ty(), 2)),
                                           pResult,

@@ -66,8 +66,7 @@ static cl::opt<bool> UseBuilderRecorder("use-builder-recorder",
 
 // =====================================================================================================================
 Context::Context(
-    GfxIpVersion gfxIp,                     // Graphics IP version info
-    const WorkaroundFlags* pGpuWorkarounds) // GPU workarounds
+    GfxIpVersion gfxIp)                     // Graphics IP version info
     :
     LLVMContext(),
     m_gfxIp(gfxIp),
@@ -124,11 +123,30 @@ void Context::Reset()
 }
 
 // =====================================================================================================================
-// Create LLPC builder that will be returned by GetBuilder.
-void Context::CreateBuilder()
+// Create LLPC builder that will be returned by GetBuilder, create target machine if necessary, and set
+// pipeline options in context
+Result Context::CreateBuilder(
+    const PipelineOptions* pPipelineOptions)  // [in] Pipeline options
 {
+    std::string gpuName;
+    GetGpuNameString(gpuName);
+    if (m_pBuilderContext->SetTargetMachine(gpuName) == false)
+    {
+        LLPC_ERRS("Fails to create AMDGPU target machine '" << gpuName << "'\n");
+        return Result::ErrorInvalidShader;
+    }
+
+    m_TargetMachineOptions = *pPipelineOptions;
     LLPC_ASSERT(m_pBuilder == nullptr);
     m_pBuilder = m_pBuilderContext->CreateBuilder();
+    return Result::Success;
+}
+
+// =====================================================================================================================
+// Gets the target machine.
+TargetMachine* Context::GetTargetMachine()
+{
+    return m_pBuilderContext->GetTargetMachine();
 }
 
 // =====================================================================================================================

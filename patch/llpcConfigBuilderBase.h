@@ -36,12 +36,14 @@
 namespace Llpc
 {
 
+class PipelineState;
+
 // =====================================================================================================================
 // Register configuration builder base class.
 class ConfigBuilderBase
 {
 public:
-    ConfigBuilderBase(llvm::Module* pModule);
+    ConfigBuilderBase(PipelineState* pPipelineState);
     ~ConfigBuilderBase();
 
     void WritePalMetadata();
@@ -76,6 +78,7 @@ protected:
 
     // -----------------------------------------------------------------------------------------------------------------
 
+    PipelineState*                  m_pPipelineState;     // Pipeline state
     llvm::Module*                   m_pModule;            // LLVM module being processed
     Context*                        m_pContext;           // LLPC context
     uint8_t*                        m_pConfig = nullptr;  // Register/metadata configuration

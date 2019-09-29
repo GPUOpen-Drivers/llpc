@@ -31,9 +31,21 @@
 #include "llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
 #include "llpcBuilderRecorder.h"
+#include "llpcInternal.h"
+#include "llpcPassManager.h"
+
+#include "llvm/CodeGen/CommandFlags.inc"
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Target/TargetOptions.h"
 
 using namespace Llpc;
 using namespace llvm;
+
+// -emit-llvm: emit LLVM bitcode instead of ISA
+static cl::opt<bool> EmitLlvm("emit-llvm",
+                              cl::desc("Emit LLVM bitcode instead of AMD GPU ISA"),
+                              cl::init(false));
 
 // =====================================================================================================================
 BuilderContext::BuilderContext(
@@ -41,6 +53,34 @@ BuilderContext::BuilderContext(
     bool          useBuilderRecorder)   // True to use BuilderRecorder, false to build directly
     : m_context(context), m_useBuilderRecorder(useBuilderRecorder)
 {
+}
+
+// =====================================================================================================================
+// Set target machine. Returns false on failure (GPU name not found or not supported)
+bool BuilderContext::SetTargetMachine(
+    StringRef     gpuName)      // LLVM GPU name, e.g. "gfx900"
+{
+    if (SetTargetInfo(gpuName, &m_targetInfo) == false)
+    {
+        return false;
+    }
+
+    // Get the LLVM target and create the target machine. This should not fail, as we determined above
+    // that we support the requested target.
+    StringRef triple = "amdgcn--amdpal";
+    std::string errMsg;
+    const Target* pTarget = TargetRegistry::lookupTarget(triple, errMsg);
+    // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)
+    TargetOptions targetOpts;
+    targetOpts.NoSignedZerosFPMath = true;
+
+    m_pTargetMachine.reset(pTarget->createTargetMachine(triple,
+                                                        gpuName,
+                                                        "",
+                                                        targetOpts,
+                                                        Optional<Reloc::Model>()));
+    LLPC_ASSERT(m_pTargetMachine);
+    return true;
 }
 
 // =====================================================================================================================
@@ -65,5 +105,52 @@ Builder* BuilderContext::CreateBuilderImpl(
     BuilderImpl* pBuilderImpl = new BuilderImpl(this);
     pBuilderImpl->SetPipelineState(pPipelineState);
     return pBuilderImpl;
+}
+
+// =====================================================================================================================
+// Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
+void BuilderContext::AddTargetPasses(
+    PassManager&          passMgr,        // [in/out] pass manager to add passes to
+    Timer*                pCodeGenTimer,  // [in] Timer to time target passes with, nullptr if not timing
+    raw_pwrite_stream&    outStream)      // [out] Output stream
+{
+    // Start timer for codegen passes.
+    if (pCodeGenTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pCodeGenTimer, true));
+    }
+
+    // Dump the module just before codegen.
+    if (EnableOuts())
+    {
+        passMgr.add(createPrintModulePass(outs(),
+                    "===============================================================================\n"
+                    "// LLPC final pipeline module info\n"));
+    }
+
+    if (EmitLlvm)
+    {
+        // For -emit-llvm, add a pass to output the LLVM IR, then tell the pass manager to stop adding
+        // passes. We do it this way to ensure that we still get the immutable passes from
+        // TargetMachine::addPassesToEmitFile, as they can affect LLVM middle-end optimizations.
+        passMgr.add(createPrintModulePass(outStream));
+        passMgr.stop();
+    }
+
+    // TODO: We should probably be using InitTargetOptionsFromCodeGenFlags() here.
+    // Currently we are not, and it would give an "unused function" warning when compiled with
+    // CLANG. So we avoid the warning by referencing it here.
+    LLPC_UNUSED(&InitTargetOptionsFromCodeGenFlags);
+
+    if (GetTargetMachine()->addPassesToEmitFile(passMgr, outStream, nullptr, FileType))
+    {
+        report_fatal_error("Target machine cannot emit a file of this type");
+    }
+
+    // Stop timer for codegen passes.
+    if (pCodeGenTimer != nullptr)
+    {
+        passMgr.add(CreateStartStopTimer(pCodeGenTimer, false));
+    }
 }
 

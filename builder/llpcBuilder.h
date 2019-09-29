@@ -91,20 +91,22 @@ inline static void InitializeBuilderPasses(
 //    front-end decides whether to use BuilderImpl (generate IR directly) or BuilderRecorder (record
 //    Builder calls and replay them at the start of middle-end passes).
 //
-// 2. For a single compile, use BuilderContext::CreateBuilder to create the Builder object.
+// 2. Use BuilderContext::SetTargetMachine to specify which GPU we are compiling for.
 //
-// 3. Use Builder calls to specify the pipeline state:
+// 3. For a single compile, use BuilderContext::CreateBuilder to create the Builder object.
+//
+// 4. Use Builder calls to specify the pipeline state:
 //      Builder::SetUserDataNodes
 //    Setting pipeline state can be deferred to just before pipeline linking if using BuilderRecorder.
 //    If using BuilderImpl, it must be done here before any Builder calls that generate IR.
 //
-// 4. For each shader stage, create or process an IR module, using Builder calls to generate new IR.
+// 5. For each shader stage, create or process an IR module, using Builder calls to generate new IR.
 //
-// 5. Call Builder::Link to link the shader IR modules into a pipeline IR module. (This needs to be
+// 6. Call Builder::Link to link the shader IR modules into a pipeline IR module. (This needs to be
 //    done even if the pipeline only has a single shader, such as a compute pipeline.)
 //    if using BuilderRecorder, this also records the pipeline state into IR metadata.
 //
-// 6. Call Builder::Generate to run middle-end and back-end passes and generate the ELF.
+// 7. Call Builder::Generate to run middle-end and back-end passes and generate the ELF.
 //    (Global options such as -filetype and -emit-llvm cause the output to be something other than ELF.)
 //    The front-end can pass a call-back function into Builder::Generate to check a shader cache
 //    after input and output mapping, and elect to remove already-cached shaders from the pipeline.

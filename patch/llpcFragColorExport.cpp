@@ -38,6 +38,7 @@
 #include "llpcDebug.h"
 #include "llpcFragColorExport.h"
 #include "llpcIntrinsDefs.h"
+#include "llpcPipelineState.h"
 
 using namespace llvm;
 
@@ -1168,11 +1169,12 @@ const ColorFormatInfo FragColorExport::m_colorFormatInfo[] =
 
 // =====================================================================================================================
 FragColorExport::FragColorExport(
-    Module* pModule) // [in] LLVM module
+    PipelineState*  pPipelineState) // [in] Pipeline state
     :
-    m_pModule(pModule),
-    m_pContext(static_cast<Context*>(&pModule->getContext())),
-    pPipelineInfo(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo()))
+    m_pModule(pPipelineState->GetModule()),
+    m_pContext(static_cast<Context*>(&m_pModule->getContext())),
+    pPipelineInfo(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo())),
+    m_pPipelineState(pPipelineState)
 {
 }
 
@@ -1644,8 +1646,8 @@ ExportFormat FragColorExport::ComputeExportFormat(
     // Start by assuming EXP_FORMAT_ZERO (no exports)
     ExportFormat expFmt = EXP_FORMAT_ZERO;
 
-    GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
+    auto pGpuWorkarounds = m_pPipelineState->GetGpuWorkarounds();
 
     bool gfx8RbPlusEnable = false;
     if ((gfxIp.major == 8) && (gfxIp.minor == 1))

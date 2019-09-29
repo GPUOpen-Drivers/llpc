@@ -647,7 +647,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
                                         pInsertPoint);
 
     // DWORD3
-    const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+    const GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
     if (gfxIp.major < 10)
     {
         SqBufRsrcWord3 sqBufRsrcWord3 = {};

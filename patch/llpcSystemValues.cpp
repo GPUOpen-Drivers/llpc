@@ -95,7 +95,7 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
 
         auto pDesc = LoadDescFromDriverTable(tableOffset);
         m_pEsGsRingBufDesc = pDesc;
-        if ((m_shaderStage != ShaderStageGeometry) && (m_pContext->GetGfxIpVersion().major >= 8))
+        if ((m_shaderStage != ShaderStageGeometry) && (m_pPipelineState->GetGfxIpVersion().major >= 8))
         {
             // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
             // VS/TES output.
@@ -341,7 +341,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
                                             pInsertPos);
 
             m_gsVsRingBufDescs[streamId] = pDesc;
-            if (m_pContext->GetGfxIpVersion().major >= 8)
+            if (m_pPipelineState->GetGfxIpVersion().major >= 8)
             {
                 // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
                 m_gsVsRingBufDescs[streamId] = SetRingBufferDataFormat(m_gsVsRingBufDescs[streamId],

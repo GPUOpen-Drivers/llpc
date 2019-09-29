@@ -31,6 +31,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPipelineState.h"
 
 #include "llvm/IR/Intrinsics.h"
 
@@ -245,7 +246,7 @@ Value* BuilderImplDesc::ScalarizeIfUniform(
     if ((isNonUniform == false) && (isa<Constant>(pValue) == false))
     {
         // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-        if (getContext().GetGfxIpVersion().major > 6)
+        if (GetPipelineState()->GetGfxIpVersion().major > 6)
         {
             pValue = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pValue);
         }

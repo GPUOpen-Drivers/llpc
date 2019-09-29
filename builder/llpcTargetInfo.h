@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,75 +24,33 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcCodeGenManager.h
- * @brief LLPC header file: contains declaration of class Llpc::CodeGenManager.
+ * @file  llpcTargetInfo.h
+ * @brief LLPC header file: declaration of TargetInfo struct
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llvm/IR/Module.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include <string>
 #include "llpc.h"
-#include "llpcDebug.h"
-#include "llpcElfReader.h"
-
-namespace llvm
-{
-
-namespace legacy
-{
-
-class PassManager;
-
-} // legacy
-
-class Timer;
-
-} // llvm
+#include "llpcCompiler.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace Llpc
 {
 
-namespace Gfx6
-{
-    struct PipelineVsFsRegConfig;
-    struct PipelineCsRegConfig;
-}
-
-class Context;
-class PassManager;
-class PipelineState;
-
-// Represents data entry in a ELF section, including associated ELF symbols.
-struct ElfDataEntry
-{
-    const void* pData;           // Data in the section
-    uint32_t    offset;          // Offset of the data
-    uint32_t    size;            // Size of the data
-    uint32_t    padSize;         // Padding size of the data
-    const char* pSymName;        // Name of associated ELF symbol
-};
+using namespace llvm;
 
 // =====================================================================================================================
-// Represents the manager of GPU ISA code generation.
-class CodeGenManager
+// TargetInfo struct, representing features and workarounds for the particular selected target
+struct TargetInfo
 {
-public:
-    static void SetupTargetFeatures(PipelineState* pPipelineState);
-
-    static Result Run(llvm::Module*               pModule,
-                      llvm::legacy::PassManager&  passMgr);
-
-private:
-    LLPC_DISALLOW_DEFAULT_CTOR(CodeGenManager);
-    LLPC_DISALLOW_COPY_AND_ASSIGN(CodeGenManager);
-
-    static void DiagnosticHandler(const llvm::DiagnosticInfo& diagInfo, void* pContext);
-
-    static void FatalErrorHandler(void* userData, const std::string& reason, bool gen_crash_diag);
-
+    GfxIpVersion    gfxIp;          // major.minor.stepping
+    GpuProperty     gpuProperty;    // GPU properties
+    WorkaroundFlags gpuWorkarounds; // GPU workarounds
 };
+
+// Set TargetInfo. Returns false if the GPU name is not found or not supported.
+bool SetTargetInfo(
+    StringRef     gpuName,      // LLVM GPU name, e.g. "gfx900"
+    TargetInfo*   pTargetInfo); // [out] TargetInfo struct to set up
 
 } // Llpc
