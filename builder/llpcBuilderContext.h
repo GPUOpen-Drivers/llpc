@@ -46,6 +46,7 @@ namespace Llpc
 using namespace llvm;
 
 class Builder;
+class PipelineState;
 
 // =====================================================================================================================
 // BuilderContext class, used to create Builder objects. State shared between Builder objects is kept here.
@@ -59,6 +60,9 @@ public:
 
     // Create a Builder object
     Builder* CreateBuilder();
+
+    // Create a BuilderImpl object directly, passing in the PipelineState to use. This is used by BuilderReplayer.
+    Builder* CreateBuilderImpl(PipelineState* pPipelineState);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderContext)

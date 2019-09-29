@@ -42,6 +42,16 @@ Context& BuilderImplBase::getContext() const
 }
 
 // =====================================================================================================================
+// Set PipelineState. This is used by BuilderReplayer to get its BuilderImpl to use the existing PipelineState,
+// rather than allocate its own new one.
+void BuilderImplBase::SetPipelineState(
+    PipelineState*  pPipelineState)   // [in] PipelineState to use
+{
+    LLPC_ASSERT(m_pAllocatedPipelineState == nullptr);
+    m_pPipelineState = pPipelineState;
+}
+
+// =====================================================================================================================
 // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
 Value* BuilderImplBase::CreateDotProduct(
     Value* const pVector1,            // [in] The float vector 1

@@ -674,4 +674,7 @@ private:
 #endif
 };
 
+// Create BuilderReplayer pass
+ModulePass* CreateBuilderReplayer(BuilderContext* pBuilderContext);
+
 } // Llpc

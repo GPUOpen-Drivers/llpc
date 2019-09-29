@@ -1404,13 +1404,21 @@ protected:
     static Builder* CreateBuilderImpl(BuilderContext* pBuilderContext);
     static Builder* CreateBuilderRecorder(BuilderContext* pBuilderContext);
 
+    // Const version of GetPipelineState. This is used in BuilderImpl, and we know it does not need allocating.
+    PipelineState* GetPipelineState() const { return m_pPipelineState; }
+
+    // Get PipelineState, allocating if necessary. If it is allocated here (rather than passed in by
+    // BuilderImpl::SetPipelineState), then it is freed when the Builder is freed.
+    PipelineState* GetPipelineState();
+
     // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
     Constant* GetFpConstant(Type* pTy, APFloat value);
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    ShaderStage     m_shaderStage     = ShaderStageInvalid; // Current shader stage being built.
-    PipelineState*  m_pPipelineState  = nullptr;            // Pipeline state
+    ShaderStage                     m_shaderStage = ShaderStageInvalid; // Current shader stage being built.
+    std::unique_ptr<PipelineState>  m_pAllocatedPipelineState;          // Pipeline state allocated by this Builder
+    PipelineState*                  m_pPipelineState = nullptr;         // Pipeline state to use in this Builder
 
     Type* GetTransposedMatrixTy(
         Type* const pMatrixType) const; // [in] The matrix type to tranpose
@@ -1432,8 +1440,5 @@ private:
 
     BuilderContext* m_pBuilderContext;      // Builder context
 };
-
-// Create BuilderReplayer pass
-ModulePass* CreateBuilderReplayer(Builder* pBuilder);
 
 } // Llpc

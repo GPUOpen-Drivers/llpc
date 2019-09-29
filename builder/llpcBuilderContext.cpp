@@ -56,3 +56,14 @@ Builder* BuilderContext::CreateBuilder()
     return new BuilderRecorder(this);
 }
 
+// =====================================================================================================================
+// Create a BuilderImpl object directly, passing in the PipelineState to use.
+Builder* BuilderContext::CreateBuilderImpl(
+    PipelineState*  pPipelineState)   // [in] PipelineState to use
+{
+    // Generate LLVM IR directly without recording
+    BuilderImpl* pBuilderImpl = new BuilderImpl(this);
+    pBuilderImpl->SetPipelineState(pPipelineState);
+    return pBuilderImpl;
+}
+

@@ -44,6 +44,10 @@ class BuilderImplBase : public Builder
 public:
     BuilderImplBase(BuilderContext* pBuilderContext) : Builder(pBuilderContext) {}
 
+    // Set PipelineState. This is used by BuilderReplayer to get its BuilderImpl to use the existing PipelineState,
+    // rather than allocate its own new one.
+    void SetPipelineState(PipelineState* pPipelineState);
+
     // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
     Llpc::Context& getContext() const;
 

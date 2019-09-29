@@ -89,12 +89,22 @@ class PipelineState
 {
 public:
     PipelineState()
-        : m_pContext(nullptr)
+        : m_pBuilderContext(nullptr)
     {}
 
-    PipelineState(llvm::LLVMContext* pContext)
-        : m_pContext(pContext)
+    PipelineState(BuilderContext* pBuilderContext)
+        : m_pBuilderContext(pBuilderContext)
     {}
+
+    // Get BuilderContext
+    BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }
+
+    // Get LLVMContext
+    LLVMContext& GetContext() const;
+
+    // Accessors for pipeline module that this pipeline state is for.
+    void SetModule(Module* pModule) { m_pModule = pModule; }
+    Module* GetModule() const { return m_pModule; }
 
     // Set the resource mapping nodes for the pipeline.
     void SetUserDataNodes(ArrayRef<ResourceMappingNode>   nodes,
@@ -134,7 +144,8 @@ private:
     ResourceMappingNodeType GetResourceTypeFromName(MDString* pTypeName);
 
     // -----------------------------------------------------------------------------------------------------------------
-    llvm::LLVMContext*              m_pContext;                         // LLVM context
+    BuilderContext*                 m_pBuilderContext;                  // Builder context
+    Module*                         m_pModule = nullptr;                // Pipeline IR module
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
@@ -153,12 +164,15 @@ public:
     // Get the PipelineState from this wrapper pass.
     PipelineState* GetPipelineState(Module* pModule);
 
+    // Set the PipelineState. PipelineStateWrapper takes ownership of the PipelineState.
+    void SetPipelineState(std::unique_ptr<PipelineState> pPipelineState);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     static char ID;   // ID of this pass
 
 private:
-    PipelineState* m_pPipelineState = nullptr;  // Cached pipeline state
+    std::unique_ptr<PipelineState> m_pPipelineState;  // Cached pipeline state
 };
 
 } // Llpc

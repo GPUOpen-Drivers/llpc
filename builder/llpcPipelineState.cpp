@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-pipeline-state"
 
 #include "llpc.h"
+#include "llpcBuilderContext.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
 #include "llvm/IR/IRBuilder.h"
@@ -42,6 +43,13 @@ using namespace llvm;
 
 // User data nodes metadata name prefix
 static const char* const BuilderUserDataMetadataName = "llpc.user.data.nodes";
+
+// =====================================================================================================================
+// Get LLVMContext
+LLVMContext& PipelineState::GetContext() const
+{
+    return GetBuilderContext()->GetContext();
+}
 
 // =====================================================================================================================
 // Set the resource mapping nodes for the pipeline.
@@ -128,7 +136,7 @@ void PipelineState::SetUserDataNodesTable(
                     // can assume it is four dwords.
                     auto& immutableNode = *it->second;
 
-                    IRBuilder<> builder(*m_pContext);
+                    IRBuilder<> builder(GetContext());
                     SmallVector<Constant*, 4> values;
 
                     if (immutableNode.arraySize != 0)
@@ -177,7 +185,7 @@ void PipelineState::RecordUserDataTable(
     ArrayRef<ResourceNode>  nodes,              // Table of user data nodes
     NamedMDNode*            pUserDataMetaNode)  // IR metadata node to record them into
 {
-    IRBuilder<> builder(*m_pContext);
+    IRBuilder<> builder(GetContext());
 
     for (const ResourceNode& node : nodes)
     {
@@ -197,7 +205,7 @@ void PipelineState::RecordUserDataTable(
                 // Operand 3: Node count in sub-table.
                 operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
                 // Create the metadata node here.
-                pUserDataMetaNode->addOperand(MDNode::get(*m_pContext, operands));
+                pUserDataMetaNode->addOperand(MDNode::get(GetContext(), operands));
                 // Create nodes for the sub-table.
                 RecordUserDataTable(node.innerTable, pUserDataMetaNode);
                 continue;
@@ -240,7 +248,7 @@ void PipelineState::RecordUserDataTable(
         }
 
         // Create the metadata node.
-        pUserDataMetaNode->addOperand(MDNode::get(*m_pContext, operands));
+        pUserDataMetaNode->addOperand(MDNode::get(GetContext(), operands));
     }
 }
 
@@ -389,7 +397,7 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         for (uint32_t type = 0; type < static_cast<uint32_t>(ResourceMappingNodeType::Count); ++type)
         {
             m_resourceNodeTypeNames[type] =
-                MDString::get(*m_pContext, GetResourceMappingNodeTypeName(static_cast<ResourceMappingNodeType>(type)));
+               MDString::get(GetContext(), GetResourceMappingNodeTypeName(static_cast<ResourceMappingNodeType>(type)));
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
@@ -411,8 +419,6 @@ PipelineStateWrapper::PipelineStateWrapper()
 bool PipelineStateWrapper::doFinalization(
     Module& module)     // [in] Module
 {
-    delete m_pPipelineState;
-    m_pPipelineState = nullptr;
     return false;
 }
 
@@ -421,12 +427,16 @@ bool PipelineStateWrapper::doFinalization(
 PipelineState* PipelineStateWrapper::GetPipelineState(
     Module* pModule)   // [in] Module
 {
-    if (m_pPipelineState == nullptr)
-    {
-        m_pPipelineState = new PipelineState(&pModule->getContext());
-        m_pPipelineState->ReadStateFromModule(pModule);
-    }
-    return m_pPipelineState;
+    LLPC_ASSERT(m_pPipelineState->GetModule() == pModule);
+    return &*m_pPipelineState;
+}
+
+// =====================================================================================================================
+// Set the PipelineState. PipelineStateWrapper takes ownership of the PipelineState.
+void PipelineStateWrapper::SetPipelineState(
+    std::unique_ptr<PipelineState> pPipelineState)  // [in] PipelineState
+{
+    m_pPipelineState = std::move(pPipelineState);
 }
 
 // =====================================================================================================================

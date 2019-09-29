@@ -35,6 +35,7 @@
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
+#include "llpcPipelineState.h"
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -64,13 +65,28 @@ Builder::Builder(
     IRBuilder<>(pBuilderContext->GetContext()),
     m_pBuilderContext(pBuilderContext)
 {
-    m_pPipelineState = new PipelineState(&getContext());
 }
 
 // =====================================================================================================================
 Builder::~Builder()
 {
-    delete m_pPipelineState;
+}
+
+// =====================================================================================================================
+// Get PipelineState, allocating if necessary. If it is allocated here (rather than passed in by
+// BuilderImpl::SetPipelineState), then it is freed when the Builder is freed.
+PipelineState* Builder::GetPipelineState()
+{
+    if (m_pPipelineState == nullptr)
+    {
+        m_pPipelineState = &*m_pAllocatedPipelineState;
+        if (m_pPipelineState == nullptr)
+        {
+            m_pPipelineState = new PipelineState(m_pBuilderContext);
+            m_pAllocatedPipelineState.reset(m_pPipelineState);
+        }
+    }
+    return m_pPipelineState;
 }
 
 // =====================================================================================================================
@@ -94,7 +110,7 @@ void Builder::SetUserDataNodes(
     ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
     ArrayRef<DescriptorRangeValue>  rangeValues)      // The descriptor range values
 {
-    m_pPipelineState->SetUserDataNodes(nodes, rangeValues);
+    GetPipelineState()->SetUserDataNodes(nodes, rangeValues);
 }
 
 // =====================================================================================================================
@@ -155,10 +171,7 @@ Module* Builder::Link(
         pPipelineModule->setModuleIdentifier("llpcPipeline");
 
         // Record pipeline state into IR metadata.
-        if (m_pPipelineState != nullptr)
-        {
-            m_pPipelineState->RecordState(pPipelineModule);
-        }
+        GetPipelineState()->RecordState(pPipelineModule);
     }
     else
     {
@@ -195,6 +208,7 @@ Module* Builder::Link(
         }
     }
 
+    GetPipelineState()->SetModule(pPipelineModule);
     return pPipelineModule;
 }
 
@@ -226,6 +240,12 @@ void Builder::Generate(
 
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
     PreparePassManager(&patchPassMgr);
+
+    // Manually add a PipelineStateWrapper pass, so we can give our PipelineState to it.
+    PipelineStateWrapper* pPipelineStateWrapper = new PipelineStateWrapper();
+    GetPipelineState()->SetModule(&*pipelineModule);
+    pPipelineStateWrapper->SetPipelineState(std::move(m_pAllocatedPipelineState));
+    patchPassMgr.add(pPipelineStateWrapper);
 
     // Patching.
     Patch::AddPasses(&getContext(),

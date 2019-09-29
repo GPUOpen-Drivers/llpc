@@ -349,8 +349,7 @@ Module* BuilderRecorder::Link(
 // This is a BuilderRecorder. Create the BuilderReplayer pass.
 ModulePass* BuilderRecorder::CreateBuilderReplayer()
 {
-    // Create a new BuilderImpl to replay the recorded Builder calls in.
-    return ::CreateBuilderReplayer(Builder::CreateBuilderImpl(GetBuilderContext()));
+    return ::CreateBuilderReplayer(GetBuilderContext());
 }
 
 // =====================================================================================================================

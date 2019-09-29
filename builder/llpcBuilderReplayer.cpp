@@ -31,6 +31,7 @@
 #include "llpcBuilderRecorder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPipelineState.h"
 
 #include "llvm/Support/Debug.h"
 
@@ -48,7 +49,12 @@ class BuilderReplayer final : public ModulePass, BuilderRecorderMetadataKinds
 {
 public:
     BuilderReplayer() : ModulePass(ID) {}
-    BuilderReplayer(Builder* pBuilder);
+    BuilderReplayer(BuilderContext* pBuilderContext);
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineStateWrapper>();
+    }
 
     bool runOnModule(Module& module) override;
 
@@ -64,6 +70,7 @@ private:
 
     Value* ProcessCall(uint32_t opcode, CallInst* pCall);
 
+    BuilderContext*                         m_pBuilderContext;                  // BuilderContext to create Builder from
     std::unique_ptr<Builder>                m_pBuilder;                         // The LLPC builder that the builder
                                                                                 //  calls are being replayed on.
     Module*                                 m_pModule;                          // Module that the pass is being run on
@@ -79,19 +86,19 @@ char BuilderReplayer::ID = 0;
 // =====================================================================================================================
 // Create BuilderReplayer pass
 ModulePass* Llpc::CreateBuilderReplayer(
-    Builder* pBuilder)    // [in] Builder to replay Builder calls on. The BuilderReplayer takes ownership of this.
+    BuilderContext* pBuilderContext)    // [in] BuilderContext
 {
-    return new BuilderReplayer(pBuilder);
+    return new BuilderReplayer(pBuilderContext);
 }
 
 // =====================================================================================================================
 // Constructor
 BuilderReplayer::BuilderReplayer(
-    Builder* pBuilder)      // [in] Builder to replay calls into
+    BuilderContext* pBuilderContext)      // [in] BuilderContext
     :
     ModulePass(ID),
-    BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pBuilder->getContext())),
-    m_pBuilder(pBuilder)
+    BuilderRecorderMetadataKinds(static_cast<LLVMContext&>(pBuilderContext->GetContext())),
+    m_pBuilderContext(pBuilderContext)
 {
     initializeBuilderReplayerPass(*PassRegistry::getPassRegistry());
 }
@@ -106,6 +113,11 @@ bool BuilderReplayer::runOnModule(
     m_pModule = &module;
 
     bool changed = false;
+    // Set up the pipeline state from the specified linked IR module.
+    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(m_pModule);
+
+    // Create the BuilderImpl to replay into, passing it the PipelineState
+    m_pBuilder.reset(m_pBuilderContext->CreateBuilderImpl(pPipelineState));
 
     SmallVector<Function*, 8> funcsToRemove;
 
