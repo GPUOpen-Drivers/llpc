@@ -8969,6 +8969,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
 
     // Align StartXfbLoc to 64-bit (8 bytes)
     bool AlignTo64Bit = checkContains64BitType(ElemTy);
+    bool BlockArray = ElemTy->hasDecorate(spv::DecorationBlock);
+
     if (AlignTo64Bit)
       StartXfbLoc = roundUpToMultiple(StartXfbLoc, 8u);
     Type *ElemMDTy = nullptr;
@@ -8992,7 +8994,10 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     // Update next location value
     if (!InOutDec.IsBuiltIn) {
       InOutDec.Value.Loc = StartLoc + (Stride * NumElems);
-      InOutDec.XfbLoc = StartXfbLoc + (XfbLocStride * NumElems);
+      if (!BlockArray)
+        InOutDec.XfbLoc = StartXfbLoc + (XfbLocStride * NumElems);
+      else
+        InOutDec.XfbLoc = StartXfbLoc + XfbLocStride;
     }
 
     // Built metadata for the array/matrix
@@ -9024,7 +9029,10 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.XfbBuffer = InOutDec.XfbBuffer;
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
-    InOutMD.XfbLocStride = XfbLocStride;
+    if (BlockArray)
+      InOutMD.XfbLocStride = InOutDec.XfbStride;
+    else
+      InOutMD.XfbLocStride = XfbLocStride;
     InOutMD.XfbLoc = StartXfbLoc;
 
     std::vector<Constant *> MDValues;
