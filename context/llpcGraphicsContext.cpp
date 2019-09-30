@@ -364,7 +364,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
         uint32_t esGsRingItemSizeOnChip = esGsRingItemSize;
         uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize;
 
-        // optimize ES -> GS ring and GS -> VS ring layout for bank conflicts
+        // Optimize ES -> GS ring and GS -> VS ring layout for bank conflicts
         esGsRingItemSizeOnChip |= 1;
         gsVsRingItemSizeOnChip |= 1;
 
@@ -481,14 +481,17 @@ bool GraphicsContext::CheckGsOnChipValidity()
 
         if (pNggControl->enableNgg)
         {
-            const uint32_t esGsRingItemSize = 4; // Always 4 components for NGG
+            // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
+            const uint32_t esGsRingItemSize = hasGs ? ((4 * std::max(1u,
+                                                                     pGsResUsage->inOutUsage.inputMapLocCount)) | 1) :
+                                                      4; // Always 4 components for NGG when GS is not present
+
             const uint32_t gsVsRingItemSize = hasGs ? std::max(1u,
                                                                4 * pGsResUsage->inOutUsage.outputMapLocCount
                                                                  * pGsResUsage->builtInUsage.gs.outputVertices) : 0;
 
-            const uint32_t esExtraLdsSize = NggLdsManager::CalcLdsRegionTotalSize(this) / 4; // In DWORDs
-
-            const uint32_t gsExtraLdsSize = hasGs ? Gfx9::NggMaxThreadsPerSubgroup : 0;
+            const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(this) / 4; // In DWORDs
+            const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(this) / 4; // In DWORDs
 
             // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
             const uint32_t primAmpFactor =
@@ -589,14 +592,14 @@ bool GraphicsContext::CheckGsOnChipValidity()
 
                 if ((gsPrimsPerSubgroup * maxVertOut) > Gfx9::NggMaxThreadsPerSubgroup)
                 {
-                    gsPrimsPerSubgroup = std::min(RoundDownToMultiple(gsPrimsPerSubgroup,             maxVertOut),
-                                                  RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, maxVertOut));
+                    gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / maxVertOut;
                 }
 
                 // Let's take into consideration instancing:
                 const uint32_t gsInstanceCount = pGsResUsage->builtInUsage.gs.invocations;
                 LLPC_ASSERT(gsInstanceCount >= 1);
                 gsPrimsPerSubgroup /= gsInstanceCount;
+                esVertsPerSubgroup = gsPrimsPerSubgroup * maxVertOut;
             }
 
             // Make sure that we have at least one primitive
@@ -1105,7 +1108,6 @@ void GraphicsContext::SetNggControl()
     bool enableXfb = false;
     if (hasGs)
     {
-        // TODO: Support GS in primitive shader.
         const auto pResUsage = GetShaderResourceUsage(ShaderStageGeometry);
         enableXfb = pResUsage->inOutUsage.enableXfb;
     }
@@ -1148,6 +1150,7 @@ void GraphicsContext::SetNggControl()
     }
 
     m_nggControl.enableNgg                  = enableNgg;
+    m_nggControl.enableGsUse                = nggState.enableGsUse;
     m_nggControl.alwaysUsePrimShaderTable   = nggState.alwaysUsePrimShaderTable;
     m_nggControl.compactMode                = nggState.compactMode;
 

@@ -949,7 +949,7 @@ void PatchInOutImportExport::visitCallInst(
     else
     {
         // Other calls relevant to input/output import/export
-        if (mangledName.startswith("llvm.amdgcn.s.sendmsg"))
+        if (pCallee->isIntrinsic() && (pCallee->getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg))
         {
             // NOTE: Implicitly store the value of gl_ViewIndex to GS-VS ring buffer before emit calls.
             const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
@@ -975,10 +975,11 @@ void PatchInOutImportExport::visitCallInst(
             uint32_t emitStream = InvalidValue;
 
             uint64_t message = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
-            if ((message == GS_EMIT_STREAM0)|| (message == GS_EMIT_STREAM1) || (message == GS_EMIT_STREAM2) || (message == GS_EMIT_STREAM3))
+            if ((message == GS_EMIT_STREAM0)|| (message == GS_EMIT_STREAM1) ||
+                (message == GS_EMIT_STREAM2) || (message == GS_EMIT_STREAM3))
             {
                 // NOTE: MSG[9:8] = STREAM_ID
-                emitStream = (message &GS_EMIT_STREAM_ID_MASK) >> GS_EMIT_STREAM_ID_SHIFT;
+                emitStream = (message & GS_EMIT_CUT_STREAM_ID_MASK) >> GS_EMIT_CUT_STREAM_ID_SHIFT;
             }
 
             if (emitStream != InvalidValue)
@@ -2224,6 +2225,24 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     uint32_t     streamId,       // ID of output vertex stream
     Instruction* pInsertPos)     // [in] Where to insert the patch instruction
 {
+#if LLPC_BUILD_GFX10
+    // NOTE: For NGG, the call of exporting output to GS-VS ring is not replaced with real instructions (just rename
+    // it). The replacement is delayed when NGG primitive shader is generated.
+    if (m_pContext->GetNggControl()->enableNgg)
+    {
+        std::vector<Value*> args;
+
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), location));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compIdx));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+        args.push_back(pOutput);
+
+        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
+        EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        return;
+    }
+#endif
+
     auto pOutputTy = pOutput->getType();
 
     // Cast double or double vector to float vector.
@@ -2259,16 +2278,17 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     }
 
     LLPC_ASSERT(compIdx <= 4);
-    auto& genericOutByteSizes =
-        m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
+
     // Field "genericOutByteSizes" now gets set when generating the copy shader. Just assert that we agree on the
     // byteSize.
+    auto& genericOutByteSizes =
+        m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
     LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
     LLPC_UNUSED(genericOutByteSizes);
 
     if (compCount == 1)
     {
-        StoreValueToGsVsRingBuffer(pOutput,location, compIdx, streamId, pInsertPos);
+        StoreValueToGsVsRingBuffer(pOutput, location, compIdx, streamId, pInsertPos);
     }
     else
     {
@@ -4095,17 +4115,54 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
 void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     Value*       pOutput,       // [in] Output value
     uint32_t     builtInId,     // ID of the built-in variable
-    uint32_t     streamId,       // ID of output vertex stream
+    uint32_t     streamId,      // ID of output vertex stream
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
     auto& builtInUsage = pResUsage->builtInUsage.gs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
-    std::vector<Value*> args;
-
     LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
     uint32_t loc = builtInOutLocMap[builtInId];
+
+#if LLPC_BUILD_GFX10
+    // NOTE: For NGG, the call of exporting output to GS-VS ring is not replaced with real instructions (just rename
+    // it). The replacement is delayed when NGG primitive shader is generated.
+    if (m_pContext->GetNggControl()->enableNgg)
+    {
+        if ((builtInId == BuiltInClipDistance) || (builtInId == BuiltInCullDistance))
+        {
+            // NOTE: For gl_ClipDistance and gl_CullDistance, we change them from [n x float] to <n x float> for
+            // later LDS handling.
+            uint32_t elemCount =
+                (builtInId == BuiltInClipDistance) ? builtInUsage.clipDistance : builtInUsage.cullDistance;
+            Value* pOutputVector = UndefValue::get(VectorType::get(m_pContext->FloatTy(), elemCount));
+
+            for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
+            {
+                auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
+                pOutputVector = InsertElementInst::Create(pOutputVector,
+                                                          pElem,
+                                                          ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                          "",
+                                                          pInsertPos);
+            }
+
+            pOutput = pOutputVector;
+        }
+
+        std::vector<Value*> args;
+
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+        args.push_back(pOutput);
+
+        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
+        EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        return;
+    }
+#endif
 
     switch (builtInId)
     {
@@ -4138,11 +4195,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
             {
                 std::vector<uint32_t> idxs;
                 idxs.push_back(i);
-                auto pElem = ExtractValueInst::Create(pOutput,
-                                                      idxs,
-                                                      "",
-                                                      pInsertPos);
-
+                auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
                 StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
             }
 
@@ -4156,10 +4209,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
             {
                 std::vector<uint32_t> idxs;
                 idxs.push_back(i);
-                auto pElem = ExtractValueInst::Create(pOutput,
-                                                      idxs,
-                                                      "",
-                                                      pInsertPos);
+                auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
                 StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
             }
 
@@ -5194,7 +5244,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         // control of soffset. This is required by swizzle enabled mode when address range checking should be
         // complied with.
         std::vector<Value*> args;
-        args.push_back(pStoreValue);                                                    // vdata
+        args.push_back(pStoreValue);                                                        // vdata
         args.push_back(m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId));  // rsrc
         if (m_gfxIp.major <= 9)
         {

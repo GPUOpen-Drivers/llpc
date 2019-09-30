@@ -68,6 +68,8 @@ private:
     llvm::FunctionType* GeneratePrimShaderEntryPointType(uint64_t* pInRegMask) const;
     llvm::Function* GeneratePrimShaderEntryPoint(llvm::Module* pModule);
 
+    void InitWaveThreadInfo(llvm::Value* pMergedGroupInfo, llvm::Value* pMergedWaveInfo);
+
     llvm::Value* DoCulling(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
     void DoParamCacheAllocRequest();
     void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
@@ -84,6 +86,22 @@ private:
     llvm::Function* MutateEsToVariant(llvm::Module*         pModule,
                                       llvm::StringRef       entryName,
                                       std::vector<ExpData>& expDataSet);
+
+    void RunGsVariant(llvm::Module*     pModule,
+                      llvm::Argument*   pSysValueStart,
+                      llvm::BasicBlock* pInsertAtEnd);
+
+    llvm::Function* MutateGsToVariant(llvm::Module* pModule);
+
+    void ExportGsOutput(llvm::Value* pOutput,
+                        uint32_t     location,
+                        uint32_t     compIdx,
+                        uint32_t     streamId,
+                        llvm::Value* pThreadIdInWave,
+                        llvm::Value* pEmitCounter);
+
+    void ProcessGsEmit(uint32_t streamId, llvm::Value* pEmitCounterPtr);
+    void ProcessGsCut(uint32_t streamId, llvm::Value* pEmitCounterPtr);
 
     llvm::Value* ReadCompactDataFromLds(llvm::Type*       pReadDataTy,
                                         llvm::Value*      pThreadId,

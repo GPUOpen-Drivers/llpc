@@ -46,8 +46,9 @@ class GraphicsContext;
 // Enumerates the types of LDS regions used in NGG.
 enum NggLdsRegionType
 {
-    LdsRegionDistribPrimId = 0,         // Distributed primitive ID (a special region, overlapped with position data in
-                                        // NGG non pass-through mode)
+    // LDS region for ES only (no GS)
+    LdsRegionDistribPrimId = 0,         // Distributed primitive ID (a special region, overlapped with the region of
+                                        //   position data in NGG non pass-through mode)
     LdsRegionPosData,                   // Position data to export
     LdsRegionDrawFlag,                  // Draw flag indicating whether the primitive survives
     LdsRegionPrimCountInWaves,          // Primitive count accumulated per wave (8 potential waves) and per sub-group
@@ -63,14 +64,30 @@ enum NggLdsRegionType
     LdsRegionCompactPatchId,            // Patch ID (TES only)
     LdsRegionCompactRelPatchId,         // Relative patch ID (TES only)
 
-    LdsRegionCount,
-
     LdsRegionCompactBeginRange = LdsRegionCompactThreadIdInSubgroup,
-    LdsRegionCompactEndRange = LdsRegionCompactPatchId,
+    LdsRegionCompactEndRange = LdsRegionCompactRelPatchId,
+
+    LdsRegionEsBeginRange = LdsRegionDistribPrimId,
+    LdsRegionEsEndRange = LdsRegionCompactRelPatchId,
+
+    // LDS region for ES-GS
+    LdsRegionEsGsRing,                  // ES-GS ring
+    LdsRegionGsOutPrimData,             // GS output primitive data
+    LdsRegionGsOutVertCountInWaves,     // GS output vertex count accumulated per wave (8 potential waves) and per
+                                        //   sub-group for each stream (4 GS streams)
+    LdsRegionGsVsRingItemOffset,        // GS-VS ring item offset of exported vertex data (overlapped with the region of
+                                        //   exported primitive data
+    LdsRegionGsVsRing,                  // GS-VS ring
+
+    LdsRegionGsBeginRange = LdsRegionEsGsRing,
+    LdsRegionGsEndRange = LdsRegionGsVsRing,
+
+    // Total
+    LdsRegionCount
 };
 
 // Size of a DWORD
-static uint32_t SizeOfDword = sizeof(uint32_t);
+static const uint32_t SizeOfDword = sizeof(uint32_t);
 
 // =====================================================================================================================
 // Represents the manager doing shader merge operations.
@@ -79,10 +96,8 @@ class NggLdsManager
 public:
     NggLdsManager(llvm::Module* pModule, Context* pContext, llvm::IRBuilder<>* pBuilder);
 
-    static uint32_t CalcLdsRegionTotalSize(GraphicsContext* pContext);
-
-    // Gets LDS size for the specified region
-    uint32_t GetLdsRegionSize(NggLdsRegionType region) const { return LdsRegionSizes[region]; }
+    static uint32_t CalcEsExtraLdsSize(GraphicsContext* pContext);
+    static uint32_t CalcGsExtraLdsSize(GraphicsContext* pContext);
 
     // Gets the LDS starting offset for the specified region
     uint32_t GetLdsRegionStart(NggLdsRegionType region) const
@@ -103,14 +118,14 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static const uint32_t LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
+    static uint32_t       LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
     static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
     Context*        m_pContext;     // LLPC context
 
     llvm::GlobalValue*  m_pLds;     // Global variable to model NGG LDS
 
-    uint32_t        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all LDS region types (in BYTEs)
+    uint32_t        m_ldsRegionStart[LdsRegionCount]; // Start LDS offsets for all available LDS region types (in BYTEs)
 
     uint32_t        m_waveCountInSubgroup; // Wave count in sub-group
 
