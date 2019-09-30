@@ -487,6 +487,19 @@ void ConfigBuilderBase::SetLdsSizeByteSize(
 }
 
 // =====================================================================================================================
+// Set ES-GS LDS byte size
+void ConfigBuilderBase::SetEsGsLdsSize(
+    uint32_t value) // Value to set
+{
+    if (value == 0)
+    {
+        return; // Optional
+    }
+
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = m_document->getNode(value);
+}
+
+// =====================================================================================================================
 // Set USER_DATA_LIMIT (called once for the whole pipeline)
 void ConfigBuilderBase::SetUserDataLimit()
 {

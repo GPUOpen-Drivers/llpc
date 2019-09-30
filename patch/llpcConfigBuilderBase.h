@@ -76,6 +76,7 @@ protected:
     void SetApiName(const char* pValue);
     void SetPipelineType(Util::Abi::PipelineType value);
     void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uint32_t value);
+    void SetEsGsLdsSize(uint32_t value);
 
     // -----------------------------------------------------------------------------------------------------------------
 

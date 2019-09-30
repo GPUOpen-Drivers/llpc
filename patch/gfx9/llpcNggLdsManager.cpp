@@ -49,8 +49,10 @@ namespace Llpc
 
 // =====================================================================================================================
 // Initialize static members
-const uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
+uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
 {
+    // LDS region size for ES-only
+
     // 1 DWORD (uint32_t) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionDistribPrimId
     // 4 DWORDs (vec4) per thread
@@ -79,17 +81,31 @@ const uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactPatchId
     // 1 DWORD (uint32_t) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                     // LdsRegionCompactRelPatchId
+
+    // LDS region size for ES-GS
+
+    // ES-GS ring size is dynamically calculated (don't use it)
+    InvalidValue,                                                                 // LdsRegionEsGsRing
+    // 1 DWORD (uint32_t) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionPrimData
+    // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group (4 GS streams)
+    MaxGsStreams * (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword),   // LdsRegionGsOutVertCountInWaves
+    // 1 DWORD (uint32_t) per thread
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionGsVsRingItemOffset
+    // GS-VS ring size is dynamically calculated (don't use it)
+    InvalidValue,                                                                 // LdsRegionGsVsRing
 };
 
 // =====================================================================================================================
 // Initialize static members
 const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
 {
+    // LDS region name for ES-only
     "Distributed primitive ID",             // LdsRegionDistribPrimId
     "Vertex position data",                 // LdsRegionPosData
     "Draw flag",                            // LdsRegionDrawFlag
-    "Primitive count in sub-group",         // LdsRegionPrimCountInWaves
-    "Vertex count in sub-group",            // LdsRegionVertCountInWaves
+    "Primitive count in waves",             // LdsRegionPrimCountInWaves
+    "Vertex count in waves",                // LdsRegionVertCountInWaves
     "Cull distance",                        // LdsRegionCullDistance
     "Compacted thread ID in sub-group",     // LdsRegionCompactThreadIdInSubgroup
     "Compacted vertex ID (VS)",             // LdsRegionCompactVertexId
@@ -99,6 +115,13 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
     "Compacted tesscoord Y (TES)",          // LdsRegionCompactTessCoordY
     "Compacted patch ID (TES)",             // LdsRegionCompactPatchId
     "Compacted relative patch ID (TES)",    // LdsRegionCompactRelPatchId
+
+    // LDS region name for ES-GS
+    "ES-GS ring",                           // LdsRegionEsGsRing
+    "GS output primitive data",             // LdsRegionPrimData
+    "GS output vertex count in waves",      // LdsRegionGsOutVertCountInWaves
+    "GS-VS ring item offset",               // LdsRegionGsVsRingItemOffset
+    "GS-VS ring",                           // LdsRegionGsVsRing
 };
 
 // =====================================================================================================================
@@ -117,6 +140,7 @@ NggLdsManager::NggLdsManager(
     LLPC_ASSERT(pNggControl->enableNgg);
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
+    const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
 
@@ -125,70 +149,146 @@ NggLdsManager::NggLdsManager(
     //
     m_pLds = Patch::GetLdsVariable(pModule);
 
+    memset(&m_ldsRegionStart, InvalidValue, sizeof(m_ldsRegionStart)); // Initialized to invalid value (0xFFFFFFFF)
+
     //
-    // Calculate start LDS offset for all LDS region types
+    // Calculate start LDS offset for all available LDS region types
     //
-    memset(&m_ldsRegionStart, InvalidValue, sizeof(m_ldsRegionStart)); // Initialize them to invalid value (0xFFFFFFFF)
 
     LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// LLPC NGG LDS region info\n\n");
+    LLPC_OUTS("// LLPC NGG LDS region info (in bytes)\n\n");
 
-    m_ldsRegionStart[LdsRegionDistribPrimId] = 0;
-
-    LLPC_OUTS(format("%-40s : offset = %5u, size = %5u",
-              LdsRegionNames[LdsRegionDistribPrimId],
-              m_ldsRegionStart[LdsRegionDistribPrimId],
-              LdsRegionSizes[LdsRegionDistribPrimId]) << "\n");
-
-    if (pNggControl->passthroughMode == false)
+    if (hasGs)
     {
+        //
+        // The LDS layout is something like this:
+        //
+        // +------------+------------------------+--------------------------------+------------+
+        // | ES-GS ring | GS out primitive data  | GS out vertex count (in waves) | GS-VS ring |
+        // +------------+------------------------+--------------------------------+------------+
+        //              | GS-VS ring item offset |
+        //              +------------------------+
+        //
+        const auto& calcFactor = pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+        // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
+        // DWORDs (such as DS128).
+        const uint32_t esGsRingLdsSize = RoundUpToMultiple(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
+        const uint32_t gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
+                                         CalcGsExtraLdsSize(static_cast<GraphicsContext*>(
+                                             pContext->GetPipelineContext()));
+
         uint32_t ldsRegionStart = 0;
-        for (uint32_t region = 0; region < LdsRegionCount; ++region)
+
+        for (uint32_t region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region)
         {
-            // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
-            if (region == LdsRegionDistribPrimId)
+            uint32_t ldsRegionSize = LdsRegionSizes[region];
+
+            if (region == LdsRegionGsVsRingItemOffset)
             {
+                // An overlapped region, reused
+                m_ldsRegionStart[LdsRegionGsVsRingItemOffset] = m_ldsRegionStart[LdsRegionGsOutPrimData];
+
+                LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+                    LdsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
+
                 continue;
             }
 
-            // NOTE: If cull distance culling is disabled, skip this region
-            if ((region == LdsRegionCullDistance) && (pNggControl->enableCullDistanceCulling == false))
+            // NOTE: LDS size of ES-GS ring is calculated (by rounding it up to 16-byte alignment)
+            if (region == LdsRegionEsGsRing)
             {
-                continue;
+                ldsRegionSize = esGsRingLdsSize;
             }
 
-            // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
-            // skipped.
-            if ((pNggControl->compactMode == NggCompactSubgroup) &&
-                ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
+            // NOTE: LDS size of ES-GS ring is calculated
+            if (region == LdsRegionGsVsRing)
             {
-                continue;
-            }
-
-            if (hasTs)
-            {
-                // Skip those regions that are for VS only
-                if ((region == LdsRegionCompactVertexId) || (region == LdsRegionCompactInstanceId) ||
-                    (region == LdsRegionCompactPrimId))
-                {
-                    continue;
-                }
-            }
-            else
-            {
-                // Skip those regions that are for TES only
-                if ((region == LdsRegionCompactTessCoordX) || (region == LdsRegionCompactTessCoordY) ||
-                    (region == LdsRegionCompactRelPatchId) || (region == LdsRegionCompactPatchId))
-                {
-                    continue;
-                }
+                ldsRegionSize = gsVsRingLdsSize;
             }
 
             m_ldsRegionStart[region] = ldsRegionStart;
-            ldsRegionStart += LdsRegionSizes[region];
+            LLPC_ASSERT(ldsRegionSize != InvalidValue);
+            ldsRegionStart += ldsRegionSize;
 
-            LLPC_OUTS(format("%-40s : offset = %5u, size = %5u",
-                      LdsRegionNames[region], m_ldsRegionStart[region], LdsRegionSizes[region]) << "\n");
+            LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+                LdsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
+        }
+    }
+    else
+    {
+        m_ldsRegionStart[LdsRegionDistribPrimId] = 0;
+
+        LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+                         LdsRegionNames[LdsRegionDistribPrimId],
+                         m_ldsRegionStart[LdsRegionDistribPrimId],
+                         LdsRegionSizes[LdsRegionDistribPrimId]) << "\n");
+
+        if (pNggControl->passthroughMode == false)
+        {
+            //
+            // The LDS layout is something like this:
+            //
+            // +--------------------------+-----------+----------------------------+---------------+
+            // | Vertex position data     | Draw flag | Vertex count (in waves)    | Cull distance | >>>
+            // +--------------------------+-----------+----------------------------+---------------+
+            // | Distributed primitive ID |           | Primitive count (in waves) |
+            // +--------------------------+           +----------------------------+
+            //
+            //     | =============== Compacted data region (for vertex compaction) ================ |
+            //     +------------------+-------------+-------------+-------------+
+            // >>> | Vertex thread ID | Vertex ID   | Instance ID | Primtive ID |                     (VS)
+            //     +------------------+-------------+-------------+-------------+-------------------+
+            //                        | Tesscoord X | Tesscoord Y | Patch ID    | Relative patch ID | (TES)
+            //                        +-------------+-------------+-------------+-------------------+
+            //
+            uint32_t ldsRegionStart = 0;
+            for (uint32_t region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
+            {
+                // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
+                if (region == LdsRegionDistribPrimId)
+                {
+                    continue;
+                }
+
+                // NOTE: If cull distance culling is disabled, skip this region
+                if ((region == LdsRegionCullDistance) && (pNggControl->enableCullDistanceCulling == false))
+                {
+                    continue;
+                }
+
+                // NOTE: If NGG compaction is based on sub-group, those regions that are for vertex compaction should be
+                // skipped.
+                if ((pNggControl->compactMode == NggCompactSubgroup) &&
+                    ((region >= LdsRegionCompactBeginRange) && (region <= LdsRegionCompactEndRange)))
+                {
+                    continue;
+                }
+
+                if (hasTs)
+                {
+                    // Skip those regions that are for VS only
+                    if ((region == LdsRegionCompactVertexId) || (region == LdsRegionCompactInstanceId) ||
+                        (region == LdsRegionCompactPrimId))
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    // Skip those regions that are for TES only
+                    if ((region == LdsRegionCompactTessCoordX) || (region == LdsRegionCompactTessCoordY) ||
+                        (region == LdsRegionCompactRelPatchId) || (region == LdsRegionCompactPatchId))
+                    {
+                        continue;
+                    }
+                }
+
+                m_ldsRegionStart[region] = ldsRegionStart;
+                ldsRegionStart += LdsRegionSizes[region];
+
+                LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+                    LdsRegionNames[region], m_ldsRegionStart[region], LdsRegionSizes[region]) << "\n");
+            }
         }
     }
 
@@ -196,8 +296,8 @@ NggLdsManager::NggLdsManager(
 }
 
 // =====================================================================================================================
-// Calculates total size for all LDS region types (extra LDS size used for NGG).
-uint32_t NggLdsManager::CalcLdsRegionTotalSize(
+// Calculates ES extra LDS size.
+uint32_t NggLdsManager::CalcEsExtraLdsSize(
     GraphicsContext* pContext) // [in] LLPC graphics context
 {
     const auto pNggControl = pContext->GetNggControl();
@@ -206,36 +306,35 @@ uint32_t NggLdsManager::CalcLdsRegionTotalSize(
         return 0;
     }
 
-    uint32_t regionTotalSize = 0;
-
     const uint32_t stageMask = pContext->GetShaderStageMask();
+    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+
+    if (hasGs)
+    {
+        // NOTE: Not need ES extra LDS when GS is present.
+        return 0;
+    }
+
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
-    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+
+    uint32_t esExtraLdsSize = 0;
 
     if (pNggControl->passthroughMode)
     {
         // NOTE: For NGG pass-through mode, only primitive ID region is valid.
         bool distributePrimId = false;
-        if (hasGs)
+        if (hasTs == false)
         {
-            // TODO: Support GS in primitive shader.
-            LLPC_NOT_IMPLEMENTED();
-        }
-        else
-        {
-            if (hasTs == false)
-            {
-                const auto& builtInUsage = pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
-                distributePrimId = builtInUsage.primitiveId;
-            }
+            const auto& builtInUsage = pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+            distributePrimId = builtInUsage.primitiveId;
         }
 
-        regionTotalSize = distributePrimId ? LdsRegionSizes[LdsRegionDistribPrimId] : 0;
+        esExtraLdsSize = distributePrimId ? LdsRegionSizes[LdsRegionDistribPrimId] : 0;
     }
     else
     {
-        for (uint32_t region = 0; region < LdsRegionCount; ++region)
+        for (uint32_t region = LdsRegionEsBeginRange; region <= LdsRegionEsEndRange; ++region)
         {
             // NOTE: For NGG non pass-through mode, primitive ID region is overlapped with position data.
             if (region == LdsRegionDistribPrimId)
@@ -276,11 +375,35 @@ uint32_t NggLdsManager::CalcLdsRegionTotalSize(
                 }
             }
 
-            regionTotalSize += LdsRegionSizes[region];
+            esExtraLdsSize += LdsRegionSizes[region];
         }
     }
 
-    return regionTotalSize;
+    return esExtraLdsSize;
+}
+
+// =====================================================================================================================
+// Calculates GS extra LDS size (used for operations other than ES-GS ring and GS-VS ring read/write).
+uint32_t NggLdsManager::CalcGsExtraLdsSize(
+    GraphicsContext* pContext) // [in] LLPC graphics context
+{
+    const auto pNggControl = pContext->GetNggControl();
+    if (pNggControl->enableNgg == false)
+    {
+        return 0;
+    }
+
+    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    if (hasGs == false)
+    {
+        // NOTE: Not need GS extra LDS when GS is not present.
+        return 0;
+    }
+
+    uint32_t gsExtraLdsSize = LdsRegionSizes[LdsRegionGsOutPrimData] + LdsRegionSizes[LdsRegionGsOutVertCountInWaves];
+
+    return gsExtraLdsSize;
 }
 
 // =====================================================================================================================

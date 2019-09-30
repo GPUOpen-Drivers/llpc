@@ -143,7 +143,7 @@ static cl::opt<bool> EnableNgg(
 
 // -enable-gs-use: enable NGG use on geometry shader
 static cl::opt<bool> NggEnableGsUse(
-    "ngg-enable-gs_use",
+    "ngg-enable-gs-use",
     cl::desc("Enable NGG use on geometry shader"),
     cl::init(false));
 

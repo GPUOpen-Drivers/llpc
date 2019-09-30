@@ -159,11 +159,13 @@ namespace LlpcName
 
 #if LLPC_BUILD_GFX10
     const static char NggEsEntryPoint[]               = "llpc.ngg.ES.main";
-    const static char NggEsEntryVariantExp[]          = "llpc.ngg.ES.exp";
-    const static char NggEsEntryVariantExpPos[]       = "llpc.ngg.ES.exp.pos";
-    const static char NggEsEntryVariantExpParam[]     = "llpc.ngg.ES.exp.param";
+    const static char NggEsEntryVariant[]             = "llpc.ngg.ES.variant";
+    const static char NggEsEntryVariantPos[]          = "llpc.ngg.ES.variant.pos";
+    const static char NggEsEntryVariantParam[]        = "llpc.ngg.ES.variant.param";
 
     const static char NggGsEntryPoint[]               = "llpc.ngg.GS.main";
+    const static char NggGsEntryVariant[]             = "llpc.ngg.GS.variant";
+    const static char NggGsOutputExport[]             = "llpc.ngg.GS.output.export.";
     const static char NggPrimShaderEntryPoint[]       = "llpc.shader.PRIM.main";
 
     const static char NggCullingFetchReg[]            = "llpc.ngg.culling.fetchreg";

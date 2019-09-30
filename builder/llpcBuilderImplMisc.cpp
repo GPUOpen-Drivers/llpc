@@ -59,7 +59,7 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
 
     // Do the sendmsg.
     // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
-    uint32_t msg = (streamId << GS_EMIT_STREAM_ID_SHIFT) | GS_EMIT;
+    uint32_t msg = (streamId << GS_EMIT_CUT_STREAM_ID_SHIFT) | GS_EMIT;
     return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), pGsWaveId }, nullptr);
 }
 
@@ -82,7 +82,7 @@ Instruction* BuilderImplMisc::CreateEndPrimitive(
 
     // Do the sendmsg.
     // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
-    uint32_t msg = (streamId << GS_EMIT_STREAM_ID_SHIFT) | GS_CUT;
+    uint32_t msg = (streamId << GS_EMIT_CUT_STREAM_ID_SHIFT) | GS_CUT;
     return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, { getInt32(msg), pGsWaveId }, nullptr);
 }
 

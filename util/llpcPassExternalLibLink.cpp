@@ -111,7 +111,8 @@ bool PassExternalLibLink::runOnModule(
                     pFunc->getName().startswith(LlpcName::InputCallPrefix) ||
                     pFunc->getName().startswith(LlpcName::OutputCallPrefix) ||
                     pFunc->getName().startswith(LlpcName::DescriptorCallPrefix) ||
-                    pFunc->getName().startswith(LlpcName::LaterCallPrefix))
+                    pFunc->getName().startswith(LlpcName::LaterCallPrefix)||
+                    pFunc->getName().startswith(LlpcName::NggGsOutputExport))
                 {
                     // Allow unsatisfied externals in the first "native only" linking pass,
                     // or for certain prefixes that are not patched until after linking.

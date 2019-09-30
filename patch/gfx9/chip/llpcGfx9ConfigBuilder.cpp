@@ -1068,7 +1068,10 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig(
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-    SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, pNggControl->passthroughMode);
+    // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
+    // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
+    // hardware pass-through).
+    SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
 
     if (stageMask & (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageGeometry)))
     {
@@ -1179,7 +1182,10 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-    SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, pNggControl->passthroughMode);
+    // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
+    // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
+    // hardware pass-through).
+    SET_REG_GFX10_FIELD(pConfig, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
 
     if (stageMask & (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageTessControl)))
     {
@@ -1980,6 +1986,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
                   LDS_SIZE,
                   calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
     SetLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
+    SetEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(gsBuiltInUsage.outputVertices));
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -2197,8 +2204,18 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     uint32_t gsVgprCompCnt = 0;
     if (hasGs)
     {
-        // TODO: Support GS in primitive shader.
-        LLPC_NOT_IMPLEMENTED();
+        if ((calcFactor.inputVertices > 4) || gsBuiltInUsage.invocationId)
+        {
+            gsVgprCompCnt = 3;
+        }
+        else if (gsBuiltInUsage.primitiveIdIn)
+        {
+            gsVgprCompCnt = 2;
+        }
+        else if (calcFactor.inputVertices > 2)
+        {
+            gsVgprCompCnt = 1;
+        }
     }
     else
     {
@@ -2281,6 +2298,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
                   LDS_SIZE,
                   calcFactor.gsOnChipLdsSize >> ldsSizeDwordGranularityShift);
     SetLdsSizeByteSize(Util::Abi::HardwareStage::Gs, calcFactor.gsOnChipLdsSize * 4);
+    SetEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(gsBuiltInUsage.outputVertices));
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);

@@ -48,12 +48,19 @@ static const uint32_t GS_ALLOC_REQ = 9;       // GS requests that parameter cach
 #endif
 static const uint32_t GS_CUT = 0x12;           // [3:0] = 2 (GS), [5:4] = 1 (cut)
 static const uint32_t GS_EMIT = 0x22;          // [3:0] = 2 (GS), [5:4] = 2 (emit)
+
+static const uint32_t GS_CUT_STREAM0 = 0x12;   // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 0 (stream0)
+static const uint32_t GS_CUT_STREAM1 = 0x112;  // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 1 (stream1)
+static const uint32_t GS_CUT_STREAM2 = 0x212;  // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 2 (stream2)
+static const uint32_t GS_CUT_STREAM3 = 0x312;  // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 3 (stream3)
+
 static const uint32_t GS_EMIT_STREAM0 = 0x22;  // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 0 (stream0)
 static const uint32_t GS_EMIT_STREAM1 = 0x122; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 1 (stream1)
 static const uint32_t GS_EMIT_STREAM2 = 0x222; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 2 (stream2)
 static const uint32_t GS_EMIT_STREAM3 = 0x322; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 3 (stream3)
-static const uint32_t GS_EMIT_STREAM_ID_SHIFT = 0x8; // Shift of STREAM_ID of the message GS_EMIT_STREAM
-static const uint32_t GS_EMIT_STREAM_ID_MASK = 0x300; // Mask of STREAM_ID of the message GS_EMIT_STREAM
+
+static const uint32_t GS_EMIT_CUT_STREAM_ID_SHIFT = 0x8;    // Shift of STREAM_ID of the message GS_EMIT/GS_CUT
+static const uint32_t GS_EMIT_CUT_STREAM_ID_MASK = 0x300;   // Mask of STREAM_ID of the message GS_EMIT/GS_CUT
 
 // Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
 enum AddrSpace

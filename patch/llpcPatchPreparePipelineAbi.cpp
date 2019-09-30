@@ -240,7 +240,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 #if LLPC_BUILD_GFX10
             if (enableNgg)
             {
-                if (pEsEntryPoint != nullptr)
+                if (pGsEntryPoint != nullptr)
                 {
                     auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint);
                     pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
@@ -300,7 +300,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 #if LLPC_BUILD_GFX10
             if (enableNgg)
             {
-                if (pEsEntryPoint != nullptr)
+                if (pGsEntryPoint != nullptr)
                 {
                     auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint);
                     pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
