@@ -76,7 +76,7 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
 
     static const uint32_t PipelineTimerEnableMask = ((1 << TimerCount) - 1);
-    static const uint32_t ShaderModuleTimerEnableMask = ((1 << TimerTranslate) || (1 << TimerLower));
+    static const uint32_t ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
 
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(TimerProfiler);
