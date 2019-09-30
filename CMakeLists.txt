@@ -319,7 +319,6 @@ if(ICD_BUILD_LLPC)
         translator/lib/SPIRV/SPIRVLowerOCLBlocks.cpp
         translator/lib/SPIRV/SPIRVReader.cpp
         translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
-        translator/lib/SPIRV/SPIRVToOCL20.cpp
         translator/lib/SPIRV/SPIRVUtil.cpp
         translator/lib/SPIRV/SPIRVWriter.cpp
         translator/lib/SPIRV/SPIRVWriterPass.cpp

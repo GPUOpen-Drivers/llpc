@@ -173,10 +173,6 @@ ModulePass *createSPIRVLowerOCLBlocks();
 /// Create a pass for regularize LLVM module to be translated to SPIR-V.
 ModulePass *createSPIRVRegularizeLLVM();
 
-/// Create a pass for translating SPIR-V builtin functions to OCL 2.0 builtin
-/// functions.
-ModulePass *createSPIRVToOCL20();
-
 /// Create a pass for lowering llvm.memmove to llvm.memcpys with a temporary variable.
 ModulePass *createSPIRVLowerMemmove();
 

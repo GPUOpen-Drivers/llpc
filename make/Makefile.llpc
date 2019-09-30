@@ -168,7 +168,6 @@ endif
         SPIRVLowerOCLBlocks.cpp             \
         SPIRVReader.cpp                     \
         SPIRVRegularizeLLVM.cpp             \
-        SPIRVToOCL20.cpp                    \
         SPIRVUtil.cpp                       \
         SPIRVWriter.cpp                     \
         SPIRVWriterPass.cpp                 \
