@@ -351,14 +351,15 @@ Value* BuilderImplSubgroup::CreateSubgroupShuffle(
     }
     else
     {
-        auto pfnMapFunc = [](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
+        auto pfnMapFunc = [this](Builder& builder, ArrayRef<Value*> mappedArgs, ArrayRef<Value*> passthroughArgs) -> Value*
         {
-            return builder.CreateIntrinsic(Intrinsic::amdgcn_readlane,
-                                           {},
-                                           {
-                                                mappedArgs[0],
-                                                passthroughArgs[0]
-                                           });
+            Value* const pReadlane = builder.CreateIntrinsic(Intrinsic::amdgcn_readlane,
+                                                             {},
+                                                             {
+                                                                 mappedArgs[0],
+                                                                 passthroughArgs[0]
+                                                             });
+            return CreateWaterfallLoop(cast<Instruction>(pReadlane), 1);
         };
 
         return CreateMapToInt32(pfnMapFunc, pValue, pIndex);

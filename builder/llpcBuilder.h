@@ -1405,9 +1405,9 @@ protected:
     Type* GetTransposedMatrixTy(
         Type* const pMatrixType) const; // [in] The matrix type to tranpose
 
-    typedef Value* (*PFN_MapToInt32Func)(Builder&                     builder,
-                                               ArrayRef<Value*> mappedArgs,
-                                               ArrayRef<Value*> passthroughArgs);
+    typedef std::function<Value* (Builder& builder,
+                                  ArrayRef<Value*> mappedArgs,
+                                  ArrayRef<Value*> passthroughArgs)> PFN_MapToInt32Func;
 
     // Create a call that'll map the massage arguments to an i32 type (for functions that only take i32).
     Value* CreateMapToInt32(
