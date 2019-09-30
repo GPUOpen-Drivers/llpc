@@ -1161,7 +1161,7 @@ Result Compiler::BuildPipelineInternal(
             else
             {
                 pModule = new Module((Twine("llpc") + GetShaderStageName(pShaderInfo->entryStage)).str() +
-                                     std::to_string(shaderIndex), *pContext);
+                                     std::to_string(GetModuleIdByIndex(shaderIndex)), *pContext);
             }
 
             modules[shaderIndex] = pModule;

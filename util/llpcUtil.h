@@ -52,6 +52,16 @@ const char* GetShaderStageAbbreviation(ShaderStage shaderStage, bool upper = fal
 // Translates shader stage to corresponding stage mask.
 uint32_t ShaderStageToMask(ShaderStage stage);
 
+// =====================================================================================================================
+// Gets module ID according to the index
+inline uint32_t GetModuleIdByIndex(
+    uint32_t index)  // Index in stage array
+{
+    static const uint32_t BaseModuleId = 1;
+    return BaseModuleId + index;
+}
+
+
 // Create directory.
 bool CreateDirectory(const char* pDir);
 
