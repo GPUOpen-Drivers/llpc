@@ -10464,9 +10464,6 @@ bool llvm::readSpirv(Builder *Builder, const void *shaderInfo, std::istream &IS,
     BM->getError(ErrMsg);
     Succeed = false;
   }
-  llvm::legacy::PassManager PassMgr;
-  PassMgr.add(createSPIRVToOCL20());
-  PassMgr.run(*M);
 
   if (DbgSaveTmpLLVM)
     dumpLLVM(M, DbgTmpLLVMFileName);
