@@ -233,20 +233,17 @@ public:
     Result BuildGraphicsPipelineInternal(GraphicsContext*                           pGraphicsContext,
                                          llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
                                          uint32_t                                   forceLoopUnrollCount,
-                                         ElfPackage*                                pPipelineElf,
-                                         bool*                                      pDynamicLoopUnroll);
+                                         ElfPackage*                                pPipelineElf);
 
     Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
                                         const ComputePipelineBuildInfo* pPipelineInfo,
                                         uint32_t                        forceLoopUnrollCount,
-                                        ElfPackage*                     pPipelineElf,
-                                        bool*                           pDynamicLoopUnroll);
+                                        ElfPackage*                     pPipelineElf);
 
     Result BuildPipelineInternal(Context*                                   pContext,
                                  llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
                                  uint32_t                                   forceLoopUnrollCount,
-                                 ElfPackage*                                pPipelineElf,
-                                 bool*                                      pDynamicLoopUnroll);
+                                 ElfPackage*                                pPipelineElf);
 
     // Gets the count of compiler instance.
     static uint32_t GetInstanceCount() { return m_instanceCount; }
@@ -288,9 +285,6 @@ private:
                                size_t                  codeSize,
                                GfxIpVersion            gfxIp,
                                PipelineStatistics*     pPipelineStats) const;
-
-    uint32_t ChooseLoopUnrollCountCandidate(PipelineStatistics* pPipelineStats,
-                                            uint32_t            candidateCount) const;
 
     bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
 

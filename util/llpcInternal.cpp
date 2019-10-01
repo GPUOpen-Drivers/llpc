@@ -50,7 +50,6 @@
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
 #include "llpcInternal.h"
-#include "llpcPassLoopInfoCollect.h"
 
 using namespace llvm;
 

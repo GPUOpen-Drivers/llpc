@@ -183,7 +183,6 @@ endif
         llpcFile.cpp                        \
         llpcInternal.cpp                    \
         llpcPassDeadFuncRemove.cpp          \
-        llpcPassLoopInfoCollect.cpp         \
         llpcPassManager.cpp                 \
         llpcPipelineDumper.cpp              \
         llpcPipelineShaders.cpp             \

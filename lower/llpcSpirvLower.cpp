@@ -50,7 +50,6 @@
 
 #include "llpcContext.h"
 #include "llpcInternal.h"
-#include "llpcPassLoopInfoCollect.h"
 #include "llpcPassManager.h"
 #include "llpcSpirvLower.h"
 
@@ -83,9 +82,7 @@ void SpirvLower::AddPasses(
     ShaderStage           stage,                  // Shader stage
     legacy::PassManager&  passMgr,                // [in/out] Pass manager to add passes to
     llvm::Timer*          pLowerTimer,            // [in] Timer to time lower passes with, nullptr if not timing
-    uint32_t              forceLoopUnrollCount,   // 0 or force loop unroll count
-    bool*                 pNeedDynamicLoopUnroll) // [out] nullptr or where to store flag of whether dynamic loop
-                                                  // unrolling is needed
+    uint32_t              forceLoopUnrollCount)   // 0 or force loop unroll count
 {
     // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
     AddTargetLibInfo(pContext, &passMgr);
@@ -94,13 +91,6 @@ void SpirvLower::AddPasses(
     if (pLowerTimer != nullptr)
     {
         passMgr.add(CreateStartStopTimer(pLowerTimer, true));
-    }
-
-    // Check if this module needs dynamic loop unroll. Only do this check when caller has passed
-    // in pNeedDynamicLoopUnroll, and this is the fragment shader.
-    if ((stage == ShaderStageFragment) && (pNeedDynamicLoopUnroll != nullptr))
-    {
-        passMgr.add(new PassLoopInfoCollect(pNeedDynamicLoopUnroll));
     }
 
     // Function inlining. Use the "always inline" pass, since we want to inline all functions, and

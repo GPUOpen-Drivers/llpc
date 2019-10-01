@@ -108,8 +108,7 @@ public:
                           ShaderStage                 stage,
                           llvm::legacy::PassManager&  passMgr,
                           llvm::Timer*                pLowerTimer,
-                          uint32_t                    forceLoopUnrollCount,
-                          bool*                       pNeedDynamicLoopUnroll);
+                          uint32_t                    forceLoopUnrollCount);
 
 protected:
     void Init(llvm::Module* pModule);

@@ -76,7 +76,6 @@ class Timer;
 
 void initializePassDeadFuncRemovePass(PassRegistry&);
 void initializePassExternalLibLinkPass(PassRegistry&);
-void initializePassLoopInfoCollectPass(PassRegistry&);
 void initializePipelineShadersPass(PassRegistry&);
 void initializeStartStopTimerPass(PassRegistry&);
 
@@ -100,7 +99,6 @@ inline static void InitializeUtilPasses(
     llvm::PassRegistry& passRegistry)   // Pass registry
 {
     initializePassDeadFuncRemovePass(passRegistry);
-    initializePassLoopInfoCollectPass(passRegistry);
     initializePipelineShadersPass(passRegistry);
 }
 
