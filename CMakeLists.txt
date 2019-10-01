@@ -355,7 +355,6 @@ if(ICD_BUILD_LLPC)
         util/llpcInternal.cpp
         util/llpcFile.cpp
         util/llpcPassDeadFuncRemove.cpp
-        util/llpcPassLoopInfoCollect.cpp
         util/llpcPassManager.cpp
         util/llpcPipelineDumper.cpp
         util/llpcPipelineShaders.cpp

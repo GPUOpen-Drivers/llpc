@@ -56,8 +56,6 @@ namespace cl
 
 extern opt<bool> EnablePipelineDump;
 
-extern opt<bool> EnableDynamicLoopUnroll;
-
 // -enable-si-scheduler: enable target option si-scheduler
 static opt<bool> EnableSiScheduler("enable-si-scheduler",
                                    desc("Enable target option si-scheduler"),
@@ -155,7 +153,6 @@ void CodeGenManager::SetupTargetFeatures(
 
     if (cl::EnablePipelineDump ||
         EnableOuts() ||
-        cl::EnableDynamicLoopUnroll ||
         pPipelineOptions->includeDisassembly)
     {
         globalFeatures += ",+DumpCode";

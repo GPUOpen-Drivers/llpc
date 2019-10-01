@@ -60,7 +60,6 @@
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
 #include "llpcFile.h"
-#include "llpcPassLoopInfoCollect.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPipelineDumper.h"
@@ -128,10 +127,7 @@ opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
                                      desc("High part of VA for shadow descriptor table pointer"),
                                      init(2));
 
-// -enable-dynamic-loop-unroll: Enable dynamic loop unroll.
-opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dynamic loop unroll"), init(false));
-
-// -force-loop-unroll-count: Force to set the loop unroll count; this option will ignore dynamic loop unroll.
+// -force-loop-unroll-count: Force to set the loop unroll count.
 opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
 
 // -enable-shader-module-opt: Enable translate & lower phase in shader module build.
@@ -866,8 +862,7 @@ Result Compiler::BuildShaderModule(
                                           static_cast<ShaderStage>(entryNames[i].stage),
                                           lowerPassMgr,
                                           timerProfiler.GetTimer(TimerLower),
-                                          cl::ForceLoopUnrollCount,
-                                          nullptr);
+                                          cl::ForceLoopUnrollCount);
 
                     lowerPassMgr.add(createBitcodeWriterPass(moduleBinaryStream));
 
@@ -984,15 +979,9 @@ Result Compiler::BuildPipelineInternal(
     Context*                            pContext,                   // [in] Acquired context
     ArrayRef<const PipelineShaderInfo*> shaderInfo,                 // [in] Shader info of this pipeline
     uint32_t                            forceLoopUnrollCount,       // [in] Force loop unroll count (0 means disable)
-    ElfPackage*                         pPipelineElf,               // [out] Output Elf package
-    bool*                               pDynamicLoopUnroll)         // [out] Need dynamic loop unroll or not
+    ElfPackage*                         pPipelineElf)               // [out] Output Elf package
 {
     Result          result = Result::Success;
-
-    if ((forceLoopUnrollCount != 0) || (cl::EnableDynamicLoopUnroll == false))
-    {
-        pDynamicLoopUnroll = nullptr;
-    }
 
     uint32_t passIndex = 0;
     TimerProfiler timerProfiler(pContext->GetPiplineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
@@ -1157,8 +1146,7 @@ Result Compiler::BuildPipelineInternal(
                                   pShaderInfo->entryStage,
                                   lowerPassMgr,
                                   timerProfiler.GetTimer(TimerLower),
-                                  forceLoopUnrollCount,
-                                  pDynamicLoopUnroll);
+                                  forceLoopUnrollCount);
 
             // Run the passes.
             bool success = RunPasses(&lowerPassMgr, modules[shaderIndex]);
@@ -1434,14 +1422,13 @@ Result Compiler::BuildGraphicsPipelineInternal(
     GraphicsContext*                    pGraphicsContext,           // [in] Graphics context this graphics pipeline
     ArrayRef<const PipelineShaderInfo*> shaderInfo,                 // Shader info of this graphics pipeline
     uint32_t                            forceLoopUnrollCount,       // [in] Force loop unroll count (0 means disable)
-    ElfPackage*                         pPipelineElf,               // [out] Output Elf package
-    bool*                               pDynamicLoopUnroll)         // [out] Need dynamic loop unroll or not
+    ElfPackage*                         pPipelineElf)               // [out] Output Elf package
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pGraphicsContext);
     pContext->SetBuilder(Builder::Create(*pContext));
 
-    Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf, pDynamicLoopUnroll);
+    Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
 
     delete pContext->GetBuilder();
     pContext->SetBuilder(nullptr);
@@ -1516,15 +1503,10 @@ Result Compiler::BuildGraphicsPipeline(
 
     cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
 
-    constexpr uint32_t CandidateCount = 4;
-    uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
-    bool               needRecompile   = false;
-    uint32_t           candidateIdx    = 0;
-    ElfPackage         candidateElfs[CandidateCount];
+    ElfPackage candidateElf;
 
     if (cacheEntryState == ShaderEntryState::Compiling)
     {
-        PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
         GraphicsContext graphicsContext(m_gfxIp,
@@ -1536,65 +1518,12 @@ Result Compiler::BuildGraphicsPipeline(
         result = BuildGraphicsPipelineInternal(&graphicsContext,
                                                shaderInfo,
                                                forceLoopUnrollCount,
-                                               &candidateElfs[candidateIdx],
-                                               &needRecompile);
-
-        if ((result == Result::Success) && needRecompile)
-        {
-            GetPipelineStatistics(candidateElfs[candidateIdx].data(),
-                                  candidateElfs[candidateIdx].size(),
-                                  m_gfxIp,
-                                  &pipelineStats[candidateIdx]);
-
-            LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
-            LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
-                      "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
-                      "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
-                      "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
-
-            for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
-            {
-                forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                GraphicsContext graphicsContext(m_gfxIp,
-                                                &m_gpuProperty,
-                                                &m_gpuWorkarounds,
-                                                pPipelineInfo,
-                                                &pipelineHash,
-                                                &cacheHash);
-                result = BuildGraphicsPipelineInternal(&graphicsContext,
-                                                       shaderInfo,
-                                                       forceLoopUnrollCount,
-                                                       &candidateElfs[candidateIdx],
-                                                       &needRecompile);
-
-                if (result == Result::Success)
-                {
-                    GetPipelineStatistics(candidateElfs[candidateIdx].data(),
-                                          candidateElfs[candidateIdx].size(),
-                                          m_gfxIp,
-                                          &pipelineStats[candidateIdx]);
-
-                    LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
-                    LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
-                              "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
-                              "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
-                              "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
-                }
-            }
-        }
-
-        candidateIdx = 0;
-        if ((result == Result::Success) && needRecompile)
-        {
-            candidateIdx = ChooseLoopUnrollCountCandidate(pipelineStats, CandidateCount);
-            LLPC_OUTS("// Dynamic loop unroll: choose candidate = " << candidateIdx <<
-                      "; loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n");
-        }
+                                               &candidateElf);
 
         if (result == Result::Success)
         {
-            elfBin.codeSize = candidateElfs[candidateIdx].size();
-            elfBin.pCode = candidateElfs[candidateIdx].data();
+            elfBin.codeSize = candidateElf.size();
+            elfBin.pCode = candidateElf.data();
         }
 
         UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
@@ -1620,20 +1549,6 @@ Result Compiler::BuildGraphicsPipeline(
         pPipelineOut->pipelineBin.pCode = pCode;
     }
 
-    if (pPipelineDumpFile != nullptr)
-    {
-        if (result == Result::Success)
-        {
-            if (needRecompile)
-            {
-                std::stringstream strStream;
-                strStream << "Dynamic loop unroll enabled: loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n";
-                std::string extraInfo = strStream.str();
-                PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
-            }
-        }
-    }
-
     return result;
 }
 
@@ -1643,8 +1558,7 @@ Result Compiler::BuildComputePipelineInternal(
     ComputeContext*                 pComputeContext,                // [in] Compute context this compute pipeline
     const ComputePipelineBuildInfo* pPipelineInfo,                  // [in] Pipeline info of this compute pipeline
     uint32_t                        forceLoopUnrollCount,           // [in] Force loop unroll count (0 means disable)
-    ElfPackage*                     pPipelineElf,                   // [out] Output Elf package
-    bool*                           pDynamicLoopUnroll)             // [out] Need dynamic loop unroll or not
+    ElfPackage*                     pPipelineElf)                   // [out] Output Elf package
 {
     Context* pContext = AcquireContext();
     pContext->AttachPipelineContext(pComputeContext);
@@ -1660,7 +1574,7 @@ Result Compiler::BuildComputePipelineInternal(
         &pPipelineInfo->cs,
     };
 
-    Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf, pDynamicLoopUnroll);
+    Result result = BuildPipelineInternal(pContext, shaderInfo, forceLoopUnrollCount, pPipelineElf);
 
     delete pContext->GetBuilder();
     pContext->SetBuilder(nullptr);
@@ -1721,15 +1635,10 @@ Result Compiler::BuildComputePipeline(
 
     cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
 
-    constexpr uint32_t CandidateCount = 4;
-    uint32_t           loopUnrollCountCandidates[CandidateCount] = { 32, 16, 4, 1 };
-    bool               needRecompile   = false;
-    uint32_t           candidateIdx    = 0;
-    ElfPackage         candidateElfs[CandidateCount];
+    ElfPackage candidateElf;
 
     if (cacheEntryState == ShaderEntryState::Compiling)
     {
-        PipelineStatistics            pipelineStats[CandidateCount];
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
         ComputeContext computeContext(m_gfxIp,
@@ -1742,67 +1651,12 @@ Result Compiler::BuildComputePipeline(
         result = BuildComputePipelineInternal(&computeContext,
                                               pPipelineInfo,
                                               forceLoopUnrollCount,
-                                              &candidateElfs[candidateIdx],
-                                              &needRecompile);
-
-        if ((result == Result::Success) && needRecompile)
-        {
-            GetPipelineStatistics(candidateElfs[candidateIdx].data(),
-                                  candidateElfs[candidateIdx].size(),
-                                  m_gfxIp,
-                                  &pipelineStats[candidateIdx]);
-
-            LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
-            LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
-                      "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
-                      "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
-                      "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
-
-            for (candidateIdx = 1; candidateIdx < CandidateCount; candidateIdx++)
-            {
-                forceLoopUnrollCount = loopUnrollCountCandidates[candidateIdx];
-                ComputeContext computeContext(m_gfxIp,
-                                              &m_gpuProperty,
-                                              &m_gpuWorkarounds,
-                                              pPipelineInfo,
-                                              &pipelineHash,
-                                              &cacheHash);
-
-                result = BuildComputePipelineInternal(&computeContext,
-                                                      pPipelineInfo,
-                                                      forceLoopUnrollCount,
-                                                      &candidateElfs[candidateIdx],
-                                                      &needRecompile);
-
-                if ((result == Result::Success) && needRecompile)
-                {
-                    GetPipelineStatistics(candidateElfs[candidateIdx].data(),
-                                          candidateElfs[candidateIdx].size(),
-                                          m_gfxIp,
-                                          &pipelineStats[candidateIdx]);
-
-                    LLPC_OUTS("// Dynamic loop unroll analysis pass " << candidateIdx << ":\n");
-                    LLPC_OUTS("//    loopUnrollCount =  " << loopUnrollCountCandidates[candidateIdx] <<
-                              "; numUsedVgrps = " << pipelineStats[candidateIdx].numUsedVgprs <<
-                              "; sgprSpill = " << pipelineStats[candidateIdx].sgprSpill <<
-                              "; useScratchBuffer = " << pipelineStats[candidateIdx].useScratchBuffer << " \n");
-
-                }
-            }
-        }
-
-        candidateIdx = 0;
-        if ((result == Result::Success) && needRecompile)
-        {
-            candidateIdx = ChooseLoopUnrollCountCandidate(pipelineStats, CandidateCount);
-            LLPC_OUTS("// Dynamic loop unroll: choose candidate = " << candidateIdx <<
-                      "; loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n");
-        }
+                                              &candidateElf);
 
         if (result == Result::Success)
         {
-            elfBin.codeSize = candidateElfs[candidateIdx].size();
-            elfBin.pCode = candidateElfs[candidateIdx].data();
+            elfBin.codeSize = candidateElf.size();
+            elfBin.pCode = candidateElf.data();
         }
 
         UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
@@ -1831,20 +1685,6 @@ Result Compiler::BuildComputePipeline(
         {
             // Allocator is not specified
             result = Result::ErrorInvalidPointer;
-        }
-    }
-
-    if (pPipelineDumpFile != nullptr)
-    {
-        if (result == Result::Success)
-        {
-            if (needRecompile)
-            {
-                std::stringstream strStream;
-                strStream << "Dynamic loop unroll enabled: loopUnrollCount = " << loopUnrollCountCandidates[candidateIdx] << " \n";
-                std::string extraInfo = strStream.str();
-                PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
-            }
         }
     }
 
@@ -2767,105 +2607,6 @@ void Compiler::GetPipelineStatistics(
             const_cast<uint8_t*>(pSection->pData)[endPos - 1] = lastChar;
         }
     }
-}
-
-// =====================================================================================================================
-// Chooses the optimal candidate of loop unroll count with the specified pipeline statistics info
-//
-// NOTE: Candidates of loop unroll count is assumed to be provide with a descending order. The first candidate has max loop unroll count while the last has the min one.
-uint32_t Compiler::ChooseLoopUnrollCountCandidate(
-    PipelineStatistics* pPipelineStats,             // [in] Pipeline module info
-    uint32_t            candidateCount              // [in] Candidate  Count
-    ) const
-{
-    uint32_t candidateIdx        = 0;
-    uint32_t optimalCandidateIdx = 0;
-    uint32_t noSpillCandidateIdx = 0;
-    uint32_t maxWaveCandidateIdx = 0;
-
-    // Find the optimal candidate with no SGPR spill or scratch buffer.
-    for (; candidateIdx < candidateCount; candidateIdx++)
-    {
-        if ((pPipelineStats[candidateIdx].sgprSpill == false) &&
-            (pPipelineStats[candidateIdx].useScratchBuffer == false))
-        {
-            break;
-        }
-    }
-    noSpillCandidateIdx = candidateIdx;
-
-    // Check available wavefronts
-    // Only need to check VGPR usage. There are a lot more SGPRs(800).
-    // It will only limit waves to 8, which is not a problem as the designed wave ratio is 0.2
-    uint32_t maxWave = 0;
-    uint32_t totalVgprs = pPipelineStats[0].numAvailVgprs;
-    LLPC_ASSERT(totalVgprs > 0);
-
-    for (candidateIdx = 0; candidateIdx < candidateCount; candidateIdx++)
-    {
-        uint32_t wave = totalVgprs / pPipelineStats[candidateIdx].numUsedVgprs;
-        if (maxWave < wave)
-        {
-            maxWave = wave;
-            maxWaveCandidateIdx = candidateIdx;
-        }
-    }
-
-    float waveRatio = 0.0f;
-
-    if (noSpillCandidateIdx < candidateCount)
-    {
-        if (noSpillCandidateIdx < maxWaveCandidateIdx)
-        {
-            // Choose the optimal candidate with max wave
-            optimalCandidateIdx = maxWaveCandidateIdx;
-            uint32_t wave = totalVgprs / pPipelineStats[optimalCandidateIdx - 1].numUsedVgprs;
-
-            waveRatio = static_cast<float>(maxWave - wave);
-            waveRatio = waveRatio / maxWave;
-
-            // Choose larger loop unroll count if wave difference is relatively small.
-            if (waveRatio < 0.2)
-            {
-                optimalCandidateIdx--;
-                int32_t nextIndex = static_cast<int32_t>(optimalCandidateIdx) - 1;
-                while (nextIndex > 0)
-                {
-                    if (wave != (totalVgprs / pPipelineStats[nextIndex].numUsedVgprs))
-                    {
-                        break;
-                    }
-                    optimalCandidateIdx--;
-                    nextIndex = optimalCandidateIdx - 1;
-                }
-            }
-        }
-        else if (noSpillCandidateIdx == maxWaveCandidateIdx)
-        {
-            optimalCandidateIdx = maxWaveCandidateIdx;
-        }
-        else
-        {
-            // Large loop unroll count has more wavefronts.
-            // This is not a common case.
-            waveRatio = static_cast<float>(maxWave - totalVgprs / pPipelineStats[noSpillCandidateIdx].numUsedVgprs);
-            waveRatio = waveRatio / maxWave;
-            if (waveRatio < 0.2)
-            {
-                optimalCandidateIdx = noSpillCandidateIdx;
-            }
-            else
-            {
-                optimalCandidateIdx = maxWaveCandidateIdx;
-            }
-        }
-    }
-    else
-    {
-        optimalCandidateIdx = 0;
-    }
-
-    return optimalCandidateIdx;
 }
 
 // =====================================================================================================================
