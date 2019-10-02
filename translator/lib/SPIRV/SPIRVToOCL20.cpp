@@ -382,7 +382,8 @@ void SPIRVToOCL20::visitCallSPIRVAtomicBuiltin(CallInst *CI, Op OC) {
                                     ->getParent()
                                     ->getEntryBlock()
                                     .getFirstInsertionPt()));
-          PExpected->setAlignment(CI->getType()->getScalarSizeInBits() / 8);
+          PExpected->setAlignment(
+              MaybeAlign(CI->getType()->getScalarSizeInBits() / 8));
           new StoreInst(Args[1], PExpected, PInsertBefore);
           Args[1] = PExpected;
           std::swap(Args[3], Args[4]);

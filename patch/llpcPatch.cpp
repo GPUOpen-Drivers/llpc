@@ -404,7 +404,7 @@ GlobalVariable* Patch::GetLdsVariable(
                                    nullptr,
                                    GlobalValue::NotThreadLocal,
                                    ADDR_SPACE_LOCAL);
-    pLds->setAlignment(sizeof(uint32_t));
+    pLds->setAlignment(MaybeAlign(sizeof(uint32_t)));
     return pLds;
 }
 

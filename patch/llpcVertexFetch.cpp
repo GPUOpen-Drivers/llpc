@@ -1669,7 +1669,7 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
 
     auto pVbDesc = new LoadInst(pVbDescPtr, "", pInsertPos);
     pVbDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
-    pVbDesc->setAlignment(16);
+    pVbDesc->setAlignment(MaybeAlign(16));
 
     return pVbDesc;
 }
