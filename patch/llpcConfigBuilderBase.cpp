@@ -376,13 +376,20 @@ void ConfigBuilderBase::WritePalMetadata()
 
     // Add the register values to the MsgPack document.
     msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
-    size_t sizeInDword = m_configSize / sizeof(uint32_t);
+    const size_t sizeInBytes = m_configSize;
+    const size_t dwordsInByte = sizeof(uint32_t);
+    const size_t sizeInDwords = sizeInBytes / dwordsInByte;
+    static_assert(sizeof(*m_pConfig) == 1, "Expected a byte-sized word buffer");
     // Configs are composed of DWORD key/value pair, the size should be even
-    LLPC_ASSERT((sizeInDword % 2) == 0);
-    for (size_t i = 0; i < sizeInDword; i += 2)
+    LLPC_ASSERT((sizeInDwords % 2) == 0);
+    for (size_t i = 0, offset = 0; i < sizeInDwords; i += 2, offset += 2 * dwordsInByte)
     {
-        auto key   = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i]);
-        auto value = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i + 1]);
+        uint32_t keyVal;
+        std::memcpy(&keyVal, m_pConfig + offset, dwordsInByte);
+        uint32_t valueVal;
+        std::memcpy(&valueVal, m_pConfig + offset + dwordsInByte, dwordsInByte);
+        auto key = m_document->getNode(keyVal);
+        auto value = m_document->getNode(valueVal);
         // Don't export invalid metadata key and value
         if (key.getUInt() == InvalidMetadataKey)
         {
