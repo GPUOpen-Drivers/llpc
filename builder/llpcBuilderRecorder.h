@@ -544,8 +544,8 @@ public:
 
     Instruction* CreateKill(const Twine& instName = "") override final;
     Instruction* CreateReadClock(bool realtime, const Twine& instName = "") override final;
-    Instruction* CreateDemoteToHelperInvocation(const llvm::Twine& instName) override final;
-    Value* CreateIsHelperInvocation(const llvm::Twine& instName) override final;
+    Instruction* CreateDemoteToHelperInvocation(const Twine& instName) override final;
+    Value* CreateIsHelperInvocation(const Twine& instName) override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Builder methods implemented in BuilderImplMatrix
