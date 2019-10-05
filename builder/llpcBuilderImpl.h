@@ -707,10 +707,10 @@ public:
     Value* CreateDerivative(Value* pValue, bool isDirectionY, bool isFine, const Twine& instName = "") override final;
 
     // Create a demote to helper invocation operation. Only allowed in a fragment shader.
-    llvm::Instruction* CreateDemoteToHelperInvocation(const llvm::Twine& instName) override final;
+    Instruction* CreateDemoteToHelperInvocation(const Twine& instName) override final;
 
     // Create a helper invocation query. Only allowed in a fragment shader.
-    llvm::Value* CreateIsHelperInvocation(const llvm::Twine& instName) override final;
+    Value* CreateIsHelperInvocation(const Twine& instName) override final;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplMisc)

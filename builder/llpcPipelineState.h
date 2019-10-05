@@ -51,6 +51,8 @@ void initializePipelineStateWrapperPass(PassRegistry&);
 namespace Llpc
 {
 
+using namespace llvm;
+
 class PipelineState;
 
 // =====================================================================================================================
@@ -70,11 +72,11 @@ struct ResourceNode
         {
             uint32_t                        set;
             uint32_t                        binding;
-            llvm::Constant*                 pImmutableValue;
+            Constant*                       pImmutableValue;
         };
 
         // Info for DescriptorTableVaPtr
-        llvm::ArrayRef<ResourceNode>        innerTable;
+        ArrayRef<ResourceNode>              innerTable;
 
         // Info for indirect data nodes (IndirectUserDataVaPtr, StreamOutVaTablePtr)
         uint32_t                            indirectSizeInDwords;
@@ -95,61 +97,61 @@ public:
     {}
 
     // Set the resource mapping nodes for the pipeline.
-    void SetUserDataNodes(llvm::ArrayRef<ResourceMappingNode>   nodes,
-                          llvm::ArrayRef<DescriptorRangeValue>  rangeValues);
+    void SetUserDataNodes(ArrayRef<ResourceMappingNode>   nodes,
+                          ArrayRef<DescriptorRangeValue>  rangeValues);
 
     // Record pipeline state into IR metadata.
-    void RecordState(llvm::Module* pModule);
+    void RecordState(Module* pModule);
 
     // Set up the pipeline state from the specified linked IR module.
-    void ReadStateFromModule(llvm::Module* pModule);
+    void ReadStateFromModule(Module* pModule);
 
     // Get user data nodes
-    llvm::ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
+    ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
 
 private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
 
-    void SetUserDataNodesTable(llvm::ArrayRef<ResourceMappingNode>  nodes,
+    void SetUserDataNodesTable(ArrayRef<ResourceMappingNode>        nodes,
                                const ImmutableNodesMap&             immutableNodesMap,
                                ResourceNode*                        pDestTable,
                                ResourceNode*&                       pDestInnerTable);
-    void RecordUserDataNodes(llvm::Module* pModule);
-    void RecordUserDataTable(llvm::ArrayRef<ResourceNode> nodes, llvm::NamedMDNode* pUserDataMetaNode);
+    void RecordUserDataNodes(Module* pModule);
+    void RecordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNode* pUserDataMetaNode);
 
     // Read user data nodes for each shader stage from IR metadata
-    void ReadUserDataNodes(llvm::Module* pModule);
+    void ReadUserDataNodes(Module* pModule);
 
     // Get the array of cached MDStrings for names of resource mapping node type, as used in IR metadata for user
     // data nodes.
-    llvm::ArrayRef<llvm::MDString*> GetResourceTypeNames();
+    ArrayRef<MDString*> GetResourceTypeNames();
 
     // Get the cached MDString for the name of a resource mapping node type, as used in IR metadata for user data nodes.
-    llvm::MDString* GetResourceTypeName(ResourceMappingNodeType type);
+    MDString* GetResourceTypeName(ResourceMappingNodeType type);
 
     // Get the resource mapping node type given its MDString name.
-    ResourceMappingNodeType GetResourceTypeFromName(llvm::MDString* pTypeName);
+    ResourceMappingNodeType GetResourceTypeFromName(MDString* pTypeName);
 
     // -----------------------------------------------------------------------------------------------------------------
     llvm::LLVMContext*              m_pContext;                         // LLVM context
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
-    llvm::ArrayRef<ResourceNode>    m_userDataNodes;                    // Top-level user data node table
-    llvm::MDString*                 m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
+    ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
+    MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
 };
 
 // =====================================================================================================================
 // Wrapper pass for the pipeline state in the middle-end
-class PipelineStateWrapper : public llvm::ImmutablePass
+class PipelineStateWrapper : public ImmutablePass
 {
 public:
     PipelineStateWrapper();
 
-    bool doFinalization(llvm::Module& module) override;
+    bool doFinalization(Module& module) override;
 
     // Get the PipelineState from this wrapper pass.
-    PipelineState* GetPipelineState(llvm::Module* pModule);
+    PipelineState* GetPipelineState(Module* pModule);
 
     // -----------------------------------------------------------------------------------------------------------------
 
