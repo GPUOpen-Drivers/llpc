@@ -57,6 +57,7 @@ extern opt<uint32_t> ShadowDescTablePtrHigh;
 // =====================================================================================================================
 // Initialize this ShaderSystemValues if it was previously uninitialized.
 void ShaderSystemValues::Initialize(
+    PipelineState*  pPipelineState, // [in] Pipeline state
     Function*       pEntryPoint)    // [in] Shader entrypoint
 {
     if (m_pEntryPoint == nullptr)
@@ -64,6 +65,7 @@ void ShaderSystemValues::Initialize(
         m_pEntryPoint = pEntryPoint;
         m_shaderStage = GetShaderStageFromFunction(pEntryPoint);
         m_pContext = static_cast<Context*>(&pEntryPoint->getParent()->getContext());
+        m_pPipelineState = pPipelineState;
 
         LLPC_ASSERT(m_shaderStage != ShaderStageInvalid);
         LLPC_ASSERT(m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
@@ -387,7 +389,6 @@ ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
 // =====================================================================================================================
 // Get descriptor table pointer
 Value* ShaderSystemValues::GetDescTablePtr(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        descSet)        // Descriptor set ID
 {
     if (m_descTablePtrs.size() <= descSet)
@@ -397,13 +398,12 @@ Value* ShaderSystemValues::GetDescTablePtr(
     if (m_descTablePtrs[descSet] == nullptr)
     {
         // Find the node.
-        uint32_t resNodeIdx = FindResourceNodeByDescSet(pPipelineState, descSet);
+        uint32_t resNodeIdx = FindResourceNodeByDescSet(descSet);
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
             auto pDescTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), UINT32_MAX), ADDR_SPACE_CONST);
-            m_descTablePtrs[descSet] = GetExtendedResourceNodeValue(pPipelineState,
-                                                                    resNodeIdx,
+            m_descTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
                                                                     pDescTablePtrTy,
                                                                     InvalidValue);
         }
@@ -414,7 +414,6 @@ Value* ShaderSystemValues::GetDescTablePtr(
 // =====================================================================================================================
 // Get shadow descriptor table pointer
 Value* ShaderSystemValues::GetShadowDescTablePtr(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        descSet)        // Descriptor set ID
 {
     if (m_shadowDescTablePtrs.size() <= descSet)
@@ -424,13 +423,12 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
     if (m_shadowDescTablePtrs[descSet] == nullptr)
     {
         // Find the node.
-        uint32_t resNodeIdx = FindResourceNodeByDescSet(pPipelineState, descSet);
+        uint32_t resNodeIdx = FindResourceNodeByDescSet(descSet);
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
             auto pDescTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), UINT32_MAX), ADDR_SPACE_CONST);
-            m_shadowDescTablePtrs[descSet] = GetExtendedResourceNodeValue(pPipelineState,
-                                                                          resNodeIdx,
+            m_shadowDescTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
                                                                           pDescTablePtrTy,
                                                                           cl::ShadowDescTablePtrHigh);
         }
@@ -441,7 +439,6 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
 // =====================================================================================================================
 // Get dynamic descriptor
 Value* ShaderSystemValues::GetDynamicDesc(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        dynDescIdx)     // Dynamic descriptor index
 {
     if (dynDescIdx >= InterfaceData::MaxDynDescCount)
@@ -456,7 +453,7 @@ Value* ShaderSystemValues::GetDynamicDesc(
     {
         // Find the node.
         uint32_t foundDynDescIdx = 0;
-        auto userDataNodes = pPipelineState->GetUserDataNodes();
+        auto userDataNodes = m_pPipelineState->GetUserDataNodes();
         for (uint32_t i = 0; i != userDataNodes.size(); ++i)
         {
             auto pNode = &userDataNodes[i];
@@ -470,7 +467,7 @@ Value* ShaderSystemValues::GetDynamicDesc(
                 if (foundDynDescIdx == dynDescIdx)
                 {
                     // Get the node value.
-                    m_dynDescs[dynDescIdx] = GetResourceNodeValue(pPipelineState, i);
+                    m_dynDescs[dynDescIdx] = GetResourceNodeValue(i);
                     break;
                 }
                 ++foundDynDescIdx;
@@ -531,8 +528,7 @@ Value* ShaderSystemValues::GetNumWorkgroups()
 
 // =====================================================================================================================
 // Get spilled push constant pointer
-Value* ShaderSystemValues::GetSpilledPushConstTablePtr(
-    PipelineState*  pPipelineState) // [in] Pipeline state
+Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
 {
     if (m_pSpilledPushConstTablePtr == nullptr)
     {
@@ -542,7 +538,7 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr(
 
         Instruction* pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
 
-        auto pPushConstNode = &pPipelineState->GetUserDataNodes()[pIntfData->pushConst.resNodeIdx];
+        auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pIntfData->pushConst.resNodeIdx];
         uint32_t pushConstOffset = pPushConstNode->offsetInDwords * sizeof(uint32_t);
 
         auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
@@ -560,13 +556,12 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr(
 
 // =====================================================================================================================
 // Get vertex buffer table pointer
-Value* ShaderSystemValues::GetVertexBufTablePtr(
-    PipelineState*  pPipelineState) // [in] Pipeline state
+Value* ShaderSystemValues::GetVertexBufTablePtr()
 {
     if (m_pVbTablePtr == nullptr)
     {
         // Find the node.
-        auto pVbTableNode = FindResourceNodeByType(pPipelineState, ResourceMappingNodeType::IndirectUserDataVaPtr);
+        auto pVbTableNode = FindResourceNodeByType(ResourceMappingNodeType::IndirectUserDataVaPtr);
         if (pVbTableNode != nullptr)
         {
             // Get the 64-bit extended node value.
@@ -586,7 +581,6 @@ Value* ShaderSystemValues::GetVertexBufTablePtr(
 // =====================================================================================================================
 // Get stream-out buffer descriptor
 Value* ShaderSystemValues::GetStreamOutBufDesc(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        xfbBuffer)      // Transform feedback buffer number
 {
     if (m_streamOutBufDescs.size() <= xfbBuffer)
@@ -596,7 +590,7 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
 
     if (m_streamOutBufDescs[xfbBuffer] == nullptr)
     {
-        auto pStreamOutTablePtr = GetStreamOutTablePtr(pPipelineState);
+        auto pStreamOutTablePtr = GetStreamOutTablePtr();
         auto pInsertPos = pStreamOutTablePtr->getNextNode();
 
         Value* idxs[] =
@@ -619,8 +613,7 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
 
 // =====================================================================================================================
 // Get stream-out buffer table pointer
-Instruction* ShaderSystemValues::GetStreamOutTablePtr(
-    PipelineState*  pPipelineState) // [in] Pipeline state
+Instruction* ShaderSystemValues::GetStreamOutTablePtr()
 {
     LLPC_ASSERT((m_shaderStage == ShaderStageVertex) ||
                 (m_shaderStage == ShaderStageTessEval) ||
@@ -634,7 +627,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr(
         if (m_shaderStage != ShaderStageCopyShader)
         {
             // Find the node.
-            auto pNode = FindResourceNodeByType(pPipelineState, ResourceMappingNodeType::StreamOutTableVaPtr);
+            auto pNode = FindResourceNodeByType(ResourceMappingNodeType::StreamOutTableVaPtr);
             if (pNode != nullptr)
             {
                 // Get the SGPR number of the stream-out table pointer.
@@ -744,23 +737,21 @@ Instruction* ShaderSystemValues::MakePointer(
 // =====================================================================================================================
 // Get 64-bit extended resource node value
 Value* ShaderSystemValues::GetExtendedResourceNodeValue(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        resNodeIdx,     // Resource node index
     Type*           pResNodeTy,     // [in] Pointer type of result
     uint32_t        highValue)      // Value to use for high part, or InvalidValue to use PC
 {
-    return MakePointer(GetResourceNodeValue(pPipelineState, resNodeIdx), pResNodeTy, highValue);
+    return MakePointer(GetResourceNodeValue(resNodeIdx), pResNodeTy, highValue);
 }
 
 // =====================================================================================================================
 // Get 32 bit resource node value
 Value* ShaderSystemValues::GetResourceNodeValue(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        resNodeIdx)     // Resource node index
 {
     auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
     auto pIntfData   = m_pContext->GetShaderInterfaceData(m_shaderStage);
-    auto pNode = &pPipelineState->GetUserDataNodes()[resNodeIdx];
+    auto pNode = &m_pPipelineState->GetUserDataNodes()[resNodeIdx];
     Value* pResNodeValue = nullptr;
 
     if ((pNode->type == ResourceMappingNodeType::IndirectUserDataVaPtr) ||
@@ -889,10 +880,9 @@ Value* ShaderSystemValues::SetRingBufferDataFormat(
 // =====================================================================================================================
 // Find resource node by type
 const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
-    PipelineState*          pPipelineState, // [in] Pipeline state
     ResourceMappingNodeType type)           // Resource node type to find
 {
-    auto userDataNodes = pPipelineState->GetUserDataNodes();
+    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
     for (uint32_t i = 0; i < userDataNodes.size(); ++i)
     {
         auto pNode = &userDataNodes[i];
@@ -907,10 +897,9 @@ const ResourceNode* ShaderSystemValues::FindResourceNodeByType(
 // =====================================================================================================================
 // Find resource node by descriptor set ID
 uint32_t ShaderSystemValues::FindResourceNodeByDescSet(
-    PipelineState*  pPipelineState, // [in] Pipeline state
     uint32_t        descSet)        // Descriptor set to find
 {
-    auto userDataNodes = pPipelineState->GetUserDataNodes();
+    auto userDataNodes = m_pPipelineState->GetUserDataNodes();
     for (uint32_t i = 0; i < userDataNodes.size(); ++i)
     {
         auto pNode = &userDataNodes[i];

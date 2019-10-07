@@ -53,7 +53,7 @@ class ShaderSystemValues
 {
 public:
     // Initialize this ShaderSystemValues if it was previously uninitialized.
-    void Initialize(llvm::Function* pEntryPoint);
+    void Initialize(PipelineState* pPipelineState, llvm::Function* pEntryPoint);
 
     // Get ES-GS ring buffer descriptor (for VS/TES output or GS input)
     llvm::Value* GetEsGsRingBufDesc();
@@ -86,13 +86,13 @@ public:
     llvm::ArrayRef<llvm::Value*> GetEmitCounterPtr();
 
     // Get descriptor table pointer
-    llvm::Value* GetDescTablePtr(PipelineState* pPipelineState, uint32_t descSet);
+    llvm::Value* GetDescTablePtr(uint32_t descSet);
 
     // Get shadow descriptor table pointer
-    llvm::Value* GetShadowDescTablePtr(PipelineState* pPipelineState, uint32_t descSet);
+    llvm::Value* GetShadowDescTablePtr(uint32_t descSet);
 
     // Get dynamic descriptor
-    llvm::Value* GetDynamicDesc(PipelineState* pPipelineState, uint32_t dynDescIdx);
+    llvm::Value* GetDynamicDesc(uint32_t dynDescIdx);
 
     // Get global internal table pointer
     llvm::Value* GetInternalGlobalTablePtr();
@@ -104,29 +104,26 @@ public:
     llvm::Value* GetNumWorkgroups();
 
     // Get spilled push constant pointer
-    llvm::Value* GetSpilledPushConstTablePtr(PipelineState* pPipelineState);
+    llvm::Value* GetSpilledPushConstTablePtr();
 
     // Get vertex buffer table pointer
-    llvm::Value* GetVertexBufTablePtr(PipelineState* pPipelineState);
+    llvm::Value* GetVertexBufTablePtr();
 
     // Get stream-out buffer descriptor
-    llvm::Value* GetStreamOutBufDesc(PipelineState* pPipelineState, uint32_t xfbBuffer);
+    llvm::Value* GetStreamOutBufDesc(uint32_t xfbBuffer);
 
 private:
     // Get stream-out buffer table pointer
-    llvm::Instruction* GetStreamOutTablePtr(PipelineState* pPipelineState);
+    llvm::Instruction* GetStreamOutTablePtr();
 
     // Make 64-bit pointer of specified type from 32-bit int, extending with the specified value, or PC if InvalidValue
     llvm::Instruction* MakePointer(llvm::Value* pLowValue, llvm::Type* pPtrTy, uint32_t highValue);
 
     // Get 64-bit extended resource node value
-    llvm::Value* GetExtendedResourceNodeValue(PipelineState* pPipelineState,
-                                              uint32_t resNodeIdx,
-                                              llvm::Type* pResNodeTy,
-                                              uint32_t highValue);
+    llvm::Value* GetExtendedResourceNodeValue(uint32_t resNodeIdx, llvm::Type* pResNodeTy, uint32_t highValue);
 
     // Get 32 bit resource node value
-    llvm::Value* GetResourceNodeValue(PipelineState* pPipelineState, uint32_t resNodeIdx);
+    llvm::Value* GetResourceNodeValue(uint32_t resNodeIdx);
 
     // Get spill table pointer
     llvm::Instruction* GetSpillTablePtr();
@@ -140,15 +137,16 @@ private:
                                          llvm::Instruction* pInsertPos) const;
 
     // Find resource node by type
-    const ResourceNode* FindResourceNodeByType(PipelineState* pPipelineState, ResourceMappingNodeType type);
+    const ResourceNode* FindResourceNodeByType(ResourceMappingNodeType type);
 
     // Find resource node by descriptor set ID
-    uint32_t FindResourceNodeByDescSet(PipelineState* pPipelineState, uint32_t descSet);
+    uint32_t FindResourceNodeByDescSet(uint32_t descSet);
 
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Function*     m_pEntryPoint = nullptr;        // Shader entrypoint
     Context*            m_pContext;                     // LLPC context
+    PipelineState*      m_pPipelineState;               // Pipeline state
     ShaderStage         m_shaderStage;                  // Shader stage
 
     llvm::Value*        m_pEsGsRingBufDesc = nullptr;   // ES -> GS ring buffer descriptor (VS, TES, and GS)
@@ -191,11 +189,14 @@ private:
 class PipelineSystemValues
 {
 public:
+    // Initialize this PipelineSystemValues.
+    void Initialize(PipelineState* pPipelineState) { m_pPipelineState = pPipelineState; }
+
     // Get the ShaderSystemValues object for the given shader entrypoint.
     ShaderSystemValues* Get(llvm::Function* pEntryPoint)
     {
         auto pShaderSysValues = &m_shaderSysValuesMap[pEntryPoint];
-        pShaderSysValues->Initialize(pEntryPoint);
+        pShaderSysValues->Initialize(m_pPipelineState, pEntryPoint);
         return pShaderSysValues;
     }
 
@@ -206,6 +207,7 @@ public:
     }
 
 private:
+    PipelineState*                                m_pPipelineState;
     std::map<llvm::Function*, ShaderSystemValues> m_shaderSysValuesMap;
 };
 
