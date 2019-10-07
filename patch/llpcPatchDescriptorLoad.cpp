@@ -89,6 +89,7 @@ bool PatchDescriptorLoad::runOnModule(
     m_changed = false;
 
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    m_pipelineSysValues.Initialize(m_pPipelineState);
 
     // Invoke handling of "call" instruction
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
@@ -233,7 +234,7 @@ void PatchDescriptorLoad::visitCallInst(
         Value* pDesc = nullptr;
         if (mangledName == LlpcName::DescriptorLoadSpillTable)
         {
-            pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr(m_pPipelineState);
+            pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
         }
         else
         {
@@ -375,7 +376,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
         if (dynDescIdx != InvalidValue)
         {
             // Dynamic descriptors
-            pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(m_pPipelineState, dynDescIdx);
+            pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(dynDescIdx);
             if (pDesc != nullptr)
             {
                 auto pDescTy = VectorType::get(m_pContext->Int32Ty(), descSizeInDword);
@@ -416,7 +417,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
         else if (nodeType1 == ResourceMappingNodeType::PushConst)
         {
             auto pDescTablePtr =
-                m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, descSet);
+                m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(descSet);
 
             Value* pDescTableAddr = new PtrToIntInst(pDescTablePtr,
                                                      m_pContext->Int64Ty(),
@@ -530,12 +531,11 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             }
             else if ((cl::EnableShadowDescriptorTable) && (nodeType1 == ResourceMappingNodeType::DescriptorFmask))
             {
-                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->
-                                  GetShadowDescTablePtr(m_pPipelineState, descSet);
+                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetShadowDescTablePtr(descSet);
             }
             else
             {
-                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(m_pPipelineState, descSet);
+                pDescTablePtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(descSet);
             }
             auto pDescPtr = GetElementPtrInst::Create(nullptr, pDescTablePtr, idxs, "", pInsertPoint);
             auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", pInsertPoint);

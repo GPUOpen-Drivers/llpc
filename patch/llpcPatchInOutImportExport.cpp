@@ -110,6 +110,7 @@ bool PatchInOutImportExport::runOnModule(
 
     m_gfxIp = m_pContext->GetGfxIpVersion();
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    m_pipelineSysValues.Initialize(m_pPipelineState);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
@@ -4487,7 +4488,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
                 (m_shaderStage == ShaderStageTessEval) ||
                 (m_shaderStage == ShaderStageCopyShader));
 
-    Value* pStreamOutBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetStreamOutBufDesc(m_pPipelineState, xfbBuffer);
+    Value* pStreamOutBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetStreamOutBufDesc(xfbBuffer);
 
     const auto& xfbStrides = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
     uint32_t xfbStride = xfbStrides[xfbBuffer];

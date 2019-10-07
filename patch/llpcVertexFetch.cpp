@@ -1663,7 +1663,7 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
     idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
     idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), binding, false));
 
-    auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr(m_pPipelineState);
+    auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr();
     auto pVbDescPtr = GetElementPtrInst::Create(nullptr, pVbTablePtr, idxs, "", pInsertPos);
     pVbDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
 
