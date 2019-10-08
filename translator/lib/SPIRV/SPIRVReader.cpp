@@ -56,6 +56,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/CFG.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
@@ -558,6 +559,7 @@ private:
   RemappedTypeElementsMap RemappedTypeElements;
   DenseMap<Type *, bool> TypesWithPadMap;
   DenseMap<std::pair<SPIRVType*, uint32_t>, Type *> OverlappingStructTypeWorkaroundMap;
+  DenseMap<std::pair<BasicBlock*, BasicBlock*>, unsigned> BlockPredecessorToCount;
   const ShaderModuleInfo* ModuleData;
 
   Llpc::Builder *getBuilder() const { return m_pBuilder; }
@@ -625,6 +627,25 @@ private:
     }
     ValueMap[BV] = V;
     return V;
+  }
+
+  // Used to keep track of the number of incoming edges to a block from each
+  // of the predecessor.
+  void recordBlockPredecessor(BasicBlock* Block, BasicBlock* PredecessorBlock) {
+    assert(Block);
+    assert(PredecessorBlock);
+    BlockPredecessorToCount[{Block, PredecessorBlock}] += 1;
+  }
+
+  unsigned
+  getBlockPredecessorCounts(BasicBlock* Block, BasicBlock* Predecessor) {
+    assert(Block);
+    // This will create the map entry if it does not already exist.
+    auto it = BlockPredecessorToCount.find({Block, Predecessor});
+    if (it != BlockPredecessorToCount.end())
+      return it->second;
+
+    return 0;
   }
 
   bool isSPIRVBuiltinVariable(GlobalVariable *GV,
@@ -5545,13 +5566,15 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   switch (static_cast<uint32_t>(BV->getOpCode())) {
   case OpBranch: {
     auto BR = static_cast<SPIRVBranch *>(BV);
-    auto BI = BranchInst::Create(
-        dyn_cast<BasicBlock>(transValue(BR->getTargetLabel(), F, BB)), BB);
+    auto Successor = cast<BasicBlock>(transValue(BR->getTargetLabel(), F, BB));
+    auto BI = BranchInst::Create(Successor, BB);
     auto LM = static_cast<SPIRVLoopMerge *>(BR->getPrevious());
     if (LM != nullptr && LM->getOpCode() == OpLoopMerge)
       setLLVMLoopMetadata(LM, BI);
     else if (BR->getBasicBlock()->getLoopMerge())
       setLLVMLoopMetadata(BR->getBasicBlock()->getLoopMerge(), BI);
+
+    recordBlockPredecessor(Successor, BB);
     return mapValue(BV, BI);
   }
 
@@ -5570,15 +5593,19 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
           llvm::ConstantInt::get(C->getType(), 0));
     }
 
-    auto BC = BranchInst::Create(
-        dyn_cast<BasicBlock>(transValue(BR->getTrueLabel(), F, BB)),
-        dyn_cast<BasicBlock>(transValue(BR->getFalseLabel(), F, BB)),
-        C, BB);
+    auto TrueSuccessor =
+      cast<BasicBlock>(transValue(BR->getTrueLabel(), F, BB));
+    auto FalseSuccessor =
+      cast<BasicBlock>(transValue(BR->getFalseLabel(), F, BB));
+    auto BC = BranchInst::Create(TrueSuccessor, FalseSuccessor, C, BB);
     auto LM = static_cast<SPIRVLoopMerge *>(BR->getPrevious());
     if (LM != nullptr && LM->getOpCode() == OpLoopMerge)
       setLLVMLoopMetadata(LM, BC);
     else if (BR->getBasicBlock()->getLoopMerge())
       setLLVMLoopMetadata(BR->getBasicBlock()->getLoopMerge(), BC);
+
+    recordBlockPredecessor(TrueSuccessor, BB);
+    recordBlockPredecessor(FalseSuccessor, BB);
     return mapValue(BV, BC);
   }
 
@@ -5595,12 +5622,24 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                                 Phi->getPairs().size() / 2, Phi->getName(), BB);
 
     auto LPhi = dyn_cast<PHINode>(mapValue(BV, PhiNode));
+    BasicBlock* ParentBB = LPhi->getParent();
+
+#ifndef NDEBUG
+    SmallDenseSet<BasicBlock*, 4> SeenPredecessors;
+#endif
     Phi->foreachPair([&](SPIRVValue *IncomingV, SPIRVBasicBlock *IncomingBB,
                          size_t Index) {
-      auto Translated = transValue(IncomingV, F, BB);
-      LPhi->addIncoming(Translated,
-                        dyn_cast<BasicBlock>(transValue(IncomingBB, F, BB)));
+      auto TranslatedVal = transValue(IncomingV, F, BB);
+      auto TranslatedBB = cast<BasicBlock>(transValue(IncomingBB, F, BB));
+      LPhi->addIncoming(TranslatedVal, TranslatedBB);
+
+#ifndef NDEBUG
+      assert(SeenPredecessors.count(TranslatedBB) != 0 &&
+             "SPIR-V requires phi entries to be unique for duplicate predecessor blocks.");
+      SeenPredecessors.insert(TranslatedBB);
+#endif
     });
+
     return LPhi;
   }
 
@@ -5675,9 +5714,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
           if (Literals.size() == 2) {
             Literal += uint64_t(Literals.at(1)) << 32;
           }
+
+          auto Successor = cast<BasicBlock>(transValue(Label, F, BB));
           LS->addCase(ConstantInt::get(dyn_cast<IntegerType>(Select->getType()),
                                        Literal),
-                      dyn_cast<BasicBlock>(transValue(Label, F, BB)));
+                      Successor);
+          recordBlockPredecessor(Successor, BB);
         });
     return mapValue(BV, LS);
   }
@@ -6554,6 +6596,29 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *BF) {
       transValue(BInst, F, BB, false);
     }
   }
+
+  // Update phi nodes -- add missing incoming arcs.
+  // This is necessary because LLVM's CFG is a multigraph, while SPIR-V's
+  // CFG is not.
+  for (BasicBlock &BB : *F) {
+
+    // Add missing incoming arcs to each phi node that requires fixups.
+    for (PHINode &Phi : BB.phis()) {
+      const unsigned InitialNumIncoming = Phi.getNumIncomingValues();
+      for (unsigned i = 0; i != InitialNumIncoming; ++i) {
+        BasicBlock* Predecessor = Phi.getIncomingBlock(i);
+        Value *IncomingValue = Phi.getIncomingValue(i);
+        const unsigned NumIncomingArcsForPred =
+          getBlockPredecessorCounts(&BB, Predecessor);
+
+        for (unsigned j = 1; j < NumIncomingArcsForPred; ++j)
+          Phi.addIncoming(IncomingValue, Predecessor);
+      }
+    }
+  }
+
+  BlockPredecessorToCount.clear();
+
   return F;
 }
 
