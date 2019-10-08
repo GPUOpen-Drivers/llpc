@@ -100,7 +100,8 @@ bool PatchCheckShaderCache::runOnModule(
 
     std::string inOutUsageStreams[ShaderStageGfxCount];
     ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
-    auto stageMask = m_pContext->GetShaderStageMask();
+    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    auto stageMask = pPipelineState->GetShaderStageMask();
 
     // Build input/output layout hash per shader stage
     for (auto stage = ShaderStageVertex; stage < ShaderStageGfxCount; stage = static_cast<ShaderStage>(stage + 1))

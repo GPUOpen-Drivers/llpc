@@ -167,16 +167,6 @@ public:
         return m_pPipelineContext->GetActiveShaderStageCount();
     }
 
-    ShaderStage GetPrevShaderStage(ShaderStage shaderStage) const
-    {
-        return m_pPipelineContext->GetPrevShaderStage(shaderStage);
-    }
-
-    ShaderStage GetNextShaderStage(ShaderStage shaderStage) const
-    {
-        return m_pPipelineContext->GetNextShaderStage(shaderStage);
-    }
-
     const char* GetGpuNameString() const
     {
         return PipelineContext::GetGpuNameString(m_gfxIp);

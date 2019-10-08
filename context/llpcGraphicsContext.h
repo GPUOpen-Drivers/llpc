@@ -63,14 +63,8 @@ public:
     // Gets the mask of active shader stages bound to this pipeline
     virtual uint32_t GetShaderStageMask() const { return m_stageMask; }
 
-    // Get the last vertex processing shader stage in this pipeline, or ShaderStageInvalid if none.
-    virtual ShaderStage GetLastVertexProcessingStage() const;
-
     // Gets the count of active shader stages
     virtual uint32_t GetActiveShaderStageCount() const { return m_activeStageCount; }
-
-    virtual ShaderStage GetPrevShaderStage(ShaderStage shaderStage) const;
-    virtual ShaderStage GetNextShaderStage(ShaderStage shaderStage) const;
 
     virtual void DoUserDataNodeMerge();
 

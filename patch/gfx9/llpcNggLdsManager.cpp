@@ -141,7 +141,7 @@ NggLdsManager::NggLdsManager(
     const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
@@ -308,7 +308,7 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
         return 0;
     }
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = pPipelineState->GetShaderStageMask();
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     if (hasGs)
@@ -389,14 +389,13 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
 uint32_t NggLdsManager::CalcGsExtraLdsSize(
     PipelineState* pPipelineState)  // [in] Pipeline state
 {
-    Context* pContext = static_cast<Context*>(&pPipelineState->GetContext());
     const auto pNggControl = pPipelineState->GetNggControl();
     if (pNggControl->enableNgg == false)
     {
         return 0;
     }
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = pPipelineState->GetShaderStageMask();
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
     if (hasGs == false)
     {

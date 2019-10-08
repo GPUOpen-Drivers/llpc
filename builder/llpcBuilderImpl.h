@@ -58,6 +58,9 @@ protected:
     // Get the ShaderModes object.
     ShaderModes* GetShaderModes() override final;
 
+    // Get the PipelineState object.
+    PipelineState* GetPipelineState() const { return m_pPipelineState; }
+
     // Get whether the context we are building in supports DPP operations.
     bool SupportDpp() const;
 

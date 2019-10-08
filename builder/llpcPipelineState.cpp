@@ -271,7 +271,129 @@ void PipelineState::ReadState(
     Module* pModule)    // [in] LLVM module
 {
     GetShaderModes()->ReadModesFromPipeline(pModule);
+    ReadShaderStageMask(pModule);
     ReadUserDataNodes(pModule);
+}
+
+// =====================================================================================================================
+// Read shaderStageMask from IR. This consists of checking what shader stage functions are present in the IR.
+void PipelineState::ReadShaderStageMask(
+    Module* pModule)    // [in] LLVM module
+{
+    m_stageMask = 0;
+    for (auto& func : *pModule)
+    {
+        if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
+        {
+            auto shaderStage = GetShaderStageFromFunction(&func);
+
+            if (shaderStage != ShaderStageInvalid)
+            {
+                m_stageMask |= 1 << shaderStage;
+            }
+        }
+    }
+}
+
+// =====================================================================================================================
+// Get the last vertex processing shader stage in this pipeline, or ShaderStageInvalid if none.
+ShaderStage PipelineState::GetLastVertexProcessingStage() const
+{
+    if (m_stageMask & ShaderStageToMask(ShaderStageCopyShader))
+    {
+        return ShaderStageCopyShader;
+    }
+    if (m_stageMask & ShaderStageToMask(ShaderStageGeometry))
+    {
+        return ShaderStageGeometry;
+    }
+    if (m_stageMask & ShaderStageToMask(ShaderStageTessEval))
+    {
+        return ShaderStageTessEval;
+    }
+    if (m_stageMask & ShaderStageToMask(ShaderStageVertex))
+    {
+        return ShaderStageVertex;
+    }
+    return ShaderStageInvalid;
+}
+
+// =====================================================================================================================
+// Gets the previous active shader stage in this pipeline
+ShaderStage PipelineState::GetPrevShaderStage(
+    ShaderStage shaderStage // Current shader stage
+    ) const
+{
+    if (shaderStage == ShaderStageCompute)
+    {
+        return ShaderStageInvalid;
+    }
+
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        // Treat copy shader as part of geometry shader
+        shaderStage = ShaderStageGeometry;
+    }
+
+    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
+
+    ShaderStage prevStage = ShaderStageInvalid;
+
+    for (int32_t stage = shaderStage - 1; stage >= 0; --stage)
+    {
+        if ((m_stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage))) != 0)
+        {
+            prevStage = static_cast<ShaderStage>(stage);
+            break;
+        }
+    }
+
+    return prevStage;
+}
+
+// =====================================================================================================================
+// Gets the next active shader stage in this pipeline
+ShaderStage PipelineState::GetNextShaderStage(
+    ShaderStage shaderStage // Current shader stage
+    ) const
+{
+    if (shaderStage == ShaderStageCompute)
+    {
+        return ShaderStageInvalid;
+    }
+
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        // Treat copy shader as part of geometry shader
+        shaderStage = ShaderStageGeometry;
+    }
+
+    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
+
+    ShaderStage nextStage = ShaderStageInvalid;
+
+    for (uint32_t stage = shaderStage + 1; stage < ShaderStageGfxCount; ++stage)
+    {
+        if ((m_stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage))) != 0)
+        {
+            nextStage = static_cast<ShaderStage>(stage);
+            break;
+        }
+    }
+
+    return nextStage;
+}
+
+// =====================================================================================================================
+// Check whether the pipeline is a graphics pipeline
+bool PipelineState::IsGraphics() const
+{
+    return (GetShaderStageMask() &
+            ((1U << ShaderStageVertex) |
+             (1U << ShaderStageTessControl) |
+             (1U << ShaderStageTessEval) |
+             (1U << ShaderStageGeometry) |
+             (1U << ShaderStageFragment))) != 0;
 }
 
 // =====================================================================================================================

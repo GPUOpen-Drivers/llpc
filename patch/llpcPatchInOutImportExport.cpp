@@ -113,7 +113,7 @@ bool PatchInOutImportExport::runOnModule(
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     m_pipelineSysValues.Initialize(m_pPipelineState);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                              ShaderStageToMask(ShaderStageTessEval))) != 0);
     m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -223,7 +223,7 @@ void PatchInOutImportExport::ProcessShader()
     // Initialize calculation factors for tessellation shader
     if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
     {
-        const uint32_t stageMask = m_pContext->GetShaderStageMask();
+        const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
         auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
@@ -1012,7 +1012,7 @@ void PatchInOutImportExport::visitReturnInst(
         return;
     }
 
-    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
     const bool enableXfb = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
 
     // Whether this shader stage has to use "exp" instructions to export outputs
@@ -2566,7 +2566,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
     case BuiltInPatchVertices:
         {
             uint32_t patchVertices = MaxTessPatchVertices;
-            const bool hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
+            const bool hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
             if (hasTcs)
             {
                 patchVertices = m_pPipelineState->GetShaderModes()->GetTessellationMode().outputVertices;
@@ -5302,7 +5302,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
     {
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
-        LLPC_ASSERT((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+        LLPC_ASSERT(m_pPipelineState->HasShaderStage(ShaderStageGeometry));
         const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
         pEsGsOffset = BinaryOperator::CreateLShr(pEsGsOffset,
@@ -6399,7 +6399,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
     Instruction* pInsertPos)     // [in] Where to insert the "exp" instruction
 {
     // Check if the shader stage is valid to use "exp" instruction to export output
-    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
                               (m_shaderStage == ShaderStageCopyShader)) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
@@ -6579,7 +6579,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
     Instruction* pInsertPos)    // [in] Where to insert the "exp" instruction
 {
     // Check if the shader stage is valid to use "exp" instruction to export output
-    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
                               (m_shaderStage == ShaderStageCopyShader)) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));

@@ -32,6 +32,7 @@
 
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 
 namespace Llpc
 {
@@ -46,6 +47,7 @@ public:
 
     void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
     }
 

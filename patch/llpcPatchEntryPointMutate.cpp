@@ -109,7 +109,7 @@ bool PatchEntryPointMutate::runOnModule(
 
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                              ShaderStageToMask(ShaderStageTessEval))) != 0);
     m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -288,7 +288,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
         // NOTE: For LS-HS/ES-GS merged shader, resource mapping nodes of the two shader stages are merged as a whole.
         // So we have to check activeness of both shader stages at the same time. Here, we determine the second shader
        // stage and get its resource usage accordingly.
-        uint32_t stageMask = m_pContext->GetShaderStageMask();
+        uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
         const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                             ShaderStageToMask(ShaderStageTessEval))) != 0);
         const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -441,7 +441,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             if (pNode->type == ResourceMappingNodeType::StreamOutTableVaPtr)
             {
                 // Only the last shader stage before fragment (ignoring copy shader) needs a stream out table.
-                if ((m_pContext->GetShaderStageMask() &
+                if ((m_pPipelineState->GetShaderStageMask() &
                      (ShaderStageToMask(ShaderStageFragment) - ShaderStageToMask(m_shaderStage))) ==
                     ShaderStageToMask(m_shaderStage))
                 {
@@ -484,7 +484,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
 
 #if LLPC_BUILD_GFX10
-    const bool enableNgg = m_pContext->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
+    const bool enableNgg = m_pPipelineState->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
 #endif
 
     switch (m_shaderStage)
@@ -514,7 +514,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             auto pCurrResUsage = pResUsage;
             if ((m_pContext->GetGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
-                (m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
+                (m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
             {
                 pCurrResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
             }
@@ -789,7 +789,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             if ((m_pContext->GetGfxIpVersion().major >= 9) &&
                 (m_shaderStage == ShaderStageTessControl) &&
-                (m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
+                (m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
             {
                 pCurrIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
                 pCurrResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);

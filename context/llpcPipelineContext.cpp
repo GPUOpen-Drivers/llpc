@@ -284,10 +284,13 @@ ShaderHash PipelineContext::GetShaderHashCode(
 void PipelineContext::SetPipelineState(
     Pipeline*    pPipeline) const   // [in/out] Pipeline object
 {
+    // Give the shader stage mask to the middle-end.
+    uint32_t stageMask = GetShaderStageMask();
+    pPipeline->SetShaderStageMask(stageMask);
+
     // Give the user data nodes and descriptor range values to the Builder.
     // The user data nodes have been merged so they are the same in each shader stage. Get them from
     // the first active stage.
-    uint32_t stageMask = GetShaderStageMask();
     const PipelineShaderInfo* pShaderInfo = nullptr;
     {
         pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));

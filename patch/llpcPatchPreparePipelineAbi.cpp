@@ -129,10 +129,10 @@ bool PatchPreparePipelineAbi::runOnModule(
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     m_pPipelineShaders = &getAnalysis<PipelineShaders>();
 
-    m_hasVs  = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
-    m_hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
-    m_hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
-    m_hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 
     m_gfxIp = m_pContext->GetGfxIpVersion();
 
@@ -212,7 +212,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
     SetCallingConv(ShaderStageCompute, CallingConv::AMDGPU_CS);
     SetCallingConv(ShaderStageFragment, CallingConv::AMDGPU_PS);
 
-    if (m_pContext->IsGraphics())
+    if (m_pPipelineState->IsGraphics())
     {
         ShaderMerger shaderMerger(m_pPipelineState, m_pPipelineShaders);
 #if LLPC_BUILD_GFX10
