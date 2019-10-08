@@ -112,7 +112,7 @@ bool PatchInOutImportExport::runOnModule(
     m_pipelineSysValues.Initialize(m_pPipelineState);
     m_gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     m_hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                              ShaderStageToMask(ShaderStageTessEval))) != 0);
     m_hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -222,7 +222,7 @@ void PatchInOutImportExport::ProcessShader()
     // Initialize calculation factors for tessellation shader
     if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
     {
-        const uint32_t stageMask = m_pContext->GetShaderStageMask();
+        const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
         auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
@@ -2618,7 +2618,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
     case BuiltInPatchVertices:
         {
             uint32_t patchVertices = MaxTessPatchVertices;
-            const bool hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
+            const bool hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
             if (hasTcs)
             {
                 const auto& tcsBuiltInUsage =
@@ -5406,7 +5406,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
     {
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
-        LLPC_ASSERT((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+        LLPC_ASSERT(m_pPipelineState->HasShaderStage(ShaderStageGeometry));
         const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
         pEsGsOffset = BinaryOperator::CreateLShr(pEsGsOffset,

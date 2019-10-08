@@ -149,7 +149,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsFsRegConfig)];
     PipelineVsFsRegConfig* pConfig = reinterpret_cast<PipelineVsFsRegConfig*>(pAllocBuf);
@@ -256,7 +256,7 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsFsRegConfig)];
     PipelineVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsFsRegConfig*>(pAllocBuf);
@@ -420,7 +420,7 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsGsFsRegConfig)];
     PipelineVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsGsFsRegConfig*>(pAllocBuf);
@@ -557,7 +557,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineVsTsGsFsRegConfig)];
     PipelineVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsGsFsRegConfig*>(pAllocBuf);
@@ -763,7 +763,7 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig(
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineNggVsFsRegConfig)];
     PipelineNggVsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsFsRegConfig*>(pAllocBuf);
@@ -867,7 +867,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineNggVsTsFsRegConfig)];
     PipelineNggVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsTsFsRegConfig*>(pAllocBuf);
@@ -1014,7 +1014,7 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig(
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineNggVsGsFsRegConfig)];
     PipelineNggVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsGsFsRegConfig*>(pAllocBuf);
@@ -1128,7 +1128,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     uint8_t* pAllocBuf = new uint8_t[sizeof(PipelineNggVsTsGsFsRegConfig)];
     PipelineNggVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsTsGsFsRegConfig*>(pAllocBuf);
@@ -1295,7 +1295,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    LLPC_ASSERT(pContext->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
+    LLPC_ASSERT(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -1527,7 +1527,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         cullDistanceCount = builtInUsage.gs.cullDistance;
 
         // NOTE: For ES-GS merged shader, the actual use of primitive ID should take both ES and GS into consideration.
-        const bool hasTs = ((pContext->GetShaderStageMask() & (ShaderStageToMask(ShaderStageTessControl) |
+        const bool hasTs = ((m_pPipelineState->GetShaderStageMask() & (ShaderStageToMask(ShaderStageTessControl) |
                                                                ShaderStageToMask(ShaderStageTessEval))) != 0);
         if (hasTs)
         {
@@ -1855,7 +1855,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     GfxIpVersion gfxIp = m_pPipelineState->GetGfxIpVersion();
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
 
@@ -2151,7 +2151,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);

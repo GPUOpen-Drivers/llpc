@@ -122,6 +122,12 @@ public:
     // Clear the pipeline state IR metadata.
     void Clear(Module* pModule);
 
+    // Accessors for shader stage mask
+    void SetShaderStageMask(uint32_t mask) { m_stageMask = mask; }
+    uint32_t GetShaderStageMask() const { return m_stageMask; }
+    bool HasShaderStage(ShaderStage stage) const { return (GetShaderStageMask() >> stage) & 1; }
+    bool IsGraphics() const;
+
     // Record dirty pipeline state into IR metadata of specified module. Returns true if module modified.
     bool Flush(Module* pModule);
 
@@ -140,6 +146,9 @@ private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
 
+    // Read shaderStageMask from IR
+    void ReadShaderStageMask();
+
     // User data nodes handling
     void SetUserDataNodesTable(ArrayRef<ResourceMappingNode>        nodes,
                                const ImmutableNodesMap&             immutableNodesMap,
@@ -155,6 +164,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
     BuilderContext*                 m_pBuilderContext;                  // Builder context
     Module*                         m_pModule = nullptr;                // Pipeline IR module
+    uint32_t                        m_stageMask = 0;                    // Mask of active shader stages
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};

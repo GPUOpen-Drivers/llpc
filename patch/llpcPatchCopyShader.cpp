@@ -308,6 +308,9 @@ bool PatchCopyShader::runOnModule(
     auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
     pEntryPoint->addMetadata(gSPIRVMD::ExecutionModel, *pExecModelMetaNode);
 
+    // Tell pipeline state there is a copy shader.
+    pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | (1U << ShaderStageCopyShader));
+
     return true;
 }
 

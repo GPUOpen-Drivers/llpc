@@ -102,7 +102,7 @@ void CodeGenManager::SetupTargetFeatures(
              std::string targetFeatures(globalFeatures);
              AttrBuilder builder;
 
-             ShaderStage shaderStage = GetShaderStageFromCallingConv(pContext->GetShaderStageMask(),
+             ShaderStage shaderStage = GetShaderStageFromCallingConv(pPipelineState->GetShaderStageMask(),
                                                                      pFunc->getCallingConv());
 
             bool useSiScheduler = cl::EnableSiScheduler;

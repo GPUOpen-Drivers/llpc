@@ -101,7 +101,7 @@ bool PatchResourceCollect::runOnModule(
 #endif
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
-        bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+        bool hasGs = pPipelineState->HasShaderStage(ShaderStageGeometry);
 #if LLPC_BUILD_GFX10
         bool checkGsOnChip = hasGs || m_pContext->GetNggControl()->enableNgg;
 #else

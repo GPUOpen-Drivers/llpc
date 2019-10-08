@@ -489,8 +489,8 @@ bool GraphicsContext::CheckGsOnChipValidity(
                                                                4 * pGsResUsage->inOutUsage.outputMapLocCount
                                                                  * pGsResUsage->builtInUsage.gs.outputVertices) : 0;
 
-            const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(this) / 4; // In DWORDs
-            const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(this) / 4; // In DWORDs
+            const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(pPipelineState) / 4; // In DWORDs
+            const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(pPipelineState) / 4; // In DWORDs
 
             // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
             const uint32_t primAmpFactor =

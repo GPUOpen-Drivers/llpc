@@ -81,6 +81,37 @@ const WorkaroundFlags* PipelineState::GetGpuWorkarounds() const
 }
 
 // =====================================================================================================================
+// Read shaderStageMask from IR. This consists of checking what shader stage functions are present in the IR.
+void PipelineState::ReadShaderStageMask()
+{
+    m_stageMask = 0;
+    for (auto& func : *m_pModule)
+    {
+        if ((func.empty() == false) && (func.getLinkage() != GlobalValue::InternalLinkage))
+        {
+            auto shaderStage = GetShaderStageFromFunction(&func);
+
+            if (shaderStage != ShaderStageInvalid)
+            {
+                m_stageMask |= 1 << shaderStage;
+            }
+        }
+    }
+}
+
+// =====================================================================================================================
+// Check whether the pipeline is a graphics pipeline
+bool PipelineState::IsGraphics() const
+{
+    return (GetShaderStageMask() &
+            ((1U << ShaderStageVertex) |
+             (1U << ShaderStageTessControl) |
+             (1U << ShaderStageTessEval) |
+             (1U << ShaderStageGeometry) |
+             (1U << ShaderStageFragment))) != 0;
+}
+
+// =====================================================================================================================
 // Clear the pipeline state IR metadata.
 void PipelineState::Clear(
     Module* pModule)    // [in/out] IR module
@@ -110,6 +141,7 @@ bool PipelineState::Flush(
 // Set up the pipeline state from the pipeline IR module.
 void PipelineState::ReadState()
 {
+    ReadShaderStageMask();
     ReadUserDataNodes();
 }
 

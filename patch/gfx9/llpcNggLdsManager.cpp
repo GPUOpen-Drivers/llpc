@@ -132,6 +132,7 @@ NggLdsManager::NggLdsManager(
     IRBuilder<>*    pBuilder)       // [in] LLVM IR builder
     :
     m_pContext(pContext),
+    m_pPipelineState(pPipelineState),
     m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / pPipelineState->GetGpuProperty()->waveSize),
     m_pBuilder(pBuilder)
 {
@@ -140,7 +141,7 @@ NggLdsManager::NggLdsManager(
     const auto pNggControl = pContext->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
@@ -175,8 +176,7 @@ NggLdsManager::NggLdsManager(
         // DWORDs (such as DS128).
         const uint32_t esGsRingLdsSize = RoundUpToMultiple(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
         const uint32_t gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
-                                         CalcGsExtraLdsSize(static_cast<GraphicsContext*>(
-                                             pContext->GetPipelineContext()));
+                                         CalcGsExtraLdsSize(pPipelineState);
 
         uint32_t ldsRegionStart = 0;
 
@@ -299,15 +299,16 @@ NggLdsManager::NggLdsManager(
 // =====================================================================================================================
 // Calculates ES extra LDS size.
 uint32_t NggLdsManager::CalcEsExtraLdsSize(
-    GraphicsContext* pContext) // [in] LLPC graphics context
+    PipelineState*    pPipelineState) // [in] Pipeline state
 {
+    Context* pContext = reinterpret_cast<Context*>(&pPipelineState->GetContext());
     const auto pNggControl = pContext->GetNggControl();
     if (pNggControl->enableNgg == false)
     {
         return 0;
     }
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = pPipelineState->GetShaderStageMask();
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 
     if (hasGs)
@@ -386,15 +387,16 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
 // =====================================================================================================================
 // Calculates GS extra LDS size (used for operations other than ES-GS ring and GS-VS ring read/write).
 uint32_t NggLdsManager::CalcGsExtraLdsSize(
-    GraphicsContext* pContext) // [in] LLPC graphics context
+    PipelineState*    pPipelineState) // [in] Pipeline state
 {
+    Context* pContext = reinterpret_cast<Context*>(&pPipelineState->GetContext());
     const auto pNggControl = pContext->GetNggControl();
     if (pNggControl->enableNgg == false)
     {
         return 0;
     }
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = pPipelineState->GetShaderStageMask();
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
     if (hasGs == false)
     {

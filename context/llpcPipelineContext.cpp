@@ -240,10 +240,19 @@ ShaderHash PipelineContext::GetShaderHashCode(
 void PipelineContext::SetBuilderPipelineState(
     Builder*          pBuilder) const   // [in] The builder
 {
+    // Give the shader stage mask to Builder.
+    uint32_t stageMask = GetShaderStageMask();
+#if VKI_RAY_TRACING
+    if (HasRayTracingShaderStage(stageMask))
+    {
+        stageMask = 1 << ShaderStageCompute;
+    }
+#endif
+    pBuilder->SetShaderStageMask(stageMask);
+
     // Give the user data nodes and descriptor range values to the Builder.
     // The user data nodes have been merged so they are the same in each shader stage. Get them from
     // the first active stage.
-    uint32_t stageMask = GetShaderStageMask();
     const PipelineShaderInfo* pShaderInfo = nullptr;
     {
         pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));

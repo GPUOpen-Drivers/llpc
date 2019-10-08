@@ -104,6 +104,14 @@ Type* Builder::GetConditionallyVectorizedTy(
 }
 
 // =====================================================================================================================
+// Set the mask of shader stages that are present in the pipeline.
+void Builder::SetShaderStageMask(
+    uint32_t mask)  // Mask of shader stages
+{
+    GetPipelineState()->SetShaderStageMask(mask);
+}
+
+// =====================================================================================================================
 // Set the resource mapping nodes for the given shader stage.
 // This stores the nodes as IR metadata.
 void Builder::SetUserDataNodes(

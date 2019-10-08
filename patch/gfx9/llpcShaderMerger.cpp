@@ -66,11 +66,10 @@ ShaderMerger::ShaderMerger(
     LLPC_ASSERT(m_gfxIp.major >= 9);
     LLPC_ASSERT(m_pContext->IsGraphics());
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
-    m_hasVs  = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
-    m_hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
-    m_hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
-    m_hasGs  = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 }
 
 #if LLPC_BUILD_GFX10

@@ -108,7 +108,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
 {
     Result result = Result::Success;
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -170,7 +170,7 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
     size_t*             pConfigSize)      // [out] Size of register configuration
 {
     Result result = Result::Success;
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -267,7 +267,7 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
 {
     Result result = Result::Success;
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -347,7 +347,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
 {
     Result result = Result::Success;
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -462,7 +462,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
 {
     Result result = Result::Success;
 
-    LLPC_ASSERT(pContext->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
+    LLPC_ASSERT(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -839,7 +839,7 @@ Result ConfigBuilder::BuildEsRegConfig(
     const auto pResUsage = pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
-    LLPC_ASSERT((pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    LLPC_ASSERT((m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
     const auto& calcFactor = pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     uint32_t floatMode = SetupFloatingPointMode(pContext, shaderStage);

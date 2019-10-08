@@ -31,6 +31,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPipelineState.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-inout"
 
@@ -618,7 +619,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
 
     // Ignore if not in last-vertex-stage shader (excluding copy shader).
     auto stagesAfterThisOneMask = -ShaderStageToMask(static_cast<ShaderStage>(m_shaderStage + 1));
-    if ((getContext().GetShaderStageMask() & ~ShaderStageToMask(ShaderStageFragment) &
+    if ((GetPipelineState()->GetShaderStageMask() & ~ShaderStageToMask(ShaderStageFragment) &
           ~ShaderStageToMask(ShaderStageCopyShader) & stagesAfterThisOneMask) != 0)
     {
         return nullptr;

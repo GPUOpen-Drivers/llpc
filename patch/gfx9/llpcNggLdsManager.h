@@ -97,8 +97,8 @@ class NggLdsManager
 public:
     NggLdsManager(PipelineState* pPipelineState, Context* pContext, llvm::IRBuilder<>* pBuilder);
 
-    static uint32_t CalcEsExtraLdsSize(GraphicsContext* pContext);
-    static uint32_t CalcGsExtraLdsSize(GraphicsContext* pContext);
+    static uint32_t CalcEsExtraLdsSize(PipelineState* pPipelineState);
+    static uint32_t CalcGsExtraLdsSize(PipelineState* pPipelineState);
 
     // Gets the LDS starting offset for the specified region
     uint32_t GetLdsRegionStart(NggLdsRegionType region) const
@@ -122,7 +122,8 @@ private:
     static const uint32_t LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
     static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
-    Context*        m_pContext;     // LLPC context
+    Context*        m_pContext;       // LLPC context
+    PipelineState*  m_pPipelineState; // Pipeline state
 
     llvm::GlobalValue*  m_pLds;     // Global variable to model NGG LDS
 

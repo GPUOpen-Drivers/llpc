@@ -162,6 +162,9 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Methods to set pipeline state
 
+    // Set the mask of shader stages that are present in the pipeline.
+    void SetShaderStageMask(uint32_t mask);
+
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.
     // "immutableDescs" contains descriptors (currently limited to samplers), whose values are hard
