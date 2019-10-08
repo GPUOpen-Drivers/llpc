@@ -64,7 +64,7 @@ void ConfigBuilder::BuildPalMetadata()
 {
     Result result = Result::Success;
 
-    if (m_pContext->IsGraphics() == false)
+    if (m_pPipelineState->IsGraphics() == false)
     {
         result = BuildPipelineCsRegConfig();
     }
@@ -146,7 +146,7 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -243,7 +243,7 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsTsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -398,7 +398,7 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsGsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -525,7 +525,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineVsTsGsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -722,7 +722,7 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
     const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineNggVsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -815,7 +815,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
     const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineNggVsTsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -951,7 +951,7 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
 
     LLPC_ASSERT(m_pPipelineState->GetNggControl()->enableNgg);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineNggVsGsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -1054,7 +1054,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
 
     LLPC_ASSERT(m_pPipelineState->GetNggControl()->enableNgg);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
 
     PipelineNggVsTsGsFsRegConfig config(gfxIp);
     auto* pConfig = &config; // TODO: remove; this was added in refactoring to reduce the size of a diff
@@ -1212,7 +1212,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
     Result result = Result::Success;
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
-    LLPC_ASSERT(m_pContext->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
+    LLPC_ASSERT(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
     ShaderHash hash = {};
@@ -1434,7 +1434,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         cullDistanceCount = builtInUsage.gs.cullDistance;
 
         // NOTE: For ES-GS merged shader, the actual use of primitive ID should take both ES and GS into consideration.
-        const bool hasTs = ((m_pContext->GetShaderStageMask() & (ShaderStageToMask(ShaderStageTessControl) |
+        const bool hasTs = ((m_pPipelineState->GetShaderStageMask() & (ShaderStageToMask(ShaderStageTessControl) |
                                                                ShaderStageToMask(ShaderStageTessEval))) != 0);
         if (hasTs)
         {
@@ -1749,7 +1749,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
 
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
 
@@ -2041,7 +2041,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -2955,14 +2955,14 @@ Result ConfigBuilder::BuildUserDataConfig(
                 (shaderStage2 == ShaderStageInvalid));
 
     bool enableMultiView = false;
-    if (m_pContext->IsGraphics())
+    if (m_pPipelineState->IsGraphics())
     {
         enableMultiView = static_cast<const GraphicsPipelineBuildInfo*>(
             m_pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
     }
 
     bool enableXfb = false;
-    if (m_pContext->IsGraphics())
+    if (m_pPipelineState->IsGraphics())
     {
         if (((shaderStage1 == ShaderStageVertex) || (shaderStage1 == ShaderStageTessEval)) &&
             (shaderStage2 == ShaderStageInvalid))
@@ -2972,7 +2972,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     }
 
 #if LLPC_BUILD_GFX10
-    const bool enableNgg = m_pContext->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
+    const bool enableNgg = m_pPipelineState->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
     LLPC_UNUSED(enableNgg);
 #endif
 

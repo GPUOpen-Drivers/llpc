@@ -53,10 +53,10 @@ ConfigBuilderBase::ConfigBuilderBase(
 {
     m_pContext = static_cast<Context*>(&pModule->getContext());
 
-    m_hasVs  = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
-    m_hasTcs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) != 0);
-    m_hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
-    m_hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 
     m_gfxIp = m_pContext->GetGfxIpVersion();
 

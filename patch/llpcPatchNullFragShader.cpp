@@ -41,6 +41,7 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"
 #include "llpcPatch.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -71,6 +72,11 @@ public:
     PatchNullFragShader() : Patch(ID)
     {
         initializePatchNullFragShaderPass(*PassRegistry::getPassRegistry());
+    }
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineStateWrapper>();
     }
 
     bool runOnModule(Module& module) override;
@@ -106,11 +112,12 @@ bool PatchNullFragShader::runOnModule(
         return false;
     }
 
-    const bool hasCs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageCompute)) != 0);
-    const bool hasVs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)) != 0);
-    const bool hasTes = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) != 0);
-    const bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
-    const bool hasFs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageFragment)) != 0);
+    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    const bool hasCs = pPipelineState->HasShaderStage(ShaderStageCompute);
+    const bool hasVs = pPipelineState->HasShaderStage(ShaderStageVertex);
+    const bool hasTes = pPipelineState->HasShaderStage(ShaderStageTessEval);
+    const bool hasGs = pPipelineState->HasShaderStage(ShaderStageGeometry);
+    const bool hasFs = pPipelineState->HasShaderStage(ShaderStageFragment);
     if (hasCs || hasFs || ((hasVs == false) && (hasTes == false) && (hasGs == false)))
     {
         // This is an incomplete graphics pipeline from the amdllpc command-line tool, or a compute pipeline, or a
@@ -163,6 +170,7 @@ bool PatchNullFragShader::runOnModule(
     // Initialize shader info.
     GraphicsContext* pGraphicsContext = static_cast<GraphicsContext*>(m_pContext->GetPipelineContext());
     pGraphicsContext->InitShaderInfoForNullFs();
+    pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | (1U << ShaderStageFragment));
 
     return true;
 }

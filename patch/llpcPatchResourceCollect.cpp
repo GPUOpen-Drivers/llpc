@@ -117,7 +117,7 @@ bool PatchResourceCollect::runOnModule(
         }
     }
 
-    if (m_pContext->IsGraphics())
+    if (m_pPipelineState->IsGraphics())
     {
 #if LLPC_BUILD_GFX10
         // Set NGG control settings
@@ -125,7 +125,7 @@ bool PatchResourceCollect::runOnModule(
 #endif
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
-        bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
+        bool hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 #if LLPC_BUILD_GFX10
         bool checkGsOnChip = hasGs || m_pPipelineState->GetNggControl()->enableNgg;
 #else
@@ -153,7 +153,7 @@ void PatchResourceCollect::SetNggControl()
         return;
     }
 
-    uint32_t stageMask = m_pContext->GetShaderStageMask();
+    uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                         ShaderStageToMask(ShaderStageTessEval))) != 0);
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
@@ -451,7 +451,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 {
     bool gsOnChip = true;
 
-    uint32_t stageMask = m_pContext->GetShaderStageMask();
+    uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
 #if LLPC_BUILD_GFX10
@@ -1079,7 +1079,7 @@ void PatchResourceCollect::ProcessShader()
     ClearInactiveInput();
     ClearInactiveOutput();
 
-    if (m_pContext->IsGraphics())
+    if (m_pPipelineState->IsGraphics())
     {
         MatchGenericInOut();
         MapBuiltInToGenericInOut();
@@ -1431,7 +1431,7 @@ void PatchResourceCollect::visitCallInst(
 void PatchResourceCollect::ClearInactiveInput()
 {
     // Clear those inactive generic inputs, remove them from location mappings
-    if (m_pContext->IsGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval))
+    if (m_pPipelineState->IsGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval))
     {
         // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
         // generic outputs of tessellation control shader might involve in output import and dynamic indexing, which
@@ -1907,7 +1907,7 @@ void PatchResourceCollect::ClearInactiveOutput()
 // NOTE: This function should be called after the cleanup work of inactive inputs is done.
 void PatchResourceCollect::MatchGenericInOut()
 {
-    LLPC_ASSERT(m_pContext->IsGraphics());
+    LLPC_ASSERT(m_pPipelineState->IsGraphics());
     auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     auto& inLocMap  = inOutUsage.inputLocMap;
@@ -1919,7 +1919,7 @@ void PatchResourceCollect::MatchGenericInOut()
     // Do input/output matching
     if (m_shaderStage != ShaderStageFragment)
     {
-        const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+        const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
 
         // Do normal input/output matching
         if (nextStage != ShaderStageInvalid)
@@ -2155,14 +2155,14 @@ void PatchResourceCollect::MatchGenericInOut()
 // NOTE: This function should be called after generic input/output matching is done.
 void PatchResourceCollect::MapBuiltInToGenericInOut()
 {
-    LLPC_ASSERT(m_pContext->IsGraphics());
+    LLPC_ASSERT(m_pPipelineState->IsGraphics());
 
     const auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
     auto& builtInUsage = pResUsage->builtInUsage;
     auto& inOutUsage = pResUsage->inOutUsage;
 
-    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
     auto pNextResUsage =
         (nextStage != ShaderStageInvalid) ? m_pContext->GetShaderResourceUsage(nextStage) : nullptr;
 
@@ -2676,7 +2676,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             // NOTE: If gl_in[].gl_ClipDistance is used, we have to check the usage of gl_out[].gl_ClipDistance in
             // tessellation control shader. The clip distance is the maximum of the two. We do this to avoid
             // incorrectness of location assignment during builtin-to-generic mapping.
-            const auto prevStage = m_pContext->GetPrevShaderStage(m_shaderStage);
+            const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
             {
                 const auto& prevBuiltInUsage = m_pContext->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
@@ -2694,7 +2694,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
         {
             uint32_t cullDistanceCount = builtInUsage.tes.cullDistanceIn;
 
-            const auto prevStage = m_pContext->GetPrevShaderStage(m_shaderStage);
+            const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
             {
                 const auto& prevBuiltInUsage = m_pContext->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
@@ -3269,7 +3269,7 @@ bool PatchResourceCollect::CanPackInOut() const
     // 1) -pack-in-out option is on
     // 2) It is a VS-FS pipeline
     return PackInOut &&
-           (m_pContext->GetShaderStageMask() ==
+           (m_pPipelineState->GetShaderStageMask() ==
             (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment)));
 }
 
@@ -3541,7 +3541,7 @@ void PatchResourceCollect::ScalarizeForInOutPacking(
             {
                 auto pCall = cast<CallInst>(pUser);
                 if (m_pPipelineShaders->GetShaderStage(pCall->getFunction()) !=
-                      m_pContext->GetPipelineContext()->GetLastVertexProcessingStage())
+                      m_pPipelineState->GetLastVertexProcessingStage())
                 {
                     continue;
                 }

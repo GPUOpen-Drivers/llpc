@@ -66,15 +66,14 @@ NggPrimShader::NggPrimShader(
     m_pLdsManager(nullptr),
     m_pBuilder(new IRBuilder<>(*m_pContext))
 {
-    LLPC_ASSERT(m_pContext->IsGraphics());
+    LLPC_ASSERT(m_pPipelineState->IsGraphics());
 
     memset(&m_nggFactor, 0, sizeof(m_nggFactor));
 
-    const uint32_t stageMask = m_pContext->GetShaderStageMask();
-    m_hasVs  = ((stageMask & ShaderStageToMask(ShaderStageVertex)) != 0);
-    m_hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
-    m_hasTes = ((stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0);
-    m_hasGs  = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+    m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
+    m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);
+    m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
+    m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 }
 
 // =====================================================================================================================
