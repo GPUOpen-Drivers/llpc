@@ -326,6 +326,7 @@ const static char MemoryModel[] = "spirv.MemoryModel";
 } // namespace kSPIRVMD
 
 namespace kSPIR2MD {
+const static char Prefix[] = "opencl.";
 const static char Extensions[] = "opencl.used.extensions";
 const static char FPContract[] = "opencl.enable.FP_CONTRACT";
 const static char OCLVer[] = "opencl.ocl.version";
@@ -337,6 +338,7 @@ const static char WGSizeHint[] = "work_group_size_hint";
 } // namespace kSPIR2MD
 
 namespace gSPIRVMD {
+  const static char Prefix[]            = "spirv.";
   const static char InOut[]             = "spirv.InOut";
   const static char Block[]             = "spirv.Block";
   const static char PushConst[]         = "spirv.PushConst";
