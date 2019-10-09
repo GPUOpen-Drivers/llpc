@@ -38,7 +38,7 @@
 #include <cassert>
 
 // Debug assertion: generic
-#define LLPC_ASSERT(_expr)      assert(_expr)
+#define LLPC_ASSERT(...)        assert(__VA_ARGS__)
 // Debug assertion: not implemented
 #define LLPC_NOT_IMPLEMENTED()  assert(0 && "Not implemented!")
 // Debug assertion: should never be called
@@ -48,7 +48,7 @@
 
 #else
 
-#define LLPC_ASSERT(_expr)            ((void)0)
+#define LLPC_ASSERT(...)              ((void)0)
 #define LLPC_NOT_IMPLEMENTED()        ((void)0)
 #define LLPC_NEVER_CALLED()           ((void)0)
 #define LLPC_NOT_TESTED()             ((void)0)
