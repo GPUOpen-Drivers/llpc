@@ -127,6 +127,11 @@ opt<uint32_t> ShadowDescTablePtrHigh("shadow-desc-table-ptr-high",
                                      desc("High part of VA for shadow descriptor table pointer"),
                                      init(2));
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 37
+// -enable-dynamic-loop-unroll: Enable dynamic loop unroll. (Deprecated)
+opt<bool> EnableDynamicLoopUnroll("enable-dynamic-loop-unroll", desc("Enable dynamic loop unroll (deprecated)"), init(false));
+#endif
+
 // -force-loop-unroll-count: Force to set the loop unroll count.
 opt<int> ForceLoopUnrollCount("force-loop-unroll-count", cl::desc("Force loop unroll count"), init(0));
 
