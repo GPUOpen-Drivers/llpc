@@ -5233,13 +5233,14 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
     }
 
     const uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
+    string varName = pSpvVar->getName();
 
     GlobalVariable* const pGlobalVar = new GlobalVariable(*M,
                                                           pVarType,
                                                           readOnly,
                                                           GlobalValue::ExternalLinkage,
                                                           pInitializer,
-                                                          pSpvVar->getName(),
+                                                          varName,
                                                           nullptr,
                                                           GlobalVariable::NotThreadLocal,
                                                           addrSpace);
@@ -8689,7 +8690,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       BlockTy = BV->getType()->getPointerElementType();
       while (BlockTy->isTypeArray())
         BlockTy = BlockTy->getArrayElementType();
-      assert(BlockTy->isTypeStruct());
+      bool IsStructTy = BlockTy->isTypeStruct();
+      assert(IsStructTy);
 
       // Get values of descriptor binding and set based on corresponding
       // decorations
