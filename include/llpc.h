@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 36
+#define LLPC_INTERFACE_MAJOR_VERSION 37
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
 //* |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
 //* |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
 //* |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
