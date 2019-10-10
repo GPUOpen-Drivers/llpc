@@ -2968,7 +2968,7 @@ void Compiler::MergeElfBinary(
     }
 
     // Merge LLVM IR disassemble
-    const std::string LlvmIrSectionName = std::string(Util::Abi::AmdGpuCommentName) + ".llvmir";
+    const std::string LlvmIrSectionName = std::string(Util::Abi::AmdGpuCommentLlvmIrName);
     ElfSectionBuffer<Elf64::SectionHeader>* pFragmentLlvmIrSection = nullptr;
     const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentLlvmIrSection = nullptr;
 
