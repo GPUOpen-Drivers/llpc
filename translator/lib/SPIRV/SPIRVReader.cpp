@@ -5431,8 +5431,17 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 
   case OpConstantNull: {
-    auto LT = transType(BV->getType());
-    return mapValue(BV, Constant::getNullValue(LT));
+    auto BTy = BV->getType();
+    auto NullPtrTy = transType(BTy);
+    Value *NullPtr = nullptr;
+    // For local memory space (LDS) the NULL value is 0xFFFFFFFF, not 0x0.
+    if (BTy->isTypePointer() && BTy->getPointerStorageClass() == spv::StorageClassWorkgroup) {
+      auto NullPtrAsInt = getBuilder()->getInt32(0xFFFFFFFF);
+      NullPtr = getBuilder()->CreateIntToPtr(NullPtrAsInt, NullPtrTy);
+    } else {
+      NullPtr = Constant::getNullValue(NullPtrTy);
+    }
+    return mapValue(BV, NullPtr);
   }
 
   case OpConstantComposite:
