@@ -5622,7 +5622,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
                                 Phi->getPairs().size() / 2, Phi->getName(), BB);
 
     auto LPhi = dyn_cast<PHINode>(mapValue(BV, PhiNode));
-    BasicBlock* ParentBB = LPhi->getParent();
 
 #ifndef NDEBUG
     SmallDenseSet<BasicBlock*, 4> SeenPredecessors;
@@ -5634,7 +5633,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
       LPhi->addIncoming(TranslatedVal, TranslatedBB);
 
 #ifndef NDEBUG
-      assert(SeenPredecessors.count(TranslatedBB) != 0 &&
+      assert(SeenPredecessors.count(TranslatedBB) == 0 &&
              "SPIR-V requires phi entries to be unique for duplicate predecessor blocks.");
       SeenPredecessors.insert(TranslatedBB);
 #endif
