@@ -775,10 +775,17 @@ void SpirvLowerGlobal::MapInputToProxy(
 void SpirvLowerGlobal::MapOutputToProxy(
     GlobalVariable* pOutput) // [in] Output to be mapped
 {
+    auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
+
     // NOTE: For tessellation control shader, we do not map outputs to real proxy variables. Instead, we directly
     // replace "store" instructions with export calls in the lowering operation.
     if (m_shaderStage == ShaderStageTessControl)
     {
+        if (pOutput->hasInitializer())
+        {
+            auto pInitializer = pOutput->getInitializer();
+            new StoreInst(pInitializer, pOutput, &*pInsertPos);
+        }
         m_outputProxyMap.push_back(std::pair<Value*, Value*>(pOutput, nullptr));
         m_lowerOutputInPlace = true;
         return;
@@ -787,7 +794,6 @@ void SpirvLowerGlobal::MapOutputToProxy(
     const auto& dataLayout = m_pModule->getDataLayout();
     Type* pOutputTy = pOutput->getType()->getContainedType(0);
     Twine prefix = LlpcName::OutputProxyPrefix;
-    auto pInsertPos = m_pEntryPoint->begin()->getFirstInsertionPt();
 
     auto pProxy = new AllocaInst(pOutputTy,
                                  dataLayout.getAllocaAddrSpace(),
