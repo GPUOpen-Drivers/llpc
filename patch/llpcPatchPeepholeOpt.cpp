@@ -33,6 +33,7 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -866,6 +867,8 @@ void PatchPeepholeOpt::visitPHINode(
                 phiNode.setIncomingValue(otherIncomingIndex, pNoEffectConstant);
 
                 BinaryOperator* const pNewBinaryOp = BinaryOperator::Create(opCode, &phiNode, pOtherIncoming);
+                if (isa<FPMathOperator>(pNewBinaryOp))
+                    pNewBinaryOp->copyFastMathFlags(pBinaryOp);
 
                 insertAfter(*pNewBinaryOp, phiNode);
 
