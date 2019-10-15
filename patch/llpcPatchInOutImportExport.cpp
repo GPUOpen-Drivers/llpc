@@ -2231,24 +2231,6 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     uint32_t     streamId,       // ID of output vertex stream
     Instruction* pInsertPos)     // [in] Where to insert the patch instruction
 {
-#if LLPC_BUILD_GFX10
-    // NOTE: For NGG, the call of exporting output to GS-VS ring is not replaced with real instructions (just rename
-    // it). The replacement is delayed when NGG primitive shader is generated.
-    if (m_pContext->GetNggControl()->enableNgg)
-    {
-        std::vector<Value*> args;
-
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), location));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compIdx));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
-        args.push_back(pOutput);
-
-        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
-        return;
-    }
-#endif
-
     auto pOutputTy = pOutput->getType();
 
     // Cast double or double vector to float vector.
@@ -2292,22 +2274,40 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
     LLPC_UNUSED(genericOutByteSizes);
 
-    if (compCount == 1)
+#if LLPC_BUILD_GFX10
+    if (m_pContext->GetNggControl()->enableNgg)
     {
-        StoreValueToGsVsRingBuffer(pOutput, location, compIdx, streamId, pInsertPos);
+        // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
+        // real instructions when when NGG primitive shader is generated.
+        std::vector<Value*> args;
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), location));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compIdx));
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+        args.push_back(pOutput);
+
+        std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
+        EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else
+#endif
     {
-        for (uint32_t i = 0; i < compCount; ++i)
+        if (compCount == 1)
         {
-            auto pComp = ExtractElementInst::Create(pOutput,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                    "",
-                                                    pInsertPos);
-            StoreValueToGsVsRingBuffer(pComp, location + ((compIdx + i) / 4), (compIdx + i) % 4, streamId, pInsertPos);
+            StoreValueToGsVsRingBuffer(pOutput, location, compIdx, streamId, pInsertPos);
+        }
+        else
+        {
+            for (uint32_t i = 0; i < compCount; ++i)
+            {
+                auto pComp = ExtractElementInst::Create(pOutput,
+                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                        "",
+                                                        pInsertPos);
+                StoreValueToGsVsRingBuffer(
+                    pComp, location + ((compIdx + i) / 4), (compIdx + i) % 4, streamId, pInsertPos);
+            }
         }
     }
-
 }
 
 // =====================================================================================================================
@@ -4257,33 +4257,11 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     uint32_t loc = builtInOutLocMap[builtInId];
 
 #if LLPC_BUILD_GFX10
-    // NOTE: For NGG, the call of exporting output to GS-VS ring is not replaced with real instructions (just rename
-    // it). The replacement is delayed when NGG primitive shader is generated.
     if (m_pContext->GetNggControl()->enableNgg)
     {
-        if ((builtInId == BuiltInClipDistance) || (builtInId == BuiltInCullDistance))
-        {
-            // NOTE: For gl_ClipDistance and gl_CullDistance, we change them from [n x float] to <n x float> for
-            // later LDS handling.
-            uint32_t elemCount =
-                (builtInId == BuiltInClipDistance) ? builtInUsage.clipDistance : builtInUsage.cullDistance;
-            Value* pOutputVector = UndefValue::get(VectorType::get(m_pContext->FloatTy(), elemCount));
-
-            for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
-            {
-                auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                pOutputVector = InsertElementInst::Create(pOutputVector,
-                                                          pElem,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                          "",
-                                                          pInsertPos);
-            }
-
-            pOutput = pOutputVector;
-        }
-
+        // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
+        // real instructions when when NGG primitive shader is generated.
         std::vector<Value*> args;
-
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
@@ -4291,86 +4269,87 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
 
         std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
         EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
-        return;
     }
-#endif
-
-    switch (builtInId)
+    else
     {
-    case BuiltInPosition:
+#endif
+        switch (builtInId)
         {
-            LLPC_ASSERT(builtInUsage.position);
-
-            for (uint32_t i = 0; i < 4; ++i)
+        case BuiltInPosition:
             {
-                auto pComp = ExtractElementInst::Create(pOutput,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                        "",
-                                                        pInsertPos);
-                StoreValueToGsVsRingBuffer(pComp, loc, i, streamId, pInsertPos);
+                LLPC_ASSERT(builtInUsage.position);
+
+                for (uint32_t i = 0; i < 4; ++i)
+                {
+                    auto pComp = ExtractElementInst::Create(pOutput,
+                                                            ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                            "",
+                                                            pInsertPos);
+                    StoreValueToGsVsRingBuffer(pComp, loc, i, streamId, pInsertPos);
+                }
+                break;
             }
-            break;
-        }
-    case BuiltInPointSize:
-        {
-            LLPC_ASSERT(builtInUsage.pointSize);
-
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-            break;
-        }
-    case BuiltInClipDistance:
-        {
-            LLPC_ASSERT(builtInUsage.clipDistance);
-
-            for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
+        case BuiltInPointSize:
             {
-                std::vector<uint32_t> idxs;
-                idxs.push_back(i);
-                auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
-                StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
+                LLPC_ASSERT(builtInUsage.pointSize);
+
+                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
+                break;
             }
-
-            break;
-        }
-    case BuiltInCullDistance:
-        {
-            LLPC_ASSERT(builtInUsage.cullDistance);
-
-            for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
+        case BuiltInClipDistance:
             {
-                std::vector<uint32_t> idxs;
-                idxs.push_back(i);
-                auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
-                StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
+                LLPC_ASSERT(builtInUsage.clipDistance);
+
+                for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
+                {
+                    std::vector<uint32_t> idxs;
+                    idxs.push_back(i);
+                    auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
+                    StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
+                }
+
+                break;
             }
+        case BuiltInCullDistance:
+            {
+                LLPC_ASSERT(builtInUsage.cullDistance);
 
-            break;
-        }
-    case BuiltInPrimitiveId:
-        {
-            LLPC_ASSERT(builtInUsage.primitiveId);
+                for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
+                {
+                    std::vector<uint32_t> idxs;
+                    idxs.push_back(i);
+                    auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
+                    StoreValueToGsVsRingBuffer(pElem, loc + i / 4, i % 4, streamId, pInsertPos);
+                }
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-            break;
-        }
-    case BuiltInLayer:
-        {
-            LLPC_ASSERT(builtInUsage.layer);
+                break;
+            }
+        case BuiltInPrimitiveId:
+            {
+                LLPC_ASSERT(builtInUsage.primitiveId);
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-            break;
-        }
-    case BuiltInViewportIndex:
-        {
-            LLPC_ASSERT(builtInUsage.viewportIndex);
+                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
+                break;
+            }
+        case BuiltInLayer:
+            {
+                LLPC_ASSERT(builtInUsage.layer);
 
-            StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
-            break;
-        }
-    default:
-        {
-            LLPC_NEVER_CALLED();
-            break;
+                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
+                break;
+            }
+        case BuiltInViewportIndex:
+            {
+                LLPC_ASSERT(builtInUsage.viewportIndex);
+
+                StoreValueToGsVsRingBuffer(pOutput, loc, 0, streamId, pInsertPos);
+                break;
+            }
+        default:
+            {
+                LLPC_NEVER_CALLED();
+                break;
+            }
         }
     }
 }

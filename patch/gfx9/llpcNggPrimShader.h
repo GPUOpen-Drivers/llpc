@@ -59,7 +59,9 @@ public:
     NggPrimShader(Context* pContext);
     ~NggPrimShader();
 
-    llvm::Function* Generate(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
+    llvm::Function* Generate(llvm::Function* pEsEntryPoint,
+                             llvm::Function* pGsEntryPoint,
+                             llvm::Function* pCopyShaderEntryPoint);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(NggPrimShader);
@@ -67,6 +69,8 @@ private:
 
     llvm::FunctionType* GeneratePrimShaderEntryPointType(uint64_t* pInRegMask) const;
     llvm::Function* GeneratePrimShaderEntryPoint(llvm::Module* pModule);
+
+    void ConstructPrimShaderWithGs(llvm::Module* pModule);
 
     void InitWaveThreadInfo(llvm::Value* pMergedGroupInfo, llvm::Value* pMergedWaveInfo);
 
@@ -87,11 +91,13 @@ private:
                                       llvm::StringRef       entryName,
                                       std::vector<ExpData>& expDataSet);
 
-    void RunGsVariant(llvm::Module*     pModule,
-                      llvm::Argument*   pSysValueStart,
-                      llvm::BasicBlock* pInsertAtEnd);
+    llvm::Value* RunGsVariant(llvm::Module*     pModule,
+                              llvm::Argument*   pSysValueStart,
+                              llvm::BasicBlock* pInsertAtEnd);
 
     llvm::Function* MutateGsToVariant(llvm::Module* pModule);
+
+    void RunCopyShader(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
 
     void ExportGsOutput(llvm::Value* pOutput,
                         uint32_t     location,
@@ -100,8 +106,27 @@ private:
                         llvm::Value* pThreadIdInWave,
                         llvm::Value* pEmitCounter);
 
-    void ProcessGsEmit(uint32_t streamId, llvm::Value* pEmitCounterPtr);
-    void ProcessGsCut(uint32_t streamId, llvm::Value* pEmitCounterPtr);
+    llvm::Value* ImportGsOutput(llvm::Type*  pOutputTy,
+                                uint32_t     location,
+                                uint32_t     compIdx,
+                                uint32_t     streamId,
+                                llvm::Value* pThreadIdInSubgroup);
+
+    void ProcessGsEmit(llvm::Module* pModule,
+                        uint32_t     streamId,
+                        llvm::Value* pThreadIdInSubgroup,
+                        llvm::Value* pEmitCounterPtr,
+                        llvm::Value* pOutVertCounterPtr,
+                        llvm::Value* pOutPrimCounterPtr);
+
+    void ProcessGsCut(llvm::Module*  pModule,
+                      uint32_t       streamId,
+                      llvm::Value*   pThreadIdInSubgroup,
+                      llvm::Value*   pEmitCounterPtr,
+                      llvm::Value*   pOutPrimCounterPtr);
+
+    llvm::Function* CreateGsEmitHandler(llvm::Module* pModule, uint32_t streamId);
+    llvm::Function* CreateGsCutHandler(llvm::Module* pModule, uint32_t streamId);
 
     llvm::Value* ReadCompactDataFromLds(llvm::Type*       pReadDataTy,
                                         llvm::Value*      pThreadId,
@@ -157,16 +182,23 @@ private:
                                              uint32_t          regOffset,
                                              llvm::BasicBlock* pInsertAtEnd);
 
-    void CreateBackfaceCuller(llvm::Module* pModule);
-    void CreateFrustumCuller(llvm::Module* pModule);
-    void CreateBoxFilterCuller(llvm::Module* pModule);
-    void CreateSphereCuller(llvm::Module* pModule);
-    void CreateSmallPrimFilterCuller(llvm::Module* pModule);
-    void CreateCullDistanceCuller(llvm::Module* pModule);
+    llvm::Function* CreateBackfaceCuller(llvm::Module* pModule);
+    llvm::Function* CreateFrustumCuller(llvm::Module* pModule);
+    llvm::Function* CreateBoxFilterCuller(llvm::Module* pModule);
+    llvm::Function* CreateSphereCuller(llvm::Module* pModule);
+    llvm::Function* CreateSmallPrimFilterCuller(llvm::Module* pModule);
+    llvm::Function* CreateCullDistanceCuller(llvm::Module* pModule);
 
-    void CreateFetchCullingRegister(llvm::Module* pModule);
+    llvm::Function* CreateFetchCullingRegister(llvm::Module* pModule);
 
     llvm::Value* DoSubgroupBallot(llvm::Value* pValue);
+    llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue);
+    llvm::Value* DoDppUpdate(llvm::Value* pOldValue,
+                             llvm::Value* pSrcValue,
+                             uint32_t     dppCtrl,
+                             uint32_t     rowMask,
+                             uint32_t     bankMask,
+                             bool         boundCtrl = false);
 
     // Checks if NGG culling operations are enabled
     bool EnableCulling() const
@@ -182,6 +214,8 @@ private:
     llvm::BasicBlock* CreateBlock(llvm::Function* pParent, const llvm::Twine& blockName = "");
 
     // -----------------------------------------------------------------------------------------------------------------
+
+    static const uint32_t NullPrim = (1u << 31); // Null primitive data (invalid)
 
     Context*        m_pContext; // LLPC context
     GfxIpVersion    m_gfxIp;    // Graphics IP version info
