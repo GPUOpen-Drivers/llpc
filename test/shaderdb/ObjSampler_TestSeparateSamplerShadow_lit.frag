@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract float (...) @llpc.call.image.sample.f32(i32 1, i32 0, <8 x i32>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-: SHADERTEST: call float @llvm.amdgcn.image.sample.c.l.2d.f32.f32
+: SHADERTEST: call {{.*}} float @llvm.amdgcn.image.sample.c.l.2d.f32.f32
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

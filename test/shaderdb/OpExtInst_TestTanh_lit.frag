@@ -29,14 +29,14 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.exp2.f32(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract float %{{.*}}, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = fadd reassoc nnan nsz arcp contract float %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.fdiv.fast(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.amdgcn.fdiv.fast(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3FF7154760000000
 ; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract float -0.000000e+00, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.exp2.f32(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.exp2.f32(float %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract float %{{.*}}, %{{.*}}
 ; SHADERTEST: %{{[0-9]*}} = fadd reassoc nnan nsz arcp contract float %{{.*}}, %{{.*}}
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.fdiv.fast(float %{{.*}}, float %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract float @llvm.amdgcn.fdiv.fast(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

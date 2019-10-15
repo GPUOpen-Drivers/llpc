@@ -615,3 +615,21 @@ CallInst* Builder::CreateBinaryIntrinsic(
     return pResult;
 }
 
+// =====================================================================================================================
+// Create a call to the specified intrinsic with the specified operands, mangled on the specified types.
+// This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+// flags from the Builder if none are specified by pFmfSource.
+CallInst* Builder::CreateIntrinsic(
+    Intrinsic::ID    id,         // Intrinsic ID
+    ArrayRef<Type*>  types,      // [in] Types
+    ArrayRef<Value*> args,       // [in] Input values
+    Instruction*     pFmfSource, // [in] Instruction to copy fast math flags from; nullptr to get from Builder
+    const Twine&     name)       // [in] Name to give instruction
+{
+    CallInst* pResult = IRBuilder<>::CreateIntrinsic(id, types, args, pFmfSource, name);
+    if ((pFmfSource == nullptr) && isa<FPMathOperator>(pResult))
+    {
+        pResult->setFastMathFlags(getFastMathFlags());
+    }
+    return pResult;
+}

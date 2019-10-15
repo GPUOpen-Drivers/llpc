@@ -46,11 +46,11 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract <2 x float> (...) @llpc.call.image.get.lod.v2f32(i32 2, i32 0, {{.*}}, {{.*}}, <3 x float> <float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getlod.1d.v2f32.f32(i32 3, float 1.000000e+00,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
-; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 5.000000e-01, float 5.000000e-01,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
-; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0x3FD99999A0000000, float 0x3FD99999A0000000,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
-; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getlod.cube.v2f32.f32(i32 3,{{.*}},{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)
-; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getlod.3d.v2f32.f32(i32 3, float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <2 x float> @llvm.amdgcn.image.getlod.1d.v2f32.f32(i32 3, float 1.000000e+00,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 5.000000e-01, float 5.000000e-01,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0x3FD99999A0000000, float 0x3FD99999A0000000,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <2 x float> @llvm.amdgcn.image.getlod.cube.v2f32.f32(i32 3,{{.*}},{{.*}},{{.*}},{{.*}},{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <2 x float> @llvm.amdgcn.image.getlod.3d.v2f32.f32(i32 3, float 0x3FE6666660000000, float 0x3FE6666660000000, float 0x3FE6666660000000,{{.*}},{{.*}}, i1 false, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
