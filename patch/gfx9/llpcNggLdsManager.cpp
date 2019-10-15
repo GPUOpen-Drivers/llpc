@@ -49,7 +49,7 @@ namespace Llpc
 
 // =====================================================================================================================
 // Initialize static members
-uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
+const uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
 {
     // LDS region size for ES-only
 
@@ -85,15 +85,15 @@ uint32_t NggLdsManager::LdsRegionSizes[LdsRegionCount] =
     // LDS region size for ES-GS
 
     // ES-GS ring size is dynamically calculated (don't use it)
-    InvalidValue,                                                                 // LdsRegionEsGsRing
+    InvalidValue,                                                      // LdsRegionEsGsRing
     // 1 DWORD (uint32_t) per thread
-    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionPrimData
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionOutPrimData
     // 1 DWORD per wave (8 potential waves) + 1 DWORD for the entire sub-group (4 GS streams)
-    MaxGsStreams * (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword),   // LdsRegionGsOutVertCountInWaves
+    MaxGsStreams * (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword),   // LdsRegionOutVertCountInWaves
     // 1 DWORD (uint32_t) per thread
-    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionGsVsRingItemOffset
+    SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,                      // LdsRegionOutVertOffset
     // GS-VS ring size is dynamically calculated (don't use it)
-    InvalidValue,                                                                 // LdsRegionGsVsRing
+    InvalidValue,                                                      // LdsRegionGsVsRing
 };
 
 // =====================================================================================================================
@@ -118,9 +118,9 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
 
     // LDS region name for ES-GS
     "ES-GS ring",                           // LdsRegionEsGsRing
-    "GS output primitive data",             // LdsRegionPrimData
-    "GS output vertex count in waves",      // LdsRegionGsOutVertCountInWaves
-    "GS-VS ring item offset",               // LdsRegionGsVsRingItemOffset
+    "GS output primitive data",             // LdsRegionOutPrimData
+    "GS output vertex count in waves",      // LdsRegionOutVertCountInWaves
+    "GS output vertex offset",              // LdsRegionOutVertOffset
     "GS-VS ring",                           // LdsRegionGsVsRing
 };
 
@@ -163,11 +163,11 @@ NggLdsManager::NggLdsManager(
         //
         // The LDS layout is something like this:
         //
-        // +------------+------------------------+--------------------------------+------------+
-        // | ES-GS ring | GS out primitive data  | GS out vertex count (in waves) | GS-VS ring |
-        // +------------+------------------------+--------------------------------+------------+
-        //              | GS-VS ring item offset |
-        //              +------------------------+
+        // +------------+-----------------------+--------------------------------+------------+
+        // | ES-GS ring | GS out primitive data | GS out vertex count (in waves) | GS-VS ring |
+        // +------------+-----------------------+--------------------------------+------------+
+        //              | GS out vertex  offset |
+        //              +-----------------------+
         //
         const auto& calcFactor = pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
         // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
@@ -183,12 +183,12 @@ NggLdsManager::NggLdsManager(
         {
             uint32_t ldsRegionSize = LdsRegionSizes[region];
 
-            if (region == LdsRegionGsVsRingItemOffset)
+            if (region == LdsRegionOutVertOffset)
             {
                 // An overlapped region, reused
-                m_ldsRegionStart[LdsRegionGsVsRingItemOffset] = m_ldsRegionStart[LdsRegionGsOutPrimData];
+                m_ldsRegionStart[LdsRegionOutVertOffset] = m_ldsRegionStart[LdsRegionOutPrimData];
 
-                LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+                LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
                     LdsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
 
                 continue;
@@ -210,7 +210,7 @@ NggLdsManager::NggLdsManager(
             LLPC_ASSERT(ldsRegionSize != InvalidValue);
             ldsRegionStart += ldsRegionSize;
 
-            LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+            LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
                 LdsRegionNames[region], m_ldsRegionStart[region], ldsRegionSize) << "\n");
         }
     }
@@ -218,7 +218,7 @@ NggLdsManager::NggLdsManager(
     {
         m_ldsRegionStart[LdsRegionDistribPrimId] = 0;
 
-        LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+        LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
                          LdsRegionNames[LdsRegionDistribPrimId],
                          m_ldsRegionStart[LdsRegionDistribPrimId],
                          LdsRegionSizes[LdsRegionDistribPrimId]) << "\n");
@@ -286,7 +286,7 @@ NggLdsManager::NggLdsManager(
                 m_ldsRegionStart[region] = ldsRegionStart;
                 ldsRegionStart += LdsRegionSizes[region];
 
-                LLPC_OUTS(format("%-40s : offset = 0x%05" PRIX32 ", size = 0x%05" PRIX32,
+                LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32,
                     LdsRegionNames[region], m_ldsRegionStart[region], LdsRegionSizes[region]) << "\n");
             }
         }
@@ -401,7 +401,7 @@ uint32_t NggLdsManager::CalcGsExtraLdsSize(
         return 0;
     }
 
-    uint32_t gsExtraLdsSize = LdsRegionSizes[LdsRegionGsOutPrimData] + LdsRegionSizes[LdsRegionGsOutVertCountInWaves];
+    uint32_t gsExtraLdsSize = LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves];
 
     return gsExtraLdsSize;
 }

@@ -242,7 +242,9 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             {
                 if (pGsEntryPoint != nullptr)
                 {
-                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint);
+                    auto pCopyShaderEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageCopyShader);
+                    auto pPrimShaderEntryPoint =
+                        shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
                     pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
@@ -281,7 +283,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
 
                 if (pEsEntryPoint != nullptr)
                 {
-                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr);
+                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr, nullptr);
                     pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
@@ -302,7 +304,9 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
             {
                 if (pGsEntryPoint != nullptr)
                 {
-                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint);
+                    auto pCopyShaderEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageCopyShader);
+                    auto pPrimShaderEntryPoint =
+                        shaderMerger.BuildPrimShader(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
                     pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }
@@ -328,7 +332,7 @@ void PatchPreparePipelineAbi::MergeShaderAndSetCallingConvs(
                 auto pEsEntryPoint = m_pPipelineShaders->GetEntryPoint(ShaderStageVertex);
                 if (pEsEntryPoint != nullptr)
                 {
-                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr);
+                    auto pPrimShaderEntryPoint = shaderMerger.BuildPrimShader(pEsEntryPoint, nullptr, nullptr);
                     pPrimShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
                 }
             }

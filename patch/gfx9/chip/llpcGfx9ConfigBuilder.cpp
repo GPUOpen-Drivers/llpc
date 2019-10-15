@@ -2495,7 +2495,13 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     if (usePrimitiveId)
     {
         SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, true);
-        SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_PRIMITIVEID_EN, NGG_DISABLE_PROVOK_REUSE, true);
+
+        // NOTE: If primitive ID is used and there is no GS present, the field NGG_DISABLE_PROVOK_REUSE must be
+        // set to ensure provoking vertex reuse is disabled in the GE.
+        if (m_hasGs == false)
+        {
+            SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_PRIMITIVEID_EN, NGG_DISABLE_PROVOK_REUSE, true);
+        }
     }
 
     if (expCount == 0)

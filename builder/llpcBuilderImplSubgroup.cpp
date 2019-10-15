@@ -1429,18 +1429,19 @@ Value* BuilderImplSubgroup::CreateThreadMask()
 {
     Value* pThreadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
 
+    Value* pThreadMask = nullptr;
 #if LLPC_BUILD_GFX10
     if (GetShaderSubgroupSize() <= 32)
     {
-        pThreadId = CreateShl(getInt32(1), pThreadId);
+        pThreadMask = CreateShl(getInt32(1), pThreadId);
     }
     else
 #endif
     {
-        pThreadId = CreateShl(getInt64(1), CreateZExtOrTrunc(pThreadId, getInt64Ty()));
+        pThreadMask = CreateShl(getInt64(1), CreateZExtOrTrunc(pThreadId, getInt64Ty()));
     }
 
-    return pThreadId;
+    return pThreadMask;
 }
 
 // =====================================================================================================================

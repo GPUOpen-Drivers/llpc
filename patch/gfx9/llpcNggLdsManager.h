@@ -72,11 +72,11 @@ enum NggLdsRegionType
 
     // LDS region for ES-GS
     LdsRegionEsGsRing,                  // ES-GS ring
-    LdsRegionGsOutPrimData,             // GS output primitive data
-    LdsRegionGsOutVertCountInWaves,     // GS output vertex count accumulated per wave (8 potential waves) and per
+    LdsRegionOutPrimData,               // GS output primitive data
+    LdsRegionOutVertCountInWaves,       // GS output vertex count accumulated per wave (8 potential waves) and per
                                         //   sub-group for each stream (4 GS streams)
-    LdsRegionGsVsRingItemOffset,        // GS-VS ring item offset of exported vertex data (overlapped with the region of
-                                        //   exported primitive data
+    LdsRegionOutVertOffset,             // GS output vertex (exported vertex data) offset in GS-VS ring
+                                        //   (overlapped with the region of exported primitive data, LDS reused)
     LdsRegionGsVsRing,                  // GS-VS ring
 
     LdsRegionGsBeginRange = LdsRegionEsGsRing,
@@ -118,7 +118,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    static uint32_t       LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
+    static const uint32_t LdsRegionSizes[LdsRegionCount];  // LDS sizes for all LDS region types (in BYTEs)
     static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
     Context*        m_pContext;     // LLPC context

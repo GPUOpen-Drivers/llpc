@@ -214,6 +214,7 @@ void Patch::AddPasses(
         passMgr.add(createAlwaysInlinerLegacyPass());
         passMgr.add(CreatePassDeadFuncRemove());
         passMgr.add(createGlobalDCEPass());
+        passMgr.add(createPromoteMemoryToRegisterPass());
         passMgr.add(createAggressiveDCEPass());
         passMgr.add(createInstructionCombiningPass(false));
         passMgr.add(createCFGSimplificationPass());

@@ -74,11 +74,12 @@ ShaderMerger::ShaderMerger(
 // =====================================================================================================================
 // Builds LLVM function for hardware primitive shader (NGG).
 Function* ShaderMerger::BuildPrimShader(
-    Function*  pEsEntryPoint,     // [in] Entry-point of hardware export shader (ES)
-    Function*  pGsEntryPoint)     // [in] Entry-point of hardware geometry shader (GS) (could be null)
+    Function*  pEsEntryPoint,           // [in] Entry-point of hardware export shader (ES) (could be null)
+    Function*  pGsEntryPoint,           // [in] Entry-point of hardware geometry shader (GS) (could be null)
+    Function*  pCopyShaderEntryPoint)   // [in] Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 {
     NggPrimShader primShader(m_pContext);
-    return primShader.Generate(pEsEntryPoint, pGsEntryPoint);
+    return primShader.Generate(pEsEntryPoint, pGsEntryPoint, pCopyShaderEntryPoint);
 }
 #endif
 

@@ -131,14 +131,6 @@ bool PatchCopyShader::runOnModule(
         return false;
     }
 
-#if LLPC_BUILD_GFX10
-    if (m_pContext->GetNggControl()->enableNgg)
-    {
-        // No copy shader for NGG.
-        return false;
-    }
-#endif
-
     // Gather GS generic export details.
     CollectGsGenericOutputInfo(pGsEntryPoint);
 
@@ -412,169 +404,262 @@ void PatchCopyShader::ExportOutput(
         auto pOutputTy = VectorType::get(m_pContext->FloatTy(), dwordSize);
         pOutputValue = UndefValue::get(pOutputTy);
 
-        for (uint32_t i = 0; i < dwordSize; ++i)
+#if LLPC_BUILD_GFX10
+        if (m_pContext->GetNggControl()->enableNgg)
         {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
-            pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                     pLoadValue,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                     "",
-                                                     pInsertPos);
+            // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
+            // real instructions when when NGG primitive shader is generated.
+            std::vector<Value*> args;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc));
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+
+            std::string callName = LlpcName::NggGsOutputImport + GetTypeName(pOutputTy);
+            pOutputValue = EmitCall(m_pModule, callName, pOutputTy, args, NoAttrib, pInsertPos);
+        }
+        else
+#endif
+        {
+            for (uint32_t i = 0; i < dwordSize; ++i)
+            {
+                auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
+                pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                         pLoadValue,
+                                                         ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                         "",
+                                                         pInsertPos);
+            }
         }
         ExportGenericOutput(pOutputValue, loc, streamId, pInsertPos);
     }
 
-    pOutputValue = UndefValue::get(m_pContext->Floatx4Ty());
-    if (builtInUsage.position)
+#if LLPC_BUILD_GFX10
+    if (m_pContext->GetNggControl()->enableNgg)
     {
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPosition) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
+        std::vector<std::pair<BuiltIn, Type*>> builtInPairs;
 
-        uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPosition];
-
-        for (uint32_t i = 0; i < 4; ++i)
+        if (builtInUsage.position)
         {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, i, streamId, pInsertPos);
-                                                          pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                          pLoadValue,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                          "",
-                                                          pInsertPos);
-        }
-        ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
-    }
-    // Generate dummy gl_position vec4(0, 0, 0, 1) for the raster stream
-    else if (pResUsage->inOutUsage.enableXfb)
-    {
-        auto pZero = ConstantFP::get(m_pContext->FloatTy(), 0.0);
-        auto pOne = ConstantFP::get(m_pContext->FloatTy(), 1.0);
-        pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                 pZero,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                 "",
-                                                 pInsertPos);
-
-        pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                 pZero,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                 "",
-                                                 pInsertPos);
-
-        pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                 pZero,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
-                                                 "",
-                                                 pInsertPos);
-
-        pOutputValue = InsertElementInst::Create(pOutputValue,
-                                                 pOne,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 3),
-                                                 "",
-                                                 pInsertPos);
-
-        ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
-    }
-
-    if (builtInUsage.pointSize)
-    {
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPointSize) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
-
-        uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPointSize];
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
-
-        ExportBuiltInOutput(pLoadValue, BuiltInPointSize, streamId, pInsertPos);
-    }
-
-    if (builtInUsage.clipDistance > 0)
-    {
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
-
-        uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInClipDistance];
-        pOutputValue = UndefValue::get(ArrayType::get(m_pContext->FloatTy(), builtInUsage.clipDistance));
-
-        for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
-        {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
-            std::vector<uint32_t> idxs;
-            idxs.push_back(i);
-            pOutputValue = InsertValueInst::Create(pOutputValue,
-                                                   pLoadValue,
-                                                   idxs,
-                                                   "",
-                                                   pInsertPos);
+            builtInPairs.push_back(std::make_pair(BuiltInPosition, m_pContext->Floatx4Ty()));
         }
 
-        ExportBuiltInOutput(pOutputValue, BuiltInClipDistance, streamId, pInsertPos);
-    }
-
-    if (builtInUsage.cullDistance > 0)
-    {
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
-
-        uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
-        pOutputValue = UndefValue::get(ArrayType::get(m_pContext->FloatTy(), builtInUsage.cullDistance));
-
-        for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
+        if (builtInUsage.pointSize)
         {
-            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
-
-            std::vector<uint32_t> idxs;
-            idxs.push_back(i);
-            pOutputValue = InsertValueInst::Create(pOutputValue,
-                                                   pLoadValue,
-                                                   idxs,
-                                                   "",
-                                                   pInsertPos);
+            builtInPairs.push_back(std::make_pair(BuiltInPointSize, m_pContext->FloatTy()));
         }
 
-        ExportBuiltInOutput(pOutputValue, BuiltInCullDistance, streamId, pInsertPos);
-    }
+        if (builtInUsage.clipDistance > 0)
+        {
+            builtInPairs.push_back(std::make_pair(BuiltInClipDistance,
+                                                  ArrayType::get(m_pContext->FloatTy(), builtInUsage.clipDistance)));
+        }
 
-    if (builtInUsage.primitiveId)
+        if (builtInUsage.cullDistance > 0)
+        {
+            builtInPairs.push_back(std::make_pair(BuiltInCullDistance,
+                                                  ArrayType::get(m_pContext->FloatTy(), builtInUsage.cullDistance)));
+        }
+
+        if (builtInUsage.primitiveId)
+        {
+            builtInPairs.push_back(std::make_pair(BuiltInPrimitiveId, m_pContext->Int32Ty()));
+        }
+
+        const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
+            m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
+        if (builtInUsage.layer || enableMultiView)
+        {
+            // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.
+            builtInPairs.push_back(std::make_pair(enableMultiView ? BuiltInViewIndex : BuiltInLayer,
+                                                  m_pContext->Int32Ty()));
+        }
+
+        if (builtInUsage.viewportIndex)
+        {
+            builtInPairs.push_back(std::make_pair(BuiltInViewportIndex, m_pContext->Int32Ty()));
+        }
+
+        for (auto& builtInPair : builtInPairs)
+        {
+            auto builtInId = builtInPair.first;
+            Type* pBuiltInTy = builtInPair.second;
+
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(builtInId) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
+
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[builtInId];
+
+            // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced
+            // with real instructions when when NGG primitive shader is generated.
+            std::vector<Value*> args;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc));
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+
+            std::string callName = LlpcName::NggGsOutputImport + GetTypeName(pBuiltInTy);
+            pOutputValue = EmitCall(m_pModule, callName, pBuiltInTy, args, NoAttrib, pInsertPos);
+
+            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
+        }
+    }
+    else
+#endif
     {
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPrimitiveId) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
+        pOutputValue = nullptr;
 
-        uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
+        if (builtInUsage.position)
+        {
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPosition) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
 
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
-        pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPosition];
 
-        ExportBuiltInOutput(pLoadValue, BuiltInPrimitiveId, streamId, pInsertPos);
+            pOutputValue = UndefValue::get(m_pContext->Floatx4Ty());
+            for (uint32_t i = 0; i < 4; ++i)
+            {
+                auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, i, streamId, pInsertPos);
+                pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                         pLoadValue,
+                                                         ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                         "",
+                                                         pInsertPos);
+            }
+            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
+        }
+        else if (pResUsage->inOutUsage.enableXfb)
+        {
+            // Generate dummy gl_position vec4(0, 0, 0, 1) for the rasterization stream if transform feeback is enabled
+            auto pZero = ConstantFP::get(m_pContext->FloatTy(), 0.0);
+            auto pOne = ConstantFP::get(m_pContext->FloatTy(), 1.0);
+
+            pOutputValue = UndefValue::get(m_pContext->Floatx4Ty());
+            pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                     pZero,
+                                                     ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                     "",
+                                                     pInsertPos);
+
+            pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                     pZero,
+                                                     ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                     "",
+                                                     pInsertPos);
+
+            pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                     pZero,
+                                                     ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                     "",
+                                                     pInsertPos);
+
+            pOutputValue = InsertElementInst::Create(pOutputValue,
+                                                     pOne,
+                                                     ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                                     "",
+                                                     pInsertPos);
+
+            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
+        }
+
+        if (builtInUsage.pointSize)
+        {
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPointSize) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
+
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPointSize];
+            pOutputValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
+
+            ExportBuiltInOutput(pOutputValue, BuiltInPointSize, streamId, pInsertPos);
+        }
+
+        if (builtInUsage.clipDistance > 0)
+        {
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
+
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInClipDistance];
+            pOutputValue = UndefValue::get(ArrayType::get(m_pContext->FloatTy(), builtInUsage.clipDistance));
+
+            for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
+            {
+                auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
+                std::vector<uint32_t> idxs;
+                idxs.push_back(i);
+                pOutputValue = InsertValueInst::Create(pOutputValue,
+                                                       pLoadValue,
+                                                       idxs,
+                                                       "",
+                                                       pInsertPos);
+            }
+
+            ExportBuiltInOutput(pOutputValue, BuiltInClipDistance, streamId, pInsertPos);
+        }
+
+        if (builtInUsage.cullDistance > 0)
+        {
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
+
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
+            pOutputValue = UndefValue::get(ArrayType::get(m_pContext->FloatTy(), builtInUsage.cullDistance));
+
+            for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
+            {
+                auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
+
+                std::vector<uint32_t> idxs;
+                idxs.push_back(i);
+                pOutputValue = InsertValueInst::Create(pOutputValue,
+                                                       pLoadValue,
+                                                       idxs,
+                                                       "",
+                                                       pInsertPos);
+            }
+
+            ExportBuiltInOutput(pOutputValue, BuiltInCullDistance, streamId, pInsertPos);
+        }
+
+        if (builtInUsage.primitiveId)
+        {
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInPrimitiveId) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
+
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
+
+            pOutputValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
+            pOutputValue = new BitCastInst(pOutputValue, m_pContext->Int32Ty(), "", pInsertPos);
+
+            ExportBuiltInOutput(pOutputValue, BuiltInPrimitiveId, streamId, pInsertPos);
+        }
+
+        const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
+            m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
+        if (builtInUsage.layer || enableMultiView)
+        {
+            // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.
+            auto builtInId = enableMultiView ? BuiltInViewIndex : BuiltInLayer;
+            auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
+            LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+
+            uint32_t loc = builtInOutLocMap[builtInId];
+
+            pOutputValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
+            pOutputValue = new BitCastInst(pOutputValue, m_pContext->Int32Ty(), "", pInsertPos);
+
+            ExportBuiltInOutput(pOutputValue, BuiltInLayer, streamId, pInsertPos);
+        }
+
+        if (builtInUsage.viewportIndex)
+        {
+            LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) !=
+                pResUsage->inOutUsage.builtInOutputLocMap.end());
+
+            uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
+            auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
+            pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
+
+            ExportBuiltInOutput(pLoadValue, BuiltInViewportIndex, streamId, pInsertPos);
+        }
     }
-
-    const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
-        m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
-    if (builtInUsage.layer || enableMultiView)
-    {
-        // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.
-        auto builtInId = enableMultiView ? BuiltInViewIndex : BuiltInLayer;
-        auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
-        LLPC_ASSERT(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-
-        uint32_t loc = builtInOutLocMap[builtInId];
-
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
-        pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
-
-        ExportBuiltInOutput(pLoadValue, BuiltInLayer, streamId, pInsertPos);
-    }
-
-    if (builtInUsage.viewportIndex)
-    {
-        LLPC_ASSERT(pResUsage->inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) !=
-            pResUsage->inOutUsage.builtInOutputLocMap.end());
-
-        uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
-        auto pLoadValue = LoadValueFromGsVsRingBuffer(loc, 0, streamId, pInsertPos);
-        pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
-
-        ExportBuiltInOutput(pLoadValue, BuiltInViewportIndex, streamId, pInsertPos);
-    }
-
 }
 
 // =====================================================================================================================

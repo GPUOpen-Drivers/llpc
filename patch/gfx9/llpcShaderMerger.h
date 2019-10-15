@@ -93,7 +93,9 @@ public:
     llvm::Function* GenerateLsHsEntryPoint(llvm::Function* pLsEntryPoint, llvm::Function* pHsEntryPoint);
     llvm::Function* GenerateEsGsEntryPoint(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
 #if LLPC_BUILD_GFX10
-    llvm::Function* BuildPrimShader(llvm::Function* pEsEntryPoint, llvm::Function* pGsEntryPoint);
+    llvm::Function* BuildPrimShader(llvm::Function* pEsEntryPoint,
+                                    llvm::Function* pGsEntryPoint,
+                                    llvm::Function* pCopyShaderEntryPoint);
 #endif
 
 private:

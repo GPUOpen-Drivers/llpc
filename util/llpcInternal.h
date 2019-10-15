@@ -161,6 +161,11 @@ namespace LlpcName
     const static char NggGsEntryPoint[]               = "llpc.ngg.GS.main";
     const static char NggGsEntryVariant[]             = "llpc.ngg.GS.variant";
     const static char NggGsOutputExport[]             = "llpc.ngg.GS.output.export.";
+    const static char NggGsOutputImport[]             = "llpc.ngg.GS.output.import.";
+    const static char NggGsEmit[]                     = "llpc.ngg.GS.emit";
+    const static char NggGsCut[]                      = "llpc.ngg.GS.cut";
+
+    const static char NggCopyShaderEntryPoint[]       = "llpc.ngg.COPY.main";
     const static char NggPrimShaderEntryPoint[]       = "llpc.shader.PRIM.main";
 
     const static char NggCullingFetchReg[]            = "llpc.ngg.culling.fetchreg";
