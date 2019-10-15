@@ -45,6 +45,7 @@ class NamedMDNode;
 class PassRegistry;
 
 void initializePipelineStateWrapperPass(PassRegistry&);
+void initializePipelineStateClearerPass(PassRegistry&);
 
 } // llvm
 
@@ -54,6 +55,8 @@ namespace Llpc
 using namespace llvm;
 
 class PipelineState;
+
+ModulePass* CreatePipelineStateClearer();
 
 // =====================================================================================================================
 // The representation of a user data resource node in builder and patching
@@ -106,41 +109,34 @@ public:
     void SetModule(Module* pModule) { m_pModule = pModule; }
     Module* GetModule() const { return m_pModule; }
 
-    // Set the resource mapping nodes for the pipeline.
+    // Clear the pipeline state IR metadata.
+    void Clear(Module* pModule);
+
+    // Record dirty pipeline state into IR metadata of specified module. Returns true if module modified.
+    bool Flush(Module* pModule);
+
+    // Set up the pipeline state from the pipeline module.
+    void ReadState();
+
+    // Accessors for user data nodes
     void SetUserDataNodes(ArrayRef<ResourceMappingNode>   nodes,
                           ArrayRef<DescriptorRangeValue>  rangeValues);
-
-    // Record pipeline state into IR metadata.
-    void RecordState(Module* pModule);
-
-    // Set up the pipeline state from the specified linked IR module.
-    void ReadStateFromModule(Module* pModule);
-
-    // Get user data nodes
     ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
 
 private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
 
+    // User data nodes handling
     void SetUserDataNodesTable(ArrayRef<ResourceMappingNode>        nodes,
                                const ImmutableNodesMap&             immutableNodesMap,
                                ResourceNode*                        pDestTable,
                                ResourceNode*&                       pDestInnerTable);
     void RecordUserDataNodes(Module* pModule);
     void RecordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNode* pUserDataMetaNode);
-
-    // Read user data nodes for each shader stage from IR metadata
-    void ReadUserDataNodes(Module* pModule);
-
-    // Get the array of cached MDStrings for names of resource mapping node type, as used in IR metadata for user
-    // data nodes.
+    void ReadUserDataNodes();
     ArrayRef<MDString*> GetResourceTypeNames();
-
-    // Get the cached MDString for the name of a resource mapping node type, as used in IR metadata for user data nodes.
     MDString* GetResourceTypeName(ResourceMappingNodeType type);
-
-    // Get the resource mapping node type given its MDString name.
     ResourceMappingNodeType GetResourceTypeFromName(MDString* pTypeName);
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -150,6 +146,9 @@ private:
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
+    bool                            m_clientStateDirty = false;         // Whether state provided by builder client
+                                                                        //  (user data, vertex inputs, options) is dirty
+                                                                        //  and needs writing to IR
 };
 
 // =====================================================================================================================

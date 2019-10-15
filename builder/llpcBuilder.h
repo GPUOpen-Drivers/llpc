@@ -102,6 +102,7 @@ inline static void InitializeBuilderPasses(
 //
 // 5. Call Builder::Link to link the shader IR modules into a pipeline IR module. (This needs to be
 //    done even if the pipeline only has a single shader, such as a compute pipeline.)
+//    if using BuilderRecorder, this also records the pipeline state into IR metadata.
 //
 // 6. Call Builder::Generate to run middle-end and back-end passes and generate the ELF.
 //    (Global options such as -filetype and -emit-llvm cause the output to be something other than ELF.)
@@ -200,7 +201,7 @@ public:
     // Output is written to outStream.
     // Like other Builder methods, on error, this calls report_fatal_error, which you can catch by setting
     // a diagnostic handler with LLVMContext::setDiagnosticHandler.
-    void Generate(
+    virtual void Generate(
         std::unique_ptr<Module>   pipelineModule,       // IR pipeline module
         raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
         CheckShaderCacheFunc      checkShaderCacheFunc, // Function to check shader cache in graphics pipeline

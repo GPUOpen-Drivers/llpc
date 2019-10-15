@@ -221,6 +221,12 @@ public:
     Module* Link(ArrayRef<Module*> modules, bool linkNativeStages) override final;
 #endif
 
+    // Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
+    void Generate(std::unique_ptr<Module>   pipelineModule,
+                  raw_pwrite_stream&        outStream,
+                  CheckShaderCacheFunc      checkShaderCacheFunc,
+                  ArrayRef<Timer*>          timers) override final;
+
     // If this is a BuilderRecorder, create the BuilderReplayer pass.
     ModulePass* CreateBuilderReplayer() override;
 

@@ -41,14 +41,47 @@
 using namespace Llpc;
 using namespace llvm;
 
-// User data nodes metadata name prefix
-static const char* const BuilderUserDataMetadataName = "llpc.user.data.nodes";
+// Names for named metadata nodes when storing and reading back pipeline state
+static const char* const UserDataMetadataName = "llpc.user.data.nodes";
 
 // =====================================================================================================================
 // Get LLVMContext
 LLVMContext& PipelineState::GetContext() const
 {
     return GetBuilderContext()->GetContext();
+}
+
+// =====================================================================================================================
+// Clear the pipeline state IR metadata.
+void PipelineState::Clear(
+    Module* pModule)    // [in/out] IR module
+{
+    m_userDataNodes = {};
+    m_clientStateDirty = true;
+    Flush(pModule);
+}
+
+// =====================================================================================================================
+// Record dirty pipeline state into IR metadata of specified module. Returns true if module modified.
+// Note that this takes a Module* instead of using m_pModule, because it can be called before pipeline linking.
+bool PipelineState::Flush(
+    Module* pModule)    // [in/out] Module to record the IR metadata in
+{
+    bool changed = false;
+    if (m_clientStateDirty)
+    {
+        m_clientStateDirty = false;
+        RecordUserDataNodes(pModule);
+        changed = true;
+    }
+    return changed;
+}
+
+// =====================================================================================================================
+// Set up the pipeline state from the pipeline IR module.
+void PipelineState::ReadState()
+{
+    ReadUserDataNodes();
 }
 
 // =====================================================================================================================
@@ -83,6 +116,8 @@ void PipelineState::SetUserDataNodes(
     m_userDataNodes = ArrayRef<ResourceNode>(pDestTable, nodes.size());
     SetUserDataNodesTable(nodes, immutableNodesMap, pDestTable, pDestInnerTable);
     LLPC_ASSERT(pDestInnerTable == pDestTable + nodes.size());
+
+    m_clientStateDirty = true;
 }
 
 // =====================================================================================================================
@@ -163,19 +198,22 @@ void PipelineState::SetUserDataNodesTable(
 }
 
 // =====================================================================================================================
-// Record the pipeline state to IR metadata
-void PipelineState::RecordState(
+// Record user data nodes into IR metadata.
+// Note that this takes a Module* instead of using m_pModule, because it can be called before pipeline linking.
+void PipelineState::RecordUserDataNodes(
     Module* pModule)    // [in/out] Module to record the IR metadata in
 {
-    RecordUserDataNodes(pModule);
-}
+    if (m_userDataNodes.empty())
+    {
+        if (auto pUserDataMetaNode = pModule->getNamedMetadata(UserDataMetadataName))
+        {
+            pModule->eraseNamedMetadata(pUserDataMetaNode);
+        }
+        return;
+    }
 
-// =====================================================================================================================
-// Record user data nodes into IR metadata.
-void PipelineState::RecordUserDataNodes(
-    Module*   pModule)    // [in/out] Module to write IR metadata to
-{
-    auto pUserDataMetaNode = pModule->getOrInsertNamedMetadata(BuilderUserDataMetadataName);
+    auto pUserDataMetaNode = pModule->getOrInsertNamedMetadata(UserDataMetadataName);
+    pUserDataMetaNode->clearOperands();
     RecordUserDataTable(m_userDataNodes, pUserDataMetaNode);
 }
 
@@ -253,22 +291,15 @@ void PipelineState::RecordUserDataTable(
 }
 
 // =====================================================================================================================
-// Set up the pipeline state from the specified linked IR module.
-void PipelineState::ReadStateFromModule(
-    Module* pModule)  // [in] Module
-{
-    ReadUserDataNodes(pModule);
-}
-
-// =====================================================================================================================
 // Read user data nodes for the pipeline from IR metadata
-void PipelineState::ReadUserDataNodes(
-    Module* pModule)  // [in] Module
+void PipelineState::ReadUserDataNodes()
 {
-    LLPC_ASSERT(m_allocUserDataNodes.get() == nullptr);
-
     // Find the named metadata node.
-    auto pUserDataMetaNode = pModule->getNamedMetadata(BuilderUserDataMetadataName);
+    auto pUserDataMetaNode = m_pModule->getNamedMetadata(UserDataMetadataName);
+    if (pUserDataMetaNode == nullptr)
+    {
+        return;
+    }
 
     // Prepare to read the resource nodes from the named MD node. We allocate a single buffer, with the
     // outer table at the start, and inner tables allocated from the end backwards.
@@ -404,6 +435,48 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
 }
 
 // =====================================================================================================================
+// Pass to clear pipeline state out of the IR
+class PipelineStateClearer : public ModulePass
+{
+public:
+    PipelineStateClearer() : ModulePass(ID) {}
+
+    void getAnalysisUsage(llvm::AnalysisUsage& analysisUsage) const override
+    {
+        analysisUsage.addRequired<PipelineStateWrapper>();
+    }
+
+    bool runOnModule(Module& module) override;
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    static char ID;   // ID of this pass
+};
+
+char PipelineStateClearer::ID = 0;
+
+// =====================================================================================================================
+// Create pipeline state clearer pass
+ModulePass* Llpc::CreatePipelineStateClearer()
+{
+    return new PipelineStateClearer();
+}
+
+// =====================================================================================================================
+// Run PipelineStateClearer pass to clear the pipeline state out of the IR
+bool PipelineStateClearer::runOnModule(
+    Module& module)   // [in/out] IR module
+{
+    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    pPipelineState->Clear(&module);
+    return true;
+}
+
+// =====================================================================================================================
+// Initialize the pipeline state clearer pass
+INITIALIZE_PASS(PipelineStateClearer, "llpc-pipeline-state-clearer", "LLPC pipeline state clearer", false, true)
+
+// =====================================================================================================================
 char PipelineStateWrapper::ID = 0;
 
 // =====================================================================================================================
@@ -419,7 +492,7 @@ PipelineStateWrapper::PipelineStateWrapper()
 bool PipelineStateWrapper::doFinalization(
     Module& module)     // [in] Module
 {
-    return false;
+    return GetPipelineState(&module)->Flush(&module);
 }
 
 // =====================================================================================================================

@@ -112,9 +112,9 @@ bool BuilderReplayer::runOnModule(
 
     m_pModule = &module;
 
-    bool changed = false;
     // Set up the pipeline state from the specified linked IR module.
     PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(m_pModule);
+    pPipelineState->ReadState();
 
     // Create the BuilderImpl to replay into, passing it the PipelineState
     m_pBuilder.reset(m_pBuilderContext->CreateBuilderImpl(pPipelineState));
@@ -142,9 +142,6 @@ bool BuilderReplayer::runOnModule(
         const ConstantAsMetadata* const pMetaConst = cast<ConstantAsMetadata>(pFuncMeta->getOperand(0));
         uint32_t opcode = cast<ConstantInt>(pMetaConst->getValue())->getZExtValue();
 
-        // If we got here we are definitely changing the module.
-        changed = true;
-
         SmallVector<CallInst*, 8> callsToRemove;
 
         while (func.use_empty() == false)
@@ -165,7 +162,7 @@ bool BuilderReplayer::runOnModule(
         pFunc->eraseFromParent();
     }
 
-    return changed;
+    return true;
 }
 
 // =====================================================================================================================

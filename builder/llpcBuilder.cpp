@@ -171,7 +171,7 @@ Module* Builder::Link(
         pPipelineModule->setModuleIdentifier("llpcPipeline");
 
         // Record pipeline state into IR metadata.
-        GetPipelineState()->RecordState(pPipelineModule);
+        GetPipelineState()->Flush(pPipelineModule);
     }
     else
     {
@@ -183,10 +183,7 @@ Module* Builder::Link(
         static_cast<Llpc::Context*>(&getContext())->SetModuleTargetMachine(pPipelineModule);
         Linker linker(*pPipelineModule);
 
-        if (m_pPipelineState != nullptr)
-        {
-            m_pPipelineState->RecordState(pPipelineModule);
-        }
+        GetPipelineState()->Flush(pPipelineModule);
 
         for (int32_t shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)
         {
@@ -253,6 +250,9 @@ void Builder::Generate(
                      pPatchTimer,
                      pOptTimer,
                      checkShaderCacheFunc);
+
+    // Add pass to clear pipeline state from IR
+    patchPassMgr.add(CreatePipelineStateClearer());
 
     // Run the "whole pipeline" passes, excluding the target backend.
     patchPassMgr.run(*pipelineModule);

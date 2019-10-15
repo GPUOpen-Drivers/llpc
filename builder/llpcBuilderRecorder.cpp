@@ -33,6 +33,7 @@
 #include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
+#include "llpcPipelineState.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
@@ -344,6 +345,21 @@ Module* BuilderRecorder::Link(
     return Builder::Link(modules, linkNativeStages);
 }
 #endif
+
+// =====================================================================================================================
+// Generate pipeline module by running patch, middle-end optimization and backend codegen passes.
+// This override for BuilderRecorder is just to free the PipelineState so a new one gets allocated that reads
+// the state that was recorded in the IR.
+void BuilderRecorder::Generate(
+    std::unique_ptr<Module>         pipelineModule,       // IR pipeline module
+    raw_pwrite_stream&              outStream,            // [in/out] Stream to write ELF or IR disassembly output
+    Builder::CheckShaderCacheFunc   checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
+    ArrayRef<Timer*>                timers)               // Timers for: patch passes, llvm optimizations, codegen
+{
+    m_pAllocatedPipelineState.reset(nullptr);
+    m_pPipelineState = nullptr;
+    Builder::Generate(std::move(pipelineModule), outStream, checkShaderCacheFunc, timers);
+}
 
 // =====================================================================================================================
 // This is a BuilderRecorder. Create the BuilderReplayer pass.
