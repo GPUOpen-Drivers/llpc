@@ -28,8 +28,8 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x double> (...) @llpc.call.extract.significand.v3f64(<3 x double>
 ; SHADERTEST: = call <3 x i32> (...) @llpc.call.extract.exponent.v3i32(<3 x double>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS

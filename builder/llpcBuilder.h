@@ -241,6 +241,14 @@ public:
                                             //    from Builder
         const Twine&  name = "");           // [in] Name to give instruction
 
+    CallInst* CreateIntrinsic(
+        Intrinsic::ID    id,                   // Intrinsic ID
+        ArrayRef<Type*>  types,                // [in] Types
+        ArrayRef<Value*> args,                 // [in] Input values
+        Instruction*     pFmfSource = nullptr, // [in] Instruction to copy fast math flags from; nullptr to get
+                                               //    from Builder
+        const Twine&     name = "");           // [in] Name to give instruction
+
     // -----------------------------------------------------------------------------------------------------------------
     // Arithmetic operations
 

@@ -34,9 +34,9 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.minnum.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.maxnum.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x half> @llvm.maxnum.v3f16(<3 x half>
-; SHADERTEST: = call half @llvm.amdgcn.fmed3.f16(half
-; SHADERTEST: = call half @llvm.amdgcn.fmed3.f16(half
-; SHADERTEST: = call half @llvm.amdgcn.fmed3.f16(half
+; SHADERTEST: = call reassoc nnan nsz arcp contract half @llvm.amdgcn.fmed3.f16(half
+; SHADERTEST: = call reassoc nnan nsz arcp contract half @llvm.amdgcn.fmed3.f16(half
+; SHADERTEST: = call reassoc nnan nsz arcp contract half @llvm.amdgcn.fmed3.f16(half
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS
 */

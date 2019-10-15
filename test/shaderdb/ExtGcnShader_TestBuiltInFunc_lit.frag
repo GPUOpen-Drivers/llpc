@@ -27,10 +27,10 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <2 x float> (...) @llpc.call.cube.face.coord.v2f32(<3 x float>
 ; SHADERTEST: = call i64 (...) @llpc.call.read.clock.i64(i1 false)
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call float @llvm.amdgcn.cubeid
-; SHADERTEST: call float @llvm.amdgcn.cubema
-; SHADERTEST: call float @llvm.amdgcn.cubesc
-; SHADERTEST: call float @llvm.amdgcn.cubetc
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubeid
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubema
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubesc
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubetc
 ; SHADERTEST: [[TIME:%[^ ]*]] = call i64 @llvm.amdgcn.s.memtime()
 ; SHADERTEST: = call i64 asm sideeffect "; %1", "=r,0"(i64 [[TIME]])
 ; SHADERTEST: AMDLLPC SUCCESS

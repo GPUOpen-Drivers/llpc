@@ -18,13 +18,13 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <4 x float> (...) @llpc.call.extract.significand.v4f32(<4 x float>
 ; SHADERTEST: = call <4 x i32> (...) @llpc.call.extract.exponent.v4i32(<4 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST-DAG: = call float @llvm.amdgcn.frexp.mant.f32(float
+; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST-DAG: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
-; SHADERTEST-DAG: = call float @llvm.amdgcn.frexp.mant.f32(float
+; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST-DAG: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
-; SHADERTEST-DAG: = call float @llvm.amdgcn.frexp.mant.f32(float
+; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST-DAG: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
-; SHADERTEST-DAG: = call float @llvm.amdgcn.frexp.mant.f32(float
+; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST-DAG: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
 ; SHADERTEST: AMDLLPC SUCCESS
 */

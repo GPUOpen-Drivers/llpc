@@ -75,29 +75,29 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.1d.v4f32.f32({{.*}}, float 0x3FB99999A0000000, {{.*}})
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.1d.v4f32.f32({{.*}}, float 0x3FB99999A0000000, {{.*}})
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.2d.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000, {{.*}})
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.2d.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000, {{.*}})
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.3d.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000, {{.*}})
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.3d.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000, {{.*}})
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call float @llvm.amdgcn.cubesc(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
-; SHADERTEST: call float @llvm.amdgcn.cubetc(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
-; SHADERTEST: call float @llvm.amdgcn.cubema(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
-; SHADERTEST: call float @llvm.amdgcn.cubeid(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.cube.v4f32.f32
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubesc(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubetc(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubema(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubeid(float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0x3FB99999A0000000)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.cube.v4f32.f32
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.1darray.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0.000000e+00, {{.*}})
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.1darray.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0.000000e+00, {{.*}})
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.2darray.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0.000000e+00, {{.*}})
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.2darray.v4f32.f32({{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000, float 0.000000e+00, {{.*}})
 ; SHADERTEST: load <4 x i32>, <4 x i32> addrspace(4)* %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, <8 x i32> addrspace(4)* %{{[0-9]*}}
-; SHADERTEST: call <4 x float> @llvm.amdgcn.image.sample.cl.cube.v4f32.f32
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.cl.cube.v4f32.f32
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -83,7 +83,7 @@ void main()
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.xor.cube.i32.i32(i32 %{{[0-9]*}}, i32 2, i32 2, i32 2, <8 x i32> %{{[0-9]*}}, i32 0
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.swap.cube.i32.i32(i32 %{{[0-9]*}}, i32 1, i32 1, i32 1, <8 x i32> %{{[0-9]*}}, i32 0
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.cmpswap.cube.i32.i32(i32 %{{[0-9]*}}, i32 17, i32 1, i32 1, i32 1, <8 x i32> %{{[0-9]*}}, i32 0
-; SHADERTEST: call float @llvm.amdgcn.image.atomic.swap.2d.f32.i32(float %{{[-0-9A-Za0z_.]+}}, i32 3, i32 3, <8 x i32> %{{[-0-9A-Za0z_.]+}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} float @llvm.amdgcn.image.atomic.swap.2d.f32.i32(float %{{[-0-9A-Za0z_.]+}}, i32 3, i32 3, <8 x i32> %{{[-0-9A-Za0z_.]+}}, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

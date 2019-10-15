@@ -7,7 +7,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: fptrunc float
 ; SHADERTEST: fpext half %{{.*}} to float
-; SHADERTEST: call float @llvm.fabs.f32
+; SHADERTEST: call reassoc nnan nsz arcp contract float @llvm.fabs.f32
 ; SHADERTEST: fcmp reassoc nnan nsz arcp contract olt float
 ; SHADERTEST: fcmp reassoc nnan nsz arcp contract one half
 ; SHADERTEST: and i1 %{{.*}}, %{{.*}}
