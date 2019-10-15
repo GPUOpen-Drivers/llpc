@@ -340,6 +340,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
         {
             IRBuilder<> builder(*m_pContext);
             builder.SetInsertPoint(&binaryOp);
+            builder.setFastMathFlags(binaryOp.getFastMathFlags());
             Value* pRcp = builder.CreateFDiv(ConstantFP::get(binaryOp.getType(), 1.0), pSrc2);
             Value* pFDiv = builder.CreateFMul(pSrc1, pRcp);
 
