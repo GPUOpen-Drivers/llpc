@@ -56,8 +56,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
 
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pBufDescLoadCall = EmitCall(pInsertPos->getModule(),
-                                     LlpcName::DescriptorLoadBuffer,
+    auto pBufDescLoadCall = EmitCall(LlpcName::DescriptorLoadBuffer,
                                      VectorType::get(getInt32Ty(), 4),
                                      {
                                          getInt32(descSet),
@@ -68,8 +67,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
                                      pInsertPos);
     pBufDescLoadCall->setName(instName);
 
-    pBufDescLoadCall = EmitCall(pInsertPos->getModule(),
-                                LlpcName::LateLaunderFatPointer,
+    pBufDescLoadCall = EmitCall(LlpcName::LateLaunderFatPointer,
                                 getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER),
                                 pBufDescLoadCall,
                                 Attribute::ReadNone,
@@ -92,8 +90,7 @@ Value* BuilderImplDesc::CreateIndexDescPtr(
         pIndex = ScalarizeIfUniform(pIndex, isNonUniform);
         std::string name = LlpcName::DescriptorIndex;
         AddTypeMangling(pDescPtr->getType(), {}, name);
-        pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                            name,
+        pDescPtr = EmitCall(name,
                             pDescPtr->getType(),
                             {
                                 pDescPtr,
@@ -116,8 +113,7 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
 {
     std::string name = LlpcName::DescriptorLoadFromPtr;
     AddTypeMangling(pDescPtr->getType(), {}, name);
-    auto pDesc = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                          name,
+    auto pDesc = EmitCall(name,
                           cast<StructType>(pDescPtr->getType())->getElementType(0)->getPointerElementType(),
                           pDescPtr,
                           NoAttrib,
@@ -135,8 +131,7 @@ Value* BuilderImplDesc::CreateGetSamplerDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                             LlpcName::DescriptorGetSamplerPtr,
+    auto pDescPtr = EmitCall(LlpcName::DescriptorGetSamplerPtr,
                              GetSamplerDescPtrTy(),
                              {
                                  getInt32(descSet),
@@ -157,8 +152,7 @@ Value* BuilderImplDesc::CreateGetImageDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                             LlpcName::DescriptorGetResourcePtr,
+    auto pDescPtr = EmitCall(LlpcName::DescriptorGetResourcePtr,
                              GetImageDescPtrTy(),
                              {
                                  getInt32(descSet),
@@ -179,8 +173,7 @@ Value* BuilderImplDesc::CreateGetTexelBufferDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                             LlpcName::DescriptorGetTexelBufferPtr,
+    auto pDescPtr = EmitCall(LlpcName::DescriptorGetTexelBufferPtr,
                              GetTexelBufferDescPtrTy(),
                              {
                                  getInt32(descSet),
@@ -201,8 +194,7 @@ Value* BuilderImplDesc::CreateGetFmaskDescPtr(
 {
     // This currently creates calls to the llpc.descriptor.* functions. A future commit will change it to
     // look up the descSet/binding and generate the code directly.
-    auto pDescPtr = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                             LlpcName::DescriptorGetFmaskPtr,
+    auto pDescPtr = EmitCall(LlpcName::DescriptorGetFmaskPtr,
                              GetFmaskDescPtrTy(),
                              {
                                  getInt32(descSet),
@@ -225,8 +217,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
     // TODO: This currently creates a call to the llpc.descriptor.* function. A future commit will change it to
     // generate the code directly.
     Instruction* pInsertPos = &*GetInsertPoint();
-    auto pPushConstantsLoadCall = EmitCall(pInsertPos->getModule(),
-                                           LlpcName::DescriptorLoadSpillTable,
+    auto pPushConstantsLoadCall = EmitCall(LlpcName::DescriptorLoadSpillTable,
                                            pPushConstantsPtrTy,
                                            {},
                                            NoAttrib,
@@ -264,8 +255,7 @@ Value* BuilderImplDesc::CreateGetBufferDescLength(
     Instruction* const pInsertPos = &*GetInsertPoint();
     std::string callName = LlpcName::LateBufferLength;
     AddTypeMangling(nullptr, pBufferDesc, callName);
-    return EmitCall(pInsertPos->getModule(),
-                    callName,
+    return EmitCall(callName,
                     getInt32Ty(),
                     pBufferDesc,
                     Attribute::ReadNone,

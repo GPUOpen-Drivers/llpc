@@ -50,8 +50,7 @@ Instruction* BuilderImplMisc::CreateEmitVertex(
     // Get GsWaveId
     std::string callName = LlpcName::InputImportBuiltIn;
     callName += "GsWaveId.i32.i32";
-    Value* pGsWaveId = EmitCall(GetInsertBlock()->getModule(),
-                                callName,
+    Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
                                 getInt32(spv::BuiltInWaveId),
                                 NoAttrib,
@@ -73,8 +72,7 @@ Instruction* BuilderImplMisc::CreateEndPrimitive(
     // Get GsWaveId
     std::string callName = LlpcName::InputImportBuiltIn;
     callName += "GsWaveId.i32.i32";
-    Value* pGsWaveId = EmitCall(GetInsertBlock()->getModule(),
-                                callName,
+    Value* pGsWaveId = EmitCall(callName,
                                 getInt32Ty(),
                                 getInt32(spv::BuiltInWaveId),
                                 NoAttrib,

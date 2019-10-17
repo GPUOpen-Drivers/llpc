@@ -137,7 +137,6 @@ Value* ShaderSystemValues::GetInvocationId()
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
     if (m_pInvocationId == nullptr)
     {
-        auto pModule = m_pEntryPoint->getParent();
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
         auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
 
@@ -148,8 +147,7 @@ Value* ShaderSystemValues::GetInvocationId()
             ConstantInt::get(m_pContext->Int32Ty(), 8),
             ConstantInt::get(m_pContext->Int32Ty(), 5)
         };
-        m_pInvocationId = EmitCall(pModule,
-                                   "llvm.amdgcn.ubfe.i32",
+        m_pInvocationId = EmitCall("llvm.amdgcn.ubfe.i32",
                                    m_pContext->Int32Ty(),
                                    args,
                                    Attribute::ReadNone,
@@ -696,9 +694,7 @@ Instruction* ShaderSystemValues::MakePointer(
             // Insert the s_getpc code at the start of the function, so a later call into here knows it can
             // reuse this PC if its pLowValue is an arg rather than an instruction.
             auto pPcInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-            auto pModule = m_pEntryPoint->getParent();
-            Value* pPc = EmitCall(pModule,
-                                  "llvm.amdgcn.s.getpc",
+            Value* pPc = EmitCall("llvm.amdgcn.s.getpc",
                                   m_pContext->Int64Ty(),
                                   ArrayRef<Value*>(),
                                   NoAttrib,
@@ -825,7 +821,6 @@ Instruction* ShaderSystemValues::GetSpillTablePtr()
 Instruction* ShaderSystemValues::LoadDescFromDriverTable(
     uint32_t tableOffset)    // Byte offset in driver table
 {
-    auto pModule = m_pEntryPoint->getParent();
     auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
     Value* args[] =
     {
@@ -833,8 +828,7 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
         ConstantInt::get(m_pContext->Int32Ty(), tableOffset),
         ConstantInt::get(m_pContext->Int32Ty(), 0),
     };
-    return EmitCall(pModule,
-                    LlpcName::DescriptorLoadBuffer,
+    return EmitCall(LlpcName::DescriptorLoadBuffer,
                     m_pContext->Int32x4Ty(),
                     args,
                     NoAttrib,

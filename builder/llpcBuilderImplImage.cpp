@@ -2395,8 +2395,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         std::string callName = LlpcName::InputImportBuiltIn;
         Type* pBuiltInTy = VectorType::get(getFloatTy(), 4);
         AddTypeMangling(pBuiltInTy, {}, callName);
-        Value *pFragCoord = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                                     callName,
+        Value *pFragCoord = EmitCall(callName,
                                      pBuiltInTy,
                                      getInt32(BuiltInFragCoord),
                                      {},
@@ -2444,8 +2443,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         std::string callName = LlpcName::InputImportBuiltIn;
         Type* pBuiltInTy = getInt32Ty();
         AddTypeMangling(pBuiltInTy, {}, callName);
-        Value *pViewIndex = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                                     callName,
+        Value *pViewIndex = EmitCall(callName,
                                      pBuiltInTy,
                                      getInt32(BuiltInViewIndex),
                                      {},

@@ -80,13 +80,13 @@ Function* GetEntryPoint(
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
 CallInst* EmitCall(
-    Module*                       pModule,          // [in] LLVM module
     StringRef                     funcName,         // Name string of the function
     Type*                         pRetTy,           // [in] Return type
     ArrayRef<Value *>             args,             // [in] Parameters
     ArrayRef<Attribute::AttrKind> attribs,          // Attributes
     Instruction*                  pInsertPos)       // [in] Where to insert this call
 {
+    Module* pModule = pInsertPos->getModule();
     Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(funcName));
     if (pFunc == nullptr)
     {
@@ -119,13 +119,13 @@ CallInst* EmitCall(
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
 CallInst* EmitCall(
-    Module*                       pModule,          // [in] LLVM module
     StringRef                     funcName,         // Name string of the function
     Type*                         pRetTy,           // [in] Return type
     ArrayRef<Value *>             args,             // [in] Parameters
     ArrayRef<Attribute::AttrKind> attribs,          // Attributes
     BasicBlock*                   pInsertAtEnd)     // [in] Which block to insert this call at the end
 {
+    Module* pModule = pInsertAtEnd->getModule();
     Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(funcName));
     if (pFunc == nullptr)
     {

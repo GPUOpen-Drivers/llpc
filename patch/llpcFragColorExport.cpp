@@ -1383,8 +1383,7 @@ Value* FragColorExport::Run(
                 args.clear();
                 args.push_back(comps[0]);
                 args.push_back(comps[1]);
-                comps[0] = EmitCall(m_pModule,
-                                    "llvm.amdgcn.cvt.pkrtz",
+                comps[0] = EmitCall("llvm.amdgcn.cvt.pkrtz",
                                     m_pContext->Float16x2Ty(),
                                     args,
                                     attribs,
@@ -1395,8 +1394,7 @@ Value* FragColorExport::Run(
                     args.clear();
                     args.push_back(comps[2]);
                     args.push_back(comps[3]);
-                    comps[1] = EmitCall(m_pModule,
-                                        "llvm.amdgcn.cvt.pkrtz",
+                    comps[1] = EmitCall("llvm.amdgcn.cvt.pkrtz",
                                         m_pContext->Float16x2Ty(),
                                         args,
                                         attribs,
@@ -1438,12 +1436,11 @@ Value* FragColorExport::Run(
                 args.clear();
                 args.push_back(comps[i]);
                 args.push_back(comps[i + 1]);
-                Value* pComps = EmitCall(m_pModule,
-                                            funcName,
-                                            m_pContext->Int16x2Ty(),
-                                            args,
-                                            NoAttrib,
-                                            pInsertPos);
+                Value* pComps = EmitCall(funcName,
+                                         m_pContext->Int16x2Ty(),
+                                         args,
+                                         NoAttrib,
+                                         pInsertPos);
 
                 pComps = new BitCastInst(pComps, m_pContext->Float16x2Ty(), "", pInsertPos);
 
@@ -1494,12 +1491,11 @@ Value* FragColorExport::Run(
                 args.clear();
                 args.push_back(comps[i]);
                 args.push_back(comps[i + 1]);
-                Value* pComps = EmitCall(m_pModule,
-                                            funcName,
-                                            m_pContext->Int16x2Ty(),
-                                            args,
-                                            NoAttrib,
-                                            pInsertPos);
+                Value* pComps = EmitCall(funcName,
+                                         m_pContext->Int16x2Ty(),
+                                         args,
+                                         NoAttrib,
+                                         pInsertPos);
 
                 pComps = new BitCastInst(pComps, m_pContext->Float16x2Ty(), "", pInsertPos);
 
@@ -1585,7 +1581,7 @@ Value* FragColorExport::Run(
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                        // done
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                         // vm
 
-        pExport = EmitCall(m_pModule, "llvm.amdgcn.exp.compr.v2f16", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else
     {
@@ -1600,7 +1596,7 @@ Value* FragColorExport::Run(
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                        // done
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                         // vm
 
-        pExport = EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        pExport = EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
 
     return pExport;
