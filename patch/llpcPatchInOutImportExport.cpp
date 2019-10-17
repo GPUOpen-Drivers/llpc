@@ -1113,8 +1113,8 @@ void PatchInOutImportExport::visitReturnInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));             // done
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));             // vm
 
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
 
         // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
@@ -1186,8 +1186,8 @@ void PatchInOutImportExport::visitReturnInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // vm
 
             // "Done" flag is valid for exporting position 0 ~ 3
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
             if (clipCullDistance.size() > 4)
             {
@@ -1202,8 +1202,8 @@ void PatchInOutImportExport::visitReturnInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));      // done
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));      // vm
 
-                m_pLastExport = cast<CallInst>(
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+                m_pLastExport =
+                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
             }
 
             // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
@@ -1300,7 +1300,7 @@ void PatchInOutImportExport::visitReturnInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // done
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // vm
 
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
 
                 if (clipCullDistance.size() > 4)
@@ -1316,7 +1316,7 @@ void PatchInOutImportExport::visitReturnInst(
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                          // done
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                          // vm
 
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                     ++inOutUsage.expCount;
                 }
             }
@@ -1369,7 +1369,7 @@ void PatchInOutImportExport::visitReturnInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // done
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // vm
 
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
         }
@@ -1417,8 +1417,8 @@ void PatchInOutImportExport::visitReturnInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));              // vm
 
             // "Done" flag is valid for exporting position 0 ~ 3
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
             // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
             if (useViewportIndex)
@@ -1460,7 +1460,7 @@ void PatchInOutImportExport::visitReturnInst(
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // done
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // vm
 
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                     ++inOutUsage.expCount;
                 }
             }
@@ -1513,7 +1513,7 @@ void PatchInOutImportExport::visitReturnInst(
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // done
                     args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // vm
 
-                    EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                     ++inOutUsage.expCount;
                 }
             }
@@ -1538,7 +1538,7 @@ void PatchInOutImportExport::visitReturnInst(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));               // done
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));               // vm
 
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
         }
@@ -1560,7 +1560,7 @@ void PatchInOutImportExport::visitReturnInst(
         auto pWaveId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.waveId);
         args.push_back(pWaveId);
 
-        EmitCall(m_pModule, "llvm.amdgcn.s.sendmsg", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.s.sendmsg", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
@@ -1608,8 +1608,8 @@ void PatchInOutImportExport::visitReturnInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));   // vm
 
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
 
         // Export fragment colors
@@ -1685,8 +1685,8 @@ void PatchInOutImportExport::visitReturnInst(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));             // done
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));              // vm
 
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
 
@@ -1969,8 +1969,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // high
                 args.push_back(pPrimMask);                                      // m0
 
-                pCompValue = EmitCall(m_pModule,
-                                      "llvm.amdgcn.interp.p1.f16",
+                pCompValue = EmitCall("llvm.amdgcn.interp.p1.f16",
                                       m_pContext->FloatTy(),
                                       args,
                                       attribs,
@@ -1984,8 +1983,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // high
                 args.push_back(pPrimMask);                                      // m0
 
-                pCompValue = EmitCall(m_pModule,
-                                      "llvm.amdgcn.interp.p2.f16",
+                pCompValue = EmitCall("llvm.amdgcn.interp.p2.f16",
                                       m_pContext->Float16Ty(),
                                       args,
                                       attribs,
@@ -1999,8 +1997,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 args.push_back(pLoc);                                           // attr
                 args.push_back(pPrimMask);                                      // m0
 
-                pCompValue = EmitCall(m_pModule,
-                                      "llvm.amdgcn.interp.p1",
+                pCompValue = EmitCall("llvm.amdgcn.interp.p1",
                                       m_pContext->FloatTy(),
                                       args,
                                       attribs,
@@ -2013,8 +2010,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 args.push_back(pLoc);                                           // attr
                 args.push_back(pPrimMask);                                      // m0
 
-                pCompValue = EmitCall(m_pModule,
-                                      "llvm.amdgcn.interp.p2",
+                pCompValue = EmitCall("llvm.amdgcn.interp.p2",
                                       m_pContext->FloatTy(),
                                       args,
                                       attribs,
@@ -2059,8 +2055,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                             ConstantInt::get(m_pContext->Int32Ty(), location + i / 4)); // attr
             args.push_back(pPrimMask);                                                  // m0
 
-            pCompValue = EmitCall(m_pModule,
-                                  "llvm.amdgcn.interp.mov",
+            pCompValue = EmitCall("llvm.amdgcn.interp.mov",
                                   m_pContext->FloatTy(),
                                   args,
                                   attribs,
@@ -2287,7 +2282,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
         args.push_back(pOutput);
 
         std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else
 #endif
@@ -2851,7 +2846,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 4));
             auto pSampleId =
-                EmitCall(m_pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, NoAttrib, pInsertPos);
 
             auto pSampleMaskIn = pSampleCoverage;
             if (pPipelineInfo->rsState.perSampleShading)
@@ -2889,7 +2884,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             args.push_back(fragCoord[3]);
 
             fragCoord[3] =
-                EmitCall(m_pModule, "llvm.amdgcn.rcp.f32", m_pContext->FloatTy(), args, attribs, pInsertPos);
+                EmitCall("llvm.amdgcn.rcp.f32", m_pContext->FloatTy(), args, attribs, pInsertPos);
 
             for (uint32_t i = 0; i < 4; ++i)
             {
@@ -2938,7 +2933,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInHelperInvocation:
         {
-            pInput = EmitCall(m_pModule, "llvm.amdgcn.ps.live", m_pContext->BoolTy(), args, Attribute::ReadNone, pInsertPos);
+            pInput = EmitCall("llvm.amdgcn.ps.live", m_pContext->BoolTy(), args, Attribute::ReadNone, pInsertPos);
             pInput = BinaryOperator::CreateNot(pInput, "", pInsertPos);
             pInput = CastInst::CreateIntegerCast(pInput, pInputTy, false, "", pInsertPos);
             break;
@@ -3056,8 +3051,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc + (startChannel + i) / 4));  // attr
                 args.push_back(pPrimMask);                                                              // m0
 
-                auto pCompValue = EmitCall(m_pModule,
-                                           "llvm.amdgcn.interp.p1",
+                auto pCompValue = EmitCall("llvm.amdgcn.interp.p1",
                                            m_pContext->FloatTy(),
                                            args,
                                            attribs,
@@ -3070,8 +3064,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                 args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc + (startChannel + i) / 4));  // attr
                 args.push_back(pPrimMask);                                                              // m0
 
-                pCompValue = EmitCall(m_pModule,
-                                      "llvm.amdgcn.interp.p2",
+                pCompValue = EmitCall("llvm.amdgcn.interp.p2",
                                       m_pContext->FloatTy(),
                                       args,
                                       attribs,
@@ -3093,7 +3086,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             args.push_back(pAncillary);
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 4));
-            pInput = EmitCall(m_pModule, "llvm.amdgcn.ubfe.i32", pInputTy, args, NoAttrib, pInsertPos);
+            pInput = EmitCall("llvm.amdgcn.ubfe.i32", pInputTy, args, NoAttrib, pInsertPos);
 
             break;
         }
@@ -3217,8 +3210,7 @@ Value* PatchInOutImportExport::GetSamplePosOffset(
     Value* pSampleValid = builder.CreateICmpUGT(pNumSamples, pSampleId);
     Value* pOffset = builder.CreateSelect(pSampleValid, pValidOffset, builder.getInt32(0));
     // Load sample position descriptor.
-    auto pDesc = EmitCall(m_pModule,
-                          LlpcName::DescriptorLoadBuffer,
+    auto pDesc = EmitCall(LlpcName::DescriptorLoadBuffer,
                           VectorType::get(builder.getInt32Ty(), 4),
                           {
                               builder.getInt32(InternalResourceTable),
@@ -4269,7 +4261,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
         args.push_back(pOutput);
 
         std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else
     {
@@ -4750,7 +4742,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
     coherent.bits.glc = true;
     coherent.bits.slc = true;
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));           // glc, slc
-    EmitCall(m_pModule, callName, m_pContext->VoidTy(), args, NoAttrib, pStoreBlock);
+    EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pStoreBlock);
     BranchInst::Create(pEndBlock, pStoreBlock);
 }
 
@@ -4852,7 +4844,7 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), formats[compCount - 1]));    // format
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));         // glc
 
-            EmitCall(m_pModule, funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall(funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
             break;
         }
@@ -4938,7 +4930,7 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), formats[compCount - 1]));  // format
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc
 
-            pLoadValue = EmitCall(m_pModule, funcName, loadTyps[compCount - 1], args, NoAttrib, pInsertPos);
+            pLoadValue = EmitCall(funcName, loadTyps[compCount - 1], args, NoAttrib, pInsertPos);
             LLPC_ASSERT(pLoadValue != nullptr);
             if (compCount > 1)
             {
@@ -5057,8 +5049,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     args.push_back(pStreamInfo);
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 7));
-    Value* pVertexCount = EmitCall(m_pModule,
-                                   "llvm.amdgcn.ubfe.i32",
+    Value* pVertexCount = EmitCall("llvm.amdgcn.ubfe.i32",
                                    m_pContext->Int32Ty(),
                                    args,
                                    NoAttrib,
@@ -5084,7 +5075,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), xfbOffset));
     args.push_back(pStreamOffset);
 
-    EmitCall(m_pModule, funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+    EmitCall(funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 }
 
 // =====================================================================================================================
@@ -5176,7 +5167,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
-            EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall("llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
 }
@@ -5256,8 +5247,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
             coherent.bits.slc = true;
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc slc
 
-            pLoadValue = EmitCall(m_pModule,
-                                  "llvm.amdgcn.raw.buffer.load.f32",
+            pLoadValue = EmitCall("llvm.amdgcn.raw.buffer.load.f32",
                                   m_pContext->FloatTy(),
                                   args,
                                   NoAttrib,
@@ -5367,7 +5357,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
-            EmitCall(m_pModule, "llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall("llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
 #if LLPC_BUILD_GFX10
         else if (m_gfxIp.major == 10)
@@ -5379,7 +5369,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
             coherent.bits.glc = true;
             coherent.bits.slc = true;
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc, slc
-            EmitCall(m_pModule, "llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
 #endif
         else
@@ -6012,7 +6002,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         args.push_back(pTessFactorOffset);              // tfOffset
         args.push_back(tessFactors[0]);                 // tfValue
 
-        EmitCall(m_pModule, LlpcName::TfBufferStore, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(LlpcName::TfBufferStore, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
 }
 
@@ -6105,7 +6095,7 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));     // soffset
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));     // cachepolicy: glc = 1
 
-    EmitCall(m_pModule, "llvm.amdgcn.raw.buffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pBranch);
+    EmitCall("llvm.amdgcn.raw.buffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pBranch);
 
     // Create entry block
     BasicBlock* pEntryBlock = BasicBlock::Create(*m_pContext, "", pFunc, pTfStoreBlock);
@@ -6619,7 +6609,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // vm
 
-        EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         ++inOutUsage.expCount;
     }
     else
@@ -6642,7 +6632,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // vm
 
-        EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         ++inOutUsage.expCount;
 
         // Do the second exporting
@@ -6667,7 +6657,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // done
         args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // vm
 
-        EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         ++inOutUsage.expCount;
     }
 }
@@ -6715,8 +6705,8 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // vm
 
             // "Done" flag is valid for exporting position 0 ~ 3
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
             break;
         }
     case BuiltInPointSize:
@@ -6732,8 +6722,8 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));             // vm
 
             // "Done" flag is valid for exporting position 0 ~ 3
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
             break;
         }
     case BuiltInLayer:
@@ -6756,8 +6746,8 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));             // vm
 
             // "Done" flag is valid for exporting position 0 ~ 3
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
             // NOTE: We have to export gl_Layer via generic outputs as well.
             bool hasLayerExport = true;
@@ -6802,7 +6792,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // done
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // vm
 
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
 
@@ -6824,8 +6814,8 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));             // vm
 
             // "Done" flag is valid for exporting position 0 ~ 3
-            m_pLastExport = cast<CallInst>(
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos));
+            m_pLastExport =
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
 
             // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
             bool hasViewportIndexExport = true;
@@ -6863,7 +6853,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // done
                 args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                      // vm
 
-                EmitCall(m_pModule, "llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
 
@@ -6917,12 +6907,11 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
     std::vector<Value*> args;
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
     args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-    Value* pSubgroupLocalInvocationId = EmitCall(m_pModule,
-                                                "llvm.amdgcn.mbcnt.lo",
-                                                m_pContext->Int32Ty(),
-                                                args,
-                                                NoAttrib,
-                                                &*pInsertPos);
+    Value* pSubgroupLocalInvocationId = EmitCall("llvm.amdgcn.mbcnt.lo",
+                                                 m_pContext->Int32Ty(),
+                                                 args,
+                                                 NoAttrib,
+                                                 &*pInsertPos);
 
 #if LLPC_BUILD_GFX10
     uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
@@ -6932,12 +6921,11 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
         args.clear();
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
         args.push_back(pSubgroupLocalInvocationId);
-        pSubgroupLocalInvocationId = EmitCall(m_pModule,
-                                                "llvm.amdgcn.mbcnt.hi",
-                                                m_pContext->Int32Ty(),
-                                                args,
-                                                NoAttrib,
-                                                &*pInsertPos);
+        pSubgroupLocalInvocationId = EmitCall("llvm.amdgcn.mbcnt.hi",
+                                              m_pContext->Int32Ty(),
+                                              args,
+                                              NoAttrib,
+                                              &*pInsertPos);
     }
 
     return pSubgroupLocalInvocationId;

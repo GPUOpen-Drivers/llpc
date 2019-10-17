@@ -204,8 +204,7 @@ Value* BuilderImplInOut::ReadGenericInputOutput(
 
     std::string callName = baseCallName;
     AddTypeMangling(pResultTy, args, callName);
-    Value* pResult = EmitCall(GetInsertBlock()->getModule(),
-                              callName,
+    Value* pResult = EmitCall(callName,
                               pResultTy,
                               args,
                               Attribute::ReadOnly,
@@ -302,8 +301,7 @@ Instruction* BuilderImplInOut::CreateWriteGenericOutput(
 
     std::string llpcCallName = LlpcName::OutputExportGeneric;
     AddTypeMangling(nullptr, args, llpcCallName);
-    return EmitCall(GetInsertBlock()->getModule(),
-                    llpcCallName,
+    return EmitCall(llpcCallName,
                     getVoidTy(),
                     args,
                     NoAttrib,
@@ -510,8 +508,7 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
                 pResUsage->builtInUsage.fs.centroid = true;
             }
 
-            pAuxInterpValue = EmitCall(GetInsertBlock()->getModule(),
-                                       evalInstName,
+            pAuxInterpValue = EmitCall(evalInstName,
                                        VectorType::get(getFloatTy(), 2),
                                        evalArgs,
                                        Attribute::ReadOnly,
@@ -665,8 +662,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     args.push_back(getInt32(0));
     args.push_back(pValueToWrite);
     AddTypeMangling(nullptr, args, instName);
-    return EmitCall(GetInsertBlock()->getParent()->getParent(),
-                    instName,
+    return EmitCall(instName,
                     getVoidTy(),
                     args,
                     NoAttrib,
@@ -835,8 +831,7 @@ Value* BuilderImplInOut::ReadBuiltIn(
     std::string callName = isOutput ? LlpcName::OutputImportBuiltIn : LlpcName::InputImportBuiltIn;
     callName += GetBuiltInName(builtIn);
     AddTypeMangling(pResultTy, args, callName);
-    Value* pResult = EmitCall(GetInsertBlock()->getParent()->getParent(),
-                              callName,
+    Value* pResult = EmitCall(callName,
                               pResultTy,
                               args,
                               Attribute::ReadOnly,
@@ -925,8 +920,7 @@ Instruction* BuilderImplInOut::CreateWriteBuiltInOutput(
     std::string callName = LlpcName::OutputExportBuiltIn;
     callName += GetBuiltInName(builtIn);
     AddTypeMangling(nullptr, args, callName);
-    return cast<Instruction>(EmitCall(GetInsertBlock()->getModule(),
-                             callName,
+    return cast<Instruction>(EmitCall(callName,
                              getVoidTy(),
                              args,
                              NoAttrib,

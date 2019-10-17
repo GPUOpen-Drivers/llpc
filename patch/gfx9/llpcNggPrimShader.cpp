@@ -3132,8 +3132,7 @@ void NggPrimShader::RunEsOrEsVariant(
 
     if (runEsVariant)
     {
-        auto pExpData = EmitCall(pModule,
-                                 entryName,
+        auto pExpData = EmitCall(entryName,
                                  pEsEntry->getReturnType(),
                                  args,
                                  NoAttrib,
@@ -3152,8 +3151,7 @@ void NggPrimShader::RunEsOrEsVariant(
     }
     else
     {
-        EmitCall(pModule,
-                 entryName,
+        EmitCall(entryName,
                  pEsEntry->getReturnType(),
                  args,
                  NoAttrib,
@@ -3515,8 +3513,7 @@ Value* NggPrimShader::RunGsVariant(
     ++gsArgIdx;
     LLPC_ASSERT(gsArgIdx == gsArgCount); // Must have visit all arguments of ES entry point
 
-    return EmitCall(pModule,
-                    LlpcName::NggGsEntryVariant,
+    return EmitCall(LlpcName::NggGsEntryVariant,
                     pGsEntry->getReturnType(),
                     args,
                     NoAttrib,
@@ -3814,8 +3811,7 @@ void NggPrimShader::RunCopyShader(
             }
         }
 
-        EmitCall(pModule,
-                 LlpcName::NggCopyShaderEntryPoint,
+        EmitCall(LlpcName::NggCopyShaderEntryPoint,
                  m_pBuilder->getVoidTy(),
                  args,
                  NoAttrib,

@@ -1817,8 +1817,7 @@ void VertexFetch::AddVertexFetchInst(
             }
         }
 
-        Value* pFetch = EmitCall(m_pModule,
-                                 (Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(),
+        Value* pFetch = EmitCall((Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(),
                                  pFetchTy,
                                  args,
                                  NoAttrib,
@@ -1908,8 +1907,7 @@ void VertexFetch::AddVertexFetchInst(
             Value* pCompFetch = nullptr;
             if (is16bitFetch)
             {
-                pCompFetch = EmitCall(m_pModule,
-                                      "llvm.amdgcn.struct.tbuffer.load.f16",
+                pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.f16",
                                       m_pContext->Float16Ty(),
                                       args,
                                       NoAttrib,
@@ -1920,8 +1918,7 @@ void VertexFetch::AddVertexFetchInst(
             }
             else
             {
-                pCompFetch = EmitCall(m_pModule,
-                                      "llvm.amdgcn.struct.tbuffer.load.i32",
+                pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.i32",
                                       m_pContext->Int32Ty(),
                                       args,
                                       NoAttrib,

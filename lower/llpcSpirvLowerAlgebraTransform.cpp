@@ -207,8 +207,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             {
                 // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
                 std::string instName = "llvm.canonicalize." + GetTypeName(pDestTy);
-                auto pCanonical = EmitCall(m_pModule,
-                                           instName,
+                auto pCanonical = EmitCall(instName,
                                            pDestTy,
                                            { UndefValue::get(pDestTy) }, // Will be replaced later
                                            NoAttrib,
@@ -243,8 +242,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             // -trunc(x * 1/y)
             Value* pTrunc = BinaryOperator::CreateFDiv(pOne, pSrc2, "", &binaryOp);
             pTrunc = BinaryOperator::CreateFMul(pTrunc, pSrc1, "", &binaryOp);
-            pTrunc = EmitCall(m_pModule,
-                              "llvm.trunc." + GetTypeName(pDestTy),
+            pTrunc = EmitCall("llvm.trunc." + GetTypeName(pDestTy),
                               pDestTy,
                               { pTrunc },
                               NoAttrib,
@@ -252,8 +250,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             pTrunc = BinaryOperator::CreateFNeg(pTrunc, "", &binaryOp);
 
             // -trunc(x/y) * y + x
-            auto pFRem = EmitCall(m_pModule,
-                                  "llvm.fmuladd." + GetTypeName(pDestTy),
+            auto pFRem = EmitCall("llvm.fmuladd." + GetTypeName(pDestTy),
                                   pDestTy,
                                   { pTrunc, pSrc2, pSrc1 },
                                   NoAttrib,
@@ -406,12 +403,11 @@ void SpirvLowerAlgebraTransform::visitCallInst(
         {
             // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
             std::string instName = "llvm.canonicalize." + GetTypeName(pDestTy);
-            auto pCanonical = EmitCall(m_pModule,
-                                        instName,
-                                        pDestTy,
-                                        { UndefValue::get(pDestTy) }, // Will be replaced later
-                                        NoAttrib,
-                                        callInst.getNextNode());
+            auto pCanonical = EmitCall(instName,
+                                       pDestTy,
+                                       { UndefValue::get(pDestTy) }, // Will be replaced later
+                                       NoAttrib,
+                                       callInst.getNextNode());
 
                 callInst.replaceAllUsesWith(pCanonical);
                 pCanonical->setArgOperand(0, &callInst);

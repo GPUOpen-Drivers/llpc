@@ -147,13 +147,13 @@ bool PatchNullFragShader::runOnModule(
     auto pInputTy = m_pContext->FloatTy();
     std::string importName = LlpcName::InputImportGeneric;
     AddTypeMangling(pInputTy, importArgs, importName);
-    auto pInput = EmitCall(&module, importName, pInputTy, importArgs, NoAttrib, pInsertPos);
+    auto pInput = EmitCall(importName, pInputTy, importArgs, NoAttrib, pInsertPos);
 
     // Then the export.
     Value* exportArgs[] = { pZero, pZero, pInput };
     std::string exportName = LlpcName::OutputExportGeneric;
     AddTypeMangling(m_pContext->VoidTy(), exportArgs, exportName);
-    EmitCall(&module, exportName, m_pContext->VoidTy(), exportArgs, NoAttrib, pInsertPos);
+    EmitCall(exportName, m_pContext->VoidTy(), exportArgs, NoAttrib, pInsertPos);
 
     // Add SPIR-V execution model metadata to the function.
     auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), ExecutionModelFragment));

@@ -234,8 +234,7 @@ bool PatchCopyShader::runOnModule(
         args.push_back(pStreamInfo);
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 24));
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
-        Value* pStreamId = EmitCall(m_pModule,
-                                    "llvm.amdgcn.ubfe.i32",
+        Value* pStreamId = EmitCall("llvm.amdgcn.ubfe.i32",
                                     m_pContext->Int32Ty(),
                                     args,
                                     NoAttrib,
@@ -415,7 +414,7 @@ void PatchCopyShader::ExportOutput(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
 
             std::string callName = LlpcName::NggGsOutputImport + GetTypeName(pOutputTy);
-            pOutputValue = EmitCall(m_pModule, callName, pOutputTy, args, NoAttrib, pInsertPos);
+            pOutputValue = EmitCall(callName, pOutputTy, args, NoAttrib, pInsertPos);
         }
         else
 #endif
@@ -497,7 +496,7 @@ void PatchCopyShader::ExportOutput(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
 
             std::string callName = LlpcName::NggGsOutputImport + GetTypeName(pBuiltInTy);
-            pOutputValue = EmitCall(m_pModule, callName, pBuiltInTy, args, NoAttrib, pInsertPos);
+            pOutputValue = EmitCall(callName, pBuiltInTy, args, NoAttrib, pInsertPos);
 
             ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
         }
@@ -742,8 +741,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRingBuffer(
         coherent.bits.slc = true;
         args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc, slc
 
-        pLoadValue = EmitCall(m_pModule,
-                              "llvm.amdgcn.raw.buffer.load.f32",
+        pLoadValue = EmitCall("llvm.amdgcn.raw.buffer.load.f32",
                               m_pContext->FloatTy(),
                               args,
                               NoAttrib,
@@ -762,7 +760,7 @@ Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
     Value* pInternalTablePtrLow = GetFunctionArgument(pEntryPoint, EntryArgIdxInternalTablePtrLow);
 
     std::vector<Value*> args;
-    Value* pPc = EmitCall(m_pModule, "llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), args, NoAttrib, pInsertPos);
+    Value* pPc = EmitCall("llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), args, NoAttrib, pInsertPos);
     pPc = new BitCastInst(pPc, m_pContext->Int32x2Ty(), "", &*pInsertPos);
 
     auto pInternalTablePtrHigh =
@@ -876,7 +874,7 @@ void PatchCopyShader::ExportGenericOutput(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbLocOffset));
             args.push_back(pOutputValue);
             AddTypeMangling(nullptr, args, instName);
-            EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall(instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
 
@@ -892,7 +890,7 @@ void PatchCopyShader::ExportGenericOutput(
         instName = LlpcName::OutputExportGeneric;
         instName += GetTypeName(pOutputTy);
 
-        EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
 }
 
@@ -930,7 +928,7 @@ void PatchCopyShader::ExportBuiltInOutput(
             args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
             args.push_back(pOutputValue);
             AddTypeMangling(nullptr, args, instName);
-            EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall(instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
 
@@ -943,7 +941,7 @@ void PatchCopyShader::ExportBuiltInOutput(
         std::string builtInName = getNameMap(builtInId).map(builtInId);
         LLPC_ASSERT(builtInName.find("BuiltIn") == 0);
         instName = LlpcName::OutputExportBuiltIn + builtInName.substr(strlen("BuiltIn"));
-        EmitCall(m_pModule, instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
 }
 
