@@ -1521,6 +1521,35 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             outputInfo.SetArraySize(pOutputTy->getArrayNumElements());
             m_pBuilder->SetInsertPoint(pInsertPos);
             m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, nullptr);
+
+            if (outputMeta.IsXfb)
+            {
+                // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
+                LLPC_ASSERT(xfbLocOffset == 0); // Unused for built-ins
+
+                auto pElemTy = pOutputTy->getArrayElementType();
+                LLPC_ASSERT(pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()); // Must be scalar
+
+                const uint64_t elemCount = pOutputTy->getArrayNumElements();
+                const uint64_t byteSize = pElemTy->getScalarSizeInBits() / 8;
+
+                for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+                {
+                    // Handle array elements recursively
+                    std::vector<uint32_t> idxs;
+                    idxs.push_back(elemIdx);
+                    auto pElem = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
+
+                    auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbLoc + byteSize * elemIdx);
+                    m_pBuilder->CreateWriteXfbOutput(pElem,
+                                                     /*isBuiltIn=*/true,
+                                                     builtInId,
+                                                     outputMeta.XfbBuffer,
+                                                     outputMeta.XfbStride,
+                                                     pXfbOffset,
+                                                     outputInfo);
+                }
+            }
         }
         else
         {
@@ -1627,14 +1656,15 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                LLPC_ASSERT(xfbLocOffset != InvalidValue);
-                Value* pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + xfbLocOffset + outputMeta.XfbLoc);
+                LLPC_ASSERT(xfbLocOffset == 0); // Unused for built-ins
+                auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbLoc);
                 m_pBuilder->CreateWriteXfbOutput(pOutputValue,
                                                  /*isBuiltIn=*/true,
                                                  builtInId,
                                                  outputMeta.XfbBuffer,
                                                  outputMeta.XfbStride,
-                                                 pXfbOffset, outputInfo);
+                                                 pXfbOffset,
+                                                 outputInfo);
             }
 
             m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, pElemIdx);
