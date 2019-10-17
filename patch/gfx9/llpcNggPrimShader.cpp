@@ -1884,12 +1884,8 @@ void NggPrimShader::ConstructPrimShaderWithGs(
 
     pArg += EsGsSpecialSysValueCount;
 
-    Value* pUserData = pArg++;
-
     Value* pEsGsOffsets01 = pArg;
     Value* pEsGsOffsets23 = (pArg + 1);
-    Value* pGsPrimitiveId = (pArg + 2);
-    Value* pInvocationId = (pArg + 3);
     Value* pEsGsOffsets45 = (pArg + 4);
 
     // define dllexport amdgpu_gs @_amdgpu_gs_main(
@@ -2111,8 +2107,6 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     // Construct ".initOutPrimData" block
     {
         m_pBuilder->SetInsertPoint(pInitOutPrimDataBlock);
-
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 
         auto pLdsOffset = m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
         pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
