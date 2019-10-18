@@ -3939,6 +3939,8 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 LLPC_ASSERT(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
                 uint32_t loc = perPatchBuiltInOutLocMap[builtInId];
 
+                llvm::Instruction *pInsertAtEnd = pInsertPos->getParent()->getTerminator();
+
                 if (pElemIdx == nullptr)
                 {
                     // gl_TessLevelOuter[4] is treated as vec4
@@ -3948,18 +3950,18 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                     {
                         std::vector<uint32_t> idxs;
                         idxs.push_back(i);
-                        auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
+                        auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertAtEnd);
 
                         auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
                         auto pLdsOffset =
-                            CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
-                        WriteValueToLds(pElem, pLdsOffset, pInsertPos);
+                            CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertAtEnd);
+                        WriteValueToLds(pElem, pLdsOffset, pInsertAtEnd);
                     }
                 }
                 else
                 {
-                    auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, nullptr, pInsertPos);
-                    WriteValueToLds(pOutput, pLdsOffset, pInsertPos);
+                    auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, nullptr, pInsertAtEnd);
+                    WriteValueToLds(pOutput, pLdsOffset, pInsertAtEnd);
                 }
             }
             break;
@@ -4014,6 +4016,8 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 LLPC_ASSERT(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
                 uint32_t loc = perPatchBuiltInOutLocMap[builtInId];
 
+                llvm::Instruction *pInsertAtEnd = pInsertPos->getParent()->getTerminator();
+
                 if (pElemIdx == nullptr)
                 {
                     // gl_TessLevelInner[2] is treated as vec2
@@ -4023,18 +4027,18 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                     {
                         std::vector<uint32_t> idxs;
                         idxs.push_back(i);
-                        auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertPos);
+                        auto pElem = ExtractValueInst::Create(pOutput, idxs, "", pInsertAtEnd);
 
                         auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
                         auto pLdsOffset =
-                            CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
-                        WriteValueToLds(pElem, pLdsOffset, pInsertPos);
+                            CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertAtEnd);
+                        WriteValueToLds(pElem, pLdsOffset, pInsertAtEnd);
                     }
                 }
                 else
                 {
-                    auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, nullptr, pInsertPos);
-                    WriteValueToLds(pOutput, pLdsOffset, pInsertPos);
+                    auto pLdsOffset = CalcLdsOffsetForTcsOutput(pOutputTy, loc, nullptr, pElemIdx, nullptr, pInsertAtEnd);
+                    WriteValueToLds(pOutput, pLdsOffset, pInsertAtEnd);
                 }
             }
 
