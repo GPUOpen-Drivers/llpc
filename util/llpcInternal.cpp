@@ -77,8 +77,52 @@ Function* GetEntryPoint(
 }
 
 // =====================================================================================================================
+/// Emits a LLVM function call using the given builder. The callee is built automically based on return
+/// type and its parameters.
+///
+/// @oaram [in] funcName Name of the callee
+/// @param [in] pRetTy Return type of the callee
+/// @param [in] args Arguments to pass to the callee
+/// @param [in] attribs Function attributes
+/// @param [in] builder The IRBuilder to use for creating the call
+CallInst* EmitCall(
+    StringRef                     funcName,
+    Type*                         pRetTy,
+    ArrayRef<Value *>             args,
+    ArrayRef<Attribute::AttrKind> attribs,
+    IRBuilder<>&                  builder)
+{
+    Module* pModule = builder.GetInsertBlock()->getParent()->getParent();
+    Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(funcName));
+    if (!pFunc)
+    {
+        SmallVector<Type*, 8> argTys;
+        argTys.reserve(args.size());
+        for (auto arg : args)
+        {
+            argTys.push_back(arg->getType());
+        }
+
+        auto pFuncTy = FunctionType::get(pRetTy, argTys, false);
+        pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, funcName, pModule);
+
+        pFunc->setCallingConv(CallingConv::C);
+        pFunc->addFnAttr(Attribute::NoUnwind);
+
+        for (auto attrib : attribs)
+        {
+            pFunc->addFnAttr(attrib);
+        }
+    }
+
+    return builder.CreateCall(pFunc, args);
+}
+
+// =====================================================================================================================
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
+//
+// NOTE: Prefer the IRBuilder overload of this function where possible.
 CallInst* EmitCall(
     StringRef                     funcName,         // Name string of the function
     Type*                         pRetTy,           // [in] Return type
@@ -86,38 +130,15 @@ CallInst* EmitCall(
     ArrayRef<Attribute::AttrKind> attribs,          // Attributes
     Instruction*                  pInsertPos)       // [in] Where to insert this call
 {
-    Module* pModule = pInsertPos->getModule();
-    Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(funcName));
-    if (pFunc == nullptr)
-    {
-        std::vector<Type*> argTys;
-        for (auto arg : args)
-        {
-            argTys.push_back(arg->getType());
-        }
-
-        auto pFuncTy = FunctionType::get(pRetTy, argTys, false);
-        pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, funcName, pModule);
-
-        pFunc->setCallingConv(CallingConv::C);
-        pFunc->addFnAttr(Attribute::NoUnwind);
-
-        for (auto attrib : attribs)
-        {
-            pFunc->addFnAttr(attrib);
-        }
-    }
-
-    auto pCallInst = CallInst::Create(pFunc, args, "", pInsertPos);
-    pCallInst->setCallingConv(CallingConv::C);
-    pCallInst->setAttributes(pFunc->getAttributes());
-
-    return pCallInst;
+    IRBuilder<> builder(pInsertPos);
+    return EmitCall(funcName, pRetTy, args, attribs, builder);
 }
 
 // =====================================================================================================================
 // Emits a LLVM function call (inserted at the end of the specified basic block), builds it automically based on return
 // type and its parameters.
+//
+// NOTE: Prefer the IRBuilder overload of this function where possible.
 CallInst* EmitCall(
     StringRef                     funcName,         // Name string of the function
     Type*                         pRetTy,           // [in] Return type
@@ -125,33 +146,8 @@ CallInst* EmitCall(
     ArrayRef<Attribute::AttrKind> attribs,          // Attributes
     BasicBlock*                   pInsertAtEnd)     // [in] Which block to insert this call at the end
 {
-    Module* pModule = pInsertAtEnd->getModule();
-    Function* pFunc = dyn_cast_or_null<Function>(pModule->getFunction(funcName));
-    if (pFunc == nullptr)
-    {
-        std::vector<Type*> argTys;
-        for (auto arg : args)
-        {
-            argTys.push_back(arg->getType());
-        }
-
-        auto pFuncTy = FunctionType::get(pRetTy, argTys, false);
-        pFunc = Function::Create(pFuncTy, GlobalValue::ExternalLinkage, funcName, pModule);
-
-        pFunc->setCallingConv(CallingConv::C);
-        pFunc->addFnAttr(Attribute::NoUnwind);
-
-        for (auto attrib : attribs)
-        {
-            pFunc->addFnAttr(attrib);
-        }
-    }
-
-    auto pCallInst = CallInst::Create(pFunc, args, "", pInsertAtEnd);
-    pCallInst->setCallingConv(CallingConv::C);
-    pCallInst->setAttributes(pFunc->getAttributes());
-
-    return pCallInst;
+    IRBuilder<> builder(pInsertAtEnd);
+    return EmitCall(funcName, pRetTy, args, attribs, builder);
 }
 
 // =====================================================================================================================

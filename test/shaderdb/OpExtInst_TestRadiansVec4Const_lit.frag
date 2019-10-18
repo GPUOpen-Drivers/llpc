@@ -22,7 +22,7 @@ void main()
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3F91DF46A0000000
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3F91DF46A0000000
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract float %{{.*}}, 0x3F91DF46A0000000
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 0x3F9ACEEA00000000, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg true, i1 immarg true)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 0, i32 15, float 0x3F9ACEEA00000000, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 true, i1 true)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
