@@ -1177,6 +1177,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             // Load ELF binary
             auto result = writer.ReadFromBuffer(nonFragmentPipelineElf.pCode, nonFragmentPipelineElf.codeSize);
             LLPC_ASSERT(result == Result::Success);
+            LLPC_UNUSED(result);
             writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
 
             pipelineElf.codeSize = pPipelineElf->size();
@@ -1211,6 +1212,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             // Load ELF binary
             auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
             LLPC_ASSERT(result == Result::Success);
+            LLPC_UNUSED(result);
 
             writer.MergeElfBinary(m_pContext, &fragmentPipelineElf, pPipelineElf);
 
@@ -1237,6 +1239,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         // Load ELF binary
         auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
         LLPC_ASSERT(result == Result::Success);
+        LLPC_UNUSED(result);
         writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
     }
 

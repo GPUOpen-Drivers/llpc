@@ -1384,7 +1384,7 @@ Value* PatchBufferOp::GetPointerOperandAsInst(
     }
 
     // If the value is a constant (i.e., null pointer), return it.
-    if (Constant* const pConst = dyn_cast<Constant>(pValue))
+    if (isa<Constant>(pValue))
     {
         Constant* const pNullPointer = ConstantPointerNull::get(GetRemappedType(pValue->getType()));
         m_replacementMap[pValue] = std::make_pair(nullptr, pNullPointer);

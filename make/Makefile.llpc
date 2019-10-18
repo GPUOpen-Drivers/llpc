@@ -269,7 +269,8 @@ endif
                     -Wno-delete-non-virtual-dtor       \
                     -Wno-invalid-offsetof              \
                     -Wno-sign-compare                  \
-                    -Wno-delete-incomplete
+                    -Wno-delete-incomplete             \
+                    -Wunused-variable
         ifeq ($(USING_CLANG),)
             LCXXOPTS += -Wno-maybe-uninitialized
         else

@@ -3437,6 +3437,7 @@ Value* NggPrimShader::RunGsVariant(
 
     auto pGsArgBegin = pGsEntry->arg_begin();
     const uint32_t gsArgCount = pGsEntry->arg_size();
+    LLPC_UNUSED(gsArgCount);
 
     uint32_t gsArgIdx = 0;
 

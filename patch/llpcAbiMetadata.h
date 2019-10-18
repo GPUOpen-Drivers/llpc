@@ -153,7 +153,7 @@ DEF_META(CS_WAVE_FRONT_SIZE, CsWaveFrontSize)
 #endif
 
 // The names of API shader stages used in PAL metadata, in ShaderStage order.
-static const char* ApiStageNames[] =
+static const char* const ApiStageNames[] =
 {
     ".vertex",
     ".hull",
@@ -164,7 +164,7 @@ static const char* ApiStageNames[] =
 };
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
-static const char* HwStageNames[] =
+static const char* const HwStageNames[] =
 {
     ".ls",
     ".hs",
