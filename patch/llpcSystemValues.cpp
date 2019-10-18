@@ -610,7 +610,7 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
 
         auto pStreamOutBufDesc = new LoadInst(pStreamOutBufDescPtr, "", pInsertPos);
         pStreamOutBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
-        pStreamOutBufDesc->setAlignment(16);
+        pStreamOutBufDesc->setAlignment(MaybeAlign(16));
 
         m_streamOutBufDescs[xfbBuffer] = pStreamOutBufDesc;
     }

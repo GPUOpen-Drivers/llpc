@@ -244,7 +244,6 @@ public:
     // the given cube map texture coordinates.
     Value* CreateCubeFaceIndex(Value* pCoord, const Twine& instName = "") override final;
 
-
     // Create scalar or vector FP truncate operation with rounding mode.
     Value* CreateFpTruncWithRounding(Value*                                pValue,
                                      Type*                                 pDestTy,

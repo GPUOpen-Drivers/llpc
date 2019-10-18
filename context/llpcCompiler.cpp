@@ -1132,7 +1132,6 @@ Result Compiler::BuildPipelineInternal(
                 result = Result::ErrorInvalidShader;
             }
         }
-
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             // Per-shader SPIR-V lowering passes.

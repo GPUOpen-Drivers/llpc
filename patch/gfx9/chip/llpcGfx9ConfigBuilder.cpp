@@ -660,7 +660,6 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-
 #if LLPC_BUILD_GFX10
         auto waveFrontSize = pContext->GetShaderWaveSize(ShaderStageGeometry);
         if (waveFrontSize == 32)

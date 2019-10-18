@@ -61,7 +61,6 @@ inline uint32_t GetModuleIdByIndex(
     return BaseModuleId + index;
 }
 
-
 // Create directory.
 bool CreateDirectory(const char* pDir);
 

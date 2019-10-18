@@ -545,7 +545,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             pDesc = new LoadInst(pCastedDescPtr, "", pInsertPoint);
             if (LoadInst *LI = dyn_cast<LoadInst>(pDesc))
               LI->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
-            cast<LoadInst>(pDesc)->setAlignment(16);
+            cast<LoadInst>(pDesc)->setAlignment(MaybeAlign(16));
 
             if (foundNodeType == ResourceMappingNodeType::DescriptorBufferCompact)
             {
