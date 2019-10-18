@@ -3469,6 +3469,7 @@ Value* NggPrimShader::RunGsVariant(
     args.push_back(pInvocationId);
     ++gsArgIdx;
     LLPC_ASSERT(gsArgIdx == gsArgCount); // Must have visit all arguments of ES entry point
+    LLPC_UNUSED(gsArgCount);
 
     return EmitCall(pModule,
                     LlpcName::NggGsEntryVariant,
