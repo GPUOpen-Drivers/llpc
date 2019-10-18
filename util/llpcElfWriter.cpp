@@ -761,6 +761,7 @@ void ElfWriter<Elf>::MergeElfBinary(
     auto fragmentCodesize = pFragmentElf->codeSize;
     auto result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
     LLPC_ASSERT(result == Result::Success);
+    LLPC_UNUSED(result);
 
     // Merge GPU ISA code
     const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentTextSection = nullptr;

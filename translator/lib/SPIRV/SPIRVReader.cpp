@@ -8694,7 +8694,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       while (BlockTy->isTypeArray())
         BlockTy = BlockTy->getArrayElementType();
       bool IsStructTy = BlockTy->isTypeStruct();
-     assert(IsStructTy);
+      assert(IsStructTy);
+      (void)IsStructTy;
 
       // Get values of descriptor binding and set based on corresponding
       // decorations
