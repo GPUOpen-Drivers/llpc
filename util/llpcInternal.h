@@ -34,6 +34,7 @@
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 
@@ -205,6 +206,14 @@ static const std::vector<llvm::Attribute::AttrKind>   NoAttrib;
 
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
 llvm::Function* GetEntryPoint(llvm::Module* pModule);
+
+// Emits a LLVM function call using the given builder. The callee is built automically based on return
+// type and its parameters.
+llvm::CallInst* EmitCall(llvm::StringRef                           funcName,
+                         llvm::Type*                               pRetTy,
+                         llvm::ArrayRef<llvm::Value *>             args,
+                         llvm::ArrayRef<llvm::Attribute::AttrKind> attribs,
+                         llvm::IRBuilder<>&                        builder);
 
 // Emits a LLVM function call (inserted before the specified instruction), builds it automically based on return type
 // and its parameters.
