@@ -1184,15 +1184,19 @@ Result Compiler::BuildPipelineInternal(
         }
     }
 
-    constexpr uint32_t ShaderCacheCount = 2;
     ShaderEntryState fragmentCacheEntryState = ShaderEntryState::New;
+    ShaderEntryState nonFragmentCacheEntryState = ShaderEntryState::New;
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    constexpr uint32_t ShaderCacheCount = 2;
     ShaderCache* pFragmentShaderCache[ShaderCacheCount] = { nullptr, nullptr };
     CacheEntryHandle hFragmentEntry[ShaderCacheCount] = { nullptr, nullptr };
-
-    ShaderEntryState nonFragmentCacheEntryState = ShaderEntryState::New;
     ShaderCache* pNonFragmentShaderCache[ShaderCacheCount] = { nullptr, nullptr };
     CacheEntryHandle hNonFragmentEntry[ShaderCacheCount] = { nullptr, nullptr };
-
+#else
+    CacheEntryHandle hFragmentEntry = nullptr;
+    CacheEntryHandle hNonFragmentEntry = nullptr;
+#endif
     BinaryData fragmentElf = {};
     BinaryData nonFragmentElf = {};
 
@@ -1229,6 +1233,7 @@ Result Compiler::BuildPipelineInternal(
         if (checkPerStageCache)
         {
             auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo());
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
             if (stageMask & ShaderStageToMask(ShaderStageFragment))
             {
                 fragmentCacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache,
@@ -1246,6 +1251,21 @@ Result Compiler::BuildPipelineInternal(
                                                                 pNonFragmentShaderCache,
                                                                 hNonFragmentEntry);
             }
+#else
+            if (stageMask & ShaderStageToMask(ShaderStageFragment))
+            {
+                fragmentCacheEntryState = LookUpShaderCache(&fragmentHash,
+                                                             &fragmentElf,
+                                                             &hFragmentEntry);
+            }
+
+            if (stageMask & ~ShaderStageToMask(ShaderStageFragment))
+            {
+                nonFragmentCacheEntryState = LookUpShaderCache(&nonFragmentHash,
+                                                                &nonFragmentElf,
+                                                                &hNonFragmentEntry);
+            }
+#endif
         }
     }
 
@@ -1355,12 +1375,17 @@ Result Compiler::BuildPipelineInternal(
                 pipelineElf.codeSize = pPipelineElf->size();
                 pipelineElf.pCode = pPipelineElf->data();
             }
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
             UpdateShaderCaches(result == Result::Success,
                                &pipelineElf,
                                pNonFragmentShaderCache,
                                hNonFragmentEntry,
                                ShaderCacheCount);
+#else
+            UpdateShaderCache(result == Result::Success,
+                               &pipelineElf,
+                               hNonFragmentEntry);
+#endif
         }
 
         // Only fragment shader is compiled
@@ -1379,12 +1404,17 @@ Result Compiler::BuildPipelineInternal(
                 pipelineElf.codeSize = pPipelineElf->size();
                 pipelineElf.pCode = pPipelineElf->data();
             }
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
             UpdateShaderCaches(result == Result::Success,
                                &pipelineElf,
                                pFragmentShaderCache,
                                hFragmentEntry,
                                ShaderCacheCount);
+#else
+            UpdateShaderCache(result == Result::Success,
+                               &pipelineElf,
+                               hFragmentEntry);
+#endif
         }
 
         // Whole pipeline is compiled
@@ -1394,6 +1424,7 @@ Result Compiler::BuildPipelineInternal(
             BinaryData pipelineElf = {};
             pipelineElf.codeSize = pPipelineElf->size();
             pipelineElf.pCode = pPipelineElf->data();
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
             UpdateShaderCaches((result == Result::Success),
                                &pipelineElf,
                                pFragmentShaderCache,
@@ -1405,6 +1436,15 @@ Result Compiler::BuildPipelineInternal(
                                pNonFragmentShaderCache,
                                hNonFragmentEntry,
                                ShaderCacheCount);
+#else
+            UpdateShaderCache(result == Result::Success,
+                               &pipelineElf,
+                               hFragmentEntry);
+
+            UpdateShaderCache(result == Result::Success,
+                               &pipelineElf,
+                               hNonFragmentEntry);
+#endif
         }
     }
     else
@@ -1500,12 +1540,17 @@ Result Compiler::BuildGraphicsPipeline(
         PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
     }
 
-    constexpr uint32_t ShaderCacheCount = 2;
     ShaderEntryState cacheEntryState  = ShaderEntryState::New;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    constexpr uint32_t ShaderCacheCount = 2;
     ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
     CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
 
     cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
+#else
+    CacheEntryHandle hEntry = nullptr;
+    cacheEntryState = LookUpShaderCache(&cacheHash, &elfBin, &hEntry);
+#endif
 
     ElfPackage candidateElf;
 
@@ -1529,8 +1574,11 @@ Result Compiler::BuildGraphicsPipeline(
             elfBin.codeSize = candidateElf.size();
             elfBin.pCode = candidateElf.data();
         }
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
         UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
+#else
+        UpdateShaderCache((result == Result::Success), &elfBin, hEntry);
+#endif
     }
 
     if (result == Result::Success)
@@ -1632,12 +1680,17 @@ Result Compiler::BuildComputePipeline(
         PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pPipelineDumpFile), &extraInfo);
     }
 
-    constexpr uint32_t ShaderCacheCount = 2;
     ShaderEntryState cacheEntryState  = ShaderEntryState::New;
-    ShaderCache*     pShaderCache[ShaderCacheCount]  = { nullptr, nullptr };
-    CacheEntryHandle hEntry[ShaderCacheCount]        = { nullptr, nullptr };
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
+    constexpr uint32_t ShaderCacheCount = 2;
+    ShaderCache* pShaderCache[ShaderCacheCount] = { nullptr, nullptr };
+    CacheEntryHandle hEntry[ShaderCacheCount] = { nullptr, nullptr };
 
     cacheEntryState = LookUpShaderCaches(pPipelineInfo->pShaderCache, &cacheHash, &elfBin, pShaderCache, hEntry);
+#else
+    CacheEntryHandle hEntry = nullptr;
+    cacheEntryState = LookUpShaderCache(&cacheHash, &elfBin, &hEntry);
+#endif
 
     ElfPackage candidateElf;
 
@@ -1662,8 +1715,11 @@ Result Compiler::BuildComputePipeline(
             elfBin.codeSize = candidateElf.size();
             elfBin.pCode = candidateElf.data();
         }
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
         UpdateShaderCaches((result == Result::Success), &elfBin, pShaderCache, hEntry, ShaderCacheCount);
+#else
+        UpdateShaderCache((result == Result::Success), &elfBin, hEntry);
+#endif
     }
 
     if (result == Result::Success)
@@ -1936,6 +1992,7 @@ Result Compiler::ValidatePipelineShaderInfo(
     return result;
 }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
 // =====================================================================================================================
 // Creates shader cache object with the requested properties.
 Result Compiler::CreateShaderCache(
@@ -1977,6 +2034,7 @@ Result Compiler::CreateShaderCache(
 
     return result;
 }
+#endif
 
 // =====================================================================================================================
 // Initialize GPU property.
@@ -2619,6 +2677,7 @@ void Compiler::GetPipelineStatistics(
 // Then try on the internal shader cache next if it misses.
 //
 // NOTE: Only two items in the array of shader caches; one for App's pipeline cache and one for internal cache
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
 ShaderEntryState Compiler::LookUpShaderCaches(
     IShaderCache*                    pAppPipelineCache, // [in]    App's pipeline cache
     MetroHash::Hash*                 pCacheHash,        // [in]    Hash code of the shader
@@ -2681,9 +2740,36 @@ ShaderEntryState Compiler::LookUpShaderCaches(
 
     return cacheEntryState;
 }
+#else
+ShaderEntryState Compiler::LookUpShaderCache(
+    MetroHash::Hash*                 pCacheHash,        // [in]    Hash code of the shader
+    BinaryData*                      pElfBin,           // [out]   Pointer to shader data
+    CacheEntryHandle*                phEntry            // [out]   Handle of the shader caches entry
+    )
+{
+    ShaderEntryState cacheEntryState  = ShaderEntryState::New;
+    Result           result           = Result::Success;
+
+    cacheEntryState = m_shaderCache->FindShader(*pCacheHash, true, phEntry);
+    if (cacheEntryState == ShaderEntryState::Ready)
+    {
+        result = m_shaderCache->RetrieveShader(*phEntry, &pElfBin->pCode, &pElfBin->codeSize);
+        // Re-try if shader cache return error unknown
+        if (result == Result::ErrorUnknown)
+        {
+            result = Result::Success;
+            *phEntry = nullptr;
+            cacheEntryState = ShaderEntryState::Compiling;
+        }
+    }
+
+    return cacheEntryState;
+}
+#endif
 
 // =====================================================================================================================
 // Update the shader caches with the given entry handle, based on the "bInsert" flag.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
 void Compiler::UpdateShaderCaches(
     bool                             bInsert,           // [in] To insert data or reset the shader caches
     const BinaryData*                pElfBin,           // [in] Pointer to shader data
@@ -2708,6 +2794,23 @@ void Compiler::UpdateShaderCaches(
         }
     }
 }
+#else
+void Compiler::UpdateShaderCache(
+    bool                             bInsert,           // [in] To insert data or reset the shader caches
+    const BinaryData*                pElfBin,           // [in] Pointer to shader data
+    CacheEntryHandle                 hEntry)            // [in] Handle of the shader caches entry
+{
+    if (bInsert)
+    {
+        LLPC_ASSERT(pElfBin->codeSize > 0);
+        m_shaderCache->InsertShader(hEntry, pElfBin->pCode, pElfBin->codeSize);
+    }
+    else
+    {
+        m_shaderCache->ResetShader(hEntry);
+    }
+}
+#endif
 
 // =====================================================================================================================
 // Builds hash code from input context for per shader stage cache

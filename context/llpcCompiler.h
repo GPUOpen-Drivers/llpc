@@ -254,7 +254,9 @@ public:
     static MetroHash::Hash GenerateHashForCompileOptions(uint32_t          optionCount,
                                                          const char*const* pOptions);
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
+#endif
 
     static void TranslateSpirvToLlvm(const PipelineShaderInfo*    pShaderInfo,
                                      llvm::Module*                pModule);
@@ -287,7 +289,7 @@ private:
                                PipelineStatistics*     pPipelineStats) const;
 
     bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
-
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
                                         MetroHash::Hash*    pCacheHash,
                                         BinaryData*         pElfBin,
@@ -299,7 +301,15 @@ private:
                             ShaderCache**       ppShaderCache,
                             CacheEntryHandle*   phEntry,
                             uint32_t            shaderCacheCount);
+#else
+    ShaderEntryState LookUpShaderCache(MetroHash::Hash*    pCacheHash,
+                                       BinaryData*         pElfBin,
+                                       CacheEntryHandle*   phEntry);
 
+    void UpdateShaderCache(bool                bInsert,
+                           const BinaryData*   pElfBin,
+                           CacheEntryHandle   phEntry);
+#endif
     void BuildShaderCacheHash(Context* pContext, MetroHash::Hash* pFragmentHash, MetroHash::Hash* pNonFragmentHash);
 
     void MergeElfBinary(Context*          pContext,
