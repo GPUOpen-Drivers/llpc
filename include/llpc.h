@@ -40,7 +40,7 @@
 #undef Bool
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 37
+#define LLPC_INTERFACE_MAJOR_VERSION 38
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
 //* |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
 //* |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
 //* |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
@@ -448,7 +449,9 @@ struct GraphicsPipelineBuildInfo
     void*               pInstance;          ///< Vulkan instance object
     void*               pUserData;          ///< User data
     OutputAllocFunc     pfnOutputAlloc;     ///< Output buffer allocator
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     IShaderCache*       pShaderCache;       ///< Shader cache, used to search for the compiled shader data
+#endif
     PipelineShaderInfo  vs;                 ///< Vertex shader
     PipelineShaderInfo  tcs;                ///< Tessellation control shader
     PipelineShaderInfo  tes;                ///< Tessellation evaluation shader
@@ -519,7 +522,9 @@ struct ComputePipelineBuildInfo
     void*               pInstance;          ///< Vulkan instance object
     void*               pUserData;          ///< User data
     OutputAllocFunc     pfnOutputAlloc;     ///< Output buffer allocator
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     IShaderCache*       pShaderCache;       ///< Shader cache, used to search for the compiled shader data
+#endif
     uint32_t            deviceIndex;        ///< Device index for device group
     PipelineShaderInfo  cs;                 ///< Compute shader
     PipelineOptions     options;            ///< Per pipeline tuning options
@@ -756,6 +761,7 @@ public:
                                         ComputePipelineBuildOut*        pPipelineOut,
                                         void*                           pPipelineDumpFile = nullptr) = 0;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     /// Creates a shader cache object with the requested properties.
     ///
     /// @param [in]  pCreateInfo    Create info of the shader cache.
@@ -765,6 +771,7 @@ public:
     virtual Result CreateShaderCache(
         const ShaderCacheCreateInfo* pCreateInfo,
         IShaderCache**               ppShaderCache) = 0;
+#endif
 
 protected:
     ICompiler() {}
