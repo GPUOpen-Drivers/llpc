@@ -484,11 +484,6 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                 }
                 else
                 {
-                    //# NOTE: From SCPC notes, there is a a hazard in SPI with NGG and VMID pipeline reset that can
-                    //# happen if we hit the scenario: SPI has launched some waves of a subgroup; we get GS_ALLOC_REQ
-                    //# back from the first wave of the group before launching all of the waves; we get a VMID reset
-                    //# before launching the last few waves of the subgroup. In such case, we must emit at least a
-                    //# s_barrier before sending GS_ALLOC_REQ message.
                     m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
                     auto pFirstWaveInSubgroup =

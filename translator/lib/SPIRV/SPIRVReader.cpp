@@ -1980,7 +1980,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                             LoadInst* const pNewLoadElem = getBuilder()->CreateLoad(pPointerElem, pLoad->isVolatile());
                             pNewLoadElem->setOrdering(pLoad->getOrdering());
-                            pNewLoadElem->setAlignment(pLoad->getAlignment());
+                            pNewLoadElem->setAlignment(MaybeAlign(pLoad->getAlignment()));
                             pNewLoadElem->setSyncScopeID(pLoad->getSyncScopeID());
 
                             if (pLoad->getMetadata(LLVMContext::MD_nontemporal))
@@ -2018,7 +2018,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                             LoadInst* const pNewLoadElem = getBuilder()->CreateLoad(pPointerElem, pLoad->isVolatile());
                             pNewLoadElem->setOrdering(pLoad->getOrdering());
-                            pNewLoadElem->setAlignment(pLoad->getAlignment());
+                            pNewLoadElem->setAlignment(MaybeAlign(pLoad->getAlignment()));
                             pNewLoadElem->setSyncScopeID(pLoad->getSyncScopeID());
 
                             if (pLoad->getMetadata(LLVMContext::MD_nontemporal))
@@ -2036,7 +2036,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                         // Otherwise we are loading a single element and it's a simple load.
                         LoadInst* const pNewLoad = getBuilder()->CreateLoad(pPointer, pLoad->isVolatile());
                         pNewLoad->setOrdering(pLoad->getOrdering());
-                        pNewLoad->setAlignment(pLoad->getAlignment());
+                        pNewLoad->setAlignment(MaybeAlign(pLoad->getAlignment()));
                         pNewLoad->setSyncScopeID(pLoad->getSyncScopeID());
 
                         if (pLoad->getMetadata(LLVMContext::MD_nontemporal))
@@ -2082,7 +2082,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                                                   pPointerElem,
                                                                                   pStore->isVolatile());
                             pNewStoreElem->setOrdering(pStore->getOrdering());
-                            pNewStoreElem->setAlignment(pStore->getAlignment());
+                            pNewStoreElem->setAlignment(MaybeAlign(pStore->getAlignment()));
                             pNewStoreElem->setSyncScopeID(pStore->getSyncScopeID());
 
                             if (pStore->getMetadata(LLVMContext::MD_nontemporal))
@@ -2149,7 +2149,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                                                   pPointerElem,
                                                                                   pStore->isVolatile());
                             pNewStoreElem->setOrdering(pStore->getOrdering());
-                            pNewStoreElem->setAlignment(pStore->getAlignment());
+                            pNewStoreElem->setAlignment(MaybeAlign(pStore->getAlignment()));
                             pNewStoreElem->setSyncScopeID(pStore->getSyncScopeID());
 
                             if (pStore->getMetadata(LLVMContext::MD_nontemporal))
@@ -2165,7 +2165,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
                                                                           pPointer,
                                                                           pStore->isVolatile());
                         pNewStore->setOrdering(pStore->getOrdering());
-                        pNewStore->setAlignment(pStore->getAlignment());
+                        pNewStore->setAlignment(MaybeAlign(pStore->getAlignment()));
                         pNewStore->setSyncScopeID(pStore->getSyncScopeID());
 
                         if (pStore->getMetadata(LLVMContext::MD_nontemporal))
@@ -2697,7 +2697,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
         }
 
         LoadInst* const pLoad = getBuilder()->CreateLoad(pLoadPointer, isVolatile);
-        pLoad->setAlignment(M->getDataLayout().getABITypeAlignment(pAlignmentType));
+        pLoad->setAlignment(MaybeAlign(M->getDataLayout().getABITypeAlignment(pAlignmentType)));
 
         if (isCoherent)
         {
@@ -2756,7 +2756,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
                                                                       cast<Constant>(pStoreValue));
 
         StoreInst* const pStore = getBuilder()->CreateStore(pConstStoreValue, pStorePointer, isVolatile);
-        pStore->setAlignment(alignment);
+        pStore->setAlignment(MaybeAlign(alignment));
 
         if (isCoherent)
         {
@@ -2859,7 +2859,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
         }
 
         StoreInst* const pStore = getBuilder()->CreateStore(pStoreValue, pStorePointer, isVolatile);
-        pStore->setAlignment(M->getDataLayout().getABITypeAlignment(pAlignmentType));
+        pStore->setAlignment(MaybeAlign(M->getDataLayout().getABITypeAlignment(pAlignmentType)));
 
         if (isCoherent)
         {
@@ -3088,7 +3088,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(
     LoadInst* const pLoad = getBuilder()->CreateLoad(pLoadPointer);
 
     const uint32_t loadAlignment = static_cast<uint32_t>(M->getDataLayout().getTypeSizeInBits(pLoad->getType()) / 8);
-    pLoad->setAlignment(loadAlignment);
+    pLoad->setAlignment(MaybeAlign(loadAlignment));
     pLoad->setAtomic(ordering, scope);
 
     return pLoad;
@@ -3123,7 +3123,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(
 
     const uint64_t storeSizeInBits = M->getDataLayout().getTypeSizeInBits(pStoreValue->getType());
     const uint32_t storeAlignment = static_cast<uint32_t>(storeSizeInBits / 8);
-    pStore->setAlignment(storeAlignment);
+    pStore->setAlignment(MaybeAlign(storeAlignment));
     pStore->setAtomic(ordering, scope);
 
     return pStore;
@@ -5246,7 +5246,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
 
     if (addrSpace == SPIRAS_Local)
     {
-        pGlobalVar->setAlignment(16);
+        pGlobalVar->setAlignment(MaybeAlign(16));
 
         // NOTE: Give shared variable a name to skip "global optimize pass".
         // The pass will change constant store operations to initializerand this
@@ -6807,7 +6807,7 @@ Value *SPIRVToLLVM::transEnqueuedBlock(SPIRVValue *SInvoke,
 
   // Allocate block on the stack, then store data to it
   auto BlockAlloca = Builder.CreateAlloca(BlockTy, nullptr, "block");
-  BlockAlloca->setAlignment(DL.getPrefTypeAlignment(BlockTy));
+  BlockAlloca->setAlignment(MaybeAlign(DL.getPrefTypeAlignment(BlockTy)));
 
   auto GetIndices = [Int32Ty](int A, int B) -> SmallVector<Value *, 2> {
     return {ConstantInt::get(Int32Ty, A), ConstantInt::get(Int32Ty, B)};
@@ -8548,13 +8548,13 @@ bool SPIRVToLLVM::transAlign(SPIRVValue *BV, Value *V) {
   if (auto AL = dyn_cast<AllocaInst>(V)) {
     SPIRVWord Align = 0;
     if (BV->hasAlignment(&Align))
-      AL->setAlignment(Align);
+      AL->setAlignment(MaybeAlign(Align));
     return true;
   }
   if (auto GV = dyn_cast<GlobalVariable>(V)) {
     SPIRVWord Align = 0;
     if (BV->hasAlignment(&Align))
-      GV->setAlignment(Align);
+      GV->setAlignment(MaybeAlign(Align));
     return true;
   }
   return true;

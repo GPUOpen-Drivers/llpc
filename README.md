@@ -1,24 +1,24 @@
 
-# LLVM-Based Pipeline Compiler (LLPC) 
+# LLVM-Based Pipeline Compiler (LLPC)
 
-LLPC builds on LLVM's existing shader compilation infrastructure for AMD GPUs to generate code objects compatible with PAL's pipeline ABI. It consists of three components: 
+LLPC builds on LLVM's existing shader compilation infrastructure for AMD GPUs to generate code objects compatible with PAL's pipeline ABI. It consists of three components:
 
 ![LLPC Architecture Diagram](LLPCArch.png)
 
-* SPIR-V translator is based on Khronos SPIRV-LLVM translator. It translates SPIR-V binary to LLVM IR with rich metadata. 
+* SPIR-V translator is based on Khronos SPIRV-LLVM translator. It translates SPIR-V binary to LLVM IR with rich metadata.
 
-* Lower translates all LLVM compiler unsupported LLVM IR and metadata to function calls. 
+* Lower translates all LLVM compiler unsupported LLVM IR and metadata to function calls.
 
-Both SPIR-V translator and Lower are machine independent. 
+Both SPIR-V translator and Lower are machine independent.
 
-* Patcher replaces all external function calls with LLVM compiler compatible LLVM IR according to the pipeline information. It calls LLVM and reorganizes LLVM compiler's output with PAL Pipeline ABI.  
+* Patcher replaces all external function calls with LLVM compiler compatible LLVM IR according to the pipeline information. It calls LLVM and reorganizes LLVM compiler's output with PAL Pipeline ABI.
 
 ## Standalone Compiler
 
 LLPC could be built into a standalone offline compiler (amdllpc). It supports GLSL, SPIR-V binary and SPIR-V assemble file as input and output GPU ISA code and related register settings.
 
 ### Build Instruction
-Please refer to the [Build Instructions](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) of amdvlk. By default, amdllpc is built together with Vulkan driver. You can use "make amdllpc" to build amdllpc only. 
+Please refer to the [Build Instructions](https://github.com/GPUOpen-Drivers/AMDVLK#build-instructions) of amdvlk. By default, amdllpc is built together with Vulkan driver. You can use "make amdllpc" to build amdllpc only.
 
 ### Usage
 ```
@@ -53,7 +53,6 @@ amdllpc [<options>...] [<files>...]
 | `-enable-pipeline-dump`          | Enable pipeline info dump	                                       |                               |
 | `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped	               |                               |
 
-
 * Debug & Performance tunning options
 
 | Option Name                      | Description                                                       | Default Value                 |
@@ -80,7 +79,6 @@ amdllpc [<options>...] [<files>...]
 
 > **Note:** amdllpc overwrites following native options in LLVM:
 >>>> -pragma-unroll-threshold=4096 -unroll-allow-partial -simplifycfg-sink-common=false -amdgpu-vgpr-index-mode -filetype=obj
-
 
 #### File formats
 
@@ -109,7 +107,6 @@ call [spvgen](https://github.com/GPUOpen-Drivers/spvgen). The directory of the s
 needs to be added to the environment variable LD_LIBRARY_PATH. Compiling SPIR-V binary
 or a Pipeline info file that contains or points to SPIR-V binary does not require spvgen.
 
-
 #### Examples
 
 * Compile single fragment shader "a.frag" on Vega10
@@ -121,7 +118,6 @@ amdllpc -auto-layout-desc -gfxip=9.0.0 a.frag
 ```
 amdllpc -gfxip=8.0.3 -o=c.elf b.pipe
 ```
-
 
 ## Test with SHADERDB
 You can use [shaderdb](https://github.com/GPUOpen-Drivers/llpc/tree/master/test) to test llpc with standalone compiler and [spvgen](https://github.com/GPUOpen-Drivers/spvgen):
@@ -158,9 +154,9 @@ When you need to investigate a test failure, run a single test from that same bu
 llvm/bin/llvm-lit -v llpc/test/shaderdb/OpAtomicIIncrement_TestVariablePointer_lit.spvas
 ```
 
-## Third Party Software  
+## Third Party Software
 LLPC contains code written by third parties:
-* SPIRV-LLVM translator is distributed under the terms of University of Illinois/NCSA Open Source License. See translator/LICENSE.TXT.  
+* SPIRV-LLVM translator is distributed under the terms of University of Illinois/NCSA Open Source License. See translator/LICENSE.TXT.
 * SPIRV-Tools is distributed under the terms of Apache License version 2.0. See translator/hex_float.h and bitutils.h.
 * Metrohash is distributed under the terms of MIT License. See imported/metrohash/metrohash-license.
 * CWPack is distributed under the terms of MITLicense. See imported/cwpack/cwpack-license.

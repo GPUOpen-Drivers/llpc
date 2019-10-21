@@ -50,7 +50,6 @@ extern opt<bool> DisableLicm;
 
 } // llvm
 
-
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;

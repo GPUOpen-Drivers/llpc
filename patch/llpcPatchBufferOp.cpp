@@ -656,7 +656,7 @@ void PatchBufferOp::visitLoadInst(
 
         LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pLoadPointer);
         pNewLoad->setVolatile(loadInst.isVolatile());
-        pNewLoad->setAlignment(loadInst.getAlignment());
+        pNewLoad->setAlignment(MaybeAlign(loadInst.getAlignment()));
         pNewLoad->setOrdering(loadInst.getOrdering());
         pNewLoad->setSyncScopeID(loadInst.getSyncScopeID());
         CopyMetadata(pNewLoad, &loadInst);
@@ -1565,7 +1565,7 @@ Value* PatchBufferOp::ReplaceLoad(
 
         LoadInst* const pNewLoad = m_pBuilder->CreateLoad(pLoadPointer);
         pNewLoad->setVolatile(pLoadInst->isVolatile());
-        pNewLoad->setAlignment(pLoadInst->getAlignment());
+        pNewLoad->setAlignment(MaybeAlign(pLoadInst->getAlignment()));
         pNewLoad->setOrdering(pLoadInst->getOrdering());
         pNewLoad->setSyncScopeID(pLoadInst->getSyncScopeID());
         CopyMetadata(pNewLoad, pLoadInst);
@@ -1837,7 +1837,7 @@ void PatchBufferOp::ReplaceStore(
 
         StoreInst* const pNewStore = m_pBuilder->CreateStore(pStoreInst->getValueOperand(), pStorePointer);
         pNewStore->setVolatile(pStoreInst->isVolatile());
-        pNewStore->setAlignment(pStoreInst->getAlignment());
+        pNewStore->setAlignment(MaybeAlign(pStoreInst->getAlignment()));
         pNewStore->setOrdering(pStoreInst->getOrdering());
         pNewStore->setSyncScopeID(pStoreInst->getSyncScopeID());
         CopyMetadata(pNewStore, pStoreInst);
