@@ -87,7 +87,11 @@ inline bool isValid(spv::AddressingModel V) {
   case AddressingModelLogical:
   case AddressingModelPhysical32:
   case AddressingModelPhysical64:
+#if SPV_VERSION >= 0x10500
+  case AddressingModelPhysicalStorageBuffer64:
+#else
   case AddressingModelPhysicalStorageBuffer64EXT:
+#endif
     return true;
   default:
     return false;
@@ -99,6 +103,9 @@ inline bool isValid(spv::MemoryModel V) {
   case MemoryModelSimple:
   case MemoryModelGLSL450:
   case MemoryModelOpenCL:
+#if SPV_VERSION >= 0x10500
+  case MemoryModelVulkan:
+#endif
     return true;
   default:
     return false;
@@ -169,7 +176,11 @@ inline bool isValid(spv::StorageClass V) {
   case StorageClassAtomicCounter:
   case StorageClassImage:
   case StorageClassStorageBuffer:
+#if SPV_VERSION >= 0x10500
+  case StorageClassPhysicalStorageBuffer:
+#else
   case StorageClassPhysicalStorageBufferEXT:
+#endif
     return true;
   default:
     return false;
@@ -416,7 +427,13 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNoUnsignedWrap:
 #endif
   case DecorationExplicitInterpAMD:
+#if SPV_VERSION >= 0x10500
+  case DecorationNonUniform:
+  case DecorationRestrictPointer:
+  case DecorationAliasedPointer:
+#else
   case DecorationNonUniformEXT:
+#endif
   case DecorationHlslCounterBufferGOOGLE:
   case DecorationHlslSemanticGOOGLE:
   case DecorationUserTypeGOOGLE:
@@ -501,6 +518,9 @@ inline bool isValid(spv::Scope V) {
   case ScopeWorkgroup:
   case ScopeSubgroup:
   case ScopeInvocation:
+#if SPV_VERSION >= 0x10500
+  case ScopeQueueFamily:
+#endif
     return true;
   default:
     return false;
@@ -600,6 +620,10 @@ inline bool isValid(spv::Capability V) {
   case CapabilityGroupNonUniformShuffleRelative:
   case CapabilityGroupNonUniformClustered:
   case CapabilityGroupNonUniformQuad:
+#if SPV_VERSION >= 0x10500
+  case CapabilityShaderLayer:
+  case CapabilityShaderViewportIndex:
+#endif
   case CapabilityStencilExportEXT:
   case CapabilityShaderViewportIndexLayerEXT:
   case CapabilitySubgroupBallotKHR:
@@ -625,6 +649,23 @@ inline bool isValid(spv::Capability V) {
   case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
   case CapabilityVariablePointers:
+#if SPV_VERSION >= 0x10500
+  case CapabilityShaderNonUniform:
+  case CapabilityRuntimeDescriptorArray:
+  case CapabilityInputAttachmentArrayDynamicIndexing:
+  case CapabilityUniformTexelBufferArrayDynamicIndexing:
+  case CapabilityStorageTexelBufferArrayDynamicIndexing:
+  case CapabilityUniformBufferArrayNonUniformIndexing:
+  case CapabilitySampledImageArrayNonUniformIndexing:
+  case CapabilityStorageBufferArrayNonUniformIndexing:
+  case CapabilityStorageImageArrayNonUniformIndexing:
+  case CapabilityInputAttachmentArrayNonUniformIndexing:
+  case CapabilityUniformTexelBufferArrayNonUniformIndexing:
+  case CapabilityStorageTexelBufferArrayNonUniformIndexing:
+  case CapabilityVulkanMemoryModel:
+  case CapabilityVulkanMemoryModelDeviceScope:
+  case CapabilityPhysicalStorageBufferAddresses:
+#else
   case CapabilityShaderNonUniformEXT:
   case CapabilityRuntimeDescriptorArrayEXT:
   case CapabilityInputAttachmentArrayDynamicIndexingEXT:
@@ -637,6 +678,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityInputAttachmentArrayNonUniformIndexingEXT:
   case CapabilityUniformTexelBufferArrayNonUniformIndexingEXT:
   case CapabilityStorageTexelBufferArrayNonUniformIndexingEXT:
+#endif
   case CapabilityDemoteToHelperInvocationEXT:
     return true;
   default:
@@ -1041,6 +1083,16 @@ inline bool isValidImageOperandsMask(SPIRVWord Mask) {
   ValidMask |= ImageOperandsConstOffsetsMask;
   ValidMask |= ImageOperandsSampleMask;
   ValidMask |= ImageOperandsMinLodMask;
+#if SPV_VERSION >= 0x10500
+  ValidMask |= ImageOperandsMakeTexelAvailableMask;
+  ValidMask |= ImageOperandsMakeTexelVisibleMask;
+  ValidMask |= ImageOperandsNonPrivateTexelMask;
+  ValidMask |= ImageOperandsVolatileTexelMask;
+#endif
+#if SPV_VERSION >= 0x10400
+  ValidMask |= ImageOperandsSignExtendMask;
+  ValidMask |= ImageOperandsZeroExtendMask;
+#endif
 
   return (Mask & ~ValidMask) == 0;
 }
@@ -1103,6 +1155,12 @@ inline bool isValidMemorySemanticsMask(SPIRVWord Mask) {
   ValidMask |= MemorySemanticsCrossWorkgroupMemoryMask;
   ValidMask |= MemorySemanticsAtomicCounterMemoryMask;
   ValidMask |= MemorySemanticsImageMemoryMask;
+#if SPV_VERSION >= 0x10500
+  ValidMask |= MemorySemanticsOutputMemoryMask;
+  ValidMask |= MemorySemanticsMakeAvailableMask;
+  ValidMask |= MemorySemanticsMakeVisibleMask;
+  ValidMask |= MemorySemanticsVolatileMask;
+#endif
 
   return (Mask & ~ValidMask) == 0;
 }
@@ -1112,6 +1170,11 @@ inline bool isValidMemoryAccessMask(SPIRVWord Mask) {
   ValidMask |= MemoryAccessVolatileMask;
   ValidMask |= MemoryAccessAlignedMask;
   ValidMask |= MemoryAccessNontemporalMask;
+#if SPV_VERSION >= 0x10500
+  ValidMask |= MemoryAccessMakePointerAvailableMask;
+  ValidMask |= MemoryAccessMakePointerVisibleMask;
+  ValidMask |= MemoryAccessNonPrivatePointerMask;
+#endif
 
   return (Mask & ~ValidMask) == 0;
 }
