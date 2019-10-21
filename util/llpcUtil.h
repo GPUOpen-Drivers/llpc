@@ -31,6 +31,8 @@
  */
 #pragma once
 
+#include "spirv.hpp"
+
 #include "llpc.h"
 #include "llpcDebug.h"
 
@@ -51,6 +53,12 @@ const char* GetShaderStageAbbreviation(ShaderStage shaderStage, bool upper = fal
 
 // Translates shader stage to corresponding stage mask.
 uint32_t ShaderStageToMask(ShaderStage stage);
+
+// Convert shader stage to the SPIR-V execution model
+spv::ExecutionModel ConvertToExecModel(ShaderStage shaderStage);
+
+// Convert SPIR-V execution model to the shader stage
+ShaderStage ConvertToStageShage(uint32_t execModel);
 
 // =====================================================================================================================
 // Gets module ID according to the index

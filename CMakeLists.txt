@@ -358,6 +358,7 @@ if(ICD_BUILD_LLPC)
         util/llpcPassManager.cpp
         util/llpcPipelineDumper.cpp
         util/llpcPipelineShaders.cpp
+        util/llpcShaderModuleHelper.cpp
         util/llpcStartStopTimer.cpp
         util/llpcTimerProfiler.cpp
         util/llpcUtil.cpp

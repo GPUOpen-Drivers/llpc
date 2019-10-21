@@ -36,6 +36,7 @@
 #include "llpcInternal.h"
 #include "llpcMetroHash.h"
 #include "llpcShaderCacheManager.h"
+#include "llpcShaderModuleHelper.h"
 
 namespace Llpc
 {
@@ -47,59 +48,6 @@ class ComputeContext;
 class Context;
 class GraphicsContext;
 class PassManager;
-
-// Enumerates types of shader binary.
-enum class BinaryType : uint32_t
-{
-    Unknown = 0,  // Invalid type
-    Spirv,        // SPIR-V binary
-    LlvmBc,       // LLVM bitcode
-    MultiLlvmBc,  // Multiple LLVM bitcode
-    Elf,          // ELF
-};
-
-// Represents the information of one shader entry in ShaderModuleData
-struct ShaderModuleEntry
-{
-    ShaderStage stage;              // Shader stage
-    uint32_t    entryNameHash[4];   // Hash code of entry name
-    uint32_t    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
-    uint32_t    entrySize;          // Byte size of the entry data
-    uint32_t    resUsageSize;       // Byte size of the resource usage
-                                    // NOTE: It should be removed after we move all necessary resUsage info to
-                                    // LLVM module metadata
-    uint32_t    passIndex;          // Indices of passes, It is only for internal debug.
-};
-
-// Represents the name map <stage, name> of shader entry-point
-struct ShaderEntryName
-{
-    ShaderStage stage;             // Shader stage
-    const char* pName;             // Entry name
-};
-
-// Represents the information of a shader module
-struct ShaderModuleInfo
-{
-    uint32_t              cacheHash[4];            // hash code for calculate pipeline cache key
-    uint32_t              debugInfoSize;           // Byte size of debug instructions
-    bool                  enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
-    bool                  enableVarPtr;            // Whether to enable "VariablePointer" capability
-    bool                  useSubgroupSize;         // Whether gl_SubgroupSize is used
-    bool                  useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
-    bool                  useSpecConstant;         // Whether specializaton constant is used
-    bool                  keepUnusedFunctions;     // Whether to keep unused function
-    uint32_t              entryCount;              // Entry count in the module
-    ShaderModuleEntry     entries[1];              // Array of all entries
-};
-
-// Represents output data of building a shader module.
-struct ShaderModuleData : public ShaderModuleDataHeader
-{
-    BinaryType       binType;                 // Shader binary type
-    BinaryData       binCode;                 // Shader binary data
-    ShaderModuleInfo moduleInfo;              // Shader module info
-};
 
 // Represents the properties of GPU device.
 struct GpuProperty
@@ -202,15 +150,6 @@ struct WorkaroundFlags
 #endif
 };
 
-// Represents statistics info for pipeline module
-struct PipelineStatistics
-{
-    uint32_t    numUsedVgprs;       // Number of used VGPRs
-    uint32_t    numAvailVgprs;      // Number of available VGPRs
-    bool        sgprSpill;          // Has SGPR spill
-    bool        useScratchBuffer;   // Whether scratch buffer is used
-};
-
 // =====================================================================================================================
 // Object to manage checking and updating shader cache for graphics pipeline.
 class GraphicsShaderCacheChecker
@@ -308,9 +247,6 @@ public:
     virtual Result CreateShaderCache(const ShaderCacheCreateInfo* pCreateInfo, IShaderCache** ppShaderCache);
 #endif
 
-    static void TranslateSpirvToLlvm(const PipelineShaderInfo*    pShaderInfo,
-                                     llvm::Module*                pModule);
-
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     ShaderEntryState LookUpShaderCaches(IShaderCache*       pAppPipelineCache,
                                         MetroHash::Hash*    pCacheHash,
@@ -338,11 +274,6 @@ public:
                                      MetroHash::Hash*                         pFragmentHash,
                                      MetroHash::Hash*                         pNonFragmentHash);
 
-    void MergeElfBinary(Context*          pContext,
-                        const BinaryData* pFragmentElf,
-                        const BinaryData* pNonFragmentElf,
-                        ElfPackage*       pPipelineElf);
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Compiler);
@@ -354,21 +285,6 @@ private:
 
     Context* AcquireContext() const;
     void ReleaseContext(Context* pContext) const;
-
-    static Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut);
-
-    static void CleanOptimizedSpirv(BinaryData* pSpirvBin);
-
-    static void TrimSpirvDebugInfo(const BinaryData* pSpvBinCode, uint32_t bufferSize, void* pTrimCode);
-
-    static Result CollectInfoFromSpirvBinary(const BinaryData*                      pSpvBinCode,
-                                             ShaderModuleInfo*                      pShaderModuleInfo,
-                                             llvm::SmallVector<ShaderEntryName, 4>& shaderEntryNames);
-
-    void GetPipelineStatistics(const void*             pCode,
-                               size_t                  codeSize,
-                               GfxIpVersion            gfxIp,
-                               PipelineStatistics*     pPipelineStats) const;
 
     bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
     // -----------------------------------------------------------------------------------------------------------------

@@ -53,7 +53,25 @@ namespace spv
   static const Op OpForward = static_cast<Op>(1024);
 
   // Built-ins for per-vertex structure
-  static const BuiltIn BuiltInPerVertex = static_cast<BuiltIn>(1024);
+  static const BuiltIn BuiltInPerVertex             = static_cast<BuiltIn>(1024);
+
+  // Built-ins for fragment input interpolation (I/J)
+  static const BuiltIn BuiltInInterpPerspSample     = static_cast<BuiltIn>(0x10000000);
+  static const BuiltIn BuiltInInterpPerspCenter     = static_cast<BuiltIn>(0x10000001);
+  static const BuiltIn BuiltInInterpPerspCentroid   = static_cast<BuiltIn>(0x10000002);
+  static const BuiltIn BuiltInInterpPullMode        = static_cast<BuiltIn>(0x10000003);
+  static const BuiltIn BuiltInInterpLinearSample    = static_cast<BuiltIn>(0x10000004);
+  static const BuiltIn BuiltInInterpLinearCenter    = static_cast<BuiltIn>(0x10000005);
+  static const BuiltIn BuiltInInterpLinearCentroid  = static_cast<BuiltIn>(0x10000006);
+
+  // Built-ins for sample position emulation
+  static const BuiltIn BuiltInSamplePosOffset       = static_cast<BuiltIn>(0x10000007);
+  static const BuiltIn BuiltInNumSamples            = static_cast<BuiltIn>(0x10000008);
+  static const BuiltIn BuiltInSamplePatternIdx      = static_cast<BuiltIn>(0x10000009);
+  static const BuiltIn BuiltInWaveId                = static_cast<BuiltIn>(0x1000000A);
+
+  // Execution model: copy shader
+  static const ExecutionModel ExecutionModelCopyShader = static_cast<ExecutionModel>(1024);
 
 }; // spv
 

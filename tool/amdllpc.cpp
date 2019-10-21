@@ -82,6 +82,7 @@
 #include "llpcDebug.h"
 #include "llpcElfReader.h"
 #include "llpcInternal.h"
+#include "llpcShaderModuleHelper.h"
 
 #define DEBUG_TYPE "amd-llpc"
 
@@ -327,7 +328,7 @@ struct CompileInfo
 {
     GfxIpVersion                gfxIp;                          // Graphics IP version info
     VkFlags                     stageMask;                      // Shader stage mask
-    std::vector<ShaderModuleData> shaderModuleDatas;            // ShaderModule Data
+    std::vector<::ShaderModuleData> shaderModuleDatas;            // ShaderModule Data
     GraphicsPipelineBuildInfo   gfxPipelineInfo;                // Info to build graphics pipeline
     GraphicsPipelineBuildOut    gfxPipelineOut;                 // Output of building graphics pipeline
     ComputePipelineBuildInfo    compPipelineInfo;               // Info to build compute pipeline
@@ -1337,10 +1338,10 @@ static Result ProcessPipeline(
                 // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
                 if (EntryTarget.empty())
                 {
-                    EntryTarget.setValue(GetEntryPointNameFromSpirvBinary(&spvBin));
+                    EntryTarget.setValue(ShaderModuleHelper::GetEntryPointNameFromSpirvBinary(&spvBin));
                 }
 
-                uint32_t stageMask = GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
+                uint32_t stageMask = ShaderModuleHelper::GetStageMaskFromSpirvBinary(&spvBin, EntryTarget.c_str());
 
                 if ((stageMask & compileInfo.stageMask) != 0)
                 {
@@ -1352,7 +1353,7 @@ static Result ProcessPipeline(
                     {
                         if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
                         {
-                            ShaderModuleData shaderModuleData = {};
+                            ::ShaderModuleData shaderModuleData = {};
                             shaderModuleData.shaderStage = static_cast<ShaderStage>(stage);
                             shaderModuleData.spirvBin = spvBin;
                             compileInfo.shaderModuleDatas.push_back(shaderModuleData);
@@ -1429,7 +1430,7 @@ static Result ProcessPipeline(
                     {
                         if (pPipelineState->stages[stage].dataSize > 0)
                         {
-                            ShaderModuleData shaderModuleData = {};
+                            ::ShaderModuleData shaderModuleData = {};
                             shaderModuleData.spirvBin.codeSize = pPipelineState->stages[stage].dataSize;
                             shaderModuleData.spirvBin.pCode = pPipelineState->stages[stage].pData;
                             shaderModuleData.shaderStage = pPipelineState->stages[stage].stage;
@@ -1528,7 +1529,7 @@ static Result ProcessPipeline(
                 void* pCode = new uint8_t[bitcodeBuf.size()];
                 memcpy(pCode, bitcodeBuf.data(), bitcodeBuf.size());
 
-                ShaderModuleData shaderModuledata = {};
+                ::ShaderModuleData shaderModuledata = {};
                 shaderModuledata.spirvBin.codeSize = bitcodeBuf.size();
                 shaderModuledata.spirvBin.pCode = pCode;
                 shaderModuledata.shaderStage = shaderStage;
@@ -1557,7 +1558,7 @@ static Result ProcessPipeline(
                 }
 
                 compileInfo.stageMask |= ShaderStageToMask(stage);
-                ShaderModuleData shaderModuleData = {};
+                ::ShaderModuleData shaderModuleData = {};
                 result = GetSpirvBinaryFromFile(spvBinFile, &shaderModuleData.spirvBin);
                 shaderModuleData.shaderStage = stage;
                 compileInfo.shaderModuleDatas.push_back(shaderModuleData);

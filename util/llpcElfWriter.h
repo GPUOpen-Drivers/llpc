@@ -70,6 +70,10 @@ public:
 
     Result ReadFromBuffer(const void* pBuffer, size_t bufSize);
 
+    void MergeElfBinary(Context*          pContext,
+                        const BinaryData* pFragmentElf,
+                        ElfPackage*       pPipelineElf);
+
     // Gets the section index for the specified section name.
     int32_t GetSectionIndex(const char* pName) const
     {
