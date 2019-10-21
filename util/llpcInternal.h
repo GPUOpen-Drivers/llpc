@@ -48,24 +48,6 @@ namespace Llpc { class Context; }
 namespace spv
 {
 
-// Built-ins for fragment input interpolation (I/J)
-static const BuiltIn BuiltInInterpPerspSample    = static_cast<BuiltIn>(0x10000000);
-static const BuiltIn BuiltInInterpPerspCenter    = static_cast<BuiltIn>(0x10000001);
-static const BuiltIn BuiltInInterpPerspCentroid  = static_cast<BuiltIn>(0x10000002);
-static const BuiltIn BuiltInInterpPullMode       = static_cast<BuiltIn>(0x10000003);
-static const BuiltIn BuiltInInterpLinearSample   = static_cast<BuiltIn>(0x10000004);
-static const BuiltIn BuiltInInterpLinearCenter   = static_cast<BuiltIn>(0x10000005);
-static const BuiltIn BuiltInInterpLinearCentroid = static_cast<BuiltIn>(0x10000006);
-
-// Built-ins for sample position emulation
-static const BuiltIn BuiltInSamplePosOffset      = static_cast<BuiltIn>(0x10000007);
-static const BuiltIn BuiltInNumSamples           = static_cast<BuiltIn>(0x10000008);
-static const BuiltIn BuiltInSamplePatternIdx     = static_cast<BuiltIn>(0x10000009);
-static const BuiltIn BuiltInWaveId               = static_cast<BuiltIn>(0x1000000A);
-
-// Execution model: copy shader
-static const ExecutionModel ExecutionModelCopyShader = static_cast<ExecutionModel>(1024);
-
 } // spv
 
 namespace llvm
@@ -221,16 +203,6 @@ static const uint32_t SI_STREAMOUT_TABLE_OFFS           = 0;
 // No attribute
 static const std::vector<llvm::Attribute::AttrKind>   NoAttrib;
 
-// Represents the special header of SPIR-V token stream (the first DWORD).
-struct SpirvHeader
-{
-    uint32_t    magicNumber;        // Magic number of SPIR-V module
-    uint32_t    spvVersion;         // SPIR-V version number
-    uint32_t    genMagicNumber;     // Generator's magic number
-    uint32_t    idBound;            // Upbound (X) of all IDs used in SPIR-V (0 < ID < X)
-    uint32_t    reserved;           // Reserved word
-};
-
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
 llvm::Function* GetEntryPoint(llvm::Module* pModule);
 
@@ -269,32 +241,11 @@ ShaderStage GetShaderStageFromFunction(const llvm::Function* pFunc);
 // Gets the shader stage from the specified calling convention.
 ShaderStage GetShaderStageFromCallingConv(uint32_t stageMask, llvm::CallingConv::ID callConv);
 
-// Convert shader stage to the SPIR-V execution model
-spv::ExecutionModel ConvertToExecModel(ShaderStage shaderStage);
-
-// Convert SPIR-V execution model to the shader stage
-ShaderStage ConvertToStageShage(uint32_t execModel);
-
 // Gets the argument from the specified function according to the argument index.
 llvm::Value* GetFunctionArgument(llvm::Function* pFunc, uint32_t idx, const llvm::Twine& name = "");
 
 // Checks if one type can be bitcasted to the other (type1 -> type2).
 bool CanBitCast(const llvm::Type* pTy1, const llvm::Type* pTy2);
-
-// Checks whether input binary data is SPIR-V binary
-bool IsSpirvBinary(const BinaryData*  pShaderBin);
-
-// Checks whether input binary data is LLVM bitcode
-bool IsLlvmBitcode(const BinaryData*  pShaderBin);
-
-// Gets the shader stage mask from the SPIR-V binary according to the specified entry-point.
-uint32_t GetStageMaskFromSpirvBinary(const BinaryData* pSpvBin, const char* pEntryName);
-
-// Gets the entry-point name from the SPIR-V binary
-const char* GetEntryPointNameFromSpirvBinary(const BinaryData* pSpvBin);
-
-// Verifies if the SPIR-V binary is valid and is supported
-Result VerifySpirvBinary(const BinaryData* pSpvBin);
 
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
 bool IsDontCareValue(llvm::Value* pValue);

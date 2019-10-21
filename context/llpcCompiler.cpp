@@ -57,6 +57,8 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
+#include "llpcBinaryStream.h"
+#include "llpcShaderModuleHelper.h"
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
 #include "llpcFile.h"
@@ -314,222 +316,6 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
 }
 
 // =====================================================================================================================
-//  Represents the template stream class which reads data in binary format.
-template<class Stream>
-class BinaryIStream
-{
-public:
-    BinaryIStream(Stream& stream) : m_stream(stream) {}
-
-    // Read obj from Stream m_ss with binary format
-    template<class T>
-    BinaryIStream& operator >>(T& object)
-    {
-        m_stream.read(reinterpret_cast<char*>(&object), sizeof(T));
-        return *this;
-    }
-
-    // Read set object to BinaryIStream
-    BinaryIStream& operator >> (
-        std::unordered_set<uint64_t>& set)  // [out] set object
-    {
-        uint32_t setSize = 0;
-        *this >> setSize;
-        for (uint32_t i = 0; i < setSize; ++i)
-        {
-            uint64_t item;
-            *this >> item;
-            set.insert(item);
-        }
-        return *this;
-    }
-
-    // Read map object to BinaryIStream
-    BinaryIStream& operator >> (
-        std::map<uint32_t, uint32_t>& map)   // [out] map object
-    {
-        uint32_t mapSize = 0;
-        *this >> mapSize;
-        for (uint32_t i = 0; i < mapSize; ++i)
-        {
-            uint32_t first;
-            uint32_t second;
-            *this >> first;
-            *this >> second;
-            map[first] = second;
-        }
-        return *this;
-    }
-
-private:
-    Stream& m_stream;   // Stream for binary data read/write
-};
-
-// =====================================================================================================================
-//  Represents the template stream class which writes data in binary format.
-template<class Stream>
-class BinaryOStream
-{
-public:
-    BinaryOStream(Stream& stream) : m_stream(stream) {}
-
-    // Write obj to Stream m_ss with binary format
-    template<class T>
-    BinaryOStream& operator <<(const T& object)
-    {
-        m_stream.write(reinterpret_cast<const char*>(&object), sizeof(T));
-        return *this;
-    }
-
-    // Write set object to BinaryOStream
-    BinaryOStream& operator << (
-        const std::unordered_set<uint64_t>& set)   // [in] set object
-    {
-        uint32_t setSize = set.size();
-        *this << setSize;
-        for (auto item : set)
-        {
-            *this << item;
-        }
-        return *this;
-    }
-
-    // Write map object to BinaryOStream
-    BinaryOStream& operator << (
-        const std::map<uint32_t, uint32_t>& map)  // [in] map object
-    {
-        uint32_t mapSize = map.size();
-        *this << mapSize;
-        for (auto item : map)
-        {
-            *this << item.first;
-            *this << item.second;
-        }
-        return *this;
-    }
-
-private:
-    Stream& m_stream;   // Stream for binary data read/write
-};
-
-// =====================================================================================================================
-// Output resource usage to stream out with binary format.
-//
-// NOTE: This function must keep same order with IStream& operator >> (IStream& in, ResourceUsage& resUsage)
-template <class OStream>
-OStream& operator << (
-    OStream&             out,          // [out] Output stream
-    const ResourceUsage& resUsage)     // [in] Resource usage object
-{
-    BinaryOStream<OStream> binOut(out);
-
-    binOut << resUsage.descPairs;
-    binOut << resUsage.pushConstSizeInBytes;
-    binOut << resUsage.resourceWrite;
-    binOut << resUsage.resourceRead;
-    binOut << resUsage.perShaderTable;
-    binOut << resUsage.globalConstant;
-    binOut << resUsage.numSgprsAvailable;
-    binOut << resUsage.numVgprsAvailable;
-    binOut << resUsage.builtInUsage.perStage.u64All;
-    binOut << resUsage.builtInUsage.allStage.u64All;
-
-    // Map from shader specified locations to tightly packed locations
-    binOut << resUsage.inOutUsage.inputLocMap;
-    binOut << resUsage.inOutUsage.outputLocMap;
-    binOut << resUsage.inOutUsage.perPatchInputLocMap;
-    binOut << resUsage.inOutUsage.perPatchOutputLocMap;
-    binOut << resUsage.inOutUsage.builtInInputLocMap;
-    binOut << resUsage.inOutUsage.builtInOutputLocMap;
-    binOut << resUsage.inOutUsage.perPatchBuiltInInputLocMap;
-    binOut << resUsage.inOutUsage.perPatchBuiltInOutputLocMap;
-
-    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
-    {
-        binOut << resUsage.inOutUsage.xfbStrides[i];
-    }
-
-    binOut << resUsage.inOutUsage.enableXfb;
-    for (uint32_t i = 0; i < MaxGsStreams; ++i)
-    {
-        binOut << resUsage.inOutUsage.streamXfbBuffers[i];
-    }
-
-    binOut << resUsage.inOutUsage.inputMapLocCount;
-    binOut << resUsage.inOutUsage.outputMapLocCount;
-    binOut << resUsage.inOutUsage.perPatchInputMapLocCount;
-    binOut << resUsage.inOutUsage.perPatchOutputMapLocCount;
-    binOut << resUsage.inOutUsage.expCount;
-
-    binOut << resUsage.inOutUsage.gs.rasterStream;
-    binOut << resUsage.inOutUsage.gs.xfbOutsInfo;
-    for (uint32_t i = 0; i < MaxColorTargets; ++i)
-    {
-        binOut << static_cast<uint32_t>(resUsage.inOutUsage.fs.outputTypes[i]);
-    }
-    return out;
-}
-
-// =====================================================================================================================
-// Read resUsage from stream in with binary format.
-//
-// NOTE: This function must keep same order with OStream& operator << (OStream& out, const ResourceUsage& resUsage)
-template <class IStream>
-IStream& operator >> (
-    IStream&       in,        // [out] Input stream
-    ResourceUsage& resUsage)  // [out] Resource usage object
-{
-    BinaryIStream<IStream> binIn(in);
-
-    binIn >> resUsage.descPairs;
-    binIn >> resUsage.pushConstSizeInBytes;
-    binIn >> resUsage.resourceWrite;
-    binIn >> resUsage.resourceRead;
-    binIn >> resUsage.perShaderTable;
-    binIn >> resUsage.globalConstant;
-    binIn >> resUsage.numSgprsAvailable;
-    binIn >> resUsage.numVgprsAvailable;
-    binIn >> resUsage.builtInUsage.perStage.u64All;
-    binIn >> resUsage.builtInUsage.allStage.u64All;
-
-    binIn >> resUsage.inOutUsage.inputLocMap;
-    binIn >> resUsage.inOutUsage.outputLocMap;
-    binIn >> resUsage.inOutUsage.perPatchInputLocMap;
-    binIn >> resUsage.inOutUsage.perPatchOutputLocMap;
-    binIn >> resUsage.inOutUsage.builtInInputLocMap;
-    binIn >> resUsage.inOutUsage.builtInOutputLocMap;
-    binIn >> resUsage.inOutUsage.perPatchBuiltInInputLocMap;
-    binIn >> resUsage.inOutUsage.perPatchBuiltInOutputLocMap;
-
-    for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
-    {
-        binIn >> resUsage.inOutUsage.xfbStrides[i];
-    }
-
-    binIn >> resUsage.inOutUsage.enableXfb;
-    for (uint32_t i = 0; i < MaxGsStreams; ++i)
-    {
-        binIn >> resUsage.inOutUsage.streamXfbBuffers[i];
-    }
-
-    binIn >> resUsage.inOutUsage.inputMapLocCount;
-    binIn >> resUsage.inOutUsage.outputMapLocCount;
-    binIn >> resUsage.inOutUsage.perPatchInputMapLocCount;
-    binIn >> resUsage.inOutUsage.perPatchOutputMapLocCount;
-    binIn >> resUsage.inOutUsage.expCount;
-
-    binIn >> resUsage.inOutUsage.gs.rasterStream;
-    binIn >> resUsage.inOutUsage.gs.xfbOutsInfo;
-    for (uint32_t i = 0; i < MaxColorTargets; ++i)
-    {
-        uint32_t outType;
-        binIn >> outType;
-        resUsage.inOutUsage.fs.outputTypes[i] = static_cast<BasicType>(outType);
-    }
-    return in;
-}
-
-// =====================================================================================================================
 Compiler::Compiler(
     GfxIpVersion      gfxIp,        // Graphics IP version info
     uint32_t          optionCount,  // Count of compilation-option strings
@@ -704,7 +490,7 @@ Result Compiler::BuildShaderModule(
 
     ElfPackage moduleBinary;
     raw_svector_ostream moduleBinaryStream(moduleBinary);
-    SmallVector<ShaderEntryName, 4> entryNames;
+    std::vector<ShaderEntryName> entryNames;
     SmallVector<ShaderModuleEntry, 4> moduleEntries;
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
@@ -729,17 +515,17 @@ Result Compiler::BuildShaderModule(
                                 TimerProfiler::ShaderModuleTimerEnableMask);
 
     // Check the type of input shader binary
-    if (IsSpirvBinary(&pShaderInfo->shaderBin))
+    if (ShaderModuleHelper::IsSpirvBinary(&pShaderInfo->shaderBin))
     {
         moduleData.binType = BinaryType::Spirv;
-        if (VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
+        if (ShaderModuleHelper::VerifySpirvBinary(&pShaderInfo->shaderBin) != Result::Success)
         {
             LLPC_ERRS("Unsupported SPIR-V instructions are found!\n");
             result = Result::Unsupported;
         }
         if (result == Result::Success)
         {
-            CollectInfoFromSpirvBinary(&pShaderInfo->shaderBin, &moduleData.moduleInfo, entryNames);
+            ShaderModuleHelper::CollectInfoFromSpirvBinary(&pShaderInfo->shaderBin, &moduleData.moduleInfo, entryNames);
         }
         moduleData.binCode.codeSize = pShaderInfo->shaderBin.codeSize;
         if (cl::TrimDebugInfo)
@@ -747,7 +533,7 @@ Result Compiler::BuildShaderModule(
             moduleData.binCode.codeSize -= moduleData.moduleInfo.debugInfoSize;
         }
     }
-    else if (IsLlvmBitcode(&pShaderInfo->shaderBin))
+    else if (ShaderModuleHelper::IsLlvmBitcode(&pShaderInfo->shaderBin))
     {
         moduleData.binType = BinaryType::LlvmBc;
         moduleData.binCode = pShaderInfo->shaderBin;
@@ -771,7 +557,7 @@ Result Compiler::BuildShaderModule(
         if (cl::TrimDebugInfo)
         {
             uint8_t* pTrimmedCode = new uint8_t[moduleData.binCode.codeSize];
-            TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleData.binCode.codeSize, pTrimmedCode);
+            ShaderModuleHelper::TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleData.binCode.codeSize, pTrimmedCode);
             moduleData.binCode.pCode = pTrimmedCode;
         }
         else
@@ -1385,7 +1171,11 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             nonFragmentPipelineElf.pCode = partialPipelineElf.data();
             nonFragmentPipelineElf.codeSize = partialPipelineElf.size();
 
-            m_pCompiler->MergeElfBinary(m_pContext, &m_fragmentElf, &nonFragmentPipelineElf, pPipelineElf);
+            ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+            // Load ELF binary
+            auto result = writer.ReadFromBuffer(nonFragmentPipelineElf.pCode, nonFragmentPipelineElf.codeSize);
+            LLPC_ASSERT(result == Result::Success);
+            writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
 
             pipelineElf.codeSize = pPipelineElf->size();
             pipelineElf.pCode = pPipelineElf->data();
@@ -1415,7 +1205,12 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
             fragmentPipelineElf.pCode = partialPipelineElf.data();
             fragmentPipelineElf.codeSize = partialPipelineElf.size();
 
-            m_pCompiler->MergeElfBinary(m_pContext, &fragmentPipelineElf, &m_nonFragmentElf, pPipelineElf);
+            ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+            // Load ELF binary
+            auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
+            LLPC_ASSERT(result == Result::Success);
+
+            writer.MergeElfBinary(m_pContext, &fragmentPipelineElf, pPipelineElf);
 
             pipelineElf.codeSize = pPipelineElf->size();
             pipelineElf.pCode = pPipelineElf->data();
@@ -1436,7 +1231,11 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
     else if ((m_fragmentCacheEntryState == ShaderEntryState::Ready) &&
         (m_nonFragmentCacheEntryState == ShaderEntryState::Ready))
     {
-        m_pCompiler->MergeElfBinary(m_pContext, &m_fragmentElf, &m_nonFragmentElf, pPipelineElf);
+        ElfWriter<Elf64> writer(m_pContext->GetGfxIpVersion());
+        // Load ELF binary
+        auto result = writer.ReadFromBuffer(m_nonFragmentElf.pCode, m_nonFragmentElf.codeSize);
+        LLPC_ASSERT(result == Result::Success);
+        writer.MergeElfBinary(m_pContext, &m_fragmentElf, pPipelineElf);
     }
 
     // Whole pipeline is compiled
@@ -1755,145 +1554,6 @@ Result Compiler::BuildComputePipeline(
 }
 
 // =====================================================================================================================
-// Translates SPIR-V binary to machine-independent LLVM module.
-void Compiler::TranslateSpirvToLlvm(
-    const PipelineShaderInfo*   pShaderInfo, // [in] Specialization info
-    Module*                     pModule)             // [in/out] Module to translate into, initially empty
-{
-    BinaryData  optSpirvBin = {};
-    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-    LLPC_ASSERT(pModuleData->binType == BinaryType::Spirv);
-    const BinaryData* pSpirvBin = &pModuleData->binCode;
-    if (OptimizeSpirv(pSpirvBin, &optSpirvBin) == Result::Success)
-    {
-        pSpirvBin = &optSpirvBin;
-    }
-
-    std::string spirvCode(static_cast<const char*>(pSpirvBin->pCode), pSpirvBin->codeSize);
-    std::istringstream spirvStream(spirvCode);
-    std::string errMsg;
-    SPIRVSpecConstMap specConstMap;
-
-    // Build specialization constant map
-    if (pShaderInfo->pSpecializationInfo != nullptr)
-    {
-        for (uint32_t i = 0; i < pShaderInfo->pSpecializationInfo->mapEntryCount; ++i)
-        {
-            SPIRVSpecConstEntry specConstEntry  = {};
-            auto pMapEntry = &pShaderInfo->pSpecializationInfo->pMapEntries[i];
-            specConstEntry.DataSize= pMapEntry->size;
-            specConstEntry.Data = VoidPtrInc(pShaderInfo->pSpecializationInfo->pData, pMapEntry->offset);
-            specConstMap[pMapEntry->constantID] = specConstEntry;
-        }
-    }
-
-    Context* pContext = static_cast<Context*>(&pModule->getContext());
-
-    if (readSpirv(pContext->GetBuilder(),
-                  pShaderInfo->pModuleData,
-                  spirvStream,
-                  ConvertToExecModel(pShaderInfo->entryStage),
-                  pShaderInfo->pEntryTarget,
-                  specConstMap,
-                  pModule,
-                  errMsg) == false)
-    {
-        report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
-                            GetShaderStageName(static_cast<ShaderStage>(pShaderInfo->entryStage)) + " shader): " + errMsg,
-                           false);
-    }
-
-    CleanOptimizedSpirv(&optSpirvBin);
-
-    // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we mark it as follows:
-    //   * remove the dllexport;
-    //   * ensure it is public.
-    // Also mark all other functions internal and always_inline.
-    //
-    // TODO: We should rationalize this code as follows:
-    //   1. Add code to the spir-v reader to add the entrypoint name as metadata;
-    //   2. change this code here to detect that, instead of DLLExport;
-    //   3. remove the code we added to the spir-v reader to detect the required entrypoint and mark it as DLLExport;
-    //   4. remove the required entrypoint name and execution model args that we added to the spir-v reader API, to
-    //      make it closer to the upstream Khronos copy of that code.
-    for (auto& func : *pModule)
-    {
-        if (func.empty())
-        {
-            continue;
-        }
-        if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass)
-        {
-            func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
-            func.setLinkage(GlobalValue::ExternalLinkage);
-        }
-        else
-        {
-            func.setLinkage(GlobalValue::InternalLinkage);
-            func.addFnAttr(Attribute::AlwaysInline);
-        }
-    }
-}
-
-// =====================================================================================================================
-// Optimizes SPIR-V binary
-Result Compiler::OptimizeSpirv(
-    const BinaryData* pSpirvBinIn,     // [in] Input SPIR-V binary
-    BinaryData*       pSpirvBinOut)    // [out] Optimized SPIR-V binary
-{
-    bool success = false;
-    uint32_t optBinSize = 0;
-    void* pOptBin = nullptr;
-
-#ifdef LLPC_ENABLE_SPIRV_OPT
-    if (cl::EnableSpirvOpt)
-    {
-        char logBuf[4096] = {};
-        success = spvOptimizeSpirv(pSpirvBinIn->codeSize,
-                                   pSpirvBinIn->pCode,
-                                   0,
-                                   nullptr,
-                                   &optBinSize,
-                                   &pOptBin,
-                                   4096,
-                                   logBuf);
-        if (success == false)
-        {
-            report_fatal_error(Twine("Failed to optimize SPIR-V (") +
-                                GetShaderStageName(static_cast<ShaderStage>(shaderStage) + " shader): " + logBuf,
-                               false);
-        }
-    }
-#endif
-
-    if (success)
-    {
-        pSpirvBinOut->codeSize = optBinSize;
-        pSpirvBinOut->pCode = pOptBin;
-    }
-    else
-    {
-        pSpirvBinOut->codeSize = 0;
-        pSpirvBinOut->pCode = nullptr;
-    }
-
-    return success ? Result::Success : Result::ErrorInvalidShader;
-}
-
-// =====================================================================================================================
-// Cleanup work for SPIR-V binary, freeing the allocated buffer by OptimizeSpirv()
-void Compiler::CleanOptimizedSpirv(
-    BinaryData* pSpirvBin)  // [in] Optimized SPIR-V binary
-{
-#ifdef LLPC_ENABLE_SPIRV_OPT
-    if (pSpirvBin->pCode)
-    {
-        spvFreeBuffer(const_cast<void*>(pSpirvBin->pCode));
-    }
-#endif
-}
-
-// =====================================================================================================================
 // Builds hash code from compilation-options
 MetroHash::Hash Compiler::GenerateHashForCompileOptions(
     uint32_t          optionCount,    // Count of compilation-option strings
@@ -1966,7 +1626,8 @@ Result Compiler::ValidatePipelineShaderInfo(
             auto pSpirvBin = &pModuleData->binCode;
             if (pShaderInfo->pEntryTarget != nullptr)
             {
-                uint32_t stageMask = GetStageMaskFromSpirvBinary(pSpirvBin, pShaderInfo->pEntryTarget);
+                uint32_t stageMask =
+                    ShaderModuleHelper::GetStageMaskFromSpirvBinary(pSpirvBin, pShaderInfo->pEntryTarget);
 
                 if ((stageMask & ShaderStageToMask(shaderStage)) == 0)
                 {
@@ -2349,332 +2010,6 @@ void Compiler::ReleaseContext(
 }
 
 // =====================================================================================================================
-// Collect information from SPIR-V binary
-Result Compiler::CollectInfoFromSpirvBinary(
-    const BinaryData*                pSpvBinCode,           // [in] SPIR-V binary data
-    ShaderModuleInfo*                pShaderModuleInfo,     // [out] Shader module information
-    SmallVector<ShaderEntryName, 4>& shaderEntryNames       // [out] Entry names for this shader module
-    )
-{
-    Result result = Result::Success;
-
-    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pSpvBinCode->pCode);
-    const uint32_t* pEnd = pCode + pSpvBinCode->codeSize / sizeof(uint32_t);
-
-    const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
-
-    // Parse SPIR-V instructions
-    std::unordered_set<uint32_t> capabilities;
-
-    while (pCodePos < pEnd)
-    {
-        uint32_t opCode = (pCodePos[0] & OpCodeMask);
-        uint32_t wordCount = (pCodePos[0] >> WordCountShift);
-
-        if ((wordCount == 0) || (pCodePos + wordCount > pEnd))
-        {
-            LLPC_ERRS("Invalid SPIR-V binary\n");
-            result = Result::ErrorInvalidShader;
-            break;
-        }
-
-        // Parse each instruction and find those we are interested in
-        switch (opCode)
-        {
-        case spv::OpCapability:
-            {
-                LLPC_ASSERT(wordCount == 2);
-                auto capability = static_cast<spv::Capability>(pCodePos[1]);
-                capabilities.insert(capability);
-                break;
-            }
-        case spv::OpExtension:
-            {
-                if ((strncmp(reinterpret_cast<const char*>(&pCodePos[1]), "SPV_AMD_shader_ballot",
-                    strlen("SPV_AMD_shader_ballot")) == 0) && (pShaderModuleInfo->useSubgroupSize == false))
-                {
-                    pShaderModuleInfo->useSubgroupSize = true;
-                }
-                break;
-            }
-        case spv::OpDPdx:
-        case spv::OpDPdy:
-        case spv::OpDPdxCoarse:
-        case spv::OpDPdyCoarse:
-        case spv::OpDPdxFine:
-        case spv::OpDPdyFine:
-        case spv::OpImageSampleImplicitLod:
-        case spv::OpImageSampleDrefImplicitLod:
-        case spv::OpImageSampleProjImplicitLod:
-        case spv::OpImageSampleProjDrefImplicitLod:
-        case spv::OpImageSparseSampleImplicitLod:
-        case spv::OpImageSparseSampleProjDrefImplicitLod:
-        case spv::OpImageSparseSampleProjImplicitLod:
-            {
-                pShaderModuleInfo->useHelpInvocation = true;
-                break;
-            }
-        case spv::OpString:
-        case spv::OpSource:
-        case spv::OpSourceContinued:
-        case spv::OpSourceExtension:
-        case spv::OpName:
-        case spv::OpMemberName:
-        case spv::OpLine:
-        case spv::OpNop:
-        case spv::OpNoLine:
-        case spv::OpModuleProcessed:
-            {
-                pShaderModuleInfo->debugInfoSize += wordCount * sizeof(uint32_t);
-                break;
-            }
-        case OpSpecConstantTrue:
-        case OpSpecConstantFalse:
-        case OpSpecConstant:
-        case OpSpecConstantComposite:
-        case OpSpecConstantOp:
-            {
-                pShaderModuleInfo->useSpecConstant = true;
-                break;
-            }
-        case OpEntryPoint:
-            {
-                ShaderEntryName entry = {};
-                // The fourth word is start of the name string of the entry-point
-                entry.pName = reinterpret_cast<const char*>(&pCodePos[3]);
-                entry.stage = ConvertToStageShage(pCodePos[1]);
-                shaderEntryNames.push_back(entry);
-                break;
-            }
-        default:
-            {
-                break;
-            }
-        }
-        pCodePos += wordCount;
-    }
-
-    if (capabilities.find(spv::CapabilityVariablePointersStorageBuffer) != capabilities.end())
-    {
-        pShaderModuleInfo->enableVarPtrStorageBuf = true;
-    }
-
-    if (capabilities.find(spv::CapabilityVariablePointers) != capabilities.end())
-    {
-        pShaderModuleInfo->enableVarPtr = true;
-    }
-
-    if ((pShaderModuleInfo->useSubgroupSize == false) &&
-        ((capabilities.find(spv::CapabilityGroupNonUniform) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformVote) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformBallot) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformShuffle) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformShuffleRelative) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformClustered) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroupNonUniformQuad) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilitySubgroupBallotKHR) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilitySubgroupVoteKHR) != capabilities.end()) ||
-        (capabilities.find(spv::CapabilityGroups) != capabilities.end())))
-    {
-        pShaderModuleInfo->useSubgroupSize = true;
-    }
-
-    return result;
-}
-
-// =====================================================================================================================
-// Removes all debug instructions for SPIR-V binary.
-void Compiler::TrimSpirvDebugInfo(
-    const BinaryData* pSpvBin,   // [in] SPIR-V binay code
-    uint32_t          bufferSize,    // Output buffer size in bytes
-    void*             pTrimSpvBin)     // [out] Trimmed SPIR-V binary code
-{
-    LLPC_ASSERT(bufferSize > sizeof(SpirvHeader));
-
-    const uint32_t* pCode = reinterpret_cast<const uint32_t*>(pSpvBin->pCode);
-    const uint32_t* pEnd = pCode + pSpvBin->codeSize / sizeof(uint32_t);
-    const uint32_t* pCodePos = pCode + sizeof(SpirvHeader) / sizeof(uint32_t);
-
-    uint32_t* pTrimEnd = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, bufferSize));
-    LLPC_UNUSED(pTrimEnd);
-    uint32_t* pTrimCodePos = reinterpret_cast<uint32_t*>(VoidPtrInc(pTrimSpvBin, sizeof(SpirvHeader)));
-
-    // Copy SPIR-V header
-    memcpy(pTrimSpvBin, pCode, sizeof(SpirvHeader));
-
-    // Copy SPIR-V instructions
-    while (pCodePos < pEnd)
-    {
-        uint32_t opCode = (pCodePos[0] & OpCodeMask);
-        uint32_t wordCount = (pCodePos[0] >> WordCountShift);
-        switch (opCode)
-        {
-        case spv::OpString:
-        case spv::OpSource:
-        case spv::OpSourceContinued:
-        case spv::OpSourceExtension:
-        case spv::OpName:
-        case spv::OpMemberName:
-        case spv::OpLine:
-        case spv::OpNop:
-        case spv::OpNoLine:
-        case spv::OpModuleProcessed:
-            {
-                // Skip debug instructions
-                break;
-            }
-        default:
-            {
-                // Copy other instructions
-                LLPC_ASSERT(pCodePos + wordCount <= pEnd);
-                LLPC_ASSERT(pTrimCodePos + wordCount <= pTrimEnd);
-                memcpy(pTrimCodePos, pCodePos, wordCount * sizeof(uint32_t));
-                pTrimCodePos += wordCount;
-                break;
-            }
-        }
-
-        pCodePos += wordCount;
-    }
-
-    LLPC_ASSERT(pTrimCodePos == pTrimEnd);
-}
-
-// =====================================================================================================================
-// Gets the statistics info for the specified pipeline binary.
-void Compiler::GetPipelineStatistics(
-    const void*             pCode,                  // [in]  Pipeline ISA code
-    size_t                  codeSize,               // Pipeline ISA code size
-    GfxIpVersion            gfxIp,                  // Graphics IP version info
-    PipelineStatistics*     pPipelineStats          // [out] Output statistics info for the pipeline
-    ) const
-{
-    ElfReader<Elf64> reader(gfxIp);
-    auto result = reader.ReadFromBuffer(pCode, &codeSize);
-    LLPC_ASSERT(result == Result::Success);
-    LLPC_UNUSED(result);
-
-    pPipelineStats->numAvailVgprs       = 0;
-    pPipelineStats->numUsedVgprs        = 0;
-    pPipelineStats->useScratchBuffer    = false;
-    pPipelineStats->sgprSpill           = false;
-
-    uint32_t sectionCount = reader.GetSectionCount();
-    for (uint32_t secIdx = 0; secIdx < sectionCount; ++secIdx)
-    {
-        typename ElfReader<Elf64>::SectionBuffer* pSection = nullptr;
-        bool isCompute = false;
-        Result result = reader.GetSectionDataBySectionIndex(secIdx, &pSection);
-        LLPC_ASSERT(result == Result::Success);
-        LLPC_UNUSED(result);
-
-        if (strcmp(pSection->pName, NoteName) == 0)
-        {
-            uint32_t offset = 0;
-            const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
-            while (offset < pSection->secHead.sh_size)
-            {
-                const NoteHeader* pNode = reinterpret_cast<const NoteHeader*>(pSection->pData + offset);
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 432
-                if (pNode->type == Util::Abi::PipelineAbiNoteType::PalMetadata)
-                {
-                    // Msgpack metadata.
-                    msgpack::Document document;
-                    if (document.readFromBlob(StringRef(reinterpret_cast<const char*>(pSection->pData + offset +
-                                                            noteHeaderSize + Pow2Align(pNode->nameSize,
-                                                          sizeof(uint32_t))),
-                                                        pNode->descSize),
-                                              false))
-                    {
-                        auto hwStages = document.getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines]
-                                                          .getArray(true)[0]
-                                                          .getMap(true)[Util::Abi::PipelineMetadataKey::HardwareStages]
-                                                          .getMap(true);
-                        auto stageIt = hwStages.find(".ps");
-                        if (stageIt == hwStages.end())
-                        {
-                            stageIt = hwStages.find(".cs");
-                            isCompute = true;
-                        }
-
-                        if (stageIt != hwStages.end())
-                        {
-                            auto hwStage = stageIt->second.getMap(true);
-                            auto node = hwStage[Util::Abi::HardwareStageMetadataKey::VgprCount];
-
-                            if (node.getKind() == msgpack::Type::UInt)
-                            {
-                                pPipelineStats->numUsedVgprs = node.getUInt();
-                            }
-
-                            node = hwStage[Util::Abi::HardwareStageMetadataKey::VgprLimit];
-                            if (node.getKind() == msgpack::Type::UInt)
-                            {
-                                pPipelineStats->numAvailVgprs = node.getUInt();
-                            }
-
-                            node = hwStage[Util::Abi::PipelineMetadataKey::ScratchMemorySize];
-                            if (node.getKind() == msgpack::Type::UInt)
-                            {
-                                pPipelineStats->useScratchBuffer = (node.getUInt() > 0);
-                            }
-                        }
-                    }
-                }
-#endif
-
-                offset += noteHeaderSize + Pow2Align(pNode->nameSize, sizeof(uint32_t)) +
-                          Pow2Align(pNode->descSize, sizeof(uint32_t));
-                LLPC_ASSERT(offset <= pSection->secHead.sh_size);
-            }
-        }
-        else if (strncmp(pSection->pName, AmdGpuDisasmName, sizeof(AmdGpuDisasmName) - 1) == 0)
-        {
-            uint32_t startPos = 0;
-            uint32_t endPos = static_cast<uint32_t>(pSection->secHead.sh_size);
-
-            uint8_t lastChar = pSection->pData[endPos - 1];
-            const_cast<uint8_t*>(pSection->pData)[endPos - 1] = '\0';
-
-            const char* pText = reinterpret_cast<const char*>(pSection->pData + startPos);
-
-            // Search PS or CS segment first
-            auto entryStage = Util::Abi::PipelineSymbolType::PsMainEntry;
-            if (isCompute)
-            {
-                entryStage = Util::Abi::PipelineSymbolType::CsMainEntry;
-            }
-
-            const char* pEntryName = Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(entryStage)];
-
-            pText = strstr(pText, pEntryName);
-
-            if (pText != nullptr)
-            {
-                // Search program end marker
-                const char* pEndPgm = strstr(pText, "s_endpgm");
-                LLPC_ASSERT(pEndPgm);
-                char savedChar = *pEndPgm;
-                const_cast<char*>(pEndPgm)[0] = '\0';
-
-                // Search writelane instructions, which mean SGPR spill.
-                if (strstr(pText, "writelane") != nullptr)
-                {
-                    pPipelineStats->sgprSpill = true;
-                }
-
-                // Restore last character
-                const_cast<char*>(pEndPgm)[0] = savedChar;
-            }
-
-            // Restore last character
-            const_cast<uint8_t*>(pSection->pData)[endPos - 1] = lastChar;
-        }
-    }
-}
-
-// =====================================================================================================================
 // Lookup in the shader caches with the given pipeline hash code.
 // It will try App's pipelince cache first if that's available.
 // Then try on the internal shader cache next if it misses.
@@ -2896,227 +2231,6 @@ void Compiler::BuildShaderCacheHash(
         PipelineDumper::UpdateHashForNonFragmentState(pPipelineInfo, true, &nonFragmentHasher);
         nonFragmentHasher.Finalize(pNonFragmentHash->bytes);
     }
-}
-
-// =====================================================================================================================
-// Merge ELF binary of fragment shader and ELF binary of non-fragment shaders into single ELF binary
-void Compiler::MergeElfBinary(
-    Context*          pContext,        // [in] Pipeline context
-    const BinaryData* pFragmentElf,    // [in] ELF binary of fragment shader
-    const BinaryData* pNonFragmentElf, // [in] ELF binary of non-fragment shaders
-    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
-{
-    auto FragmentIsaSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsMainEntry)];
-    auto FragmentIntrlTblSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlTblPtr)];
-    auto FragmentDisassemblySymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsDisassembly)];
-    auto FragmentIntrlDataSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlData)];
-    auto FragmentAmdIlSymbolName =
-        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsAmdIl)];
-
-    ElfWriter<Elf64> writer(m_gfxIp);
-    ElfReader<Elf64> reader(m_gfxIp);
-
-    // Load ELF binary
-    auto result = writer.ReadFromBuffer(pNonFragmentElf->pCode, pNonFragmentElf->codeSize);
-    LLPC_ASSERT(result == Result::Success);
-
-    auto fragmentCodesize = pFragmentElf->codeSize;
-    result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
-    LLPC_ASSERT(result == Result::Success);
-
-    // Merge GPU ISA code
-    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentTextSection = nullptr;
-    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentTextSection = nullptr;
-    std::vector<ElfSymbol> fragmentSymbols;
-    std::vector<ElfSymbol*> nonFragmentSymbols;
-
-    auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
-    auto nonFragmentSecIndex = writer.GetSectionIndex(TextName);
-    reader.GetSectionDataBySectionIndex(fragmentTextSecIndex, &pFragmentTextSection);
-    reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
-
-    writer.GetSectionDataBySectionIndex(nonFragmentSecIndex, &pNonFragmentTextSection);
-    writer.GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
-    ElfSymbol* pFragmentIsaSymbol = nullptr;
-    ElfSymbol* pNonFragmentIsaSymbol = nullptr;
-    std::string firstIsaSymbolName;
-
-    for (auto pSymbol : nonFragmentSymbols)
-    {
-        if (firstIsaSymbolName.empty())
-        {
-            // NOTE: Entry name of the first shader stage is missed in disassembly section, we have to add it back
-            // when merge disassembly sections.
-            if (strncmp(pSymbol->pSymName, "_amdgpu_", strlen("_amdgpu_")) == 0)
-            {
-                firstIsaSymbolName = pSymbol->pSymName;
-            }
-        }
-
-        if (strcmp(pSymbol->pSymName, FragmentIsaSymbolName) == 0)
-        {
-            pNonFragmentIsaSymbol = pSymbol;
-        }
-
-        if (pNonFragmentIsaSymbol == nullptr)
-        {
-            continue;
-        }
-
-        // Reset all symbols after _amdgpu_ps_main
-        pSymbol->secIdx = InvalidValue;
-    }
-
-    size_t isaOffset = (pNonFragmentIsaSymbol == nullptr) ?
-                       Pow2Align(pNonFragmentTextSection->secHead.sh_size, 0x100) :
-                       pNonFragmentIsaSymbol->value;
-    for (auto& fragmentSymbol : fragmentSymbols)
-    {
-        if (strcmp(fragmentSymbol.pSymName, FragmentIsaSymbolName) == 0)
-        {
-            // Modify ISA code
-            pFragmentIsaSymbol = &fragmentSymbol;
-            ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
-            writer.MergeSection(pNonFragmentTextSection,
-                                isaOffset,
-                                nullptr,
-                                pFragmentTextSection,
-                                pFragmentIsaSymbol->value,
-                                nullptr,
-                                &newSection);
-            writer.SetSection(nonFragmentSecIndex, &newSection);
-        }
-
-        if (pFragmentIsaSymbol == nullptr)
-        {
-            continue;
-        }
-
-        // Update fragment shader related symbols
-        ElfSymbol* pSymbol = nullptr;
-        pSymbol = writer.GetSymbol(fragmentSymbol.pSymName);
-        pSymbol->secIdx = nonFragmentSecIndex;
-        pSymbol->pSecName = nullptr;
-        pSymbol->value = isaOffset + fragmentSymbol.value - pFragmentIsaSymbol->value;
-        pSymbol->size = fragmentSymbol.size;
-    }
-
-    // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
-    LLPC_ASSERT((reader.IsValidSymbol(FragmentIntrlTblSymbolName) == false) &&
-                (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
-                (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
-                (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
-    LLPC_UNUSED(FragmentIntrlTblSymbolName);
-    LLPC_UNUSED(FragmentDisassemblySymbolName);
-    LLPC_UNUSED(FragmentIntrlDataSymbolName);
-    LLPC_UNUSED(FragmentAmdIlSymbolName);
-
-    // Merge ISA disassemble
-    auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
-    auto nonFragmentDisassemblySecIndex = writer.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
-    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentDisassemblySection = nullptr;
-    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentDisassemblySection = nullptr;
-    reader.GetSectionDataBySectionIndex(fragmentDisassemblySecIndex, &pFragmentDisassemblySection);
-    writer.GetSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &pNonFragmentDisassemblySection);
-    if (pNonFragmentDisassemblySection != nullptr)
-    {
-        LLPC_ASSERT(pFragmentDisassemblySection != nullptr);
-        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
-        // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
-        // for all section data.
-        auto pFragmentDisassemblySectionEnd = pFragmentDisassemblySection->pData +
-                                              pFragmentDisassemblySection->secHead.sh_size - 1;
-        uint8_t lastChar = *pFragmentDisassemblySectionEnd;
-        const_cast<uint8_t*>(pFragmentDisassemblySectionEnd)[0] = '\0';
-        auto pFragmentDisassembly = strstr(reinterpret_cast<const char*>(pFragmentDisassemblySection->pData),
-                                          FragmentIsaSymbolName);
-        const_cast<uint8_t*>(pFragmentDisassemblySectionEnd)[0] = lastChar;
-
-        auto fragmentDisassemblyOffset =
-            (pFragmentDisassembly == nullptr) ?
-            0 :
-            (pFragmentDisassembly - reinterpret_cast<const char*>(pFragmentDisassemblySection->pData));
-
-        auto pDisassemblyEnd = strstr(reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData),
-                                     FragmentIsaSymbolName);
-        auto disassemblySize = (pDisassemblyEnd == nullptr) ?
-                              pNonFragmentDisassemblySection->secHead.sh_size :
-                              pDisassemblyEnd - reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData);
-
-        ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
-        writer.MergeSection(pNonFragmentDisassemblySection,
-                            disassemblySize,
-                            firstIsaSymbolName.c_str(),
-                            pFragmentDisassemblySection,
-                            fragmentDisassemblyOffset,
-                            FragmentIsaSymbolName,
-                            &newSection);
-        writer.SetSection(nonFragmentDisassemblySecIndex, &newSection);
-    }
-
-    // Merge LLVM IR disassemble
-    const std::string LlvmIrSectionName = std::string(Util::Abi::AmdGpuCommentLlvmIrName);
-    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentLlvmIrSection = nullptr;
-    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentLlvmIrSection = nullptr;
-
-    auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(LlvmIrSectionName.c_str());
-    auto nonFragmentLlvmIrSecIndex = writer.GetSectionIndex(LlvmIrSectionName.c_str());
-    reader.GetSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &pFragmentLlvmIrSection);
-    writer.GetSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &pNonFragmentLlvmIrSection);
-
-    if (pNonFragmentLlvmIrSection != nullptr)
-    {
-        LLPC_ASSERT(pFragmentLlvmIrSection != nullptr);
-
-        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
-        // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
-        // for all section data.
-        auto pFragmentLlvmIrSectionEnd = pFragmentLlvmIrSection->pData +
-                                         pFragmentLlvmIrSection->secHead.sh_size - 1;
-        uint8_t lastChar = *pFragmentLlvmIrSectionEnd;
-        const_cast<uint8_t*>(pFragmentLlvmIrSectionEnd)[0] = '\0';
-        auto pFragmentLlvmIrStart = strstr(reinterpret_cast<const char*>(pFragmentLlvmIrSection->pData),
-                                           FragmentIsaSymbolName);
-        const_cast<uint8_t*>(pFragmentLlvmIrSectionEnd)[0] = lastChar;
-
-        auto fragmentLlvmIrOffset =
-            (pFragmentLlvmIrStart == nullptr) ?
-            0 :
-            (pFragmentLlvmIrStart - reinterpret_cast<const char*>(pFragmentLlvmIrSection->pData));
-
-        auto pLlvmIrEnd = strstr(reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData),
-                                 FragmentIsaSymbolName);
-        auto llvmIrSize = (pLlvmIrEnd == nullptr) ?
-                          pNonFragmentLlvmIrSection->secHead.sh_size :
-                          pLlvmIrEnd - reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData);
-
-        ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
-        writer.MergeSection(pNonFragmentLlvmIrSection,
-                            llvmIrSize,
-                            firstIsaSymbolName.c_str(),
-                            pFragmentLlvmIrSection,
-                            fragmentLlvmIrOffset,
-                            FragmentIsaSymbolName,
-                            &newSection);
-        writer.SetSection(nonFragmentLlvmIrSecIndex, &newSection);
-    }
-
-    // Merge PAL metadata
-    ElfNote nonFragmentMetaNote = {};
-    nonFragmentMetaNote = writer.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-
-    LLPC_ASSERT(nonFragmentMetaNote.pData != nullptr);
-    ElfNote fragmentMetaNote = {};
-    ElfNote newMetaNote = {};
-    fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-    writer.MergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
-    writer.SetNote(&newMetaNote);
-
-    writer.WriteToBuffer(pPipelineElf);
 }
 
 } // Llpc

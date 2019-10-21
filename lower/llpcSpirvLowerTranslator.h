@@ -59,13 +59,8 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(SpirvLowerTranslator);
 
-    llvm::Module* TranslateSpirvToLlvm(const BinaryData*           pSpirvBin,
-                                       ShaderStage                 shaderStage,
-                                       const char*                 pEntryTarget,
-                                       const VkSpecializationInfo* pSpecializationInfo
-                                      ) const;
-    Result OptimizeSpirv(const BinaryData* pSpirvBinIn, BinaryData* pSpirvBinOut) const;
-    void CleanOptimizedSpirv(BinaryData* pSpirvBin) const;
+    void TranslateSpirvToLlvm(const PipelineShaderInfo* pShaderInfo,
+                              llvm::Module*             pModule);
 
     // -----------------------------------------------------------------------------------------------------------------
 

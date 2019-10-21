@@ -737,6 +737,222 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(
     }
 }
 
+// =====================================================================================================================
+// Merge ELF binary of fragment shader and ELF binary of non-fragment shaders into single ELF binary
+template<class Elf>
+void ElfWriter<Elf>::MergeElfBinary(
+    Context*          pContext,        // [in] Pipeline context
+    const BinaryData* pFragmentElf,    // [in] ELF binary of fragment shader
+    ElfPackage*       pPipelineElf)    // [out] Final ELF binary
+{
+    auto FragmentIsaSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsMainEntry)];
+    auto FragmentIntrlTblSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlTblPtr)];
+    auto FragmentDisassemblySymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsDisassembly)];
+    auto FragmentIntrlDataSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsShdrIntrlData)];
+    auto FragmentAmdIlSymbolName =
+        Util::Abi::PipelineAbiSymbolNameStrings[static_cast<uint32_t>(Util::Abi::PipelineSymbolType::PsAmdIl)];
+
+    ElfReader<Elf64> reader(m_gfxIp);
+
+    auto fragmentCodesize = pFragmentElf->codeSize;
+    auto result = reader.ReadFromBuffer(pFragmentElf->pCode, &fragmentCodesize);
+    LLPC_ASSERT(result == Result::Success);
+
+    // Merge GPU ISA code
+    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentTextSection = nullptr;
+    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentTextSection = nullptr;
+    std::vector<ElfSymbol> fragmentSymbols;
+    std::vector<ElfSymbol*> nonFragmentSymbols;
+
+    auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
+    auto nonFragmentSecIndex = GetSectionIndex(TextName);
+    reader.GetSectionDataBySectionIndex(fragmentTextSecIndex, &pFragmentTextSection);
+    reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
+
+    GetSectionDataBySectionIndex(nonFragmentSecIndex, &pNonFragmentTextSection);
+    GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
+    ElfSymbol* pFragmentIsaSymbol = nullptr;
+    ElfSymbol* pNonFragmentIsaSymbol = nullptr;
+    std::string firstIsaSymbolName;
+
+    for (auto pSymbol : nonFragmentSymbols)
+    {
+        if (firstIsaSymbolName.empty())
+        {
+            // NOTE: Entry name of the first shader stage is missed in disassembly section, we have to add it back
+            // when merge disassembly sections.
+            if (strncmp(pSymbol->pSymName, "_amdgpu_", strlen("_amdgpu_")) == 0)
+            {
+                firstIsaSymbolName = pSymbol->pSymName;
+            }
+        }
+
+        if (strcmp(pSymbol->pSymName, FragmentIsaSymbolName) == 0)
+        {
+            pNonFragmentIsaSymbol = pSymbol;
+        }
+
+        if (pNonFragmentIsaSymbol == nullptr)
+        {
+            continue;
+        }
+
+        // Reset all symbols after _amdgpu_ps_main
+        pSymbol->secIdx = InvalidValue;
+    }
+
+    size_t isaOffset = (pNonFragmentIsaSymbol == nullptr) ?
+                       Pow2Align(pNonFragmentTextSection->secHead.sh_size, 0x100) :
+                       pNonFragmentIsaSymbol->value;
+    for (auto& fragmentSymbol : fragmentSymbols)
+    {
+        if (strcmp(fragmentSymbol.pSymName, FragmentIsaSymbolName) == 0)
+        {
+            // Modify ISA code
+            pFragmentIsaSymbol = &fragmentSymbol;
+            ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+            MergeSection(pNonFragmentTextSection,
+                                isaOffset,
+                                nullptr,
+                                pFragmentTextSection,
+                                pFragmentIsaSymbol->value,
+                                nullptr,
+                                &newSection);
+            SetSection(nonFragmentSecIndex, &newSection);
+        }
+
+        if (pFragmentIsaSymbol == nullptr)
+        {
+            continue;
+        }
+
+        // Update fragment shader related symbols
+        ElfSymbol* pSymbol = nullptr;
+        pSymbol = GetSymbol(fragmentSymbol.pSymName);
+        pSymbol->secIdx = nonFragmentSecIndex;
+        pSymbol->pSecName = nullptr;
+        pSymbol->value = isaOffset + fragmentSymbol.value - pFragmentIsaSymbol->value;
+        pSymbol->size = fragmentSymbol.size;
+    }
+
+    // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
+    LLPC_ASSERT((reader.IsValidSymbol(FragmentIntrlTblSymbolName) == false) &&
+                (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
+                (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
+                (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
+    LLPC_UNUSED(FragmentIntrlTblSymbolName);
+    LLPC_UNUSED(FragmentDisassemblySymbolName);
+    LLPC_UNUSED(FragmentIntrlDataSymbolName);
+    LLPC_UNUSED(FragmentAmdIlSymbolName);
+
+    // Merge ISA disassemble
+    auto fragmentDisassemblySecIndex = reader.GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+    auto nonFragmentDisassemblySecIndex = GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
+    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentDisassemblySection = nullptr;
+    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentDisassemblySection = nullptr;
+    reader.GetSectionDataBySectionIndex(fragmentDisassemblySecIndex, &pFragmentDisassemblySection);
+    GetSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &pNonFragmentDisassemblySection);
+    if (pNonFragmentDisassemblySection != nullptr)
+    {
+        LLPC_ASSERT(pFragmentDisassemblySection != nullptr);
+        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
+        // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
+        // for all section data.
+        auto pFragmentDisassemblySectionEnd = pFragmentDisassemblySection->pData +
+                                              pFragmentDisassemblySection->secHead.sh_size - 1;
+        uint8_t lastChar = *pFragmentDisassemblySectionEnd;
+        const_cast<uint8_t*>(pFragmentDisassemblySectionEnd)[0] = '\0';
+        auto pFragmentDisassembly = strstr(reinterpret_cast<const char*>(pFragmentDisassemblySection->pData),
+                                          FragmentIsaSymbolName);
+        const_cast<uint8_t*>(pFragmentDisassemblySectionEnd)[0] = lastChar;
+
+        auto fragmentDisassemblyOffset =
+            (pFragmentDisassembly == nullptr) ?
+            0 :
+            (pFragmentDisassembly - reinterpret_cast<const char*>(pFragmentDisassemblySection->pData));
+
+        auto pDisassemblyEnd = strstr(reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData),
+                                     FragmentIsaSymbolName);
+        auto disassemblySize = (pDisassemblyEnd == nullptr) ?
+                              pNonFragmentDisassemblySection->secHead.sh_size :
+                              pDisassemblyEnd - reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData);
+
+        ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+        MergeSection(pNonFragmentDisassemblySection,
+                     disassemblySize,
+                     firstIsaSymbolName.c_str(),
+                     pFragmentDisassemblySection,
+                     fragmentDisassemblyOffset,
+                     FragmentIsaSymbolName,
+                     &newSection);
+        SetSection(nonFragmentDisassemblySecIndex, &newSection);
+    }
+
+    // Merge LLVM IR disassemble
+    const std::string LlvmIrSectionName = std::string(Util::Abi::AmdGpuCommentLlvmIrName);
+    ElfSectionBuffer<Elf64::SectionHeader>* pFragmentLlvmIrSection = nullptr;
+    const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentLlvmIrSection = nullptr;
+
+    auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(LlvmIrSectionName.c_str());
+    auto nonFragmentLlvmIrSecIndex = GetSectionIndex(LlvmIrSectionName.c_str());
+    reader.GetSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &pFragmentLlvmIrSection);
+    GetSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &pNonFragmentLlvmIrSection);
+
+    if (pNonFragmentLlvmIrSection != nullptr)
+    {
+        LLPC_ASSERT(pFragmentLlvmIrSection != nullptr);
+
+        // NOTE: We have to replace last character with null terminator and restore it afterwards. Otherwise, the
+        // text search will be incorrect. It is only needed for ElfReader, ElfWriter always append a null terminator
+        // for all section data.
+        auto pFragmentLlvmIrSectionEnd = pFragmentLlvmIrSection->pData +
+                                         pFragmentLlvmIrSection->secHead.sh_size - 1;
+        uint8_t lastChar = *pFragmentLlvmIrSectionEnd;
+        const_cast<uint8_t*>(pFragmentLlvmIrSectionEnd)[0] = '\0';
+        auto pFragmentLlvmIrStart = strstr(reinterpret_cast<const char*>(pFragmentLlvmIrSection->pData),
+                                           FragmentIsaSymbolName);
+        const_cast<uint8_t*>(pFragmentLlvmIrSectionEnd)[0] = lastChar;
+
+        auto fragmentLlvmIrOffset =
+            (pFragmentLlvmIrStart == nullptr) ?
+            0 :
+            (pFragmentLlvmIrStart - reinterpret_cast<const char*>(pFragmentLlvmIrSection->pData));
+
+        auto pLlvmIrEnd = strstr(reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData),
+                                 FragmentIsaSymbolName);
+        auto llvmIrSize = (pLlvmIrEnd == nullptr) ?
+                          pNonFragmentLlvmIrSection->secHead.sh_size :
+                          pLlvmIrEnd - reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData);
+
+        ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
+        MergeSection(pNonFragmentLlvmIrSection,
+                     llvmIrSize,
+                     firstIsaSymbolName.c_str(),
+                     pFragmentLlvmIrSection,
+                     fragmentLlvmIrOffset,
+                     FragmentIsaSymbolName,
+                     &newSection);
+        SetSection(nonFragmentLlvmIrSecIndex, &newSection);
+    }
+
+    // Merge PAL metadata
+    ElfNote nonFragmentMetaNote = {};
+    nonFragmentMetaNote = GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+
+    LLPC_ASSERT(nonFragmentMetaNote.pData != nullptr);
+    ElfNote fragmentMetaNote = {};
+    ElfNote newMetaNote = {};
+    fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    MergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
+    SetNote(&newMetaNote);
+
+    WriteToBuffer(pPipelineElf);
+}
+
 template class ElfWriter<Elf64>;
 
 } // Llpc
