@@ -303,7 +303,6 @@ bool GraphicsContext::CheckGsOnChipValidity()
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 #endif
 
-    auto pEsResUsage = GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     auto pGsResUsage = GetShaderResourceUsage(ShaderStageGeometry);
 
     uint32_t inVertsPerPrim = 0;
@@ -355,7 +354,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
     {
         uint32_t gsPrimsPerSubgroup = m_pGpuProperty->gsOnChipDefaultPrimsPerSubgroup;
 
-        const uint32_t esGsRingItemSize = 4 * std::max(1u, pEsResUsage->inOutUsage.outputMapLocCount);
+        const uint32_t esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
         const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
         const uint32_t gsVsRingItemSize = 4 * std::max(1u,
                                                        (pGsResUsage->inOutUsage.outputMapLocCount *
@@ -647,7 +646,7 @@ bool GraphicsContext::CheckGsOnChipValidity()
                                                    GetShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
-            const uint32_t esGsRingItemSize = (4 * std::max(1u, pEsResUsage->inOutUsage.outputMapLocCount)) | 1;
+            const uint32_t esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
 
             const uint32_t gsVsRingItemSize = 4 * std::max(1u,
                                                            (pGsResUsage->inOutUsage.outputMapLocCount *

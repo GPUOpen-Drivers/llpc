@@ -70,11 +70,12 @@ private:
     llvm::FunctionType* GeneratePrimShaderEntryPointType(uint64_t* pInRegMask) const;
     llvm::Function* GeneratePrimShaderEntryPoint(llvm::Module* pModule);
 
+    void ConstructPrimShaderWithoutGs(llvm::Module* pModule);
     void ConstructPrimShaderWithGs(llvm::Module* pModule);
 
     void InitWaveThreadInfo(llvm::Value* pMergedGroupInfo, llvm::Value* pMergedWaveInfo);
 
-    llvm::Value* DoCulling(llvm::Module* pModule, llvm::BasicBlock* pInsertAtEnd);
+    llvm::Value* DoCulling(llvm::Module* pModule);
     void DoParamCacheAllocRequest();
     void DoPrimitiveExport(llvm::Value* pCullFlag = nullptr);
 
@@ -140,47 +141,39 @@ private:
                                    llvm::Value*      pCullFlag,
                                    llvm::Value*      pVertex0,
                                    llvm::Value*      pVertex1,
-                                   llvm::Value*      pVertex2,
-                                   llvm::BasicBlock* pInsertAtEnd);
+                                   llvm::Value*      pVertex2);
 
     llvm::Value* DoFrustumCulling(llvm::Module*     pModule,
                                   llvm::Value*      pCullFlag,
                                   llvm::Value*      pVertex0,
                                   llvm::Value*      pVertex1,
-                                  llvm::Value*      pVertex2,
-                                  llvm::BasicBlock* pInsertAtEnd);
+                                  llvm::Value*      pVertex2);
 
     llvm::Value* DoBoxFilterCulling(llvm::Module*     pModule,
                                     llvm::Value*      pCullFlag,
                                     llvm::Value*      pVertex0,
                                     llvm::Value*      pVertex1,
-                                    llvm::Value*      pVertex2,
-                                    llvm::BasicBlock* pInsertAtEnd);
+                                    llvm::Value*      pVertex2);
 
     llvm::Value* DoSphereCulling(llvm::Module*     pModule,
                                  llvm::Value*      pCullFlag,
                                  llvm::Value*      pVertex0,
                                  llvm::Value*      pVertex1,
-                                 llvm::Value*      pVertex2,
-                                 llvm::BasicBlock* pInsertAtEnd);
+                                 llvm::Value*      pVertex2);
 
     llvm::Value* DoSmallPrimFilterCulling(llvm::Module*     pModule,
                                           llvm::Value*      pCullFlag,
                                           llvm::Value*      pVertex0,
                                           llvm::Value*      pVertex1,
-                                          llvm::Value*      pVertex2,
-                                          llvm::BasicBlock* pInsertAtEnd);
+                                          llvm::Value*      pVertex2);
 
     llvm::Value* DoCullDistanceCulling(llvm::Module*     pModule,
                                        llvm::Value*      pCullFlag,
                                        llvm::Value*      pSignMask0,
                                        llvm::Value*      pSignMask1,
-                                       llvm::Value*      pSignMask2,
-                                       llvm::BasicBlock* pInsertAtEnd);
+                                       llvm::Value*      pSignMask2);
 
-    llvm::Value* FetchCullingControlRegister(llvm::Module*     pModule,
-                                             uint32_t          regOffset,
-                                             llvm::BasicBlock* pInsertAtEnd);
+    llvm::Value* FetchCullingControlRegister(llvm::Module* pModule, uint32_t regOffset);
 
     llvm::Function* CreateBackfaceCuller(llvm::Module* pModule);
     llvm::Function* CreateFrustumCuller(llvm::Module* pModule);

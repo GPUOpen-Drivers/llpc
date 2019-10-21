@@ -245,13 +245,6 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
 Function* NggPrimShader::GeneratePrimShaderEntryPoint(
     Module* pModule)  // [in] LLVM module
 {
-    const bool hasTs = (m_hasTcs || m_hasTes);
-
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
-    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
-
-    const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
-
     uint64_t inRegMask = 0;
     auto pEntryPointTy = GeneratePrimShaderEntryPointType(&inRegMask);
 
@@ -341,777 +334,1162 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
     }
     else
     {
-        const auto pResUsage = m_pContext->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+        // GS is not present in primitive shader (ES-only shader)
+        ConstructPrimShaderWithoutGs(pModule);
+    }
 
-        // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
-        // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
-        // like this:
-        //
-        //   if (threadIdInWave < primCountInWave)
-        //   {
-        //      ldsOffset = vindex0 * 4
-        //      ds_write ldsOffset, primId
-        //   }
-        //
-        //   s_barrier
-        //
-        //   if (threadIdInWave < vertCountInWave)
-        //   {
-        //      ldsOffset = threadIdInSubgroup * 4
-        //      ds_read primId, ldsOffset
-        //   }
-        //
-        //   s_barrier
-        //
-        const bool distributePrimId = hasTs ? false : pResUsage->builtInUsage.vs.primitiveId;
+    return pEntryPoint;
+}
 
-        // No GS in primitive shader (ES only)
-        if (m_pNggControl->passthroughMode)
+// =====================================================================================================================
+// Constructs primitive shader for ES-only merged shader (GS is not present).
+void NggPrimShader::ConstructPrimShaderWithoutGs(
+    Module* pModule) // [in] LLVM module
+{
+    LLPC_ASSERT(m_hasGs == false);
+
+    const bool hasTs = (m_hasTcs || m_hasTes);
+
+    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+
+    const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
+
+    auto pEntryPoint = pModule->getFunction(LlpcName::NggPrimShaderEntryPoint);
+
+    auto pArg = pEntryPoint->arg_begin();
+
+    Value* pMergedGroupInfo = (pArg + EsGsSysValueMergedGroupInfo);
+    Value* pMergedWaveInfo = (pArg + EsGsSysValueMergedWaveInfo);
+    Value* pPrimShaderTableAddrLow = (pArg + EsGsSysValuePrimShaderTableAddrLow);
+    Value* pPrimShaderTableAddrHigh = (pArg + EsGsSysValuePrimShaderTableAddrHigh);
+
+    pArg += (EsGsSpecialSysValueCount + 1);
+
+    Value* pEsGsOffsets01 = pArg;
+    Value* pEsGsOffsets23 = (pArg + 1);
+    Value* pGsPrimitiveId = (pArg + 2);
+
+    Value* pTessCoordX = (pArg + 5);
+    Value* pTessCoordY = (pArg + 6);
+    Value* pRelPatchId = (pArg + 7);
+    Value* pPatchId = (pArg + 8);
+
+    Value* pVertexId = (pArg + 5);
+    Value* pInstanceId = (pArg + 8);
+
+    const auto pResUsage = m_pContext->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+
+    // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
+    // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
+    // like this:
+    //
+    //   if (threadIdInWave < primCountInWave)
+    //   {
+    //      ldsOffset = vindex0 * 4
+    //      ds_write ldsOffset, primId
+    //   }
+    //
+    //   s_barrier
+    //
+    //   if (threadIdInWave < vertCountInWave)
+    //   {
+    //      ldsOffset = threadIdInSubgroup * 4
+    //      ds_read primId, ldsOffset
+    //   }
+    //
+    //   s_barrier
+    //
+    const bool distributePrimId = hasTs ? false : pResUsage->builtInUsage.vs.primitiveId;
+
+    // No GS in primitive shader (ES only)
+    if (m_pNggControl->passthroughMode)
+    {
+        // Pass-through mode
+
+        // define dllexport amdgpu_gs @_amdgpu_gs_main(
+        //     inreg i32 %sgpr0..7, inreg <n x i32> %userData, i32 %vgpr0..8)
+        // {
+        // .entry:
+        //     ; Initialize EXEC mask: exec = 0xFFFFFFFF'FFFFFFFF
+        //     call void @llvm.amdgcn.init.exec(i64 -1)
+        //
+        //     ; Get thread ID in a wave:
+        //     ;   bitCount  = ((1 << threadPosition) - 1) & 0xFFFFFFFF
+        //     ;   bitCount += (((1 << threadPosition) - 1) >> 32) & 0xFFFFFFFF
+        //     ;   threadIdInWave = bitCount
+        //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
+        //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %threadIdInWave)
+        //
+        //     %waveIdInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 24, i32 4)
+        //     %threadIdInSubgroup = mul i32 %waveIdInSubgroup, %waveSize
+        //     %threadIdInSubgroup = add i32 %threadIdInSubgroup, %threadIdInWave
+        //
+        //     %primCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 22, i32 9)
+        //     %vertCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 12, i32 9)
+        //
+        //     %primCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
+        //     %vertCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 0, i32 8)
+        //
+        //     %primValid = icmp ult i32 %threadIdInWave , %primCountInWave
+        //     br i1 %primValid, label %.writePrimId, label %.endWritePrimId
+        // [
+        // .writePrimId:
+        //     ; Write LDS region (primitive ID)
+        //     br label %.endWritePrimId
+        //
+        // .endWritePrimId:
+        //     call void @llvm.amdgcn.s.barrier()
+        //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
+        //     br i1 %vertValid, label %.readPrimId, label %.endReadPrimId
+        //
+        // .readPrimId:
+        //     ; Read LDS region (primitive ID)
+        //     br label %.endReadPrimId
+        //
+        // .endReadPrimId:
+        // ]
+        //     call void @llvm.amdgcn.s.barrier()
+        //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
+        //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
+        //
+        // .allocReq:
+        //     ; Do parameter cache (PC) alloc request: s_sendmsg(GS_ALLOC_REQ, ...)
+        //     br label %.endAllocReq
+        //
+        // .endAllocReq:
+        //     %primExp = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
+        //     br i1 %primExp, label %.expPrim, label %.endExpPrim
+        //
+        // .expPrim:
+        //     ; Do primitive export: exp prim, ...
+        //     br label %.endExpPrim
+        //
+        // .endExpPrim:
+        //     %vertExp = icmp ult i32 %threadIdInSubgroup, %vertCountInSubgroup
+        //     br i1 %vertExp, label %.expVert, label %.endExpVert
+        //
+        // .expVert:
+        //     call void @llpc.ngg.ES.main(%sgpr..., %userData..., %vgpr...)
+        //     br label %.endExpVert
+        //
+        // .endExpVert:
+        //     ret void
+        // }
+
+        // Define basic blocks
+        auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");
+
+        // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
+        BasicBlock* pWritePrimIdBlock = nullptr;
+        BasicBlock* pEndWritePrimIdBlock = nullptr;
+        BasicBlock* pReadPrimIdBlock = nullptr;
+        BasicBlock* pEndReadPrimIdBlock = nullptr;
+
+        if (distributePrimId)
         {
-            // Pass-through mode
+            pWritePrimIdBlock = CreateBlock(pEntryPoint, ".writePrimId");
+            pEndWritePrimIdBlock = CreateBlock(pEntryPoint, ".endWritePrimId");
 
-            // define dllexport amdgpu_gs @_amdgpu_gs_main(
-            //     inreg i32 %sgpr0..7, inreg <n x i32> %userData, i32 %vgpr0..8)
-            // {
-            // .entry:
-            //     ; Initialize EXEC mask: exec = 0xFFFFFFFF'FFFFFFFF
-            //     call void @llvm.amdgcn.init.exec(i64 -1)
-            //
-            //     ; Get thread ID in a wave:
-            //     ;   bitCount  = ((1 << threadPosition) - 1) & 0xFFFFFFFF
-            //     ;   bitCount += (((1 << threadPosition) - 1) >> 32) & 0xFFFFFFFF
-            //     ;   threadIdInWave = bitCount
-            //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
-            //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %threadIdInWave)
-            //
-            //     %waveIdInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 24, i32 4)
-            //     %threadIdInSubgroup = mul i32 %waveIdInSubgroup, %waveSize
-            //     %threadIdInSubgroup = add i32 %threadIdInSubgroup, %threadIdInWave
-            //
-            //     %primCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 22, i32 9)
-            //     %vertCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 12, i32 9)
-            //
-            //     %primCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
-            //     %vertCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 0, i32 8)
-            //
-            //     %primValid = icmp ult i32 %threadIdInWave , %primCountInWave
-            //     br i1 %primValid, label %.writePrimId, label %.endWritePrimId
-            // [
-            // .writePrimId:
-            //     ; Write LDS region (primitive ID)
-            //     br label %.endWritePrimId
-            //
-            // .endWritePrimId:
-            //     call void @llvm.amdgcn.s.barrier()
-            //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
-            //     br i1 %vertValid, label %.readPrimId, label %.endReadPrimId
-            //
-            // .readPrimId:
-            //     ; Read LDS region (primitive ID)
-            //     br label %.endReadPrimId
-            //
-            // .endReadPrimId:
-            // ]
-            //     call void @llvm.amdgcn.s.barrier()
-            //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
-            //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
-            //
-            // .allocReq:
-            //     ; Do parameter cache (PC) alloc request: s_sendmsg(GS_ALLOC_REQ, ...)
-            //     br label %.endAllocReq
-            //
-            // .endAllocReq:
-            //     %primExp = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
-            //     br i1 %primExp, label %.expPrim, label %.endExpPrim
-            //
-            // .expPrim:
-            //     ; Do primitive export: exp prim, ...
-            //     br label %.endExpPrim
-            //
-            // .endExpPrim:
-            //     %vertExp = icmp ult i32 %threadIdInSubgroup, %vertCountInSubgroup
-            //     br i1 %vertExp, label %.expVert, label %.endExpVert
-            //
-            // .expVert:
-            //     call void @llpc.ngg.ES.main(%sgpr..., %userData..., %vgpr...)
-            //     br label %.endExpVert
-            //
-            // .endExpVert:
-            //     ret void
-            // }
-
-            // Define basic blocks
-            auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");
-
-            // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-            BasicBlock* pWritePrimIdBlock = nullptr;
-            BasicBlock* pEndWritePrimIdBlock = nullptr;
-            BasicBlock* pReadPrimIdBlock = nullptr;
-            BasicBlock* pEndReadPrimIdBlock = nullptr;
-
-            if (distributePrimId)
-            {
-                pWritePrimIdBlock = CreateBlock(pEntryPoint, ".writePrimId");
-                pEndWritePrimIdBlock = CreateBlock(pEntryPoint, ".endWritePrimId");
-
-                pReadPrimIdBlock = CreateBlock(pEntryPoint, ".readPrimId");
-                pEndReadPrimIdBlock = CreateBlock(pEntryPoint, ".endReadPrimId");
-            }
-
-            auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
-            auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
-
-            auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
-            auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
-
-            auto pExpVertBlock = CreateBlock(pEntryPoint, ".expVert");
-            auto pEndExpVertBlock = CreateBlock(pEntryPoint, ".endExpVert");
-
-            // Construct ".entry" block
-            {
-                m_pBuilder->SetInsertPoint(pEntryBlock);
-
-                InitWaveThreadInfo(pMergedGroupInfo, pMergedWaveInfo);
-
-                // Record ES-GS vertex offsets info
-                m_nggFactor.pEsGsOffsets01 = pEsGsOffsets01;
-
-                if (distributePrimId)
-                {
-                    auto pPrimValid =
-                        m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
-                    m_pBuilder->CreateCondBr(pPrimValid, pWritePrimIdBlock, pEndWritePrimIdBlock);
-                }
-                else
-                {
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                    auto pFirstWaveInSubgroup =
-                        m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
-                    m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
-                }
-            }
-
-            if (distributePrimId)
-            {
-                // Construct ".writePrimId" block
-                {
-                    m_pBuilder->SetInsertPoint(pWritePrimIdBlock);
-
-                    // Primitive data layout
-                    //   ES_GS_OFFSET01[31]    = null primitive flag
-                    //   ES_GS_OFFSET01[28:20] = vertexId2 (in bytes)
-                    //   ES_GS_OFFSET01[18:10] = vertexId1 (in bytes)
-                    //   ES_GS_OFFSET01[8:0]   = vertexId0 (in bytes)
-
-                    // Distribute primitive ID
-                    auto pVertexId0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                                  m_pBuilder->getInt32Ty(),
-                                                                  {
-                                                                      m_nggFactor.pEsGsOffsets01,
-                                                                      m_pBuilder->getInt32(0),
-                                                                      m_pBuilder->getInt32(9)
-                                                                  });
-
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
-
-                    auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
-                    pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
-
-                    auto pPrimIdWriteValue = pGsPrimitiveId;
-                    m_pLdsManager->WriteValueToLds(pPrimIdWriteValue, pLdsOffset);
-
-                    BranchInst::Create(pEndWritePrimIdBlock, pWritePrimIdBlock);
-                }
-
-                // Construct ".endWritePrimId" block
-                {
-                    m_pBuilder->SetInsertPoint(pEndWritePrimIdBlock);
-
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                    auto pVertValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave,
-                                                                m_nggFactor.pVertCountInWave);
-                    m_pBuilder->CreateCondBr(pVertValid, pReadPrimIdBlock, pEndReadPrimIdBlock);
-                }
-
-                // Construct ".readPrimId" block
-                Value* pPrimIdReadValue = nullptr;
-                {
-                    m_pBuilder->SetInsertPoint(pReadPrimIdBlock);
-
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
-
-                    auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
-                    pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
-
-                    pPrimIdReadValue = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-                    m_pBuilder->CreateBr(pEndReadPrimIdBlock);
-                }
-
-                // Construct ".endReadPrimId" block
-                {
-                    m_pBuilder->SetInsertPoint(pEndReadPrimIdBlock);
-
-                    auto pPrimitiveId = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
-
-                    pPrimitiveId->addIncoming(pPrimIdReadValue, pReadPrimIdBlock);
-                    pPrimitiveId->addIncoming(m_pBuilder->getInt32(0), pEndWritePrimIdBlock);
-
-                    // Record primitive ID
-                    m_nggFactor.pPrimitiveId = pPrimitiveId;
-
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                    auto pFirstWaveInSubgroup = m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup,
-                                                                         m_pBuilder->getInt32(0));
-                    m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
-                }
-            }
-
-            // Construct ".allocReq" block
-            {
-                m_pBuilder->SetInsertPoint(pAllocReqBlock);
-
-                DoParamCacheAllocRequest();
-                m_pBuilder->CreateBr(pEndAllocReqBlock);
-            }
-
-            // Construct ".endAllocReq" block
-            {
-                m_pBuilder->SetInsertPoint(pEndAllocReqBlock);
-
-                auto pPrimExp =
-                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
-                m_pBuilder->CreateCondBr(pPrimExp, pExpPrimBlock, pEndExpPrimBlock);
-            }
-
-            // Construct ".expPrim" block
-            {
-                m_pBuilder->SetInsertPoint(pExpPrimBlock);
-
-                DoPrimitiveExport();
-                m_pBuilder->CreateBr(pEndExpPrimBlock);
-            }
-
-            // Construct ".endExpPrim" block
-            {
-                m_pBuilder->SetInsertPoint(pEndExpPrimBlock);
-
-                auto pVertExp =
-                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pVertCountInSubgroup);
-                m_pBuilder->CreateCondBr(pVertExp, pExpVertBlock, pEndExpVertBlock);
-            }
-
-            // Construct ".expVert" block
-            {
-                m_pBuilder->SetInsertPoint(pExpVertBlock);
-
-                RunEsOrEsVariant(pModule,
-                                 LlpcName::NggEsEntryPoint,
-                                 pEntryPoint->arg_begin(),
-                                 false,
-                                 nullptr,
-                                 pExpVertBlock);
-
-                m_pBuilder->CreateBr(pEndExpVertBlock);
-            }
-
-            // Construct ".endExpVert" block
-            {
-                m_pBuilder->SetInsertPoint(pEndExpVertBlock);
-
-                m_pBuilder->CreateRetVoid();
-            }
+            pReadPrimIdBlock = CreateBlock(pEntryPoint, ".readPrimId");
+            pEndReadPrimIdBlock = CreateBlock(pEntryPoint, ".endReadPrimId");
         }
-        else
+
+        auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
+        auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
+
+        auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
+        auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
+
+        auto pExpVertBlock = CreateBlock(pEntryPoint, ".expVert");
+        auto pEndExpVertBlock = CreateBlock(pEntryPoint, ".endExpVert");
+
+        // Construct ".entry" block
         {
-            // Non pass-through mode
+            m_pBuilder->SetInsertPoint(pEntryBlock);
 
-            // define dllexport amdgpu_gs @_amdgpu_gs_main(
-            //     inreg i32 %sgpr0..7, inreg <n x i32> %userData, i32 %vgpr0..8])
-            // {
-            // .entry:
-            //     ; Initialize EXEC mask: exec = 0xFFFFFFFF'FFFFFFFF
-            //     call void @llvm.amdgcn.init.exec(i64 -1)
-            //
-            //     ; Get thread ID in a wave:
-            //     ;   bitCount  = ((1 << threadPosition) - 1) & 0xFFFFFFFF
-            //     ;   bitCount += (((1 << threadPosition) - 1) >> 32) & 0xFFFFFFFF
-            //     ;   threadIdInWave = bitCount
-            //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
-            //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %threadIdInWave)
-            //
-            //     %waveIdInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 24, i32 4)
-            //
-            //     %threadIdInSubgroup = mul i32 %waveIdInSubgroup, %waveSize
-            //     %threadIdInSubgroup = add i32 %threadIdInSubgroup, %threadIdInWave
-            //
-            //     %primCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 22, i32 9)
-            //     %vertCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 12, i32 9)
-            //
-            //     %primCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
-            //     %vertCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 0, i32 8)
-            //
-            // <if (distributePrimId)>
-            // [
-            // .writePrimId:
-            //     ; Write LDS region (primitive ID)
-            //     br label %.endWritePrimId
-            //
-            // .endWritePrimId:
-            //     call void @llvm.amdgcn.s.barrier()
-            //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
-            //     br i1 %vertValid, label %.readPrimId, label %.endReadPrimId
-            //
-            // .readPrimId:
-            //     ; Read LDS region (primitive ID)
-            //     br label %.endReadPrimId
-            //
-            // .endReadPrimId:
-            //     call void @llvm.amdgcn.s.barrier()
-            // ]
-            //     %firstThreadInSubgroup = icmp eq i32 %threadIdInSubgroup, 0
-            //     br i1 %firstThreadInSubgroup, label %.zeroPrimWaveCount, label %.endZeroPrimWaveCount
-            //
-            // .zeroThreadCount:
-            //     ; Zero LDS region (primitive/vertex count in waves), do it for the first thread
-            //     br label %.endZeroThreadCount
-            //
-            // .endZeroThreadCount:
-            //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
-            //     br i1 %firstWaveInSubgroup, label %.zeroDrawFlag, label %.endZeroDrawFlag
-            //
-            // .zeroDrawFlag:
-            //     ; Zero LDS regision (draw flag), do it for the first wave
-            //     br label %.endZeroDrawFlag
-            //
-            // .endZeroDrawFlag:
-            //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
-            //     br i1 %vertValid, label %.writePosData, label %.endWritePosData
-            //
-            // .writePosData:
-            //     ; Write LDS region (position data)
-            //     %expData = call [ POS0: <4 x float>, POS1: <4 x float>, ...,
-            //                       PARAM0: <4 x float>, PARAM1: <4 xfloat>, ... ]
-            //                     @llpc.ngg.ES.variant(%sgpr..., %userData..., %vgpr...)
-            //     br label %.endWritePosData
-            //
-            // .endWritePosData:
-            //     call void @llvm.amdgcn.s.barrier()
-            //
-            //     %primValidInWave = icmp ult i32 %threadIdInWave, %primCountInWave
-            //     %primValidInSubgroup = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
-            //     %primValid = and i1 %primValidInWave, %primValidInSubgroup
-            //     br i1 %primValid, label %.culling, label %.endCulling
-            //
-            // .culling:
-            //     ; Do culling
-            //     %doCull = call i32 @llpc.ngg.culling.XXX(...)
-            //     br label %.endCulling
-            //
-            // .endCulling:
-            //     %cullFlag = phi i1 [ true, %.endWritePosData ], [ %doCull, %.culling ]
-            //     %drawFlag = xor i1 1, %cullFlag
-            //     br i1 %drawFlag, label %.writeDrawFlag, label %.endWriteDrawFlag
-            //
-            // .writeDrawFlag:
-            //     ; Write LDS region (draw flag)
-            //     br label %.endWriteDrawFlag
-            //
-            // .endWriteDrawFlag:
-            // <if (vertexCompact)>
-            // [
-            //     call void @llvm.amdgcn.s.barrier()
-            // ]
-            //     %drawMask = call i64 @llpc.subgroup.ballot(i1 %drawFlag)
-            //     %drawCount = call i64 @llvm.ctpop.i64(i64 %drawMask)
-            //     %hasSurviveDraw = icmp ne i64 %drawCount, 0
-            //
-            //     %theadIdUpbound = sub i32 %waveCountInSubgroup, %waveIdInSubgroup
-            //     %threadValid = icmp ult i32 %threadIdInWave, %theadIdUpbound
-            //     %primCountAcc = and i1 %hasSurviveDraw, %threadValid
-            //     br i1 %primCountAcc, label %.accThreadCount, label %.endAccThreadCount
-            //
-            // .accThreadCount:
-            //     ; Write LDS region (primitive/vertex count in waves)
-            //     br label %.endAccThreadCount
-            //
-            // .endAccThreadCount:
-            //     call void @llvm.amdgcn.s.barrier()
-            //
-            // <if (vertexCompact)>
-            // [
-            //     br lable %.readThreadCount
-            //
-            // .readThreadCount:
-            //     %vertCountInWaves = ... (read LDS region, vertex count in waves)
-            //     %threadCountInWaves = %vertCountInWaves
-            //
-            //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
-            //     %compactDataWrite = and i1 %vertValid, %drawFlag
-            //     br i1 %compactDataWrite, label %.writeCompactData, label %.endReadThreadCount
-            //
-            // .writeCompactData:
-            //     ; Write LDS region (compaction data: compacted thread ID, vertex position data,
-            //     ; vertex ID/tessCoordX, instance ID/tessCoordY, primitive ID/relative patch ID, patch ID)
-            //     br label %.endReadThreadCount
-            //
-            // .endReadThreadCount:
-            //     %hasSurviveVert = icmp ne i32 %vertCountInWaves, 0
-            //     %primCountInSubgroup =
-            //         select i1 %hasSurviveVert, i32 %primCountInSubgroup, i32 %fullyCulledThreadCount
-            //     %vertCountInSubgroup =
-            //         select i1 %hasSurviveVert, i32 %vertCountInWaves, i32 %fullyCulledThreadCount
-            //
-            //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
-            //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
-            // ]
-            // <else>
-            // [
-            //     %firstThreadInWave = icmp eq i32 %threadIdInWave, 0
-            //     br i1 %firstThreadInWave, label %.readThreadCount, label %.endReadThreadCount
-            //
-            // .readThreadCount:
-            //     %primCount = ... (read LDS region, primitive count in waves)
-            //     %threadCountInWaves = %primCount
-            //
-            //     br label %.endReadThreadCount
-            //
-            // .endReadThreadCount:
-            //     %primCount = phi i32 [ primCountInSubgroup, %.endAccPrimCount ], [ %primCount, %.readThreadCount ]
-            //     %hasSurvivePrim = icmp ne i32 %primCount, 0
-            //     %primCountInSubgroup =
-            //         select i1 %hasSurvivePrim, i32 %primCountInSubgroup, i32 %fullyCulledThreadCount
-            //     %hasSurvivePrim = icmp ne i32 %primCountInSubgroup, 0
-            //     %vertCountInSubgroup =
-            //         select i1 %hasSurvivePrim, i32 %vertCountInSubgroup, i32 %fullyCulledThreadCount
-            //
-            //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
-            //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
-            // ]
-            // .allocReq:
-            //     ; Do parameter cache (PC) alloc request: s_sendmsg(GS_ALLOC_REQ, ...)
-            //     br label %.endAllocReq
-            //
-            // .endAlloReq:
-            // <if (vertexCompact)>
-            // [
-            //     call void @llvm.amdgcn.s.barrier()
-            // ]
-            //     %noSurviveThread = icmp eq %threadCountInWaves, 0
-            //     br i1 %noSurviveThread, label %.earlyExit, label %.noEarlyExit
-            //
-            // .earlyExit:
-            //     %firstThreadInSubgroup = icmp eq i32 %threadIdInSubgroup, 0
-            //     br i1 %firstThreadInSubgroup, label %.dummyExp, label %.endDummyExp
-            //
-            // .dummyExp:
-            //     ; Do vertex position export: exp pos, ... (off, off, off, off)
-            //     ; Do primitive export: exp prim, ... (0, off, off, off)
-            //     br label %.endDummyExp
-            //
-            // .endDummyExp:
-            //     ret void
-            //
-            // .noEarlyExit:
-            //     %primExp = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
-            //     br i1 %primExp, label %.expPrim, label %.endExpPrim
-            //
-            // .expPrim:
-            //     ; Do primitive export: exp prim, ...
-            //     br label %.endExpPrim
-            //
-            // .endExpPrim:
-            //     %vertExp = icmp ult i32 %threadIdInSubgroup, %vertCountInSubgroup
-            //     br i1 %vertExp, label %.expVertPos, label %.endExpVertPos
-            //
-            // .expVertPos:
-            //     ; Do vertex position export: exp pos, ...
-            //     br label %.endExpVertPos
-            //
-            // .endExpVertPos:
-            //     br i1 %vertExp, label %.expVertParam, label %.endExpVertParam
-            //
-            // .expVertParam:
-            //     ; Do vertex parameter export: exp param, ...
-            //     br label %.endExpVertParam
-            //
-            // .endExpVertParam:
-            //     ret void
-            // }
+            InitWaveThreadInfo(pMergedGroupInfo, pMergedWaveInfo);
 
-            const bool vertexCompact = (m_pNggControl->compactMode == NggCompactVertices);
-
-            // Thread count when the entire sub-group is fully culled
-            const uint32_t fullyCulledThreadCount =
-                m_pContext->GetGpuWorkarounds()->gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
-
-            // Define basic blocks
-            auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");
-
-            // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-            BasicBlock* pWritePrimIdBlock = nullptr;
-            BasicBlock* pEndWritePrimIdBlock = nullptr;
-            BasicBlock* pReadPrimIdBlock = nullptr;
-            BasicBlock* pEndReadPrimIdBlock = nullptr;
+            // Record ES-GS vertex offsets info
+            m_nggFactor.pEsGsOffsets01 = pEsGsOffsets01;
 
             if (distributePrimId)
             {
-                pWritePrimIdBlock = CreateBlock(pEntryPoint, ".writePrimId");
-                pEndWritePrimIdBlock = CreateBlock(pEntryPoint, ".endWritePrimId");
-
-                pReadPrimIdBlock = CreateBlock(pEntryPoint, ".readPrimId");
-                pEndReadPrimIdBlock = CreateBlock(pEntryPoint, ".endReadPrimId");
-            }
-
-            auto pZeroThreadCountBlock = CreateBlock(pEntryPoint, ".zeroThreadCount");
-            auto pEndZeroThreadCountBlock = CreateBlock(pEntryPoint, ".endZeroThreadCount");
-
-            auto pZeroDrawFlagBlock = CreateBlock(pEntryPoint, ".zeroDrawFlag");
-            auto pEndZeroDrawFlagBlock = CreateBlock(pEntryPoint, ".endZeroDrawFlag");
-
-            auto pWritePosDataBlock = CreateBlock(pEntryPoint, ".writePosData");
-            auto pEndWritePosDataBlock = CreateBlock(pEntryPoint, ".endWritePosData");
-
-            auto pCullingBlock = CreateBlock(pEntryPoint, ".culling");
-            auto pEndCullingBlock = CreateBlock(pEntryPoint, ".endCulling");
-
-            auto pWriteDrawFlagBlock = CreateBlock(pEntryPoint, ".writeDrawFlag");
-            auto pEndWriteDrawFlagBlock = CreateBlock(pEntryPoint, ".endWriteDrawFlag");
-
-            auto pAccThreadCountBlock = CreateBlock(pEntryPoint, ".accThreadCount");
-            auto pEndAccThreadCountBlock = CreateBlock(pEntryPoint, ".endAccThreadCount");
-
-            // NOTE: Those basic blocks are conditionally created on the basis of actual NGG compaction mode.
-            BasicBlock* pReadThreadCountBlock = nullptr;
-            BasicBlock* pWriteCompactDataBlock = nullptr;
-            BasicBlock* pEndReadThreadCountBlock = nullptr;
-
-            if (vertexCompact)
-            {
-                pReadThreadCountBlock = CreateBlock(pEntryPoint, ".readThreadCount");
-                pWriteCompactDataBlock = CreateBlock(pEntryPoint, ".writeCompactData");
-                pEndReadThreadCountBlock = CreateBlock(pEntryPoint, ".endReadThreadCount");
+                auto pPrimValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
+                m_pBuilder->CreateCondBr(pPrimValid, pWritePrimIdBlock, pEndWritePrimIdBlock);
             }
             else
             {
-                pReadThreadCountBlock = CreateBlock(pEntryPoint, ".readThreadCount");
-                pEndReadThreadCountBlock = CreateBlock(pEntryPoint, ".endReadThreadCount");
-            }
-
-            auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
-            auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
-
-            auto pEarlyExitBlock = CreateBlock(pEntryPoint, ".earlyExit");
-            auto pNoEarlyExitBlock = CreateBlock(pEntryPoint, ".noEarlyExit");
-
-            auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
-            auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
-
-            auto pExpVertPosBlock = CreateBlock(pEntryPoint, ".expVertPos");
-            auto pEndExpVertPosBlock = CreateBlock(pEntryPoint, ".endExpVertPos");
-
-            auto pExpVertParamBlock = CreateBlock(pEntryPoint, ".expVertParam");
-            auto pEndExpVertParamBlock = CreateBlock(pEntryPoint, ".endExpVertParam");
-
-            // Construct ".entry" block
-            {
-                m_pBuilder->SetInsertPoint(pEntryBlock);
-
-                InitWaveThreadInfo(pMergedGroupInfo, pMergedWaveInfo);
-
-                // Record primitive shader table address info
-                m_nggFactor.pPrimShaderTableAddrLow  = pPrimShaderTableAddrLow;
-                m_nggFactor.pPrimShaderTableAddrHigh = pPrimShaderTableAddrHigh;
-
-                // Record ES-GS vertex offsets info
-                m_nggFactor.pEsGsOffsets01  = pEsGsOffsets01;
-                m_nggFactor.pEsGsOffsets23  = pEsGsOffsets23;
-
-                if (distributePrimId)
-                {
-                    auto pPrimValid =
-                        m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
-                    m_pBuilder->CreateCondBr(pPrimValid, pWritePrimIdBlock, pEndWritePrimIdBlock);
-                }
-                else
-                {
-                    auto pFirstThreadInSubgroup =
-                        m_pBuilder->CreateICmpEQ(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(0));
-                    m_pBuilder->CreateCondBr(pFirstThreadInSubgroup, pZeroThreadCountBlock, pEndZeroThreadCountBlock);
-                }
-            }
-
-            if (distributePrimId)
-            {
-                // Construct ".writePrimId" block
-                {
-                    m_pBuilder->SetInsertPoint(pWritePrimIdBlock);
-
-                    // Primitive data layout
-                    //   ES_GS_OFFSET23[15:0]  = vertexId2 (in DWORDs)
-                    //   ES_GS_OFFSET01[31:16] = vertexId1 (in DWORDs)
-                    //   ES_GS_OFFSET01[15:0]  = vertexId0 (in DWORDs)
-
-                    // Use vertex0 as provoking vertex to distribute primitive ID
-                    auto pEsGsOffset0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                                    m_pBuilder->getInt32Ty(),
-                                                                    {
-                                                                        m_nggFactor.pEsGsOffsets01,
-                                                                        m_pBuilder->getInt32(0),
-                                                                        m_pBuilder->getInt32(16),
-                                                                    });
-
-                    auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
-
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
-
-                    auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
-                    pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
-
-                    auto pPrimIdWriteValue = pGsPrimitiveId;
-                    m_pLdsManager->WriteValueToLds(pPrimIdWriteValue, pLdsOffset);
-
-                    m_pBuilder->CreateBr(pEndWritePrimIdBlock);
-                }
-
-                // Construct ".endWritePrimId" block
-                {
-                    m_pBuilder->SetInsertPoint(pEndWritePrimIdBlock);
-
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                    auto pVertValid =
-                        m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pVertCountInWave);
-                    m_pBuilder->CreateCondBr(pVertValid, pReadPrimIdBlock, pEndReadPrimIdBlock);
-                }
-
-                // Construct ".readPrimId" block
-                Value* pPrimIdReadValue = nullptr;
-                {
-                    m_pBuilder->SetInsertPoint(pReadPrimIdBlock);
-
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
-
-                    auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
-                    pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
-
-                    pPrimIdReadValue =
-                        m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-                    m_pBuilder->CreateBr(pEndReadPrimIdBlock);
-                }
-
-                // Construct ".endReadPrimId" block
-                {
-                    m_pBuilder->SetInsertPoint(pEndReadPrimIdBlock);
-
-                    auto pPrimitiveId = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
-
-                    pPrimitiveId->addIncoming(pPrimIdReadValue, pReadPrimIdBlock);
-                    pPrimitiveId->addIncoming(m_pBuilder->getInt32(0), pEndWritePrimIdBlock);
-
-                    // Record primitive ID
-                    m_nggFactor.pPrimitiveId = pPrimitiveId;
-
-                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                    auto pFirstThreadInSubgroup =
-                        m_pBuilder->CreateICmpEQ(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(0));
-                    m_pBuilder->CreateCondBr(pFirstThreadInSubgroup,
-                                             pZeroThreadCountBlock,
-                                             pEndZeroThreadCountBlock);
-                }
-            }
-
-            // Construct ".zeroThreadCount" block
-            {
-                m_pBuilder->SetInsertPoint(pZeroThreadCountBlock);
-
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
-                    vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
-
-                auto pZero = m_pBuilder->getInt32(0);
-
-                // Zero per-wave primitive/vertex count
-                std::vector<Constant*> zeros;
-                for (uint32_t i = 0; i < Gfx9::NggMaxWavesPerSubgroup; ++i)
-                {
-                    zeros.push_back(pZero);
-                }
-                auto pZeros = ConstantVector::get(zeros);
-
-                auto pLdsOffset = m_pBuilder->getInt32(regionStart);
-                m_pLdsManager->WriteValueToLds(pZeros, pLdsOffset);
-
-                // Zero sub-group primitive/vertex count
-                pLdsOffset = m_pBuilder->getInt32(regionStart + SizeOfDword * Gfx9::NggMaxWavesPerSubgroup);
-                m_pLdsManager->WriteValueToLds(pZero, pLdsOffset);
-
-                m_pBuilder->CreateBr(pEndZeroThreadCountBlock);
-            }
-
-            // Construct ".endZeroThreadCount" block
-            {
-                m_pBuilder->SetInsertPoint(pEndZeroThreadCountBlock);
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
                 auto pFirstWaveInSubgroup =
                     m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
-                m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pZeroDrawFlagBlock, pEndZeroDrawFlagBlock);
+                m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
+            }
+        }
+
+        if (distributePrimId)
+        {
+            // Construct ".writePrimId" block
+            {
+                m_pBuilder->SetInsertPoint(pWritePrimIdBlock);
+
+                // Primitive data layout
+                //   ES_GS_OFFSET01[31]    = null primitive flag
+                //   ES_GS_OFFSET01[28:20] = vertexId2 (in bytes)
+                //   ES_GS_OFFSET01[18:10] = vertexId1 (in bytes)
+                //   ES_GS_OFFSET01[8:0]   = vertexId0 (in bytes)
+
+                // Distribute primitive ID
+                auto pVertexId0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                              m_pBuilder->getInt32Ty(),
+                                                              {
+                                                                  m_nggFactor.pEsGsOffsets01,
+                                                                  m_pBuilder->getInt32(0),
+                                                                  m_pBuilder->getInt32(9)
+                                                              });
+
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+
+                auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
+                pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
+
+                auto pPrimIdWriteValue = pGsPrimitiveId;
+                m_pLdsManager->WriteValueToLds(pPrimIdWriteValue, pLdsOffset);
+
+                BranchInst::Create(pEndWritePrimIdBlock, pWritePrimIdBlock);
             }
 
-            // Construct ".zeroDrawFlag" block
+            // Construct ".endWritePrimId" block
             {
-                m_pBuilder->SetInsertPoint(pZeroDrawFlagBlock);
+                m_pBuilder->SetInsertPoint(pEndWritePrimIdBlock);
 
-                Value* pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInWave, 2);
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+                auto pVertValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave,
+                                                            m_nggFactor.pVertCountInWave);
+                m_pBuilder->CreateCondBr(pVertValid, pReadPrimIdBlock, pEndReadPrimIdBlock);
+            }
 
-                pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
+            // Construct ".readPrimId" block
+            Value* pPrimIdReadValue = nullptr;
+            {
+                m_pBuilder->SetInsertPoint(pReadPrimIdBlock);
 
-                auto pZero = m_pBuilder->getInt32(0);
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+
+                auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
+                pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
+
+                pPrimIdReadValue = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
+
+                m_pBuilder->CreateBr(pEndReadPrimIdBlock);
+            }
+
+            // Construct ".endReadPrimId" block
+            {
+                m_pBuilder->SetInsertPoint(pEndReadPrimIdBlock);
+
+                auto pPrimitiveId = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
+
+                pPrimitiveId->addIncoming(pPrimIdReadValue, pReadPrimIdBlock);
+                pPrimitiveId->addIncoming(m_pBuilder->getInt32(0), pEndWritePrimIdBlock);
+
+                // Record primitive ID
+                m_nggFactor.pPrimitiveId = pPrimitiveId;
+
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+                auto pFirstWaveInSubgroup = m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup,
+                                                                     m_pBuilder->getInt32(0));
+                m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
+            }
+        }
+
+        // Construct ".allocReq" block
+        {
+            m_pBuilder->SetInsertPoint(pAllocReqBlock);
+
+            DoParamCacheAllocRequest();
+            m_pBuilder->CreateBr(pEndAllocReqBlock);
+        }
+
+        // Construct ".endAllocReq" block
+        {
+            m_pBuilder->SetInsertPoint(pEndAllocReqBlock);
+
+            auto pPrimExp =
+                m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
+            m_pBuilder->CreateCondBr(pPrimExp, pExpPrimBlock, pEndExpPrimBlock);
+        }
+
+        // Construct ".expPrim" block
+        {
+            m_pBuilder->SetInsertPoint(pExpPrimBlock);
+
+            DoPrimitiveExport();
+            m_pBuilder->CreateBr(pEndExpPrimBlock);
+        }
+
+        // Construct ".endExpPrim" block
+        {
+            m_pBuilder->SetInsertPoint(pEndExpPrimBlock);
+
+            auto pVertExp =
+                m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pVertCountInSubgroup);
+            m_pBuilder->CreateCondBr(pVertExp, pExpVertBlock, pEndExpVertBlock);
+        }
+
+        // Construct ".expVert" block
+        {
+            m_pBuilder->SetInsertPoint(pExpVertBlock);
+
+            RunEsOrEsVariant(pModule,
+                             LlpcName::NggEsEntryPoint,
+                             pEntryPoint->arg_begin(),
+                             false,
+                             nullptr,
+                             pExpVertBlock);
+
+            m_pBuilder->CreateBr(pEndExpVertBlock);
+        }
+
+        // Construct ".endExpVert" block
+        {
+            m_pBuilder->SetInsertPoint(pEndExpVertBlock);
+
+            m_pBuilder->CreateRetVoid();
+        }
+    }
+    else
+    {
+        // Non pass-through mode
+
+        // define dllexport amdgpu_gs @_amdgpu_gs_main(
+        //     inreg i32 %sgpr0..7, inreg <n x i32> %userData, i32 %vgpr0..8])
+        // {
+        // .entry:
+        //     ; Initialize EXEC mask: exec = 0xFFFFFFFF'FFFFFFFF
+        //     call void @llvm.amdgcn.init.exec(i64 -1)
+        //
+        //     ; Get thread ID in a wave:
+        //     ;   bitCount  = ((1 << threadPosition) - 1) & 0xFFFFFFFF
+        //     ;   bitCount += (((1 << threadPosition) - 1) >> 32) & 0xFFFFFFFF
+        //     ;   threadIdInWave = bitCount
+        //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
+        //     %threadIdInWave = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 %threadIdInWave)
+        //
+        //     %waveIdInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 24, i32 4)
+        //
+        //     %threadIdInSubgroup = mul i32 %waveIdInSubgroup, %waveSize
+        //     %threadIdInSubgroup = add i32 %threadIdInSubgroup, %threadIdInWave
+        //
+        //     %primCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 22, i32 9)
+        //     %vertCountInSubgroup = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr2, i32 12, i32 9)
+        //
+        //     %primCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 8, i32 8)
+        //     %vertCountInWave = call i32 @llvm.amdgcn.ubfe.i32(i32 %sgpr3, i32 0, i32 8)
+        //
+        // <if (distributePrimId)>
+        // [
+        // .writePrimId:
+        //     ; Write LDS region (primitive ID)
+        //     br label %.endWritePrimId
+        //
+        // .endWritePrimId:
+        //     call void @llvm.amdgcn.s.barrier()
+        //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
+        //     br i1 %vertValid, label %.readPrimId, label %.endReadPrimId
+        //
+        // .readPrimId:
+        //     ; Read LDS region (primitive ID)
+        //     br label %.endReadPrimId
+        //
+        // .endReadPrimId:
+        //     call void @llvm.amdgcn.s.barrier()
+        // ]
+        //     %firstThreadInSubgroup = icmp eq i32 %threadIdInSubgroup, 0
+        //     br i1 %firstThreadInSubgroup, label %.zeroPrimWaveCount, label %.endZeroPrimWaveCount
+        //
+        // .zeroThreadCount:
+        //     ; Zero LDS region (primitive/vertex count in waves), do it for the first thread
+        //     br label %.endZeroThreadCount
+        //
+        // .endZeroThreadCount:
+        //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
+        //     br i1 %firstWaveInSubgroup, label %.zeroDrawFlag, label %.endZeroDrawFlag
+        //
+        // .zeroDrawFlag:
+        //     ; Zero LDS regision (draw flag), do it for the first wave
+        //     br label %.endZeroDrawFlag
+        //
+        // .endZeroDrawFlag:
+        //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
+        //     br i1 %vertValid, label %.writePosData, label %.endWritePosData
+        //
+        // .writePosData:
+        //     ; Write LDS region (position data)
+        //     %expData = call [ POS0: <4 x float>, POS1: <4 x float>, ...,
+        //                       PARAM0: <4 x float>, PARAM1: <4 xfloat>, ... ]
+        //                     @llpc.ngg.ES.variant(%sgpr..., %userData..., %vgpr...)
+        //     br label %.endWritePosData
+        //
+        // .endWritePosData:
+        //     call void @llvm.amdgcn.s.barrier()
+        //
+        //     %primValidInWave = icmp ult i32 %threadIdInWave, %primCountInWave
+        //     %primValidInSubgroup = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
+        //     %primValid = and i1 %primValidInWave, %primValidInSubgroup
+        //     br i1 %primValid, label %.culling, label %.endCulling
+        //
+        // .culling:
+        //     ; Do culling
+        //     %doCull = call i32 @llpc.ngg.culling.XXX(...)
+        //     br label %.endCulling
+        //
+        // .endCulling:
+        //     %cullFlag = phi i1 [ true, %.endWritePosData ], [ %doCull, %.culling ]
+        //     %drawFlag = xor i1 1, %cullFlag
+        //     br i1 %drawFlag, label %.writeDrawFlag, label %.endWriteDrawFlag
+        //
+        // .writeDrawFlag:
+        //     ; Write LDS region (draw flag)
+        //     br label %.endWriteDrawFlag
+        //
+        // .endWriteDrawFlag:
+        // <if (vertexCompact)>
+        // [
+        //     call void @llvm.amdgcn.s.barrier()
+        // ]
+        //     %drawMask = call i64 @llpc.subgroup.ballot(i1 %drawFlag)
+        //     %drawCount = call i64 @llvm.ctpop.i64(i64 %drawMask)
+        //     %hasSurviveDraw = icmp ne i64 %drawCount, 0
+        //
+        //     %theadIdUpbound = sub i32 %waveCountInSubgroup, %waveIdInSubgroup
+        //     %threadValid = icmp ult i32 %threadIdInWave, %theadIdUpbound
+        //     %primCountAcc = and i1 %hasSurviveDraw, %threadValid
+        //     br i1 %primCountAcc, label %.accThreadCount, label %.endAccThreadCount
+        //
+        // .accThreadCount:
+        //     ; Write LDS region (primitive/vertex count in waves)
+        //     br label %.endAccThreadCount
+        //
+        // .endAccThreadCount:
+        //     call void @llvm.amdgcn.s.barrier()
+        //
+        // <if (vertexCompact)>
+        // [
+        //     br lable %.readThreadCount
+        //
+        // .readThreadCount:
+        //     %vertCountInWaves = ... (read LDS region, vertex count in waves)
+        //     %threadCountInWaves = %vertCountInWaves
+        //
+        //     %vertValid = icmp ult i32 %threadIdInWave , %vertCountInWave
+        //     %compactDataWrite = and i1 %vertValid, %drawFlag
+        //     br i1 %compactDataWrite, label %.writeCompactData, label %.endReadThreadCount
+        //
+        // .writeCompactData:
+        //     ; Write LDS region (compaction data: compacted thread ID, vertex position data,
+        //     ; vertex ID/tessCoordX, instance ID/tessCoordY, primitive ID/relative patch ID, patch ID)
+        //     br label %.endReadThreadCount
+        //
+        // .endReadThreadCount:
+        //     %hasSurviveVert = icmp ne i32 %vertCountInWaves, 0
+        //     %primCountInSubgroup =
+        //         select i1 %hasSurviveVert, i32 %primCountInSubgroup, i32 %fullyCulledThreadCount
+        //     %vertCountInSubgroup =
+        //         select i1 %hasSurviveVert, i32 %vertCountInWaves, i32 %fullyCulledThreadCount
+        //
+        //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
+        //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
+        // ]
+        // <else>
+        // [
+        //     %firstThreadInWave = icmp eq i32 %threadIdInWave, 0
+        //     br i1 %firstThreadInWave, label %.readThreadCount, label %.endReadThreadCount
+        //
+        // .readThreadCount:
+        //     %primCount = ... (read LDS region, primitive count in waves)
+        //     %threadCountInWaves = %primCount
+        //
+        //     br label %.endReadThreadCount
+        //
+        // .endReadThreadCount:
+        //     %primCount = phi i32 [ primCountInSubgroup, %.endAccPrimCount ], [ %primCount, %.readThreadCount ]
+        //     %hasSurvivePrim = icmp ne i32 %primCount, 0
+        //     %primCountInSubgroup =
+        //         select i1 %hasSurvivePrim, i32 %primCountInSubgroup, i32 %fullyCulledThreadCount
+        //     %hasSurvivePrim = icmp ne i32 %primCountInSubgroup, 0
+        //     %vertCountInSubgroup =
+        //         select i1 %hasSurvivePrim, i32 %vertCountInSubgroup, i32 %fullyCulledThreadCount
+        //
+        //     %firstWaveInSubgroup = icmp eq i32 %waveIdInSubgroup, 0
+        //     br i1 %firstWaveInSubgroup, label %.allocreq, label %.endAllocReq
+        // ]
+        // .allocReq:
+        //     ; Do parameter cache (PC) alloc request: s_sendmsg(GS_ALLOC_REQ, ...)
+        //     br label %.endAllocReq
+        //
+        // .endAlloReq:
+        // <if (vertexCompact)>
+        // [
+        //     call void @llvm.amdgcn.s.barrier()
+        // ]
+        //     %noSurviveThread = icmp eq %threadCountInWaves, 0
+        //     br i1 %noSurviveThread, label %.earlyExit, label %.noEarlyExit
+        //
+        // .earlyExit:
+        //     %firstThreadInSubgroup = icmp eq i32 %threadIdInSubgroup, 0
+        //     br i1 %firstThreadInSubgroup, label %.dummyExp, label %.endDummyExp
+        //
+        // .dummyExp:
+        //     ; Do vertex position export: exp pos, ... (off, off, off, off)
+        //     ; Do primitive export: exp prim, ... (0, off, off, off)
+        //     br label %.endDummyExp
+        //
+        // .endDummyExp:
+        //     ret void
+        //
+        // .noEarlyExit:
+        //     %primExp = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
+        //     br i1 %primExp, label %.expPrim, label %.endExpPrim
+        //
+        // .expPrim:
+        //     ; Do primitive export: exp prim, ...
+        //     br label %.endExpPrim
+        //
+        // .endExpPrim:
+        //     %vertExp = icmp ult i32 %threadIdInSubgroup, %vertCountInSubgroup
+        //     br i1 %vertExp, label %.expVertPos, label %.endExpVertPos
+        //
+        // .expVertPos:
+        //     ; Do vertex position export: exp pos, ...
+        //     br label %.endExpVertPos
+        //
+        // .endExpVertPos:
+        //     br i1 %vertExp, label %.expVertParam, label %.endExpVertParam
+        //
+        // .expVertParam:
+        //     ; Do vertex parameter export: exp param, ...
+        //     br label %.endExpVertParam
+        //
+        // .endExpVertParam:
+        //     ret void
+        // }
+
+        const bool vertexCompact = (m_pNggControl->compactMode == NggCompactVertices);
+
+        // Thread count when the entire sub-group is fully culled
+        const uint32_t fullyCulledThreadCount =
+            m_pContext->GetGpuWorkarounds()->gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
+
+        // Define basic blocks
+        auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");
+
+        // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
+        BasicBlock* pWritePrimIdBlock = nullptr;
+        BasicBlock* pEndWritePrimIdBlock = nullptr;
+        BasicBlock* pReadPrimIdBlock = nullptr;
+        BasicBlock* pEndReadPrimIdBlock = nullptr;
+
+        if (distributePrimId)
+        {
+            pWritePrimIdBlock = CreateBlock(pEntryPoint, ".writePrimId");
+            pEndWritePrimIdBlock = CreateBlock(pEntryPoint, ".endWritePrimId");
+
+            pReadPrimIdBlock = CreateBlock(pEntryPoint, ".readPrimId");
+            pEndReadPrimIdBlock = CreateBlock(pEntryPoint, ".endReadPrimId");
+        }
+
+        auto pZeroThreadCountBlock = CreateBlock(pEntryPoint, ".zeroThreadCount");
+        auto pEndZeroThreadCountBlock = CreateBlock(pEntryPoint, ".endZeroThreadCount");
+
+        auto pZeroDrawFlagBlock = CreateBlock(pEntryPoint, ".zeroDrawFlag");
+        auto pEndZeroDrawFlagBlock = CreateBlock(pEntryPoint, ".endZeroDrawFlag");
+
+        auto pWritePosDataBlock = CreateBlock(pEntryPoint, ".writePosData");
+        auto pEndWritePosDataBlock = CreateBlock(pEntryPoint, ".endWritePosData");
+
+        auto pCullingBlock = CreateBlock(pEntryPoint, ".culling");
+        auto pEndCullingBlock = CreateBlock(pEntryPoint, ".endCulling");
+
+        auto pWriteDrawFlagBlock = CreateBlock(pEntryPoint, ".writeDrawFlag");
+        auto pEndWriteDrawFlagBlock = CreateBlock(pEntryPoint, ".endWriteDrawFlag");
+
+        auto pAccThreadCountBlock = CreateBlock(pEntryPoint, ".accThreadCount");
+        auto pEndAccThreadCountBlock = CreateBlock(pEntryPoint, ".endAccThreadCount");
+
+        // NOTE: Those basic blocks are conditionally created on the basis of actual NGG compaction mode.
+        BasicBlock* pReadThreadCountBlock = nullptr;
+        BasicBlock* pWriteCompactDataBlock = nullptr;
+        BasicBlock* pEndReadThreadCountBlock = nullptr;
+
+        if (vertexCompact)
+        {
+            pReadThreadCountBlock = CreateBlock(pEntryPoint, ".readThreadCount");
+            pWriteCompactDataBlock = CreateBlock(pEntryPoint, ".writeCompactData");
+            pEndReadThreadCountBlock = CreateBlock(pEntryPoint, ".endReadThreadCount");
+        }
+        else
+        {
+            pReadThreadCountBlock = CreateBlock(pEntryPoint, ".readThreadCount");
+            pEndReadThreadCountBlock = CreateBlock(pEntryPoint, ".endReadThreadCount");
+        }
+
+        auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
+        auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
+
+        auto pEarlyExitBlock = CreateBlock(pEntryPoint, ".earlyExit");
+        auto pNoEarlyExitBlock = CreateBlock(pEntryPoint, ".noEarlyExit");
+
+        auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
+        auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
+
+        auto pExpVertPosBlock = CreateBlock(pEntryPoint, ".expVertPos");
+        auto pEndExpVertPosBlock = CreateBlock(pEntryPoint, ".endExpVertPos");
+
+        auto pExpVertParamBlock = CreateBlock(pEntryPoint, ".expVertParam");
+        auto pEndExpVertParamBlock = CreateBlock(pEntryPoint, ".endExpVertParam");
+
+        // Construct ".entry" block
+        {
+            m_pBuilder->SetInsertPoint(pEntryBlock);
+
+            InitWaveThreadInfo(pMergedGroupInfo, pMergedWaveInfo);
+
+            // Record primitive shader table address info
+            m_nggFactor.pPrimShaderTableAddrLow  = pPrimShaderTableAddrLow;
+            m_nggFactor.pPrimShaderTableAddrHigh = pPrimShaderTableAddrHigh;
+
+            // Record ES-GS vertex offsets info
+            m_nggFactor.pEsGsOffsets01  = pEsGsOffsets01;
+            m_nggFactor.pEsGsOffsets23  = pEsGsOffsets23;
+
+            if (distributePrimId)
+            {
+                auto pPrimValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
+                m_pBuilder->CreateCondBr(pPrimValid, pWritePrimIdBlock, pEndWritePrimIdBlock);
+            }
+            else
+            {
+                auto pFirstThreadInSubgroup =
+                    m_pBuilder->CreateICmpEQ(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(0));
+                m_pBuilder->CreateCondBr(pFirstThreadInSubgroup, pZeroThreadCountBlock, pEndZeroThreadCountBlock);
+            }
+        }
+
+        if (distributePrimId)
+        {
+            // Construct ".writePrimId" block
+            {
+                m_pBuilder->SetInsertPoint(pWritePrimIdBlock);
+
+                // Primitive data layout
+                //   ES_GS_OFFSET23[15:0]  = vertexId2 (in DWORDs)
+                //   ES_GS_OFFSET01[31:16] = vertexId1 (in DWORDs)
+                //   ES_GS_OFFSET01[15:0]  = vertexId0 (in DWORDs)
+
+                // Use vertex0 as provoking vertex to distribute primitive ID
+                auto pEsGsOffset0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                                m_pBuilder->getInt32Ty(),
+                                                                {
+                                                                    m_nggFactor.pEsGsOffsets01,
+                                                                    m_pBuilder->getInt32(0),
+                                                                    m_pBuilder->getInt32(16),
+                                                                });
+
+                auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
+
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+
+                auto pLdsOffset = m_pBuilder->CreateShl(pVertexId0, 2);
+                pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
+
+                auto pPrimIdWriteValue = pGsPrimitiveId;
+                m_pLdsManager->WriteValueToLds(pPrimIdWriteValue, pLdsOffset);
+
+                m_pBuilder->CreateBr(pEndWritePrimIdBlock);
+            }
+
+            // Construct ".endWritePrimId" block
+            {
+                m_pBuilder->SetInsertPoint(pEndWritePrimIdBlock);
+
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+                auto pVertValid =
+                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pVertCountInWave);
+                m_pBuilder->CreateCondBr(pVertValid, pReadPrimIdBlock, pEndReadPrimIdBlock);
+            }
+
+            // Construct ".readPrimId" block
+            Value* pPrimIdReadValue = nullptr;
+            {
+                m_pBuilder->SetInsertPoint(pReadPrimIdBlock);
+
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDistribPrimId);
+
+                auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
+                pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
+
+                pPrimIdReadValue =
+                    m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
+
+                m_pBuilder->CreateBr(pEndReadPrimIdBlock);
+            }
+
+            // Construct ".endReadPrimId" block
+            {
+                m_pBuilder->SetInsertPoint(pEndReadPrimIdBlock);
+
+                auto pPrimitiveId = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
+
+                pPrimitiveId->addIncoming(pPrimIdReadValue, pReadPrimIdBlock);
+                pPrimitiveId->addIncoming(m_pBuilder->getInt32(0), pEndWritePrimIdBlock);
+
+                // Record primitive ID
+                m_nggFactor.pPrimitiveId = pPrimitiveId;
+
+                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+                auto pFirstThreadInSubgroup =
+                    m_pBuilder->CreateICmpEQ(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(0));
+                m_pBuilder->CreateCondBr(pFirstThreadInSubgroup, pZeroThreadCountBlock, pEndZeroThreadCountBlock);
+            }
+        }
+
+        // Construct ".zeroThreadCount" block
+        {
+            m_pBuilder->SetInsertPoint(pZeroThreadCountBlock);
+
+            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
+                vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
+
+            auto pZero = m_pBuilder->getInt32(0);
+
+            // Zero per-wave primitive/vertex count
+            std::vector<Constant*> zeros;
+            for (uint32_t i = 0; i < Gfx9::NggMaxWavesPerSubgroup; ++i)
+            {
+                zeros.push_back(pZero);
+            }
+            auto pZeros = ConstantVector::get(zeros);
+
+            auto pLdsOffset = m_pBuilder->getInt32(regionStart);
+            m_pLdsManager->WriteValueToLds(pZeros, pLdsOffset);
+
+            // Zero sub-group primitive/vertex count
+            pLdsOffset = m_pBuilder->getInt32(regionStart + SizeOfDword * Gfx9::NggMaxWavesPerSubgroup);
+            m_pLdsManager->WriteValueToLds(pZero, pLdsOffset);
+
+            m_pBuilder->CreateBr(pEndZeroThreadCountBlock);
+        }
+
+        // Construct ".endZeroThreadCount" block
+        {
+            m_pBuilder->SetInsertPoint(pEndZeroThreadCountBlock);
+
+            auto pFirstWaveInSubgroup =
+                m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
+            m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pZeroDrawFlagBlock, pEndZeroDrawFlagBlock);
+        }
+
+        // Construct ".zeroDrawFlag" block
+        {
+            m_pBuilder->SetInsertPoint(pZeroDrawFlagBlock);
+
+            Value* pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInWave, 2);
+
+            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+
+            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
+
+            auto pZero = m_pBuilder->getInt32(0);
+            m_pLdsManager->WriteValueToLds(pZero, pLdsOffset);
+
+            if (waveCountInSubgroup == 8)
+            {
+                LLPC_ASSERT(waveSize == 32);
+                pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(32 * SizeOfDword));
                 m_pLdsManager->WriteValueToLds(pZero, pLdsOffset);
+            }
 
-                if (waveCountInSubgroup == 8)
+            m_pBuilder->CreateBr(pEndZeroDrawFlagBlock);
+        }
+
+        // Construct ".endZeroDrawFlag" block
+        {
+            m_pBuilder->SetInsertPoint(pEndZeroDrawFlagBlock);
+
+            auto pVertValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pVertCountInWave);
+            m_pBuilder->CreateCondBr(pVertValid, pWritePosDataBlock, pEndWritePosDataBlock);
+        }
+
+        // Construct ".writePosData" block
+        std::vector<ExpData> expDataSet;
+        bool separateExp = false;
+        {
+            m_pBuilder->SetInsertPoint(pWritePosDataBlock);
+
+            separateExp = (pResUsage->resourceWrite == false); // No resource writing
+
+            // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
+            // get other exported data).
+            const auto entryName = (separateExp || vertexCompact) ? LlpcName::NggEsEntryVariantPos :
+                                                                    LlpcName::NggEsEntryVariant;
+
+            RunEsOrEsVariant(pModule,
+                             entryName,
+                             pEntryPoint->arg_begin(),
+                             false,
+                             &expDataSet,
+                             pWritePosDataBlock);
+
+            // Write vertex position data to LDS
+            for (const auto& expData : expDataSet)
+            {
+                if (expData.target == EXP_TARGET_POS_0)
                 {
-                    LLPC_ASSERT(waveSize == 32);
-                    pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(32 * SizeOfDword));
-                    m_pLdsManager->WriteValueToLds(pZero, pLdsOffset);
+                    const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
+                    LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
+
+                    Value* pLdsOffset =
+                        m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
+                    pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
+
+                    m_pLdsManager->WriteValueToLds(expData.pExpValue, pLdsOffset, true);
+
+                    break;
+                }
+            }
+
+            // Write cull distance sign mask to LDS
+            if (m_pNggControl->enableCullDistanceCulling)
+            {
+                uint32_t clipCullPos = EXP_TARGET_POS_1;
+                std::vector<Value*> clipCullDistance;
+                std::vector<Value*> cullDistance;
+
+                bool usePointSize     = false;
+                bool useLayer         = false;
+                bool useViewportIndex = false;
+                uint32_t clipDistanceCount = 0;
+                uint32_t cullDistanceCount = 0;
+
+                if (hasTs)
+                {
+                    const auto& builtInUsage = pResUsage->builtInUsage.tes;
+
+                    usePointSize        = builtInUsage.pointSize;
+                    useLayer            = builtInUsage.layer;
+                    useViewportIndex    = builtInUsage.viewportIndex;
+                    clipDistanceCount   = builtInUsage.clipDistance;
+                    cullDistanceCount   = builtInUsage.cullDistance;
+                }
+                else
+                {
+                    const auto& builtInUsage = pResUsage->builtInUsage.vs;
+
+                    usePointSize        = builtInUsage.pointSize;
+                    useLayer            = builtInUsage.layer;
+                    useViewportIndex    = builtInUsage.viewportIndex;
+                    clipDistanceCount   = builtInUsage.clipDistance;
+                    cullDistanceCount   = builtInUsage.cullDistance;
                 }
 
-                m_pBuilder->CreateBr(pEndZeroDrawFlagBlock);
+                // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or
+                // gl_CullDistance[] should start from pos2.
+                clipCullPos = (usePointSize || useLayer || useViewportIndex) ?
+                                    EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+
+                // Collect clip/cull distance from exported value
+                for (const auto& expData : expDataSet)
+                {
+                    if ((expData.target == clipCullPos) || (expData.target == clipCullPos + 1))
+                    {
+                        for (uint32_t i = 0; i < 4; ++i)
+                        {
+                            auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
+                            clipCullDistance.push_back(pExpValue);
+                        }
+                    }
+                }
+                LLPC_ASSERT(clipCullDistance.size() < MaxClipCullDistanceCount);
+
+                for (uint32_t i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
+                {
+                    cullDistance.push_back(clipCullDistance[i]);
+                }
+
+                // Calculate the sign mask for cull distance
+                Value* pSignMask = m_pBuilder->getInt32(0);
+                for (uint32_t i = 0; i < cullDistance.size(); ++i)
+                {
+                    auto pCullDistance = m_pBuilder->CreateBitCast(cullDistance[i], m_pBuilder->getInt32Ty());
+
+                    Value* pSignBit = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                                  m_pBuilder->getInt32Ty(),
+                                                                  {
+                                                                      pCullDistance,
+                                                                      m_pBuilder->getInt32(31),
+                                                                      m_pBuilder->getInt32(1)
+                                                                  });
+                    pSignBit = m_pBuilder->CreateShl(pSignBit, i);
+
+                    pSignMask = m_pBuilder->CreateOr(pSignMask, pSignBit);
+                }
+
+                // Write the sign mask to LDS
+                const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionCullDistance);
+
+                Value* pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
+                pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
+
+                m_pLdsManager->WriteValueToLds(pSignMask, pLdsOffset);
             }
 
-            // Construct ".endZeroDrawFlag" block
-            {
-                m_pBuilder->SetInsertPoint(pEndZeroDrawFlagBlock);
+            m_pBuilder->CreateBr(pEndWritePosDataBlock);
+        }
 
-                auto pVertValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pVertCountInWave);
-                m_pBuilder->CreateCondBr(pVertValid, pWritePosDataBlock, pEndWritePosDataBlock);
+        // Construct ".endWritePosData" block
+        {
+            m_pBuilder->SetInsertPoint(pEndWritePosDataBlock);
+
+            auto pUndef = UndefValue::get(m_pContext->Floatx4Ty());
+            for (auto& expData : expDataSet)
+            {
+                PHINode* pExpValue = m_pBuilder->CreatePHI(m_pContext->Floatx4Ty(), 2);
+                pExpValue->addIncoming(expData.pExpValue, pWritePosDataBlock);
+                pExpValue->addIncoming(pUndef, pEndZeroDrawFlagBlock);
+
+                expData.pExpValue = pExpValue; // Update the exportd data
             }
 
-            // Construct ".writePosData" block
-            std::vector<ExpData> expDataSet;
-            bool separateExp = false;
+            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+            auto pPrimValidInWave =
+                m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
+            auto pPrimValidInSubgroup =
+                m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
+
+            auto pPrimValid = m_pBuilder->CreateAnd(pPrimValidInWave, pPrimValidInSubgroup);
+            m_pBuilder->CreateCondBr(pPrimValid, pCullingBlock, pEndCullingBlock);
+        }
+
+        // Construct ".culling" block
+        Value* pDoCull = nullptr;
+        {
+            m_pBuilder->SetInsertPoint(pCullingBlock);
+
+            pDoCull = DoCulling(pModule);
+            m_pBuilder->CreateBr(pEndCullingBlock);
+        }
+
+        // Construct ".endCulling" block
+        Value* pDrawFlag = nullptr;
+        PHINode* pCullFlag = nullptr;
+        {
+            m_pBuilder->SetInsertPoint(pEndCullingBlock);
+
+            pCullFlag = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
+
+            pCullFlag->addIncoming(m_pBuilder->getTrue(), pEndWritePosDataBlock);
+            pCullFlag->addIncoming(pDoCull, pCullingBlock);
+
+            pDrawFlag = m_pBuilder->CreateNot(pCullFlag);
+            m_pBuilder->CreateCondBr(pDrawFlag, pWriteDrawFlagBlock, pEndWriteDrawFlagBlock);
+        }
+
+        // Construct ".writeDrawFlag" block
+        {
+            m_pBuilder->SetInsertPoint(pWriteDrawFlagBlock);
+
+            auto pEsGsOffset0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                            m_pBuilder->getInt32Ty(),
+                                                            {
+                                                                pEsGsOffsets01,
+                                                                m_pBuilder->getInt32(0),
+                                                                m_pBuilder->getInt32(16)
+                                                            });
+            auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
+
+            auto pEsGsOffset1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                            m_pBuilder->getInt32Ty(),
+                                                            {
+                                                                pEsGsOffsets01,
+                                                                m_pBuilder->getInt32(16),
+                                                                m_pBuilder->getInt32(16)
+                                                            });
+            auto pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, 2);
+
+            auto pEsGsOffset2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
+                                                            m_pBuilder->getInt32Ty(),
+                                                            {
+                                                                pEsGsOffsets23,
+                                                                m_pBuilder->getInt32(0),
+                                                                m_pBuilder->getInt32(16)
+                                                            });
+            auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, 2);
+
+            Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
+
+            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+            auto pRegionStart = m_pBuilder->getInt32(regionStart);
+
+            auto pOne = m_pBuilder->getInt8(1);
+
+            for (uint32_t i = 0; i < 3; ++i)
             {
-                m_pBuilder->SetInsertPoint(pWritePosDataBlock);
+                auto pLdsOffset = m_pBuilder->CreateAdd(pRegionStart, vertexId[i]);
+                m_pLdsManager->WriteValueToLds(pOne, pLdsOffset);
+            }
 
-                separateExp = (pResUsage->resourceWrite == false); // No resource writing
+            m_pBuilder->CreateBr(pEndWriteDrawFlagBlock);
+        }
 
-                // NOTE: For vertex compaction, we have to run ES for twice (get vertex position data and
-                // get other exported data).
-                const auto entryName = (separateExp || vertexCompact) ? LlpcName::NggEsEntryVariantPos :
-                                                                        LlpcName::NggEsEntryVariant;
+        // Construct ".endWriteDrawFlag" block
+        Value* pDrawCount = nullptr;
+        {
+            m_pBuilder->SetInsertPoint(pEndWriteDrawFlagBlock);
 
-                RunEsOrEsVariant(pModule,
-                                 entryName,
-                                 pEntryPoint->arg_begin(),
-                                 false,
-                                 &expDataSet,
-                                 pWritePosDataBlock);
+            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+            if (vertexCompact)
+            {
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
+
+                auto pLdsOffset =
+                    m_pBuilder->CreateAdd(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(regionStart));
+
+                pDrawFlag = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt8Ty(), pLdsOffset);
+                pDrawFlag = m_pBuilder->CreateTrunc(pDrawFlag, m_pBuilder->getInt1Ty());
+            }
+
+            auto pDrawMask = DoSubgroupBallot(pDrawFlag);
+
+            pDrawCount = m_pBuilder->CreateIntrinsic(Intrinsic::ctpop, m_pBuilder->getInt64Ty(), pDrawMask);
+            pDrawCount = m_pBuilder->CreateTrunc(pDrawCount, m_pBuilder->getInt32Ty());
+
+            auto pThreadIdUpbound = m_pBuilder->CreateSub(m_pBuilder->getInt32(waveCountInSubgroup),
+                                                          m_nggFactor.pWaveIdInSubgroup);
+            auto pThreadValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, pThreadIdUpbound);
+
+            Value* pPrimCountAcc = nullptr;
+            if (vertexCompact)
+            {
+                pPrimCountAcc = pThreadValid;
+            }
+            else
+            {
+                auto pHasSurviveDraw = m_pBuilder->CreateICmpNE(pDrawCount, m_pBuilder->getInt32(0));
+
+                pPrimCountAcc = m_pBuilder->CreateAnd(pHasSurviveDraw, pThreadValid);
+            }
+
+            m_pBuilder->CreateCondBr(pPrimCountAcc, pAccThreadCountBlock, pEndAccThreadCountBlock);
+        }
+
+        // Construct ".accThreadCount" block
+        {
+            m_pBuilder->SetInsertPoint(pAccThreadCountBlock);
+
+            auto pLdsOffset = m_pBuilder->CreateAdd(m_nggFactor.pWaveIdInSubgroup, m_nggFactor.pThreadIdInWave);
+            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(1));
+            pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
+
+            uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
+                vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
+
+            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
+            m_pLdsManager->AtomicOpWithLds(AtomicRMWInst::Add, pDrawCount, pLdsOffset);
+
+            m_pBuilder->CreateBr(pEndAccThreadCountBlock);
+        }
+
+        // Construct ".endAccThreadCount" block
+        {
+            m_pBuilder->SetInsertPoint(pEndAccThreadCountBlock);
+
+            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+            if (vertexCompact)
+            {
+                m_pBuilder->CreateBr(pReadThreadCountBlock);
+            }
+            else
+            {
+                auto pFirstThreadInWave =
+                    m_pBuilder->CreateICmpEQ(m_nggFactor.pThreadIdInWave, m_pBuilder->getInt32(0));
+
+                m_pBuilder->CreateCondBr(pFirstThreadInWave, pReadThreadCountBlock, pEndReadThreadCountBlock);
+            }
+        }
+
+        Value* pThreadCountInWaves = nullptr;
+        if (vertexCompact)
+        {
+            // Construct ".readThreadCount" block
+            Value* pVertCountInWaves = nullptr;
+            Value* pVertCountInPrevWaves = nullptr;
+            {
+                m_pBuilder->SetInsertPoint(pReadThreadCountBlock);
+
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionVertCountInWaves);
+
+                // The DWORD following DWORDs for all waves stores the vertex count of the entire sub-group
+                Value* pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
+                pVertCountInWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
+
+                // NOTE: We promote vertex count in waves to SGPR since it is treated as an uniform value.
+                pVertCountInWaves =
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pVertCountInWaves);
+                pThreadCountInWaves = pVertCountInWaves;
+
+                // Get vertex count for all waves prior to this wave
+                pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
+                pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
+
+                pVertCountInPrevWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
+
+                auto pVertValid =
+                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pVertCountInWave);
+
+                auto pCompactDataWrite = m_pBuilder->CreateAnd(pDrawFlag, pVertValid);
+
+                m_pBuilder->CreateCondBr(pCompactDataWrite, pWriteCompactDataBlock, pEndReadThreadCountBlock);
+            }
+
+            // Construct ".writeCompactData" block
+            {
+                m_pBuilder->SetInsertPoint(pWriteCompactDataBlock);
+
+                Value* pDrawMask = DoSubgroupBallot(pDrawFlag);
+                pDrawMask = m_pBuilder->CreateBitCast(pDrawMask, m_pContext->Int32x2Ty());
+
+                auto pDrawMaskLow = m_pBuilder->CreateExtractElement(pDrawMask, static_cast<uint64_t>(0));
+
+                Value* pCompactThreadIdInSubrgoup = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo,
+                                                                                {},
+                                                                                {
+                                                                                    pDrawMaskLow,
+                                                                                    m_pBuilder->getInt32(0)
+                                                                                });
+
+                if (waveSize == 64)
+                {
+                    auto pDrawMaskHigh = m_pBuilder->CreateExtractElement(pDrawMask, 1);
+
+                    pCompactThreadIdInSubrgoup = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi,
+                                                                            {},
+                                                                            {
+                                                                                pDrawMaskHigh,
+                                                                                pCompactThreadIdInSubrgoup
+                                                                            });
+                }
+
+                pCompactThreadIdInSubrgoup =
+                    m_pBuilder->CreateAdd(pVertCountInPrevWaves, pCompactThreadIdInSubrgoup);
 
                 // Write vertex position data to LDS
                 for (const auto& expData : expDataSet)
@@ -1119,736 +1497,381 @@ Function* NggPrimShader::GeneratePrimShaderEntryPoint(
                     if (expData.target == EXP_TARGET_POS_0)
                     {
                         const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
-                        LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
 
                         Value* pLdsOffset =
-                            m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
+                            m_pBuilder->CreateMul(pCompactThreadIdInSubrgoup, m_pBuilder->getInt32(SizeOfVec4));
                         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
-                        m_pLdsManager->WriteValueToLds(expData.pExpValue, pLdsOffset, true);
+                        m_pLdsManager->WriteValueToLds(expData.pExpValue, pLdsOffset);
 
                         break;
                     }
                 }
 
-                // Write cull distance sign mask to LDS
-                if (m_pNggControl->enableCullDistanceCulling)
+                // Write thread ID in sub-group to LDS
+                Value* pCompactThreadId =
+                    m_pBuilder->CreateTrunc(pCompactThreadIdInSubrgoup, m_pBuilder->getInt8Ty());
+                WriteCompactDataToLds(pCompactThreadId,
+                                      m_nggFactor.pThreadIdInSubgroup,
+                                      LdsRegionCompactThreadIdInSubgroup);
+
+                if (hasTs)
                 {
-                    uint32_t clipCullPos = EXP_TARGET_POS_1;
-                    std::vector<Value*> clipCullDistance;
-                    std::vector<Value*> cullDistance;
-
-                    bool usePointSize     = false;
-                    bool useLayer         = false;
-                    bool useViewportIndex = false;
-                    uint32_t clipDistanceCount = 0;
-                    uint32_t cullDistanceCount = 0;
-
-                    if (hasTs)
+                    // Write X/Y of tessCoord (U/V) to LDS
+                    if (pResUsage->builtInUsage.tes.tessCoord)
                     {
-                        const auto& builtInUsage = pResUsage->builtInUsage.tes;
+                        WriteCompactDataToLds(pTessCoordX,
+                                              pCompactThreadIdInSubrgoup,
+                                              LdsRegionCompactTessCoordX);
 
-                        usePointSize        = builtInUsage.pointSize;
-                        useLayer            = builtInUsage.layer;
-                        useViewportIndex    = builtInUsage.viewportIndex;
-                        clipDistanceCount   = builtInUsage.clipDistance;
-                        cullDistanceCount   = builtInUsage.cullDistance;
-                    }
-                    else
-                    {
-                        const auto& builtInUsage = pResUsage->builtInUsage.vs;
-
-                        usePointSize        = builtInUsage.pointSize;
-                        useLayer            = builtInUsage.layer;
-                        useViewportIndex    = builtInUsage.viewportIndex;
-                        clipDistanceCount   = builtInUsage.clipDistance;
-                        cullDistanceCount   = builtInUsage.cullDistance;
+                        WriteCompactDataToLds(pTessCoordY,
+                                              pCompactThreadIdInSubrgoup,
+                                              LdsRegionCompactTessCoordY);
                     }
 
-                    // NOTE: When gl_PointSize, gl_Layer, or gl_ViewportIndex is used, gl_ClipDistance[] or
-                    // gl_CullDistance[] should start from pos2.
-                    clipCullPos = (usePointSize || useLayer || useViewportIndex) ?
-                                      EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+                    // Write relative patch ID to LDS
+                    WriteCompactDataToLds(pRelPatchId,
+                                          pCompactThreadIdInSubrgoup,
+                                          LdsRegionCompactRelPatchId);
 
-                    // Collect clip/cull distance from exported value
-                    for (const auto& expData : expDataSet)
+                    // Write patch ID to LDS
+                    if (pResUsage->builtInUsage.tes.primitiveId)
                     {
-                        if ((expData.target == clipCullPos) || (expData.target == clipCullPos + 1))
-                        {
-                            for (uint32_t i = 0; i < 4; ++i)
-                            {
-                                auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
-                                clipCullDistance.push_back(pExpValue);
-                            }
-                        }
+                        WriteCompactDataToLds(pPatchId,
+                                              pCompactThreadIdInSubrgoup,
+                                              LdsRegionCompactPatchId);
                     }
-                    LLPC_ASSERT(clipCullDistance.size() < MaxClipCullDistanceCount);
-
-                    for (uint32_t i = clipDistanceCount; i < clipDistanceCount + cullDistanceCount; ++i)
+                }
+                else
+                {
+                    // Write vertex ID to LDS
+                    if (pResUsage->builtInUsage.vs.vertexIndex)
                     {
-                        cullDistance.push_back(clipCullDistance[i]);
-                    }
-
-                    // Calculate the sign mask for cull distance
-                    Value* pSignMask = m_pBuilder->getInt32(0);
-                    for (uint32_t i = 0; i < cullDistance.size(); ++i)
-                    {
-                        auto pCullDistance = m_pBuilder->CreateBitCast(cullDistance[i], m_pBuilder->getInt32Ty());
-
-                        Value* pSignBit = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                                      m_pBuilder->getInt32Ty(),
-                                                                      {
-                                                                          pCullDistance,
-                                                                          m_pBuilder->getInt32(31),
-                                                                          m_pBuilder->getInt32(1)
-                                                                      });
-                        pSignBit = m_pBuilder->CreateShl(pSignBit, i);
-
-                        pSignMask = m_pBuilder->CreateOr(pSignMask, pSignBit);
+                        WriteCompactDataToLds(pVertexId,
+                                              pCompactThreadIdInSubrgoup,
+                                              LdsRegionCompactVertexId);
                     }
 
-                    // Write the sign mask to LDS
-                    const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionCullDistance);
+                    // Write instance ID to LDS
+                    if (pResUsage->builtInUsage.vs.instanceIndex)
+                    {
+                        WriteCompactDataToLds(pInstanceId,
+                                              pCompactThreadIdInSubrgoup,
+                                              LdsRegionCompactInstanceId);
+                    }
 
-                    Value* pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pThreadIdInSubgroup, 2);
-                    pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-
-                    m_pLdsManager->WriteValueToLds(pSignMask, pLdsOffset);
+                    // Write primitive ID to LDS
+                    if (pResUsage->builtInUsage.vs.primitiveId)
+                    {
+                        LLPC_ASSERT(m_nggFactor.pPrimitiveId != nullptr);
+                        WriteCompactDataToLds(m_nggFactor.pPrimitiveId,
+                                              pCompactThreadIdInSubrgoup,
+                                              LdsRegionCompactPrimId);
+                    }
                 }
 
-                m_pBuilder->CreateBr(pEndWritePosDataBlock);
+                m_pBuilder->CreateBr(pEndReadThreadCountBlock);
             }
 
-            // Construct ".endWritePosData" block
+            // Construct ".endReadThreadCount" block
             {
-                m_pBuilder->SetInsertPoint(pEndWritePosDataBlock);
+                m_pBuilder->SetInsertPoint(pEndReadThreadCountBlock);
 
+                Value* pHasSurviveVert = m_pBuilder->CreateICmpNE(pVertCountInWaves, m_pBuilder->getInt32(0));
+
+                Value* pPrimCountInSubgroup =
+                    m_pBuilder->CreateSelect(pHasSurviveVert,
+                                             m_nggFactor.pPrimCountInSubgroup,
+                                             m_pBuilder->getInt32(fullyCulledThreadCount));
+
+                // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
+                // as an uniform value later. This is similar to the provided primitive count in sub-group that is
+                // a system value.
+                pPrimCountInSubgroup =
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCountInSubgroup);
+
+                Value* pVertCountInSubgroup =
+                    m_pBuilder->CreateSelect(pHasSurviveVert,
+                                             pVertCountInWaves,
+                                             m_pBuilder->getInt32(fullyCulledThreadCount));
+
+                // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
+                // an uniform value later, similar to what we have done for the revised primitive count in
+                // sub-group.
+                pVertCountInSubgroup =
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pVertCountInSubgroup);
+
+                m_nggFactor.pPrimCountInSubgroup = pPrimCountInSubgroup;
+                m_nggFactor.pVertCountInSubgroup = pVertCountInSubgroup;
+
+                auto pFirstWaveInSubgroup =
+                    m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
+
+                m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
+            }
+        }
+        else
+        {
+            // Construct ".readThreadCount" block
+            Value* pPrimCountInWaves = nullptr;
+            {
+                m_pBuilder->SetInsertPoint(pReadThreadCountBlock);
+
+                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPrimCountInWaves);
+
+                // The DWORD following DWORDs for all waves stores the primitive count of the entire sub-group
+                auto pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
+                pPrimCountInWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
+
+                m_pBuilder->CreateBr(pEndReadThreadCountBlock);
+            }
+
+            // Construct ".endReadThreadCount" block
+            {
+                m_pBuilder->SetInsertPoint(pEndReadThreadCountBlock);
+
+                Value* pPrimCount = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
+
+                static_cast<PHINode*>(pPrimCount)->addIncoming(m_nggFactor.pPrimCountInSubgroup,
+                                                               pEndAccThreadCountBlock);
+                static_cast<PHINode*>(pPrimCount)->addIncoming(pPrimCountInWaves, pReadThreadCountBlock);
+
+                // NOTE: We promote primitive count in waves to SGPR since it is treated as an uniform value.
+                pPrimCount = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCount);
+                pThreadCountInWaves = pPrimCount;
+
+                Value* pHasSurvivePrim = m_pBuilder->CreateICmpNE(pPrimCount, m_pBuilder->getInt32(0));
+
+                Value* pPrimCountInSubgroup =
+                    m_pBuilder->CreateSelect(pHasSurvivePrim,
+                                             m_nggFactor.pPrimCountInSubgroup,
+                                             m_pBuilder->getInt32(fullyCulledThreadCount));
+
+                // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
+                // as an uniform value later. This is similar to the provided primitive count in sub-group that is
+                // a system value.
+                pPrimCountInSubgroup =
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCountInSubgroup);
+
+                Value* pVertCountInSubgroup =
+                    m_pBuilder->CreateSelect(pHasSurvivePrim,
+                                             m_nggFactor.pVertCountInSubgroup,
+                                             m_pBuilder->getInt32(fullyCulledThreadCount));
+
+                // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
+                // an uniform value later, similar to what we have done for the revised primitive count in
+                // sub-group.
+                pVertCountInSubgroup =
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pVertCountInSubgroup);
+
+                m_nggFactor.pPrimCountInSubgroup = pPrimCountInSubgroup;
+                m_nggFactor.pVertCountInSubgroup = pVertCountInSubgroup;
+
+                auto pFirstWaveInSubgroup =
+                    m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
+
+                m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
+            }
+        }
+
+        // Construct ".allocReq" block
+        {
+            m_pBuilder->SetInsertPoint(pAllocReqBlock);
+
+            DoParamCacheAllocRequest();
+            m_pBuilder->CreateBr(pEndAllocReqBlock);
+        }
+
+        // Construct ".endAllocReq" block
+        {
+            m_pBuilder->SetInsertPoint(pEndAllocReqBlock);
+
+            m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+
+            auto pNoSurviveThread = m_pBuilder->CreateICmpEQ(pThreadCountInWaves, m_pBuilder->getInt32(0));
+            m_pBuilder->CreateCondBr(pNoSurviveThread, pEarlyExitBlock, pNoEarlyExitBlock);
+        }
+
+        // Construct ".earlyExit" block
+        {
+            m_pBuilder->SetInsertPoint(pEarlyExitBlock);
+
+            uint32_t expPosCount = 0;
+            for (const auto& expData : expDataSet)
+            {
+                if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
+                {
+                    ++expPosCount;
+                }
+            }
+
+            DoEarlyExit(fullyCulledThreadCount, expPosCount);
+        }
+
+        // Construct ".noEarlyExit" block
+        {
+            m_pBuilder->SetInsertPoint(pNoEarlyExitBlock);
+
+            auto pPrimExp =
+                m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
+            m_pBuilder->CreateCondBr(pPrimExp, pExpPrimBlock, pEndExpPrimBlock);
+        }
+
+        // Construct ".expPrim" block
+        {
+            m_pBuilder->SetInsertPoint(pExpPrimBlock);
+
+            DoPrimitiveExport(vertexCompact ? pCullFlag : nullptr);
+            m_pBuilder->CreateBr(pEndExpPrimBlock);
+        }
+
+        // Construct ".endExpPrim" block
+        Value* pVertExp = nullptr;
+        {
+            m_pBuilder->SetInsertPoint(pEndExpPrimBlock);
+
+            pVertExp =
+                m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pVertCountInSubgroup);
+            m_pBuilder->CreateCondBr(pVertExp, pExpVertPosBlock, pEndExpVertPosBlock);
+        }
+
+        // Construct ".expVertPos" block
+        {
+            m_pBuilder->SetInsertPoint(pExpVertPosBlock);
+
+            // NOTE: For vertex compaction, we have to run ES to get exported data once again.
+            if (vertexCompact)
+            {
+                expDataSet.clear();
+
+                RunEsOrEsVariant(pModule,
+                                 LlpcName::NggEsEntryVariant,
+                                 pEntryPoint->arg_begin(),
+                                 true,
+                                 &expDataSet,
+                                 pExpVertPosBlock);
+
+                // For vertex position, we get the exported data from LDS
+                for (auto& expData : expDataSet)
+                {
+                    if (expData.target == EXP_TARGET_POS_0)
+                    {
+                        const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
+                        LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
+
+                        auto pLdsOffset =
+                            m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
+                        pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
+
+                        auto pExpValue = m_pLdsManager->ReadValueFromLds(m_pContext->Floatx4Ty(), pLdsOffset, true);
+                        expData.pExpValue = pExpValue;
+
+                        break;
+                    }
+                }
+            }
+
+            for (const auto& expData : expDataSet)
+            {
+                if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
+                {
+                    std::vector<Value*> args;
+
+                    args.push_back(m_pBuilder->getInt32(expData.target));        // tgt
+                    args.push_back(m_pBuilder->getInt32(expData.channelMask));   // en
+
+                    // src0 ~ src3
+                    for (uint32_t i = 0; i < 4; ++i)
+                    {
+                        auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
+                        args.push_back(pExpValue);
+                    }
+
+                    args.push_back(m_pBuilder->getInt1(expData.doneFlag));       // done
+                    args.push_back(m_pBuilder->getFalse());                      // vm
+
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_pBuilder->getFloatTy(), args);
+                }
+            }
+
+            m_pBuilder->CreateBr(pEndExpVertPosBlock);
+        }
+
+        // Construct ".endExpVertPos" block
+        {
+            m_pBuilder->SetInsertPoint(pEndExpVertPosBlock);
+
+            if (vertexCompact)
+            {
                 auto pUndef = UndefValue::get(m_pContext->Floatx4Ty());
                 for (auto& expData : expDataSet)
                 {
                     PHINode* pExpValue = m_pBuilder->CreatePHI(m_pContext->Floatx4Ty(), 2);
-                    pExpValue->addIncoming(expData.pExpValue, pWritePosDataBlock);
-                    pExpValue->addIncoming(pUndef, pEndZeroDrawFlagBlock);
+
+                    pExpValue->addIncoming(expData.pExpValue, pExpVertPosBlock);
+                    pExpValue->addIncoming(pUndef, pEndExpPrimBlock);
 
                     expData.pExpValue = pExpValue; // Update the exportd data
                 }
-
-                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                auto pPrimValidInWave =
-                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
-                auto pPrimValidInSubgroup =
-                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
-
-                auto pPrimValid = m_pBuilder->CreateAnd(pPrimValidInWave, pPrimValidInSubgroup);
-                m_pBuilder->CreateCondBr(pPrimValid, pCullingBlock, pEndCullingBlock);
             }
 
-            // Construct ".culling" block
-            Value* pDoCull = nullptr;
+            m_pBuilder->CreateCondBr(pVertExp, pExpVertParamBlock, pEndExpVertParamBlock);
+        }
+
+        // Construct ".expVertParam" block
+        {
+            m_pBuilder->SetInsertPoint(pExpVertParamBlock);
+
+            // NOTE: For vertex compaction, ES must have been run in ".expVertPos" block.
+            if (vertexCompact == false)
             {
-                m_pBuilder->SetInsertPoint(pCullingBlock);
-
-                pDoCull = DoCulling(pModule, pCullingBlock);
-                m_pBuilder->CreateBr(pEndCullingBlock);
-            }
-
-            // Construct ".endCulling" block
-            Value* pDrawFlag = nullptr;
-            PHINode* pCullFlag = nullptr;
-            {
-                m_pBuilder->SetInsertPoint(pEndCullingBlock);
-
-                pCullFlag = m_pBuilder->CreatePHI(m_pBuilder->getInt1Ty(), 2);
-
-                pCullFlag->addIncoming(m_pBuilder->getTrue(), pEndWritePosDataBlock);
-                pCullFlag->addIncoming(pDoCull, pCullingBlock);
-
-                pDrawFlag = m_pBuilder->CreateNot(pCullFlag);
-                m_pBuilder->CreateCondBr(pDrawFlag, pWriteDrawFlagBlock, pEndWriteDrawFlagBlock);
-            }
-
-            // Construct ".writeDrawFlag" block
-            {
-                m_pBuilder->SetInsertPoint(pWriteDrawFlagBlock);
-
-                auto pEsGsOffset0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                                m_pBuilder->getInt32Ty(),
-                                                                {
-                                                                    pEsGsOffsets01,
-                                                                    m_pBuilder->getInt32(0),
-                                                                    m_pBuilder->getInt32(16)
-                                                                });
-                auto pVertexId0 = m_pBuilder->CreateLShr(pEsGsOffset0, 2);
-
-                auto pEsGsOffset1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                                m_pBuilder->getInt32Ty(),
-                                                                {
-                                                                    pEsGsOffsets01,
-                                                                    m_pBuilder->getInt32(16),
-                                                                    m_pBuilder->getInt32(16)
-                                                                });
-                auto pVertexId1 = m_pBuilder->CreateLShr(pEsGsOffset1, 2);
-
-                auto pEsGsOffset2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                                m_pBuilder->getInt32Ty(),
-                                                                {
-                                                                    pEsGsOffsets23,
-                                                                    m_pBuilder->getInt32(0),
-                                                                    m_pBuilder->getInt32(16)
-                                                                });
-                auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, 2);
-
-                Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
-
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
-                auto pRegionStart = m_pBuilder->getInt32(regionStart);
-
-                auto pOne = m_pBuilder->getInt8(1);
-
-                for (uint32_t i = 0; i < 3; ++i)
+                if (separateExp)
                 {
-                    auto pLdsOffset = m_pBuilder->CreateAdd(pRegionStart, vertexId[i]);
-                    m_pLdsManager->WriteValueToLds(pOne, pLdsOffset);
-                }
-
-                m_pBuilder->CreateBr(pEndWriteDrawFlagBlock);
-            }
-
-            // Construct ".endWriteDrawFlag" block
-            Value* pDrawCount = nullptr;
-            {
-                m_pBuilder->SetInsertPoint(pEndWriteDrawFlagBlock);
-
-                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                if (vertexCompact)
-                {
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
-
-                    auto pLdsOffset =
-                        m_pBuilder->CreateAdd(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(regionStart));
-
-                    pDrawFlag = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt8Ty(), pLdsOffset);
-                    pDrawFlag = m_pBuilder->CreateTrunc(pDrawFlag, m_pBuilder->getInt1Ty());
-                }
-
-                auto pDrawMask = DoSubgroupBallot(pDrawFlag);
-
-                pDrawCount = m_pBuilder->CreateIntrinsic(Intrinsic::ctpop,
-                                                         m_pBuilder->getInt64Ty(),
-                                                         pDrawMask);
-
-                pDrawCount = m_pBuilder->CreateTrunc(pDrawCount, m_pBuilder->getInt32Ty());
-
-                auto pThreadIdUpbound = m_pBuilder->CreateSub(m_pBuilder->getInt32(waveCountInSubgroup),
-                                                              m_nggFactor.pWaveIdInSubgroup);
-                auto pThreadValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, pThreadIdUpbound);
-
-                Value* pPrimCountAcc = nullptr;
-                if (vertexCompact)
-                {
-                    pPrimCountAcc = pThreadValid;
-                }
-                else
-                {
-                    auto pHasSurviveDraw = m_pBuilder->CreateICmpNE(pDrawCount, m_pBuilder->getInt32(0));
-
-                    pPrimCountAcc = m_pBuilder->CreateAnd(pHasSurviveDraw, pThreadValid);
-                }
-
-                m_pBuilder->CreateCondBr(pPrimCountAcc, pAccThreadCountBlock, pEndAccThreadCountBlock);
-            }
-
-            // Construct ".accThreadCount" block
-            {
-                m_pBuilder->SetInsertPoint(pAccThreadCountBlock);
-
-                auto pLdsOffset = m_pBuilder->CreateAdd(m_nggFactor.pWaveIdInSubgroup, m_nggFactor.pThreadIdInWave);
-                pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(1));
-                pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
-
-                uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(
-                    vertexCompact ? LdsRegionVertCountInWaves : LdsRegionPrimCountInWaves);
-
-                pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-                m_pLdsManager->AtomicOpWithLds(AtomicRMWInst::Add, pDrawCount, pLdsOffset);
-
-                m_pBuilder->CreateBr(pEndAccThreadCountBlock);
-            }
-
-            // Construct ".endAccThreadCount" block
-            {
-                m_pBuilder->SetInsertPoint(pEndAccThreadCountBlock);
-
-                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                if (vertexCompact)
-                {
-                    m_pBuilder->CreateBr(pReadThreadCountBlock);
-                }
-                else
-                {
-                    auto pFirstThreadInWave =
-                        m_pBuilder->CreateICmpEQ(m_nggFactor.pThreadIdInWave, m_pBuilder->getInt32(0));
-
-                    m_pBuilder->CreateCondBr(pFirstThreadInWave,
-                                             pReadThreadCountBlock,
-                                             pEndReadThreadCountBlock);
-                }
-            }
-
-            Value* pThreadCountInWaves = nullptr;
-            if (vertexCompact)
-            {
-                // Construct ".readThreadCount" block
-                Value* pVertCountInWaves = nullptr;
-                Value* pVertCountInPrevWaves = nullptr;
-                {
-                    m_pBuilder->SetInsertPoint(pReadThreadCountBlock);
-
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionVertCountInWaves);
-
-                    // The DWORD following DWORDs for all waves stores the vertex count of the entire sub-group
-                    Value* pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
-                    pVertCountInWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-                    // NOTE: We promote vertex count in waves to SGPR since it is treated as an uniform value.
-                    pVertCountInWaves =
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pVertCountInWaves);
-                    pThreadCountInWaves = pVertCountInWaves;
-
-                    // Get vertex count for all waves prior to this wave
-                    pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
-                    pLdsOffset = m_pBuilder->CreateAdd(m_pBuilder->getInt32(regionStart), pLdsOffset);
-
-                    pVertCountInPrevWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-                    auto pVertValid =
-                        m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pVertCountInWave);
-
-                    auto pCompactDataWrite = m_pBuilder->CreateAnd(pDrawFlag, pVertValid);
-
-                    m_pBuilder->CreateCondBr(pCompactDataWrite,
-                                             pWriteCompactDataBlock,
-                                             pEndReadThreadCountBlock);
-                }
-
-                // Construct ".writeCompactData" block
-                {
-                    m_pBuilder->SetInsertPoint(pWriteCompactDataBlock);
-
-                    Value* pDrawMask = DoSubgroupBallot(pDrawFlag);
-                    pDrawMask = m_pBuilder->CreateBitCast(pDrawMask, m_pContext->Int32x2Ty());
-
-                    auto pDrawMaskLow = m_pBuilder->CreateExtractElement(pDrawMask, static_cast<uint64_t>(0));
-
-                    Value* pCompactThreadIdInSubrgoup = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo,
-                                                                                    {},
-                                                                                    {
-                                                                                        pDrawMaskLow,
-                                                                                        m_pBuilder->getInt32(0)
-                                                                                    });
-
-                    if (waveSize == 64)
-                    {
-                        auto pDrawMaskHigh = m_pBuilder->CreateExtractElement(pDrawMask, 1);
-
-                        pCompactThreadIdInSubrgoup = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi,
-                                                                                {},
-                                                                                {
-                                                                                    pDrawMaskHigh,
-                                                                                    pCompactThreadIdInSubrgoup
-                                                                                });
-                    }
-
-                    pCompactThreadIdInSubrgoup =
-                        m_pBuilder->CreateAdd(pVertCountInPrevWaves, pCompactThreadIdInSubrgoup);
-
-                    // Write vertex position data to LDS
-                    for (const auto& expData : expDataSet)
-                    {
-                        if (expData.target == EXP_TARGET_POS_0)
-                        {
-                            const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
-
-                            Value* pLdsOffset =
-                                m_pBuilder->CreateMul(pCompactThreadIdInSubrgoup, m_pBuilder->getInt32(SizeOfVec4));
-                            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-
-                            m_pLdsManager->WriteValueToLds(expData.pExpValue, pLdsOffset);
-
-                            break;
-                        }
-                    }
-
-                    // Write thread ID in sub-group to LDS
-                    Value* pCompactThreadId =
-                        m_pBuilder->CreateTrunc(pCompactThreadIdInSubrgoup, m_pBuilder->getInt8Ty());
-                    WriteCompactDataToLds(pCompactThreadId,
-                                          m_nggFactor.pThreadIdInSubgroup,
-                                          LdsRegionCompactThreadIdInSubgroup);
-
-                    if (hasTs)
-                    {
-                        // Write X/Y of tessCoord (U/V) to LDS
-                        if (pResUsage->builtInUsage.tes.tessCoord)
-                        {
-                            WriteCompactDataToLds(pTessCoordX,
-                                                  pCompactThreadIdInSubrgoup,
-                                                  LdsRegionCompactTessCoordX);
-
-                            WriteCompactDataToLds(pTessCoordY,
-                                                  pCompactThreadIdInSubrgoup,
-                                                  LdsRegionCompactTessCoordY);
-                        }
-
-                        // Write relative patch ID to LDS
-                        WriteCompactDataToLds(pRelPatchId,
-                                              pCompactThreadIdInSubrgoup,
-                                              LdsRegionCompactRelPatchId);
-
-                        // Write patch ID to LDS
-                        if (pResUsage->builtInUsage.tes.primitiveId)
-                        {
-                            WriteCompactDataToLds(pPatchId,
-                                                  pCompactThreadIdInSubrgoup,
-                                                  LdsRegionCompactPatchId);
-                        }
-                    }
-                    else
-                    {
-                        // Write vertex ID to LDS
-                        if (pResUsage->builtInUsage.vs.vertexIndex)
-                        {
-                            WriteCompactDataToLds(pVertexId,
-                                                  pCompactThreadIdInSubrgoup,
-                                                  LdsRegionCompactVertexId);
-                        }
-
-                        // Write instance ID to LDS
-                        if (pResUsage->builtInUsage.vs.instanceIndex)
-                        {
-                            WriteCompactDataToLds(pInstanceId,
-                                                  pCompactThreadIdInSubrgoup,
-                                                  LdsRegionCompactInstanceId);
-                        }
-
-                        // Write primitive ID to LDS
-                        if (pResUsage->builtInUsage.vs.primitiveId)
-                        {
-                            LLPC_ASSERT(m_nggFactor.pPrimitiveId != nullptr);
-                            WriteCompactDataToLds(m_nggFactor.pPrimitiveId,
-                                                  pCompactThreadIdInSubrgoup,
-                                                  LdsRegionCompactPrimId);
-                        }
-                    }
-
-                    m_pBuilder->CreateBr(pEndReadThreadCountBlock);
-                }
-
-                // Construct ".endReadThreadCount" block
-                {
-                    m_pBuilder->SetInsertPoint(pEndReadThreadCountBlock);
-
-                    Value* pHasSurviveVert = m_pBuilder->CreateICmpNE(pVertCountInWaves, m_pBuilder->getInt32(0));
-
-                    Value* pPrimCountInSubgroup =
-                        m_pBuilder->CreateSelect(pHasSurviveVert,
-                                                 m_nggFactor.pPrimCountInSubgroup,
-                                                 m_pBuilder->getInt32(fullyCulledThreadCount));
-
-                    // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
-                    // as an uniform value later. This is similar to the provided primitive count in sub-group that is
-                    // a system value.
-                    pPrimCountInSubgroup =
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCountInSubgroup);
-
-                    Value* pVertCountInSubgroup =
-                        m_pBuilder->CreateSelect(pHasSurviveVert,
-                                                 pVertCountInWaves,
-                                                 m_pBuilder->getInt32(fullyCulledThreadCount));
-
-                    // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
-                    // an uniform value later, similar to what we have done for the revised primitive count in
-                    // sub-group.
-                    pVertCountInSubgroup =
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pVertCountInSubgroup);
-
-                    m_nggFactor.pPrimCountInSubgroup = pPrimCountInSubgroup;
-                    m_nggFactor.pVertCountInSubgroup = pVertCountInSubgroup;
-
-                    auto pFirstWaveInSubgroup =
-                        m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
-
-                    m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
-                }
-            }
-            else
-            {
-                // Construct ".readThreadCount" block
-                Value* pPrimCountInWaves = nullptr;
-                {
-                    m_pBuilder->SetInsertPoint(pReadThreadCountBlock);
-
-                    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPrimCountInWaves);
-
-                    // The DWORD following DWORDs for all waves stores the primitive count of the entire sub-group
-                    auto pLdsOffset = m_pBuilder->getInt32(regionStart + waveCountInSubgroup * SizeOfDword);
-                    pPrimCountInWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-                    m_pBuilder->CreateBr(pEndReadThreadCountBlock);
-                }
-
-                // Construct ".endReadThreadCount" block
-                {
-                    m_pBuilder->SetInsertPoint(pEndReadThreadCountBlock);
-
-                    Value* pPrimCount = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
-
-                    static_cast<PHINode*>(pPrimCount)->addIncoming(m_nggFactor.pPrimCountInSubgroup,
-                                                                   pEndAccThreadCountBlock);
-                    static_cast<PHINode*>(pPrimCount)->addIncoming(pPrimCountInWaves, pReadThreadCountBlock);
-
-                    // NOTE: We promote primitive count in waves to SGPR since it is treated as an uniform value.
-                    pPrimCount = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCount);
-                    pThreadCountInWaves = pPrimCount;
-
-                    Value* pHasSurvivePrim = m_pBuilder->CreateICmpNE(pPrimCount, m_pBuilder->getInt32(0));
-
-                    Value* pPrimCountInSubgroup =
-                        m_pBuilder->CreateSelect(pHasSurvivePrim,
-                                                 m_nggFactor.pPrimCountInSubgroup,
-                                                 m_pBuilder->getInt32(fullyCulledThreadCount));
-
-                    // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
-                    // as an uniform value later. This is similar to the provided primitive count in sub-group that is
-                    // a system value.
-                    pPrimCountInSubgroup =
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pPrimCountInSubgroup);
-
-                    Value* pVertCountInSubgroup =
-                        m_pBuilder->CreateSelect(pHasSurvivePrim,
-                                                 m_nggFactor.pVertCountInSubgroup,
-                                                 m_pBuilder->getInt32(fullyCulledThreadCount));
-
-                    // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
-                    // an uniform value later, similar to what we have done for the revised primitive count in
-                    // sub-group.
-                    pVertCountInSubgroup =
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, pVertCountInSubgroup);
-
-                    m_nggFactor.pPrimCountInSubgroup = pPrimCountInSubgroup;
-                    m_nggFactor.pVertCountInSubgroup = pVertCountInSubgroup;
-
-                    auto pFirstWaveInSubgroup =
-                        m_pBuilder->CreateICmpEQ(m_nggFactor.pWaveIdInSubgroup, m_pBuilder->getInt32(0));
-
-                    m_pBuilder->CreateCondBr(pFirstWaveInSubgroup, pAllocReqBlock, pEndAllocReqBlock);
-                }
-            }
-
-            // Construct ".allocReq" block
-            {
-                m_pBuilder->SetInsertPoint(pAllocReqBlock);
-
-                DoParamCacheAllocRequest();
-                m_pBuilder->CreateBr(pEndAllocReqBlock);
-            }
-
-            // Construct ".endAllocReq" block
-            {
-                m_pBuilder->SetInsertPoint(pEndAllocReqBlock);
-
-                m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-                auto pNoSurviveThread = m_pBuilder->CreateICmpEQ(pThreadCountInWaves, m_pBuilder->getInt32(0));
-                m_pBuilder->CreateCondBr(pNoSurviveThread, pEarlyExitBlock, pNoEarlyExitBlock);
-            }
-
-            // Construct ".earlyExit" block
-            {
-                m_pBuilder->SetInsertPoint(pEarlyExitBlock);
-
-                uint32_t expPosCount = 0;
-                for (const auto& expData : expDataSet)
-                {
-                    if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
-                    {
-                        ++expPosCount;
-                    }
-                }
-
-                DoEarlyExit(fullyCulledThreadCount, expPosCount);
-            }
-
-            // Construct ".noEarlyExit" block
-            {
-                m_pBuilder->SetInsertPoint(pNoEarlyExitBlock);
-
-                auto pPrimExp =
-                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
-                m_pBuilder->CreateCondBr(pPrimExp, pExpPrimBlock, pEndExpPrimBlock);
-            }
-
-            // Construct ".expPrim" block
-            {
-                m_pBuilder->SetInsertPoint(pExpPrimBlock);
-
-                DoPrimitiveExport(vertexCompact ? pCullFlag : nullptr);
-                m_pBuilder->CreateBr(pEndExpPrimBlock);
-            }
-
-            // Construct ".endExpPrim" block
-            Value* pVertExp = nullptr;
-            {
-                m_pBuilder->SetInsertPoint(pEndExpPrimBlock);
-
-                pVertExp =
-                    m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pVertCountInSubgroup);
-                m_pBuilder->CreateCondBr(pVertExp, pExpVertPosBlock, pEndExpVertPosBlock);
-            }
-
-            // Construct ".expVertPos" block
-            {
-                m_pBuilder->SetInsertPoint(pExpVertPosBlock);
-
-                // NOTE: For vertex compaction, we have to run ES to get exported data once again.
-                if (vertexCompact)
-                {
+                    // Should run ES variant to get exported parameter data
                     expDataSet.clear();
 
                     RunEsOrEsVariant(pModule,
-                                     LlpcName::NggEsEntryVariant,
+                                     LlpcName::NggEsEntryVariantParam,
                                      pEntryPoint->arg_begin(),
-                                     true,
+                                     false,
                                      &expDataSet,
-                                     pExpVertPosBlock);
-
-                    // For vertex position, we get the exported data from LDS
-                    for (auto& expData : expDataSet)
-                    {
-                        if (expData.target == EXP_TARGET_POS_0)
-                        {
-                            const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
-                            LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
-
-                            auto pLdsOffset =
-                                m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
-                            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-
-                            auto pExpValue = m_pLdsManager->ReadValueFromLds(m_pContext->Floatx4Ty(), pLdsOffset, true);
-                            expData.pExpValue = pExpValue;
-
-                            break;
-                        }
-                    }
+                                     pExpVertParamBlock);
                 }
-
-                for (const auto& expData : expDataSet)
-                {
-                    if ((expData.target >= EXP_TARGET_POS_0) && (expData.target <= EXP_TARGET_POS_4))
-                    {
-                        std::vector<Value*> args;
-
-                        args.push_back(m_pBuilder->getInt32(expData.target));        // tgt
-                        args.push_back(m_pBuilder->getInt32(expData.channelMask));   // en
-
-                        // src0 ~ src3
-                        for (uint32_t i = 0; i < 4; ++i)
-                        {
-                            auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
-                            args.push_back(pExpValue);
-                        }
-
-                        args.push_back(m_pBuilder->getInt1(expData.doneFlag));       // done
-                        args.push_back(m_pBuilder->getFalse());                      // vm
-
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_pBuilder->getFloatTy(), args);
-                    }
-                }
-
-                m_pBuilder->CreateBr(pEndExpVertPosBlock);
             }
 
-            // Construct ".endExpVertPos" block
+            for (const auto& expData : expDataSet)
             {
-                m_pBuilder->SetInsertPoint(pEndExpVertPosBlock);
-
-                if (vertexCompact)
+                if ((expData.target >= EXP_TARGET_PARAM_0) && (expData.target <= EXP_TARGET_PARAM_31))
                 {
-                    auto pUndef = UndefValue::get(m_pContext->Floatx4Ty());
-                    for (auto& expData : expDataSet)
+                    std::vector<Value*> args;
+
+                    args.push_back(m_pBuilder->getInt32(expData.target));        // tgt
+                    args.push_back(m_pBuilder->getInt32(expData.channelMask));   // en
+
+                                                                                    // src0 ~ src3
+                    for (uint32_t i = 0; i < 4; ++i)
                     {
-                        PHINode* pExpValue = m_pBuilder->CreatePHI(m_pContext->Floatx4Ty(), 2);
-
-                        pExpValue->addIncoming(expData.pExpValue, pExpVertPosBlock);
-                        pExpValue->addIncoming(pUndef, pEndExpPrimBlock);
-
-                        expData.pExpValue = pExpValue; // Update the exportd data
+                        auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
+                        args.push_back(pExpValue);
                     }
-                }
 
-                m_pBuilder->CreateCondBr(pVertExp, pExpVertParamBlock, pEndExpVertParamBlock);
+                    args.push_back(m_pBuilder->getInt1(expData.doneFlag));       // done
+                    args.push_back(m_pBuilder->getFalse());                      // vm
+
+                    m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_pBuilder->getFloatTy(), args);
+                }
             }
 
-            // Construct ".expVertParam" block
-            {
-                m_pBuilder->SetInsertPoint(pExpVertParamBlock);
+            m_pBuilder->CreateBr(pEndExpVertParamBlock);
+        }
 
-                // NOTE: For vertex compaction, ES must have been run in ".expVertPos" block.
-                if (vertexCompact == false)
-                {
-                    if (separateExp)
-                    {
-                        // Should run ES variant to get exported parameter data
-                        expDataSet.clear();
+        // Construct ".endExpVertParam" block
+        {
+            m_pBuilder->SetInsertPoint(pEndExpVertParamBlock);
 
-                        RunEsOrEsVariant(pModule,
-                                         LlpcName::NggEsEntryVariantParam,
-                                         pEntryPoint->arg_begin(),
-                                         false,
-                                         &expDataSet,
-                                         pExpVertParamBlock);
-                    }
-                }
-
-                for (const auto& expData : expDataSet)
-                {
-                    if ((expData.target >= EXP_TARGET_PARAM_0) && (expData.target <= EXP_TARGET_PARAM_31))
-                    {
-                        std::vector<Value*> args;
-
-                        args.push_back(m_pBuilder->getInt32(expData.target));        // tgt
-                        args.push_back(m_pBuilder->getInt32(expData.channelMask));   // en
-
-                                                                                     // src0 ~ src3
-                        for (uint32_t i = 0; i < 4; ++i)
-                        {
-                            auto pExpValue = m_pBuilder->CreateExtractElement(expData.pExpValue, i);
-                            args.push_back(pExpValue);
-                        }
-
-                        args.push_back(m_pBuilder->getInt1(expData.doneFlag));       // done
-                        args.push_back(m_pBuilder->getFalse());                      // vm
-
-                        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_exp, m_pBuilder->getFloatTy(), args);
-                    }
-                }
-
-                m_pBuilder->CreateBr(pEndExpVertParamBlock);
-            }
-
-            // Construct ".endExpVertParam" block
-            {
-                m_pBuilder->SetInsertPoint(pEndExpVertParamBlock);
-
-                m_pBuilder->CreateRetVoid();
-            }
+            m_pBuilder->CreateRetVoid();
         }
     }
-
-    return pEntryPoint;
 }
 
 // =====================================================================================================================
@@ -1877,7 +1900,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     Value* pMergedGroupInfo = (pArg + EsGsSysValueMergedGroupInfo);
     Value* pMergedWaveInfo = (pArg + EsGsSysValueMergedWaveInfo);
 
-    pArg += EsGsSpecialSysValueCount;
+    pArg += (EsGsSpecialSysValueCount + 1);
 
     Value* pEsGsOffsets01 = pArg;
     Value* pEsGsOffsets23 = (pArg + 1);
@@ -2103,8 +2126,11 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pInitOutPrimDataBlock);
 
+        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
+
         auto pLdsOffset = m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
         pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
+        pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
         auto pNullPrim = m_pBuilder->getInt32(NullPrim);
         Value* pNullPrims = UndefValue::get(VectorType::get(m_pBuilder->getInt32Ty(), maxOutPrims));
@@ -2519,8 +2545,7 @@ void NggPrimShader::InitWaveThreadInfo(
 // =====================================================================================================================
 // Does various culling for NGG primitive shader.
 Value* NggPrimShader::DoCulling(
-    Module*       pModule,      // [in] LLVM module
-    BasicBlock*   pInsertAtEnd) // [in] Where to insert instructions
+    Module* pModule)    // [in] LLVM module
 {
     Value* pCullFlag = m_pBuilder->getFalse();
 
@@ -2575,31 +2600,31 @@ Value* NggPrimShader::DoCulling(
     // Handle backface culling
     if (m_pNggControl->enableBackfaceCulling)
     {
-        pCullFlag = DoBackfaceCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2], pInsertAtEnd);
+        pCullFlag = DoBackfaceCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2]);
     }
 
     // Handle frustum culling
     if (m_pNggControl->enableFrustumCulling)
     {
-        pCullFlag = DoFrustumCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2], pInsertAtEnd);
+        pCullFlag = DoFrustumCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2]);
     }
 
     // Handle box filter culling
     if (m_pNggControl->enableBoxFilterCulling)
     {
-        pCullFlag = DoBoxFilterCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2], pInsertAtEnd);
+        pCullFlag = DoBoxFilterCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2]);
     }
 
     // Handle sphere culling
     if (m_pNggControl->enableSphereCulling)
     {
-        pCullFlag = DoSphereCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2], pInsertAtEnd);
+        pCullFlag = DoSphereCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2]);
     }
 
     // Handle small primitive filter culling
     if (m_pNggControl->enableSmallPrimFilter)
     {
-        pCullFlag = DoSmallPrimFilterCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2], pInsertAtEnd);
+        pCullFlag = DoSmallPrimFilterCulling(pModule, pCullFlag, vertex[0], vertex[1], vertex[2]);
     }
 
     // Handle cull distance culling
@@ -2618,7 +2643,7 @@ Value* NggPrimShader::DoCulling(
             signMask[i] = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
         }
 
-        pCullFlag = DoCullDistanceCulling(pModule, pCullFlag, signMask[0], signMask[1], signMask[2], pInsertAtEnd);
+        pCullFlag = DoCullDistanceCulling(pModule, pCullFlag, signMask[0], signMask[1], signMask[2]);
     }
 
     return pCullFlag;
@@ -3172,13 +3197,19 @@ Function* NggPrimShader::MutateEsToVariant(
                 CallInst* const pCall = dyn_cast<CallInst>(pUser);
                 LLPC_ASSERT(pCall != nullptr);
 
+                if (pCall->getParent()->getParent() != pEsEntryPoint)
+                {
+                    // Export call doesn't belong to ES, skip
+                    continue;
+                }
+
                 uint8_t expTarget = cast<ConstantInt>(pCall->getArgOperand(0))->getZExtValue();
 
                 bool expPos = ((expTarget >= EXP_TARGET_POS_0) && (expTarget <= EXP_TARGET_POS_4));
                 bool expParam = ((expTarget >= EXP_TARGET_PARAM_0) && (expTarget <= EXP_TARGET_PARAM_31));
 
                 if ((doExp && (expPos || expParam)) ||
-                    (doPosExp && expPos) ||
+                    (doPosExp && expPos)            ||
                     (doParamExp && expParam))
                 {
                     ++expCount;
@@ -3229,6 +3260,7 @@ Function* NggPrimShader::MutateEsToVariant(
     // Get exported data
     std::vector<Instruction*> expCalls;
 
+    uint32_t lastExport = InvalidValue; // Record last position export that needs "done" flag
     for (auto& func : pModule->functions())
     {
         if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_exp))
@@ -3236,7 +3268,15 @@ Function* NggPrimShader::MutateEsToVariant(
             for (auto pUser : func.users())
             {
                 CallInst* const pCall = dyn_cast<CallInst>(pUser);
-                LLPC_ASSERT((pCall != nullptr) && (pCall->getParent() == pRetBlock)); // Must in return block
+                LLPC_ASSERT(pCall != nullptr);
+
+                if (pCall->getParent()->getParent() != pEsEntryVariant)
+                {
+                    // Export call doesn't belong to ES variant, skip
+                    continue;
+                }
+
+                LLPC_ASSERT(pCall->getParent() == pRetBlock); // Must in return block
 
                 uint8_t expTarget = cast<ConstantInt>(pCall->getArgOperand(0))->getZExtValue();
 
@@ -3269,9 +3309,13 @@ Function* NggPrimShader::MutateEsToVariant(
                         pExpValue = m_pBuilder->CreateInsertElement(pExpValue, expValue[i], i);
                     }
 
-                    bool doneFlag = (cast<ConstantInt>(pCall->getArgOperand(6))->getZExtValue() != 0);
+                    if (expPos)
+                    {
+                        // Last position export that needs "done" flag
+                        lastExport = expDataSet.size();
+                    }
 
-                    ExpData expData = { expTarget, channelMask, doneFlag, pExpValue };
+                    ExpData expData = { expTarget, channelMask, false, pExpValue };
                     expDataSet.push_back(expData);
                 }
 
@@ -3280,6 +3324,12 @@ Function* NggPrimShader::MutateEsToVariant(
         }
     }
     LLPC_ASSERT(expDataSet.size() == expCount);
+
+    // Set "done" flag for last position export
+    if (lastExport != InvalidValue)
+    {
+        expDataSet[lastExport].doneFlag = true;
+    }
 
     // Construct exported data
     uint32_t i = 0;
@@ -4342,14 +4392,14 @@ Value* NggPrimShader::DoBackfaceCulling(
     Value*      pCullFlag,      // [in] Cull flag before doing this culling
     Value*      pVertex0,       // [in] Position data of vertex0
     Value*      pVertex1,       // [in] Position data of vertex1
-    Value*      pVertex2,       // [in] Position data of vertex2
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    Value*      pVertex2)       // [in] Position data of vertex2
 {
     LLPC_ASSERT(m_pNggControl->enableBackfaceCulling);
 
-    if (pModule->getFunction(LlpcName::NggCullingBackface) == nullptr)
+    auto pBackfaceCuller = pModule->getFunction(LlpcName::NggCullingBackface);
+    if (pBackfaceCuller == nullptr)
     {
-        CreateBackfaceCuller(pModule);
+        pBackfaceCuller = CreateBackfaceCuller(pModule);
     }
 
     uint32_t regOffset = 0;
@@ -4360,7 +4410,7 @@ Value* NggPrimShader::DoBackfaceCulling(
     {
         regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
         regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paSuScModeCntl);
-        pPaSuScModeCntl = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+        pPaSuScModeCntl = FetchCullingControlRegister(pModule, regOffset);
     }
     else
     {
@@ -4370,29 +4420,25 @@ Value* NggPrimShader::DoBackfaceCulling(
     // Get register PA_CL_VPORT_XSCALE
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportXscale);
-    auto pPaClVportXscale = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClVportXscale = FetchCullingControlRegister(pModule, regOffset);
 
     // Get register PA_CL_VPORT_YSCALE
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportYscale);
-    auto pPaClVportYscale = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClVportYscale = FetchCullingControlRegister(pModule, regOffset);
 
     // Do backface culling
-    return EmitCall(pModule,
-                    LlpcName::NggCullingBackface,
-                    m_pBuilder->getInt1Ty(),
-                    {
-                        pCullFlag,
-                        pVertex0,
-                        pVertex1,
-                        pVertex2,
-                        m_pBuilder->getInt32(m_pNggControl->backfaceExponent),
-                        pPaSuScModeCntl,
-                        pPaClVportXscale,
-                        pPaClVportYscale
-                    },
-                    Attribute::ReadNone,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pBackfaceCuller,
+                                  {
+                                      pCullFlag,
+                                      pVertex0,
+                                      pVertex1,
+                                      pVertex2,
+                                      m_pBuilder->getInt32(m_pNggControl->backfaceExponent),
+                                      pPaSuScModeCntl,
+                                      pPaClVportXscale,
+                                      pPaClVportYscale
+                                  });
 }
 
 // =====================================================================================================================
@@ -4402,14 +4448,14 @@ Value* NggPrimShader::DoFrustumCulling(
     Value*      pCullFlag,      // [in] Cull flag before doing this culling
     Value*      pVertex0,       // [in] Position data of vertex0
     Value*      pVertex1,       // [in] Position data of vertex1
-    Value*      pVertex2,       // [in] Position data of vertex2
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    Value*      pVertex2)       // [in] Position data of vertex2
 {
     LLPC_ASSERT(m_pNggControl->enableFrustumCulling);
 
-    if (pModule->getFunction(LlpcName::NggCullingFrustum) == nullptr)
+    auto pFrustumCuller = pModule->getFunction(LlpcName::NggCullingFrustum);
+    if (pFrustumCuller == nullptr)
     {
-        CreateFrustumCuller(pModule);
+        pFrustumCuller = CreateFrustumCuller(pModule);
     }
 
     uint32_t regOffset = 0;
@@ -4420,7 +4466,7 @@ Value* NggPrimShader::DoFrustumCulling(
     {
         regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
         regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
-        pPaClClipCntl = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+        pPaClClipCntl = FetchCullingControlRegister(pModule, regOffset);
     }
     else
     {
@@ -4430,28 +4476,24 @@ Value* NggPrimShader::DoFrustumCulling(
     // Get register PA_CL_GB_HORZ_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
-    auto pPaClGbHorzDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClGbHorzDiscAdj = FetchCullingControlRegister(pModule, regOffset);
 
     // Get register PA_CL_GB_VERT_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
-    auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset);
 
     // Do frustum culling
-    return EmitCall(pModule,
-                    LlpcName::NggCullingFrustum,
-                    m_pBuilder->getInt1Ty(),
-                    {
-                        pCullFlag,
-                        pVertex0,
-                        pVertex1,
-                        pVertex2,
-                        pPaClClipCntl,
-                        pPaClGbHorzDiscAdj,
-                        pPaClGbVertDiscAdj
-                    },
-                    Attribute::ReadNone,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pFrustumCuller,
+                                  {
+                                      pCullFlag,
+                                      pVertex0,
+                                      pVertex1,
+                                      pVertex2,
+                                      pPaClClipCntl,
+                                      pPaClGbHorzDiscAdj,
+                                      pPaClGbVertDiscAdj
+                                  });
 }
 
 // =====================================================================================================================
@@ -4461,14 +4503,14 @@ Value* NggPrimShader::DoBoxFilterCulling(
     Value*      pCullFlag,      // [in] Cull flag before doing this culling
     Value*      pVertex0,       // [in] Position data of vertex0
     Value*      pVertex1,       // [in] Position data of vertex1
-    Value*      pVertex2,       // [in] Position data of vertex2
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    Value*      pVertex2)       // [in] Position data of vertex2
 {
     LLPC_ASSERT(m_pNggControl->enableBoxFilterCulling);
 
-    if (pModule->getFunction(LlpcName::NggCullingBoxFilter) == nullptr)
+    auto pBoxFilterCuller = pModule->getFunction(LlpcName::NggCullingBoxFilter);
+    if (pBoxFilterCuller == nullptr)
     {
-        CreateBoxFilterCuller(pModule);
+        pBoxFilterCuller = CreateBoxFilterCuller(pModule);
     }
 
     uint32_t regOffset = 0;
@@ -4482,7 +4524,7 @@ Value* NggPrimShader::DoBoxFilterCulling(
     {
         regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
         regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
-        pPaClClipCntl = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+        pPaClClipCntl = FetchCullingControlRegister(pModule, regOffset);
     }
     else
     {
@@ -4492,29 +4534,25 @@ Value* NggPrimShader::DoBoxFilterCulling(
     // Get register PA_CL_GB_HORZ_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
-    auto pPaClGbHorzDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClGbHorzDiscAdj = FetchCullingControlRegister(pModule, regOffset);
 
     // Get register PA_CL_GB_VERT_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
-    auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset);
 
     // Do box filter culling
-    return EmitCall(pModule,
-                    LlpcName::NggCullingBoxFilter,
-                    m_pBuilder->getInt1Ty(),
-                    {
-                        pCullFlag,
-                        pVertex0,
-                        pVertex1,
-                        pVertex2,
-                        pPaClVteCntl,
-                        pPaClClipCntl,
-                        pPaClGbHorzDiscAdj,
-                        pPaClGbVertDiscAdj
-                    },
-                    Attribute::ReadNone,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pBoxFilterCuller,
+                                  {
+                                      pCullFlag,
+                                      pVertex0,
+                                      pVertex1,
+                                      pVertex2,
+                                      pPaClVteCntl,
+                                      pPaClClipCntl,
+                                      pPaClGbHorzDiscAdj,
+                                      pPaClGbVertDiscAdj
+                                  });
 }
 
 // =====================================================================================================================
@@ -4524,14 +4562,14 @@ Value* NggPrimShader::DoSphereCulling(
     Value*      pCullFlag,      // [in] Cull flag before doing this culling
     Value*      pVertex0,       // [in] Position data of vertex0
     Value*      pVertex1,       // [in] Position data of vertex1
-    Value*      pVertex2,       // [in] Position data of vertex2
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    Value*      pVertex2)       // [in] Position data of vertex2
 {
     LLPC_ASSERT(m_pNggControl->enableSphereCulling);
 
-    if (pModule->getFunction(LlpcName::NggCullingSphere) == nullptr)
+    auto pSphereCuller = pModule->getFunction(LlpcName::NggCullingSphere);
+    if (pSphereCuller == nullptr)
     {
-        CreateSphereCuller(pModule);
+        pSphereCuller = CreateSphereCuller(pModule);
     }
 
     uint32_t regOffset = 0;
@@ -4545,7 +4583,7 @@ Value* NggPrimShader::DoSphereCulling(
     {
         regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
         regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClClipCntl);
-        pPaClClipCntl = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+        pPaClClipCntl = FetchCullingControlRegister(pModule, regOffset);
     }
     else
     {
@@ -4555,29 +4593,25 @@ Value* NggPrimShader::DoSphereCulling(
     // Get register PA_CL_GB_HORZ_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbHorzDiscAdj);
-    auto pPaClGbHorzDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClGbHorzDiscAdj = FetchCullingControlRegister(pModule, regOffset);
 
     // Get register PA_CL_GB_VERT_DISC_ADJ
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, pipelineStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderPsoCb, paClGbVertDiscAdj);
-    auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClGbVertDiscAdj = FetchCullingControlRegister(pModule, regOffset);
 
     // Do small primitive filter culling
-    return EmitCall(pModule,
-                    LlpcName::NggCullingSphere,
-                    m_pBuilder->getInt1Ty(),
-                    {
-                        pCullFlag,
-                        pVertex0,
-                        pVertex1,
-                        pVertex2,
-                        pPaClVteCntl,
-                        pPaClClipCntl,
-                        pPaClGbHorzDiscAdj,
-                        pPaClGbVertDiscAdj
-                    },
-                    Attribute::ReadNone,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pSphereCuller,
+                                  {
+                                      pCullFlag,
+                                      pVertex0,
+                                      pVertex1,
+                                      pVertex2,
+                                      pPaClVteCntl,
+                                      pPaClClipCntl,
+                                      pPaClGbHorzDiscAdj,
+                                      pPaClGbVertDiscAdj
+                                  });
 }
 
 // =====================================================================================================================
@@ -4587,14 +4621,14 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
     Value*      pCullFlag,      // [in] Cull flag before doing this culling
     Value*      pVertex0,       // [in] Position data of vertex0
     Value*      pVertex1,       // [in] Position data of vertex1
-    Value*      pVertex2,       // [in] Position data of vertex2
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    Value*      pVertex2)       // [in] Position data of vertex2
 {
     LLPC_ASSERT(m_pNggControl->enableSmallPrimFilter);
 
-    if (pModule->getFunction(LlpcName::NggCullingSmallPrimFilter) == nullptr)
+    auto pSmallPrimFilterCuller = pModule->getFunction(LlpcName::NggCullingSmallPrimFilter);
+    if (pSmallPrimFilterCuller == nullptr)
     {
-        CreateSmallPrimFilterCuller(pModule);
+        pSmallPrimFilterCuller = CreateSmallPrimFilterCuller(pModule);
     }
 
     uint32_t regOffset = 0;
@@ -4605,28 +4639,24 @@ Value* NggPrimShader::DoSmallPrimFilterCulling(
     // Get register PA_CL_VPORT_XSCALE
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportXscale);
-    auto pPaClVportXscale = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClVportXscale = FetchCullingControlRegister(pModule, regOffset);
 
     // Get register PA_CL_VPORT_YSCALE
     regOffset  = offsetof(Util::Abi::PrimShaderCbLayout, viewportStateCb);
     regOffset += offsetof(Util::Abi::PrimShaderVportCb, vportControls[0].paClVportYscale);
-    auto pPaClVportYscale = FetchCullingControlRegister(pModule, regOffset, pInsertAtEnd);
+    auto pPaClVportYscale = FetchCullingControlRegister(pModule, regOffset);
 
     // Do small primitive filter culling
-    return EmitCall(pModule,
-                    LlpcName::NggCullingSmallPrimFilter,
-                    m_pBuilder->getInt1Ty(),
-                    {
-                        pCullFlag,
-                        pVertex0,
-                        pVertex1,
-                        pVertex2,
-                        pPaClVteCntl,
-                        pPaClVportXscale,
-                        pPaClVportYscale
-                    },
-                    Attribute::ReadNone,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pSmallPrimFilterCuller,
+                                  {
+                                      pCullFlag,
+                                      pVertex0,
+                                      pVertex1,
+                                      pVertex2,
+                                      pPaClVteCntl,
+                                      pPaClVportXscale,
+                                      pPaClVportYscale
+                                  });
 }
 
 // =====================================================================================================================
@@ -4636,52 +4666,44 @@ Value* NggPrimShader::DoCullDistanceCulling(
     Value*      pCullFlag,      // [in] Cull flag before doing this culling
     Value*      pSignMask0,     // [in] Sign mask of cull distance of vertex0
     Value*      pSignMask1,     // [in] Sign mask of cull distance of vertex1
-    Value*      pSignMask2,     // [in] Sign mask of cull distance of vertex2
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    Value*      pSignMask2)     // [in] Sign mask of cull distance of vertex2
 {
     LLPC_ASSERT(m_pNggControl->enableCullDistanceCulling);
 
-    if (pModule->getFunction(LlpcName::NggCullingCullDistance) == nullptr)
+    auto pCullDistanceCuller = pModule->getFunction(LlpcName::NggCullingCullDistance);
+    if (pCullDistanceCuller == nullptr)
     {
-        CreateCullDistanceCuller(pModule);
+        pCullDistanceCuller = CreateCullDistanceCuller(pModule);
     }
 
     // Do cull distance culling
-    return EmitCall(pModule,
-                    LlpcName::NggCullingCullDistance,
-                    m_pBuilder->getInt1Ty(),
-                    {
-                        pCullFlag,
-                        pSignMask0,
-                        pSignMask1,
-                        pSignMask2
-                    },
-                    Attribute::ReadNone,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pCullDistanceCuller,
+                                  {
+                                      pCullFlag,
+                                      pSignMask0,
+                                      pSignMask1,
+                                      pSignMask2
+                                  });
 }
 
 // =====================================================================================================================
 // Fetches culling-control register from primitive shader table.
 Value* NggPrimShader::FetchCullingControlRegister(
     Module*     pModule,        // [in] LLVM module
-    uint32_t    regOffset,      // Register offset in the primitive shader table (in BYTEs)
-    BasicBlock* pInsertAtEnd)   // [in] Where to insert instructions
+    uint32_t    regOffset)      // Register offset in the primitive shader table (in BYTEs)
 {
-    if (pModule->getFunction(LlpcName::NggCullingFetchReg) == nullptr)
+    auto pFetchCullingRegister = pModule->getFunction(LlpcName::NggCullingFetchReg);
+    if (pFetchCullingRegister == nullptr)
     {
-        CreateFetchCullingRegister(pModule);
+        pFetchCullingRegister = CreateFetchCullingRegister(pModule);
     }
 
-    return EmitCall(pModule,
-                    LlpcName::NggCullingFetchReg,
-                    m_pBuilder->getInt32Ty(),
-                    {
-                        m_nggFactor.pPrimShaderTableAddrLow,
-                        m_nggFactor.pPrimShaderTableAddrHigh,
-                        m_pBuilder->getInt32(regOffset)
-                    },
-                    Attribute::ReadOnly,
-                    pInsertAtEnd);
+    return m_pBuilder->CreateCall(pFetchCullingRegister,
+                                  {
+                                      m_nggFactor.pPrimShaderTableAddrLow,
+                                      m_nggFactor.pPrimShaderTableAddrHigh,
+                                      m_pBuilder->getInt32(regOffset)
+                                  });
 }
 
 // =====================================================================================================================
