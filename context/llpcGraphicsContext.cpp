@@ -33,6 +33,7 @@
 #include "llvm/Support/Format.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
@@ -1592,5 +1593,70 @@ void GraphicsContext::BuildNggCullingControlRegister()
     pipelineState.paClVteCntl = paClVteCntl.u32All;
 }
 #endif
+
+// =====================================================================================================================
+// Set pipeline state in Builder
+void GraphicsContext::SetBuilderPipelineState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    PipelineContext::SetBuilderPipelineState(pBuilder);
+    pBuilder->SetDeviceIndex(
+          static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->iaState.deviceIndex);
+    SetInputAssemblyState(pBuilder);
+    SetViewportState(pBuilder);
+    SetRasterizerState(pBuilder);
+}
+
+// =====================================================================================================================
+// Set input assembly state in builder
+void GraphicsContext::SetInputAssemblyState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    const auto& iaState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->iaState;
+    struct Builder::InputAssemblyState state = {};
+    // Builder::PrimitiveTopology happens to have the same values as the corresponding Vulkan enum.
+    state.topology = static_cast<Builder::PrimitiveTopology>(iaState.topology);
+    state.patchControlPoints = iaState.patchControlPoints;
+    state.disableVertexReuse = iaState.disableVertexReuse;
+    state.switchWinding = iaState.switchWinding;
+    state.enableMultiView = iaState.enableMultiView;
+
+    pBuilder->SetInputAssemblyState(state);
+}
+
+// =====================================================================================================================
+// Set viewport state in builder
+void GraphicsContext::SetViewportState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    const auto& vpState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->vpState;
+    struct Builder::ViewportState state = {};
+    state.depthClipEnable = vpState.depthClipEnable;
+
+    pBuilder->SetViewportState(state);
+}
+
+// =====================================================================================================================
+// Set rasterizer state in builder
+void GraphicsContext::SetRasterizerState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    const auto& rsState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->rsState;
+    struct Builder::RasterizerState state = {};
+
+    state.rasterizerDiscardEnable = rsState.rasterizerDiscardEnable;
+    state.innerCoverage = rsState.innerCoverage;
+    state.perSampleShading = rsState.perSampleShading;
+    state.numSamples = rsState.numSamples;
+    state.samplePatternIdx = rsState.samplePatternIdx;
+    state.usrClipPlaneMask = rsState.usrClipPlaneMask;
+    // Builder::PolygonMode and Builder::CullModeFlags happen to have the same values as their Vulkan equivalents.
+    state.polygonMode = static_cast<Builder::PolygonMode>(rsState.polygonMode);
+    state.cullMode = static_cast<Builder::CullModeFlags>(rsState.cullMode);
+    state.frontFaceClockwise = (rsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    state.depthBiasEnable = rsState.depthBiasEnable;
+
+    pBuilder->SetRasterizerState(state);
+}
 
 } // Llpc

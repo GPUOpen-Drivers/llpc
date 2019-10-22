@@ -471,13 +471,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     }
 
-    bool enableMultiView = false;
-    if (m_shaderStage != ShaderStageCompute)
-    {
-        enableMultiView = (static_cast<const GraphicsPipelineBuildInfo*>(
-            m_pContext->GetPipelineBuildInfo()))
-            ->iaState.enableMultiView;
-    }
+    auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
 #if LLPC_BUILD_GFX10
     const bool enableNgg = m_pContext->IsGraphics() ? m_pContext->GetNggControl()->enableNgg : false;

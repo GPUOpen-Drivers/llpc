@@ -177,6 +177,96 @@ public:
         ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
         ArrayRef<DescriptorRangeValue>  rangeValues);     // The descriptor range values
 
+    // Set the device index.
+    void SetDeviceIndex(
+        uint32_t    deviceIndex);       // Device index
+
+    // Primitive topology. These happen to have the same values as the corresponding Vulkan enum.
+    enum class PrimitiveTopology
+    {
+        PointList = 0,
+        LineList = 1,
+        LineStrip = 2,
+        TriangleList = 3,
+        TriangleStrip = 4,
+        TriangleFan = 5,
+        LineListWithAdjacency = 6,
+        LineStripWithAdjacency = 7,
+        TriangleListWithAdjacency = 8,
+        TriangleStripWithAdjacency = 9,
+        PatchList = 10,
+    };
+
+    // Struct to pass to SetInputAssemblyState
+    struct InputAssemblyState
+    {
+        PrimitiveTopology topology;           // Primitive topology
+        uint32_t          patchControlPoints; // Number of control points for PrimitiveTopology::PatchList
+        bool              disableVertexReuse; // Disable reusing vertex shader output for indexed draws
+        bool              switchWinding;      // Whether to reverse vertex ordering for tessellation
+        bool              enableMultiView;    // Whether to enable multi-view support
+    };
+
+    // Set input-assembly state, passing the struct above.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetInputAssemblyState(
+        const InputAssemblyState& iaState);   // [in] Input-assembly state
+
+    // Struct to pass to SetViewportState
+    struct ViewportState
+    {
+        bool              depthClipEnable;    // Enable clipping based on Z coordinate
+    };
+
+    // Set viewport state, passing the struct above.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetViewportState(
+        const ViewportState&      vpState);   // [in] Viewport state
+
+    // Polygon mode. These happen to have the same values as the corresponding Vulkan enum.
+    enum PolygonMode
+    {
+        PolygonModeFill = 0,
+        PolygonModeLine = 1,
+        PolygonModePoint = 2,
+    };
+
+    // Fragment cull mode flags. These happen to have the same values as the corresponding Vulkan enum.
+    enum CullModeFlags
+    {
+        CullModeNone = 0,
+        CullModeFront = 1,
+        CullModeBack = 2,
+        CullModeFrontAndBack = 3,
+    };
+
+    // Struct to pass to SetRasterizerState
+    struct RasterizerState
+    {
+        bool          rasterizerDiscardEnable;  // Kill all rasterized pixels. This is implicitly true if stream out
+                                                //  is enabled and no streams are rasterized
+        bool          innerCoverage;            // Related to conservative rasterization.  Must be false if
+                                                //  conservative rasterization is disabled.
+        bool          perSampleShading;         // Enable per sample shading
+        uint32_t      numSamples;               // Number of coverage samples used when rendering with this pipeline
+        uint32_t      samplePatternIdx;         // Index into the currently bound MSAA sample pattern table that
+                                                //  matches the sample pattern used by the rasterizer when rendering
+                                                //  with this pipeline.
+        uint8_t       usrClipPlaneMask;         // Mask to indicate the enabled user defined clip planes
+        PolygonMode   polygonMode;              // Polygon mode
+        CullModeFlags cullMode;                 // Fragment culling mode
+        bool          frontFaceClockwise;       // Front-facing triangle orientation: false=counter, true=clockwise
+        bool          depthBiasEnable;          // Whether to bias fragment depth values
+    };
+
+    // Set rasterizer state, passing the struct above.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetRasterizerState(
+        const RasterizerState&  rsState);   // [in] Rasterizer state
+
     // -----------------------------------------------------------------------------------------------------------------
     // Methods to link and generate pipeline
 

@@ -44,6 +44,10 @@ using namespace llvm;
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char* const UserDataMetadataName = "llpc.user.data.nodes";
+static const char* const DeviceIndexMetadataName = "llpc.device.index";
+static const char* const IaStateMetadataName = "llpc.input.assembly.state";
+static const char* const VpStateMetadataName = "llpc.viewport.state";
+static const char* const RsStateMetadataName = "llpc.rasterizer.state";
 
 // =====================================================================================================================
 // Get LLVMContext
@@ -117,6 +121,10 @@ void PipelineState::Clear(
     Module* pModule)    // [in/out] IR module
 {
     m_userDataNodes = {};
+    m_deviceIndex = 0;
+    m_inputAssemblyState = {};
+    m_viewportState = {};
+    m_rasterizerState = {};
     m_clientStateDirty = true;
     Flush(pModule);
 }
@@ -132,6 +140,10 @@ bool PipelineState::Flush(
     {
         m_clientStateDirty = false;
         RecordUserDataNodes(pModule);
+        RecordDeviceIndex(pModule);
+        RecordInputAssemblyState(pModule);
+        RecordViewportState(pModule);
+        RecordRasterizerState(pModule);
         changed = true;
     }
     return changed;
@@ -143,6 +155,10 @@ void PipelineState::ReadState()
 {
     ReadShaderStageMask();
     ReadUserDataNodes();
+    ReadDeviceIndex();
+    ReadInputAssemblyState();
+    ReadViewportState();
+    ReadRasterizerState();
 }
 
 // =====================================================================================================================
@@ -493,6 +509,255 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
+}
+
+// =====================================================================================================================
+// Set the device index.
+void PipelineState::SetDeviceIndex(
+    uint32_t    deviceIndex)        // Device index
+{
+    m_deviceIndex = deviceIndex;
+}
+
+// =====================================================================================================================
+// Get the device index.
+uint32_t PipelineState::GetDeviceIndex() const
+{
+    return m_deviceIndex;
+}
+
+// =====================================================================================================================
+// Record device index into the IR metadata
+void PipelineState::RecordDeviceIndex(
+    Module* pModule)    // [in/out] IR module to record into
+{
+    SetNamedMetadataToArrayOfInt32(pModule, m_deviceIndex, DeviceIndexMetadataName);
+}
+
+// =====================================================================================================================
+// Read device index from the IR metadata
+void PipelineState::ReadDeviceIndex()
+{
+    m_deviceIndex = 0;
+    ReadNamedMetadataArrayOfInt32(DeviceIndexMetadataName, m_deviceIndex);
+}
+
+// =====================================================================================================================
+// Set input-assembly state.
+void PipelineState::SetInputAssemblyState(
+    const Builder::InputAssemblyState& iaState)    // [in] Input-assembly state
+{
+    m_inputAssemblyState = iaState;
+    m_clientStateDirty = true;
+}
+
+// =====================================================================================================================
+// Get input-assembly state.
+const Builder::InputAssemblyState& PipelineState::GetInputAssemblyState()
+{
+    return m_inputAssemblyState;
+}
+
+// =====================================================================================================================
+// Record input-assembly state into the IR metadata
+void PipelineState::RecordInputAssemblyState(
+    Module* pModule)    // [in/out] IR module to record into
+{
+    uint32_t values[] =
+    {
+        static_cast<uint32_t>(m_inputAssemblyState.topology),
+        m_inputAssemblyState.patchControlPoints,
+        m_inputAssemblyState.disableVertexReuse,
+        m_inputAssemblyState.switchWinding,
+        m_inputAssemblyState.enableMultiView,
+    };
+    SetNamedMetadataToArrayOfInt32(pModule, values, IaStateMetadataName);
+}
+
+// =====================================================================================================================
+// Read input-assembly state from the IR metadata
+void PipelineState::ReadInputAssemblyState()
+{
+    uint32_t values[5] = {};
+    ReadNamedMetadataArrayOfInt32(IaStateMetadataName, values);
+    m_inputAssemblyState.topology = static_cast<Builder::PrimitiveTopology>(values[0]);
+    m_inputAssemblyState.patchControlPoints = values[1];
+    m_inputAssemblyState.disableVertexReuse = values[2];
+    m_inputAssemblyState.switchWinding = values[3];
+    m_inputAssemblyState.enableMultiView = values[4];
+}
+
+// =====================================================================================================================
+// Set viewport state.
+void PipelineState::SetViewportState(
+    const Builder::ViewportState&  vpState)    // [in] Viewport state
+{
+    m_viewportState = vpState;
+    m_clientStateDirty = true;
+}
+
+// =====================================================================================================================
+// Get viewport state.
+const Builder::ViewportState& PipelineState::GetViewportState()
+{
+    return m_viewportState;
+}
+
+// =====================================================================================================================
+// Record viewport state into the IR metadata
+void PipelineState::RecordViewportState(
+    Module* pModule)    // [in/out] IR module to record into
+{
+    uint32_t values[] = { m_viewportState.depthClipEnable };
+    SetNamedMetadataToArrayOfInt32(pModule, values, VpStateMetadataName);
+}
+
+// =====================================================================================================================
+// Read viewport state from the IR metadata
+void PipelineState::ReadViewportState()
+{
+    uint32_t values[1] = {};
+    ReadNamedMetadataArrayOfInt32(VpStateMetadataName, values);
+    m_viewportState.depthClipEnable = values[0];
+}
+
+// =====================================================================================================================
+// Set rasterizer state.
+void PipelineState::SetRasterizerState(
+    const Builder::RasterizerState&  rsState)    // [in] Viewport state
+{
+    m_rasterizerState = rsState;
+    m_clientStateDirty = true;
+}
+
+// =====================================================================================================================
+// Get rasterizer state.
+const Builder::RasterizerState& PipelineState::GetRasterizerState()
+{
+    return m_rasterizerState;
+}
+
+// =====================================================================================================================
+// Record rasterizer state into the IR metadata
+void PipelineState::RecordRasterizerState(
+    Module* pModule)    // [in/out] IR module to record into
+{
+    uint32_t values[] =
+    {
+        m_rasterizerState.rasterizerDiscardEnable,
+        m_rasterizerState.innerCoverage,
+        m_rasterizerState.perSampleShading,
+        m_rasterizerState.numSamples,
+        m_rasterizerState.samplePatternIdx,
+        m_rasterizerState.usrClipPlaneMask,
+        m_rasterizerState.polygonMode,
+        m_rasterizerState.cullMode,
+        m_rasterizerState.frontFaceClockwise,
+        m_rasterizerState.depthBiasEnable,
+    };
+    SetNamedMetadataToArrayOfInt32(pModule, values, RsStateMetadataName);
+}
+
+// =====================================================================================================================
+// Read rasterizer state from the IR metadata
+void PipelineState::ReadRasterizerState()
+{
+    uint32_t values[10] = {};
+    ReadNamedMetadataArrayOfInt32(RsStateMetadataName, values);
+    m_rasterizerState.rasterizerDiscardEnable = values[0];
+    m_rasterizerState.innerCoverage = values[1];
+    m_rasterizerState.perSampleShading = values[2];
+    m_rasterizerState.numSamples = values[3];
+    m_rasterizerState.samplePatternIdx = values[4];
+    m_rasterizerState.usrClipPlaneMask = values[5];
+    m_rasterizerState.polygonMode = static_cast<Builder::PolygonMode>(values[6]);
+    m_rasterizerState.cullMode = static_cast<Builder::CullModeFlags>(values[7]);
+    m_rasterizerState.frontFaceClockwise = values[8];
+    m_rasterizerState.depthBiasEnable = values[9];
+}
+
+// =====================================================================================================================
+// Set a named metadata node to point to an array of i32 values.
+// The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
+// removes the named metadata node (if it existed).
+void PipelineState::SetNamedMetadataToArrayOfInt32(
+    Module*             pModule,    // [in/out] IR module to record into
+    ArrayRef<uint32_t>  values,     // Array of values
+    StringRef           metaName)   // Name for named metadata node
+{
+    MDNode* pArrayMetaNode = GetArrayOfInt32MetaNode(values, false);
+    if (pArrayMetaNode == nullptr)
+    {
+        if (auto pNamedMetaNode = pModule->getNamedMetadata(metaName))
+        {
+            pModule->eraseNamedMetadata(pNamedMetaNode);
+        }
+        return;
+    }
+
+    auto pNamedMetaNode = pModule->getOrInsertNamedMetadata(metaName);
+    pNamedMetaNode->clearOperands();
+    pNamedMetaNode->addOperand(pArrayMetaNode);
+}
+
+// =====================================================================================================================
+// Get a metadata node containing an array of i32 values.
+// The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
+// returns nullptr.
+MDNode* PipelineState::GetArrayOfInt32MetaNode(
+    ArrayRef<uint32_t>  values,           // Array of values
+    bool                atLeastOneValue)  // True to generate node with one value even if all values are zero
+{
+    IRBuilder<> builder(GetContext());
+    while ((values.empty() == false) && (values.back() == 0))
+    {
+        if ((values.size() == 1) && atLeastOneValue)
+        {
+            break;
+        }
+        values = values.slice(0, values.size() - 1);
+    }
+    if (values.empty())
+    {
+        return nullptr;
+    }
+
+    SmallVector<Metadata*, 8> operands;
+    for (uint32_t value : values)
+    {
+        operands.push_back(ConstantAsMetadata::get(builder.getInt32(value)));
+    }
+    return MDNode::get(GetContext(), operands);
+}
+
+// =====================================================================================================================
+// Read an array of i32 values out of a metadata node that is operand 0 of the named metadata node.
+// Returns the number of values read.
+uint32_t PipelineState::ReadNamedMetadataArrayOfInt32(
+    StringRef                 metaName,   // Name for named metadata node
+    MutableArrayRef<uint32_t> values)     // Array to write values into (caller must zero initialize)
+{
+    auto pNamedMetaNode = m_pModule->getNamedMetadata(metaName);
+    if ((pNamedMetaNode == nullptr) || (pNamedMetaNode->getNumOperands() == 0))
+    {
+        return 0;
+    }
+    return ReadArrayOfInt32MetaNode(pNamedMetaNode->getOperand(0), values);
+}
+
+// =====================================================================================================================
+// Read an array of i32 values out of a metadata node.
+// Returns the number of values read.
+uint32_t PipelineState::ReadArrayOfInt32MetaNode(
+    MDNode*                   pMetaNode,  // Metadata node to read from
+    MutableArrayRef<uint32_t> values)     // Array to write values into (caller must zero initialize)
+{
+    uint32_t count = std::min(pMetaNode->getNumOperands(), unsigned(values.size()));
+    for (uint32_t index = 0; index < count; ++index)
+    {
+        values[index] = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(index))->getZExtValue();
+    }
+    return count;
 }
 
 // =====================================================================================================================

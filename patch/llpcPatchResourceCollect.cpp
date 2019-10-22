@@ -79,9 +79,9 @@ bool PatchResourceCollect::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
     Patch::Init(&module);
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
     // Process each shader stage, in reverse order.
-    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
@@ -97,11 +97,11 @@ bool PatchResourceCollect::runOnModule(
     {
 #if LLPC_BUILD_GFX10
         // Set NGG control settings
-        m_pContext->SetNggControl(pPipelineState);
+        m_pContext->SetNggControl(m_pPipelineState);
 #endif
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
-        bool hasGs = pPipelineState->HasShaderStage(ShaderStageGeometry);
+        bool hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 #if LLPC_BUILD_GFX10
         bool checkGsOnChip = hasGs || m_pContext->GetNggControl()->enableNgg;
 #else
@@ -110,7 +110,7 @@ bool PatchResourceCollect::runOnModule(
 
         if (checkGsOnChip)
         {
-            bool gsOnChip = m_pContext->CheckGsOnChipValidity(pPipelineState);
+            bool gsOnChip = m_pContext->CheckGsOnChipValidity(m_pPipelineState);
             m_pContext->SetGsOnChip(gsOnChip);
         }
     }
@@ -153,9 +153,7 @@ void PatchResourceCollect::ProcessShader()
     {
         if (m_pResUsage->builtInUsage.fs.fragCoord || m_pResUsage->builtInUsage.fs.sampleMaskIn)
         {
-            const GraphicsPipelineBuildInfo* pPipelineInfo =
-                reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            if (pPipelineInfo->rsState.perSampleShading)
+            if (m_pPipelineState->GetRasterizerState().perSampleShading)
             {
                 m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
             }

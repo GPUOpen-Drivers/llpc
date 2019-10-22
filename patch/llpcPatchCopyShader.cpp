@@ -105,6 +105,7 @@ private:
 
     GlobalVariable*       m_pLds;                     // Global variable representing LDS
     Value*                m_pGsVsRingBufDesc;         // Descriptor for GS-VS ring
+    PipelineState*        m_pPipelineState;           // Pipeline state
 };
 
 char PatchCopyShader::ID = 0;
@@ -126,7 +127,7 @@ bool PatchCopyShader::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
     Patch::Init(&module);
-    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     auto pGsEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
     if (pGsEntryPoint == nullptr)
@@ -188,7 +189,7 @@ bool PatchCopyShader::runOnModule(
 
     auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageCopyShader);
 
-    const auto gfxIp = pPipelineState->GetGfxIpVersion();
+    const auto gfxIp = m_pPipelineState->GetGfxIpVersion();
 
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
     if (gfxIp.major <= 8)
@@ -212,7 +213,7 @@ bool PatchCopyShader::runOnModule(
 
     if (m_pContext->IsGsOnChip())
     {
-        m_pLds = Patch::GetLdsVariable(pPipelineState);
+        m_pLds = Patch::GetLdsVariable(m_pPipelineState);
     }
 
     uint32_t outputStreamCount = 0;
@@ -309,7 +310,7 @@ bool PatchCopyShader::runOnModule(
     pEntryPoint->addMetadata(gSPIRVMD::ExecutionModel, *pExecModelMetaNode);
 
     // Tell pipeline state there is a copy shader.
-    pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | (1U << ShaderStageCopyShader));
+    m_pPipelineState->SetShaderStageMask(m_pPipelineState->GetShaderStageMask() | (1U << ShaderStageCopyShader));
 
     return true;
 }
@@ -638,8 +639,7 @@ void PatchCopyShader::ExportOutput(
             ExportBuiltInOutput(pOutputValue, BuiltInPrimitiveId, streamId, pInsertPos);
         }
 
-        const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
-            m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
+        const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
         if (builtInUsage.layer || enableMultiView)
         {
             // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.

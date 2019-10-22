@@ -95,6 +95,7 @@ private:
     bool            m_hasDynIndexedOutput;      // Whether dynamic indices are used in generic output addressing (valid
                                                 // for tessellation control shader)
     ResourceUsage*  m_pResUsage;                // Pointer to shader resource usage
+    PipelineState*  m_pPipelineState;           // Pipeline state
 };
 
 } // Llpc

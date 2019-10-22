@@ -31,6 +31,8 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcBuilder.h"
+
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
@@ -142,6 +144,22 @@ public:
     // Get wave size for the specified shader stage
     uint32_t GetShaderWaveSize(ShaderStage stage);
 
+    // Accessors for device index
+    void SetDeviceIndex(uint32_t deviceIndex);
+    uint32_t GetDeviceIndex() const;
+
+    // Accessors for input-assembly state.
+    void SetInputAssemblyState(const Builder::InputAssemblyState& iaState);
+    const Builder::InputAssemblyState& GetInputAssemblyState();
+
+    // Accessors for viewport state.
+    void SetViewportState(const Builder::ViewportState& vpState);
+    const Builder::ViewportState& GetViewportState();
+
+    // Accessors for rasterizer state.
+    void SetRasterizerState(const Builder::RasterizerState& vpState);
+    const Builder::RasterizerState& GetRasterizerState();
+
 private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
@@ -161,6 +179,28 @@ private:
     MDString* GetResourceTypeName(ResourceMappingNodeType type);
     ResourceMappingNodeType GetResourceTypeFromName(MDString* pTypeName);
 
+    // Device index handling
+    void RecordDeviceIndex(Module* pModule);
+    void ReadDeviceIndex();
+
+    // Input-assembly state handling
+    void RecordInputAssemblyState(Module* pModule);
+    void ReadInputAssemblyState();
+
+    // Viewport state handling
+    void RecordViewportState(Module* pModule);
+    void ReadViewportState();
+
+    // Rasterizer state handling
+    void RecordRasterizerState(Module* pModule);
+    void ReadRasterizerState();
+
+    // Utility functions to record and read an array of i32 values in metadata
+    void SetNamedMetadataToArrayOfInt32(Module* pModule, ArrayRef<uint32_t> values, StringRef metaName);
+    MDNode* GetArrayOfInt32MetaNode(ArrayRef<uint32_t> values, bool atLeastOneValue);
+    uint32_t ReadNamedMetadataArrayOfInt32(StringRef metaName, MutableArrayRef<uint32_t> values);
+    uint32_t ReadArrayOfInt32MetaNode(MDNode* pMetaNode, MutableArrayRef<uint32_t> values);
+
     // -----------------------------------------------------------------------------------------------------------------
     BuilderContext*                 m_pBuilderContext;                  // Builder context
     Module*                         m_pModule = nullptr;                // Pipeline IR module
@@ -169,6 +209,10 @@ private:
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
+    uint32_t                        m_deviceIndex = 0;                  // Device index
+    Builder::InputAssemblyState     m_inputAssemblyState = {};          // Input-assembly state
+    Builder::ViewportState          m_viewportState = {};               // Viewport state
+    Builder::RasterizerState        m_rasterizerState = {};             // Rasterizer state
     bool                            m_clientStateDirty = false;         // Whether state provided by builder client
                                                                         //  (user data, vertex inputs, options) is dirty
                                                                         //  and needs writing to IR

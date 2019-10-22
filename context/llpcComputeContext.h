@@ -101,6 +101,9 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
+    // Set pipeline state in Builder
+    virtual void SetBuilderPipelineState(Builder* pBuilder) const;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ComputeContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(ComputeContext);

@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llpcBuilder.h"
 #include "llpcPipelineContext.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -106,6 +107,9 @@ public:
 
     void InitShaderInfoForNullFs();
 
+    // Set pipeline state in Builder
+    virtual void SetBuilderPipelineState(Builder* pBuilder) const;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(GraphicsContext);
@@ -115,6 +119,15 @@ private:
 #if LLPC_BUILD_GFX10
     void BuildNggCullingControlRegister();
 #endif
+
+    // Set input assembly state in builder
+    void SetInputAssemblyState(Builder* pBuilder) const;
+
+    // Set viewport state in builder
+    void SetViewportState(Builder* pBuilder) const;
+
+    // Set rasterizer state in builder
+    void SetRasterizerState(Builder* pBuilder) const;
 
     const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
 

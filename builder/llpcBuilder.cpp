@@ -122,6 +122,42 @@ void Builder::SetUserDataNodes(
 }
 
 // =====================================================================================================================
+// Set the device index.
+void Builder::SetDeviceIndex(
+    uint32_t    deviceIndex)        // Device index
+{
+    GetPipelineState()->SetDeviceIndex(deviceIndex);
+}
+
+// =====================================================================================================================
+// Set input-assembly state.
+// The client should always zero-initialize the struct before setting it up, in case future versions
+// add more fields. A local struct variable can be zero-initialized with " = {}".
+void Builder::SetInputAssemblyState(
+    const InputAssemblyState& iaState)    // [in] Input-assembly state
+{
+    GetPipelineState()->SetInputAssemblyState(iaState);
+}
+
+// =====================================================================================================================
+// Set viewport state.
+// The client should always zero-initialize the struct before setting it up, in case future versions
+// add more fields. A local struct variable can be zero-initialized with " = {}".
+void Builder::SetViewportState(
+    const ViewportState&      vpState)    // [in] Viewport state
+{
+    GetPipelineState()->SetViewportState(vpState);
+}
+
+// =====================================================================================================================
+// Set rasterizer state.
+void Builder::SetRasterizerState(
+    const RasterizerState&  rsState)    // [in] Rasterizer state
+{
+    GetPipelineState()->SetRasterizerState(rsState);
+}
+
+// =====================================================================================================================
 // Base implementation of linking shader modules into a pipeline module.
 Module* Builder::Link(
     ArrayRef<Module*> modules,               // Array of modules indexed by shader stage, with nullptr entry

@@ -807,7 +807,7 @@ public:
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
 
     // Set pipeline state in Builder
-    void SetBuilderPipelineState(Builder* pBuilder) const;
+    virtual void SetBuilderPipelineState(Builder* pBuilder) const;
 
     static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
 

@@ -256,8 +256,7 @@ void PatchInOutImportExport::ProcessShader()
             const uint32_t outLocCount =
                 hasTcs ? std::max(tcsInOutUsage.outputMapLocCount, 1u) : std::max(tesInOutUsage.inputMapLocCount, 1u);
 
-            const auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            const uint32_t inVertexCount  = pPipelineInfo->iaState.patchControlPoints;
+            const uint32_t inVertexCount = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
             const uint32_t outVertexCount = hasTcs ? tcsBuiltInUsage.outputVertices : MaxTessPatchVertices;
 
             uint32_t tessFactorStride = 0;
@@ -959,10 +958,7 @@ void PatchInOutImportExport::visitCallInst(
         if (pCallee->isIntrinsic() && (pCallee->getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg))
         {
             // NOTE: Implicitly store the value of gl_ViewIndex to GS-VS ring buffer before emit calls.
-            const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
-                m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
-
-            if (enableMultiView)
+            if (m_pPipelineState->GetInputAssemblyState().enableMultiView)
             {
                 LLPC_ASSERT(m_shaderStage == ShaderStageGeometry); // Must be geometry shader
 
@@ -1043,8 +1039,7 @@ void PatchInOutImportExport::visitReturnInst(
 
         auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
-        const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
-            m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
+        const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
         if (m_shaderStage == ShaderStageVertex)
         {
@@ -2416,8 +2411,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
             break;
         }
     default:
@@ -2502,8 +2496,8 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInPatchVertices:
         {
-            auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.patchControlPoints);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(),
+                                      m_pPipelineState->GetInputAssemblyState().patchControlPoints);
             break;
         }
     case BuiltInPrimitiveId:
@@ -2528,8 +2522,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
             break;
         }
     default:
@@ -2699,8 +2692,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
             break;
         }
     default:
@@ -2799,8 +2791,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
             break;
         }
     // Handle internal-use built-ins
@@ -2843,7 +2834,6 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
 
             auto pSampleCoverage = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.sampleCoverage);
             auto pAncillary = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.ancillary);
-            auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
 
             // gl_SampleID = Ancillary[11:8]
             std::vector<Value*> args;
@@ -2854,7 +2844,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
                 EmitCall(m_pModule, "llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, NoAttrib, pInsertPos);
 
             auto pSampleMaskIn = pSampleCoverage;
-            if (pPipelineInfo->rsState.perSampleShading)
+            if (m_pPipelineState->GetRasterizerState().perSampleShading)
             {
                 // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
                 pSampleMaskIn = BinaryOperator::CreateShl(ConstantInt::get(m_pContext->Int32Ty(), 1),
@@ -3109,21 +3099,18 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->iaState.deviceIndex);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
             break;
         }
     // Handle internal-use built-ins for sample position emulation
     case BuiltInNumSamples:
         {
-            auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->rsState.numSamples);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetRasterizerState().numSamples);
             break;
         }
     case BuiltInSamplePatternIdx:
         {
-            auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->rsState.samplePatternIdx);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetRasterizerState().samplePatternIdx);
             break;
         }
     // Handle internal-use built-ins for interpolation functions and AMD extension (AMD_shader_explicit_vertex_parameter)
@@ -3298,8 +3285,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            auto pPipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), pPipelineInfo->deviceIndex);
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
             break;
         }
     case BuiltInNumSubgroups:
@@ -3745,8 +3731,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
                 return;
             }
 
-            const auto enableMultiView = static_cast<const GraphicsPipelineBuildInfo*>(
-                m_pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
+            const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
             if ((m_hasTs == false) && (m_hasGs == false) && (enableMultiView == false))
@@ -4196,8 +4181,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
                 return;
             }
 
-            const auto enableMultiView = static_cast<const GraphicsPipelineBuildInfo*>(
-                m_pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
+            const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
             // NOTE: Only last non-fragment shader stage has to export the value of gl_Layer.
             if ((m_hasGs == false) && (enableMultiView == false))
@@ -4442,8 +4426,7 @@ void PatchInOutImportExport::PatchCopyShaderBuiltInOutputExport(
         }
     case BuiltInLayer:
         {
-            const auto enableMultiView = static_cast<const GraphicsPipelineBuildInfo*>(
-                m_pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
+            const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
             if ((m_gfxIp.major <= 8) && (enableMultiView == false))
             {
@@ -6207,8 +6190,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
     }
 
     // dwordOffset = (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-    auto inVertexCount = pPipelineInfo->iaState.patchControlPoints;
+    auto inVertexCount = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
     auto pInVertexCount = ConstantInt::get(m_pContext->Int32Ty(), inVertexCount);
     auto pRelativeId = m_pipelineSysValues.Get(m_pEntryPoint)->GetRelativeId();
 
@@ -6744,8 +6726,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
         {
             LLPC_ASSERT(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
 
-            const auto enableMultiView = static_cast<const GraphicsPipelineBuildInfo*>(
-                m_pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
+            const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
             Value* pLayer = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
 

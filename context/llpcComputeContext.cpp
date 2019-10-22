@@ -30,6 +30,7 @@
  */
 #define DEBUG_TYPE "llpc-compute-context"
 
+#include "llpcBuilder.h"
 #include "llpcComputeContext.h"
 #include "SPIRVInternal.h"
 
@@ -140,6 +141,15 @@ uint32_t ComputeContext::GetShaderWaveSize(
 #endif
     return waveSize;
 
+}
+
+// =====================================================================================================================
+// Set pipeline state in Builder
+void ComputeContext::SetBuilderPipelineState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    PipelineContext::SetBuilderPipelineState(pBuilder);
+    pBuilder->SetDeviceIndex(static_cast<const ComputePipelineBuildInfo*>(GetPipelineBuildInfo())->deviceIndex);
 }
 
 } // Llpc
