@@ -311,8 +311,8 @@ Result VKAPI_CALL ICompiler::Create(
 bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
     VkFormat format)   // Vertex attribute format
 {
-    auto pInfo = VertexFetch::GetVertexFormatInfo(format);
-    return ((pInfo->dfmt == BUF_DATA_FORMAT_INVALID) && (pInfo->numChannels == 0)) ? false : true;
+    BufDataFormat dfmt = PipelineContext::MapVkFormat(format).first;
+    return (dfmt != BufDataFormatInvalid);
 }
 
 // =====================================================================================================================

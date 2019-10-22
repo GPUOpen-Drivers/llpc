@@ -167,6 +167,73 @@ enum class PrimitiveTopology : uint32_t
     PatchList = 10,
 };
 
+// Data format of vertex buffer entry. For ones that exist in GFX9 hardware, these match the hardware
+// encoding. But this also includes extra formats.
+enum BufDataFormat
+{
+    BufDataFormatInvalid                     = 0,
+    BufDataFormat8                           = 1,
+    BufDataFormat16                          = 2,
+    BufDataFormat8_8                         = 3,
+    BufDataFormat32                          = 4,
+    BufDataFormat16_16                       = 5,
+    BufDataFormat10_11_11                    = 6,
+    BufDataFormat11_11_10                    = 7,
+    BufDataFormat10_10_10_2                  = 8,
+    BufDataFormat2_10_10_10                  = 9,
+    BufDataFormat8_8_8_8                     = 10,
+    BufDataFormat32_32                       = 11,
+    BufDataFormat16_16_16_16                 = 12,
+    BufDataFormat32_32_32                    = 13,
+    BufDataFormat32_32_32_32                 = 14,
+    BufDataFormatReserved                    = 15,
+    // Extra formats not in GFX9 hardware encoding:
+    BufDataFormat8_8_8_8_Bgra,
+    BufDataFormat8_8_8,
+    BufDataFormat8_8_8_Bgr,
+    BufDataFormat2_10_10_10_Bgra,
+    BufDataFormat64,
+    BufDataFormat64_64,
+    BufDataFormat64_64_64,
+    BufDataFormat64_64_64_64,
+};
+
+// Numeric format of vertex buffer entry. These match the GFX9 hardware encoding.
+enum BufNumFormat
+{
+    BufNumFormatUnorm                        = 0,
+    BufNumFormatSnorm                        = 1,
+    BufNumFormatUscaled                      = 2,
+    BufNumFormatSscaled                      = 3,
+    BufNumFormatUint                         = 4,
+    BufNumFormatSint                         = 5,
+    BufNumFormatSnorm_Ogl                    = 6,
+    BufNumFormatFloat                        = 7,
+};
+
+// Rate of vertex input. This encodes both the "rate" (none/vertex/instance), and, for "instance",
+// the divisor that determines how many instances share the same vertex buffer element.
+enum VertexInputRate
+{
+    VertexInputRateVertex = ~0,     // Vertex buffer has one element per vertex
+    VertexInputRateNone = 0,        // Vertex buffer has one element shared between all instances
+    VertexInputRateInstance = 1,    // Vertex buffer has one element per instance
+                                    // Other value N means vertex buffer has one element per N instances;
+                                    //  N is the divisor.
+};
+
+// Structure for a vertex input
+struct VertexInputDescription
+{
+    uint32_t        location;       // Location of input, as provided to CreateReadGenericInput
+    uint32_t        binding;        // Index of the vertex buffer descriptor in the vertex buffer table
+    uint32_t        offset;         // Byte offset of the input in the binding's vertex buffer
+    uint32_t        stride;         // Byte stride of per-vertex/per-instance elements in the vertex buffer
+    BufDataFormat   dfmt;           // Data format of input; one of the BufDataFormat* values
+    BufNumFormat    nfmt;           // Numeric format of input; one of the BufNumFormat* values
+    uint32_t        inputRate;      // Vertex input rate for the binding
+};
+
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState
 {
@@ -395,6 +462,10 @@ public:
 
     // Set device index.
     virtual void SetDeviceIndex(uint32_t deviceIndex) = 0;
+
+    // Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
+    // vertex shader must have a corresponding description provided here.
+    virtual void SetVertexInputDescriptions(ArrayRef<VertexInputDescription> inputs) = 0;
 
     // Set graphics state (input-assembly, viewport, rasterizer).
     // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.

@@ -129,6 +129,9 @@ public:
     // Set device index
     void SetDeviceIndex(uint32_t deviceIndex) override final { m_deviceIndex = deviceIndex; }
 
+    // Set vertex input descriptions
+    void SetVertexInputDescriptions(ArrayRef<VertexInputDescription> inputs) override final;
+
     // Set graphics state (input-assembly, viewport, rasterizer).
     void SetGraphicsState(const InputAssemblyState& iaState,
                           const ViewportState&      vpState,
@@ -178,6 +181,10 @@ public:
     // Set "no replayer" flag, saying that this pipeline is being compiled with a BuilderImpl so does not
     // need a BuilderReplayer pass.
     void SetNoReplayer() { m_noReplayer = true; }
+
+    // Accessors for vertex input descriptions.
+    ArrayRef<VertexInputDescription> GetVertexInputDescriptions() const { return m_vertexInputDescriptions; }
+    const VertexInputDescription* FindVertexInputDescription(uint32_t location) const;
 
     // Accessors for pipeline state
     uint32_t GetDeviceIndex() const { return m_deviceIndex; }
@@ -325,6 +332,10 @@ private:
     void RecordDeviceIndex(Module* pModule);
     void ReadDeviceIndex(Module* pModule);
 
+    // Vertex input descriptions handling
+    void RecordVertexInputDescriptions(Module* pModule);
+    void ReadVertexInputDescriptions(Module* pModule);
+
     // Graphics state (iastate, vpstate, rsstate) handling
     void RecordGraphicsState(Module* pModule);
     void ReadGraphicsState(Module* pModule);
@@ -345,6 +356,8 @@ private:
 #endif
     ShaderModes                     m_shaderModes;                      // Shader modes for this pipeline
     uint32_t                        m_deviceIndex = 0;                  // Device index
+    std::vector<VertexInputDescription>
+                                    m_vertexInputDescriptions;          // Vertex input descriptions
     InputAssemblyState              m_inputAssemblyState = {};          // Input-assembly state
     ViewportState                   m_viewportState = {};               // Viewport state
     RasterizerState                 m_rasterizerState = {};             // Rasterizer state

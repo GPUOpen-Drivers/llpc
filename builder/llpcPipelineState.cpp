@@ -60,6 +60,7 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip",
 static const char OptionsMetadataName[] = "llpc.options";
 static const char UserDataMetadataName[] = "llpc.user.data.nodes";
 static const char DeviceIndexMetadataName[] = "llpc.device.index";
+static const char VertexInputsMetadataName[] = "llpc.vertex.inputs";
 static const char IaStateMetadataName[] = "llpc.input.assembly.state";
 static const char VpStateMetadataName[] = "llpc.viewport.state";
 static const char RsStateMetadataName[] = "llpc.rasterizer.state";
@@ -261,6 +262,7 @@ void PipelineState::Clear(
     m_options = {};
     m_userDataNodes = {};
     m_deviceIndex = 0;
+    m_vertexInputDescriptions.clear();
     m_inputAssemblyState = {};
     m_viewportState = {};
     m_rasterizerState = {};
@@ -276,6 +278,7 @@ void PipelineState::Record(
     RecordOptions(pModule);
     RecordUserDataNodes(pModule);
     RecordDeviceIndex(pModule);
+    RecordVertexInputDescriptions(pModule);
     RecordGraphicsState(pModule);
 }
 
@@ -289,6 +292,7 @@ void PipelineState::ReadState(
     ReadOptions(pModule);
     ReadUserDataNodes(pModule);
     ReadDeviceIndex(pModule);
+    ReadVertexInputDescriptions(pModule);
     ReadGraphicsState(pModule);
 }
 
@@ -828,6 +832,80 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
+}
+
+// =====================================================================================================================
+// Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
+// vertex shader must have a corresponding description provided here.
+void PipelineState::SetVertexInputDescriptions(
+    ArrayRef<VertexInputDescription>  inputs)   // Array of vertex input descriptions
+{
+    m_vertexInputDescriptions.clear();
+    m_vertexInputDescriptions.insert(m_vertexInputDescriptions.end(), inputs.begin(), inputs.end());
+}
+
+// =====================================================================================================================
+// Find vertex input description for the given location.
+// Returns nullptr if location not found.
+const VertexInputDescription* PipelineState::FindVertexInputDescription(
+    uint32_t location    // Location
+) const
+{
+    for (auto& inputDesc : m_vertexInputDescriptions)
+    {
+        if (inputDesc.location == location)
+        {
+            return &inputDesc;
+        }
+    }
+    return nullptr;
+}
+
+// =====================================================================================================================
+// Record vertex input descriptions into IR metadata.
+void PipelineState::RecordVertexInputDescriptions(
+    Module* pModule)    // [in/out] Module to record the IR metadata in
+{
+    if (m_vertexInputDescriptions.empty())
+    {
+        if (auto pVertexInputsMetaNode = pModule->getNamedMetadata(VertexInputsMetadataName))
+        {
+            pModule->eraseNamedMetadata(pVertexInputsMetaNode);
+        }
+        return;
+    }
+
+    auto pVertexInputsMetaNode = pModule->getOrInsertNamedMetadata(VertexInputsMetadataName);
+    IRBuilder<> builder(GetContext());
+    pVertexInputsMetaNode->clearOperands();
+
+    for (const VertexInputDescription& input : m_vertexInputDescriptions)
+    {
+        pVertexInputsMetaNode->addOperand(GetArrayOfInt32MetaNode(GetContext(), input, /*atLeastOneValue=*/true));
+    }
+}
+
+// =====================================================================================================================
+// Read vertex input descriptions for the pipeline from IR metadata
+void PipelineState::ReadVertexInputDescriptions(
+    Module* pModule)    // [in] Module to read
+{
+    m_vertexInputDescriptions.clear();
+
+    // Find the named metadata node.
+    auto pVertexInputsMetaNode = pModule->getNamedMetadata(VertexInputsMetadataName);
+    if (pVertexInputsMetaNode == nullptr)
+    {
+        return;
+    }
+
+    // Read the nodes.
+    uint32_t nodeCount = pVertexInputsMetaNode->getNumOperands();
+    for (uint32_t nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex)
+    {
+        m_vertexInputDescriptions.push_back({});
+        ReadArrayOfInt32MetaNode(pVertexInputsMetaNode->getOperand(nodeIndex), m_vertexInputDescriptions.back());
+    }
 }
 
 // =====================================================================================================================
