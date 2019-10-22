@@ -34,6 +34,7 @@
 #include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
 #include "llpcCodeGenManager.h"
+#include "llpcFragColorExport.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
@@ -64,6 +65,8 @@ static const char VertexInputsMetadataName[] = "llpc.vertex.inputs";
 static const char IaStateMetadataName[] = "llpc.input.assembly.state";
 static const char VpStateMetadataName[] = "llpc.viewport.state";
 static const char RsStateMetadataName[] = "llpc.rasterizer.state";
+static const char ColorExportFormatsMetadataName[] = "llpc.color.export.formats";
+static const char ColorExportStateMetadataName[] = "llpc.color.export.state";
 
 // =====================================================================================================================
 // Get LLVMContext
@@ -263,6 +266,8 @@ void PipelineState::Clear(
     m_userDataNodes = {};
     m_deviceIndex = 0;
     m_vertexInputDescriptions.clear();
+    m_colorExportFormats.clear();
+    m_colorExportState = {};
     m_inputAssemblyState = {};
     m_viewportState = {};
     m_rasterizerState = {};
@@ -279,6 +284,7 @@ void PipelineState::Record(
     RecordUserDataNodes(pModule);
     RecordDeviceIndex(pModule);
     RecordVertexInputDescriptions(pModule);
+    RecordColorExportState(pModule);
     RecordGraphicsState(pModule);
 }
 
@@ -293,6 +299,7 @@ void PipelineState::ReadState(
     ReadUserDataNodes(pModule);
     ReadDeviceIndex(pModule);
     ReadVertexInputDescriptions(pModule);
+    ReadColorExportState(pModule);
     ReadGraphicsState(pModule);
 }
 
@@ -909,6 +916,81 @@ void PipelineState::ReadVertexInputDescriptions(
 }
 
 // =====================================================================================================================
+// Set color export state.
+void PipelineState::SetColorExportState(
+    ArrayRef<ColorExportFormat> formats,      // Array of ColorExportFormat structs
+    const ColorExportState&     exportState)  // [in] Color export flags
+{
+    m_colorExportFormats.clear();
+    m_colorExportFormats.insert(m_colorExportFormats.end(), formats.begin(), formats.end());
+    m_colorExportState = exportState;
+}
+
+// =====================================================================================================================
+// Get format for one color export
+const ColorExportFormat& PipelineState::GetColorExportFormat(
+    uint32_t location)    // Export location
+{
+    if (location >= m_colorExportFormats.size())
+    {
+        static const ColorExportFormat emptyFormat = {};
+        return emptyFormat;
+    }
+    return m_colorExportFormats[location];
+}
+
+// =====================================================================================================================
+// Record color export state (including formats) into IR metadata
+void PipelineState::RecordColorExportState(
+    Module* pModule)  // [in/out] IR module
+{
+    if (m_colorExportFormats.empty())
+    {
+        if (auto pExportFormatsMetaNode = pModule->getNamedMetadata(ColorExportFormatsMetadataName))
+        {
+            pModule->eraseNamedMetadata(pExportFormatsMetaNode);
+        }
+    }
+    else
+    {
+        auto pExportFormatsMetaNode = pModule->getOrInsertNamedMetadata(ColorExportFormatsMetadataName);
+        IRBuilder<> builder(GetContext());
+        pExportFormatsMetaNode->clearOperands();
+
+        // The color export formats named metadata node's operands are:
+        // - N metadata nodes for N color targets, each one containing
+        // { dfmt, nfmt, blendEnable, blendSrcAlphaToColor }
+        for (const ColorExportFormat& target : m_colorExportFormats)
+        {
+            pExportFormatsMetaNode->addOperand(GetArrayOfInt32MetaNode(GetContext(), target, /*atLeastOneValue=*/true));
+        }
+    }
+
+    SetNamedMetadataToArrayOfInt32(pModule, m_colorExportState, ColorExportStateMetadataName);
+}
+
+// =====================================================================================================================
+// Read color targets state from IR metadata
+void PipelineState::ReadColorExportState(
+    Module* pModule)  // [in] IR module
+{
+    m_colorExportFormats.clear();
+
+    auto pExportFormatsMetaNode = pModule->getNamedMetadata(ColorExportFormatsMetadataName);
+    if (pExportFormatsMetaNode != nullptr)
+    {
+        // Read the color target nodes.
+        for (uint32_t nodeIndex = 0; nodeIndex < pExportFormatsMetaNode->getNumOperands(); ++nodeIndex)
+        {
+            m_colorExportFormats.push_back({});
+            ReadArrayOfInt32MetaNode(pExportFormatsMetaNode->getOperand(nodeIndex), m_colorExportFormats.back());
+        }
+    }
+
+    ReadNamedMetadataArrayOfInt32(pModule, ColorExportStateMetadataName, m_colorExportState);
+}
+
+// =====================================================================================================================
 // Set graphics state (input-assembly, viewport, rasterizer).
 void PipelineState::SetGraphicsState(
     const InputAssemblyState& iaState,    // [in] Input assembly state
@@ -1031,6 +1113,18 @@ uint32_t PipelineState::GetShaderWaveSize(
     }
 #endif
     return waveSize;
+}
+
+// =====================================================================================================================
+// Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
+// type. Only the number of elements of the type is significant.
+// This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
+uint32_t PipelineState::ComputeExportFormat(
+    Type*     pOutputTy,  // [in] Color output type
+    uint32_t  location)   // Location
+{
+    std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(this, nullptr));
+    return fragColorExport->ComputeExportFormat(pOutputTy, location);
 }
 
 // =====================================================================================================================

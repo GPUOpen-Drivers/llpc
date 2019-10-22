@@ -2426,9 +2426,6 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageFragment);
 
-    const GraphicsPipelineBuildInfo* pPipelineInfo =
-        static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-
     const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
@@ -2523,7 +2520,8 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE,
-                  (builtInUsage.sampleMask || (pPipelineInfo->cbState.alphaToCoverageEnable == false)));
+                  (builtInUsage.sampleMask ||
+                   (m_pPipelineState->GetColorExportState().alphaToCoverageEnable == false)));
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                   (fragmentMode.earlyFragmentTests && pResUsage->resourceWrite));

@@ -2151,7 +2151,6 @@ void PatchResourceCollect::MatchGenericInOut()
     if (outLocMap.empty() == false)
     {
         auto& outOrigLocs = inOutUsage.fs.outputOrigLocs;
-        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
         if (m_shaderStage == ShaderStageFragment)
         {
             memset(&outOrigLocs, InvalidValue, sizeof(inOutUsage.fs.outputOrigLocs));
@@ -2165,11 +2164,11 @@ void PatchResourceCollect::MatchGenericInOut()
             if (m_shaderStage == ShaderStageFragment)
             {
                 uint32_t location = locMap.first;
-                if (pPipelineInfo->cbState.dualSourceBlendEnable && (location == 1))
+                if (m_pPipelineState->GetColorExportState().dualSourceBlendEnable && (location == 1))
                 {
                     location = 0;
                 }
-                if (pPipelineInfo->cbState.target[location].format == VK_FORMAT_UNDEFINED)
+                if (m_pPipelineState->GetColorExportFormat(location).dfmt == BufDataFormatInvalid)
                 {
                     locMapIt = outLocMap.erase(locMapIt);
                     continue;

@@ -132,6 +132,10 @@ public:
     // Set vertex input descriptions
     void SetVertexInputDescriptions(ArrayRef<VertexInputDescription> inputs) override final;
 
+    // Set color export state
+    void SetColorExportState(ArrayRef<ColorExportFormat> formats,
+                             const ColorExportState&     exportState) override final;
+
     // Set graphics state (input-assembly, viewport, rasterizer).
     void SetGraphicsState(const InputAssemblyState& iaState,
                           const ViewportState&      vpState,
@@ -145,6 +149,10 @@ public:
                   raw_pwrite_stream&        outStream,
                   CheckShaderCacheFunc      checkShaderCacheFunc,
                   ArrayRef<Timer*>          timers) override final;
+
+    // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
+    // type. Only the number of elements of the type is significant.
+    uint32_t ComputeExportFormat(Type* pOutputTy, uint32_t location) override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Other methods
@@ -185,6 +193,10 @@ public:
     // Accessors for vertex input descriptions.
     ArrayRef<VertexInputDescription> GetVertexInputDescriptions() const { return m_vertexInputDescriptions; }
     const VertexInputDescription* FindVertexInputDescription(uint32_t location) const;
+
+    // Accessors for color export state
+    const ColorExportFormat& GetColorExportFormat(uint32_t location);
+    const ColorExportState& GetColorExportState() { return m_colorExportState; }
 
     // Accessors for pipeline state
     uint32_t GetDeviceIndex() const { return m_deviceIndex; }
@@ -336,6 +348,10 @@ private:
     void RecordVertexInputDescriptions(Module* pModule);
     void ReadVertexInputDescriptions(Module* pModule);
 
+    // Color export state handling
+    void RecordColorExportState(Module* pModule);
+    void ReadColorExportState(Module* pModule);
+
     // Graphics state (iastate, vpstate, rsstate) handling
     void RecordGraphicsState(Module* pModule);
     void ReadGraphicsState(Module* pModule);
@@ -358,6 +374,9 @@ private:
     uint32_t                        m_deviceIndex = 0;                  // Device index
     std::vector<VertexInputDescription>
                                     m_vertexInputDescriptions;          // Vertex input descriptions
+    SmallVector<ColorExportFormat, 8>
+                                    m_colorExportFormats;               // Color export formats
+    ColorExportState                m_colorExportState = {};            // Color export state
     InputAssemblyState              m_inputAssemblyState = {};          // Input-assembly state
     ViewportState                   m_viewportState = {};               // Viewport state
     RasterizerState                 m_rasterizerState = {};             // Rasterizer state
