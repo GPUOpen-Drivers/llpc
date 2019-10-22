@@ -308,7 +308,7 @@ Result VKAPI_CALL ICompiler::Create(
 bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
     VkFormat format)   // Vertex attribute format
 {
-    Builder::BufDataFormat dfmt = GraphicsContext::MapVkFormat(format).first;
+    Builder::BufDataFormat dfmt = GraphicsContext::MapVkFormat(format, false).first;
     return (dfmt != Builder::BufDataFormatInvalid);
 }
 

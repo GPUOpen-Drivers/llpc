@@ -210,9 +210,19 @@ public:
         BufDataFormat64_64,
         BufDataFormat64_64_64,
         BufDataFormat64_64_64_64,
+        BufDataFormat4_4,
+        BufDataFormat4_4_4_4,
+        BufDataFormat4_4_4_4_BGRA,
+        BufDataFormat5_6_5,
+        BufDataFormat5_6_5_BGR,
+        BufDataFormat5_6_5_1,
+        BufDataFormat5_6_5_1_BGRA,
+        BufDataFormat1_5_6_5,
+        BufDataFormat5_9_9_9,
     };
 
     // Numeric format of vertex buffer entry. These match the GFX9 hardware encoding.
+    // But this also includes extra formats.
     enum BufNumFormat
     {
         BufNumFormatUNORM                        = 0,
@@ -223,6 +233,9 @@ public:
         BufNumFormatSINT                         = 5,
         BufNumFormatSNORM_OGL                    = 6,
         BufNumFormatFLOAT                        = 7,
+        // Extra formats not in GFX9 hardware encoding:
+        BufNumFormatSRGB,
+        BufNumFormatOther,
     };
 
     // Rate of vertex input.
@@ -336,6 +349,30 @@ public:
     // add more fields. A local struct variable can be zero-initialized with " = {}".
     void SetRasterizerState(
         const RasterizerState&  rsState);   // [in] Rasterizer state
+
+    // A single color export format.
+    struct ColorExportFormat
+    {
+        BufDataFormat dfmt;                 // Data format
+        BufNumFormat  nfmt;                 // Numeric format
+        bool          blendEnable;          // Blend will be enabled for this target at draw time
+        bool          blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target
+                                            //  at draw time
+    };
+
+    // Struct to pass to SetColorExportState
+    struct ColorExportState
+    {
+        bool    alphaToCoverageEnable;          // Enable alpha to coverage
+        bool    dualSourceBlendEnable;          // Blend state bound at draw time will use a dual source blend mode
+    };
+
+    // Set color export state.
+    // The client should always zero-initialize the ColorExportState struct before setting it up, in case future
+    // versions add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetColorExportState(
+        ArrayRef<ColorExportFormat> formats,      // Array of ColorExportFormat structs
+        const ColorExportState&     exportState); // [in] Color export flags
 
     // -----------------------------------------------------------------------------------------------------------------
     // Methods to link and generate pipeline

@@ -49,6 +49,8 @@ static const char* const VertexInputsMetadataName = "llpc.vertex.inputs";
 static const char* const IaStateMetadataName = "llpc.input.assembly.state";
 static const char* const VpStateMetadataName = "llpc.viewport.state";
 static const char* const RsStateMetadataName = "llpc.rasterizer.state";
+static const char* const ColorExportFormatsMetadataName = "llpc.color.export.formats";
+static const char* const ColorExportStateMetadataName = "llpc.color.export.state";
 
 // =====================================================================================================================
 // Get LLVMContext
@@ -127,6 +129,8 @@ void PipelineState::Clear(
     m_inputAssemblyState = {};
     m_viewportState = {};
     m_rasterizerState = {};
+    m_colorExportFormats.clear();
+    m_colorExportState = {};
     m_clientStateDirty = true;
     Flush(pModule);
 }
@@ -147,6 +151,7 @@ bool PipelineState::Flush(
         RecordInputAssemblyState(pModule);
         RecordViewportState(pModule);
         RecordRasterizerState(pModule);
+        RecordColorExportState(pModule);
         changed = true;
     }
     return changed;
@@ -163,6 +168,7 @@ void PipelineState::ReadState()
     ReadInputAssemblyState();
     ReadViewportState();
     ReadRasterizerState();
+    ReadColorExportState();
 }
 
 // =====================================================================================================================
@@ -792,6 +798,109 @@ void PipelineState::ReadRasterizerState()
     m_rasterizerState.cullMode = static_cast<Builder::CullModeFlags>(values[7]);
     m_rasterizerState.frontFaceClockwise = values[8];
     m_rasterizerState.depthBiasEnable = values[9];
+}
+
+// =====================================================================================================================
+// Set color export state.
+void PipelineState::SetColorExportState(
+    ArrayRef<Builder::ColorExportFormat> formats,      // Array of ColorExportFormat structs
+    const Builder::ColorExportState&     exportState)  // [in] Color export flags
+{
+    m_colorExportFormats.clear();
+    m_colorExportFormats.insert(m_colorExportFormats.end(), formats.begin(), formats.end());
+    m_colorExportState = exportState;
+    m_clientStateDirty = true;
+}
+
+// =====================================================================================================================
+// Get format for one color export
+const Builder::ColorExportFormat& PipelineState::GetColorExportFormat(
+    uint32_t location)    // Export location
+{
+    static const Builder::ColorExportFormat emptyFormat = {};
+    if (location >= m_colorExportFormats.size())
+    {
+        return emptyFormat;
+    }
+    return m_colorExportFormats[location];
+}
+
+// =====================================================================================================================
+// Get overall color export state
+const Builder::ColorExportState& PipelineState::GetColorExportState()
+{
+    return m_colorExportState;
+}
+
+// =====================================================================================================================
+// Record color export state (including formats) into IR metadata
+void PipelineState::RecordColorExportState(
+    Module* pModule)  // [in/out] IR module
+{
+    if (m_colorExportFormats.empty())
+    {
+        if (auto pExportFormatsMetaNode = pModule->getNamedMetadata(ColorExportFormatsMetadataName))
+        {
+            pModule->eraseNamedMetadata(pExportFormatsMetaNode);
+        }
+    }
+    else
+    {
+        auto pExportFormatsMetaNode = pModule->getOrInsertNamedMetadata(ColorExportFormatsMetadataName);
+        IRBuilder<> builder(GetContext());
+        pExportFormatsMetaNode->clearOperands();
+
+        // The color export formats named metadata node's operands are:
+        // - N metadata nodes for N color targets, each one containing { dfmt, nfmt, blendEnable, blendSrcAlphaToColor }
+        for (const Builder::ColorExportFormat& target : m_colorExportFormats)
+        {
+            uint32_t values[] =
+            {
+                static_cast<uint32_t>(target.dfmt),
+                static_cast<uint32_t>(target.nfmt),
+                target.blendEnable,
+                target.blendSrcAlphaToColor,
+            };
+            pExportFormatsMetaNode->addOperand(GetArrayOfInt32MetaNode(values, true));
+        }
+    }
+
+    uint32_t values[] =
+    {
+        m_colorExportState.alphaToCoverageEnable,
+        m_colorExportState.dualSourceBlendEnable,
+    };
+    SetNamedMetadataToArrayOfInt32(pModule, values, ColorExportStateMetadataName);
+}
+
+// =====================================================================================================================
+// Read color targets state from IR metadata
+void PipelineState::ReadColorExportState()
+{
+    m_colorExportFormats.clear();
+
+    auto pExportFormatsMetaNode = m_pModule->getNamedMetadata(ColorExportFormatsMetadataName);
+    if (pExportFormatsMetaNode != nullptr)
+    {
+        // Read the color target nodes.
+        for (uint32_t nodeIndex = 0; nodeIndex < pExportFormatsMetaNode->getNumOperands(); ++nodeIndex)
+        {
+            MDNode* pNode = pExportFormatsMetaNode->getOperand(nodeIndex);
+            uint32_t values[4] = {};
+            ReadArrayOfInt32MetaNode(pNode, values);
+            m_colorExportFormats.push_back({});
+            m_colorExportFormats.back().dfmt = static_cast<Builder::BufDataFormat>(values[0]);
+            m_colorExportFormats.back().nfmt = static_cast<Builder::BufNumFormat>(values[1]);
+            m_colorExportFormats.back().blendEnable = values[2];
+            m_colorExportFormats.back().blendSrcAlphaToColor = values[3];
+        }
+    }
+
+    // Read the overall color export state.
+    uint32_t values[2] = {};
+    ReadNamedMetadataArrayOfInt32(ColorExportStateMetadataName, values);
+    m_colorExportState.alphaToCoverageEnable = values[0];
+    m_colorExportState.dualSourceBlendEnable = values[1];
 }
 
 // =====================================================================================================================

@@ -1606,6 +1606,7 @@ void GraphicsContext::SetBuilderPipelineState(
     SetInputAssemblyState(pBuilder);
     SetViewportState(pBuilder);
     SetRasterizerState(pBuilder);
+    SetColorExportState(pBuilder);
 }
 
 // =====================================================================================================================
@@ -1677,7 +1678,7 @@ void GraphicsContext::SetVertexInputDescriptions(
 
         auto dfmt = Builder::BufDataFormatInvalid;
         auto nfmt = Builder::BufNumFormatUNORM;
-        std::tie(dfmt, nfmt) = MapVkFormat(pAttrib->format);
+        std::tie(dfmt, nfmt) = MapVkFormat(pAttrib->format, false);
 
         if (dfmt != Builder::BufDataFormatInvalid)
         {
@@ -1750,10 +1751,41 @@ void GraphicsContext::SetRasterizerState(
 }
 
 // =====================================================================================================================
+// Set color export state in builder
+void GraphicsContext::SetColorExportState(
+    Builder*          pBuilder) const   // [in] The builder
+{
+    const auto& cbState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->cbState;
+    Builder::ColorExportState state = {};
+    SmallVector<Builder::ColorExportFormat, MaxColorTargets> formats;
+
+    state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
+    state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+
+    for (uint32_t targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex)
+    {
+        if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED)
+        {
+            auto dfmt = Builder::BufDataFormatInvalid;
+            auto nfmt = Builder::BufNumFormatUNORM;
+            std::tie(dfmt, nfmt) = MapVkFormat(cbState.target[targetIndex].format, true);
+            formats.resize(targetIndex + 1);
+            formats[targetIndex].dfmt = dfmt;
+            formats[targetIndex].nfmt = nfmt;
+            formats[targetIndex].blendEnable = cbState.target[targetIndex].blendEnable;
+            formats[targetIndex].blendSrcAlphaToColor = cbState.target[targetIndex].blendSrcAlphaToColor;
+        }
+    }
+
+    pBuilder->SetColorExportState(formats, state);
+}
+
+// =====================================================================================================================
 // Map a VkFormat to a {Builder::BufDataFormat, Builder::BufNumFormat}. Returns BufDataFormatInvalid if the
-// VkFormat is not supported for vertex input.
+// VkFormat is not supported for vertex input or color export (depending on the setting of isColorExport).
 std::pair<Builder::BufDataFormat, Builder::BufNumFormat> GraphicsContext::MapVkFormat(
-    VkFormat  format)         // Vulkan API format code
+    VkFormat  format,         // Vulkan API format code
+    bool      isColorExport)  // True for looking up color export format, false for vertex input format
 {
     static const struct FormatEntry
     {
@@ -1763,102 +1795,107 @@ std::pair<Builder::BufDataFormat, Builder::BufNumFormat> GraphicsContext::MapVkF
         Builder::BufDataFormat  dfmt;
         Builder::BufNumFormat   nfmt;
         uint32_t                validVertexFormat :1;
+        uint32_t                validExportFormat  :1;
     }
     formatTable[] =
     {
 #ifndef NDEBUG
 #define INVALID_FORMAT_ENTRY(format) \
-      { format, Builder::BufDataFormatInvalid, Builder::BufNumFormatUNORM, false }
-#define VERTEX_FORMAT_ENTRY(format, dfmt, nfmt) { format, Builder::dfmt, Builder::nfmt, true }
+      { format, Builder::BufDataFormatInvalid, Builder::BufNumFormatUNORM, false, false }
+#define VERTEX_FORMAT_ENTRY(format, dfmt, nfmt) { format, Builder::dfmt, Builder::nfmt, true, false }
+#define EXPORT_FORMAT_ENTRY(format, dfmt, nfmt) { format, Builder::dfmt, Builder::nfmt, false, true }
+#define BOTH_FORMAT_ENTRY(format, dfmt, nfmt)   { format, Builder::dfmt, Builder::nfmt, true, true }
 #else
 #define INVALID_FORMAT_ENTRY(format) \
-      { Builder::BufDataFormatInvalid, Builder::BufNumFormatUNORM, false }
-#define VERTEX_FORMAT_ENTRY(format, dfmt, nfmt) { Builder::dfmt, Builder::nfmt, true }
+      { Builder::BufDataFormatInvalid, Builder::BufNumFormatUNORM, false, false }
+#define VERTEX_FORMAT_ENTRY(format, dfmt, nfmt) { Builder::dfmt, Builder::nfmt, true, false }
+#define EXPORT_FORMAT_ENTRY(format, dfmt, nfmt) { Builder::dfmt, Builder::nfmt, false, true }
+#define BOTH_FORMAT_ENTRY(format, dfmt, nfmt)   { Builder::dfmt, Builder::nfmt, true, true }
 #endif
         INVALID_FORMAT_ENTRY( VK_FORMAT_UNDEFINED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R4G4_UNORM_PACK8),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R4G4B4A4_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B4G4R4A4_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R5G6B5_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B5G6R5_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R5G5B5A1_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B5G5R5A1_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A1R5G5B5_UNORM_PACK16),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8_SRGB),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8_SRGB),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8_SRGB),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8_SRGB),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R8G8B8A8_SRGB),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B8G8R8A8_SRGB),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_UNORM_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_SNORM_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_USCALED_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_SSCALED_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_UINT_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_SINT_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A8B8G8R8_SRGB_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2R10G10B10_UNORM_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2R10G10B10_SNORM_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2R10G10B10_USCALED_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2R10G10B10_SSCALED_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2R10G10B10_UINT_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2R10G10B10_SINT_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2B10G10R10_UNORM_PACK32),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R4G4_UNORM_PACK8,           BufDataFormat4_4,             BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R4G4B4A4_UNORM_PACK16,      BufDataFormat4_4_4_4,         BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B4G4R4A4_UNORM_PACK16,      BufDataFormat4_4_4_4_BGRA,    BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R5G6B5_UNORM_PACK16,        BufDataFormat5_6_5,           BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B5G6R5_UNORM_PACK16,        BufDataFormat5_6_5_BGR,       BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R5G5B5A1_UNORM_PACK16,      BufDataFormat5_6_5_1,         BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B5G5R5A1_UNORM_PACK16,      BufDataFormat5_6_5_1_BGRA,    BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_A1R5G5B5_UNORM_PACK16,      BufDataFormat1_5_6_5,         BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8_UNORM,                   BufDataFormat8,               BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8_SNORM,                   BufDataFormat8,               BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8_USCALED,                 BufDataFormat8,               BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8_SSCALED,                 BufDataFormat8,               BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8_UINT,                    BufDataFormat8,               BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8_SINT,                    BufDataFormat8,               BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8_SRGB,                    BufDataFormat8,               BufNumFormatSRGB),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8_UNORM,                 BufDataFormat8_8,             BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8_SNORM,                 BufDataFormat8_8,             BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8_USCALED,               BufDataFormat8_8,             BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8_SSCALED,               BufDataFormat8_8,             BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8_UINT,                  BufDataFormat8_8,             BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8_SINT,                  BufDataFormat8_8,             BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8_SRGB,                  BufDataFormat8_8,             BufNumFormatSRGB),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_UNORM,               BufDataFormat8_8_8,           BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_SNORM,               BufDataFormat8_8_8,           BufNumFormatSNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_USCALED,             BufDataFormat8_8_8,           BufNumFormatUSCALED),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_SSCALED,             BufDataFormat8_8_8,           BufNumFormatSSCALED),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_UINT,                BufDataFormat8_8_8,           BufNumFormatUINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_SINT,                BufDataFormat8_8_8,           BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8_SRGB,                BufDataFormat8_8_8,           BufNumFormatSRGB),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_UNORM,               BufDataFormat8_8_8_BGR,       BufNumFormatUNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_SNORM,               BufDataFormat8_8_8_BGR,       BufNumFormatSNORM),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_USCALED,             BufDataFormat8_8_8_BGR,       BufNumFormatUSCALED),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_SSCALED,             BufDataFormat8_8_8_BGR,       BufNumFormatSSCALED),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_UINT,                BufDataFormat8_8_8_BGR,       BufNumFormatUINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_SINT,                BufDataFormat8_8_8_BGR,       BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8_SRGB,                BufDataFormat8_8_8_BGR,       BufNumFormatSRGB),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8B8A8_UNORM,             BufDataFormat8_8_8_8,         BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8B8A8_SNORM,             BufDataFormat8_8_8_8,         BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8B8A8_USCALED,           BufDataFormat8_8_8_8,         BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8B8A8_SSCALED,           BufDataFormat8_8_8_8,         BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8B8A8_UINT,              BufDataFormat8_8_8_8,         BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R8G8B8A8_SINT,              BufDataFormat8_8_8_8,         BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_R8G8B8A8_SRGB,              BufDataFormat8_8_8_8,         BufNumFormatSRGB),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B8G8R8A8_UNORM,             BufDataFormat8_8_8_8_BGRA,    BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B8G8R8A8_SNORM,             BufDataFormat8_8_8_8_BGRA,    BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B8G8R8A8_USCALED,           BufDataFormat8_8_8_8_BGRA,    BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B8G8R8A8_SSCALED,           BufDataFormat8_8_8_8_BGRA,    BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B8G8R8A8_UINT,              BufDataFormat8_8_8_8_BGRA,    BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B8G8R8A8_SINT,              BufDataFormat8_8_8_8_BGRA,    BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_B8G8R8A8_SRGB,              BufDataFormat8_8_8_8_BGRA,    BufNumFormatSRGB),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A8B8G8R8_UNORM_PACK32,      BufDataFormat8_8_8_8,         BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A8B8G8R8_SNORM_PACK32,      BufDataFormat8_8_8_8,         BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A8B8G8R8_USCALED_PACK32,    BufDataFormat8_8_8_8,         BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A8B8G8R8_SSCALED_PACK32,    BufDataFormat8_8_8_8,         BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A8B8G8R8_UINT_PACK32,       BufDataFormat8_8_8_8,         BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A8B8G8R8_SINT_PACK32,       BufDataFormat8_8_8_8,         BufNumFormatSINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_A8B8G8R8_SRGB_PACK32,       BufDataFormat8_8_8_8,         BufNumFormatSRGB),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2R10G10B10_UNORM_PACK32,   BufDataFormat2_10_10_10_BGRA, BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2R10G10B10_SNORM_PACK32,   BufDataFormat2_10_10_10_BGRA, BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2R10G10B10_USCALED_PACK32, BufDataFormat2_10_10_10_BGRA, BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2R10G10B10_SSCALED_PACK32, BufDataFormat2_10_10_10_BGRA, BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2R10G10B10_UINT_PACK32,    BufDataFormat2_10_10_10_BGRA, BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2R10G10B10_SINT_PACK32,    BufDataFormat2_10_10_10_BGRA, BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2B10G10R10_UNORM_PACK32,   BufDataFormat2_10_10_10,      BufNumFormatUNORM),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_A2B10G10R10_SNORM_PACK32,   BufDataFormat2_10_10_10,      BufNumFormatSNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2B10G10R10_USCALED_PACK32),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2B10G10R10_USCALED_PACK32, BufDataFormat2_10_10_10,      BufNumFormatUSCALED),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_A2B10G10R10_SSCALED_PACK32, BufDataFormat2_10_10_10,      BufNumFormatSSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_A2B10G10R10_UINT_PACK32),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_A2B10G10R10_UINT_PACK32,    BufDataFormat2_10_10_10,      BufNumFormatUINT),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_A2B10G10R10_SINT_PACK32,    BufDataFormat2_10_10_10,      BufNumFormatSINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16_SFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_UNORM,                  BufDataFormat16,              BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_SNORM,                  BufDataFormat16,              BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_USCALED,                BufDataFormat16,              BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_SSCALED,                BufDataFormat16,              BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_UINT,                   BufDataFormat16,              BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_SINT,                   BufDataFormat16,              BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16_SFLOAT,                 BufDataFormat16,              BufNumFormatFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_UNORM,               BufDataFormat16_16,           BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_SNORM,               BufDataFormat16_16,           BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_USCALED,             BufDataFormat16_16,           BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_SSCALED,             BufDataFormat16_16,           BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_UINT,                BufDataFormat16_16,           BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_SINT,                BufDataFormat16_16,           BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16_SFLOAT,              BufDataFormat16_16,           BufNumFormatFLOAT),
         INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16_UNORM),
         INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16_SNORM),
         INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16_USCALED),
@@ -1866,25 +1903,25 @@ std::pair<Builder::BufDataFormat, Builder::BufNumFormat> GraphicsContext::MapVkF
         INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16_UINT),
         INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16_SINT),
         INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_UNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_SNORM),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_USCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_SSCALED),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R16G16B16A16_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32B32_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32B32_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32B32_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32B32A32_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32B32A32_SINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_R32G32B32A32_SFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_UNORM,         BufDataFormat16_16_16_16,     BufNumFormatUNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_SNORM,         BufDataFormat16_16_16_16,     BufNumFormatSNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_USCALED,       BufDataFormat16_16_16_16,     BufNumFormatUSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_SSCALED,       BufDataFormat16_16_16_16,     BufNumFormatSSCALED),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_UINT,          BufDataFormat16_16_16_16,     BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_SINT,          BufDataFormat16_16_16_16,     BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R16G16B16A16_SFLOAT,        BufDataFormat16_16_16_16,     BufNumFormatFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32_UINT,                   BufDataFormat32,              BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32_SINT,                   BufDataFormat32,              BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32_SFLOAT,                 BufDataFormat32,              BufNumFormatFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32_UINT,                BufDataFormat32_32,           BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32_SINT,                BufDataFormat32_32,           BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32_SFLOAT,              BufDataFormat32_32,           BufNumFormatFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32B32_UINT,             BufDataFormat32_32_32,        BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32B32_SINT,             BufDataFormat32_32_32,        BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32B32_SFLOAT,           BufDataFormat32_32_32,        BufNumFormatFLOAT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32B32A32_UINT,          BufDataFormat32_32_32_32,     BufNumFormatUINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32B32A32_SINT,          BufDataFormat32_32_32_32,     BufNumFormatSINT),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_R32G32B32A32_SFLOAT,        BufDataFormat32_32_32_32,     BufNumFormatFLOAT),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_R64_UINT,                   BufDataFormat64,              BufNumFormatUINT),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_R64_SINT,                   BufDataFormat64,              BufNumFormatSINT),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_R64_SFLOAT,                 BufDataFormat64,              BufNumFormatFLOAT),
@@ -1897,15 +1934,15 @@ std::pair<Builder::BufDataFormat, Builder::BufNumFormat> GraphicsContext::MapVkF
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_R64G64B64A64_UINT,          BufDataFormat64_64_64_64,     BufNumFormatUINT),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_R64G64B64A64_SINT,          BufDataFormat64_64_64_64,     BufNumFormatSINT),
         VERTEX_FORMAT_ENTRY(  VK_FORMAT_R64G64B64A64_SFLOAT,        BufDataFormat64_64_64_64,     BufNumFormatFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_B10G11R11_UFLOAT_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_E5B9G9R9_UFLOAT_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_D16_UNORM),
+        BOTH_FORMAT_ENTRY(    VK_FORMAT_B10G11R11_UFLOAT_PACK32,    BufDataFormat10_11_11,        BufNumFormatFLOAT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_E5B9G9R9_UFLOAT_PACK32,     BufDataFormat5_9_9_9,         BufNumFormatFLOAT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_D16_UNORM,                  BufDataFormat16,              BufNumFormatUNORM),
         INVALID_FORMAT_ENTRY( VK_FORMAT_X8_D24_UNORM_PACK32),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_D32_SFLOAT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_S8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_D16_UNORM_S8_UINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_D32_SFLOAT,                 BufDataFormat32,              BufNumFormatFLOAT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_S8_UINT,                    BufDataFormat8,               BufNumFormatUINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_D16_UNORM_S8_UINT,          BufDataFormat16,              BufNumFormatFLOAT),
         INVALID_FORMAT_ENTRY( VK_FORMAT_D24_UNORM_S8_UINT),
-        INVALID_FORMAT_ENTRY( VK_FORMAT_D32_SFLOAT_S8_UINT),
+        EXPORT_FORMAT_ENTRY(  VK_FORMAT_D32_SFLOAT_S8_UINT,         BufDataFormat32,              BufNumFormatFLOAT),
         INVALID_FORMAT_ENTRY( VK_FORMAT_BC1_RGB_UNORM_BLOCK),
         INVALID_FORMAT_ENTRY( VK_FORMAT_BC1_RGB_SRGB_BLOCK),
         INVALID_FORMAT_ENTRY( VK_FORMAT_BC1_RGBA_UNORM_BLOCK),
@@ -1967,7 +2004,8 @@ std::pair<Builder::BufDataFormat, Builder::BufNumFormat> GraphicsContext::MapVkF
     if (format < ArrayRef<FormatEntry>(formatTable).size())
     {
         LLPC_ASSERT(format == formatTable[format].format);
-        if (formatTable[format].validVertexFormat)
+        if ((isColorExport && formatTable[format].validExportFormat) ||
+            ((isColorExport == false) && formatTable[format].validVertexFormat))
         {
             dfmt = formatTable[format].dfmt;
             nfmt = formatTable[format].nfmt;

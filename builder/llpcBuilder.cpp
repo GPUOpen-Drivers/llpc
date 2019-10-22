@@ -167,6 +167,17 @@ void Builder::SetRasterizerState(
 }
 
 // =====================================================================================================================
+// Set color export state.
+// The client should always zero-initialize the ColorExportState struct before setting it up, in case future
+// versions add more fields. A local struct variable can be zero-initialized with " = {}".
+void Builder::SetColorExportState(
+    ArrayRef<ColorExportFormat> formats,      // Array of ColorExportFormat structs
+    const ColorExportState&     exportState)  // [in] Color export flags
+{
+    GetPipelineState()->SetColorExportState(formats, exportState);
+}
+
+// =====================================================================================================================
 // Base implementation of linking shader modules into a pipeline module.
 Module* Builder::Link(
     ArrayRef<Module*> modules,               // Array of modules indexed by shader stage, with nullptr entry

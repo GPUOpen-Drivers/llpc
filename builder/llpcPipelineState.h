@@ -165,6 +165,12 @@ public:
     void SetRasterizerState(const Builder::RasterizerState& vpState);
     const Builder::RasterizerState& GetRasterizerState();
 
+    // Accessors for color export state
+    void SetColorExportState(ArrayRef<Builder::ColorExportFormat> formats,
+                             const Builder::ColorExportState&     exportState);
+    const Builder::ColorExportFormat& GetColorExportFormat(uint32_t location);
+    const Builder::ColorExportState& GetColorExportState();
+
 private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
@@ -204,6 +210,10 @@ private:
     void RecordRasterizerState(Module* pModule);
     void ReadRasterizerState();
 
+    // Color export state handling
+    void RecordColorExportState(Module* pModule);
+    void ReadColorExportState();
+
     // Utility functions to record and read an array of i32 values in metadata
     void SetNamedMetadataToArrayOfInt32(Module* pModule, ArrayRef<uint32_t> values, StringRef metaName);
     MDNode* GetArrayOfInt32MetaNode(ArrayRef<uint32_t> values, bool atLeastOneValue);
@@ -224,6 +234,9 @@ private:
     Builder::InputAssemblyState     m_inputAssemblyState = {};          // Input-assembly state
     Builder::ViewportState          m_viewportState = {};               // Viewport state
     Builder::RasterizerState        m_rasterizerState = {};             // Rasterizer state
+    SmallVector<Builder::ColorExportFormat, 8>
+                                    m_colorExportFormats;               // Color export formats
+    Builder::ColorExportState       m_colorExportState = {};            // Color export state
     bool                            m_clientStateDirty = false;         // Whether state provided by builder client
                                                                         //  (user data, vertex inputs, options) is dirty
                                                                         //  and needs writing to IR

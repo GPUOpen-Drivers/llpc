@@ -112,7 +112,7 @@ public:
 
     // Map a VkFormat to a {Builder::BufDataFormat, Builder::BufNumFormat}. Returns BufDataFormatInvalid if the
     // VkFormat is not supported.
-    static std::pair<Builder::BufDataFormat, Builder::BufNumFormat> MapVkFormat(VkFormat format);
+    static std::pair<Builder::BufDataFormat, Builder::BufNumFormat> MapVkFormat(VkFormat format, bool isColorExport);
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
@@ -135,6 +135,9 @@ private:
 
     // Set rasterizer state in builder
     void SetRasterizerState(Builder* pBuilder) const;
+
+    // Set color export state in builder
+    void SetColorExportState(Builder* pBuilder) const;
 
     const GraphicsPipelineBuildInfo*    m_pPipelineInfo; // Info to build a graphics pipeline
 
