@@ -59,6 +59,10 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip",
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char OptionsMetadataName[] = "llpc.options";
 static const char UserDataMetadataName[] = "llpc.user.data.nodes";
+static const char DeviceIndexMetadataName[] = "llpc.device.index";
+static const char IaStateMetadataName[] = "llpc.input.assembly.state";
+static const char VpStateMetadataName[] = "llpc.viewport.state";
+static const char RsStateMetadataName[] = "llpc.rasterizer.state";
 
 // =====================================================================================================================
 // Get LLVMContext
@@ -256,6 +260,10 @@ void PipelineState::Clear(
     GetShaderModes()->Clear();
     m_options = {};
     m_userDataNodes = {};
+    m_deviceIndex = 0;
+    m_inputAssemblyState = {};
+    m_viewportState = {};
+    m_rasterizerState = {};
     Record(pModule);
 }
 
@@ -267,6 +275,8 @@ void PipelineState::Record(
     GetShaderModes()->Record(pModule);
     RecordOptions(pModule);
     RecordUserDataNodes(pModule);
+    RecordDeviceIndex(pModule);
+    RecordGraphicsState(pModule);
 }
 
 // =====================================================================================================================
@@ -278,6 +288,8 @@ void PipelineState::ReadState(
     ReadShaderStageMask(pModule);
     ReadOptions(pModule);
     ReadUserDataNodes(pModule);
+    ReadDeviceIndex(pModule);
+    ReadGraphicsState(pModule);
 }
 
 // =====================================================================================================================
@@ -816,6 +828,54 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
+}
+
+// =====================================================================================================================
+// Set graphics state (input-assembly, viewport, rasterizer).
+void PipelineState::SetGraphicsState(
+    const InputAssemblyState& iaState,    // [in] Input assembly state
+    const ViewportState&      vpState,    // [in] Viewport state
+    const RasterizerState&    rsState)    // [in] Rasterizer state
+{
+    m_inputAssemblyState = iaState;
+    m_viewportState = vpState;
+    m_rasterizerState = rsState;
+}
+
+// =====================================================================================================================
+// Record device index into the IR metadata
+void PipelineState::RecordDeviceIndex(
+    Module* pModule)    // [in/out] IR module to record into
+{
+    SetNamedMetadataToArrayOfInt32(pModule, m_deviceIndex, DeviceIndexMetadataName);
+}
+
+// =====================================================================================================================
+// Read device index from the IR metadata
+void PipelineState::ReadDeviceIndex(
+    Module* pModule)    // [in/out] IR module to read from
+{
+    ReadNamedMetadataArrayOfInt32(pModule, DeviceIndexMetadataName, m_deviceIndex);
+}
+
+// =====================================================================================================================
+// Record graphics state (iastate, vpstate, rsstate) into the IR metadata
+void PipelineState::RecordGraphicsState(
+    Module* pModule)    // [in/out] IR module to record into
+{
+    SetNamedMetadataToArrayOfInt32(pModule, m_inputAssemblyState, IaStateMetadataName);
+    SetNamedMetadataToArrayOfInt32(pModule, m_viewportState, VpStateMetadataName);
+    SetNamedMetadataToArrayOfInt32(pModule, m_rasterizerState, RsStateMetadataName);
+}
+
+// =====================================================================================================================
+// Read graphics state (device index, iastate, vpstate, rsstate) from the IR metadata
+void PipelineState::ReadGraphicsState(
+    Module* pModule)    // [in/out] IR module to read from
+{
+    ReadNamedMetadataArrayOfInt32(pModule, IaStateMetadataName, m_inputAssemblyState);
+    ReadNamedMetadataArrayOfInt32(pModule, VpStateMetadataName, m_viewportState);
+    ReadNamedMetadataArrayOfInt32(pModule, RsStateMetadataName, m_rasterizerState);
 }
 
 // =====================================================================================================================

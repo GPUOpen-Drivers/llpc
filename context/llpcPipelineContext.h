@@ -712,9 +712,6 @@ public:
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
 
-    // Gets the count of vertices per primitive
-    virtual uint32_t GetVerticesPerPrimitive() const = 0;
-
     static void GetGpuNameString(GfxIpVersion gfxIp, std::string& gpuName);
     static const char* GetGpuNameAbbreviation(GfxIpVersion gfxIp);
 
@@ -765,6 +762,9 @@ private:
 
     // Give the user data nodes and descriptor range values to the middle-end.
     void SetUserDataInPipeline(Pipeline* pPipeline) const;
+
+    // Give the graphics pipeline state to the middle-end.
+    void SetGraphicsStateInPipeline(Pipeline* pPipeline) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 

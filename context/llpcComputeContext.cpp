@@ -31,6 +31,7 @@
 #define DEBUG_TYPE "llpc-compute-context"
 
 #include "llpcComputeContext.h"
+#include "llpcPipeline.h"
 #include "SPIRVInternal.h"
 
 using namespace llvm;

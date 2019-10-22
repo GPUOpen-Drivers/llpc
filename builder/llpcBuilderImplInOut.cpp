@@ -978,7 +978,6 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
                               //    this function for this built-in might have different array sizes; we take the max)
 {
     auto& pUsage = getContext().GetShaderResourceUsage(m_shaderStage)->builtInUsage;
-    auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getContext().GetPipelineBuildInfo());
     LLPC_ASSERT(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
     switch (m_shaderStage)
     {
@@ -1084,7 +1083,7 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
                 // NOTE: gl_PointCoord is emulated via a general input. Those qualifiers therefore have to
                 // be marked as used.
                 pUsage.fs.smooth = true;
-                if (pPipelineInfo->rsState.perSampleShading)
+                if (GetPipelineState()->GetRasterizerState().perSampleShading)
                 {
                     pUsage.fs.sample = true;
                 }

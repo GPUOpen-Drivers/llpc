@@ -66,9 +66,6 @@ public:
 
     virtual void DoUserDataNodeMerge();
 
-    // Gets the count of vertices per primitive
-    virtual uint32_t GetVerticesPerPrimitive() const;
-
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
