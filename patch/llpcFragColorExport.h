@@ -32,6 +32,7 @@
 
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
+#include "llpcPipeline.h"
 
 namespace Llpc
 {
@@ -39,26 +40,6 @@ namespace Llpc
 class Context;
 class PipelineState;
 struct WorkaroundFlags;
-
-// Enumerates the source selection of each color channel in a color attachment format.
-enum class ChannelSwizzle : uint8_t
-{
-    Zero = 0,       // Always 0 (ignore source)
-    One,            // Always 1 (ignore source)
-    X,              // X channel from the source
-    Y,              // Y channel from the source
-    Z,              // Z channel from the source
-    W,              // W channel from the source
-};
-
-// Enumerates the presence of each color channel in a color attachment format.
-enum ChannelMask : uint8_t
-{
-    X = 1,          // X channel is present
-    Y = 2,          // Y channel is present
-    Z = 4,          // Z channel is present
-    W = 8,          // W channel is present
-};
 
 // Enumerates component setting of color format. This is a "helper" enum used in the CB's algorithm for deriving
 // an ideal shader export format.
@@ -71,30 +52,6 @@ enum class CompSetting : uint32_t
     TwoCompGreenRed     // Green, red
 };
 
-// Represents fragment color format info corresponding to color attachment format (VkFormat).
-struct ColorFormatInfo
-{
-    VkFormat        format;         // Color attachment format
-    ColorNumFormat  nfmt;           // Numeric format of fragment color
-    ColorDataFormat dfmt;           // Data format of fragment color
-    uint32_t        numChannels;    // Valid number of channels
-    uint32_t        bitCount[4];    // Number of bits for each channel
-
-    union
-    {
-        struct
-        {
-            ChannelSwizzle r;           // Red component swizzle
-            ChannelSwizzle g;           // Green component swizzle
-            ChannelSwizzle b;           // Blue component swizzle
-            ChannelSwizzle a;           // Alpha component swizzle
-        };
-        ChannelSwizzle     rgba[4];     // All four swizzles packed into one array
-    } channelSwizzle;
-
-    uint8_t    channelMask;    // Mask indicating which channel is valid
-};
-
 // =====================================================================================================================
 // Represents the manager of fragment color export operations.
 class FragColorExport
@@ -104,34 +61,18 @@ public:
 
     llvm::Value* Run(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
 
-    static ExportFormat ConvertColorBufferFormatToExportFormat(
-        const ColorTarget*          pTarget,
-        GfxIpVersion                gfxIp,
-        const WorkaroundFlags*      pGpuWorkarounds,
-        uint32_t                    outputMask,
-        const bool                  enableAlphaToCoverage);
+    ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) const;
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(FragColorExport);
     LLPC_DISALLOW_COPY_AND_ASSIGN(FragColorExport);
 
-    ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) const;
-    static CompSetting ComputeCompSetting(VkFormat format);
-    static ColorSwap ComputeColorSwap(VkFormat format);
+    static CompSetting ComputeCompSetting(BufDataFormat dfmt);
+    static uint32_t GetNumChannels(BufDataFormat dfmt);
 
-    static const ColorFormatInfo* GetColorFormatInfo(VkFormat format);
+    static bool HasAlpha(BufDataFormat dfmt);
 
-    // Checks whether numeric format of the specified color attachment format is as expected
-    static bool IsUnorm(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_UNORM); }
-    static bool IsSnorm(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SNORM); }
-    static bool IsFloat(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_FLOAT); }
-    static bool IsUint(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_UINT);  }
-    static bool IsSint(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SINT);  }
-    static bool IsSrgb(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SRGB);  }
-
-    static bool HasAlpha(VkFormat format);
-
-    static uint32_t GetMaxComponentBitCount(VkFormat format);
+    static uint32_t GetMaxComponentBitCount(BufDataFormat dfmt);
 
     llvm::Value* ConvertToFloat(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;
     llvm::Value* ConvertToInt(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;
@@ -141,10 +82,6 @@ private:
     PipelineState*  m_pPipelineState;   // Pipeline state
     llvm::Module*   m_pModule;          // LLVM module
     Context*        m_pContext;         // LLPC context
-
-    static const ColorFormatInfo    m_colorFormatInfo[]; // Info table of fragment color format
-
-    const GraphicsPipelineBuildInfo* pPipelineInfo;   // Graphics pipeline build info
 };
 
 } // Llpc

@@ -59,13 +59,11 @@
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
 #include "llpcFile.h"
-#include "llpcFragColorExport.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerResourceCollect.h"
-#include "llpcTargetInfo.h"
 #include "llpcTimerProfiler.h"
 #include "llpcVertexFetch.h"
 #include <mutex>
@@ -311,7 +309,7 @@ Result VKAPI_CALL ICompiler::Create(
 bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
     VkFormat format)   // Vertex attribute format
 {
-    BufDataFormat dfmt = PipelineContext::MapVkFormat(format).first;
+    BufDataFormat dfmt = PipelineContext::MapVkFormat(format, false).first;
     return (dfmt != BufDataFormatInvalid);
 }
 
@@ -1293,23 +1291,30 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
 }
 
 // =====================================================================================================================
-// convert color buffer format to fragment shader export format
+// Convert color buffer format to fragment shader export format
+// This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
 uint32_t Compiler::ConvertColorBufferFormatToExportFormat(
     const ColorTarget*          pTarget,                // [in] GraphicsPipelineBuildInfo
     const bool                  enableAlphaToCoverage   // whether enalbe AlphaToCoverage
     ) const
 {
     Context* pContext = AcquireContext();
-    const TargetInfo& targetInfo = pContext->GetBuilderContext()->GetTargetInfo();
-    ExportFormat exportFormat = FragColorExport::ConvertColorBufferFormatToExportFormat(
-            pTarget,
-            targetInfo.GetGfxIpVersion(),
-            &targetInfo.GetGpuWorkarounds(),
-            pTarget->channelWriteMask,
-            enableAlphaToCoverage);
+    std::unique_ptr<Pipeline> pipeline(pContext->GetBuilderContext()->CreatePipeline());
+    ColorExportFormat format = {};
+    ColorExportState state = {};
+    std::tie(format.dfmt, format.nfmt) = PipelineContext::MapVkFormat(pTarget->format, true);
+    format.blendEnable = pTarget->blendEnable;
+    format.blendSrcAlphaToColor = pTarget->blendSrcAlphaToColor;
+    state.alphaToCoverageEnable = enableAlphaToCoverage;
+    pipeline->SetColorExportState(format, state);
+
+    Type* pOutputTy = VectorType::get(Type::getFloatTy(*pContext), countPopulation(pTarget->channelWriteMask));
+    uint32_t exportFormat = pipeline->ComputeExportFormat(pOutputTy, 0);
+
+    pipeline.reset(nullptr);
     ReleaseContext(pContext);
 
-    return static_cast<uint32_t>(exportFormat);
+    return exportFormat;
 }
 
 // =====================================================================================================================

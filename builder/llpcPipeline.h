@@ -196,6 +196,15 @@ enum BufDataFormat
     BufDataFormat64_64,
     BufDataFormat64_64_64,
     BufDataFormat64_64_64_64,
+    BufDataFormat4_4,
+    BufDataFormat4_4_4_4,
+    BufDataFormat4_4_4_4_Bgra,
+    BufDataFormat5_6_5,
+    BufDataFormat5_6_5_Bgr,
+    BufDataFormat5_6_5_1,
+    BufDataFormat5_6_5_1_Bgra,
+    BufDataFormat1_5_6_5,
+    BufDataFormat5_9_9_9,
 };
 
 // Numeric format of vertex buffer entry. These match the GFX9 hardware encoding.
@@ -209,6 +218,9 @@ enum BufNumFormat
     BufNumFormatSint                         = 5,
     BufNumFormatSnorm_Ogl                    = 6,
     BufNumFormatFloat                        = 7,
+    // Extra formats not in GFX9 hardware encoding:
+    BufNumFormatSrgb,
+    BufNumFormatOther,
 };
 
 // Rate of vertex input. This encodes both the "rate" (none/vertex/instance), and, for "instance",
@@ -232,6 +244,23 @@ struct VertexInputDescription
     BufDataFormat   dfmt;           // Data format of input; one of the BufDataFormat* values
     BufNumFormat    nfmt;           // Numeric format of input; one of the BufNumFormat* values
     uint32_t        inputRate;      // Vertex input rate for the binding
+};
+
+// A single color export format.
+struct ColorExportFormat
+{
+    BufDataFormat dfmt;                 // Data format
+    BufNumFormat  nfmt;                 // Numeric format
+    uint32_t      blendEnable;          // Blend will be enabled for this target at draw time
+    uint32_t      blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target
+                                        //  at draw time
+};
+
+// Struct to pass to SetColorExportState
+struct ColorExportState
+{
+    uint32_t alphaToCoverageEnable;          // Enable alpha to coverage
+    uint32_t dualSourceBlendEnable;          // Blend state bound at draw time will use a dual source blend mode
 };
 
 // Struct to pass to SetInputAssemblyState.
@@ -467,6 +496,13 @@ public:
     // vertex shader must have a corresponding description provided here.
     virtual void SetVertexInputDescriptions(ArrayRef<VertexInputDescription> inputs) = 0;
 
+    // Set color export state.
+    // The client should always zero-initialize the ColorExportState struct before setting it up, in case future
+    // versions add more fields. A local struct variable can be zero-initialized with " = {}".
+    virtual void SetColorExportState(
+        ArrayRef<ColorExportFormat> formats,          // Array of ColorExportFormat structs
+        const ColorExportState&     exportState) = 0; // [in] Color export flags
+
     // Set graphics state (input-assembly, viewport, rasterizer).
     // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.
     virtual void SetGraphicsState(const InputAssemblyState& iaState,
@@ -506,6 +542,14 @@ public:
         raw_pwrite_stream&        outStream,            // [in/out] Stream to write ELF or IR disassembly output
         CheckShaderCacheFunc      checkShaderCacheFunc, // Function to check shader cache in graphics pipeline
         ArrayRef<Timer*>          timers) = 0;          // Timers for: patch passes, llvm optimizations, codegen
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Non-compiling methods
+
+    // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
+    // type. Only the number of elements of the type is significant.
+    // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
+    virtual uint32_t ComputeExportFormat(Type* pOutputTy, uint32_t location) = 0;
 
 private:
     BuilderContext*                 m_pBuilderContext;                  // Builder context
