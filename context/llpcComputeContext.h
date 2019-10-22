@@ -65,9 +65,6 @@ public:
     // Does user data node merging for all shader stages
     virtual void DoUserDataNodeMerge() { }
 
-    // Gets the count of vertices per primitive
-    virtual uint32_t GetVerticesPerPrimitive() const { LLPC_NEVER_CALLED(); return 0; }
-
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 

@@ -483,12 +483,11 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
     SET_REG(&pConfig->m_vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+    uint8_t usrClipPlaneMask = m_pPipelineState->GetRasterizerState().usrClipPlaneMask;
+    bool depthClipDisable = (m_pPipelineState->GetViewportState().depthClipEnable == false);
+    bool rasterizerDiscardEnable = m_pPipelineState->GetRasterizerState().rasterizerDiscardEnable;
+    bool disableVertexReuse = m_pPipelineState->GetInputAssemblyState().disableVertexReuse;
 
-    uint8_t usrClipPlaneMask = pPipelineInfo->rsState.usrClipPlaneMask;
-    bool depthClipDisable = (pPipelineInfo->vpState.depthClipEnable == false);
-    bool rasterizerDiscardEnable = pPipelineInfo->rsState.rasterizerDiscardEnable;
-    bool disableVertexReuse = pPipelineInfo->iaState.disableVertexReuse;
     SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_0, (usrClipPlaneMask >> 0) & 0x1);
     SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_1, (usrClipPlaneMask >> 1) & 0x1);
     SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_2, (usrClipPlaneMask >> 2) & 0x1);
@@ -611,7 +610,7 @@ Result ConfigBuilder::BuildVsRegConfig(
 
     SET_REG_FIELD(&pConfig->m_vsRegs, VGT_VERTEX_REUSE_BLOCK_CNTL, VTX_REUSE_DEPTH, 14);
 
-    useLayer = useLayer || pPipelineInfo->iaState.enableMultiView;
+    useLayer = useLayer || m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
     if (usePointSize || useLayer || useViewportIndex)
     {
@@ -716,8 +715,10 @@ Result ConfigBuilder::BuildHsRegConfig(
 
     // Set VGT_LS_HS_CONFIG
     SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, NUM_PATCHES, calcFactor.patchCountPerThreadGroup);
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-    SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, HS_NUM_INPUT_CP, pPipelineInfo->iaState.patchControlPoints);
+    SET_REG_FIELD(&pConfig->m_hsRegs,
+                  VGT_LS_HS_CONFIG,
+                  HS_NUM_INPUT_CP,
+                  m_pPipelineState->GetInputAssemblyState().patchControlPoints);
 
     auto hsNumOutputCp = tessMode.outputVertices;
     SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, HS_NUM_OUTPUT_CP, hsNumOutputCp);
@@ -1346,12 +1347,7 @@ Result ConfigBuilder::BuildUserDataConfig(
 {
     Result result = Result::Success;
 
-    bool enableMultiView = false;
-    if (m_pContext->IsGraphics())
-    {
-        enableMultiView = static_cast<const GraphicsPipelineBuildInfo*>(
-            m_pContext->GetPipelineBuildInfo())->iaState.enableMultiView;
-    }
+    bool enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
     const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
@@ -1537,8 +1533,7 @@ void ConfigBuilder::SetupVgtTfParam(
         topology = OUTPUT_TRIANGLE_CCW;
     }
 
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-    if (pPipelineInfo->iaState.switchWinding)
+    if (m_pPipelineState->GetInputAssemblyState().switchWinding)
     {
         if (topology == OUTPUT_TRIANGLE_CW)
         {

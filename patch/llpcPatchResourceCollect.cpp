@@ -248,18 +248,17 @@ void PatchResourceCollect::SetNggControl()
         if (nggControl.passthroughMode == false)
         {
             // NOTE: Further check if pass-through mode should be enabled
-            auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            const auto topology = pPipelineInfo->iaState.topology;
-            if ((topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ||
-                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST)  ||
-                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP) ||
-                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY) ||
-                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY))
+            const auto topology = m_pPipelineState->GetInputAssemblyState().topology;
+            if ((topology == PrimitiveTopology::PointList) ||
+                (topology == PrimitiveTopology::LineList)  ||
+                (topology == PrimitiveTopology::LineStrip) ||
+                (topology == PrimitiveTopology::LineListWithAdjacency) ||
+                (topology == PrimitiveTopology::LineStripWithAdjacency))
             {
                 // NGG runs in pass-through mode for non-triangle primitives
                 nggControl.passthroughMode = true;
             }
-            else if (topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST)
+            else if (topology == PrimitiveTopology::PatchList)
             {
                 // NGG runs in pass-through mode for non-triangle tessellation output
                 LLPC_ASSERT(hasTs);
@@ -271,8 +270,8 @@ void PatchResourceCollect::SetNggControl()
                 }
             }
 
-            const auto polygonMode = pPipelineInfo->rsState.polygonMode;
-            if ((polygonMode == VK_POLYGON_MODE_LINE) || (polygonMode == VK_POLYGON_MODE_POINT))
+            const auto polygonMode = m_pPipelineState->GetRasterizerState().polygonMode;
+            if ((polygonMode == PolygonModeLine) || (polygonMode == PolygonModePoint))
             {
                 // NGG runs in pass-through mode for non-fill polygon mode
                 nggControl.passthroughMode = true;
@@ -360,9 +359,8 @@ void PatchResourceCollect::SetNggControl()
 void PatchResourceCollect::BuildNggCullingControlRegister(
     NggControl& nggControl)   // [in/out] NggControl struct
 {
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-    const auto& vpState = pPipelineInfo->vpState;
-    const auto& rsState = pPipelineInfo->rsState;
+    const auto& vpState = m_pPipelineState->GetViewportState();
+    const auto& rsState = m_pPipelineState->GetRasterizerState();
 
     auto& pipelineState = nggControl.primShaderTable.pipelineStateCb;
 
@@ -376,19 +374,19 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
     paSuScModeCntl.bits.POLY_OFFSET_BACK_ENABLE  = rsState.depthBiasEnable;
     paSuScModeCntl.bits.MULTI_PRIM_IB_ENA        = true;
 
-    paSuScModeCntl.bits.POLY_MODE            = (rsState.polygonMode != VK_POLYGON_MODE_FILL);
+    paSuScModeCntl.bits.POLY_MODE            = (rsState.polygonMode != PolygonModeFill);
 
-    if (rsState.polygonMode == VK_POLYGON_MODE_FILL)
+    if (rsState.polygonMode == PolygonModeFill)
     {
         paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_TRIANGLES;
         paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_TRIANGLES;
     }
-    else if (rsState.polygonMode == VK_POLYGON_MODE_LINE)
+    else if (rsState.polygonMode == PolygonModeLine)
     {
         paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_LINES;
         paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_LINES;
     }
-    else if (rsState.polygonMode == VK_POLYGON_MODE_POINT)
+    else if (rsState.polygonMode == PolygonModePoint)
     {
         paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_POINTS;
         paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_POINTS;
@@ -398,12 +396,10 @@ void PatchResourceCollect::BuildNggCullingControlRegister(
         LLPC_NEVER_CALLED();
     }
 
-    paSuScModeCntl.bits.CULL_FRONT = ((rsState.cullMode == VK_CULL_MODE_FRONT_BIT) ||
-                                      (rsState.cullMode == VK_CULL_MODE_FRONT_AND_BACK));
-    paSuScModeCntl.bits.CULL_BACK  = ((rsState.cullMode == VK_CULL_MODE_BACK_BIT) ||
-                                      (rsState.cullMode == VK_CULL_MODE_FRONT_AND_BACK));
+    paSuScModeCntl.bits.CULL_FRONT = ((rsState.cullMode & CullModeFront) != 0);
+    paSuScModeCntl.bits.CULL_BACK  = ((rsState.cullMode & CullModeBack) != 0);
 
-    paSuScModeCntl.bits.FACE = rsState.frontFace;
+    paSuScModeCntl.bits.FACE = rsState.frontFaceClockwise;
 
     pipelineState.paSuScModeCntl = paSuScModeCntl.u32All;
 
@@ -664,7 +660,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 primAmpFactor = geometryMode.outputVertices - (outVertsPerPrim - 1);
             }
 
-            const uint32_t vertsPerPrimitive = m_pContext->GetVerticesPerPrimitive();
+            const uint32_t vertsPerPrimitive = GetVerticesPerPrimitive();
 
             const bool needsLds = (hasGs ||
                                    (pNggControl->passthroughMode == false) ||
@@ -1101,6 +1097,55 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 }
 
 // =====================================================================================================================
+// Gets the count of vertices per primitive
+uint32_t PatchResourceCollect::GetVerticesPerPrimitive() const
+{
+    uint32_t vertsPerPrim = 1;
+
+    switch (m_pPipelineState->GetInputAssemblyState().topology)
+    {
+    case PrimitiveTopology::PointList:
+        vertsPerPrim = 1;
+        break;
+    case PrimitiveTopology::LineList:
+        vertsPerPrim = 2;
+        break;
+    case PrimitiveTopology::LineStrip:
+        vertsPerPrim = 2;
+        break;
+    case PrimitiveTopology::TriangleList:
+        vertsPerPrim = 3;
+        break;
+    case PrimitiveTopology::TriangleStrip:
+        vertsPerPrim = 3;
+        break;
+    case PrimitiveTopology::TriangleFan:
+        vertsPerPrim = 3;
+        break;
+    case PrimitiveTopology::LineListWithAdjacency:
+        vertsPerPrim = 4;
+        break;
+    case PrimitiveTopology::LineStripWithAdjacency:
+        vertsPerPrim = 4;
+        break;
+    case PrimitiveTopology::TriangleListWithAdjacency:
+        vertsPerPrim = 6;
+        break;
+    case PrimitiveTopology::TriangleStripWithAdjacency:
+        vertsPerPrim = 6;
+        break;
+    case PrimitiveTopology::PatchList:
+        vertsPerPrim = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    return vertsPerPrim;
+}
+
+// =====================================================================================================================
 // Process a single shader
 void PatchResourceCollect::ProcessShader()
 {
@@ -1133,9 +1178,7 @@ void PatchResourceCollect::ProcessShader()
             m_pResUsage->builtInUsage.fs.pointCoord ||
             m_pResUsage->builtInUsage.fs.sampleMaskIn)
         {
-            const GraphicsPipelineBuildInfo* pPipelineInfo =
-                reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-            if (pPipelineInfo->rsState.perSampleShading)
+            if (m_pPipelineState->GetRasterizerState().perSampleShading)
             {
                 m_pResUsage->builtInUsage.fs.runAtSampleRate = true;
             }
@@ -1188,8 +1231,7 @@ bool PatchResourceCollect::IsVertexReuseDisabled()
                         m_pPipelineState->HasShaderStage(ShaderStageTessEval));
     const bool hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
 
-    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-    bool disableVertexReuse = pPipelineInfo->iaState.disableVertexReuse;
+    bool disableVertexReuse = m_pPipelineState->GetInputAssemblyState().disableVertexReuse;
 
     bool useViewportIndex = false;
     if (hasGs)

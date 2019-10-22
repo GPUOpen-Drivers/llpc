@@ -76,6 +76,7 @@ private:
     // Sets NGG control settings
     void SetNggControl();
     void BuildNggCullingControlRegister(NggControl& nggControl);
+    uint32_t GetVerticesPerPrimitive() const;
 
     void ProcessShader();
 

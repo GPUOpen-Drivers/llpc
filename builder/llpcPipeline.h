@@ -50,7 +50,7 @@ using namespace llvm;
 class BuilderContext;
 
 // =====================================================================================================================
-// Structs for setting pipeline state
+// Per-pipeline and per-shader options for setting in pipeline state
 
 // Bit values of NGG flags. This is done as bit values rather than bitfields so the flags word appears
 // in a platform-independent way in IR metdata.
@@ -143,6 +143,80 @@ struct ShaderOptions
 
     /// Default unroll threshold for LLVM.
     uint32_t  unrollThreshold;
+};
+
+// =====================================================================================================================
+// Structs for setting pipeline state.
+// The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+
+// Primitive topology. These happen to have the same values as the corresponding Vulkan enum.
+enum class PrimitiveTopology : uint32_t
+{
+    PointList = 0,
+    LineList = 1,
+    LineStrip = 2,
+    TriangleList = 3,
+    TriangleStrip = 4,
+    TriangleFan = 5,
+    LineListWithAdjacency = 6,
+    LineStripWithAdjacency = 7,
+    TriangleListWithAdjacency = 8,
+    TriangleStripWithAdjacency = 9,
+    PatchList = 10,
+};
+
+// Struct to pass to SetInputAssemblyState.
+struct InputAssemblyState
+{
+    PrimitiveTopology topology;           // Primitive topology
+    uint32_t          patchControlPoints; // Number of control points for PrimitiveTopology::PatchList
+    uint32_t          disableVertexReuse; // Disable reusing vertex shader output for indexed draws
+    uint32_t          switchWinding;      // Whether to reverse vertex ordering for tessellation
+    uint32_t          enableMultiView;    // Whether to enable multi-view support
+};
+
+// Struct to pass to SetViewportState.
+struct ViewportState
+{
+    uint32_t          depthClipEnable;    // Enable clipping based on Z coordinate
+};
+
+// Polygon mode. These happen to have the same values as the corresponding Vulkan enum.
+enum PolygonMode : uint32_t
+{
+    PolygonModeFill = 0,
+    PolygonModeLine = 1,
+    PolygonModePoint = 2,
+};
+
+// Fragment cull mode flags. These happen to have the same values as the corresponding Vulkan enum.
+enum CullModeFlags : uint32_t
+{
+    CullModeNone = 0,
+    CullModeFront = 1,
+    CullModeBack = 2,
+    CullModeFrontAndBack = 3,
+};
+
+// Struct to pass to SetRasterizerState
+struct RasterizerState
+{
+    uint32_t      rasterizerDiscardEnable;  // Kill all rasterized pixels. This is implicitly true if stream out
+                                            //  is enabled and no streams are rasterized
+    uint32_t      innerCoverage;            // Related to conservative rasterization.  Must be false if
+                                            //  conservative rasterization is disabled.
+    uint32_t      perSampleShading;         // Enable per sample shading
+    uint32_t      numSamples;               // Number of coverage samples used when rendering with this pipeline
+    uint32_t      samplePatternIdx;         // Index into the currently bound MSAA sample pattern table that
+                                            //  matches the sample pattern used by the rasterizer when rendering
+                                            //  with this pipeline.
+    uint32_t      usrClipPlaneMask;         // Mask to indicate the enabled user defined clip planes
+    PolygonMode   polygonMode;              // Polygon mode
+    CullModeFlags cullMode;                 // Fragment culling mode
+    uint32_t      frontFaceClockwise;       // Front-facing triangle orientation: false=counter, true=clockwise
+    uint32_t      depthBiasEnable;          // Whether to bias fragment depth values
 };
 
 // =====================================================================================================================
@@ -318,6 +392,15 @@ public:
     virtual void SetUserDataNodes(
         ArrayRef<ResourceMappingNode>   nodes,            // The resource mapping nodes
         ArrayRef<DescriptorRangeValue>  rangeValues) = 0; // The descriptor range values
+
+    // Set device index.
+    virtual void SetDeviceIndex(uint32_t deviceIndex) = 0;
+
+    // Set graphics state (input-assembly, viewport, rasterizer).
+    // The front-end should zero-initialize each struct with "= {}" in case future changes add new fields.
+    virtual void SetGraphicsState(const InputAssemblyState& iaState,
+                                  const ViewportState&      vpState,
+                                  const RasterizerState&    rsState) = 0;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Link and generate pipeline methods

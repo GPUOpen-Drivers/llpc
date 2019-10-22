@@ -126,6 +126,14 @@ public:
     // Set per-shader options
     void SetShaderOptions(ShaderStage stage, const ShaderOptions& options) override final;
 
+    // Set device index
+    void SetDeviceIndex(uint32_t deviceIndex) override final { m_deviceIndex = deviceIndex; }
+
+    // Set graphics state (input-assembly, viewport, rasterizer).
+    void SetGraphicsState(const InputAssemblyState& iaState,
+                          const ViewportState&      vpState,
+                          const RasterizerState&    rsState) override final;
+
     // Link the individual shader modules into a single pipeline module
     Module* Link(ArrayRef<Module*> modules) override final;
 
@@ -170,6 +178,12 @@ public:
     // Set "no replayer" flag, saying that this pipeline is being compiled with a BuilderImpl so does not
     // need a BuilderReplayer pass.
     void SetNoReplayer() { m_noReplayer = true; }
+
+    // Accessors for pipeline state
+    uint32_t GetDeviceIndex() const { return m_deviceIndex; }
+    const InputAssemblyState& GetInputAssemblyState() const { return m_inputAssemblyState; }
+    const ViewportState& GetViewportState() const { return m_viewportState; }
+    const RasterizerState& GetRasterizerState() const { return m_rasterizerState; }
 
     // Determine whether to use off-chip tessellation mode
     bool IsTessOffChip();
@@ -307,6 +321,14 @@ private:
     MDString* GetResourceTypeName(ResourceMappingNodeType type);
     ResourceMappingNodeType GetResourceTypeFromName(MDString* pTypeName);
 
+    // Device index handling
+    void RecordDeviceIndex(Module* pModule);
+    void ReadDeviceIndex(Module* pModule);
+
+    // Graphics state (iastate, vpstate, rsstate) handling
+    void RecordGraphicsState(Module* pModule);
+    void ReadGraphicsState(Module* pModule);
+
     // -----------------------------------------------------------------------------------------------------------------
     bool                            m_noReplayer = false;               // True if no BuilderReplayer needed
     uint32_t                        m_stageMask = 0;                    // Mask of active shader stages
@@ -322,6 +344,10 @@ private:
     NggControl                      m_nggControl = {};                  // NGG control settings
 #endif
     ShaderModes                     m_shaderModes;                      // Shader modes for this pipeline
+    uint32_t                        m_deviceIndex = 0;                  // Device index
+    InputAssemblyState              m_inputAssemblyState = {};          // Input-assembly state
+    ViewportState                   m_viewportState = {};               // Viewport state
+    RasterizerState                 m_rasterizerState = {};             // Rasterizer state
 };
 
 // =====================================================================================================================

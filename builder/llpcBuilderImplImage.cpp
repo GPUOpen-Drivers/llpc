@@ -2391,9 +2391,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
     bool useViewIndex = false;
     if (flags & ImageFlagCheckMultiView)
     {
-        auto enableMultiView = reinterpret_cast<const GraphicsPipelineBuildInfo *>(
-                               getContext().GetPipelineBuildInfo())->iaState.enableMultiView;
-        if (enableMultiView)
+        if (GetPipelineState()->GetInputAssemblyState().enableMultiView)
         {
             useViewIndex = true;
             dim = Dim2DArray;

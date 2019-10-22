@@ -33,6 +33,7 @@
 #include "llvm/Support/Format.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
@@ -366,55 +367,6 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
         nodes = nodes.slice(duplicatesCount);
     }
     return mergedNodes;
-}
-
-// =====================================================================================================================
-// Gets the count of vertices per primitive
-uint32_t GraphicsContext::GetVerticesPerPrimitive() const
-{
-    uint32_t vertsPerPrim = 1;
-
-    switch (m_pPipelineInfo->iaState.topology)
-    {
-    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
-        vertsPerPrim = 1;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
-        vertsPerPrim = 2;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
-        vertsPerPrim = 2;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
-        vertsPerPrim = 3;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
-        vertsPerPrim = 3;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
-        vertsPerPrim = 3;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
-        vertsPerPrim = 4;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
-        vertsPerPrim = 4;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
-        vertsPerPrim = 6;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
-        vertsPerPrim = 6;
-        break;
-    case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
-        vertsPerPrim = m_pPipelineInfo->iaState.patchControlPoints;
-        break;
-    default:
-        LLPC_NEVER_CALLED();
-        break;
-    }
-
-    return vertsPerPrim;
 }
 
 } // Llpc

@@ -420,8 +420,7 @@ void PatchCopyShader::ExportOutput(
         builtInPairs.push_back(std::make_pair(BuiltInPrimitiveId, builder.getInt32Ty()));
     }
 
-    const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
-        m_pContext->GetPipelineBuildInfo()))->iaState.enableMultiView;
+    const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
     if (builtInUsage.layer || enableMultiView)
     {
         // NOTE: If mult-view is enabled, always export gl_ViewIndex rather than gl_Layer.

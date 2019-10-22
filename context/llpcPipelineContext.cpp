@@ -305,6 +305,16 @@ void PipelineContext::SetPipelineState(
 
     // Give the user data nodes to the middle-end.
     SetUserDataInPipeline(pPipeline);
+
+    if (IsGraphics())
+    {
+        // Give the graphics pipeline state to the middle-end.
+        SetGraphicsStateInPipeline(pPipeline);
+    }
+    else
+    {
+        pPipeline->SetDeviceIndex(static_cast<const ComputePipelineBuildInfo*>(GetPipelineBuildInfo())->deviceIndex);
+    }
 }
 
 // =====================================================================================================================
@@ -467,6 +477,44 @@ void PipelineContext::SetUserDataInPipeline(
     ArrayRef<DescriptorRangeValue> descriptorRangeValues(pShaderInfo->pDescriptorRangeValues,
                                                          pShaderInfo->descriptorRangeValueCount);
     pPipeline->SetUserDataNodes(userDataNodes, descriptorRangeValues);
+}
+
+// =====================================================================================================================
+// Give the graphics pipeline state to the middle-end.
+void PipelineContext::SetGraphicsStateInPipeline(
+    Pipeline*    pPipeline   // [in/out] Middle-end pipeline object
+) const
+{
+    const auto& inputIaState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->iaState;
+    pPipeline->SetDeviceIndex(inputIaState.deviceIndex);
+
+    InputAssemblyState inputAssemblyState = {};
+    // PrimitiveTopology happens to have the same values as the corresponding Vulkan enum.
+    inputAssemblyState.topology = static_cast<PrimitiveTopology>(inputIaState.topology);
+    inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
+    inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
+    inputAssemblyState.switchWinding = inputIaState.switchWinding;
+    inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
+
+    const auto& inputVpState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->vpState;
+    ViewportState viewportState = {};
+    viewportState.depthClipEnable = inputVpState.depthClipEnable;
+
+    const auto& inputRsState = static_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo())->rsState;
+    RasterizerState rasterizerState = {};
+    rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
+    rasterizerState.innerCoverage = inputRsState.innerCoverage;
+    rasterizerState.perSampleShading = inputRsState.perSampleShading;
+    rasterizerState.numSamples = inputRsState.numSamples;
+    rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
+    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
+    // PolygonMode and CullModeFlags happen to have the same values as their Vulkan equivalents.
+    rasterizerState.polygonMode = static_cast<PolygonMode>(inputRsState.polygonMode);
+    rasterizerState.cullMode = static_cast<CullModeFlags>(inputRsState.cullMode);
+    rasterizerState.frontFaceClockwise = (inputRsState.frontFace != VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    rasterizerState.depthBiasEnable = inputRsState.depthBiasEnable;
+
+    pPipeline->SetGraphicsState(inputAssemblyState, viewportState, rasterizerState);
 }
 
 } // Llpc
