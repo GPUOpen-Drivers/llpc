@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llpcBuilder.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 
@@ -43,7 +44,6 @@ class ShaderSystemValues;
 // Represents vertex format info corresponding to vertex attribute format (VkFormat).
 struct VertexFormatInfo
 {
-    VkFormat        format;         // Vertex attribute format
     BufNumFormat    nfmt;           // Numeric format of vertex buffer
     BufDataFormat   dfmt;           // Data format of vertex buffer
     uint32_t        numChannels;    // Valid number of channels
@@ -59,7 +59,7 @@ struct VertexCompFormatInfo
     uint32_t        vertexByteSize; // Byte size of the vertex
     uint32_t        compByteSize;   // Byte size of each individual component
     uint32_t        compCount;      // Component count
-    BufDataFormat   compDfmt;       // Equivalent data format of each component
+    BufDataFmt      compDfmt;       // Equivalent data format of each component
 };
 
 // =====================================================================================================================
@@ -69,7 +69,7 @@ class VertexFetch
 public:
     VertexFetch(llvm::Function* pEntrypoint, ShaderSystemValues* pShaderSysValues, PipelineState* pPipelineState);
 
-    static const VertexFormatInfo* GetVertexFormatInfo(VkFormat format);
+    static VertexFormatInfo GetVertexFormatInfo(const VertexInputDescription* pDescription);
 
     llvm::Value* Run(llvm::Type* pInputTy, uint32_t location, uint32_t compIdx, llvm::Instruction* pInsertPos);
 
@@ -89,11 +89,6 @@ private:
 
     llvm::Value* LoadVertexBufferDescriptor(uint32_t binding, llvm::Instruction* pInsertPos) const;
 
-    void ExtractVertexInputInfo(uint32_t                                          location,
-                                const VkVertexInputBindingDescription**           ppBinding,
-                                const VkVertexInputAttributeDescription**         ppAttrib,
-                                const VkVertexInputBindingDivisorDescriptionEXT** ppDivisor) const;
-
     void AddVertexFetchInst(llvm::Value*       pVbDesc,
                             uint32_t           numChannels,
                             bool               is16bitFetch,
@@ -105,11 +100,12 @@ private:
                             llvm::Instruction* pInsertPos,
                             llvm::Value**      ppFetch) const;
 
-    bool NeedPostShuffle(VkFormat format, std::vector<llvm::Constant*>& shuffleMask) const;
+    bool NeedPostShuffle(const VertexInputDescription* pInputDesc,
+                         std::vector<llvm::Constant*>&          shuffleMask) const;
 
-    bool NeedPatchA2S(VkFormat format) const;
+    bool NeedPatchA2S(const VertexInputDescription* pInputDesc) const;
 
-    bool NeedSecondVertexFetch(VkFormat format) const;
+    bool NeedSecondVertexFetch(const VertexInputDescription* pInputDesc) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -118,15 +114,11 @@ private:
     ShaderSystemValues* m_pShaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
     PipelineState*      m_pPipelineState;   // Pipeline state
 
-    const VkPipelineVertexInputStateCreateInfo*   m_pVertexInput; // Vertex input info
-    const VkPipelineVertexInputDivisorStateCreateInfoEXT* m_pVertexDivisor; // Vertex input divisor info
-
     llvm::Value*    m_pVertexIndex;     // Vertex index
     llvm::Value*    m_pInstanceIndex;   // Instance index
     llvm::Value*    m_pBaseInstance;    // Base instance
     llvm::Value*    m_pInstanceId;      // Instance ID
 
-    static const VertexFormatInfo       m_vertexFormatInfo[];       // Info table of vertex format
     static const VertexCompFormatInfo   m_vertexCompFormatInfo[];   // Info table of vertex component format
 #if LLPC_BUILD_GFX10
     static const BufFormat              m_vertexFormatMap[];        // Info table of vertex format mapping

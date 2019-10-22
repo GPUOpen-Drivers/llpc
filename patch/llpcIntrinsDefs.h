@@ -165,7 +165,7 @@ enum InterpParam
 };
 
 // Enumerates data format of data in memory buffer.
-enum BufDataFormat
+enum BufDataFmt
 {
     BUF_DATA_FORMAT_INVALID                     = 0,            // Invalid
     BUF_DATA_FORMAT_8                           = 1,            // 8
@@ -185,7 +185,7 @@ enum BufDataFormat
 };
 
 // Enumerates numeric format of data in memory buffer.
-enum BufNumFormat
+enum BufNumFmt
 {
     BUF_NUM_FORMAT_UNORM                        = 0,            // Unorm
     BUF_NUM_FORMAT_SNORM                        = 1,            // Snorm

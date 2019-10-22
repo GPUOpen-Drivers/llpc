@@ -45,6 +45,7 @@
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcMetroHash.h"
+#include "llpcPipeline.h"
 
 namespace Llpc
 {
@@ -737,6 +738,10 @@ public:
     // Get ShaderFpMode struct for the given shader stage
     ShaderFpMode& GetShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
 
+    // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the
+    // VkFormat is not supported.
+    static std::pair<BufDataFormat, BufNumFormat> MapVkFormat(VkFormat format);
+
 protected:
     // Gets dummy vertex input create info
     virtual VkPipelineVertexInputStateCreateInfo* GetDummyVertexInputInfo() { return nullptr; }
@@ -765,6 +770,9 @@ private:
 
     // Give the graphics pipeline state to the middle-end.
     void SetGraphicsStateInPipeline(Pipeline* pPipeline) const;
+
+    // Set vertex input descriptions in middle-end Pipeline
+    void SetVertexInputDescriptions(Pipeline* pPipeline) const;
 
     // -----------------------------------------------------------------------------------------------------------------
 
