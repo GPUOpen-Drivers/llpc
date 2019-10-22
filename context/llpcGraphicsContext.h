@@ -110,6 +110,10 @@ public:
     // Set pipeline state in Builder
     virtual void SetBuilderPipelineState(Builder* pBuilder) const;
 
+    // Map a VkFormat to a {Builder::BufDataFormat, Builder::BufNumFormat}. Returns BufDataFormatInvalid if the
+    // VkFormat is not supported.
+    static std::pair<Builder::BufDataFormat, Builder::BufNumFormat> MapVkFormat(VkFormat format);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(GraphicsContext);
@@ -119,6 +123,9 @@ private:
 #if LLPC_BUILD_GFX10
     void BuildNggCullingControlRegister();
 #endif
+
+    // Set vertex input descriptions in Builder
+    void SetVertexInputDescriptions(Builder* pBuilder) const;
 
     // Set input assembly state in builder
     void SetInputAssemblyState(Builder* pBuilder) const;

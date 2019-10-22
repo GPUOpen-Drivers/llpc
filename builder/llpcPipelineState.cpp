@@ -45,6 +45,7 @@ using namespace llvm;
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char* const UserDataMetadataName = "llpc.user.data.nodes";
 static const char* const DeviceIndexMetadataName = "llpc.device.index";
+static const char* const VertexInputsMetadataName = "llpc.vertex.inputs";
 static const char* const IaStateMetadataName = "llpc.input.assembly.state";
 static const char* const VpStateMetadataName = "llpc.viewport.state";
 static const char* const RsStateMetadataName = "llpc.rasterizer.state";
@@ -122,6 +123,7 @@ void PipelineState::Clear(
 {
     m_userDataNodes = {};
     m_deviceIndex = 0;
+    m_vertexInputDescriptions.clear();
     m_inputAssemblyState = {};
     m_viewportState = {};
     m_rasterizerState = {};
@@ -141,6 +143,7 @@ bool PipelineState::Flush(
         m_clientStateDirty = false;
         RecordUserDataNodes(pModule);
         RecordDeviceIndex(pModule);
+        RecordVertexInputDescriptions(pModule);
         RecordInputAssemblyState(pModule);
         RecordViewportState(pModule);
         RecordRasterizerState(pModule);
@@ -156,6 +159,7 @@ void PipelineState::ReadState()
     ReadShaderStageMask();
     ReadUserDataNodes();
     ReadDeviceIndex();
+    ReadVertexInputDescriptions();
     ReadInputAssemblyState();
     ReadViewportState();
     ReadRasterizerState();
@@ -509,6 +513,120 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
+}
+
+// =====================================================================================================================
+// Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
+// vertex shader must have a corresponding description provided here.
+void PipelineState::SetVertexInputDescriptions(
+    ArrayRef<Builder::VertexInputDescription>  inputs)   // Array of vertex input descriptions
+{
+    m_vertexInputDescriptions.clear();
+    m_vertexInputDescriptions.insert(m_vertexInputDescriptions.end(), inputs.begin(), inputs.end());
+    m_clientStateDirty = true;
+}
+
+// =====================================================================================================================
+// Get vertex input descriptions
+ArrayRef<Builder::VertexInputDescription> PipelineState::GetVertexInputDescriptions() const
+{
+    return m_vertexInputDescriptions;
+}
+
+// =====================================================================================================================
+// Find vertex input description for the given location.
+// Returns nullptr if location not found.
+const Builder::VertexInputDescription* PipelineState::FindVertexInputDescription(
+    uint32_t location) const    // Location
+{
+    for (auto& inputDesc : m_vertexInputDescriptions)
+    {
+        if (inputDesc.location == location)
+        {
+            return &inputDesc;
+        }
+    }
+    return nullptr;
+}
+
+// =====================================================================================================================
+// Record vertex input descriptions into IR metadata.
+// Note that this takes a Module* instead of using m_pModule, because it can be called before pipeline linking.
+void PipelineState::RecordVertexInputDescriptions(
+    Module* pModule)    // [in/out] Module to record the IR metadata in
+{
+    if (m_vertexInputDescriptions.empty())
+    {
+        if (auto pVertexInputsMetaNode = pModule->getNamedMetadata(VertexInputsMetadataName))
+        {
+            pModule->eraseNamedMetadata(pVertexInputsMetaNode);
+        }
+        return;
+    }
+
+    auto pVertexInputsMetaNode = pModule->getOrInsertNamedMetadata(VertexInputsMetadataName);
+    IRBuilder<> builder(GetContext());
+    pVertexInputsMetaNode->clearOperands();
+
+    for (const Builder::VertexInputDescription& input : m_vertexInputDescriptions)
+    {
+        uint32_t operandInts[7] = {
+            input.location,
+            input.binding,
+            input.offset,
+            input.stride,
+            static_cast<uint32_t>(input.dfmt),
+            static_cast<uint32_t>(input.nfmt),
+            input.inputRate
+        };
+        SmallVector<Metadata*, 7> operands;
+        for (uint32_t val : ArrayRef<uint32_t>(operandInts))
+        {
+            operands.push_back(ConstantAsMetadata::get(builder.getInt32(val)));
+        }
+
+        // Create the metadata node.
+        pVertexInputsMetaNode->addOperand(MDNode::get(GetContext(), operands));
+    }
+}
+
+// =====================================================================================================================
+// Read vertex input descriptions for the pipeline from IR metadata
+void PipelineState::ReadVertexInputDescriptions()
+{
+    m_vertexInputDescriptions.clear();
+
+    // Find the named metadata node.
+    auto pVertexInputsMetaNode = m_pModule->getNamedMetadata(VertexInputsMetadataName);
+    if (pVertexInputsMetaNode == nullptr)
+    {
+        return;
+    }
+
+    // Read the nodes.
+    uint32_t nodeCount = pVertexInputsMetaNode->getNumOperands();
+    for (uint32_t nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex)
+    {
+        static const uint32_t MaxOperandCount = 7;
+        MDNode* pMetadataNode = pVertexInputsMetaNode->getOperand(nodeIndex);
+        uint32_t operandInts[MaxOperandCount] = {};
+        uint32_t operandCount = std::max(MaxOperandCount, uint32_t(pMetadataNode->getNumOperands()));
+        for (uint32_t operandIndex = 0; operandIndex < operandCount; ++operandIndex)
+        {
+            operandInts[operandIndex] =
+                      mdconst::dyn_extract<ConstantInt>(pMetadataNode->getOperand(operandIndex))->getZExtValue();
+        }
+        m_vertexInputDescriptions.push_back(
+                {
+                    operandInts[0],                                        // location
+                    operandInts[1],                                        // binding
+                    operandInts[2],                                        // offset
+                    operandInts[3],                                        // stride
+                    static_cast<Builder::BufDataFormat>(operandInts[4]),   // dfmt
+                    static_cast<Builder::BufNumFormat>(operandInts[5]),    // nfmt
+                    operandInts[6],                                        // inputRate
+                });
+    }
 }
 
 // =====================================================================================================================

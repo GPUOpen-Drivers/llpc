@@ -130,6 +130,15 @@ void Builder::SetDeviceIndex(
 }
 
 // =====================================================================================================================
+// Set vertex input descriptions. Each location referenced in a call to CreateReadGenericInput in the
+// vertex shader must have a corresponding description provided here.
+void Builder::SetVertexInputDescriptions(
+    ArrayRef<VertexInputDescription>  inputs)   // Array of vertex input descriptions
+{
+    GetPipelineState()->SetVertexInputDescriptions(inputs);
+}
+
+// =====================================================================================================================
 // Set input-assembly state.
 // The client should always zero-initialize the struct before setting it up, in case future versions
 // add more fields. A local struct variable can be zero-initialized with " = {}".

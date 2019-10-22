@@ -162,27 +162,20 @@ void PatchResourceCollect::ProcessShader()
     else if (m_shaderStage == ShaderStageVertex)
     {
         // Collect resource usages from vertex input create info
-        auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
-        auto pVertexInput = pPipelineInfo->pVertexInput;
-
         // TODO: In the future, we might check if the corresponding vertex attribute is active in vertex shader
         // and set the usage based on this info.
-        if (pVertexInput != nullptr)
+        for (const auto& vertexInput : m_pPipelineState->GetVertexInputDescriptions())
         {
-            for (uint32_t i = 0; i < pVertexInput->vertexBindingDescriptionCount; ++i)
+            if (vertexInput.inputRate == Builder::VertexInputRateVertex)
             {
-                auto pBinding = &pVertexInput->pVertexBindingDescriptions[i];
-                if (pBinding->inputRate == VK_VERTEX_INPUT_RATE_VERTEX)
-                {
-                    m_pResUsage->builtInUsage.vs.vertexIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseVertex = true;
-                }
-                else
-                {
-                    //LLPC_ASSERT(pBinding->inputRate == VK_VERTEX_INPUT_RATE_INSTANCE);
-                    m_pResUsage->builtInUsage.vs.instanceIndex = true;
-                    m_pResUsage->builtInUsage.vs.baseInstance = true;
-                }
+                m_pResUsage->builtInUsage.vs.vertexIndex = true;
+                m_pResUsage->builtInUsage.vs.baseVertex = true;
+            }
+            else
+            {
+                // TODO: We probably don't need instanceIndex for VertexInputRateNone.
+                m_pResUsage->builtInUsage.vs.instanceIndex = true;
+                m_pResUsage->builtInUsage.vs.baseInstance = true;
             }
         }
     }

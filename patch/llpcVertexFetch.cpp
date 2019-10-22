@@ -53,821 +53,6 @@ namespace Llpc
     0, \
 }
 
-// Initializes info table of vertex format map
-const VertexFormatInfo VertexFetch::m_vertexFormatInfo[] =
-{
-    // VK_FORMAT_UNDEFINED = 0
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_UNDEFINED),
-    // VK_FORMAT_R4G4_UNORM_PACK8 = 1
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R4G4_UNORM_PACK8),
-    // VK_FORMAT_R4G4B4A4_UNORM_PACK16 = 2
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R4G4B4A4_UNORM_PACK16),
-    // VK_FORMAT_B4G4R4A4_UNORM_PACK16 = 3
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B4G4R4A4_UNORM_PACK16),
-    // VK_FORMAT_R5G6B5_UNORM_PACK16 = 4
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R5G6B5_UNORM_PACK16),
-    // VK_FORMAT_B5G6R5_UNORM_PACK16 = 5
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B5G6R5_UNORM_PACK16),
-    // VK_FORMAT_R5G5B5A1_UNORM_PACK16 = 6
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R5G5B5A1_UNORM_PACK16),
-    // VK_FORMAT_B5G5R5A1_UNORM_PACK16 = 7
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B5G5R5A1_UNORM_PACK16),
-    // VK_FORMAT_A1R5G5B5_UNORM_PACK16 = 8
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_A1R5G5B5_UNORM_PACK16),
-    // VK_FORMAT_R8_UNORM = 9
-    {
-        VK_FORMAT_R8_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8,
-        1
-    },
-    // VK_FORMAT_R8_SNORM = 10
-    {
-        VK_FORMAT_R8_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_8,
-        1
-    },
-    // VK_FORMAT_R8_USCALED = 11
-    {
-        VK_FORMAT_R8_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_8,
-        1
-    },
-    // VK_FORMAT_R8_SSCALED = 12
-    {
-        VK_FORMAT_R8_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_8,
-        1
-    },
-    // VK_FORMAT_R8_UINT = 13
-    {
-        VK_FORMAT_R8_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_8,
-        1
-    },
-    // VK_FORMAT_R8_SINT = 14
-    {
-        VK_FORMAT_R8_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_8,
-        1
-    },
-    // VK_FORMAT_R8_SRGB = 15
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8_SRGB),
-    // VK_FORMAT_R8G8_UNORM = 16
-    {
-        VK_FORMAT_R8G8_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8,
-        2
-    },
-    // VK_FORMAT_R8G8_SNORM = 17
-    {
-        VK_FORMAT_R8G8_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_8_8,
-        2
-    },
-    // VK_FORMAT_R8G8_USCALED = 18
-    {
-        VK_FORMAT_R8G8_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_8_8,
-        2
-    },
-    // VK_FORMAT_R8G8_SSCALED = 19
-    {
-        VK_FORMAT_R8G8_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_8_8,
-        2
-    },
-    // VK_FORMAT_R8G8_UINT = 20
-    {
-        VK_FORMAT_R8G8_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_8_8,
-        2
-    },
-    // VK_FORMAT_R8G8_SINT = 21
-    {
-        VK_FORMAT_R8G8_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_8_8,
-        2
-    },
-    // VK_FORMAT_R8G8_SRGB = 22
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8_SRGB),
-    // VK_FORMAT_R8G8B8_UNORM = 23
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_UNORM),
-    // VK_FORMAT_R8G8B8_SNORM = 24
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_SNORM),
-    // VK_FORMAT_R8G8B8_USCALED = 25
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_USCALED),
-    // VK_FORMAT_R8G8B8_SSCALED = 26
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_SSCALED),
-    // VK_FORMAT_R8G8B8_UINT = 27
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_UINT),
-    // VK_FORMAT_R8G8B8_SINT = 28
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_SINT),
-    // VK_FORMAT_R8G8B8_SRGB = 29
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8_SRGB),
-    // VK_FORMAT_B8G8R8_UNORM = 30
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_UNORM),
-    // VK_FORMAT_B8G8R8_SNORM = 31
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_SNORM),
-    // VK_FORMAT_B8G8R8_USCALED = 32
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_USCALED),
-    // VK_FORMAT_B8G8R8_SSCALED = 33
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_SSCALED),
-    // VK_FORMAT_B8G8R8_UINT = 34
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_UINT),
-    // VK_FORMAT_B8G8R8_SINT = 35
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_SINT),
-    // VK_FORMAT_B8G8R8_SRGB = 36
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8_SRGB),
-    // VK_FORMAT_R8G8B8A8_UNORM = 37
-    {
-        VK_FORMAT_R8G8B8A8_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_R8G8B8A8_SNORM = 38
-    {
-        VK_FORMAT_R8G8B8A8_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_R8G8B8A8_USCALED = 39
-    {
-        VK_FORMAT_R8G8B8A8_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_R8G8B8A8_SSCALED = 40
-    {
-        VK_FORMAT_R8G8B8A8_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_R8G8B8A8_UINT = 41
-    {
-        VK_FORMAT_R8G8B8A8_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_R8G8B8A8_SINT = 42
-    {
-        VK_FORMAT_R8G8B8A8_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_R8G8B8A8_SRGB = 43
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R8G8B8A8_SRGB),
-    // VK_FORMAT_B8G8R8A8_UNORM = 44
-    {
-        VK_FORMAT_B8G8R8A8_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_B8G8R8A8_SNORM = 45
-    {
-        VK_FORMAT_B8G8R8A8_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_B8G8R8A8_USCALED = 46
-    {
-        VK_FORMAT_B8G8R8A8_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_B8G8R8A8_SSCALED = 47
-    {
-        VK_FORMAT_B8G8R8A8_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_B8G8R8A8_UINT = 48
-    {
-        VK_FORMAT_B8G8R8A8_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_B8G8R8A8_SINT = 49
-    {
-        VK_FORMAT_B8G8R8A8_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_B8G8R8A8_SRGB = 50
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_B8G8R8A8_SRGB),
-    // VK_FORMAT_A8B8G8R8_UNORM_PACK32 = 51
-    {
-        VK_FORMAT_A8B8G8R8_UNORM_PACK32,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_A8B8G8R8_SNORM_PACK32 = 52
-    {
-        VK_FORMAT_A8B8G8R8_SNORM_PACK32,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_A8B8G8R8_USCALED_PACK32 = 53
-    {
-        VK_FORMAT_A8B8G8R8_USCALED_PACK32,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_A8B8G8R8_SSCALED_PACK32 = 54
-    {
-        VK_FORMAT_A8B8G8R8_SSCALED_PACK32,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_A8B8G8R8_UINT_PACK32 = 55
-    {
-        VK_FORMAT_A8B8G8R8_UINT_PACK32,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_A8B8G8R8_SINT_PACK32 = 56
-    {
-        VK_FORMAT_A8B8G8R8_SINT_PACK32,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_8_8_8_8,
-        4
-    },
-    // VK_FORMAT_A8B8G8R8_SRGB_PACK32 = 57
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_A8B8G8R8_SRGB_PACK32),
-    // VK_FORMAT_A2R10G10B10_UNORM_PACK32 = 58
-    {
-        VK_FORMAT_A2R10G10B10_UNORM_PACK32,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2R10G10B10_SNORM_PACK32 = 59
-    {
-        VK_FORMAT_A2R10G10B10_SNORM_PACK32,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2R10G10B10_USCALED_PACK32 = 60
-    {
-        VK_FORMAT_A2R10G10B10_USCALED_PACK32,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2R10G10B10_SSCALED_PACK32 = 61
-    {
-        VK_FORMAT_A2R10G10B10_SSCALED_PACK32,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2R10G10B10_UINT_PACK32 = 62
-    {
-        VK_FORMAT_A2R10G10B10_UINT_PACK32,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2R10G10B10_SINT_PACK32 = 63
-    {
-        VK_FORMAT_A2R10G10B10_SINT_PACK32,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2B10G10R10_UNORM_PACK32 = 64
-    {
-        VK_FORMAT_A2B10G10R10_UNORM_PACK32,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2B10G10R10_SNORM_PACK32 = 65
-    {
-        VK_FORMAT_A2B10G10R10_SNORM_PACK32,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2B10G10R10_USCALED_PACK32 = 66
-    {
-        VK_FORMAT_A2B10G10R10_USCALED_PACK32,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2B10G10R10_SSCALED_PACK32 = 67
-    {
-        VK_FORMAT_A2B10G10R10_SSCALED_PACK32,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2B10G10R10_UINT_PACK32 = 68
-    {
-        VK_FORMAT_A2B10G10R10_UINT_PACK32,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_A2B10G10R10_SINT_PACK32 = 69
-    {
-        VK_FORMAT_A2B10G10R10_SINT_PACK32,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_2_10_10_10,
-        4
-    },
-    // VK_FORMAT_R16_UNORM = 70
-    {
-        VK_FORMAT_R16_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16_SNORM = 71
-    {
-        VK_FORMAT_R16_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16_USCALED = 72
-    {
-        VK_FORMAT_R16_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16_SSCALED = 73
-    {
-        VK_FORMAT_R16_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16_UINT = 74
-    {
-        VK_FORMAT_R16_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16_SINT = 75
-    {
-        VK_FORMAT_R16_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16_SFLOAT = 76
-    {
-        VK_FORMAT_R16_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_16,
-        1
-    },
-    // VK_FORMAT_R16G16_UNORM = 77
-    {
-        VK_FORMAT_R16G16_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16_SNORM = 78
-    {
-        VK_FORMAT_R16G16_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16_USCALED = 79
-    {
-        VK_FORMAT_R16G16_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16_SSCALED = 80
-    {
-        VK_FORMAT_R16G16_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16_UINT = 81
-    {
-        VK_FORMAT_R16G16_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16_SINT = 82
-    {
-        VK_FORMAT_R16G16_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16_SFLOAT = 83
-    {
-        VK_FORMAT_R16G16_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_16_16,
-        2
-    },
-    // VK_FORMAT_R16G16B16_UNORM = 84
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_UNORM),
-    // VK_FORMAT_R16G16B16_SNORM = 85
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_SNORM),
-    // VK_FORMAT_R16G16B16_USCALED = 86
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_USCALED),
-    // VK_FORMAT_R16G16B16_SSCALED = 87
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_SSCALED),
-    // VK_FORMAT_R16G16B16_UINT = 88
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_UINT),
-    // VK_FORMAT_R16G16B16_SINT = 89
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_SINT),
-    // VK_FORMAT_R16G16B16_SFLOAT = 90
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_R16G16B16_SFLOAT),
-    // VK_FORMAT_R16G16B16A16_UNORM = 91
-    {
-        VK_FORMAT_R16G16B16A16_UNORM,
-        BUF_NUM_FORMAT_UNORM,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R16G16B16A16_SNORM = 92
-    {
-        VK_FORMAT_R16G16B16A16_SNORM,
-        BUF_NUM_FORMAT_SNORM,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R16G16B16A16_USCALED = 93
-    {
-        VK_FORMAT_R16G16B16A16_USCALED,
-        BUF_NUM_FORMAT_USCALED,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R16G16B16A16_SSCALED = 94
-    {
-        VK_FORMAT_R16G16B16A16_SSCALED,
-        BUF_NUM_FORMAT_SSCALED,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R16G16B16A16_UINT = 95
-    {
-        VK_FORMAT_R16G16B16A16_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R16G16B16A16_SINT = 96
-    {
-        VK_FORMAT_R16G16B16A16_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R16G16B16A16_SFLOAT = 97
-    {
-        VK_FORMAT_R16G16B16A16_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_16_16_16_16,
-        4
-    },
-    // VK_FORMAT_R32_UINT = 98
-    {
-        VK_FORMAT_R32_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32,
-        1
-    },
-    // VK_FORMAT_R32_SINT = 99
-    {
-        VK_FORMAT_R32_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32,
-        1
-    },
-    // VK_FORMAT_R32_SFLOAT = 100
-    {
-        VK_FORMAT_R32_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32,
-        1
-    },
-    // VK_FORMAT_R32G32_UINT = 101
-    {
-        VK_FORMAT_R32G32_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32,
-        2
-    },
-    // VK_FORMAT_R32G32_SINT = 102
-    {
-        VK_FORMAT_R32G32_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32,
-        2
-    },
-    // VK_FORMAT_R32G32_SFLOAT = 103
-    {
-        VK_FORMAT_R32G32_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32,
-        2
-    },
-    // VK_FORMAT_R32G32B32_UINT = 104
-    {
-        VK_FORMAT_R32G32B32_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32_32,
-        3
-    },
-    // VK_FORMAT_R32G32B32_SINT = 105
-    {
-        VK_FORMAT_R32G32B32_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32_32,
-        3
-    },
-    // VK_FORMAT_R32G32B32_SFLOAT = 106
-    {
-        VK_FORMAT_R32G32B32_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32_32,
-        3
-    },
-    // VK_FORMAT_R32G32B32A32_UINT = 107
-    {
-        VK_FORMAT_R32G32B32A32_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R32G32B32A32_SINT = 108
-    {
-        VK_FORMAT_R32G32B32A32_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R32G32B32A32_SFLOAT = 109
-    {
-        VK_FORMAT_R32G32B32A32_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64_UINT = 110
-    {
-        VK_FORMAT_R64_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32,
-        2
-    },
-    // VK_FORMAT_R64_SINT = 111
-    {
-        VK_FORMAT_R64_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32,
-        2
-    },
-    // VK_FORMAT_R64_SFLOAT = 112
-    {
-        VK_FORMAT_R64_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32,
-        2
-    },
-    // VK_FORMAT_R64G64_UINT = 113
-    {
-        VK_FORMAT_R64G64_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64_SINT = 114
-    {
-        VK_FORMAT_R64G64_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64_SFLOAT = 115
-    {
-        VK_FORMAT_R64G64_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64B64_UINT = 116
-    {
-        VK_FORMAT_R64G64B64_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64B64_SINT = 117
-    {
-        VK_FORMAT_R64G64B64_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64B64_SFLOAT = 118
-    {
-        VK_FORMAT_R64G64B64_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64B64A64_UINT = 119
-    {
-        VK_FORMAT_R64G64B64A64_UINT,
-        BUF_NUM_FORMAT_UINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64B64A64_SINT = 120
-    {
-        VK_FORMAT_R64G64B64A64_SINT,
-        BUF_NUM_FORMAT_SINT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_R64G64B64A64_SFLOAT = 121
-    {
-        VK_FORMAT_R64G64B64A64_SFLOAT,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_32_32_32_32,
-        4
-    },
-    // VK_FORMAT_B10G11R11_UFLOAT_PACK32 = 122
-    {
-        VK_FORMAT_B10G11R11_UFLOAT_PACK32,
-        BUF_NUM_FORMAT_FLOAT,
-        BUF_DATA_FORMAT_10_11_11,
-        3
-    },
-    // VK_FORMAT_E5B9G9R9_UFLOAT_PACK32 = 123
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_E5B9G9R9_UFLOAT_PACK32),
-    // VK_FORMAT_D16_UNORM = 124
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_D16_UNORM),
-    // VK_FORMAT_X8_D24_UNORM_PACK32 = 125
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_X8_D24_UNORM_PACK32),
-    // VK_FORMAT_D32_SFLOAT = 126
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_D32_SFLOAT),
-    // VK_FORMAT_S8_UINT = 127
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_S8_UINT),
-    // VK_FORMAT_D16_UNORM_S8_UINT = 128
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_D16_UNORM_S8_UINT),
-    // VK_FORMAT_D24_UNORM_S8_UINT = 129
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_D24_UNORM_S8_UINT),
-    // VK_FORMAT_D32_SFLOAT_S8_UINT = 130
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_D32_SFLOAT_S8_UINT),
-    // VK_FORMAT_BC1_RGB_UNORM_BLOCK = 131
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC1_RGB_UNORM_BLOCK),
-    // VK_FORMAT_BC1_RGB_SRGB_BLOCK = 132
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC1_RGB_SRGB_BLOCK),
-    // VK_FORMAT_BC1_RGBA_UNORM_BLOCK = 133
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC1_RGBA_UNORM_BLOCK),
-    // VK_FORMAT_BC1_RGBA_SRGB_BLOCK = 134
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC1_RGBA_SRGB_BLOCK),
-    // VK_FORMAT_BC2_UNORM_BLOCK = 135
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC2_UNORM_BLOCK),
-    // VK_FORMAT_BC2_SRGB_BLOCK = 136
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC2_SRGB_BLOCK),
-    // VK_FORMAT_BC3_UNORM_BLOCK = 137
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC3_UNORM_BLOCK),
-    // VK_FORMAT_BC3_SRGB_BLOCK = 138
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC3_SRGB_BLOCK),
-    // VK_FORMAT_BC4_UNORM_BLOCK = 139
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC4_UNORM_BLOCK),
-    // VK_FORMAT_BC4_SNORM_BLOCK = 140
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC4_SNORM_BLOCK),
-    // VK_FORMAT_BC5_UNORM_BLOCK = 141
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC5_UNORM_BLOCK),
-    // VK_FORMAT_BC5_SNORM_BLOCK = 142
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC5_SNORM_BLOCK),
-    // VK_FORMAT_BC6H_UFLOAT_BLOCK = 143
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC6H_UFLOAT_BLOCK),
-    // VK_FORMAT_BC6H_SFLOAT_BLOCK = 144
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC6H_SFLOAT_BLOCK),
-    // VK_FORMAT_BC7_UNORM_BLOCK = 145
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC7_UNORM_BLOCK),
-    // VK_FORMAT_BC7_SRGB_BLOCK = 146
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_BC7_SRGB_BLOCK),
-    // VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK = 147
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK),
-    // VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK = 148
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK),
-    // VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK = 149
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK),
-    // VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK = 150
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK),
-    // VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK = 151
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK),
-    // VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK = 152
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK),
-    // VK_FORMAT_EAC_R11_UNORM_BLOCK = 153
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_EAC_R11_UNORM_BLOCK),
-    // VK_FORMAT_EAC_R11_SNORM_BLOCK = 154
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_EAC_R11_SNORM_BLOCK),
-    // VK_FORMAT_EAC_R11G11_UNORM_BLOCK = 155
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_EAC_R11G11_UNORM_BLOCK),
-    // VK_FORMAT_EAC_R11G11_SNORM_BLOCK = 156
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_EAC_R11G11_SNORM_BLOCK),
-    // VK_FORMAT_ASTC_4x4_UNORM_BLOCK = 157
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_4x4_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_4x4_SRGB_BLOCK = 158
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_4x4_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_5x4_UNORM_BLOCK = 159
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_5x4_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_5x4_SRGB_BLOCK = 160
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_5x4_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_5x5_UNORM_BLOCK = 161
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_5x5_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_5x5_SRGB_BLOCK = 162
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_5x5_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_6x5_UNORM_BLOCK = 163
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_6x5_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_6x5_SRGB_BLOCK = 164
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_6x5_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_6x6_UNORM_BLOCK = 165
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_6x6_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_6x6_SRGB_BLOCK = 166
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_6x6_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_8x5_UNORM_BLOCK = 167
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_8x5_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_8x5_SRGB_BLOCK = 168
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_8x5_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_8x6_UNORM_BLOCK = 169
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_8x6_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_8x6_SRGB_BLOCK = 170
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_8x6_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_8x8_UNORM_BLOCK = 171
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_8x8_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_8x8_SRGB_BLOCK = 172
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_8x8_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_10x5_UNORM_BLOCK = 173
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x5_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_10x5_SRGB_BLOCK = 174
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x5_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_10x6_UNORM_BLOCK = 175
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x6_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_10x6_SRGB_BLOCK = 176
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x6_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_10x8_UNORM_BLOCK = 177
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x8_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_10x8_SRGB_BLOCK = 178
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x8_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_10x10_UNORM_BLOCK = 179
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x10_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_10x10_SRGB_BLOCK = 180
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_10x10_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_12x10_UNORM_BLOCK = 181
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_12x10_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_12x10_SRGB_BLOCK = 182
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_12x10_SRGB_BLOCK),
-    // VK_FORMAT_ASTC_12x12_UNORM_BLOCK = 183
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_12x12_UNORM_BLOCK),
-    // VK_FORMAT_ASTC_12x12_SRGB_BLOCK = 184
-    VERTEX_FORMAT_UNDEFINED(VK_FORMAT_ASTC_12x12_SRGB_BLOCK),
-};
-
 // Initializes info table of vertex component format map
 const VertexCompFormatInfo VertexFetch::m_vertexCompFormatInfo[] =
 {
@@ -1072,22 +257,13 @@ VertexFetch::VertexFetch(
     m_pModule(pEntryPoint->getParent()),
     m_pContext(static_cast<Context*>(&m_pModule->getContext())),
     m_pShaderSysValues(pShaderSysValues),
-    m_pPipelineState(pPipelineState),
-    m_pVertexInput(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo())->pVertexInput)
+    m_pPipelineState(pPipelineState)
 {
     LLPC_ASSERT(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
 
     auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
     auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
     auto pInsertPos = pEntryPoint->begin()->getFirstInsertionPt();
-
-    m_pVertexDivisor = nullptr;
-    if (m_pVertexInput != nullptr)
-    {
-        m_pVertexDivisor = FindVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
-            VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT,
-            m_pVertexInput->pNext);
-    }
 
     // VertexIndex = BaseVertex + VertexID
     if (builtInUsage.vertexIndex)
@@ -1198,65 +374,67 @@ Value* VertexFetch::Run(
 {
     Value* pVertex = nullptr;
 
-    const VkVertexInputBindingDescription*   pBinding = nullptr;
-    const VkVertexInputAttributeDescription* pAttrib  = nullptr;
-    const VkVertexInputBindingDivisorDescriptionEXT* pDivisor = nullptr;
-    ExtractVertexInputInfo(location, &pBinding, &pAttrib, &pDivisor);
+    // Get vertex input description for the given location
+    const Builder::VertexInputDescription* pDescription = m_pPipelineState->FindVertexInputDescription(location);
 
     // NOTE: If we could not find vertex input info matching this location, just return undefined value.
-    if (pBinding == nullptr)
+    if (pDescription == nullptr)
     {
         return UndefValue::get(pInputTy);
     }
 
-    auto pVbDesc = LoadVertexBufferDescriptor(pBinding->binding, pInsertPos);
+    auto pVbDesc = LoadVertexBufferDescriptor(pDescription->binding, pInsertPos);
 
     Value* pVbIndex = nullptr;
-    if (pBinding->inputRate == VK_VERTEX_INPUT_RATE_VERTEX)
+    if (pDescription->inputRate == Builder::VertexInputRateVertex)
     {
         pVbIndex = GetVertexIndex(); // Use vertex index
     }
     else
     {
-        LLPC_ASSERT(pBinding->inputRate == VK_VERTEX_INPUT_RATE_INSTANCE);
-        if (pDivisor != nullptr)
+        if (pDescription->inputRate == Builder::VertexInputRateNone)
         {
-            pVbIndex = BinaryOperator::CreateUDiv(m_pInstanceId,
-                                                  ConstantInt::get(m_pContext->Int32Ty(), pDivisor->divisor),
-                                                  "",
-                                                  pInsertPos);
-            pVbIndex = BinaryOperator::CreateAdd(pVbIndex, m_pBaseInstance, "", pInsertPos);
+            pVbIndex = m_pBaseInstance;
+        }
+        else if (pDescription->inputRate == Builder::VertexInputRateInstance)
+        {
+            pVbIndex = GetInstanceIndex(); // Use instance index
         }
         else
         {
-            pVbIndex = GetInstanceIndex(); // Use instance index
+            // There is a divisor.
+            pVbIndex = BinaryOperator::CreateUDiv(m_pInstanceId,
+                                                  ConstantInt::get(m_pContext->Int32Ty(), pDescription->inputRate),
+                                                  "",
+                                                  pInsertPos);
+            pVbIndex = BinaryOperator::CreateAdd(pVbIndex, m_pBaseInstance, "", pInsertPos);
         }
     }
 
     Value* vertexFetch[2] = {}; // Two vertex fetch operations might be required
     Value* pVertexFetch = nullptr; // Coalesced vector by combining the results of two vertex fetch operations
 
-    const VertexFormatInfo* pFormatInfo = GetVertexFormatInfo(pAttrib->format);
+    VertexFormatInfo formatInfo = GetVertexFormatInfo(pDescription);
 
     const bool is8bitFetch = (pInputTy->getScalarSizeInBits() == 8);
     const bool is16bitFetch = (pInputTy->getScalarSizeInBits() == 16);
 
     // Do the first vertex fetch operation
     AddVertexFetchInst(pVbDesc,
-                       pFormatInfo->numChannels,
+                       formatInfo.numChannels,
                        is16bitFetch,
                        pVbIndex,
-                       pAttrib->offset,
-                       pBinding->stride,
-                       pFormatInfo->dfmt,
-                       pFormatInfo->nfmt,
+                       pDescription->offset,
+                       pDescription->stride,
+                       formatInfo.dfmt,
+                       formatInfo.nfmt,
                        pInsertPos,
                        &vertexFetch[0]);
 
     // Do post-processing in certain cases
     std::vector<Constant*> shuffleMask;
-    bool postShuffle = NeedPostShuffle(pAttrib->format, shuffleMask);
-    bool patchA2S = NeedPatchA2S(pAttrib->format);
+    bool postShuffle = NeedPostShuffle(pDescription, shuffleMask);
+    bool patchA2S = NeedPatchA2S(pDescription);
     if (postShuffle || patchA2S)
     {
         if (postShuffle)
@@ -1281,7 +459,7 @@ Value* VertexFetch::Run(
                                                        "",
                                                        pInsertPos);
 
-            if (pFormatInfo->nfmt == BUF_NUM_FORMAT_SINT)
+            if (formatInfo.nfmt == BUF_NUM_FORMAT_SINT)
             {
                 // NOTE: For format "SINT 10_10_10_2", vertex fetches incorrectly return the alpha channel as
                 // unsigned. We have to manually sign-extend it here by doing a "shl" 30 then an "ashr" 30.
@@ -1298,7 +476,7 @@ Value* VertexFetch::Run(
                                                     "",
                                                     pInsertPos);
             }
-            else if (pFormatInfo->nfmt == BUF_NUM_FORMAT_SNORM)
+            else if (formatInfo.nfmt == BUF_NUM_FORMAT_SNORM)
             {
                 // NOTE: For format "SNORM 10_10_10_2", vertex fetches incorrectly return the alpha channel
                 // as unsigned. We have to somehow remap the values { 0.0, 0.33, 0.66, 1.00 } to { 0.0, 1.0,
@@ -1330,7 +508,7 @@ Value* VertexFetch::Run(
                 // %a = bitcast %a to i32
                 pAlpha = new BitCastInst(pAlpha, m_pContext->Int32Ty(), "", pInsertPos);
             }
-            else if (pFormatInfo->nfmt == BUF_NUM_FORMAT_SSCALED)
+            else if (formatInfo.nfmt == BUF_NUM_FORMAT_SSCALED)
             {
                 // NOTE: For format "SSCALED 10_10_10_2", vertex fetches incorrectly return the alpha channel
                 // as unsigned. We have to somehow remap the values { 0.0, 1.0, 2.0, 3.0 } to { 0.0, 1.0,
@@ -1376,15 +554,13 @@ Value* VertexFetch::Run(
     }
 
     // Do the second vertex fetch operation
-    const bool secondFetch = NeedSecondVertexFetch(pAttrib->format);
+    const bool secondFetch = NeedSecondVertexFetch(pDescription);
     if (secondFetch)
     {
-        uint32_t numChannels = pFormatInfo->numChannels;
-        uint32_t dfmt = pFormatInfo->dfmt;
+        uint32_t numChannels = formatInfo.numChannels;
+        uint32_t dfmt = formatInfo.dfmt;
 
-        if ((pAttrib->format == VK_FORMAT_R64G64B64_UINT) ||
-            (pAttrib->format == VK_FORMAT_R64G64B64_SINT) ||
-            (pAttrib->format == VK_FORMAT_R64G64B64_SFLOAT))
+        if (pDescription->dfmt == Builder::BufDataFormat64_64_64)
         {
             // Valid number of channels and data format have to be revised
             numChannels = 2;
@@ -1395,10 +571,10 @@ Value* VertexFetch::Run(
                            numChannels,
                            is16bitFetch,
                            pVbIndex,
-                           pAttrib->offset + SizeOfVec4,
-                           pBinding->stride,
+                           pDescription->offset + SizeOfVec4,
+                           pDescription->stride,
                            dfmt,
-                           pFormatInfo->nfmt,
+                           formatInfo.nfmt,
                            pInsertPos,
                            &vertexFetch[1]);
     }
@@ -1603,15 +779,55 @@ Value* VertexFetch::Run(
 
 // =====================================================================================================================
 // Gets info from table according to vertex attribute format.
-const VertexFormatInfo* VertexFetch::GetVertexFormatInfo(
-    VkFormat format) // Vertex attribute format
+VertexFormatInfo VertexFetch::GetVertexFormatInfo(
+    const Builder::VertexInputDescription* pInputDesc)    // [in] Vertex input description
 {
-    LLPC_ASSERT(format < VK_FORMAT_RANGE_SIZE);
-
-    const VertexFormatInfo* pFormatInfo = &m_vertexFormatInfo[format];
-    LLPC_ASSERT(pFormatInfo->format == format);
-
-    return pFormatInfo;
+    VertexFormatInfo info = {
+                                static_cast<BufNumFormat>(pInputDesc->nfmt),
+                                static_cast<BufDataFormat>(pInputDesc->dfmt),
+                                1
+                            };
+    switch (pInputDesc->dfmt)
+    {
+    case Builder::BufDataFormat8_8:
+    case Builder::BufDataFormat16_16:
+    case Builder::BufDataFormat32_32:
+        info.numChannels = 2;
+        break;
+    case Builder::BufDataFormat32_32_32:
+    case Builder::BufDataFormat10_11_11:
+    case Builder::BufDataFormat11_11_10:
+        info.numChannels = 3;
+        break;
+    case Builder::BufDataFormat8_8_8_8:
+    case Builder::BufDataFormat16_16_16_16:
+    case Builder::BufDataFormat32_32_32_32:
+    case Builder::BufDataFormat10_10_10_2:
+    case Builder::BufDataFormat2_10_10_10:
+        info.numChannels = 4;
+        break;
+    case Builder::BufDataFormat8_8_8_8_BGRA:
+        info.numChannels = 4;
+        info.dfmt = BUF_DATA_FORMAT_8_8_8_8;
+        break;
+    case Builder::BufDataFormat2_10_10_10_BGRA:
+        info.numChannels = 4;
+        info.dfmt = BUF_DATA_FORMAT_2_10_10_10;
+        break;
+    case Builder::BufDataFormat64:
+        info.numChannels = 2;
+        info.dfmt = BUF_DATA_FORMAT_32_32;
+        break;
+    case Builder::BufDataFormat64_64:
+    case Builder::BufDataFormat64_64_64:
+    case Builder::BufDataFormat64_64_64_64:
+        info.numChannels = 4;
+        info.dfmt = BUF_DATA_FORMAT_32_32_32_32;
+        break;
+    default:
+        break;
+    }
+    return info;
 }
 
 // =====================================================================================================================
@@ -1673,59 +889,6 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
     pVbDesc->setAlignment(MaybeAlign(16));
 
     return pVbDesc;
-}
-
-// =====================================================================================================================
-// Extracts vertex input binding and attribute info based on the specified vertex input location.
-void VertexFetch::ExtractVertexInputInfo(
-    uint32_t                                          location,   // Location of vertex input
-    const VkVertexInputBindingDescription**           ppBinding,  // [out] Vertex binding
-    const VkVertexInputAttributeDescription**         ppAttrib,   // [out] Vertex attribute
-    const VkVertexInputBindingDivisorDescriptionEXT** ppDivisor   // [out] Vertex divisor
-    ) const
-{
-    LLPC_ASSERT((ppBinding != nullptr) && (ppAttrib != nullptr));
-
-    *ppBinding = nullptr;
-    *ppAttrib  = nullptr;
-    *ppDivisor = nullptr;
-
-    for (uint32_t i = 0; i < m_pVertexInput->vertexAttributeDescriptionCount; ++i)
-    {
-        auto pAttrib = &m_pVertexInput->pVertexAttributeDescriptions[i];
-        if (pAttrib->location == location)
-        {
-            *ppAttrib = pAttrib;
-            break;
-        }
-    }
-
-    if (*ppAttrib != nullptr) // Vertex attribute exists
-    {
-        for (uint32_t i = 0; i < m_pVertexInput->vertexBindingDescriptionCount; ++i)
-        {
-            auto pBinding = &m_pVertexInput->pVertexBindingDescriptions[i];
-            if (pBinding->binding == (*ppAttrib)->binding)
-            {
-                *ppBinding = pBinding;
-                break;
-            }
-        }
-        LLPC_ASSERT(*ppBinding != nullptr); // Vertex binding exists
-
-        if (m_pVertexDivisor != nullptr)
-        {
-            for (uint32_t i = 0;i < m_pVertexDivisor->vertexBindingDivisorCount; ++i)
-            {
-                auto pDivisor = &m_pVertexDivisor->pVertexBindingDivisors[i];
-                if (pDivisor->binding == (*ppAttrib)->binding)
-                {
-                    *ppDivisor = pDivisor;
-                    break;
-                }
-            }
-        }
-    }
 }
 
 // =====================================================================================================================
@@ -1943,26 +1106,16 @@ void VertexFetch::AddVertexFetchInst(
 // =====================================================================================================================
 // Checks whether post shuffle is required for vertex fetch oepration.
 bool VertexFetch::NeedPostShuffle(
-    VkFormat                format,     // Vertex attribute format
-    std::vector<Constant*>& shuffleMask // [out] Vector shuffle mask
+    const Builder::VertexInputDescription*  pInputDesc,   // [in] Vertex input description
+    std::vector<Constant*>&                 shuffleMask   // [out] Vector shuffle mask
     ) const
 {
     bool needShuffle = false;
 
-    switch (format)
+    switch (pInputDesc->dfmt)
     {
-    case VK_FORMAT_B8G8R8A8_UNORM:
-    case VK_FORMAT_B8G8R8A8_SNORM:
-    case VK_FORMAT_B8G8R8A8_USCALED:
-    case VK_FORMAT_B8G8R8A8_SSCALED:
-    case VK_FORMAT_B8G8R8A8_UINT:
-    case VK_FORMAT_B8G8R8A8_SINT:
-    case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
-    case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
-    case VK_FORMAT_A2R10G10B10_USCALED_PACK32:
-    case VK_FORMAT_A2R10G10B10_SSCALED_PACK32:
-    case VK_FORMAT_A2R10G10B10_UINT_PACK32:
-    case VK_FORMAT_A2R10G10B10_SINT_PACK32:
+    case Builder::BufDataFormat8_8_8_8_BGRA:
+    case Builder::BufDataFormat2_10_10_10_BGRA:
         shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
         shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
         shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
@@ -1979,23 +1132,20 @@ bool VertexFetch::NeedPostShuffle(
 // =====================================================================================================================
 // Checks whether patching 2-bit signed alpha channel is required for vertex fetch operation.
 bool VertexFetch::NeedPatchA2S(
-    VkFormat format  // Vertex attribute format
+    const Builder::VertexInputDescription* pInputDesc    // [in] Vertex input description
     ) const
 {
     bool needPatch = false;
 
-    switch (format)
+    if ((pInputDesc->dfmt == Builder::BufDataFormat2_10_10_10) ||
+        (pInputDesc->dfmt == Builder::BufDataFormat2_10_10_10_BGRA))
     {
-    case VK_FORMAT_A2R10G10B10_SNORM_PACK32:
-    case VK_FORMAT_A2R10G10B10_SSCALED_PACK32:
-    case VK_FORMAT_A2R10G10B10_SINT_PACK32:
-    case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
-    case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
-    case VK_FORMAT_A2B10G10R10_SINT_PACK32:
-        needPatch = (m_pPipelineState->GetGfxIpVersion().major < 9);
-        break;
-    default:
-        break;
+        if ((pInputDesc->nfmt == Builder::BufNumFormatSNORM) ||
+            (pInputDesc->nfmt == Builder::BufNumFormatSSCALED) ||
+            (pInputDesc->nfmt == Builder::BufNumFormatSINT))
+        {
+            needPatch = (m_pPipelineState->GetGfxIpVersion().major < 9);
+        }
     }
 
     return needPatch;
@@ -2004,15 +1154,11 @@ bool VertexFetch::NeedPatchA2S(
 // =====================================================================================================================
 // Checks whether the second vertex fetch operation is required (particularly for certain 64-bit typed formats).
 bool VertexFetch::NeedSecondVertexFetch(
-    VkFormat format // Vertex attribute format
+    const Builder::VertexInputDescription* pInputDesc    // [in] Vertex input description
     ) const
 {
-    return ((format == VK_FORMAT_R64G64B64_UINT)        ||
-            (format == VK_FORMAT_R64G64B64_SINT)        ||
-            (format == VK_FORMAT_R64G64B64_SFLOAT)      ||
-            (format == VK_FORMAT_R64G64B64A64_UINT)     ||
-            (format == VK_FORMAT_R64G64B64A64_SINT)     ||
-            (format == VK_FORMAT_R64G64B64A64_SFLOAT));
+    return ((pInputDesc->dfmt == Builder::BufDataFormat64_64_64) ||
+            (pInputDesc->dfmt == Builder::BufDataFormat64_64_64_64));
 }
 
 } // Llpc

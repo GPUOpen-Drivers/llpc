@@ -308,8 +308,8 @@ Result VKAPI_CALL ICompiler::Create(
 bool VKAPI_CALL ICompiler::IsVertexFormatSupported(
     VkFormat format)   // Vertex attribute format
 {
-    auto pInfo = VertexFetch::GetVertexFormatInfo(format);
-    return ((pInfo->dfmt == BUF_DATA_FORMAT_INVALID) && (pInfo->numChannels == 0)) ? false : true;
+    Builder::BufDataFormat dfmt = GraphicsContext::MapVkFormat(format).first;
+    return (dfmt != Builder::BufDataFormatInvalid);
 }
 
 // =====================================================================================================================

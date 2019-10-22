@@ -148,6 +148,11 @@ public:
     void SetDeviceIndex(uint32_t deviceIndex);
     uint32_t GetDeviceIndex() const;
 
+    // Accessors for vertex input descriptions.
+    void SetVertexInputDescriptions(ArrayRef<Builder::VertexInputDescription> inputs);
+    ArrayRef<Builder::VertexInputDescription> GetVertexInputDescriptions() const;
+    const Builder::VertexInputDescription* FindVertexInputDescription(uint32_t location) const;
+
     // Accessors for input-assembly state.
     void SetInputAssemblyState(const Builder::InputAssemblyState& iaState);
     const Builder::InputAssemblyState& GetInputAssemblyState();
@@ -183,6 +188,10 @@ private:
     void RecordDeviceIndex(Module* pModule);
     void ReadDeviceIndex();
 
+    // Vertex input descriptions handling
+    void RecordVertexInputDescriptions(Module* pModule);
+    void ReadVertexInputDescriptions();
+
     // Input-assembly state handling
     void RecordInputAssemblyState(Module* pModule);
     void ReadInputAssemblyState();
@@ -210,6 +219,8 @@ private:
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
     uint32_t                        m_deviceIndex = 0;                  // Device index
+    std::vector<Builder::VertexInputDescription>
+                                    m_vertexInputDescriptions;          // Vertex input descriptions
     Builder::InputAssemblyState     m_inputAssemblyState = {};          // Input-assembly state
     Builder::ViewportState          m_viewportState = {};               // Viewport state
     Builder::RasterizerState        m_rasterizerState = {};             // Rasterizer state
