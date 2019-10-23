@@ -76,6 +76,7 @@ void initializeSPIRVLowerMemmovePass(PassRegistry&);
 }
 
 #include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
 
 namespace SPIRV {
 class SPIRVModule;

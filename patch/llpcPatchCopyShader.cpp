@@ -727,9 +727,10 @@ Value* PatchCopyShader::LoadValueFromGsVsRingBuffer(
         idxs.push_back(pRingOffset);
 
         Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-        pLoadValue = new LoadInst(pLoadPtr, "", false, m_pLds->getAlignment(), pInsertPos);
+        auto pLoadInst = new LoadInst(pLoadPtr, "", false, pInsertPos);
+        pLoadInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
 
-        pLoadValue = new BitCastInst(pLoadValue, m_pContext->FloatTy(), "", pInsertPos);
+        pLoadValue = new BitCastInst(pLoadInst, m_pContext->FloatTy(), "", pInsertPos);
     }
     else
     {
