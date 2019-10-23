@@ -5161,7 +5161,8 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
             idxs.push_back(pRingOffset);
 
             Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-            new StoreInst(pStoreValue, pStorePtr, false, m_pLds->getAlignment(), pInsertPos);
+            auto pStoreInst = new StoreInst(pStoreValue, pStorePtr, false, pInsertPos);
+            pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
         }
         else
         {
@@ -5232,7 +5233,9 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
             idxs.push_back(pRingOffset);
 
             Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-            pLoadValue = new LoadInst(pLoadPtr, "", false, m_pLds->getAlignment(), pInsertPos);
+            auto pLoadInst = new LoadInst(pLoadPtr, "", false, pInsertPos);
+            pLoadInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
+            pLoadValue = pLoadInst;
 
             if (bitWidth == 8)
             {
@@ -5351,7 +5354,8 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         idxs.push_back(pRingOffset);
 
         Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-        new StoreInst(pStoreValue, pStorePtr, false, m_pLds->getAlignment(), pInsertPos);
+        auto pStoreInst = new StoreInst(pStoreValue, pStorePtr, false, pInsertPos);
+        pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
     }
     else
     {
@@ -5655,7 +5659,9 @@ Value* PatchInOutImportExport::ReadValueFromLds(
             idxs.push_back(pLdsOffset);
 
             Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-            loadValues[i] = new LoadInst(pLoadPtr, "", false, m_pLds->getAlignment(), pInsertPos);
+            auto pLoadInst = new LoadInst(pLoadPtr, "", false, pInsertPos);
+            pLoadInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
+            loadValues[i]=pLoadInst;
 
             if (bitWidth == 8)
             {
@@ -5787,7 +5793,9 @@ void PatchInOutImportExport::WriteValueToLds(
             idxs.push_back(pLdsOffset);
 
             Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
-            new StoreInst(storeValues[i], pStorePtr, false, m_pLds->getAlignment(), pInsertPos);
+            auto pStoreInst = new StoreInst(storeValues[i], pStorePtr, false, pInsertPos);
+            pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
+
 
             pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, ConstantInt::get(m_pContext->Int32Ty(), 1), "", pInsertPos);
         }

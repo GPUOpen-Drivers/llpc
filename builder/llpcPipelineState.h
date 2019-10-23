@@ -33,6 +33,7 @@
 #include "llpc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Pass.h"
 #include <map>
 
 namespace llvm
