@@ -1111,7 +1111,12 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(
                 // Pointer to sampled image is represented by a struct containing pointer to image and pointer to
                 // sampler. But if the image is multisampled, then it itself is another struct, as above.
                 Type* pImagePtrTy = getBuilder()->GetImageDescPtrTy();
-                if (static_cast<SPIRVTypeSampledImage*>(pSpvElementType)->getImageType()->getDescriptor().MS)
+                SPIRVTypeImage* pSpvImageTy = static_cast<SPIRVTypeSampledImage*>(pSpvElementType)->getImageType();
+                if (pSpvImageTy->getDescriptor().Dim == DimBuffer)
+                {
+                    pImagePtrTy = getBuilder()->GetTexelBufferDescPtrTy();
+                }
+                else if (pSpvImageTy->getDescriptor().MS)
                 {
                     pImagePtrTy = StructType::get(*Context,
                                                   { getBuilder()->GetImageDescPtrTy(), getBuilder()->GetFmaskDescPtrTy() });
