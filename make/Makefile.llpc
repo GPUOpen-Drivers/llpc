@@ -158,21 +158,13 @@ endif
         ManglingUtils.cpp                   \
         ParameterType.cpp                   \
         \
-        OCL20To12.cpp                       \
-        OCL20ToSPIRV.cpp                    \
-        OCL21ToSPIRV.cpp                    \
-        OCLTypeToSPIRV.cpp                  \
         OCLUtil.cpp                         \
         SPIRVLowerBool.cpp                  \
         SPIRVLowerConstExpr.cpp             \
         SPIRVLowerMemmove.cpp               \
-        SPIRVLowerOCLBlocks.cpp             \
         SPIRVReader.cpp                     \
         SPIRVRegularizeLLVM.cpp             \
-        SPIRVUtil.cpp                       \
-        SPIRVWriter.cpp                     \
-        SPIRVWriterPass.cpp                 \
-        TransOCLMD.cpp
+        SPIRVUtil.cpp
 
     # llpc/util
     CPPFILES +=                             \
