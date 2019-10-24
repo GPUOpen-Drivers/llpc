@@ -154,7 +154,19 @@ bool SpirvLowerGlobal::runOnModule(
     // NOTE: Global variable, inlcude general global variable, input and output is a special constant variable, so if
     // it is referenced by constant expression, we need translate constant expression to normal instruction first,
     // Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
-    RemoveConstantExpr();
+    for (GlobalVariable& global : m_pModule->globals())
+    {
+        auto addrSpace = global.getType()->getAddressSpace();
+
+        // Remove constant expressions for global variables in these address spaces
+        bool isGlobalVar = (addrSpace == SPIRAS_Private) || (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output);
+
+        if (isGlobalVar == false)
+        {
+            continue;
+        }
+        RemoveConstantExpr(m_pContext, &global);
+    }
 
     // Do lowering operations
     LowerGlobalVar();
@@ -809,40 +821,6 @@ void SpirvLowerGlobal::MapOutputToProxy(
     }
 
     m_outputProxyMap.push_back(std::pair<Value*, Value*>(pOutput, pProxy));
-}
-
-// =====================================================================================================================
-// Removes those constant expressions that reference global variables.
-void SpirvLowerGlobal::RemoveConstantExpr()
-{
-    // Collect contant expressions and translate them to regular instructions
-    for (GlobalVariable& global : m_pModule->globals())
-    {
-        auto addSpace = global.getType()->getAddressSpace();
-
-        // Remove constant expressions for global variables in these address spaces
-        bool isGlobalVar = (addSpace == SPIRAS_Private) || (addSpace == SPIRAS_Input) || (addSpace == SPIRAS_Output);
-
-        if (isGlobalVar == false)
-        {
-            continue;
-        }
-
-        SmallVector<Constant*, 8> constantUsers;
-
-        for (User* const pUser : global.users())
-        {
-            if (Constant* const pConst = dyn_cast<Constant>(pUser))
-            {
-                constantUsers.push_back(pConst);
-            }
-        }
-
-        for (Constant* const pConst : constantUsers)
-        {
-            ReplaceConstWithInsts(pConst);
-        }
-    }
 }
 
 // =====================================================================================================================
@@ -2088,86 +2066,6 @@ void SpirvLowerGlobal::CollectGsXfbOutputInfo(
 }
 
 // =====================================================================================================================
-// Replace a constant with instructions using a builder.
-void SpirvLowerGlobal::ReplaceConstWithInsts(
-    Constant* const pConst)   // [in/out] The constant to replace with instructions.
-{
-    SmallSet<Constant*, 8> otherConsts;
-
-    for (User* const pUser : pConst->users())
-    {
-        if (Constant* const pOtherConst = dyn_cast<Constant>(pUser))
-        {
-            otherConsts.insert(pOtherConst);
-        }
-    }
-
-    for (Constant* const pOtherConst : otherConsts)
-    {
-        ReplaceConstWithInsts(pOtherConst);
-    }
-
-    otherConsts.clear();
-
-    SmallVector<Value*, 8> users;
-
-    for (User* const pUser : pConst->users())
-    {
-        users.push_back(pUser);
-    }
-
-    for (Value* const pUser : users)
-    {
-        Instruction* const pInst = dyn_cast<Instruction>(pUser);
-        LLPC_ASSERT(pInst != nullptr);
-
-        // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
-        if (PHINode* const pPhiNode = dyn_cast<PHINode>(pInst))
-        {
-            const uint32_t incomingValueCount = pPhiNode->getNumIncomingValues();
-            for (uint32_t i = 0; i < incomingValueCount; i++)
-            {
-                if (pPhiNode->getIncomingValue(i) == pConst)
-                {
-                    m_pBuilder->SetInsertPoint(pPhiNode->getIncomingBlock(i)->getTerminator());
-                    break;
-                }
-            }
-        }
-        else
-        {
-            m_pBuilder->SetInsertPoint(pInst);
-        }
-
-        if (ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pConst))
-        {
-            Instruction* const pInsertInst = m_pBuilder->Insert(pConstExpr->getAsInstruction());
-            pInst->replaceUsesOfWith(pConstExpr, pInsertInst);
-        }
-        else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConst))
-        {
-            Value* pResultValue = UndefValue::get(pConstVector->getType());
-            for (uint32_t i = 0; i < pConstVector->getNumOperands(); i++)
-            {
-                // Have to not use the builder here because it will constant fold and we are trying to undo that now!
-                Instruction* const pInsertInst = InsertElementInst::Create(pResultValue,
-                                                                           pConstVector->getOperand(i),
-                                                                           m_pBuilder->getInt32(i));
-                pResultValue = m_pBuilder->Insert(pInsertInst);
-            }
-            pInst->replaceUsesOfWith(pConstVector, pResultValue);
-        }
-        else
-        {
-            LLPC_NEVER_CALLED();
-        }
-    }
-
-    pConst->removeDeadConstantUsers();
-    pConst->destroyConstant();
-}
-
-// =====================================================================================================================
 // Lowers buffer blocks.
 void SpirvLowerGlobal::LowerBufferBlock()
 {
@@ -2199,7 +2097,7 @@ void SpirvLowerGlobal::LowerBufferBlock()
 
         for (Constant* const pConst : constantUsers)
         {
-            ReplaceConstWithInsts(pConst);
+            ReplaceConstWithInsts(m_pContext, pConst);
         }
 
         // Record of all the functions that our global is used within.
@@ -2457,7 +2355,7 @@ void SpirvLowerGlobal::LowerPushConsts()
 
         for (Constant* const pConst : constantUsers)
         {
-            ReplaceConstWithInsts(pConst);
+            ReplaceConstWithInsts(m_pContext, pConst);
         }
 
         // Record of all the functions that our global is used within.

@@ -66,7 +66,6 @@ private:
     void MapGlobalVariableToProxy(llvm::GlobalVariable* pGlobalVar);
     void MapInputToProxy(llvm::GlobalVariable* pInput);
     void MapOutputToProxy(llvm::GlobalVariable* pInput);
-    void RemoveConstantExpr();
 
     void LowerGlobalVar();
     void LowerInput();
@@ -123,8 +122,6 @@ private:
                                 uint32_t                   locOffset,
                                 uint32_t                   xfbLocOffset,
                                 const ShaderInOutMetadata& outputMeta);
-
-    void ReplaceConstWithInsts(Constant* const pConst);
 
     void InterpolateInputElement(uint32_t           interpLoc,
                                  llvm::Value*       pInterpInfo,
