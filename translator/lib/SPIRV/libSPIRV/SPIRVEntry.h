@@ -229,7 +229,7 @@ class SPIRVExtInst;
 ///    To automaticly update module's version you can also call protected
 ///    function updateModuleVersion() in the constructor.
 /// 7. Add the class to the Table of SPIRVEntry::create().
-/// 8. Add the class to SPIRVToLLVM and LLVMToSPIRV.
+/// 8. Add the class to SPIRVToLLVM.
 
 class SPIRVEntry {
 public:

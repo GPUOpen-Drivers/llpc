@@ -308,21 +308,13 @@ if(ICD_BUILD_LLPC)
 
 # llpc/translator
     target_sources(llpc PRIVATE
-        translator/lib/SPIRV/OCL20To12.cpp
-        translator/lib/SPIRV/OCL20ToSPIRV.cpp
-        translator/lib/SPIRV/OCL21ToSPIRV.cpp
-        translator/lib/SPIRV/OCLTypeToSPIRV.cpp
         translator/lib/SPIRV/OCLUtil.cpp
         translator/lib/SPIRV/SPIRVLowerBool.cpp
         translator/lib/SPIRV/SPIRVLowerConstExpr.cpp
         translator/lib/SPIRV/SPIRVLowerMemmove.cpp
-        translator/lib/SPIRV/SPIRVLowerOCLBlocks.cpp
         translator/lib/SPIRV/SPIRVReader.cpp
         translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
         translator/lib/SPIRV/SPIRVUtil.cpp
-        translator/lib/SPIRV/SPIRVWriter.cpp
-        translator/lib/SPIRV/SPIRVWriterPass.cpp
-        translator/lib/SPIRV/TransOCLMD.cpp
     )
 
     target_sources(llpc PRIVATE

@@ -49,18 +49,9 @@ namespace llvm {
 // Pass initialization functions need to be declared before inclusion of
 // PassSupport.h.
 class PassRegistry;
-void initializeLLVMToSPIRVPass(PassRegistry&);
-void initializeOCL20To12Pass(PassRegistry&);
-void initializeOCL20ToGLPass(PassRegistry&);
-void initializeOCL20ToSPIRVPass(PassRegistry&);
-void initializeOCL21ToSPIRVPass(PassRegistry&);
-void initializeOCLTypeToSPIRVPass(PassRegistry&);
 void initializeSPIRVLowerBoolPass(PassRegistry&);
 void initializeSPIRVLowerConstExprPass(PassRegistry&);
-void initializeSPIRVLowerOCLBlocksPass(PassRegistry&);
 void initializeSPIRVRegularizeLLVMPass(PassRegistry&);
-void initializeSPIRVToOCL20Pass(PassRegistry&);
-void initializeTransOCLMDPass(PassRegistry&);
 void initializeSPIRVLowerInputPass(PassRegistry&);
 void initializeSPIRVLowerOutputPass(PassRegistry&);
 void initializeSPIRVResourceCollectPass(PassRegistry&);
@@ -144,46 +135,17 @@ bool regularizeLlvmForSpirv(llvm::Module *M, std::string &ErrMsg);
 void mangleOpenClBuiltin(const std::string &UnmangledName,
                          ArrayRef<Type*> ArgTypes, std::string &MangledName);
 
-/// Create a pass for translating LLVM to SPIR-V.
-ModulePass *createLLVMToSPIRV(SPIRV::SPIRVModule *);
-
-/// Create a pass for translating OCL 2.0 builtin functions to equivalent
-/// OCL 1.2 builtin functions.
-ModulePass *createOCL20To12();
-
-/// Create a pass for translating OCL 2.0 builtin functions to SPIR-V builtin
-/// functions.
-ModulePass *createOCL20ToSPIRV();
-
-/// Create a pass for translating OCL 2.1 builtin functions to SPIR-V builtin
-/// functions.
-ModulePass *createOCL21ToSPIRV();
-
-/// Create a pass for adapting OCL types for SPIRV.
-ModulePass *createOCLTypeToSPIRV();
-
 /// Create a pass for lowering cast instructions of i1 type.
 ModulePass *createSPIRVLowerBool();
 
 /// Create a pass for lowering constant expressions to instructions.
 ModulePass *createSPIRVLowerConstExpr();
 
-/// Create a pass for lowering OCL 2.0 blocks to functions calls.
-ModulePass *createSPIRVLowerOCLBlocks();
-
 /// Create a pass for regularize LLVM module to be translated to SPIR-V.
 ModulePass *createSPIRVRegularizeLLVM();
 
 /// Create a pass for lowering llvm.memmove to llvm.memcpys with a temporary variable.
 ModulePass *createSPIRVLowerMemmove();
-
-/// Create a pass for translating SPIR 1.2/2.0 metadata to SPIR-V friendly
-/// metadata.
-ModulePass *createTransOCLMD();
-
-/// Create and return a pass that writes the module to the specified
-/// ostream.
-ModulePass *createSPIRVWriterPass(llvm::raw_ostream &Str);
 
 /// Create a pass for lowering GLSL inputs to function calls
 ModulePass *createSPIRVLowerInput();
