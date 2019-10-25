@@ -757,7 +757,7 @@ Value* BuilderReplayer::ProcessCall(
             return m_pBuilder->CreateWriteXfbOutput(args[0],                                    // Value to write
                                                     cast<ConstantInt>(args[1])->getZExtValue(), // IsBuiltIn
                                                     cast<ConstantInt>(args[2])->getZExtValue(), // Location/builtIn
-                                                    cast<ConstantInt>(args[3])->getZExtValue(), // XFB buffer number
+                                                    cast<ConstantInt>(args[3])->getZExtValue(), // XFB buffer ID
                                                     cast<ConstantInt>(args[4])->getZExtValue(), // XFB stride
                                                     args[5],                                    // XFB byte offset
                                                     outputInfo);

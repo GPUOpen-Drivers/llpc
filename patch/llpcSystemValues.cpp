@@ -579,7 +579,7 @@ Value* ShaderSystemValues::GetVertexBufTablePtr()
 // =====================================================================================================================
 // Get stream-out buffer descriptor
 Value* ShaderSystemValues::GetStreamOutBufDesc(
-    uint32_t        xfbBuffer)      // Transform feedback buffer number
+    uint32_t        xfbBuffer)      // Transform feedback buffer ID
 {
     if (m_streamOutBufDescs.size() <= xfbBuffer)
     {

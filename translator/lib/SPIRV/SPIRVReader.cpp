@@ -9018,7 +9018,6 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.XfbBuffer = InOutDec.XfbBuffer;
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
-    InOutMD.XfbLocStride = InOutDec.XfbLocStride;
     InOutMD.XfbLoc = InOutDec.XfbLoc;
 
     // Check signedness for generic input/output
@@ -9062,12 +9061,14 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     // Build element metadata
     auto ElemTy = BT->isTypeArray() ? BT->getArrayElementType() :
                                       BT->getMatrixColumnType();
+    uint32_t NumElems = BT->isTypeArray() ? BT->getArrayLength() :
+                                            BT->getMatrixColumnCount();
+
     uint32_t StartLoc = InOutDec.Value.Loc;
     uint32_t StartXfbLoc = InOutDec.XfbLoc;
 
     // Align StartXfbLoc to 64-bit (8 bytes)
     bool AlignTo64Bit = checkContains64BitType(ElemTy);
-    bool BlockArray = ElemTy->hasDecorate(spv::DecorationBlock);
 
     if (AlignTo64Bit)
       StartXfbLoc = roundUpToMultiple(StartXfbLoc, 8u);
@@ -9079,23 +9080,33 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     if (ElemDec.PerPatch)
       InOutDec.PerPatch = true; // Set "per-patch" flag
 
+    InOutDec.IsBlockArray = ElemTy->hasDecorate(DecorationBlock) ||
+                            ElemDec.IsBlockArray; // Multi-dimension array
+
     uint32_t Stride = ElemDec.Value.Loc - StartLoc;
-    uint32_t XfbLocStride = ElemDec.XfbLoc - StartXfbLoc;
 
-    // Align XfbLocStride to 64-bit (8 bytes)
-    if (AlignTo64Bit)
-      XfbLocStride = roundUpToMultiple(XfbLocStride, 8u);
+    uint32_t XfbArrayStride = 0;
+    if (InOutDec.IsBlockArray) {
+      // NOTE: For block array, each block array element is handled within its
+      // own capture buffer. The transform feedback array stride is the flatten
+      // dimension of an array element.
+      assert(ElemTy->isTypeArray() || ElemTy->isTypeStruct());
+      XfbArrayStride = ElemTy->isTypeArray() ?
+        ElemDec.XfbArrayStride * ElemTy->getArrayLength() : 1;
+    } else {
+      // NOTE: For other non-block arrays, the transform feedback array stride
+      // is the occupied locations (bytes) of an array element.
+      XfbArrayStride = ElemDec.XfbLoc - StartXfbLoc;
 
-    uint32_t NumElems = BT->isTypeArray() ? BT->getArrayLength() :
-                                            BT->getMatrixColumnCount();
+      // Align XfbLocStride to 64-bit (8 bytes)
+      if (AlignTo64Bit)
+        XfbArrayStride = roundUpToMultiple(XfbArrayStride, 8u);
 
-    // Update next location value
-    if (!InOutDec.IsBuiltIn) {
-      InOutDec.Value.Loc = StartLoc + (Stride * NumElems);
-      if (!BlockArray)
-        InOutDec.XfbLoc = StartXfbLoc + (XfbLocStride * NumElems);
-      else
-        InOutDec.XfbLoc = StartXfbLoc + XfbLocStride;
+      // Update next location value
+      if (!InOutDec.IsBuiltIn) {
+        InOutDec.Value.Loc = StartLoc + Stride * NumElems;
+        InOutDec.XfbLoc = StartXfbLoc + XfbArrayStride * NumElems;
+      }
     }
 
     // Built metadata for the array/matrix
@@ -9124,13 +9135,11 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.InterpLoc = InOutDec.Interp.Loc;
     InOutMD.PerPatch = InOutDec.PerPatch;
     InOutMD.StreamId = InOutDec.StreamId;
+    InOutMD.IsBlockArray = InOutDec.IsBlockArray;
     InOutMD.XfbBuffer = InOutDec.XfbBuffer;
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
-    if (BlockArray)
-      InOutMD.XfbLocStride = InOutDec.XfbStride;
-    else
-      InOutMD.XfbLocStride = XfbLocStride;
+    InOutMD.XfbArrayStride = XfbArrayStride;
     InOutMD.XfbLoc = StartXfbLoc;
 
     std::vector<Constant *> MDValues;
