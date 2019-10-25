@@ -91,6 +91,7 @@ private:
                                     llvm::Value*       pLocOffset,
                                     uint32_t           maxLocOffset,
                                     uint32_t           xfbLocOffset,
+                                    uint32_t           xfbBufferAdjust,
                                     llvm::Value*       pElemIdx,
                                     llvm::Value*       pVertexIdx,
                                     uint32_t           emitStreamId,

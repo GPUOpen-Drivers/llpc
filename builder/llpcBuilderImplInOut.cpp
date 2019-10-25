@@ -605,7 +605,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     Value*        pValueToWrite,      // [in] Value to write
     bool          isBuiltIn,          // True for built-in, false for user output (ignored if not GS)
     uint32_t      location,           // Location (row) or built-in kind of output (ignored if not GS)
-    uint32_t      xfbBuffer,          // XFB buffer number
+    uint32_t      xfbBuffer,          // XFB buffer ID
     uint32_t      xfbStride,          // XFB stride
     Value*        pXfbOffset,         // [in] XFB byte offset
     InOutInfo     outputInfo)         // Extra output info (GS stream ID)

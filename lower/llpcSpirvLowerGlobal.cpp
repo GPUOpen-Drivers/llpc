@@ -678,6 +678,7 @@ void SpirvLowerGlobal::visitStoreInst(
                                            nullptr,
                                            0,
                                            InvalidValue,
+                                           0,
                                            nullptr,
                                            pVertexIdx,
                                            InvalidValue,
@@ -691,6 +692,7 @@ void SpirvLowerGlobal::visitStoreInst(
                                        nullptr,
                                        0,
                                        InvalidValue,
+                                       0,
                                        nullptr,
                                        nullptr,
                                        InvalidValue,
@@ -994,7 +996,7 @@ void SpirvLowerGlobal::LowerOutput()
             (m_shaderStage == ShaderStageFragment))
         {
             Value* pOutputValue = new LoadInst(pProxy, "", pRetInst);
-            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, 0, nullptr, nullptr, InvalidValue, pRetInst);
+            AddCallInstForOutputExport(pOutputValue, pMeta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue, pRetInst);
         }
         else if (m_shaderStage == ShaderStageGeometry)
         {
@@ -1016,6 +1018,7 @@ void SpirvLowerGlobal::LowerOutput()
                 AddCallInstForOutputExport(pOutputValue,
                                            pMeta,
                                            nullptr,
+                                           0,
                                            0,
                                            0,
                                            nullptr,
@@ -1168,7 +1171,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     Constant*    pInOutMeta,        // [in] Metadata of this input/output
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
     uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
-                                    //    For an array built-in with a variable index, this is the array size.
+                                    //   For an array built-in with a variable index, this is the array size.
     Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation shader
                                     // (usually, it is vector component index, for built-in input/output, it could be
                                     // element index of scalar array)
@@ -1472,23 +1475,27 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 // =====================================================================================================================
 // Inserts LLVM call instruction to export output.
 void SpirvLowerGlobal::AddCallInstForOutputExport(
-    Value*       pOutputValue, // [in] Value exported to output
-    Constant*    pOutputMeta,  // [in] Metadata of this output
-    Value*       pLocOffset,   // [in] Relative location offset, passed from aggregate type
-    uint32_t     maxLocOffset, // Max+1 location offset if variable index has been encountered.
-                               //    For an array built-in with a variable index, this is the array size.
-    uint32_t     xfbLocOffset, // Transform feedback location offset (for array type)
-    Value*       pElemIdx,     // [in] Element index used for element indexing, valid for tessellation control shader
-                               // (usually, it is vector component index, for built-in input/output, it could be
-                               // element index of scalar array)
-    Value*       pVertexIdx,   // [in] Output array outermost index used for vertex indexing, valid for tessellation
-                               // control shader
-    uint32_t     emitStreamId, // ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for other stages)
-    Instruction* pInsertPos)   // [in] Where to insert this call
+    Value*       pOutputValue,      // [in] Value exported to output
+    Constant*    pOutputMeta,       // [in] Metadata of this output
+    Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
+    uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
+                                    //   For an array built-in with a variable index, this is the array size.
+    uint32_t     xfbLocOffset,      // Transform feedback location offset (for array type)
+    uint32_t     xfbBufferAdjust,   // Adjustment of transform feedback buffer ID (for array type, default is 0)
+    Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation control
+                                    //   shader (usually, it is vector component index, for built-in input/output, it
+                                    //   could be element index of scalar array)
+    Value*       pVertexIdx,        // [in] Output array outermost index used for vertex indexing, valid for
+                                    //   tessellation control shader
+    uint32_t     emitStreamId,      // ID of emitted vertex stream, valid for geometry shader (0xFFFFFFFF for others)
+    Instruction* pInsertPos)        // [in] Where to insert this call
 {
     Type* pOutputTy = pOutputValue->getType();
 
     ShaderInOutMetadata outputMeta = {};
+
+    // NOTE: This special flag is just to check if we need output header of transform feedback info.
+    static uint32_t enableXfb = false;
 
     if (pOutputTy->isArrayTy())
     {
@@ -1525,7 +1532,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                LLPC_ASSERT(xfbLocOffset == 0); // Unused for built-ins
+                LLPC_ASSERT((xfbLocOffset == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
 
                 auto pElemTy = pOutputTy->getArrayElementType();
                 LLPC_ASSERT(pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()); // Must be scalar
@@ -1548,6 +1555,22 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                                                      outputMeta.XfbStride,
                                                      pXfbOffset,
                                                      outputInfo);
+
+                    if (enableXfb == false)
+                    {
+                        LLPC_OUTS("\n===============================================================================\n");
+                        LLPC_OUTS("// LLPC transform feedback export info for " <<
+                                  GetShaderStageName(m_shaderStage) << " shader\n\n");
+
+                        enableXfb = true;
+                    }
+
+                    auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
+                    LLPC_OUTS(GetTypeName(pOutputValue->getType()) <<
+                              " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), " <<
+                              "xfbBuffer = " << outputMeta.XfbBuffer << ", " <<
+                              "xfbStride = " << outputMeta.XfbStride << ", " <<
+                              "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
                 }
             }
         }
@@ -1587,11 +1610,16 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                     pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
                 }
 
+                // NOTE: GLSL spec says: an array of size N of blocks is captured by N consecutive buffers,
+                // with all members of block array-element E captured by buffer B, where B equals the declared or
+                // inherited xfb_buffer plus E.
+                bool blockArray = outputMeta.IsBlockArray;
                 AddCallInstForOutputExport(pElem,
                                            pElemMeta,
                                            pElemLocOffset,
                                            maxLocOffset,
-                                           xfbLocOffset + outputMeta.XfbLocStride * elemIdx,
+                                           xfbLocOffset + (blockArray ? 0 : outputMeta.XfbArrayStride * elemIdx),
+                                           xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * elemIdx : 0),
                                            nullptr,
                                            pVertexIdx,
                                            emitStreamId,
@@ -1619,6 +1647,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                                        pLocOffset,
                                        maxLocOffset,
                                        xfbLocOffset,
+                                       xfbBufferAdjust,
                                        nullptr,
                                        pVertexIdx,
                                        emitStreamId,
@@ -1656,7 +1685,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                LLPC_ASSERT(xfbLocOffset == 0); // Unused for built-ins
+                LLPC_ASSERT((xfbLocOffset == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
                 auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbLoc);
                 m_pBuilder->CreateWriteXfbOutput(pOutputValue,
                                                  /*isBuiltIn=*/true,
@@ -1665,6 +1694,21 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                                                  outputMeta.XfbStride,
                                                  pXfbOffset,
                                                  outputInfo);
+
+                if (enableXfb == false)
+                {
+                    LLPC_OUTS("\n===============================================================================\n");
+                    LLPC_OUTS("// LLPC transform feedback export info for " << GetShaderStageName(m_shaderStage) << " shader\n\n");
+
+                    enableXfb = true;
+                }
+
+                auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
+                LLPC_OUTS(GetTypeName(pOutputValue->getType()) <<
+                          " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), " <<
+                          "xfbBuffer = " << outputMeta.XfbBuffer << ", " <<
+                          "xfbStride = " << outputMeta.XfbStride << ", " <<
+                          "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
             }
 
             m_pBuilder->CreateWriteBuiltInOutput(pOutputValue, builtInId, outputInfo, pVertexIdx, pElemIdx);
@@ -1694,9 +1738,23 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             m_pBuilder->CreateWriteXfbOutput(pOutputValue,
                                              /*isBuiltIn=*/false,
                                              location + cast<ConstantInt>(pLocOffset)->getZExtValue(),
-                                             outputMeta.XfbBuffer,
+                                             outputMeta.XfbBuffer + xfbBufferAdjust,
                                              outputMeta.XfbStride,
                                              pXfbOffset, outputInfo);
+
+            if (enableXfb == false)
+            {
+                LLPC_OUTS("\n===============================================================================\n");
+                LLPC_OUTS("// LLPC transform feedback export info for " << GetShaderStageName(m_shaderStage) << " shader\n\n");
+
+                enableXfb = true;
+            }
+
+            LLPC_OUTS(GetTypeName(pOutputValue->getType()) <<
+                      " (loc = " << location + cast<ConstantInt>(pLocOffset)->getZExtValue() << "), " <<
+                      "xfbBuffer = " << outputMeta.XfbBuffer + xfbBufferAdjust << ", " <<
+                      "xfbStride = " << outputMeta.XfbStride << ", " <<
+                      "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
         }
 
         m_pBuilder->CreateWriteGenericOutput(pOutputValue,
@@ -1898,6 +1956,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                                                   nullptr,
                                                   pOutputTy->getArrayNumElements(),
                                                   InvalidValue,
+                                                  0,
                                                   pElemIdx,
                                                   pVertexIdx,
                                                   InvalidValue,
@@ -1968,6 +2027,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                                               pLocOffset,
                                               maxLocOffset,
                                               InvalidValue,
+                                              0,
                                               pCompIdx,
                                               pVertexIdx,
                                               InvalidValue,
@@ -1984,6 +2044,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                                           pLocOffset,
                                           maxLocOffset,
                                           InvalidValue,
+                                          0,
                                           nullptr,
                                           pVertexIdx,
                                           InvalidValue,

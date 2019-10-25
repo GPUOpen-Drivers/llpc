@@ -1183,11 +1183,13 @@ union ShaderInOutMetadata {
                                       // output (tessellation shader)
     uint64_t StreamId           : 2;  // ID of output stream (geometry shader)
     uint64_t IsXfb              : 1;  // Whether this is for transform feedback
+    uint64_t IsBlockArray       : 1;  // Whether we are handling block array
+
     uint64_t XfbBuffer          : 2;  // Transform feedback buffer ID
-    uint64_t XfbOffset          : 15; // Transform feedback offset
+    uint64_t XfbOffset          : 16; // Transform feedback offset
     uint64_t XfbStride          : 16; // Transform feedback stride
-    uint64_t XfbLoc             : 14; // Transform feedback location
-    uint64_t XfbLocStride       : 15; // Transform location stride
+    uint64_t XfbLoc             : 16; // Transform feedback location
+    uint64_t XfbArrayStride     : 16; // Transform feedback array stride
   };
   uint64_t U64All[2];
 };
@@ -1208,6 +1210,8 @@ struct ShaderInOutDecorate {
 
   bool           IsXfb;             // Whether this is a for transform feedback
 
+  bool           IsBlockArray;      // Whether we are handling a block array
+
   uint32_t       Component;         // Component offset of inputs and outputs
 
   bool           PerPatch;          // Whether this is a per-patch input/output
@@ -1223,7 +1227,7 @@ struct ShaderInOutDecorate {
   uint32_t       XfbOffset;          // Transform feedback offset
   uint32_t       XfbStride;          // Transform feedback stride
   uint32_t       XfbLoc;             // Transform feedback location
-  uint32_t       XfbLocStride;       // Transform feedback location stride
+  uint32_t       XfbArrayStride;     // Transform feedback array stride
   bool           contains64BitType;  // Whether contains 64-bit type
 };
 
