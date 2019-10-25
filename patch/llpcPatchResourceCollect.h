@@ -83,7 +83,6 @@ private:
     void MatchGenericInOut();
     void MapBuiltInToGenericInOut();
 
-    void ReviseTessExecutionMode();
     void MapGsGenericOutput(GsOutLocInfo outLocInfo);
     void MapGsBuiltInOutput(uint32_t builtInId, uint32_t elemCount);
 

@@ -224,7 +224,8 @@ public:
     // Given an opcode, get the call name (without the "llpc.call." prefix)
     static StringRef GetCallName(Opcode opcode);
 
-    ~BuilderRecorder() {}
+    // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
+    void RecordShaderModes(Module* pModule) override final;
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
@@ -650,6 +651,10 @@ public:
     Value* CreateSubgroupMbcnt(Value* const pMask,
                                const Twine& instName ) override final;
 
+protected:
+    // Get the ShaderModes object.
+    ShaderModes* GetShaderModes() override final;
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderRecorder)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderRecorder)
@@ -665,7 +670,8 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
-    PipelineState*            m_pPipelineState;           // PipelineState; nullptr for shader compile
+    PipelineState*                m_pPipelineState;           // PipelineState; nullptr for shader compile
+    std::unique_ptr<ShaderModes>  m_shaderModes;              // ShaderModes for a shader compile
 };
 
 // Create BuilderReplayer pass

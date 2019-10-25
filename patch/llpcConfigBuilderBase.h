@@ -69,6 +69,7 @@ protected:
     void SetPipelineType(Util::Abi::PipelineType value);
     void SetLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetEsGsLdsSize(uint32_t value);
+    uint32_t SetupFloatingPointMode(ShaderStage shaderStage);
 
     void AppendConfig(llvm::ArrayRef<Util::Abi::PalMetadataNoteEntry> config);
     void AppendConfig(uint32_t key, uint32_t value);

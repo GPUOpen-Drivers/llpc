@@ -96,8 +96,6 @@ private:
     template <typename T>
     void SetupVgtTfParam(T* pConfig);
 
-    uint32_t SetupFloatingPointMode(ShaderStage shaderStage);
-
 };
 
 } // Gfx6

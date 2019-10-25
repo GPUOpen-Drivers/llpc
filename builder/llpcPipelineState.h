@@ -31,7 +31,10 @@
 #pragma once
 
 #include "llpcPipeline.h"
+#include "llpcShaderModes.h"
+#include "palPipelineAbi.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Pass.h"
 #include <map>
 
@@ -123,6 +126,9 @@ public:
     // -----------------------------------------------------------------------------------------------------------------
     // Other methods
 
+    // Get the embedded ShaderModes object
+    ShaderModes* GetShaderModes() { return &m_shaderModes; }
+
     // Clear the pipeline state IR metadata.
     void Clear(Module* pModule);
 
@@ -156,6 +162,99 @@ public:
     NggControl* GetNggControl() { return &m_nggControl; }
 #endif
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
+
+    // Get a metadata node containing an array of i32 values, which can be read from any type.
+    // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
+    // returns nullptr.
+    template<typename T>
+    static MDNode* GetArrayOfInt32MetaNode(
+        LLVMContext&        context,          // [in] LLVM context
+        const T&            value,            // [in] Value to write as array of i32
+        bool                atLeastOneValue)  // True to generate node with one value even if all values are zero
+    {
+        IRBuilder<> builder(context);
+        ArrayRef<uint32_t> values(reinterpret_cast<const uint32_t*>(&value), sizeof(value) / sizeof(uint32_t));
+
+        while ((values.empty() == false) && (values.back() == 0))
+        {
+            if ((values.size() == 1) && atLeastOneValue)
+            {
+                break;
+            }
+            values = values.slice(0, values.size() - 1);
+        }
+        if (values.empty())
+        {
+            return nullptr;
+        }
+
+        SmallVector<Metadata*, 8> operands;
+        for (uint32_t value : values)
+        {
+            operands.push_back(ConstantAsMetadata::get(builder.getInt32(value)));
+        }
+        return MDNode::get(context, operands);
+    }
+
+    // Set a named metadata node to point to an array of i32 values, which can be read from any type.
+    // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
+    // removes the named metadata node (if it existed).
+    template<typename T>
+    static void SetNamedMetadataToArrayOfInt32(
+        Module*             pModule,    // [in/out] IR module to record into
+        const T&            value,      // [in] Value to write as array of i32
+        StringRef           metaName)   // Name for named metadata node
+    {
+        MDNode* pArrayMetaNode = GetArrayOfInt32MetaNode(pModule->getContext(), value, false);
+        if (pArrayMetaNode == nullptr)
+        {
+            if (auto pNamedMetaNode = pModule->getNamedMetadata(metaName))
+            {
+                pModule->eraseNamedMetadata(pNamedMetaNode);
+            }
+            return;
+        }
+
+        auto pNamedMetaNode = pModule->getOrInsertNamedMetadata(metaName);
+        pNamedMetaNode->clearOperands();
+        pNamedMetaNode->addOperand(pArrayMetaNode);
+    }
+
+    // Read an array of i32 values out of a metadata node, writing into any type.
+    // Returns the number of i32s read.
+    template<typename T>
+    static uint32_t ReadArrayOfInt32MetaNode(
+        MDNode*                   pMetaNode,  // Metadata node to read from
+        T&                        value)      // [out] Value to write into (caller must zero initialize)
+    {
+        MutableArrayRef<uint32_t> values(reinterpret_cast<uint32_t*>(&value), sizeof(value) / sizeof(uint32_t));
+        uint32_t count = std::min(pMetaNode->getNumOperands(), unsigned(values.size()));
+        for (uint32_t index = 0; index < count; ++index)
+        {
+            values[index] = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(index))->getZExtValue();
+        }
+        return count;
+    }
+
+    // Read an array of i32 values out of a metadata node that is operand 0 of the named metadata node,
+    // writing into any type.
+    // Returns the number of i32s read.
+    template<typename T>
+    static uint32_t ReadNamedMetadataArrayOfInt32(
+        Module*                   pModule,    // [in] IR module to look in
+        StringRef                 metaName,   // Name for named metadata node
+        T&                        value)      // [out] Value to write into (caller must zero initialize)
+    {
+        auto pNamedMetaNode = pModule->getNamedMetadata(metaName);
+        if ((pNamedMetaNode == nullptr) || (pNamedMetaNode->getNumOperands() == 0))
+        {
+            return 0;
+        }
+        return ReadArrayOfInt32MetaNode(pNamedMetaNode->getOperand(0), value);
+    }
+
 private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
@@ -183,6 +282,7 @@ private:
 #if LLPC_BUILD_GFX10
     NggControl                      m_nggControl = {};                  // NGG control settings
 #endif
+    ShaderModes                     m_shaderModes;                      // Shader modes for this pipeline
 };
 
 // =====================================================================================================================

@@ -31,6 +31,8 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPipelineState.h"
+#include "llpcShaderModes.h"
 
 #include <set>
 
@@ -46,6 +48,53 @@ Builder::Builder(
     IRBuilder<>(pBuilderContext->GetContext()),
     m_pBuilderContext(pBuilderContext)
 {
+}
+
+// =====================================================================================================================
+// Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+void Builder::SetCommonShaderMode(
+    const CommonShaderMode& commonShaderMode)   // [in] FP round and denorm modes
+{
+    GetShaderModes()->SetCommonShaderMode(m_shaderStage, commonShaderMode);
+}
+
+// =====================================================================================================================
+// Get the common shader mode for the current shader.
+const CommonShaderMode& Builder::GetCommonShaderMode()
+{
+    return GetShaderModes()->GetCommonShaderMode(m_shaderStage);
+}
+
+// =====================================================================================================================
+// Set the tessellation mode
+void Builder::SetTessellationMode(
+    const TessellationMode& tessellationMode)   // [in] Tessellation mode
+{
+    GetShaderModes()->SetTessellationMode(tessellationMode);
+}
+
+// =====================================================================================================================
+// Set the geometry shader mode
+void Builder::SetGeometryShaderMode(
+    const GeometryShaderMode& geometryShaderMode)   // [in] Geometry shader mode
+{
+    GetShaderModes()->SetGeometryShaderMode(geometryShaderMode);
+}
+
+// =====================================================================================================================
+// Set the fragment shader mode
+void Builder::SetFragmentShaderMode(
+    const FragmentShaderMode& fragmentShaderMode)   // [in] Fragment shader mode
+{
+    GetShaderModes()->SetFragmentShaderMode(fragmentShaderMode);
+}
+
+// =====================================================================================================================
+// Set the compute shader mode (workgroup size)
+void Builder::SetComputeShaderMode(
+    const ComputeShaderMode& computeShaderMode)   // [in] Compute shader mode
+{
+    GetShaderModes()->SetComputeShaderMode(computeShaderMode);
 }
 
 // =====================================================================================================================

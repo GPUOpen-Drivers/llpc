@@ -476,7 +476,7 @@ Value* PatchCopyShader::CalcGsVsRingOffsetForInput(
     }
     else
     {
-        uint32_t outputVertices = pResUsage->builtInUsage.gs.outputVertices;
+        uint32_t outputVertices = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices;
 
         // ringOffset = vertexOffset * 4 + (location * 4 + compIdx) * 64 * maxVertices
         pRingOffset = builder.CreateMul(pVertexOffset, builder.getInt32(4));

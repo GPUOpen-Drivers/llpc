@@ -111,6 +111,9 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
                                       //    the CreateGet*DescPtr methods
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
+    // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+    getContext().GetShaderResourceUsage(m_shaderStage)->useImages = true;
+
     std::string name = LlpcName::DescriptorLoadFromPtr;
     AddTypeMangling(pDescPtr->getType(), {}, name);
     auto pDesc = EmitCall(name,

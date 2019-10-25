@@ -55,6 +55,9 @@ public:
                             const Twine& instName = "") override final;
 
 protected:
+    // Get the ShaderModes object.
+    ShaderModes* GetShaderModes() override final;
+
     // Get whether the context we are building in supports DPP operations.
     bool SupportDpp() const;
 

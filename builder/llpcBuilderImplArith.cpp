@@ -30,6 +30,7 @@
  */
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
+#include "llpcPipelineState.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-arith"
 
@@ -1331,16 +1332,15 @@ Value* BuilderImplArith::CreateFindSMsb(
 // instruction that does not honor the hardware's FP mode, such as fmin/fmax/fmed on GFX8 and earlier.
 Value* BuilderImplArith::Canonicalize(
     Value*  pValue)   // [in] Value to canonicalize
-{
-    auto pContext = &getContext();
-    auto fp16Control = pContext->GetShaderFloatControl(m_shaderStage, 16);
-    auto fp32Control = pContext->GetShaderFloatControl(m_shaderStage, 32);
-    auto fp64Control = pContext->GetShaderFloatControl(m_shaderStage, 64);
-
+ {
+    const auto& shaderMode = GetShaderModes()->GetCommonShaderMode(m_shaderStage);
     auto pDestTy = pValue->getType();
-    if ((pDestTy->getScalarType()->isHalfTy() && fp16Control.denormFlushToZero) ||
-        (pDestTy->getScalarType()->isFloatTy() && fp32Control.denormFlushToZero) ||
-        (pDestTy->getScalarType()->isDoubleTy() && fp64Control.denormFlushToZero))
+    FpDenormMode denormMode =
+       pDestTy->getScalarType()->isHalfTy() ? shaderMode.fp16DenormMode :
+       pDestTy->getScalarType()->isFloatTy() ? shaderMode.fp32DenormMode :
+       pDestTy->getScalarType()->isDoubleTy() ? shaderMode.fp64DenormMode :
+       FpDenormMode::DontCare;
+    if ((denormMode == FpDenormMode::FlushOut) || (denormMode == FpDenormMode::FlushInOut))
     {
         // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
         pValue = CreateUnaryIntrinsic(Intrinsic::canonicalize, pValue);

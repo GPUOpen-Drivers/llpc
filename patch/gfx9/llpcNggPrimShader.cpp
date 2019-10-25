@@ -4004,19 +4004,20 @@ Function* NggPrimShader::CreateGsEmitHandler(
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
+    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto& pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
     uint32_t outVertsPerPrim = 0;
-    switch (pResUsage->builtInUsage.gs.outputPrimitive)
+    switch (geometryMode.outputPrimitive)
     {
-    case OutputPoints:
+    case OutputPrimitives::Points:
         outVertsPerPrim = 1;
         break;
-    case OutputLineStrip:
+    case OutputPrimitives::LineStrip:
         outVertsPerPrim = 2;
         break;
-    case OutputTriangleStrip:
+    case OutputPrimitives::TriangleStrip:
         outVertsPerPrim = 3;
         break;
     default:
@@ -4057,7 +4058,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
         {
             // vertexId = threadIdInSubgroup * outputVertices + outVertCounter
             auto pvertexId = m_pBuilder->CreateMul(pThreadIdInSubgroup,
-                m_pBuilder->getInt32(pResUsage->builtInUsage.gs.outputVertices));
+                m_pBuilder->getInt32(geometryMode.outputVertices));
             pvertexId = m_pBuilder->CreateAdd(pvertexId, pOutVertCounter);
 
             // vertexId0 = vertexId - outVertsPerPrim
@@ -4206,19 +4207,20 @@ Function* NggPrimShader::CreateGsCutHandler(
 
     auto savedInsertPoint = m_pBuilder->saveIP();
 
+    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto& pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
     uint32_t outVertsPerPrim = 0;
-    switch (pResUsage->builtInUsage.gs.outputPrimitive)
+    switch (geometryMode.outputPrimitive)
     {
-    case OutputPoints:
+    case OutputPrimitives::Points:
         outVertsPerPrim = 1;
         break;
-    case OutputLineStrip:
+    case OutputPrimitives::LineStrip:
         outVertsPerPrim = 2;
         break;
-    case OutputTriangleStrip:
+    case OutputPrimitives::TriangleStrip:
         outVertsPerPrim = 3;
         break;
     default:

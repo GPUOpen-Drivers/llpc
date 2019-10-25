@@ -90,7 +90,6 @@ private:
     uint32_t GetFlattenArrayElementCount(const llvm::Type* pTy) const;
     const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
 
-    void CollectExecutionModeUsage();
     void CollectResourceNodeData(const GlobalVariable* pGlobal);
 
     // -----------------------------------------------------------------------------------------------------------------

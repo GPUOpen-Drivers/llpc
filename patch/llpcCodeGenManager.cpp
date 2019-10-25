@@ -210,7 +210,7 @@ void CodeGenManager::SetupTargetFeatures(
             if (pFunc->getCallingConv() == CallingConv::AMDGPU_CS)
             {
                 // Set the work group size
-                const auto& csBuiltInUsage = pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+                const auto& csBuiltInUsage = pPipelineState->GetShaderModes()->GetComputeShaderMode();
                 uint32_t flatWorkGroupSize =
                     csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
                 auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
@@ -238,26 +238,33 @@ void CodeGenManager::SetupTargetFeatures(
             }
 #endif
 
-            auto fp16Control = pContext->GetShaderFloatControl(shaderStage, 16);
-            auto fp32Control = pContext->GetShaderFloatControl(shaderStage, 32);
-            auto fp64Control = pContext->GetShaderFloatControl(shaderStage, 64);
-
-            if (fp16Control.denormPerserve || fp64Control.denormPerserve)
+            if (shaderStage != ShaderStageCopyShader)
             {
-                targetFeatures += ",+fp64-fp16-denormals";
-            }
-            else if (fp16Control.denormFlushToZero || fp64Control.denormFlushToZero)
-            {
-                targetFeatures += ",-fp64-fp16-denormals";
-            }
-
-            if (fp32Control.denormPerserve)
-            {
-                targetFeatures += ",+fp32-denormals";
-            }
-            else if (fp32Control.denormFlushToZero)
-            {
-                targetFeatures += ",-fp32-denormals";
+                const auto& shaderMode = pPipelineState->GetShaderModes()->GetCommonShaderMode(shaderStage);
+                if ((shaderMode.fp16DenormMode == FpDenormMode::FlushNone) ||
+                    (shaderMode.fp16DenormMode == FpDenormMode::FlushIn) ||
+                    (shaderMode.fp64DenormMode == FpDenormMode::FlushNone) ||
+                    (shaderMode.fp64DenormMode == FpDenormMode::FlushIn))
+                {
+                    targetFeatures += ",+fp64-fp16-denormals";
+                }
+                else if ((shaderMode.fp16DenormMode == FpDenormMode::FlushOut) ||
+                         (shaderMode.fp16DenormMode == FpDenormMode::FlushInOut) ||
+                         (shaderMode.fp64DenormMode == FpDenormMode::FlushOut) ||
+                         (shaderMode.fp64DenormMode == FpDenormMode::FlushInOut))
+                {
+                    targetFeatures += ",-fp64-fp16-denormals";
+                }
+                if ((shaderMode.fp32DenormMode == FpDenormMode::FlushNone) ||
+                    (shaderMode.fp32DenormMode == FpDenormMode::FlushIn))
+                {
+                    targetFeatures += ",+fp32-denormals";
+                }
+                else if ((shaderMode.fp32DenormMode == FpDenormMode::FlushOut) ||
+                         (shaderMode.fp32DenormMode == FpDenormMode::FlushInOut))
+                {
+                    targetFeatures += ",-fp32-denormals";
+                }
             }
 
             builder.addAttribute("target-features", targetFeatures);

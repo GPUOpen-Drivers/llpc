@@ -47,6 +47,7 @@ ConfigBuilderBase::ConfigBuilderBase(
     PipelineState*  pPipelineState) // [in] Pipeline state
     :
     m_pModule(pModule),
+    m_pPipelineState(pPipelineState),
     m_userDataLimit(0),
     m_spillThreshold(UINT32_MAX)
 {
@@ -427,5 +428,41 @@ void ConfigBuilderBase::WritePalMetadata()
     auto pAbiMetaNode = MDNode::get(m_pModule->getContext(), pAbiMetaString);
     auto pNamedMeta = m_pModule->getOrInsertNamedMetadata("amdgpu.pal.metadata.msgpack");
     pNamedMeta->addOperand(pAbiMetaNode);
+}
+
+// =====================================================================================================================
+// Sets up floating point mode from the specified floating point control flags.
+uint32_t ConfigBuilderBase::SetupFloatingPointMode(
+    ShaderStage shaderStage)    // Shader stage
+{
+    FloatMode floatMode = {};
+    floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
+    if (shaderStage != ShaderStageCopyShader)
+    {
+        const auto& shaderMode = m_pPipelineState->GetShaderModes()->GetCommonShaderMode(shaderStage);
+
+        // The HW rounding mode values happen to be one less than the FpRoundMode value, other than
+        // FpRoundMode::DontCare, which we map to a default value.
+        floatMode.bits.fp16fp64RoundMode = (shaderMode.fp16RoundMode != FpRoundMode::DontCare) ?
+                                           static_cast<uint32_t>(shaderMode.fp16RoundMode) - 1 :
+                                           (shaderMode.fp64RoundMode != FpRoundMode::DontCare) ?
+                                           static_cast<uint32_t>(shaderMode.fp64RoundMode) - 1 :
+                                           FP_ROUND_TO_NEAREST_EVEN;
+        floatMode.bits.fp32RoundMode = (shaderMode.fp32RoundMode != FpRoundMode::DontCare) ?
+                                       static_cast<uint32_t>(shaderMode.fp32RoundMode) - 1 :
+                                       FP_ROUND_TO_NEAREST_EVEN;
+
+        // The denorm modes happen to be one less than the FpDenormMode value, other than
+        // FpDenormMode::DontCare, which we map to a default value.
+        floatMode.bits.fp16fp64DenormMode = (shaderMode.fp16DenormMode != FpDenormMode::DontCare) ?
+                                            static_cast<uint32_t>(shaderMode.fp16DenormMode) - 1 :
+                                            (shaderMode.fp64DenormMode != FpDenormMode::DontCare) ?
+                                            static_cast<uint32_t>(shaderMode.fp64DenormMode) - 1 :
+                                            FP_DENORM_FLUSH_NONE;
+        floatMode.bits.fp32DenormMode = (shaderMode.fp32DenormMode != FpDenormMode::DontCare) ?
+                                        static_cast<uint32_t>(shaderMode.fp32DenormMode) - 1 :
+                                        FP_DENORM_FLUSH_IN_OUT;
+    }
+    return floatMode.u32All;
 }
 

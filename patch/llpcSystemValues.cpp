@@ -209,9 +209,9 @@ Value* ShaderSystemValues::GetTessCoord()
                                                  "",
                                                  pInsertPos);
 
-        uint32_t primitiveMode =
-            m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.primitiveMode;
-        pTessCoordZ = (primitiveMode == Triangles) ? pTessCoordZ : ConstantFP::get(m_pContext->FloatTy(), 0.0f);
+        auto primitiveMode = m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode;
+        pTessCoordZ = (primitiveMode == PrimitiveMode::Triangles) ?
+                          pTessCoordZ : ConstantFP::get(m_pContext->FloatTy(), 0.0f);
 
         m_pTessCoord = UndefValue::get(m_pContext->Floatx3Ty());
         m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
@@ -286,7 +286,8 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
 
             // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(uint32_t)
             // streamOffset = (streamSize[0] + ... + streamSize[streamId - 1]) * 64 * outputVertices
-            uint32_t baseAddr = outLocStart * pResUsage->builtInUsage.gs.outputVertices
+            uint32_t baseAddr = outLocStart *
+                                m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices
                 * sizeof(uint32_t) * 4 * 64;
 
             // Patch GS-VS ring buffer descriptor base address for GS output
@@ -304,7 +305,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
             pGsVsRingBufDescElem1 = builder.CreateAnd(pGsVsRingBufDescElem1, builder.getInt32(strideClearMask.u32All));
 
             // Calculate and set stride in SRD dword1
-            uint32_t gsVsStride = pResUsage->builtInUsage.gs.outputVertices *
+            uint32_t gsVsStride = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices *
                                   pResUsage->inOutUsage.gs.outLocCount[streamId] *
                                   sizeof(uint32_t) * 4;
 

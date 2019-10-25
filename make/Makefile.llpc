@@ -83,7 +83,8 @@ ifeq ($(ICD_BUILD_LLPC), 1)
         llpcBuilderImplSubgroup.cpp         \
         llpcBuilderRecorder.cpp             \
         llpcBuilderReplayer.cpp             \
-        llpcPipelineState.cpp
+        llpcPipelineState.cpp               \
+        llpcShaderModes.cpp
 
     # llpc/context
     CPPFILES +=                             \

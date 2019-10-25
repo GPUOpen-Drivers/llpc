@@ -227,9 +227,6 @@ public:
     }
 #endif
 
-    // Gets float control settings of the specified shader stage for the provide floating-point type.
-    FloatControl GetShaderFloatControl(ShaderStage shaderStage, uint32_t bitWidth);
-
     // Gets the count of vertices per primitive
     uint32_t GetVerticesPerPrimitive()
     {
