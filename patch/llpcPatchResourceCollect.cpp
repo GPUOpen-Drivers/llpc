@@ -247,8 +247,8 @@ void PatchResourceCollect::SetNggControl()
                 // NGG runs in pass-through mode for non-triangle tessellation output
                 LLPC_ASSERT(hasTs);
 
-                const auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
-                if (builtInUsage.pointMode || (builtInUsage.primitiveMode == Isolines))
+                const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
+                if (tessMode.pointMode || (tessMode.primitiveMode == PrimitiveMode::Isolines))
                 {
                     nggControl.passthroughMode = true;
                 }
@@ -263,8 +263,8 @@ void PatchResourceCollect::SetNggControl()
 
             if (hasGs)
             {
-                const auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
-                if (builtInUsage.outputPrimitive != OutputTriangleStrip)
+                const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
+                if (geometryMode.outputPrimitive != OutputPrimitives::TriangleStrip)
                 {
                     // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
                     // (actual no culling) mode
@@ -444,26 +444,27 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
 #endif
 
+    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     auto pGsResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
 
     uint32_t inVertsPerPrim = 0;
     bool useAdjacency = false;
-    switch (pGsResUsage->builtInUsage.gs.inputPrimitive)
+    switch (geometryMode.inputPrimitive)
     {
-    case InputPoints:
+    case InputPrimitives::Points:
         inVertsPerPrim = 1;
         break;
-    case InputLines:
+    case InputPrimitives::Lines:
         inVertsPerPrim = 2;
         break;
-    case InputLinesAdjacency:
+    case InputPrimitives::LinesAdjacency:
         useAdjacency = true;
         inVertsPerPrim = 4;
         break;
-    case InputTriangles:
+    case InputPrimitives::Triangles:
         inVertsPerPrim = 3;
         break;
-    case InputTrianglesAdjacency:
+    case InputPrimitives::TrianglesAdjacency:
         useAdjacency = true;
         inVertsPerPrim = 6;
         break;
@@ -475,15 +476,15 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     pGsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
 
     uint32_t outVertsPerPrim = 0;
-    switch (pGsResUsage->builtInUsage.gs.outputPrimitive)
+    switch (geometryMode.outputPrimitive)
     {
-    case OutputPoints:
+    case OutputPrimitives::Points:
         outVertsPerPrim = 1;
         break;
-    case OutputLineStrip:
+    case OutputPrimitives::LineStrip:
         outVertsPerPrim = 2;
         break;
-    case OutputTriangleStrip:
+    case OutputPrimitives::TriangleStrip:
         outVertsPerPrim = 3;
         break;
     default:
@@ -496,10 +497,10 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         uint32_t gsPrimsPerSubgroup = m_pContext->GetGpuProperty()->gsOnChipDefaultPrimsPerSubgroup;
 
         const uint32_t esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
-        const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
+        const uint32_t gsInstanceCount  = geometryMode.invocations;
         const uint32_t gsVsRingItemSize = 4 * std::max(1u,
                                                        (pGsResUsage->inOutUsage.outputMapLocCount *
-                                                        pGsResUsage->builtInUsage.gs.outputVertices));
+                                                        geometryMode.outputVertices));
 
         uint32_t esGsRingItemSizeOnChip = esGsRingItemSize;
         uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize;
@@ -628,14 +629,14 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             const uint32_t gsVsRingItemSize = hasGs ? std::max(1u,
                                                                4 * pGsResUsage->inOutUsage.outputMapLocCount
-                                                                 * pGsResUsage->builtInUsage.gs.outputVertices) : 0;
+                                                                 * geometryMode.outputVertices) : 0;
 
             const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
             const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
 
             // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
             const uint32_t primAmpFactor =
-                hasGs ? pGsResUsage->builtInUsage.gs.outputVertices - (outVertsPerPrim - 1) : 0;
+                hasGs ? geometryMode.outputVertices - (outVertsPerPrim - 1) : 0;
 
             const uint32_t vertsPerPrimitive = m_pContext->GetVerticesPerPrimitive();
 
@@ -726,7 +727,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 // by the amplification factor is larger than the supported number of primitives within a subgroup, we
                 // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
                 // over-allocating LDS.
-                uint32_t maxVertOut = hasGs ? pGsResUsage->builtInUsage.gs.outputVertices : 1;
+                uint32_t maxVertOut = hasGs ? geometryMode.outputVertices : 1;
 
                 LLPC_ASSERT(maxVertOut >= primAmpFactor);
 
@@ -736,7 +737,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                 }
 
                 // Let's take into consideration instancing:
-                const uint32_t gsInstanceCount = pGsResUsage->builtInUsage.gs.invocations;
+                const uint32_t gsInstanceCount = geometryMode.invocations;
                 LLPC_ASSERT(gsInstanceCount >= 1);
                 gsPrimsPerSubgroup /= gsInstanceCount;
                 esVertsPerSubgroup = gsPrimsPerSubgroup * maxVertOut;
@@ -791,12 +792,12 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             const uint32_t gsVsRingItemSize = 4 * std::max(1u,
                                                            (pGsResUsage->inOutUsage.outputMapLocCount *
-                                                            pGsResUsage->builtInUsage.gs.outputVertices));
+                                                            geometryMode.outputVertices));
 
             // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
             const uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
 
-            const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
+            const uint32_t gsInstanceCount  = geometryMode.invocations;
 
             // TODO: Confirm no ES-GS extra LDS space used.
             const uint32_t esGsExtraLdsDwords  = 0;
@@ -993,7 +994,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     for (uint32_t i = 0; i < MaxGsStreams; ++i)
     {
         uint32_t streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
-                                    pGsResUsage->builtInUsage.gs.outputVertices * 4;
+                                    geometryMode.outputVertices * 4;
         LLPC_OUTS("    stream " << i << " = " << streamItemSize);
 
         if (pGsResUsage->inOutUsage.enableXfb)
@@ -1070,11 +1071,7 @@ void PatchResourceCollect::ProcessShader()
         MapBuiltInToGenericInOut();
     }
 
-    if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
-    {
-        ReviseTessExecutionMode();
-    }
-    else if (m_shaderStage == ShaderStageFragment)
+    if (m_shaderStage == ShaderStageFragment)
     {
         if (m_pResUsage->builtInUsage.fs.fragCoord || m_pResUsage->builtInUsage.fs.sampleMaskIn)
         {
@@ -3171,81 +3168,6 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output (per-patch): loc count = "
                   << inOutUsage.perPatchOutputMapLocCount << "\n");
     LLPC_OUTS("\n");
-}
-
-// =====================================================================================================================
-// Revises the usage of execution modes for tessellation shader.
-void PatchResourceCollect::ReviseTessExecutionMode()
-{
-    LLPC_ASSERT((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
-
-    // NOTE: Usually, "output vertices" is specified on tessellation control shader and "vertex spacing", "vertex
-    // order", "point mode", "primitive mode" are all specified on tessellation evaluation shader according to GLSL
-    // spec. However, SPIR-V spec allows those execution modes to be specified on any of tessellation shader. So we
-    // have to revise the execution modes and make them follow GLSL spec.
-    auto& tcsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
-    auto& tesBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
-
-    if (tcsBuiltInUsage.outputVertices == 0)
-    {
-        if (tesBuiltInUsage.outputVertices != 0)
-        {
-            tcsBuiltInUsage.outputVertices = tesBuiltInUsage.outputVertices;
-            tesBuiltInUsage.outputVertices = 0;
-        }
-        else
-        {
-            tcsBuiltInUsage.outputVertices = MaxTessPatchVertices;
-        }
-    }
-
-    if (tesBuiltInUsage.vertexSpacing == SpacingUnknown)
-    {
-        if (tcsBuiltInUsage.vertexSpacing != SpacingUnknown)
-        {
-            tesBuiltInUsage.vertexSpacing = tcsBuiltInUsage.vertexSpacing;
-            tcsBuiltInUsage.vertexSpacing = SpacingUnknown;
-        }
-        else
-        {
-            tesBuiltInUsage.vertexSpacing = SpacingEqual;
-        }
-    }
-
-    if (tesBuiltInUsage.vertexOrder == VertexOrderUnknown)
-    {
-        if (tcsBuiltInUsage.vertexOrder != VertexOrderUnknown)
-        {
-            tesBuiltInUsage.vertexOrder = tcsBuiltInUsage.vertexOrder;
-            tcsBuiltInUsage.vertexOrder = VertexOrderUnknown;
-        }
-        else
-        {
-            tesBuiltInUsage.vertexOrder = VertexOrderCcw;
-        }
-    }
-
-    if (tesBuiltInUsage.pointMode == false)
-    {
-        if (tcsBuiltInUsage.pointMode)
-        {
-            tesBuiltInUsage.pointMode = tcsBuiltInUsage.pointMode;
-            tcsBuiltInUsage.pointMode = false;
-        }
-    }
-
-    if (tesBuiltInUsage.primitiveMode == SPIRVPrimitiveModeKind::Unknown)
-    {
-        if (tcsBuiltInUsage.primitiveMode != SPIRVPrimitiveModeKind::Unknown)
-        {
-            tesBuiltInUsage.primitiveMode = tcsBuiltInUsage.primitiveMode;
-            tcsBuiltInUsage.primitiveMode = SPIRVPrimitiveModeKind::Unknown;
-        }
-        else
-        {
-            tesBuiltInUsage.primitiveMode = Triangles;
-        }
-    }
 }
 
 // =====================================================================================================================

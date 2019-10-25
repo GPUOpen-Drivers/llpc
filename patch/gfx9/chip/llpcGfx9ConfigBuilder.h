@@ -104,8 +104,6 @@ private:
                                uint32_t    startUserData);
 
     void SetupVgtTfParam(LsHsRegConfig* pConfig);
-
-    uint32_t SetupFloatingPointMode(ShaderStage shaderStage);
 };
 
 } // Gfx9

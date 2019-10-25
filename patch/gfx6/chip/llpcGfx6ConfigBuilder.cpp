@@ -735,7 +735,7 @@ Result ConfigBuilder::BuildHsRegConfig(
     const auto& pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     const auto& calcFactor = pResUsage->inOutUsage.tcs.calcFactor;
-    const auto& builtInUsage = pResUsage->builtInUsage.tcs;
+    const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
     SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
@@ -762,7 +762,7 @@ Result ConfigBuilder::BuildHsRegConfig(
     auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
     SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, HS_NUM_INPUT_CP, pPipelineInfo->iaState.patchControlPoints);
 
-    auto hsNumOutputCp = builtInUsage.outputVertices;
+    auto hsNumOutputCp = tessMode.outputVertices;
     SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, HS_NUM_OUTPUT_CP, hsNumOutputCp);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Hs, pResUsage->numSgprsAvailable);
@@ -910,8 +910,7 @@ Result ConfigBuilder::BuildLsRegConfig(
 
         // If the HS threadgroup requires more than one wavefront, barriers will be allocated and we need to limit the
         // number of thread groups in flight.
-        const uint32_t outputVertices =
-            m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs.outputVertices;
+        const uint32_t outputVertices = m_pPipelineState->GetShaderModes()->GetTessellationMode().outputVertices;
 
         const uint32_t threadGroupSize = calcFactor.patchCountPerThreadGroup * outputVertices;
         const uint32_t waveSize = m_pContext->GetGpuProperty()->waveSize;
@@ -958,6 +957,7 @@ Result ConfigBuilder::BuildGsRegConfig(
 
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.gs;
+    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto& inOutUsage   = pResUsage->inOutUsage;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
@@ -969,8 +969,8 @@ Result ConfigBuilder::BuildGsRegConfig(
     SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
     SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, pIntfData->userDataCount);
 
-    const bool primAdjacency = (builtInUsage.inputPrimitive == InputLinesAdjacency) ||
-                               (builtInUsage.inputPrimitive == InputTrianglesAdjacency);
+    const bool primAdjacency = (geometryMode.inputPrimitive == InputPrimitives::LinesAdjacency) ||
+                               (geometryMode.inputPrimitive == InputPrimitives::TrianglesAdjacency);
 
     // Maximum number of GS primitives per ES thread is capped by the hardware's GS-prim FIFO.
     auto pGpuProp = m_pContext->GetGpuProperty();
@@ -982,7 +982,7 @@ Result ConfigBuilder::BuildGsRegConfig(
         maxGsPerEs >>= 1;
     }
 
-    uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(builtInUsage.outputVertices));
+    uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(geometryMode.outputVertices));
     SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
 
     // TODO: Currently only support offchip GS
@@ -1021,15 +1021,15 @@ Result ConfigBuilder::BuildGsRegConfig(
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_ES_PER_GS, ES_PER_GS, EsThreadsPerGsThread);
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_PER_ES, GS_PER_ES, std::min(maxGsPerEs, GsPrimsPerEsThread));
     }
-    if (builtInUsage.outputVertices <= 128)
+    if (geometryMode.outputVertices <= 128)
     {
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128);
     }
-    else if (builtInUsage.outputVertices <= 256)
+    else if (geometryMode.outputVertices <= 256)
     {
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256);
     }
-    else if (builtInUsage.outputVertices <= 512)
+    else if (geometryMode.outputVertices <= 512)
     {
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512);
     }
@@ -1059,10 +1059,10 @@ Result ConfigBuilder::BuildGsRegConfig(
     gsVsRingOffset += gsVertItemSize2 * maxVertOut;
     SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, gsVsRingOffset);
 
-    if ((builtInUsage.invocations > 1) || builtInUsage.invocationId)
+    if ((geometryMode.invocations > 1) || builtInUsage.invocationId)
     {
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_INSTANCE_CNT, CNT, builtInUsage.invocations);
+        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
     }
     SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
@@ -1071,11 +1071,11 @@ Result ConfigBuilder::BuildGsRegConfig(
     {
         gsOutputPrimitiveType = POINTLIST;
     }
-    else if (builtInUsage.outputPrimitive == OutputPoints)
+    else if (geometryMode.outputPrimitive == OutputPrimitives::Points)
     {
         gsOutputPrimitiveType = POINTLIST;
     }
-    else if (builtInUsage.outputPrimitive == OutputLineStrip)
+    else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
     {
         gsOutputPrimitiveType = LINESTRIP;
     }
@@ -1121,6 +1121,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
+    const auto& fragmentMode = m_pPipelineState->GetShaderModes()->GetFragmentShaderMode();
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
@@ -1131,7 +1132,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
 
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, FRONT_FACE_ALL_BITS, true);
-    if (builtInUsage.pixelCenterInteger)
+    if (fragmentMode.pixelCenterInteger)
     {
         // TRUE - Force floating point position to upper left corner of pixel (X.0, Y.0)
         SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, POS_FLOAT_ULC, true);
@@ -1159,7 +1160,7 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     ZOrder zOrder = LATE_Z;
     bool execOnHeirFail = false;
-    if (builtInUsage.earlyFragmentTests)
+    if (fragmentMode.earlyFragmentTests)
     {
         zOrder = EARLY_Z_THEN_LATE_Z;
     }
@@ -1183,9 +1184,9 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, builtInUsage.sampleMask);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, builtInUsage.earlyFragmentTests);
+    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
-                  (builtInUsage.earlyFragmentTests && pResUsage->resourceWrite));
+                  (fragmentMode.earlyFragmentTests && pResUsage->resourceWrite));
     SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
 
     uint32_t depthExpFmt = EXP_FORMAT_ZERO;
@@ -1320,20 +1321,21 @@ Result ConfigBuilder::BuildCsRegConfig(
     const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
+    const auto& computeMode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
     uint32_t workgroupSizes[3];
 
     switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout))
     {
     case WorkgroupLayout::Unknown:
     case WorkgroupLayout::Linear:
-        workgroupSizes[0] = builtInUsage.workgroupSizeX;
-        workgroupSizes[1] = builtInUsage.workgroupSizeY;
-        workgroupSizes[2] = builtInUsage.workgroupSizeZ;
+        workgroupSizes[0] = computeMode.workgroupSizeX;
+        workgroupSizes[1] = computeMode.workgroupSizeY;
+        workgroupSizes[2] = computeMode.workgroupSizeZ;
         break;
     case WorkgroupLayout::Quads:
     case WorkgroupLayout::SexagintiQuads:
-        workgroupSizes[0] = builtInUsage.workgroupSizeX * builtInUsage.workgroupSizeY;
-        workgroupSizes[1] = builtInUsage.workgroupSizeZ;
+        workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
+        workgroupSizes[1] = computeMode.workgroupSizeZ;
         workgroupSizes[2] = 1;
         break;
     }
@@ -1527,52 +1529,52 @@ void ConfigBuilder::SetupVgtTfParam(
     uint32_t partition = InvalidValue;
     uint32_t topology  = InvalidValue;
 
-    const auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+    const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
 
-    LLPC_ASSERT(builtInUsage.primitiveMode != SPIRVPrimitiveModeKind::Unknown);
-    if (builtInUsage.primitiveMode == Isolines)
+    LLPC_ASSERT(tessMode.primitiveMode != PrimitiveMode::Unknown);
+    if (tessMode.primitiveMode == PrimitiveMode::Isolines)
     {
         primType = TESS_ISOLINE;
     }
-    else if (builtInUsage.primitiveMode == Triangles)
+    else if (tessMode.primitiveMode == PrimitiveMode::Triangles)
     {
         primType = TESS_TRIANGLE;
     }
-    else if (builtInUsage.primitiveMode == Quads)
+    else if (tessMode.primitiveMode == PrimitiveMode::Quads)
     {
         primType = TESS_QUAD;
     }
     LLPC_ASSERT(primType != InvalidValue);
 
-    LLPC_ASSERT(builtInUsage.vertexSpacing != SpacingUnknown);
-    if (builtInUsage.vertexSpacing == SpacingEqual)
+    LLPC_ASSERT(tessMode.vertexSpacing != VertexSpacing::Unknown);
+    if (tessMode.vertexSpacing == VertexSpacing::Equal)
     {
         partition = PART_INTEGER;
     }
-    else if (builtInUsage.vertexSpacing == SpacingFractionalOdd)
+    else if (tessMode.vertexSpacing == VertexSpacing::FractionalOdd)
     {
         partition = PART_FRAC_ODD;
     }
-    else if (builtInUsage.vertexSpacing == SpacingFractionalEven)
+    else if (tessMode.vertexSpacing == VertexSpacing::FractionalEven)
     {
         partition = PART_FRAC_EVEN;
     }
     LLPC_ASSERT(partition != InvalidValue);
 
-    LLPC_ASSERT(builtInUsage.vertexOrder != VertexOrderUnknown);
-    if (builtInUsage.pointMode)
+    LLPC_ASSERT(tessMode.vertexOrder != VertexOrder::Unknown);
+    if (tessMode.pointMode)
     {
         topology = OUTPUT_POINT;
     }
-    else if (builtInUsage.primitiveMode == Isolines)
+    else if (tessMode.primitiveMode == PrimitiveMode::Isolines)
     {
         topology = OUTPUT_LINE;
     }
-    else if (builtInUsage.vertexOrder == VertexOrderCw)
+    else if (tessMode.vertexOrder == VertexOrder::Cw)
     {
         topology = OUTPUT_TRIANGLE_CW;
     }
-    else if (builtInUsage.vertexOrder == VertexOrderCcw)
+    else if (tessMode.vertexOrder == VertexOrder::Ccw)
     {
         topology = OUTPUT_TRIANGLE_CCW;
     }
@@ -1595,57 +1597,6 @@ void ConfigBuilder::SetupVgtTfParam(
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, TYPE, primType);
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, PARTITIONING, partition);
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, TOPOLOGY, topology);
-}
-
-// =====================================================================================================================
-// Sets up floating point mode from the specified floating point control flags.
-uint32_t ConfigBuilder::SetupFloatingPointMode(
-    ShaderStage shaderStage)    // Shader stage
-{
-    FloatMode floatMode = {};
-    floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
-
-    auto fp16Control = m_pContext->GetShaderFloatControl(shaderStage, 16);
-    auto fp32Control = m_pContext->GetShaderFloatControl(shaderStage, 32);
-    auto fp64Control = m_pContext->GetShaderFloatControl(shaderStage, 64);
-
-    if (fp16Control.roundingModeRTE || fp64Control.roundingModeRTE)
-    {
-        floatMode.bits.fp16fp64RoundMode = FP_ROUND_TO_NEAREST_EVEN;
-    }
-    else if (fp16Control.roundingModeRTZ || fp64Control.roundingModeRTZ)
-    {
-        floatMode.bits.fp16fp64RoundMode = FP_ROUND_TO_ZERO;
-    }
-
-    if (fp32Control.roundingModeRTE)
-    {
-        floatMode.bits.fp32RoundMode = FP_ROUND_TO_NEAREST_EVEN;
-    }
-    else if (fp32Control.roundingModeRTZ)
-    {
-        floatMode.bits.fp32RoundMode = FP_ROUND_TO_ZERO;
-    }
-
-    if (fp16Control.denormPerserve || fp64Control.denormPerserve)
-    {
-        floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
-    }
-    else if (fp16Control.denormFlushToZero || fp64Control.denormFlushToZero)
-    {
-        floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_IN_OUT;
-    }
-
-    if (fp32Control.denormPerserve)
-    {
-        floatMode.bits.fp32DenormMode = FP_DENORM_FLUSH_NONE;
-    }
-    else if (fp32Control.denormFlushToZero)
-    {
-        floatMode.bits.fp32DenormMode = FP_DENORM_FLUSH_IN_OUT;
-    }
-
-    return floatMode.u32All;
 }
 
 } // Gfx6

@@ -50,6 +50,7 @@
 #include "llpcBuilder.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
+#include "llpcPipeline.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -7010,6 +7011,34 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
   if (auto EM = EntryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
       FpControlFlags.RoundingModeRTZ = EM->getLiterals()[0] >> 3;
 
+  // Set common shader mode (FP mode) for middle-end.
+  CommonShaderMode shaderMode = {};
+  if (FpControlFlags.RoundingModeRTE & SPIRVTW_16Bit)
+    shaderMode.fp16RoundMode = FpRoundMode::Even;
+  else if (FpControlFlags.RoundingModeRTZ & SPIRVTW_16Bit)
+    shaderMode.fp16RoundMode = FpRoundMode::Zero;
+  if (FpControlFlags.RoundingModeRTE & SPIRVTW_32Bit)
+    shaderMode.fp32RoundMode = FpRoundMode::Even;
+  else if (FpControlFlags.RoundingModeRTZ & SPIRVTW_32Bit)
+    shaderMode.fp32RoundMode = FpRoundMode::Zero;
+  if (FpControlFlags.RoundingModeRTE & SPIRVTW_64Bit)
+    shaderMode.fp64RoundMode = FpRoundMode::Even;
+  else if (FpControlFlags.RoundingModeRTZ & SPIRVTW_64Bit)
+    shaderMode.fp64RoundMode = FpRoundMode::Zero;
+  if (FpControlFlags.DenormPerserve & SPIRVTW_16Bit)
+    shaderMode.fp16DenormMode = FpDenormMode::FlushNone;
+  else if (FpControlFlags.DenormFlushToZero & SPIRVTW_16Bit)
+    shaderMode.fp16DenormMode = FpDenormMode::FlushInOut;
+  if (FpControlFlags.DenormPerserve & SPIRVTW_32Bit)
+    shaderMode.fp32DenormMode = FpDenormMode::FlushNone;
+  else if (FpControlFlags.DenormFlushToZero & SPIRVTW_32Bit)
+    shaderMode.fp32DenormMode = FpDenormMode::FlushInOut;
+  if (FpControlFlags.DenormPerserve & SPIRVTW_64Bit)
+    shaderMode.fp64DenormMode = FpDenormMode::FlushNone;
+  else if (FpControlFlags.DenormFlushToZero & SPIRVTW_64Bit)
+    shaderMode.fp64DenormMode = FpDenormMode::FlushInOut;
+  getBuilder()->SetCommonShaderMode(shaderMode);
+
   EnableXfb = BM->getCapability().find(
       CapabilityTransformFeedback) != BM->getCapability().end();
   EnableGatherLodNz = BM->hasCapability(CapabilityImageGatherBiasLodAMD) &&
@@ -7182,6 +7211,38 @@ bool SPIRVToLLVM::transMetadata() {
         if (auto EM = BF->getExecutionMode(ExecutionModeOutputVertices))
           ExecModeMD.ts.OutputVertices = EM->getLiterals()[0];
 
+        // Give the tessellation mode to the middle-end.
+        TessellationMode tessellationMode = {};
+        tessellationMode.outputVertices = ExecModeMD.ts.OutputVertices;
+
+        tessellationMode.vertexSpacing = VertexSpacing::Unknown;
+        if (ExecModeMD.ts.SpacingEqual)
+          tessellationMode.vertexSpacing = VertexSpacing::Equal;
+        else if (ExecModeMD.ts.SpacingFractionalEven)
+          tessellationMode.vertexSpacing = VertexSpacing::FractionalEven;
+        else if (ExecModeMD.ts.SpacingFractionalOdd)
+          tessellationMode.vertexSpacing = VertexSpacing::FractionalOdd;
+
+        tessellationMode.vertexOrder = VertexOrder::Unknown;
+        if (ExecModeMD.ts.VertexOrderCw)
+          tessellationMode.vertexOrder = VertexOrder::Cw;
+        else if (ExecModeMD.ts.VertexOrderCcw)
+          tessellationMode.vertexOrder = VertexOrder::Ccw;
+
+        tessellationMode.primitiveMode = PrimitiveMode::Unknown;
+        if (ExecModeMD.ts.Triangles)
+          tessellationMode.primitiveMode = PrimitiveMode::Triangles;
+        else if (ExecModeMD.ts.Quads)
+          tessellationMode.primitiveMode = PrimitiveMode::Quads;
+        else if (ExecModeMD.ts.Isolines)
+          tessellationMode.primitiveMode = PrimitiveMode::Isolines;
+
+        tessellationMode.pointMode = false;
+        if (ExecModeMD.ts.PointMode)
+          tessellationMode.pointMode = true;
+
+        getBuilder()->SetTessellationMode(tessellationMode);
+
       } else if (ExecModel == ExecutionModelGeometry) {
         if (BF->getExecutionMode(ExecutionModeInputPoints))
           ExecModeMD.gs.InputPoints = true;
@@ -7210,6 +7271,33 @@ bool SPIRVToLLVM::transMetadata() {
         if (auto EM = BF->getExecutionMode(ExecutionModeOutputVertices))
           ExecModeMD.gs.OutputVertices = EM->getLiterals()[0];
 
+        // Give the geometry mode to the middle-end.
+        GeometryShaderMode geometryMode = {};
+        geometryMode.invocations = 1;
+        if (ExecModeMD.gs.Invocations > 0)
+          geometryMode.invocations = ExecModeMD.gs.Invocations;
+        geometryMode.outputVertices = ExecModeMD.gs.OutputVertices;
+
+        if (ExecModeMD.gs.InputPoints)
+          geometryMode.inputPrimitive = InputPrimitives::Points;
+        else if (ExecModeMD.gs.InputLines)
+          geometryMode.inputPrimitive = InputPrimitives::Lines;
+        else if (ExecModeMD.gs.InputLinesAdjacency)
+          geometryMode.inputPrimitive = InputPrimitives::LinesAdjacency;
+        else if (ExecModeMD.gs.Triangles)
+          geometryMode.inputPrimitive = InputPrimitives::Triangles;
+        else if (ExecModeMD.gs.InputTrianglesAdjacency)
+          geometryMode.inputPrimitive = InputPrimitives::TrianglesAdjacency;
+
+        if (ExecModeMD.gs.OutputPoints)
+          geometryMode.outputPrimitive = OutputPrimitives::Points;
+        else if (ExecModeMD.gs.OutputLineStrip)
+          geometryMode.outputPrimitive = OutputPrimitives::LineStrip;
+        else if (ExecModeMD.gs.OutputTriangleStrip)
+          geometryMode.outputPrimitive = OutputPrimitives::TriangleStrip;
+
+        getBuilder()->SetGeometryShaderMode(geometryMode);
+
       } else if (ExecModel == ExecutionModelFragment) {
         if (BF->getExecutionMode(ExecutionModeOriginUpperLeft))
           ExecModeMD.fs.OriginUpperLeft = true;
@@ -7233,6 +7321,13 @@ bool SPIRVToLLVM::transMetadata() {
 
         if (BF->getExecutionMode(ExecutionModePostDepthCoverage))
           ExecModeMD.fs.PostDepthCoverage = true;
+
+        // Give the fragment mode to the middle-end.
+        FragmentShaderMode fragmentMode = {};
+        fragmentMode.pixelCenterInteger = ExecModeMD.fs.PixelCenterInteger;
+        fragmentMode.earlyFragmentTests = ExecModeMD.fs.EarlyFragmentTests;
+        fragmentMode.postDepthCoverage  = ExecModeMD.fs.PostDepthCoverage;
+        getBuilder()->SetFragmentShaderMode(fragmentMode);
 
       } else if (ExecModel == ExecutionModelGLCompute) {
         // Set values of local sizes from execution model
@@ -7275,6 +7370,13 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
+
+        // Give the workgroup size to the middle-end.
+        ComputeShaderMode computeMode = {};
+        computeMode.workgroupSizeX = ExecModeMD.cs.LocalSizeX;
+        computeMode.workgroupSizeY = ExecModeMD.cs.LocalSizeY;
+        computeMode.workgroupSizeZ = ExecModeMD.cs.LocalSizeZ;
+        getBuilder()->SetComputeShaderMode(computeMode);
       } else
         llvm_unreachable("Invalid execution model");
 

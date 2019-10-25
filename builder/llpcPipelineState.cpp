@@ -71,8 +71,7 @@ Module* PipelineState::Link(
     ArrayRef<Module*> modules)               // Array of modules indexed by shader stage, with nullptr entry
                                              // for any stage not present in the pipeline. Modules are freed.
 {
-    // Add IR metadata for the shader stage to each function in each shader, and rename the entrypoint to
-    // ensure there is no clash on linking.
+    // Processing for each shader module before linking.
     IRBuilder<> builder(GetContext());
     uint32_t metaKindId = GetContext().getMDKindID(LlpcName::ShaderStageMetadata);
     Module* pAnyModule = nullptr;
@@ -85,6 +84,12 @@ Module* PipelineState::Link(
         }
         pAnyModule = pModule;
 
+        // If this is a link of shader modules from earlier separate shader compiles, then the modes are
+        // recorded in IR metadata. Read the modes here.
+        GetShaderModes()->ReadModesFromShader(pModule, static_cast<ShaderStage>(stage));
+
+        // Add IR metadata for the shader stage to each function in the shader, and rename the entrypoint to
+        // ensure there is no clash on linking.
         auto pStageMetaNode = MDNode::get(GetContext(), { ConstantAsMetadata::get(builder.getInt32(stage)) });
         for (Function& func : *pModule)
         {
@@ -246,6 +251,7 @@ void PipelineState::Generate(
 void PipelineState::Clear(
     Module* pModule)    // [in/out] IR module
 {
+    GetShaderModes()->Clear();
     m_userDataNodes = {};
     Record(pModule);
 }
@@ -255,6 +261,7 @@ void PipelineState::Clear(
 void PipelineState::Record(
     Module* pModule)    // [in/out] Module to record the IR metadata in
 {
+    GetShaderModes()->Record(pModule);
     RecordUserDataNodes(pModule);
 }
 
@@ -263,6 +270,7 @@ void PipelineState::Record(
 void PipelineState::ReadState(
     Module* pModule)    // [in] LLVM module
 {
+    GetShaderModes()->ReadModesFromPipeline(pModule);
     ReadUserDataNodes(pModule);
 }
 

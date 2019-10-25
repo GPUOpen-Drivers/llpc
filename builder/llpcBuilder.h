@@ -43,8 +43,14 @@ namespace Llpc
 using namespace llvm;
 
 class BuilderContext;
+struct CommonShaderMode;
+struct ComputeShaderMode;
 class Context;
+struct FragmentShaderMode;
+struct GeometryShaderMode;
 class Pipeline;
+class ShaderModes;
+struct TessellationMode;
 
 // =====================================================================================================================
 // Class that represents extra information on an input or output.
@@ -160,6 +166,45 @@ public:
 
     // Set the current shader stage.
     void SetShaderStage(ShaderStage stage) { m_shaderStage = stage; }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // Methods to set shader modes (FP modes, tessellation modes, fragment modes, workgroup size) for the current
+    // shader that come from the input language. The structs passed to the methods are declared in llpcPipeline.h.
+    // For a particular shader stage, these methods must be called before any Builder::Create* calls that
+    // generate IR.
+
+    // Set the common shader mode for the current shader, containing hardware FP round and denorm modes.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetCommonShaderMode(const CommonShaderMode& commonShaderMode);
+
+    // Get the common shader mode for the current shader.
+    const CommonShaderMode& GetCommonShaderMode();
+
+    // Set the tessellation mode. This can be called in multiple shaders, and the values are merged
+    // together -- a zero value in one call is overridden by a non-zero value in another call. LLPC needs
+    // that because SPIR-V allows some of these execution mode items to appear in either the TCS or TES.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetTessellationMode(const TessellationMode& tessellationMode);
+
+    // Set the geometry shader state.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetGeometryShaderMode(const GeometryShaderMode& geometryShaderMode);
+
+    // Set the fragment shader mode.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetFragmentShaderMode(const FragmentShaderMode& fragmentShaderMode);
+
+    // Set the compute shader modes.
+    // The client should always zero-initialize the struct before setting it up, in case future versions
+    // add more fields. A local struct variable can be zero-initialized with " = {}".
+    void SetComputeShaderMode(const ComputeShaderMode& computeShaderMode);
+
+    // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
+    virtual void RecordShaderModes(Module* pModule) {}
 
     // -----------------------------------------------------------------------------------------------------------------
     // Base class operations
@@ -1273,6 +1318,10 @@ public:
 
 protected:
     Builder(BuilderContext* pBuilderContext);
+
+    // Get the ShaderModes object. For a pipeline compilation, it comes from the PipelineState. For a shader
+    // compilation, there is no PipelineState, so BuilderRecorder creates its own ShaderModes.
+    virtual ShaderModes* GetShaderModes() = 0;
 
     // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
     Constant* GetFpConstant(Type* pTy, APFloat value);

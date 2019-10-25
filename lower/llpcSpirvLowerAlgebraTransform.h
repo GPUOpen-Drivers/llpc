@@ -70,6 +70,10 @@ private:
     bool m_enableConstFolding; // Whether enable constant folding in this pass
     bool m_enableFloatOpt;     // Whether enable floating point optimization in this pass
     bool m_changed;  // Whether the module is changed
+    bool m_fp16DenormFlush;    // Whether FP mode wants f16 denorms to be flushed to zero
+    bool m_fp32DenormFlush;    // Whether FP mode wants f32 denorms to be flushed to zero
+    bool m_fp64DenormFlush;    // Whether FP mode wants f64 denorms to be flushed to zero
+    bool m_fp16Rtz;            // Whether FP mode wants f16 round-to-zero
 };
 
 } // Llpc

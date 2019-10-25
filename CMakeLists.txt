@@ -255,6 +255,7 @@ if(ICD_BUILD_LLPC)
         builder/llpcBuilderRecorder.cpp
         builder/llpcBuilderReplayer.cpp
         builder/llpcPipelineState.cpp
+        builder/llpcShaderModes.cpp
     )
 
 # llpc/context

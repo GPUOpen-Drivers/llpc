@@ -60,6 +60,13 @@ Context& BuilderImplBase::getContext() const
 }
 
 // =====================================================================================================================
+// Get the ShaderModes object.
+ShaderModes* BuilderImplBase::GetShaderModes()
+{
+    return m_pPipelineState->GetShaderModes();
+}
+
+// =====================================================================================================================
 // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
 Value* BuilderImplBase::CreateDotProduct(
     Value* const pVector1,            // [in] The float vector 1

@@ -198,7 +198,7 @@ enum BufNumFormat
 };
 
 // Enumerates float round modes.
-enum FpRoundMode
+enum FloatRoundMode
 {
     FP_ROUND_TO_NEAREST_EVEN                    = 0,            // RTE
     FP_ROUND_TO_POSITIVE_INF                    = 1,            // RTP
@@ -207,7 +207,7 @@ enum FpRoundMode
 };
 
 // Enumerates float denormal modes.
-enum FpDenormMode
+enum FloatDenormMode
 {
     FP_DENORM_FLUSH_IN_OUT                      = 0,            // Flush input/output denormals
     FP_DENORM_FLUSH_OUT                         = 1,            // Allow input denormals and flush output denormals

@@ -50,6 +50,136 @@ using namespace llvm;
 class BuilderContext;
 
 // =====================================================================================================================
+// Structs for setting shader modes, e.g. Builder::SetCommonShaderMode
+
+// FP rounding mode. These happen to have values one more than the corresponding register field in current
+// hardware, so we can make the zero initializer equivalent to DontCare.
+enum class FpRoundMode : uint32_t
+{
+    DontCare,   // Don't care
+    Even,       // Round to nearest even
+    Positive,   // Round up towards positive infinity
+    Negative,   // Round down tiwards negative infinity
+    Zero        // Round towards zero
+};
+
+// Denormal flush mode. These happen to have values one more than the corresponding register field in current
+// hardware, so we can make the zero initializer equivalent to DontCare.
+enum class FpDenormMode :uint32_t
+{
+    DontCare,     // Don't care
+    FlushInOut,   // Flush input/output denormals
+    FlushOut,     // Flush only output denormals
+    FlushIn,      // Flush only input denormals
+    FlushNone     // Don't flush any denormals
+};
+
+// Struct to pass to SetCommonShaderMode.
+// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct CommonShaderMode
+{
+    FpRoundMode   fp16RoundMode;
+    FpDenormMode  fp16DenormMode;
+    FpRoundMode   fp32RoundMode;
+    FpDenormMode  fp32DenormMode;
+    FpRoundMode   fp64RoundMode;
+    FpDenormMode  fp64DenormMode;
+};
+
+// Tessellation vertex spacing
+enum class VertexSpacing : uint32_t
+{
+    Unknown,
+    Equal,
+    FractionalEven,
+    FractionalOdd,
+};
+
+// Tessellation vertex order
+enum class VertexOrder : uint32_t
+{
+    Unknown,
+    Ccw,
+    Cw,
+};
+
+// Tessellation primitive mode
+enum class PrimitiveMode : uint32_t
+{
+    Unknown,
+    Triangles,
+    Quads,
+    Isolines,
+};
+
+// Struct to pass to SetTessellationMode.
+// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct TessellationMode
+{
+    VertexSpacing vertexSpacing;  // Vertex spacing
+    VertexOrder   vertexOrder;    // Vertex ordering
+    PrimitiveMode primitiveMode;  // Tessellation primitive mode
+    uint32_t      pointMode;      // Whether point mode is specified
+    uint32_t      outputVertices; // Number of produced vertices in the output patch
+};
+
+// Kind of GS input primitives.
+enum class InputPrimitives : uint32_t
+{
+    Points,
+    Lines,
+    LinesAdjacency,
+    Triangles,
+    TrianglesAdjacency
+};
+
+// Kind of GS output primitives
+enum class OutputPrimitives : uint32_t
+{
+    Points,
+    LineStrip,
+    TriangleStrip
+};
+
+// Struct to pass to SetGeometryShaderMode. The front-end should zero-initialize it with "= {}" in case
+// future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct GeometryShaderMode
+{
+    InputPrimitives   inputPrimitive;   // Kind of input primitives
+    OutputPrimitives  outputPrimitive;  // Kind of output primitives
+    uint32_t          invocations;      // Number of times to invoke shader for each input primitive
+    uint32_t          outputVertices;   // Max number of vertices the shader will emit in one invocation
+};
+
+// Struct to pass to SetFragmentShaderMode.
+// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct FragmentShaderMode
+{
+    uint32_t  pixelCenterInteger;
+    uint32_t  earlyFragmentTests;
+    uint32_t  postDepthCoverage;
+};
+
+// Struct to pass to SetComputeShaderMode.
+// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct ComputeShaderMode
+{
+    uint32_t  workgroupSizeX;     // X dimension of workgroup size. 0 is taken to be 1
+    uint32_t  workgroupSizeY;     // Y dimension of workgroup size. 0 is taken to be 1
+    uint32_t  workgroupSizeZ;     // Z dimension of workgroup size. 0 is taken to be 1
+};
+
+// =====================================================================================================================
 // The public API of the middle-end pipeline state exposed to the front-end for setting state and linking and
 // generating the pipeline
 class Pipeline

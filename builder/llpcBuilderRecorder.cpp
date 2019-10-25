@@ -33,7 +33,8 @@
 #include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
-#include "llpcPipeline.h"
+#include "llpcPipelineState.h"
+#include "llpcShaderModes.h"
 
 #define DEBUG_TYPE "llpc-builder-recorder"
 
@@ -310,6 +311,34 @@ BuilderRecorder::BuilderRecorder(
       BuilderRecorderMetadataKinds(pBuilderContext->GetContext()),
       m_pPipelineState(reinterpret_cast<PipelineState*>(pPipeline))
 {
+}
+
+// =====================================================================================================================
+// Record shader modes into IR metadata if this is a shader compile (no PipelineState).
+// For a pipeline compile with BuilderRecorder, they get recorded by PipelineState.
+void BuilderRecorder::RecordShaderModes(
+    Module* pModule)    // [in/out] Module to record into
+{
+    if ((m_pPipelineState == nullptr) && m_shaderModes)
+    {
+        m_shaderModes->Record(pModule);
+    }
+}
+
+// =====================================================================================================================
+// Get the ShaderModes object. If this is a pipeline compile, we get the ShaderModes object from the PipelineState.
+// If it is a shader compile, we create our own ShaderModes object.
+ShaderModes* BuilderRecorder::GetShaderModes()
+{
+    if (m_pPipelineState)
+    {
+        return m_pPipelineState->GetShaderModes();
+    }
+    if (!m_shaderModes)
+    {
+        m_shaderModes.reset(new ShaderModes());
+    }
+    return &*m_shaderModes;
 }
 
 // =====================================================================================================================
