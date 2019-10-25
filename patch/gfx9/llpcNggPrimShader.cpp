@@ -209,11 +209,9 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
         }
     }
 
-    if (userDataCount > 0)
-    {
-        argTys.push_back(VectorType::get(m_pBuilder->getInt32Ty(), userDataCount));
-        *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
-    }
+    LLPC_ASSERT(userDataCount > 0);
+    argTys.push_back(VectorType::get(m_pBuilder->getInt32Ty(), userDataCount));
+    *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
 
     // Other system values (VGPRs)
     argTys.push_back(m_pBuilder->getInt32Ty());         // ES to GS offsets (vertex 0 and 1)

@@ -128,11 +128,9 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
         }
     }
 
-    if (userDataCount > 0)
-    {
-        argTys.push_back(VectorType::get(m_pContext->Int32Ty(), userDataCount));
-        *pInRegMask |= (1ull << LsHsSpecialSysValueCount);
-    }
+    LLPC_ASSERT(userDataCount > 0);
+    argTys.push_back(VectorType::get(m_pContext->Int32Ty(), userDataCount));
+    *pInRegMask |= (1ull << LsHsSpecialSysValueCount);
 
     // Other system values (VGPRs)
     argTys.push_back(m_pContext->Int32Ty()); // Patch ID
@@ -585,11 +583,9 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
         }
     }
 
-    if (userDataCount > 0)
-    {
-        argTys.push_back(VectorType::get(m_pContext->Int32Ty(), userDataCount));
-        *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
-    }
+    LLPC_ASSERT(userDataCount > 0);
+    argTys.push_back(VectorType::get(m_pContext->Int32Ty(), userDataCount));
+    *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
 
     // Other system values (VGPRs)
     argTys.push_back(m_pContext->Int32Ty());        // ES to GS offsets (vertex 0 and 1)
