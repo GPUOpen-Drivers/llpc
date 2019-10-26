@@ -232,9 +232,13 @@ void PatchDescriptorLoad::visitCallInst(
     if (callInst.use_empty() == false)
     {
         Value* pDesc = nullptr;
-        if (mangledName == LlpcName::DescriptorLoadSpillTable)
+        if (mangledName.startswith(LlpcName::DescriptorLoadSpillTable))
         {
             pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetSpilledPushConstTablePtr();
+            if (pDesc->getType() != callInst.getType())
+            {
+                pDesc = new BitCastInst(pDesc, callInst.getType(), "", &callInst);
+            }
         }
         else
         {

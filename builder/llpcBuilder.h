@@ -595,6 +595,7 @@ public:
         uint32_t      binding,            // Descriptor binding
         Value*        pDescIndex,         // [in] Descriptor index
         bool          isNonUniform,       // Whether the descriptor index is non-uniform
+        bool          isWritten,          // Whether the buffer is (or might be) written to
         Type*         pPointeeTy,         // [in] Type that the returned pointer should point to.
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 

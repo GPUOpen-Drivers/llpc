@@ -89,10 +89,17 @@ bool PatchPushConstOp::runOnModule(
 
     Patch::Init(&module);
 
-    Function* const pFunc = module.getFunction(LlpcName::DescriptorLoadSpillTable);
+    SmallVector<Function*, 4> spillTableFuncs;
+    for (auto& func : module)
+    {
+        if (func.getName().startswith(LlpcName::DescriptorLoadSpillTable))
+        {
+            spillTableFuncs.push_back(&func);
+        }
+    }
 
     // If there was no spill table load, bail.
-    if (pFunc == nullptr)
+    if (spillTableFuncs.empty())
     {
         return false;
     }
@@ -111,23 +118,26 @@ bool PatchPushConstOp::runOnModule(
 
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
 
-        for (User* const pUser : pFunc->users())
+        for (Function* pFunc : spillTableFuncs)
         {
-            CallInst* const pCall = dyn_cast<CallInst>(pUser);
-
-            // If the user is not a call, bail.
-            if (pCall == nullptr)
+            for (User* const pUser : pFunc->users())
             {
-                continue;
-            }
+                CallInst* const pCall = dyn_cast<CallInst>(pUser);
 
-            // If the call is not in the entry point, bail.
-            if (pCall->getFunction() != m_pEntryPoint)
-            {
-                continue;
-            }
+                // If the user is not a call, bail.
+                if (pCall == nullptr)
+                {
+                    continue;
+                }
 
-            visitCallInst(*pCall);
+                // If the call is not in the entry point, bail.
+                if (pCall->getFunction() != m_pEntryPoint)
+                {
+                    continue;
+                }
+
+                visitCallInst(*pCall);
+            }
         }
     }
 
@@ -141,9 +151,12 @@ bool PatchPushConstOp::runOnModule(
         pInst->eraseFromParent();
     }
 
-    if (pFunc->user_empty())
+    for (Function* pFunc : spillTableFuncs)
     {
-        pFunc->eraseFromParent();
+        if (pFunc->user_empty())
+        {
+            pFunc->eraseFromParent();
+        }
     }
 
     return changed;
@@ -156,7 +169,7 @@ void PatchPushConstOp::visitCallInst(
 {
     Function* const pCallee = callInst.getCalledFunction();
     LLPC_ASSERT(pCallee != nullptr);
-    LLPC_ASSERT(pCallee->getName().equals(LlpcName::DescriptorLoadSpillTable));
+    LLPC_ASSERT(pCallee->getName().startswith(LlpcName::DescriptorLoadSpillTable));
     LLPC_UNUSED(pCallee);
 
     auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);

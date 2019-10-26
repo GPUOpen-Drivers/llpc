@@ -16,7 +16,7 @@ void main()
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{[0-9]*}} = call i8 addrspace(7)* {{.*}} @llpc.call.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 0, i1 false)
+; SHADERTEST: %{{[0-9]*}} = call i8 addrspace(7)* {{.*}} @llpc.call.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 0, i1 false,
 ; SHADERTEST: %{{[0-9]*}} = load i32, i32 addrspace(7)* %{{[0-9]*}}, align 4
 ; SHADERTEST: %{{[0-9]*}} = getelementptr inbounds i8, i8 addrspace(7)* %{{[0-9]*}}, i64 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, i32 addrspace(7)* %{{[0-9]*}}, align 4

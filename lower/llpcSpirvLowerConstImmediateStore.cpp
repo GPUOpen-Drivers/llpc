@@ -236,7 +236,6 @@ void SpirvLowerConstImmediateStore::ConvertAllocaToReadOnlyGlobal(
         // Visit next map pair.
     } while (allocaToGlobalMap.empty() == false);
     pStoreInst->eraseFromParent();
-    m_pContext->GetShaderResourceUsage(m_shaderStage)->globalConstant = true;
 }
 
 } // Llpc

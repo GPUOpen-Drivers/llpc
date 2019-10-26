@@ -490,6 +490,7 @@ Value* BuilderReplayer::ProcessCall(
                   cast<ConstantInt>(args[1])->getZExtValue(),  // binding
                   args[2],                                     // pDescIndex
                   cast<ConstantInt>(args[3])->getZExtValue(),  // isNonUniform
+                  cast<ConstantInt>(args[4])->getZExtValue(),  // isWritten
                   isa<PointerType>(pCall->getType()) ?
                       pCall->getType()->getPointerElementType() :
                       nullptr);                                // pPointeeTy
