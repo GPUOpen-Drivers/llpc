@@ -160,10 +160,6 @@ bool SpirvLowerResourceCollect::runOnModule(
 
     SpirvLower::Init(&module);
 
-    ShaderStage shaderStage = m_shaderStage;
-
-    m_pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
-
     // Collect unused globals and remove them
     std::unordered_set<GlobalVariable*> removedGlobals;
     for (auto pGlobal = m_pModule->global_begin(), pEnd = m_pModule->global_end(); pGlobal != pEnd; ++pGlobal)
@@ -197,14 +193,7 @@ bool SpirvLowerResourceCollect::runOnModule(
         {
         case SPIRAS_Constant:
             {
-                if (pGlobal->hasMetadata(gSPIRVMD::PushConst))
-                {
-                    // Push constant
-                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
-                    auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
-                    m_pResUsage->pushConstSizeInBytes = pushConstSize;
-                }
-                else
+                if (pGlobal->hasMetadata(gSPIRVMD::PushConst) == false)
                 {
                     // Only collect resource node data when requested
                     if (m_collectDetailUsage == true)

@@ -147,7 +147,6 @@ OStream& operator << (
     binOut << resUsage.resourceWrite;
     binOut << resUsage.resourceRead;
     binOut << resUsage.perShaderTable;
-    binOut << resUsage.globalConstant;
     binOut << resUsage.numSgprsAvailable;
     binOut << resUsage.numVgprsAvailable;
     binOut << resUsage.builtInUsage.perStage.u64All;
@@ -205,7 +204,6 @@ IStream& operator >> (
     binIn >> resUsage.resourceWrite;
     binIn >> resUsage.resourceRead;
     binIn >> resUsage.perShaderTable;
-    binIn >> resUsage.globalConstant;
     binIn >> resUsage.numSgprsAvailable;
     binIn >> resUsage.numVgprsAvailable;
     binIn >> resUsage.builtInUsage.perStage.u64All;

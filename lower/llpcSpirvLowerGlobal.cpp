@@ -2119,7 +2119,8 @@ void SpirvLowerGlobal::LowerBufferBlock()
                     Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
                                                                                 binding,
                                                                                 m_pBuilder->getInt32(0),
-                                                                                false,
+                                                                                /*isNonUniform=*/false,
+                                                                                global.isConstant() == false,
                                                                                 m_pBuilder->getInt8Ty());
 
                     // If the global variable is a constant, the data it points to is invariant.
@@ -2178,6 +2179,7 @@ void SpirvLowerGlobal::LowerBufferBlock()
                                                                                 binding,
                                                                                 pBlockIndex,
                                                                                 isNonUniform,
+                                                                                global.isConstant() == false,
                                                                                 m_pBuilder->getInt8Ty());
 
                     // If the global variable is a constant, the data it points to is invariant.
@@ -2216,7 +2218,8 @@ void SpirvLowerGlobal::LowerBufferBlock()
                 Value* const pBufferDesc = m_pBuilder->CreateLoadBufferDesc(descSet,
                                                                             binding,
                                                                             m_pBuilder->getInt32(0),
-                                                                            false,
+                                                                            /*isNonUniform=*/false,
+                                                                            global.isConstant() == false,
                                                                             m_pBuilder->getInt8Ty());
 
                 // If the global variable is a constant, the data it points to is invariant.
@@ -2260,12 +2263,6 @@ void SpirvLowerGlobal::LowerBufferBlock()
 
     for (GlobalVariable* const pGlobal : globalsToRemove)
     {
-        m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
-        if (pGlobal->isConstant() == false)
-        {
-            m_pContext->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
-        }
-
         pGlobal->dropAllReferences();
         pGlobal->eraseFromParent();
     }
@@ -2318,7 +2315,9 @@ void SpirvLowerGlobal::LowerPushConsts()
         {
             m_pBuilder->SetInsertPoint(&pFunc->getEntryBlock(), pFunc->getEntryBlock().getFirstInsertionPt());
 
-            Type* const pPushConstantsType = ArrayType::get(m_pBuilder->getInt8Ty(), 512);
+            MDNode* pMetaNode = global.getMetadata(gSPIRVMD::PushConst);
+            auto pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+            Type* const pPushConstantsType = ArrayType::get(m_pBuilder->getInt8Ty(), pushConstSize);
             Value* pPushConstants = m_pBuilder->CreateLoadPushConstantsPtr(pPushConstantsType);
 
             Type* const pCastType = global.getType()->getPointerElementType()->getPointerTo(ADDR_SPACE_CONST);

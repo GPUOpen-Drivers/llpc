@@ -338,6 +338,7 @@ public:
                                 uint32_t      binding,
                                 Value*        pDescIndex,
                                 bool          isNonUniform,
+                                bool          isWritten,
                                 Type*         pPointeeTy,
                                 const Twine&  instName) override final;
 

@@ -155,7 +155,6 @@ struct ResourceUsage
     bool                       resourceWrite;         // Whether shader does resource-write operations (UAV)
     bool                       resourceRead;          // Whether shader does resource-read operrations (UAV)
     bool                       perShaderTable;        // Whether per shader stage table is used
-    bool                       globalConstant;        // Whether global constant is used
     uint32_t                   numSgprsAvailable;     // Number of available SGPRs
     uint32_t                   numVgprsAvailable;     // Number of available VGPRs
     bool                       useImages;             // Whether images are used

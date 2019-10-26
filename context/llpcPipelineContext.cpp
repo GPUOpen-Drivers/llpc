@@ -166,7 +166,6 @@ void PipelineContext::InitShaderResourceUsage(
     pResUsage->resourceWrite = false;
     pResUsage->resourceRead = false;
     pResUsage->perShaderTable = false;
-    pResUsage->globalConstant = false;
 
     pResUsage->numSgprsAvailable = UINT32_MAX;
     pResUsage->numVgprsAvailable = UINT32_MAX;
