@@ -118,11 +118,6 @@ private:
                            llvm::Value*                     pVertexIdx,
                            llvm::Instruction*               pInsertPos);
 
-    void CollectGsXfbOutputInfo(const llvm::Type*          pOutputTy,
-                                uint32_t                   locOffset,
-                                uint32_t                   xfbExtraOffset,
-                                const ShaderInOutMetadata& outputMeta);
-
     void InterpolateInputElement(uint32_t           interpLoc,
                                  llvm::Value*       pInterpInfo,
                                  llvm::CallInst&    callInst);

@@ -2039,37 +2039,6 @@ void SpirvLowerGlobal::StoreOutputMember(
 }
 
 // =====================================================================================================================
-// Collects transform output info for geometry shader.
-void SpirvLowerGlobal::CollectGsXfbOutputInfo(
-    const llvm::Type *          pOutputTy,      // [in] Type of this output
-    uint32_t                    locOffset,      // Relative location array offset, passed from aggregate type
-    uint32_t                    xfbExtraOffset, // Transform feedback extra offset (for array type)
-    const ShaderInOutMetadata & outputMeta)     // [in] Metadata of this output
-{
-    LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
-    LLPC_ASSERT(outputMeta.IsXfb == true);
-    LLPC_ASSERT(outputMeta.IsBuiltIn == false);
-
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
-
-    uint32_t location = outputMeta.Value + outputMeta.Index + locOffset;
-
-    GsOutLocInfo outLocInfo = {};
-    outLocInfo.location = location;
-    outLocInfo.isBuiltIn = false;
-    outLocInfo.streamId = outputMeta.StreamId;
-
-    XfbOutInfo xfbOutInfo = {};
-
-    xfbOutInfo.xfbBuffer = outputMeta.XfbBuffer;
-    xfbOutInfo.xfbOffset = outputMeta.XfbOffset;
-    xfbOutInfo.is16bit = (pOutputTy->getScalarSizeInBits() == 16);
-    xfbOutInfo.xfbExtraOffset = xfbExtraOffset;
-
-    pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
-}
-
-// =====================================================================================================================
 // Lowers buffer blocks.
 void SpirvLowerGlobal::LowerBufferBlock()
 {
