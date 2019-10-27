@@ -118,7 +118,7 @@ struct NggControl {
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
 class PipelineState final : public Pipeline {
 public:
-  PipelineState(LgcContext *builderContext) : Pipeline(builderContext) {}
+  PipelineState(LgcContext *builderContext, bool emitLgc = false) : Pipeline(builderContext), m_emitLgc(emitLgc) {}
 
   ~PipelineState() override final {}
 
@@ -369,6 +369,7 @@ private:
 
   // -----------------------------------------------------------------------------------------------------------------
   bool m_noReplayer = false;                            // True if no BuilderReplayer needed
+  bool m_emitLgc = false;                               // Whether -emit-lgc is on
   unsigned m_stageMask = 0;                             // Mask of active shader stages
   Options m_options = {};                               // Per-pipeline options
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options

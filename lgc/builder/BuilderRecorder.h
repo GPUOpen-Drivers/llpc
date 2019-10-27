@@ -214,13 +214,19 @@ public:
     SubgroupSwizzleMask,
     SubgroupWriteInvocation,
     SubgroupMbcnt,
+
+    // Total count of opcodes
+    Count
   };
 
   // Given an opcode, get the call name (without the "lgc.create." prefix)
   static llvm::StringRef getCallName(Opcode opcode);
 
+  // Get the recorded call opcode from the function name. Asserts if not found.
+  static Opcode getOpcodeFromName(llvm::StringRef name);
+
   // Constructors
-  BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline);
+  BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline, bool omitOpcodes);
   BuilderRecorder() = delete;
   BuilderRecorder(const BuilderRecorder &) = delete;
   BuilderRecorder &operator=(const BuilderRecorder &) = delete;
@@ -551,6 +557,7 @@ private:
 
   PipelineState *m_pipelineState;             // PipelineState; nullptr for shader compile
   std::unique_ptr<ShaderModes> m_shaderModes; // ShaderModes for a shader compile
+  bool m_omitOpcodes;                         // Omit opcodes on lgc.create.* function declarations
 };
 
 // Create BuilderReplayer pass

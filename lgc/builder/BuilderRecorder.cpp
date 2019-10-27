@@ -292,6 +292,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "subgroup.write.invocation";
   case SubgroupMbcnt:
     return "subgroup.mbcnt";
+  case Count:
+    break;
   }
   llvm_unreachable("Should never be called!");
   return "";
@@ -309,9 +311,9 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(llvm::LLVMContext &co
 //
 // @param builderContext : Builder context
 // @param pipeline : PipelineState, or nullptr for shader compile
-BuilderRecorder::BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline)
+BuilderRecorder::BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline, bool omitOpcodes)
     : Builder(builderContext), BuilderRecorderMetadataKinds(builderContext->getContext()),
-      m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)) {
+      m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)), m_omitOpcodes(omitOpcodes) {
   m_isBuilderRecorder = true;
 }
 
@@ -1837,8 +1839,15 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     auto funcTy = FunctionType::get(resultTy, {}, true);
     func = Function::Create(funcTy, GlobalValue::ExternalLinkage, mangledName, module);
 
-    MDNode *const funcMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
-    func->setMetadata(opcodeMetaKindId, funcMeta);
+    // Add opcode metadata to the function, so that BuilderReplayer does not need to do a string comparison.
+    // We do not add that metadata if doing -emit-lgc, so that a test constructed with -emit-lgc will rely
+    // on the more stable lgc.create.* name rather than the less stable opcode.
+    if (!m_omitOpcodes) {
+      MDNode *const funcMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
+      func->setMetadata(opcodeMetaKindId, funcMeta);
+    }
+
+    // Add requested attributes, plus nounwind.
     func->addFnAttr(Attribute::NoUnwind);
     for (auto attrib : attribs)
       func->addFnAttr(attrib);
@@ -1848,4 +1857,28 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
   auto call = CreateCall(func, args, instName);
 
   return call;
+}
+
+// =====================================================================================================================
+// Get the recorded call opcode from the function name. Asserts if not found.
+// This does not have to be particularly efficient, as it is only used with the lgc command-line utility.
+//
+// @param name : Name of function declaration
+// @return : Opcode
+BuilderRecorder::Opcode BuilderRecorder::getOpcodeFromName(StringRef name) {
+  assert(name.startswith(BuilderCallPrefix));
+  name = name.slice(strlen(BuilderCallPrefix), StringRef::npos);
+  unsigned bestOpcode = 0;
+  unsigned bestLength = 0;
+  for (unsigned opcode = 0; opcode != Opcode::Count; ++opcode) {
+    StringRef opcodeName = getCallName(static_cast<Opcode>(opcode));
+    if (name.startswith(opcodeName)) {
+      if (opcodeName.size() > bestLength) {
+        bestLength = opcodeName.size();
+        bestOpcode = opcode;
+      }
+    }
+  }
+  assert(bestLength != 0 && "No matching lgc.create.* name found!");
+  return static_cast<Opcode>(bestOpcode);
 }
