@@ -606,10 +606,11 @@ Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
 
     auto pInt32x4PtrTy = PointerType::get(VectorType::get(builder.getInt32Ty(), 4), ADDR_SPACE_CONST);
     pGsVsRingBufDescPtr = builder.CreateIntToPtr(pGsVsRingBufDescPtr, pInt32x4PtrTy);
-    cast<Instruction>(pGsVsRingBufDescPtr)->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+    cast<Instruction>(pGsVsRingBufDescPtr)->setMetadata(MetaNameUniform,
+                                                        MDNode::get(pGsVsRingBufDescPtr->getContext(), {}));
 
     auto pGsVsRingBufDesc = builder.CreateLoad(pGsVsRingBufDescPtr);
-    pGsVsRingBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+    pGsVsRingBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pGsVsRingBufDesc->getContext(), {}));
 
     return pGsVsRingBufDesc;
 }

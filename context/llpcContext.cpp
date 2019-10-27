@@ -67,8 +67,6 @@ Context::Context(
     m_gfxIp(gfxIp),
     m_glslEmuLib(this)
 {
-    m_pEmptyMetaNode = MDNode::get(*this, {});
-
     // Initialize pre-constructed LLVM derived types
     m_tys.pBoolTy     = Type::getInt1Ty(*this);
     m_tys.pInt8Ty     = Type::getInt8Ty(*this);
@@ -91,11 +89,6 @@ Context::Context(
     m_tys.pFloatx2Ty    = VectorType::get(m_tys.pFloatTy, 2);
     m_tys.pFloatx3Ty    = VectorType::get(m_tys.pFloatTy, 3);
     m_tys.pFloatx4Ty    = VectorType::get(m_tys.pFloatTy, 4);
-
-    // Initialize IDs of pre-declared LLVM metadata
-    m_metaIds.invariantLoad = getMDKindID("invariant.load");
-    m_metaIds.range         = getMDKindID("range");
-    m_metaIds.uniform       = getMDKindID("amdgpu.uniform");
 
     Reset();
 }

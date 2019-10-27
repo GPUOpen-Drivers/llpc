@@ -127,11 +127,6 @@ public:
     llvm::Type* Floatx3Ty() const { return m_tys.pFloatx3Ty; }
     llvm::Type* Floatx4Ty() const { return m_tys.pFloatx4Ty; }
 
-    // Gets IDs of pre-declared LLVM metadata
-    uint32_t MetaIdInvariantLoad() const { return m_metaIds.invariantLoad; }
-    uint32_t MetaIdRange() const { return m_metaIds.range; }
-    uint32_t MetaIdUniform() const { return m_metaIds.uniform; }
-
     std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
 
     // Wrappers of interfaces of pipeline context
@@ -167,11 +162,6 @@ public:
     GfxIpVersion GetGfxIpVersion() const
     {
         return m_gfxIp;
-    }
-
-    llvm::MDNode* GetEmptyMetadataNode()
-    {
-        return m_pEmptyMetaNode;
     }
 
     void DoUserDataNodeMerge()
@@ -214,8 +204,6 @@ private:
     bool                          m_scalarBlockLayout = false;  // scalarBlockLayout option from last pipeline compile
     bool                          m_robustBufferAccess = false; // robustBufferAccess option from last pipeline compile
 
-    llvm::MDNode*       m_pEmptyMetaNode;   // Empty metadata node
-
     // Pre-constructed LLVM types
     struct
     {
@@ -241,14 +229,6 @@ private:
         llvm::Type* pFloatx3Ty;   // Float x 3
         llvm::Type* pFloatx4Ty;   // Float x 4
     } m_tys;
-
-    // IDs of pre-declared LLVM metadata
-    struct
-    {
-        uint32_t invariantLoad;   // "invariant.load"
-        uint32_t range;           // "range"
-        uint32_t uniform;         // "amdgpu.uniform"
-    } m_metaIds;
 };
 
 } // Llpc

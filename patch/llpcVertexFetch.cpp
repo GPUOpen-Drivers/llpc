@@ -846,10 +846,10 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
 
     auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr();
     auto pVbDescPtr = GetElementPtrInst::Create(nullptr, pVbTablePtr, idxs, "", pInsertPos);
-    pVbDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+    pVbDescPtr->setMetadata(MetaNameUniform, MDNode::get(pVbDescPtr->getContext(), {}));
 
     auto pVbDesc = new LoadInst(pVbDescPtr, "", pInsertPos);
-    pVbDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+    pVbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pVbDesc->getContext(), {}));
     pVbDesc->setAlignment(MaybeAlign(16));
 
     return pVbDesc;
