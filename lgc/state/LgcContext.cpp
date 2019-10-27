@@ -65,6 +65,10 @@ static cl::opt<bool> EmitLlvm("emit-llvm", cl::desc("Emit LLVM assembly instead 
 // -emit-llvm-bc: emit LLVM bitcode instead of ISA
 static cl::opt<bool> EmitLlvmBc("emit-llvm-bc", cl::desc("Emit LLVM bitcode instead of AMD GPU ISA"), cl::init(false));
 
+// -emit-lgc: emit LLVM assembly suitable for input to LGC (middle-end compiler)
+static cl::opt<bool> EmitLgc("emit-lgc", cl::desc("Emit LLVM assembly suitable for input to LGC (middle-end compiler)"),
+                             cl::init(false));
+
 // =====================================================================================================================
 // Initialize the middle-end. This must be called before the first LgcContext::Create, although you are
 // allowed to call it again after that. It must also be called before LLVM command-line processing, so
@@ -159,7 +163,7 @@ LgcContext::~LgcContext() {
 // This actually creates a PipelineState, but returns the Pipeline superclass that is visible to
 // the front-end.
 Pipeline *LgcContext::createPipeline() {
-  return new PipelineState(this);
+  return new PipelineState(this, EmitLgc);
 }
 
 // =====================================================================================================================
@@ -169,8 +173,8 @@ Pipeline *LgcContext::createPipeline() {
 // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
 // @param useBuilderRecorder : true to use BuilderRecorder, false to use BuilderImpl
 Builder *LgcContext::createBuilder(Pipeline *pipeline, bool useBuilderRecorder) {
-  if (!pipeline || useBuilderRecorder)
-    return Builder::createBuilderRecorder(this, pipeline);
+  if (!pipeline || useBuilderRecorder || EmitLgc)
+    return Builder::createBuilderRecorder(this, pipeline, EmitLgc);
   return Builder::createBuilderImpl(this, pipeline);
 }
 

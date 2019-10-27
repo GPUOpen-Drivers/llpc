@@ -37,6 +37,9 @@ amdllpc [<options>...] [<files>...]
 | `-log-file-outs=<filename>`      | Name of the file to log info from LLPC_OUTS() and LLPC_ERRS()     |                               |
 | `-enable-pipeline-dump`          | Enable pipeline info dump	                                       |                               |
 | `-pipeline-dump-dir=<directory>` | Directory where pipeline shader info are dumped	               |                               |
+| `-emit-lgc`                      | Emit LLVM IR assembly just before LGC (middle-end)                | false                         |
+| `-emit-llvm`                     | Emit LLVM IR assembly just before LLVM back-end                   | false                         |
+| `-emit-llvm-bc`                  | Emit LLVM IR bitcode just before LLVM back-end                    | false                         |
 
 * Debug & Performance tunning options
 

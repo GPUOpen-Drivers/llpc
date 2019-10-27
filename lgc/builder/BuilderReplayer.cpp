@@ -111,28 +111,31 @@ bool BuilderReplayer::runOnModule(Module &module) {
   SmallVector<Function *, 8> funcsToRemove;
 
   for (auto &func : module) {
-    // Skip non-declarations that are definitely not LLPC intrinsics.
+    // Skip non-declarations; they are definitely not lgc.create.* calls.
     if (!func.isDeclaration())
       continue;
 
-    const MDNode *const funcMeta = func.getMetadata(opcodeMetaKindId);
-
-    // Skip builder calls that do not have the correct metadata to identify the opcode.
-    if (!funcMeta) {
-      // If the function had the llpc builder call prefix, it means the metadata was not encoded correctly.
-      assert(func.getName().startswith(BuilderCallPrefix) == false);
-      continue;
+    // Get the opcode if it is an lgc.create.* call, either from the metadata on the declaration, or
+    // (in the case that there is no metadata because we are running the lgc command-line tool on the
+    // output from "amdllpc -emit-lgc") from the name with string searching.
+    unsigned opcode = 0;
+    if (const MDNode *funcMeta = func.getMetadata(opcodeMetaKindId)) {
+      const ConstantAsMetadata *metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
+      opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
+      assert(func.getName().startswith(BuilderCallPrefix));
+      assert(func.getName()
+                 .slice(strlen(BuilderCallPrefix), StringRef::npos)
+                 .startswith(BuilderRecorder::getCallName(static_cast<BuilderRecorder::Opcode>(opcode))) &&
+             "lgc.create.* mismatch!");
+    } else {
+      if (!func.getName().startswith(BuilderCallPrefix))
+        continue; // Not lgc.create.* call
+      opcode = BuilderRecorder::getOpcodeFromName(func.getName());
     }
 
-    const ConstantAsMetadata *const metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
-    unsigned opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
-
-    SmallVector<CallInst *, 8> callsToRemove;
-
+    // Replay all call uses of the function declaration.
     while (!func.use_empty()) {
-      CallInst *const call = dyn_cast<CallInst>(func.use_begin()->getUser());
-
-      // Replay the call into BuilderImpl.
+      CallInst *call = cast<CallInst>(func.use_begin()->getUser());
       replayCall(opcode, call);
     }
 

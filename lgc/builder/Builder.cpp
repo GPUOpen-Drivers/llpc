@@ -56,8 +56,9 @@ Builder *Builder::createBuilderImpl(LgcContext *context, Pipeline *pipeline) {
 //
 // @param context : LGC context
 // @param pipeline : Pipeline object, can be nullptr
-Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline) {
-  return new BuilderRecorder(context, pipeline);
+// @param omitOpcodes : Don't add opcode metadata to lgc.create.* function declarations
+Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline, bool omitOpcodes) {
+  return new BuilderRecorder(context, pipeline, omitOpcodes);
 }
 
 // =====================================================================================================================

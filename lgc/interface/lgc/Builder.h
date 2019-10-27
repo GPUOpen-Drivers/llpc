@@ -132,7 +132,7 @@ public:
   // Static methods to create a BuilderImpl or BuilderRecorder. These are not used as part of the LGC
   // interface; use LgcContext::createBuilder instead.
   static Builder *createBuilderImpl(LgcContext *context, Pipeline *pipeline);
-  static Builder *createBuilderRecorder(LgcContext *context, Pipeline *pipeline);
+  static Builder *createBuilderRecorder(LgcContext *context, Pipeline *pipeline, bool omitOpcodes);
 
   // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
   // is a vector type.

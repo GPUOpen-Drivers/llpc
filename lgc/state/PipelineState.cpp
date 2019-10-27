@@ -37,6 +37,7 @@
 #include "lgc/util/Internal.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
@@ -204,6 +205,12 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   if (m_noReplayer)
     pipelineStateWrapper->setPipelineState(this);
 
+  if (m_emitLgc) {
+    // -emit-lgc: Just write the module.
+    patchPassMgr->add(createPrintModulePass(outStream));
+    patchPassMgr->stop();
+  }
+
   // Get a BuilderReplayer pass if needed.
   ModulePass *replayerPass = nullptr;
   if (!m_noReplayer)
@@ -218,6 +225,9 @@ void PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
   // Run the "whole pipeline" passes, excluding the target backend.
   patchPassMgr->run(*pipelineModule);
   patchPassMgr.reset(nullptr);
+
+  if (m_emitLgc)
+    return;
 
   // A separate "whole pipeline" pass manager for code generation.
   std::unique_ptr<PassManager> codeGenPassMgr(PassManager::Create());
