@@ -547,11 +547,11 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             auto pCastedDescPtr = CastInst::Create(Instruction::BitCast, pDescPtr, pDescPtrTy, "", pInsertPoint);
 
             // Load descriptor
-            pCastedDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
-            pDesc = new LoadInst(pCastedDescPtr, "", pInsertPoint);
-            if (LoadInst *LI = dyn_cast<LoadInst>(pDesc))
-              LI->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
-            cast<LoadInst>(pDesc)->setAlignment(MaybeAlign(16));
+            pCastedDescPtr->setMetadata(MetaNameUniform, MDNode::get(pCastedDescPtr->getContext(), {}));
+            auto pLoad = new LoadInst(pCastedDescPtr, "", pInsertPoint);
+            pLoad->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pLoad->getContext(), {}));
+            pLoad->setAlignment(MaybeAlign(16));
+            pDesc = pLoad;
 
             if (foundNodeType == ResourceMappingNodeType::DescriptorBufferCompact)
             {

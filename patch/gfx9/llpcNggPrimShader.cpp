@@ -6554,12 +6554,11 @@ Function* NggPrimShader::CreateFetchCullingRegister(
         pRegOffset = m_pBuilder->CreateLShr(pRegOffset, 2); // To DWORD offset
 
         auto pLoadPtr = m_pBuilder->CreateGEP(pPrimShaderTablePtr, { m_pBuilder->getInt32(0), pRegOffset });
-        static_cast<Instruction*>(pLoadPtr)->setMetadata(m_pContext->MetaIdUniform(),
-                                                         m_pContext->GetEmptyMetadataNode());
+        cast<Instruction>(pLoadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_pBuilder->getContext(), {}));
 
         auto pRegValue = m_pBuilder->CreateAlignedLoad(pLoadPtr, 4);
         pRegValue->setVolatile(true);
-        pRegValue->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+        pRegValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_pBuilder->getContext(), {}));
 
         m_pBuilder->CreateRet(pRegValue);
     }

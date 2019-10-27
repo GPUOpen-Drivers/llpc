@@ -159,6 +159,9 @@ namespace LlpcName
     const static char ShaderStageMetadata[]           = "llpc.shaderstage";
 } // LlpcName
 
+// Well-known metadata names
+const static char MetaNameUniform[] = "amdgpu.uniform";
+
 // Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify
 static const uint32_t MaxInOutLocCount = 32;
 

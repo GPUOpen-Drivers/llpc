@@ -495,7 +495,7 @@ Value* ShaderSystemValues::GetNumWorkgroups()
                                                     pIntfData->entryArgIdxs.cs.numWorkgroupsPtr,
                                                     "numWorkgroupsPtr");
         auto pNumWorkgroups = new LoadInst(pNumWorkgroupPtr, "", pInsertPos);
-        pNumWorkgroups->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+        pNumWorkgroups->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pInsertPos->getContext(), {}));
         m_pNumWorkgroups = pNumWorkgroups;
     }
     return m_pNumWorkgroups;
@@ -575,10 +575,10 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
         };
 
         auto pStreamOutBufDescPtr = GetElementPtrInst::Create(nullptr, pStreamOutTablePtr, idxs, "", pInsertPos);
-        pStreamOutBufDescPtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+        pStreamOutBufDescPtr->setMetadata(MetaNameUniform, MDNode::get(pStreamOutBufDescPtr->getContext(), {}));
 
         auto pStreamOutBufDesc = new LoadInst(pStreamOutBufDescPtr, "", pInsertPos);
-        pStreamOutBufDesc->setMetadata(m_pContext->MetaIdInvariantLoad(), m_pContext->GetEmptyMetadataNode());
+        pStreamOutBufDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(pStreamOutBufDesc->getContext(), {}));
         pStreamOutBufDesc->setAlignment(MaybeAlign(16));
 
         m_streamOutBufDescs[xfbBuffer] = pStreamOutBufDesc;
@@ -770,7 +770,7 @@ Value* ShaderSystemValues::GetResourceNodeValue(
         }
 
         auto pResNodePtr = BitCastInst::CreatePointerCast(pElemPtr, pResNodePtrTy, "", pInsertPos);
-        pResNodePtr->setMetadata(m_pContext->MetaIdUniform(), m_pContext->GetEmptyMetadataNode());
+        pResNodePtr->setMetadata(MetaNameUniform, MDNode::get(pResNodePtr->getContext(), {}));
 
         pResNodeValue = new LoadInst(pResNodePtr, "", pInsertPos);
     }
