@@ -1458,7 +1458,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
     uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
-    uint32_t     xfbLocOffset,      // Transform feedback location offset (for array type)
+    uint32_t     xfbOffsetAdjust,   // Adjustment of transform feedback offset (for array type)
     uint32_t     xfbBufferAdjust,   // Adjustment of transform feedback buffer ID (for array type, default is 0)
     Value*       pElemIdx,          // [in] Element index used for element indexing, valid for tessellation control
                                     //   shader (usually, it is vector component index, for built-in input/output, it
@@ -1510,7 +1510,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                LLPC_ASSERT((xfbLocOffset == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
+                LLPC_ASSERT((xfbOffsetAdjust == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
 
                 auto pElemTy = pOutputTy->getArrayElementType();
                 LLPC_ASSERT(pElemTy->isFloatingPointTy() || pElemTy->isIntegerTy()); // Must be scalar
@@ -1525,7 +1525,9 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                     idxs.push_back(elemIdx);
                     auto pElem = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
 
-                    auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbLoc + byteSize * elemIdx);
+                    auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset +
+                                                           outputMeta.XfbExtraOffset +
+                                                           byteSize * elemIdx);
                     m_pBuilder->CreateWriteXfbOutput(pElem,
                                                      /*isBuiltIn=*/true,
                                                      builtInId,
@@ -1575,8 +1577,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
                 if (pLocOffsetConst != nullptr)
                 {
-                    uint32_t xfbLocOffset = pLocOffsetConst->getZExtValue();
-                    pElemLocOffset = ConstantInt::get(m_pContext->Int32Ty(), xfbLocOffset + stride * elemIdx);
+                    uint32_t locOffset = pLocOffsetConst->getZExtValue();
+                    pElemLocOffset = ConstantInt::get(m_pContext->Int32Ty(), locOffset + stride * elemIdx);
                 }
                 else
                 {
@@ -1596,7 +1598,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                                            pElemMeta,
                                            pElemLocOffset,
                                            maxLocOffset,
-                                           xfbLocOffset + (blockArray ? 0 : outputMeta.XfbArrayStride * elemIdx),
+                                           xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * elemIdx),
                                            xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * elemIdx : 0),
                                            nullptr,
                                            pVertexIdx,
@@ -1624,7 +1626,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                                        pMemberMeta,
                                        pLocOffset,
                                        maxLocOffset,
-                                       xfbLocOffset,
+                                       xfbOffsetAdjust,
                                        xfbBufferAdjust,
                                        nullptr,
                                        pVertexIdx,
@@ -1663,8 +1665,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             if (outputMeta.IsXfb)
             {
                 // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-                LLPC_ASSERT((xfbLocOffset == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
-                auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbLoc);
+                LLPC_ASSERT((xfbOffsetAdjust == 0) && (xfbBufferAdjust == 0)); // Unused for built-ins
+                auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
                 m_pBuilder->CreateWriteXfbOutput(pOutputValue,
                                                  /*isBuiltIn=*/true,
                                                  builtInId,
@@ -1712,8 +1714,10 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         if (outputMeta.IsXfb)
         {
             // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-            LLPC_ASSERT(xfbLocOffset != InvalidValue);
-            Value* pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset + xfbLocOffset + outputMeta.XfbLoc);
+            LLPC_ASSERT(xfbOffsetAdjust != InvalidValue);
+            Value* pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset +
+                                                     outputMeta.XfbExtraOffset +
+                                                     xfbOffsetAdjust);
             m_pBuilder->CreateWriteXfbOutput(pOutputValue,
                                              /*isBuiltIn=*/false,
                                              location + cast<ConstantInt>(pLocOffset)->getZExtValue(),

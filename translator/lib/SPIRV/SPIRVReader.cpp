@@ -9018,7 +9018,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.XfbBuffer = InOutDec.XfbBuffer;
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
-    InOutMD.XfbLoc = InOutDec.XfbLoc;
+    InOutMD.XfbExtraOffset = InOutDec.XfbExtraOffset;
 
     // Check signedness for generic input/output
     if (!InOutDec.IsBuiltIn) {
@@ -9038,7 +9038,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       InOutDec.Value.Loc += (Width <= 32 * 4) ? 1 : 2;
       uint32_t Alignment = 32;
       uint32_t BaseStride = 4; // Strides in (BYTES)
-      InOutDec.XfbLoc += (((Width + Alignment - 1) / Alignment) * BaseStride);
+      InOutDec.XfbExtraOffset +=
+        (((Width + Alignment - 1) / Alignment) * BaseStride);
     }
 
     auto Int64Ty = Type::getInt64Ty(*Context);
@@ -9065,16 +9066,18 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
                                             BT->getMatrixColumnCount();
 
     uint32_t StartLoc = InOutDec.Value.Loc;
-    uint32_t StartXfbLoc = InOutDec.XfbLoc;
 
-    // Align StartXfbLoc to 64-bit (8 bytes)
     bool AlignTo64Bit = checkContains64BitType(ElemTy);
 
+    uint32_t StartXfbExtraOffset = InOutDec.XfbExtraOffset;
+    // Align StartXfbExtraOffset to 64-bit (8 bytes)
     if (AlignTo64Bit)
-      StartXfbLoc = roundUpToMultiple(StartXfbLoc, 8u);
+      StartXfbExtraOffset = roundUpToMultiple(
+        InOutDec.XfbOffset + InOutDec.XfbExtraOffset, 8u) - InOutDec.XfbOffset;
+
     Type *ElemMDTy = nullptr;
     auto ElemDec = InOutDec; // Inherit from parent
-    ElemDec.XfbLoc = StartXfbLoc;
+    ElemDec.XfbExtraOffset = StartXfbExtraOffset;
     auto ElemMD = buildShaderInOutMetadata(ElemTy, ElemDec, ElemMDTy);
 
     if (ElemDec.PerPatch)
@@ -9095,17 +9098,18 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
         ElemDec.XfbArrayStride * ElemTy->getArrayLength() : 1;
     } else {
       // NOTE: For other non-block arrays, the transform feedback array stride
-      // is the occupied locations (bytes) of an array element.
-      XfbArrayStride = ElemDec.XfbLoc - StartXfbLoc;
+      // is the occupied byte count of an array element.
+      XfbArrayStride = ElemDec.XfbExtraOffset - StartXfbExtraOffset;
 
-      // Align XfbLocStride to 64-bit (8 bytes)
+      // Align XfbArrayStride to 64-bit (8 bytes)
       if (AlignTo64Bit)
         XfbArrayStride = roundUpToMultiple(XfbArrayStride, 8u);
 
       // Update next location value
       if (!InOutDec.IsBuiltIn) {
         InOutDec.Value.Loc = StartLoc + Stride * NumElems;
-        InOutDec.XfbLoc = StartXfbLoc + XfbArrayStride * NumElems;
+        InOutDec.XfbExtraOffset =
+          StartXfbExtraOffset + XfbArrayStride * NumElems;
       }
     }
 
@@ -9140,7 +9144,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     InOutMD.XfbStride = InOutDec.XfbStride;
     InOutMD.XfbOffset = InOutDec.XfbOffset;
     InOutMD.XfbArrayStride = XfbArrayStride;
-    InOutMD.XfbLoc = StartXfbLoc;
+    InOutMD.XfbExtraOffset = StartXfbExtraOffset;
 
     std::vector<Constant *> MDValues;
     MDValues.push_back(ConstantInt::get(Int32Ty, Stride));
@@ -9156,8 +9160,8 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
     std::vector<Constant *> MemberMDValues;
 
     // Build metadata for each structure member
-    uint32_t XfbLoc = InOutDec.XfbLoc;
-    uint32_t StructXfbLoc = 0;
+    uint32_t XfbExtraOffset = InOutDec.XfbExtraOffset;
+    uint32_t StructXfbExtraOffset = 0;
     auto NumMembers = BT->getStructMemberCount();
 
     // Get Block starting transform feedback offset,
@@ -9217,17 +9221,17 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       bool AlignTo64Bit = checkContains64BitType(MemberTy);
       if (BT->hasMemberDecorate(MemberIdx, DecorationOffset, 0, &XfbOffset)) {
         // For the structure member, if it has DecorationOffset,
-        // Then use DecorationOffset as starting xfbloc
-        MemberDec.XfbLoc = XfbOffset - BlockXfbOffset;
+        // Then use DecorationOffset as starting XfbExtraOffset
+        MemberDec.XfbExtraOffset = XfbOffset - BlockXfbOffset;
         MemberDec.XfbOffset = BlockXfbOffset;
       } else {
         if (AlignTo64Bit)
-          // Align next XfbLoc to 64-bit (8 bytes)
-          MemberDec.XfbLoc = roundUpToMultiple(XfbLoc, 8u);
+          // Align next XfbExtraOffset to 64-bit (8 bytes)
+          MemberDec.XfbExtraOffset = roundUpToMultiple(XfbExtraOffset, 8u);
         else
-          MemberDec.XfbLoc = XfbLoc;
+          MemberDec.XfbExtraOffset = XfbExtraOffset;
       }
-      XfbLoc = MemberDec.XfbLoc;
+      XfbExtraOffset = MemberDec.XfbExtraOffset;
       SPIRVWord MemberStreamId = SPIRVID_INVALID;
       if (BT->hasMemberDecorate(
             MemberIdx, DecorationStream, 0, &MemberStreamId))
@@ -9236,12 +9240,13 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       auto  MemberMD   =
         buildShaderInOutMetadata(MemberTy, MemberDec, MemberMDTy);
 
-      XfbLoc = MemberDec.XfbLoc;
-      // Align next XfbLoc to 64-bit (8 bytes)
-      if (AlignTo64Bit)
-        XfbLoc = roundUpToMultiple(XfbLoc, 8u);
+      // Align next XfbExtraOffset to 64-bit (8 bytes)
+      XfbExtraOffset = MemberDec.XfbExtraOffset;
 
-      StructXfbLoc = std::max(StructXfbLoc, XfbLoc);
+      if (AlignTo64Bit)
+        XfbExtraOffset = roundUpToMultiple(XfbExtraOffset, 8u);
+
+      StructXfbExtraOffset = std::max(StructXfbExtraOffset, XfbExtraOffset);
 
       if (MemberDec.IsBuiltIn)
         InOutDec.IsBuiltIn = true; // Set "builtin" flag
@@ -9255,7 +9260,7 @@ Constant * SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *BT,
       MemberMDValues.push_back(MemberMD);
     }
 
-    InOutDec.XfbLoc = StructXfbLoc;
+    InOutDec.XfbExtraOffset = StructXfbExtraOffset;
     // Build  metadata for the structure
     MDTy = StructType::get(*Context, MemberMDTys);
     return ConstantStruct::get(static_cast<StructType *>(MDTy), MemberMDValues);

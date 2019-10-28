@@ -1193,9 +1193,13 @@ union ShaderInOutMetadata {
     uint64_t XfbStride          : 16; // Transform feedback stride
     // BYTE 8~9
     uint64_t IsBlockArray       : 1;  // Whether we are handling block array
-    uint64_t XfbArrayStride     : 15; // Transform feedback array stride
+    uint64_t XfbArrayStride     : 15; // Transform feedback array stride (for
+                                      //   block array, it's flatten dimension
+                                      //   of an element (1 if element is not
+                                      //   sub-array; for non block array, it's
+                                      //   occupied byte count of an element)
     // BYTE 10~11
-    uint64_t XfbLoc             : 14; // Transform feedback location
+    uint64_t XfbExtraOffset     : 16; // Transform feedback extra offset
   };
   uint64_t U64All[2];
 };
@@ -1232,8 +1236,12 @@ struct ShaderInOutDecorate {
   uint32_t       XfbBuffer;          // Transform feedback buffer ID
   uint32_t       XfbOffset;          // Transform feedback offset
   uint32_t       XfbStride;          // Transform feedback stride
-  uint32_t       XfbLoc;             // Transform feedback location
-  uint32_t       XfbArrayStride;     // Transform feedback array stride
+  uint32_t       XfbExtraOffset;     // Transform feedback extra offset
+  uint32_t       XfbArrayStride;     // Transform feedback array stride (for
+                                     //   block array, it's flatten dimension
+                                     //   of an element (1 if element is not
+                                     //   sub-array; for non block array, it's
+                                     //   occupied byte count of an element)
   bool           contains64BitType;  // Whether contains 64-bit type
 };
 
