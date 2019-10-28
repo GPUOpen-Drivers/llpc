@@ -153,10 +153,10 @@ union XfbOutInfo
 {
     struct
     {
-        uint32_t xfbBuffer    : 2;   // Transform feedback buffer
-        uint32_t xfbOffset    : 16;  // Transform feedback offset
-        uint32_t xfbLocOffset : 13;  // Location offset
-        uint32_t is16bit      : 1;   // Whether it is 16-bit data for transform feedback
+        uint32_t xfbBuffer      : 2;   // Transform feedback buffer
+        uint32_t xfbOffset      : 16;  // Transform feedback offset
+        uint32_t xfbExtraOffset : 13;  // Transform feedback extra offset
+        uint32_t is16bit        : 1;   // Whether it is 16-bit data for transform feedback
     };
     uint32_t u32All;
 };

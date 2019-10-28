@@ -642,7 +642,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
         xfbOutInfo.xfbBuffer = xfbBuffer;
         xfbOutInfo.xfbOffset = cast<ConstantInt>(pXfbOffset)->getZExtValue();
         xfbOutInfo.is16bit = (pValueToWrite->getType()->getScalarSizeInBits() == 16);
-        xfbOutInfo.xfbLocOffset = 0;
+        xfbOutInfo.xfbExtraOffset = 0;
 
         auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageGeometry);
         pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
@@ -654,7 +654,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
         }
     }
 
-    // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbLocOffset, %Type% outputValue)
+    // XFB: @llpc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 xfbExtraOffset, %Type% outputValue)
     SmallVector<Value*, 4> args;
     std::string instName = LlpcName::OutputExportXfb;
     args.push_back(getInt32(xfbBuffer));
