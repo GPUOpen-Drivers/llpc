@@ -1559,8 +1559,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                     if (enableXfb == false)
                     {
                         LLPC_OUTS("\n===============================================================================\n");
-                        LLPC_OUTS("// LLPC transform feedback export info for " <<
-                                  GetShaderStageName(m_shaderStage) << " shader\n\n");
+                        LLPC_OUTS("// LLPC transform feedback export info (" <<
+                                  GetShaderStageName(m_shaderStage) << " shader)\n\n");
 
                         enableXfb = true;
                     }
@@ -1698,7 +1698,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 if (enableXfb == false)
                 {
                     LLPC_OUTS("\n===============================================================================\n");
-                    LLPC_OUTS("// LLPC transform feedback export info for " << GetShaderStageName(m_shaderStage) << " shader\n\n");
+                    LLPC_OUTS("// LLPC transform feedback export info ("
+                              << GetShaderStageName(m_shaderStage) << " shader)\n\n");
 
                     enableXfb = true;
                 }
@@ -1745,7 +1746,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             if (enableXfb == false)
             {
                 LLPC_OUTS("\n===============================================================================\n");
-                LLPC_OUTS("// LLPC transform feedback export info for " << GetShaderStageName(m_shaderStage) << " shader\n\n");
+                LLPC_OUTS("// LLPC transform feedback export info ("
+                          << GetShaderStageName(m_shaderStage) << " shader)\n\n");
 
                 enableXfb = true;
             }
