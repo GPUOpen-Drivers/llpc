@@ -515,8 +515,8 @@ void PatchInOutImportExport::visitCallInst(
                     pLocOffset = callInst.getOperand(1);
                     if (isa<ConstantInt>(pLocOffset))
                     {
-                        auto xfbLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                        value += xfbLocOffset;
+                        auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                        value += locOffset;
                         pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
                     }
                 }
@@ -681,8 +681,8 @@ void PatchInOutImportExport::visitCallInst(
             Value* pLocOffset = callInst.getOperand(1);
             if (isa<ConstantInt>(pLocOffset))
             {
-                auto xfbLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                value += xfbLocOffset;
+                auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                value += locOffset;
                 pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
             }
 
@@ -731,7 +731,7 @@ void PatchInOutImportExport::visitCallInst(
             LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
 
             uint32_t xfbOffset = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-            uint32_t xfbLocOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
+            uint32_t xfbExtraOffset = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
 
             // NOTE: Transform feedback output will be done in last vertex-processing shader stage.
             switch (m_shaderStage)
@@ -741,7 +741,7 @@ void PatchInOutImportExport::visitCallInst(
                     // No TS/GS pipeline, VS is the last stage
                     if ((m_hasGs == false) && (m_hasTs == false))
                     {
-                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbLocOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
                     }
                     break;
                 }
@@ -750,7 +750,7 @@ void PatchInOutImportExport::visitCallInst(
                     // TS-only pipeline, TES is the last stage
                     if (m_hasGs == false)
                     {
-                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbLocOffset, &callInst);
+                        PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
                     }
                     break;
                 }
@@ -762,7 +762,7 @@ void PatchInOutImportExport::visitCallInst(
             case ShaderStageCopyShader:
                 {
                     // TS-GS or GS-only pipeline, copy shader is the last stage
-                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset,xfbLocOffset, &callInst);
+                    PatchXfbOutputExport(pOutput, xfbBuffer, xfbOffset, xfbExtraOffset, &callInst);
                     break;
                 }
             default:
@@ -839,8 +839,8 @@ void PatchInOutImportExport::visitCallInst(
                 pLocOffset = callInst.getOperand(1);
                 if (isa<ConstantInt>(pLocOffset))
                 {
-                    auto xfbLocOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                    value += xfbLocOffset;
+                    auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                    value += locOffset;
                     pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
                 }
 
@@ -4477,7 +4477,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     Value*        pOutput,            // [in] Output value
     uint32_t      xfbBuffer,          // Transform feedback buffer ID
     uint32_t      xfbOffset,          // Transform feedback offset
-    uint32_t      xfbLocOffset,         //  Relative location offset, passed from aggregate type
+    uint32_t      xfbExtraOffset,     // Transform feedback extra offset, passed from aggregate type
     Instruction*  pInsertPos)         // [in] Where to insert the store instruction
 {
     LLPC_ASSERT((m_shaderStage == ShaderStageVertex) ||
@@ -4493,7 +4493,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
     uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
 
-    xfbOffset = xfbOffset + xfbLocOffset;
+    xfbOffset = xfbOffset + xfbExtraOffset;
 
     if (bitWidth == 64)
     {

@@ -120,7 +120,7 @@ private:
 
     void CollectGsXfbOutputInfo(const llvm::Type*          pOutputTy,
                                 uint32_t                   locOffset,
-                                uint32_t                   xfbLocOffset,
+                                uint32_t                   xfbExtraOffset,
                                 const ShaderInOutMetadata& outputMeta);
 
     void InterpolateInputElement(uint32_t           interpLoc,
