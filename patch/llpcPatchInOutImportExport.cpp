@@ -5164,15 +5164,21 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
             std::vector<Value*> args;
             args.push_back(pStoreValue);                                                    // vdata
             args.push_back(pEsGsRingBufDesc);                                               // rsrc
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // voffset
+
+            args.push_back(pRingOffset);                                                    // voffset
             args.push_back(pEsGsOffset);                                                    // soffset
-            args.push_back(pRingOffset);                                                    // offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
-            EmitCall("llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            CombineFormat combineFormat = {};
+            combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
+            combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), combineFormat.u32All));
+
+            CoherentFlag coherent = {};
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+            coherent.bits.swz = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc, slc, swz
+
+            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
     }
 }
@@ -5357,15 +5363,20 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         args.push_back(m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId));  // rsrc
         if (m_gfxIp.major <= 9)
         {
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // vindex
             args.push_back(pRingOffset);                                                    // voffset
             args.push_back(pGsVsOffset);                                                    // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_DATA_FORMAT_32));    // dfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), BUF_NUM_FORMAT_UINT));   // nfmt
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // glc
-            args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                   // slc
-            EmitCall("llvm.amdgcn.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            CombineFormat combineFormat = {};
+            combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
+            combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), combineFormat.u32All));
+
+            CoherentFlag coherent = {};
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+            coherent.bits.swz = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc, slc, swz
+
+            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
 #if LLPC_BUILD_GFX10
         else if (m_gfxIp.major == 10)
@@ -5376,7 +5387,8 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
             CoherentFlag coherent = {};
             coherent.bits.glc = true;
             coherent.bits.slc = true;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc, slc
+            coherent.bits.swz = true;
+            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));       // glc, slc, swz
             EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
 #endif

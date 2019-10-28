@@ -605,10 +605,11 @@ union CoherentFlag
         uint32_t slc    :  1;   // System level coherence
 #if LLPC_BUILD_GFX10
         uint32_t dlc    :  1;   // Device level coherence
-        uint32_t        :  29;
 #else
-        uint32_t        :  30;
+        uint32_t        :  1;
 #endif
+        uint32_t swz    :  1;   // Swizzled buffer
+        uint32_t        :  28;
     } bits;
 
     uint32_t u32All;
