@@ -89,7 +89,7 @@ private:
                                     llvm::Constant*    pOutputMeta,
                                     llvm::Value*       pLocOffset,
                                     uint32_t           maxLocOffset,
-                                    uint32_t           xfbLocOffset,
+                                    uint32_t           xfbOffsetAdjust,
                                     uint32_t           xfbBufferAdjust,
                                     llvm::Value*       pElemIdx,
                                     llvm::Value*       pVertexIdx,
