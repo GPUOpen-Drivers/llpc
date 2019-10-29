@@ -330,7 +330,8 @@ ShaderStage GetShaderStageFromCallingConv(
         shaderStage = hasTs ? ShaderStageTessEval : ShaderStageVertex;
         break;
     case CallingConv::AMDGPU_GS:
-        shaderStage = ShaderStageGeometry;
+        // NOTE: If GS is not present, this must be NGG.
+        shaderStage = hasGs ? ShaderStageGeometry : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
         break;
     case CallingConv::AMDGPU_VS:
         shaderStage = hasGs ? ShaderStageCopyShader : (hasTs ? ShaderStageTessEval : ShaderStageVertex);
