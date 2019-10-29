@@ -1746,7 +1746,9 @@ void VertexFetch::AddVertexFetchInst(
 
     // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
     // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
-    if ((((offset % pFormatInfo->vertexByteSize) == 0) && ((stride % pFormatInfo->vertexByteSize) == 0)) ||
+    if ((((offset % pFormatInfo->vertexByteSize) == 0) &&
+         ((stride % pFormatInfo->vertexByteSize) == 0) &&
+         (dfmt != BUF_DATA_FORMAT_8_8)) || // Format 8_8 has to be per-component fetch because of alignment problem
         (pFormatInfo->compDfmt == dfmt))
     {
         // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
