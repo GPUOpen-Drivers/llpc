@@ -93,13 +93,13 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
             break;
         }
 
-        auto pDesc = LoadDescFromDriverTable(tableOffset);
-        m_pEsGsRingBufDesc = pDesc;
+        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        m_pEsGsRingBufDesc = LoadDescFromDriverTable(tableOffset, builder);
         if ((m_shaderStage != ShaderStageGeometry) && (m_pContext->GetGfxIpVersion().major >= 8))
         {
             // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
             // VS/TES output.
-            m_pEsGsRingBufDesc = SetRingBufferDataFormat(m_pEsGsRingBufDesc, BUF_DATA_FORMAT_32, pDesc->getNextNode());
+            m_pEsGsRingBufDesc = SetRingBufferDataFormat(m_pEsGsRingBufDesc, BUF_DATA_FORMAT_32, builder);
         }
     }
     return m_pEsGsRingBufDesc;
@@ -112,7 +112,8 @@ Value* ShaderSystemValues::GetTessFactorBufDesc()
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
     if (m_pTfBufDesc == nullptr)
     {
-        m_pTfBufDesc = LoadDescFromDriverTable(SI_DRV_TABLE_TF_BUFFER_OFFS);
+        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        m_pTfBufDesc = LoadDescFromDriverTable(SI_DRV_TABLE_TF_BUFFER_OFFS, builder);
     }
     return m_pTfBufDesc;
 }
@@ -183,7 +184,8 @@ Value* ShaderSystemValues::GetOffChipLdsDesc()
     LLPC_ASSERT((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval));
     if (m_pOffChipLdsDesc == nullptr)
     {
-        m_pOffChipLdsDesc = LoadDescFromDriverTable(SI_DRV_TABLE_HS_BUFFER0_OFFS);
+        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+        m_pOffChipLdsDesc = LoadDescFromDriverTable(SI_DRV_TABLE_HS_BUFFER0_OFFS, builder);
     }
     return m_pOffChipLdsDesc;
 }
@@ -269,13 +271,14 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
     }
     if (m_gsVsRingBufDescs[streamId] == nullptr)
     {
+        IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
+
         if (m_shaderStage == ShaderStageGeometry)
         {
             const auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
             // Geometry shader, using GS-VS ring for output.
-            auto pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS + streamId);
-            auto pInsertPos = pDesc->getNextNode();
+            Value* pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS + streamId, builder);
 
             uint32_t outLocStart = 0;
             for (int i = 0; i < streamId; ++i)
@@ -287,37 +290,18 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
                 * sizeof(uint32_t) * 4 * 64;
 
             // Patch GS-VS ring buffer descriptor base address for GS output
-            Value* pGsVsOutRingBufDescElem0 = ExtractElementInst::Create(pDesc,
-                                                                         ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                                         "",
-                                                                         &*pInsertPos);
-
-            pGsVsOutRingBufDescElem0 = BinaryOperator::CreateAdd(pGsVsOutRingBufDescElem0,
-                                                                 ConstantInt::get(m_pContext->Int32Ty(), baseAddr),
-                                                                 "",
-                                                                 &*pInsertPos);
-
-            pDesc = InsertElementInst::Create(pDesc,
-                                            pGsVsOutRingBufDescElem0,
-                                            ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                            "",
-                                            &*pInsertPos);
+            Value* pGsVsOutRingBufDescElem0 = builder.CreateExtractElement(pDesc, (uint64_t)0);
+            pGsVsOutRingBufDescElem0 = builder.CreateAdd(pGsVsOutRingBufDescElem0, builder.getInt32(baseAddr));
+            pDesc = builder.CreateInsertElement(pDesc, pGsVsOutRingBufDescElem0, (uint64_t)0);
 
             // Patch GS-VS ring buffer descriptor stride for GS output
-            Value* pGsVsRingBufDescElem1 = ExtractElementInst::Create(pDesc,
-                                                                      ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                                                      "",
-                                                                      pInsertPos);
+            Value* pGsVsRingBufDescElem1 = builder.CreateExtractElement(pDesc, (uint64_t)1);
 
             // Clear stride in SRD DWORD1
             SqBufRsrcWord1 strideClearMask = {};
             strideClearMask.u32All         = UINT32_MAX;
             strideClearMask.bits.STRIDE    = 0;
-            pGsVsRingBufDescElem1 =
-                    BinaryOperator::CreateAnd(pGsVsRingBufDescElem1,
-                                              ConstantInt::get(m_pContext->Int32Ty(), strideClearMask.u32All),
-                                              "",
-                                              pInsertPos);
+            pGsVsRingBufDescElem1 = builder.CreateAnd(pGsVsRingBufDescElem1, builder.getInt32(strideClearMask.u32All));
 
             // Calculate and set stride in SRD dword1
             uint32_t gsVsStride = pResUsage->builtInUsage.gs.outputVertices *
@@ -326,32 +310,23 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
 
             SqBufRsrcWord1 strideSetValue = {};
             strideSetValue.bits.STRIDE = gsVsStride;
-            pGsVsRingBufDescElem1 =
-                    BinaryOperator::CreateOr(pGsVsRingBufDescElem1,
-                                             ConstantInt::get(m_pContext->Int32Ty(), strideSetValue.u32All),
-                                             "",
-                                             pInsertPos);
+            pGsVsRingBufDescElem1 = builder.CreateOr(pGsVsRingBufDescElem1, builder.getInt32(strideSetValue.u32All));
 
-            pDesc = InsertElementInst::Create(pDesc,
-                                            pGsVsRingBufDescElem1,
-                                            ConstantInt::get(m_pContext->Int32Ty(), 1),
-                                            "",
-                                            pInsertPos);
+            pDesc = builder.CreateInsertElement(pDesc, pGsVsRingBufDescElem1, (uint64_t)1);
 
-            m_gsVsRingBufDescs[streamId] = pDesc;
             if (m_pContext->GetGfxIpVersion().major >= 8)
             {
                 // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
-                m_gsVsRingBufDescs[streamId] = SetRingBufferDataFormat(m_gsVsRingBufDescs[streamId],
-                                                                       BUF_DATA_FORMAT_32,
-                                                                       pInsertPos);
+                pDesc = SetRingBufferDataFormat(pDesc, BUF_DATA_FORMAT_32, builder);
             }
+
+            m_gsVsRingBufDescs[streamId] = pDesc;
         }
         else
         {
             // Copy shader, using GS-VS ring for input.
             LLPC_ASSERT(streamId == 0);
-            m_gsVsRingBufDescs[streamId] = LoadDescFromDriverTable(SI_DRV_TABLE_VS_RING_IN_OFFS);
+            m_gsVsRingBufDescs[streamId] = LoadDescFromDriverTable(SI_DRV_TABLE_VS_RING_IN_OFFS, builder);
         }
     }
     return m_gsVsRingBufDescs[streamId];
@@ -819,20 +794,20 @@ Instruction* ShaderSystemValues::GetSpillTablePtr()
 // =====================================================================================================================
 // Load descriptor from driver table
 Instruction* ShaderSystemValues::LoadDescFromDriverTable(
-    uint32_t tableOffset)    // Byte offset in driver table
+    uint32_t tableOffset,    // Byte offset in driver table
+    IRBuilder<>& builder)    // Builder to use for insertion
 {
-    auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
     Value* args[] =
     {
-        ConstantInt::get(m_pContext->Int32Ty(), InternalResourceTable),
-        ConstantInt::get(m_pContext->Int32Ty(), tableOffset),
-        ConstantInt::get(m_pContext->Int32Ty(), 0),
+        builder.getInt32(InternalResourceTable),
+        builder.getInt32(tableOffset),
+        builder.getInt32(0),
     };
     return EmitCall(LlpcName::DescriptorLoadBuffer,
                     m_pContext->Int32x4Ty(),
                     args,
                     NoAttrib,
-                    pInsertPos);
+                    builder);
 }
 
 // =====================================================================================================================
@@ -840,13 +815,10 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
 Value* ShaderSystemValues::SetRingBufferDataFormat(
     Value*          pBufDesc,       // [in] Buffer Descriptor
     uint32_t        dataFormat,     // Data format
-    Instruction*    pInsertPos      // [in] Where to insert instructions
+    IRBuilder<>&    builder         // [in] Builder to use for inserting instructions
     ) const
 {
-    Value* pElem3 = ExtractElementInst::Create(pBufDesc,
-                                               ConstantInt::get(m_pContext->Int32Ty(), 3),
-                                               "",
-                                               pInsertPos);
+    Value* pElem3 = builder.CreateExtractElement(pBufDesc, (uint64_t)3);
 
     SqBufRsrcWord3 dataFormatClearMask;
     dataFormatClearMask.u32All = UINT32_MAX;
@@ -854,21 +826,13 @@ Value* ShaderSystemValues::SetRingBufferDataFormat(
     // TODO: This code needs to be fixed for gfx10; buffer format is handled differently.
 #endif
     dataFormatClearMask.gfx6.DATA_FORMAT = 0;
-    pElem3 = BinaryOperator::CreateAnd(pElem3,
-                                       ConstantInt::get(m_pContext->Int32Ty(), dataFormatClearMask.u32All),
-                                       "",
-                                       pInsertPos);
+    pElem3 = builder.CreateAnd(pElem3, builder.getInt32(dataFormatClearMask.u32All));
 
     SqBufRsrcWord3 dataFormatSetValue = {};
     dataFormatSetValue.gfx6.DATA_FORMAT = dataFormat;
-    pElem3 = BinaryOperator::CreateOr(pElem3,
-                                      ConstantInt::get(m_pContext->Int32Ty(), dataFormatSetValue.u32All),
-                                      "",
-                                      pInsertPos);
+    pElem3 = builder.CreateOr(pElem3, builder.getInt32(dataFormatSetValue.u32All));
 
-    pBufDesc = InsertElementInst::Create(pBufDesc, pElem3, ConstantInt::get(m_pContext->Int32Ty(), 3), "", pInsertPos);
-
-    return pBufDesc;
+    return builder.CreateInsertElement(pBufDesc, pElem3, (uint64_t)3);
 }
 
 // =====================================================================================================================
