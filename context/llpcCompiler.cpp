@@ -62,6 +62,7 @@
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
 #include "llpcFile.h"
+#include "llpcFragColorExport.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPipelineDumper.h"
@@ -1259,6 +1260,23 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
 #endif
     }
+}
+
+// =====================================================================================================================
+// convert color buffer format to fragment shader export format
+uint32_t Compiler::ConvertColorBufferFormatToExportFormat(
+    const ColorTarget*          pTarget,                // [in] GraphicsPipelineBuildInfo
+    const bool                  enableAlphaToCoverage   // whether enalbe AlphaToCoverage
+    ) const
+{
+    ExportFormat exportFormat = FragColorExport::ConvertColorBufferFormatToExportFormat(
+            pTarget,
+            m_gfxIp,
+            &m_gpuWorkarounds,
+            pTarget->channelWriteMask,
+            enableAlphaToCoverage);
+
+    return static_cast<uint32_t>(exportFormat);
 }
 
 // =====================================================================================================================

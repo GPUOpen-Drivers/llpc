@@ -102,27 +102,34 @@ public:
 
     llvm::Value* Run(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
 
+    static ExportFormat ConvertColorBufferFormatToExportFormat(
+        const ColorTarget*          pTarget,
+        GfxIpVersion                gfxIp,
+        const WorkaroundFlags*      pGpuWorkarounds,
+        uint32_t                    outputMask,
+        const bool                  enableAlphaToCoverage);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(FragColorExport);
     LLPC_DISALLOW_COPY_AND_ASSIGN(FragColorExport);
 
     ExportFormat ComputeExportFormat(llvm::Type* pOutputTy, uint32_t location) const;
-    CompSetting ComputeCompSetting(VkFormat format) const;
-    ColorSwap ComputeColorSwap(VkFormat format) const;
+    static CompSetting ComputeCompSetting(VkFormat format);
+    static ColorSwap ComputeColorSwap(VkFormat format);
 
     static const ColorFormatInfo* GetColorFormatInfo(VkFormat format);
 
     // Checks whether numeric format of the specified color attachment format is as expected
-    bool IsUnorm(VkFormat format) const { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_UNORM); }
-    bool IsSnorm(VkFormat format) const { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SNORM); }
-    bool IsFloat(VkFormat format) const { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_FLOAT); }
-    bool IsUint(VkFormat format)  const { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_UINT);  }
-    bool IsSint(VkFormat format)  const { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SINT);  }
-    bool IsSrgb(VkFormat format)  const { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SRGB);  }
+    static bool IsUnorm(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_UNORM); }
+    static bool IsSnorm(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SNORM); }
+    static bool IsFloat(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_FLOAT); }
+    static bool IsUint(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_UINT);  }
+    static bool IsSint(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SINT);  }
+    static bool IsSrgb(VkFormat format) { return (GetColorFormatInfo(format)->nfmt == COLOR_NUM_FORMAT_SRGB);  }
 
-    bool HasAlpha(VkFormat format) const;
+    static bool HasAlpha(VkFormat format);
 
-    uint32_t GetMaxComponentBitCount(VkFormat format) const;
+    static uint32_t GetMaxComponentBitCount(VkFormat format);
 
     llvm::Value* ConvertToFloat(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;
     llvm::Value* ConvertToInt(llvm::Value* pValue, bool signedness, llvm::Instruction* pInsertPos) const;

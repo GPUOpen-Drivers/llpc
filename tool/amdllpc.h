@@ -45,3 +45,8 @@ void DoAutoLayoutDesc(Llpc::ShaderStage                 shaderStage,
 bool CheckShaderInfoComptible(Llpc::PipelineShaderInfo*        pShaderInfo,
                               uint32_t                         autoLayoutUserDataNodeCount,
                               const Llpc::ResourceMappingNode* pAutoLayoutUserDataNodes);
+
+bool CheckPipelineStateCompatible(const Llpc::ICompiler*            pCompiler,
+                                  Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,
+                                  Llpc::GraphicsPipelineBuildInfo*  pAutoLayoutPipelineInfo,
+                                  Llpc::GfxIpVersion                gfxIp);
