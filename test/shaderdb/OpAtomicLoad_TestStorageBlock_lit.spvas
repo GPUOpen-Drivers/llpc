@@ -3,7 +3,7 @@
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = load atomic i32, i32 addrspace({{.*}})* {{.*}} unordered
+; SHADERTEST: %{{.*}} = load atomic i32, i32 addrspace({{.*}})* {{.*}} monotonic
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST:  %{{.*}} = call float @llvm.amdgcn.raw.buffer.load.f32

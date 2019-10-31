@@ -3042,8 +3042,7 @@ static AtomicOrdering transMemorySemantics(
         return AtomicOrdering::Monotonic;
     }
 
-    // Atomic RMW have to at least be monotically ordered.
-    return isAtomicRMW ? AtomicOrdering::Monotonic : AtomicOrdering::Unordered;
+    return AtomicOrdering::Monotonic;
 }
 
 // =====================================================================================================================
