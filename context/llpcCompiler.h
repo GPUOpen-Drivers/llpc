@@ -212,6 +212,9 @@ public:
     virtual Result BuildShaderModule(const ShaderModuleBuildInfo* pShaderInfo,
                                      ShaderModuleBuildOut*        pShaderOut) const;
 
+    virtual uint32_t ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
+                                                            const bool          enableAlphaToCoverage) const;
+
     virtual Result BuildGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipelineInfo,
                                          GraphicsPipelineBuildOut*        pPipelineOut,
                                          void*                            pPipelineDumpFile = nullptr);

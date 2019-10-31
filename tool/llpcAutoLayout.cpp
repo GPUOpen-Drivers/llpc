@@ -269,6 +269,52 @@ bool CheckShaderInfoComptible(
 }
 
 // =====================================================================================================================
+// Compare if neccessary pipeline state is same.
+bool CheckPipelineStateCompatible(
+        const ICompiler*                  pCompiler,                // [in] LLPC compiler object
+        Llpc::GraphicsPipelineBuildInfo*  pPipelineInfo,            // [in] Graphics pipeline info
+        Llpc::GraphicsPipelineBuildInfo*  pAutoLayoutPipelineInfo,  // [in] layout pipeline info
+        Llpc::GfxIpVersion                gfxIp)                    // Graphics IP version
+{
+    bool compatible = true;
+
+    auto pCbState = &pPipelineInfo->cbState;
+    auto pAutoLayoutCbState = &pAutoLayoutPipelineInfo->cbState;
+
+    for (uint32_t i = 0; i < MaxColorTargets; ++i)
+    {
+        if (pCbState->target[i].format != VK_FORMAT_UNDEFINED)
+        {
+            // NOTE: Alpha-to-coverage only take effect for output from color target 0.
+            const bool enableAlphaToCoverage = pCbState->alphaToCoverageEnable && (i == 0);
+            uint32_t exportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
+                                                            &pCbState->target[i],
+                                                            enableAlphaToCoverage);
+            const bool autoLayoutEnableAlphaToCoverage = pAutoLayoutCbState->alphaToCoverageEnable && (i == 0);
+            uint32_t autoLayoutExportFormat = pCompiler->ConvertColorBufferFormatToExportFormat(
+                                                            &pAutoLayoutCbState->target[i],
+                                                            autoLayoutEnableAlphaToCoverage);
+
+            if (exportFormat != autoLayoutExportFormat)
+            {
+                outs()  << "pPipelineInfo->cbState.target[" << i << "] export format:"
+                        << format("0x%016" PRIX64, exportFormat)
+                        << "\n"
+                        << "pAutoLayoutPipelineInfo->cbState.target[" << i << "] export format:"
+                        << format("0x%016" PRIX64, autoLayoutExportFormat)
+                        << "\n";
+
+                compatible = false;
+                break;
+            }
+        }
+    }
+    // TODO: RsState and other members in CbState except target[].format
+
+    return compatible;
+}
+
+// =====================================================================================================================
 // Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
 // matter because we are running a short-lived command-line utility.

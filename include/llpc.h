@@ -443,6 +443,16 @@ struct NggState
 };
 #endif
 
+/// Represents color target info
+struct ColorTarget
+{
+    bool            blendEnable;          ///< Blend will be enabled for this target at draw time
+    bool            blendSrcAlphaToColor; ///< Whether source alpha is blended to color channels for this target
+                                          ///  at draw time
+    uint8_t         channelWriteMask;     ///< Write mask to specify destination channels
+    VkFormat        format;               ///< Color attachment format
+};
+
 /// Represents info to build a graphics pipeline.
 struct GraphicsPipelineBuildInfo
 {
@@ -499,14 +509,8 @@ struct GraphicsPipelineBuildInfo
     {
         bool    alphaToCoverageEnable;          ///< Enable alpha to coverage
         bool    dualSourceBlendEnable;          ///< Blend state bound at draw time will use a dual source blend mode
-        struct
-        {
-            bool          blendEnable;          ///< Blend will be enabled for this target at draw time
-            bool          blendSrcAlphaToColor; ///< Whether source alpha is blended to color channels for this target
-                                                ///  at draw time
-           uint8_t        channelWriteMask;     ///< Write mask to specify destination channels
-           VkFormat       format;               ///< Color attachment format
-        } target[MaxColorTargets];              ///< Per-MRT color target info
+
+        ColorTarget target[MaxColorTargets];    ///< Per-MRT color target info
     } cbState;                                  ///< Color target state
 
 #if LLPC_BUILD_GFX10
@@ -731,6 +735,15 @@ public:
 
     /// Destroys the pipeline compiler.
     virtual void VKAPI_CALL Destroy() = 0;
+
+    /// Convert ColorBufferFormat to fragment shader export format
+    ///
+    /// param [in] pTarget                  Color target including color buffer format
+    /// param [in] enableAlphaToCoverage    Whether enable AlphaToCoverage
+    ///
+    /// @return uint32_t type casted from fragment shader export format.
+    virtual uint32_t ConvertColorBufferFormatToExportFormat(const ColorTarget*  pTarget,
+                                                            const bool          enableAlphaToCoverage) const = 0;
 
     /// Build shader module from the specified info.
     ///

@@ -1610,17 +1610,30 @@ ExportFormat FragColorExport::ComputeExportFormat(
     uint32_t location    // Location of fragment data output
     ) const
 {
+    GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    uint32_t outputMask = pOutputTy->isVectorTy() ? (1 << pOutputTy->getVectorNumElements()) - 1 : 1;
     const auto pCbState = &pPipelineInfo->cbState;
     const auto pTarget = &pCbState->target[location];
+    // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
+    const bool enableAlphaToCoverage = (pCbState->alphaToCoverageEnable && (location == 0));
 
+    return ConvertColorBufferFormatToExportFormat(pTarget, gfxIp, pGpuWorkarounds,
+                                                  outputMask, enableAlphaToCoverage);
+}
+
+// =====================================================================================================================
+// Get an export format from vk format
+ExportFormat FragColorExport::ConvertColorBufferFormatToExportFormat(
+    const ColorTarget*          pTarget,                // [in] ColorTarget
+    GfxIpVersion                gfxIp,                  // Graphics IP version
+    const WorkaroundFlags*      pGpuWorkarounds,        // [in] GPU workarounds for different graphics IP
+    uint32_t                    outputMask,             // Vector elements mask
+    const bool                  enableAlphaToCoverage)  // Whether enable AlphaToCoverage
+{
     const VkFormat format = pTarget->format;
 
     const bool blendEnabled = pTarget->blendEnable;
-
-    const bool shaderExportsAlpha = (pOutputTy->isVectorTy() && (pOutputTy->getVectorNumElements() == 4));
-
-    // NOTE: Alpha-to-coverage only cares at the output from target #0.
-    const bool enableAlphaToCoverage = (pCbState->alphaToCoverageEnable && (location == 0));
 
     const bool isUnorm = IsUnorm(format);
     const bool isSnorm = IsSnorm(format);
@@ -1632,16 +1645,13 @@ ExportFormat FragColorExport::ComputeExportFormat(
     const uint32_t maxCompBitCount = GetMaxComponentBitCount(format);
 
     const bool hasAlpha = HasAlpha(pTarget->format);
-    const bool alphaExport = (shaderExportsAlpha &&
+    const bool alphaExport = ((outputMask == 0xF) &&
                               (hasAlpha || pTarget->blendSrcAlphaToColor || enableAlphaToCoverage));
 
     const CompSetting compSetting = ComputeCompSetting(format);
 
     // Start by assuming EXP_FORMAT_ZERO (no exports)
     ExportFormat expFmt = EXP_FORMAT_ZERO;
-
-    GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
 
     bool gfx8RbPlusEnable = false;
     if ((gfxIp.major == 8) && (gfxIp.minor == 1))
@@ -1727,8 +1737,7 @@ ExportFormat FragColorExport::ComputeExportFormat(
 // =====================================================================================================================
 // This is the helper function for the algorithm to determine the shader export format.
 CompSetting FragColorExport::ComputeCompSetting(
-    VkFormat format // Color attachment color
-    ) const
+    VkFormat format) // Color attachment color
 {
     CompSetting compSetting = CompSetting::Invalid;
 
@@ -1772,8 +1781,7 @@ CompSetting FragColorExport::ComputeCompSetting(
 // =====================================================================================================================
 // Determines the CB component swap mode according to color attachment format.
 ColorSwap FragColorExport::ComputeColorSwap(
-    VkFormat format // Color attachment format
-    ) const
+    VkFormat format) // Color attachment format
 {
     ColorSwap colorSwap = COLOR_SWAP_STD;
 
@@ -1908,8 +1916,7 @@ const ColorFormatInfo* FragColorExport::GetColorFormatInfo(
 // =====================================================================================================================
 // Checks whether the alpha channel is present in the specified color attachment format.
 bool FragColorExport::HasAlpha(
-    VkFormat format // Color attachment foramt
-    ) const
+    VkFormat format) // Color attachment foramt
 {
     const auto mask = GetColorFormatInfo(format)->channelMask;
     const auto& swizzle = GetColorFormatInfo(format)->channelSwizzle;
@@ -1921,8 +1928,7 @@ bool FragColorExport::HasAlpha(
 // =====================================================================================================================
 // Gets the maximum bit-count of any component in specified color attachment format.
 uint32_t FragColorExport::GetMaxComponentBitCount(
-    VkFormat format // Color attachment foramt
-    ) const
+    VkFormat format) // Color attachment foramt
 {
     auto& bitCount = GetColorFormatInfo(format)->bitCount;
     return std::max(std::max(bitCount[0], bitCount[1]), std::max(bitCount[2], bitCount[3]));

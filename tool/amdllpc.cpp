@@ -969,7 +969,8 @@ static Result BuildShaderModules(
 // =====================================================================================================================
 // Check autolayout compatible.
 static Result CheckAutoLayoutCompatibleFunc(
-    CompileInfo*  pCompileInfo)     // [in,out] Compilation info of LLPC standalone tool
+    const ICompiler*    pCompiler,          // [in] LLPC compiler object
+    CompileInfo*        pCompileInfo)       // [in,out] Compilation info of LLPC standalone tool
 {
     Result result = Result::Success;
 
@@ -1014,15 +1015,16 @@ static Result CheckAutoLayoutCompatibleFunc(
             if (checkAutoLayoutCompatible)
             {
                 PipelineShaderInfo shaderInfo = *pShaderInfo;
+                GraphicsPipelineBuildInfo pipelineInfo = *pPipelineInfo;
                 DoAutoLayoutDesc(pCompileInfo->shaderModuleDatas[i].shaderStage,
                                  pCompileInfo->shaderModuleDatas[i].spirvBin,
-                                 pPipelineInfo,
+                                 &pipelineInfo,
                                  &shaderInfo,
                                  userDataOffset,
                                  true);
-                if (CheckShaderInfoComptible(pShaderInfo, shaderInfo.userDataNodeCount, shaderInfo.pUserDataNodes))
+                if (CheckShaderInfoComptible(pShaderInfo, shaderInfo.userDataNodeCount, shaderInfo.pUserDataNodes) &&
+                    CheckPipelineStateCompatible(pCompiler, pPipelineInfo, &pipelineInfo, ParsedGfxIp))
                 {
-                    // TODO: Pipeline state check
                     outs() << "Auto Layout fragment shader in " << pCompileInfo->pFileNames << " hitted\n";
                 }
                 else
@@ -1692,7 +1694,7 @@ static Result ProcessPipeline(
     if ((result == Result::Success) && (compileInfo.checkAutoLayoutCompatible == true))
     {
         compileInfo.pFileNames = fileNames.c_str();
-        result = CheckAutoLayoutCompatibleFunc(&compileInfo);
+        result = CheckAutoLayoutCompatibleFunc(pCompiler, &compileInfo);
     }
     else
     {
