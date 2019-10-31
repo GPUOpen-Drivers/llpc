@@ -39,14 +39,14 @@ void main()
 /*
 ; RUN: amdllpc -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: = call [2 x <3 x half>] (...) @llpc.call.outer.product.a2v3f16(<3 x half> %{{.*}}, <2 x half> %{{.*}})
-; SHADERTEST: %{{[^, ]*}} = call [3 x <2 x half>] {{.*}}@llpc.call.transpose.matrix.a3v2f16([2 x <3 x half>] %{{[^, ]*}})
+; SHADERTEST: = call {{.*}}[2 x <3 x half>] (...) @llpc.call.outer.product.a2v3f16(<3 x half> %{{.*}}, <2 x half> %{{.*}})
+; SHADERTEST: %{{[^, ]*}} = call {{.*}}[3 x <2 x half>] {{.*}}@llpc.call.transpose.matrix.a3v2f16([2 x <3 x half>] %{{[^, ]*}})
 ; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @llpc.call.determinant.f16([2 x <2 x half>] %
 ; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @llpc.call.determinant.f16([3 x <3 x half>] %
 ; SHADERTEST: = call reassoc nnan nsz arcp contract half (...) @llpc.call.determinant.f16([4 x <4 x half>] %
-; SHADERTEST: = call [2 x <2 x half>] (...) @llpc.call.matrix.inverse.a2v2f16([2 x <2 x half>] %
-; SHADERTEST: = call [3 x <3 x half>] (...) @llpc.call.matrix.inverse.a3v3f16([3 x <3 x half>] %
-; SHADERTEST: = call [4 x <4 x half>] (...) @llpc.call.matrix.inverse.a4v4f16([4 x <4 x half>] %
+; SHADERTEST: = call {{.*}}[2 x <2 x half>] (...) @llpc.call.matrix.inverse.a2v2f16([2 x <2 x half>] %
+; SHADERTEST: = call {{.*}}[3 x <3 x half>] (...) @llpc.call.matrix.inverse.a3v3f16([3 x <3 x half>] %
+; SHADERTEST: = call {{.*}}[4 x <4 x half>] (...) @llpc.call.matrix.inverse.a4v4f16([4 x <4 x half>] %
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

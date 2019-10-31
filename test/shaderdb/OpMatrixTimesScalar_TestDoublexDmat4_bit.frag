@@ -20,7 +20,7 @@ void main()
 ; SHADERTEST: [4 x <4 x double>] (...) @llpc.call.matrix.times.scalar.a4v4f64
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: fmul double %{{[^, ]*}}, %{{[^, ]*}}
+; SHADERTEST: fmul {{.*}}double %{{[^, ]*}}, %{{[^, ]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
