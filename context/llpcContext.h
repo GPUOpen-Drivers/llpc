@@ -150,7 +150,6 @@ public:
     {
         return m_pPipelineContext->IsGraphics();
     }
-
     const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const
     {
         return m_pPipelineContext->GetPipelineShaderInfo(shaderStage);

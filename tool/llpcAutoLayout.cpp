@@ -46,6 +46,7 @@
 #include "llpcInternal.h"
 
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Format.h"
 
 #define DEBUG_TYPE "llpc-auto-layout"
 
@@ -64,6 +65,9 @@ struct ResourceNodeSet
 // NOTE: This option is deprecated and will be ignored, and is present only for compatibility.
 static cl::opt<bool> AutoLayoutDesc("auto-layout-desc",
                                     cl::desc("Automatically create descriptor layout based on resource usages"));
+
+// Offset in Node will be a fixed number, which will be conveniently to identify offset in auto-layout.
+static const uint32_t OffsetStrideInDwords = 12;
 
 // =====================================================================================================================
 // Get the storage size in bytes of a SPIR-V type.
@@ -94,6 +98,177 @@ static uint32_t GetTypeDataSize(
 }
 
 // =====================================================================================================================
+// Find VaPtr userDataNode with specified set.
+static const ResourceMappingNode* FindDescriptorTableVaPtr(
+    PipelineShaderInfo*         pShaderInfo,                 // [in] Shader info, will have user data nodes added to it
+    uint32_t set)                                            // [in] Accroding this set to find ResourceMappingNode
+{
+    const ResourceMappingNode* pDescriptorTableVaPtr = nullptr;
+
+    for (uint32_t k = 0; k < pShaderInfo->userDataNodeCount; ++k)
+    {
+        const ResourceMappingNode* pUserDataNode = &pShaderInfo->pUserDataNodes[k];
+
+        if (pUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
+        {
+            if (pUserDataNode->tablePtr.pNext[0].srdRange.set == set)
+            {
+                pDescriptorTableVaPtr = pUserDataNode;
+                break;
+            }
+        }
+    }
+
+    return pDescriptorTableVaPtr;
+}
+
+// =====================================================================================================================
+// Find userDataNode with specified set and binding. And return Node index.
+static const ResourceMappingNode* FindResourceNode(
+    const ResourceMappingNode* pUserDataNode, // [in] ResourceMappingNode pointer
+    uint32_t                   nodeCount,     // [in] User data node count
+    uint32_t                   set,           // [in] find same set in node array
+    uint32_t                   binding,       // [in] find same binding in node array
+    uint32_t*                  index)         // [out] Return node position in node array
+{
+    const ResourceMappingNode* pResourceNode = nullptr;
+
+    for (uint32_t j = 0; j < nodeCount; ++j)
+    {
+        const ResourceMappingNode* pNext = &pUserDataNode[j];
+
+        if((set == pNext->srdRange.set) && (binding == pNext->srdRange.binding))
+        {
+            pResourceNode = pNext;
+            *index = j;
+            break;
+        }
+    }
+
+    return pResourceNode;
+}
+
+// =====================================================================================================================
+// Compare if pAutoLayoutUserDataNodes is subset of pUserDataNodes.
+bool CheckShaderInfoComptible(
+    PipelineShaderInfo*         pShaderInfo,                 // [in/out] Shader info, will have user data nodes added to it
+    uint32_t                    autoLayoutUserDataNodeCount, // [in] UserData Node count
+    const ResourceMappingNode*  pAutoLayoutUserDataNodes)    // [in] ResourceMappingNode
+{
+    bool hit = false;
+
+    if (autoLayoutUserDataNodeCount == 0)
+    {
+        hit = true;
+    }
+    else if ((pShaderInfo->pDescriptorRangeValues != nullptr) || (pShaderInfo->pSpecializationInfo->dataSize != 0))
+    {
+        hit = false;
+    }
+    else if (pShaderInfo->userDataNodeCount >= autoLayoutUserDataNodeCount)
+    {
+        for (uint32_t n = 0; n < autoLayoutUserDataNodeCount; ++n)
+        {
+            const ResourceMappingNode* pAutoLayoutUserDataNode = &pAutoLayoutUserDataNodes[n];
+
+            // Multiple levels
+            if (pAutoLayoutUserDataNode->type == Llpc::ResourceMappingNodeType::DescriptorTableVaPtr)
+            {
+                uint32_t set = pAutoLayoutUserDataNode->tablePtr.pNext[0].srdRange.set;
+                const ResourceMappingNode* pUserDataNode = FindDescriptorTableVaPtr(pShaderInfo, set);
+
+                if (pUserDataNode != nullptr)
+                {
+                    bool hitNode = false;
+                    for (uint32_t i = 0; i < pAutoLayoutUserDataNode->tablePtr.nodeCount; ++i)
+                    {
+                        const ResourceMappingNode* pAutoLayoutNext = &pAutoLayoutUserDataNode->tablePtr.pNext[i];
+
+                        uint32_t index = 0;
+                        const ResourceMappingNode* pNode = FindResourceNode(
+                                                            pUserDataNode->tablePtr.pNext,
+                                                            pUserDataNode->tablePtr.nodeCount,
+                                                            pAutoLayoutNext->srdRange.set,
+                                                            pAutoLayoutNext->srdRange.binding,
+                                                            &index);
+
+                        if (pNode != nullptr)
+                        {
+                            if ((pAutoLayoutNext->type == pNode->type) &&
+                                (pAutoLayoutNext->sizeInDwords == pNode->sizeInDwords) &&
+                                (pAutoLayoutNext->sizeInDwords <= OffsetStrideInDwords) &&
+                                (pAutoLayoutNext->offsetInDwords == (index * OffsetStrideInDwords)))
+                            {
+                                hitNode = true;
+                                continue;
+                            }
+                            else
+                            {
+                                outs() << "AutoLayoutNode:"
+                                       << "\n ->type                    : "
+                                       << format("0x%016" PRIX64, static_cast<uint32_t>(pAutoLayoutNext->type))
+                                       << "\n ->sizeInDwords            : " << pAutoLayoutNext->sizeInDwords
+                                       << "\n ->offsetInDwords          : " << pAutoLayoutNext->offsetInDwords;
+
+                                outs() << "\nShaderInfoNode:"
+                                       << "\n ->type                    : "
+                                       << format("0x%016" PRIX64, static_cast<uint32_t>(pNode->type))
+                                       << "\n ->sizeInDwords            : " << pNode->sizeInDwords
+                                       << "\n OffsetStrideInDwords      : " << OffsetStrideInDwords
+                                       << "\n index*OffsetStrideInDwords: " << (index * OffsetStrideInDwords) << "\n";
+                                hitNode = false;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    if (hitNode == false)
+                    {
+                        hit = false;
+                        break;
+                    }
+                    else
+                    {
+                        hit = true;
+                    }
+                }
+                else
+                {
+                    hit = false;
+                    break;
+                }
+            }
+            // Single level
+            else
+            {
+                uint32_t index = 0;
+                const ResourceMappingNode* pNode = FindResourceNode(
+                                                            pShaderInfo->pUserDataNodes,
+                                                            pShaderInfo->userDataNodeCount,
+                                                            pAutoLayoutUserDataNode->srdRange.set,
+                                                            pAutoLayoutUserDataNode->srdRange.binding,
+                                                            &index);
+                if ((pNode != nullptr) && (pAutoLayoutUserDataNode->sizeInDwords == pNode->sizeInDwords))
+                {
+                    hit = true;
+                    continue;
+                }
+                else
+                {
+                    hit = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    return hit;
+}
+
+// =====================================================================================================================
 // Lay out dummy descriptors and other information for one shader stage. This is used when running amdllpc on a single
 // SPIR-V or GLSL shader, rather than on a .pipe file. Memory allocated here may be leaked, but that does not
 // matter because we are running a short-lived command-line utility.
@@ -103,8 +278,9 @@ void DoAutoLayoutDesc(
     GraphicsPipelineBuildInfo*  pPipelineInfo,  // [in/out] Graphics pipeline info, will have dummy information filled
                                                 //   in. nullptr if not a graphics pipeline.
     PipelineShaderInfo*         pShaderInfo,    // [in/out] Shader info, will have user data nodes added to it
-    uint32_t&                   topLevelOffset) // [in/out] User data offset; ensures that multiple shader stages use
+    uint32_t&                   topLevelOffset, // [in/out] User data offset; ensures that multiple shader stages use
                                                 //    disjoint offsets
+    bool                        checkAutoLayoutCompatible) // [in] if check AutoLayout Compatiple
 {
     // Read the SPIR-V.
     std::string spirvCode(static_cast<const char*>(spirvBin.pCode), spirvBin.codeSize);
@@ -574,8 +750,15 @@ void DoAutoLayoutDesc(
         uint32_t offsetInDwords = 0;
         for (auto& node : resNodeSet.nodes)
         {
-            node.offsetInDwords = offsetInDwords;
-            offsetInDwords += node.sizeInDwords;
+            if (checkAutoLayoutCompatible)
+            {
+                node.offsetInDwords = node.srdRange.binding * OffsetStrideInDwords;
+            }
+            else
+            {
+                node.offsetInDwords = offsetInDwords;
+                offsetInDwords += node.sizeInDwords;
+            }
         }
     }
 

@@ -1010,8 +1010,7 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig(
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    const auto pNggControl = pContext->GetNggControl();
-    LLPC_ASSERT(pNggControl->enableNgg);
+    LLPC_ASSERT(pContext->GetNggControl()->enableNgg);
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
 
@@ -1124,8 +1123,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
     GfxIpVersion gfxIp = pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    const auto pNggControl = pContext->GetNggControl();
-    LLPC_ASSERT(pNggControl->enableNgg);
+    LLPC_ASSERT(pContext->GetNggControl()->enableNgg);
 
     const uint32_t stageMask = pContext->GetShaderStageMask();
 

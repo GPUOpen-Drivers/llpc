@@ -108,7 +108,9 @@ endif
         llpcSpirvLowerTranslator.cpp
 
 ifeq ($(VKI_RAY_TRACING), 1)
-        CPPFILES += llpcSpirvLowerRayTracing.cpp
+    CPPFILES +=                                 \
+        llpcSpirvLowerRayTracing.cpp            \
+        llpcSpirvLowerRayTracingBuiltIn.cpp
 endif
 
     # llpc/patch

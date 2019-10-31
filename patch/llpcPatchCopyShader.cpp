@@ -658,6 +658,7 @@ void PatchCopyShader::ExportOutput(
 
             ExportBuiltInOutput(pLoadValue, BuiltInViewportIndex, streamId, pInsertPos);
         }
+
     }
 }
 

@@ -479,10 +479,7 @@ void PatchInOutImportExport::visitCallInst(
                 }
             case ShaderStageCompute:
                 {
-                    {
-                        pInput = PatchCsBuiltInInputImport(pInputTy, builtInId, &callInst);
-                    }
-
+                    pInput = PatchCsBuiltInInputImport(pInputTy, builtInId, &callInst);
                     break;
                 }
             default:
@@ -5767,7 +5764,6 @@ void PatchInOutImportExport::WriteValueToLds(
             Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
             auto pStoreInst = new StoreInst(storeValues[i], pStorePtr, false, pInsertPos);
             pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
-
 
             pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, ConstantInt::get(m_pContext->Int32Ty(), 1), "", pInsertPos);
         }
