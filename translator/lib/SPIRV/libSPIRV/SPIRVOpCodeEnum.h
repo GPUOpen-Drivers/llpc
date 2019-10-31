@@ -374,4 +374,3 @@ _SPIRV_OP(SubgroupImageBlockReadINTEL, 5577)
 _SPIRV_OP(SubgroupImageBlockWriteINTEL, 5578)
 _SPIRV_OP(DecorateStringGOOGLE, 5632)
 _SPIRV_OP(MemberDecorateStringGOOGLE, 5633)
-

@@ -1151,7 +1151,6 @@ Result Compiler::BuildPipelineInternal(
                                   lowerPassMgr,
                                   timerProfiler.GetTimer(TimerLower),
                                   forceLoopUnrollCount);
-
             // Run the passes.
             bool success = RunPasses(&lowerPassMgr, modules[shaderIndex]);
             if (success == false)

@@ -261,6 +261,11 @@ static cl::opt<std::string> SpvGenDir("spvgen-dir", cl::desc("Directory to load 
 static cl::opt<bool> RobustBufferAccess("robust-buffer-access",
                                         cl::desc("Validate if the index is out of bounds"), cl::init(false));
 
+// -check-auto-layout-compatible: check if auto descriptor layout got from spv file is commpatible with real layout
+static cl::opt<bool> CheckAutoLayoutCompatible(
+    "check-auto-layout-compatible",
+    cl::desc("check if auto descriptor layout got from spv file is commpatible with real layout"));
+
 namespace llvm
 {
 
@@ -336,6 +341,8 @@ struct CompileInfo
     void*                       pPipelineInfoFile;              // VFX-style file containing pipeline info
     const char*                 pFileNames;                     // Names of input shader source files
     bool                        doAutoLayout;                   // Whether to auto layout descriptors
+    bool                        checkAutoLayoutCompatible;      // Whether to comapre if auto layout descriptors is
+                                                                // same as specified pipeline layout
 };
 
 // =====================================================================================================================
@@ -959,6 +966,115 @@ static Result BuildShaderModules(
 }
 
 // =====================================================================================================================
+// Check autolayout compatible.
+static Result CheckAutoLayoutCompatibleFunc(
+    CompileInfo*  pCompileInfo)     // [in,out] Compilation info of LLPC standalone tool
+{
+    Result result = Result::Success;
+
+    bool isGraphics = (pCompileInfo->stageMask & (ShaderStageToMask(ShaderStageCompute) -1)) ? true : false;
+    if (isGraphics)
+    {
+        // Build graphics pipeline
+        GraphicsPipelineBuildInfo* pPipelineInfo = &pCompileInfo->gfxPipelineInfo;
+
+        // Fill pipeline shader info
+        PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
+        {
+            &pPipelineInfo->vs,
+            &pPipelineInfo->tcs,
+            &pPipelineInfo->tes,
+            &pPipelineInfo->gs,
+            &pPipelineInfo->fs,
+        };
+
+        uint32_t userDataOffset = 0;
+        for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
+        {
+
+            PipelineShaderInfo*         pShaderInfo = shaderInfo[pCompileInfo->shaderModuleDatas[i].shaderStage];
+            bool                        checkAutoLayoutCompatible = pCompileInfo->checkAutoLayoutCompatible;
+
+            if (pCompileInfo->shaderModuleDatas[i].shaderStage != Llpc::ShaderStageFragment)
+            {
+                checkAutoLayoutCompatible = false;
+            }
+            const ShaderModuleBuildOut* pShaderOut  = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
+
+            if (pShaderInfo->pEntryTarget == nullptr)
+            {
+                // If entry target is not specified, use the one from command line option
+                pShaderInfo->pEntryTarget = EntryTarget.c_str();
+            }
+            pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+            pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
+#endif
+            if (checkAutoLayoutCompatible)
+            {
+                PipelineShaderInfo shaderInfo = *pShaderInfo;
+                DoAutoLayoutDesc(pCompileInfo->shaderModuleDatas[i].shaderStage,
+                                 pCompileInfo->shaderModuleDatas[i].spirvBin,
+                                 pPipelineInfo,
+                                 &shaderInfo,
+                                 userDataOffset,
+                                 true);
+                if (CheckShaderInfoComptible(pShaderInfo, shaderInfo.userDataNodeCount, shaderInfo.pUserDataNodes))
+                {
+                    // TODO: Pipeline state check
+                    outs() << "Auto Layout fragment shader in " << pCompileInfo->pFileNames << " hitted\n";
+                }
+                else
+                {
+                    outs() << "Auto Layout fragment shader in " << pCompileInfo->pFileNames << " failed to hit\n";
+                }
+                outs().flush();
+            }
+        }
+    }
+    else if (pCompileInfo->stageMask == ShaderStageToMask(ShaderStageCompute))
+    {
+        ComputePipelineBuildInfo* pPipelineInfo = &pCompileInfo->compPipelineInfo;
+
+        PipelineShaderInfo*         pShaderInfo = &pPipelineInfo->cs;
+        const ShaderModuleBuildOut* pShaderOut  = &pCompileInfo->shaderModuleDatas[0].shaderOut;
+
+        if (pShaderInfo->pEntryTarget == nullptr)
+        {
+            // If entry target is not specified, use the one from command line option
+            pShaderInfo->pEntryTarget = EntryTarget.c_str();
+        }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+        pShaderInfo->entryStage = ShaderStageCompute;
+#endif
+        pShaderInfo->pModuleData  = pShaderOut->pModuleData;
+
+        if (pCompileInfo->checkAutoLayoutCompatible)
+        {
+            uint32_t userDataOffset = 0;
+            PipelineShaderInfo shaderInfo = *pShaderInfo;
+            DoAutoLayoutDesc(ShaderStageCompute,
+                             pCompileInfo->shaderModuleDatas[0].spirvBin,
+                             nullptr,
+                             &shaderInfo,
+                             userDataOffset,
+                             true);
+            if (CheckShaderInfoComptible(pShaderInfo, shaderInfo.userDataNodeCount, shaderInfo.pUserDataNodes))
+            {
+                outs() << "Auto Layout compute shader in " << pCompileInfo->pFileNames << " hitted\n";
+            }
+            else
+            {
+                outs() << "Auto Layout compute shader in " << pCompileInfo->pFileNames << " failed to hit\n";
+            }
+            outs().flush();
+        }
+    }
+
+    return result;
+}
+
+// =====================================================================================================================
 // Builds pipeline and do linking.
 static Result BuildPipeline(
     ICompiler*    pCompiler,        // [in] LLPC compiler object
@@ -1007,7 +1123,8 @@ static Result BuildPipeline(
                                     pCompileInfo->shaderModuleDatas[i].spirvBin,
                                     pPipelineInfo,
                                     pShaderInfo,
-                                    userDataOffset);
+                                    userDataOffset,
+                                    false);
             }
         }
 
@@ -1097,7 +1214,8 @@ static Result BuildPipeline(
                              pCompileInfo->shaderModuleDatas[0].spirvBin,
                              nullptr,
                              pShaderInfo,
-                             userDataOffset);
+                             userDataOffset,
+                             false);
         }
 
         pPipelineInfo->pInstance      = nullptr; // Dummy, unused
@@ -1263,6 +1381,7 @@ static Result ProcessPipeline(
     CompileInfo compileInfo = {};
     std::string fileNames;
     compileInfo.doAutoLayout = true;
+    compileInfo.checkAutoLayoutCompatible = CheckAutoLayoutCompatible;
 
     result = InitCompileInfo(&compileInfo);
 
@@ -1569,27 +1688,34 @@ static Result ProcessPipeline(
         *pNextFile = i + 1;
     }
 
-    //
-    // Build shader modules
-    //
-    if ((result == Result::Success) && (compileInfo.stageMask != 0))
-    {
-        result = BuildShaderModules(pCompiler, &compileInfo);
-    }
-
-    //
-    // Build pipeline
-    //
-    if ((result == Result::Success) && ToLink)
+    if ((result == Result::Success) && (compileInfo.checkAutoLayoutCompatible == true))
     {
         compileInfo.pFileNames = fileNames.c_str();
-        result = BuildPipeline(pCompiler, &compileInfo);
-        if (result == Result::Success)
+        result = CheckAutoLayoutCompatibleFunc(&compileInfo);
+    }
+    else
+    {
+        //
+        // Build shader modules
+        //
+        if ((result == Result::Success) && (compileInfo.stageMask != 0))
         {
-            result = OutputElf(&compileInfo, OutFile, inFiles[0]);
+            result = BuildShaderModules(pCompiler, &compileInfo);
+        }
+
+        //
+        // Build pipeline
+        //
+        if ((result == Result::Success) && ToLink)
+        {
+            compileInfo.pFileNames = fileNames.c_str();
+            result = BuildPipeline(pCompiler, &compileInfo);
+            if (result == Result::Success)
+            {
+                result = OutputElf(&compileInfo, OutFile, inFiles[0]);
+            }
         }
     }
-
     //
     // Clean up
     //

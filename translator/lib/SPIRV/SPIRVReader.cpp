@@ -1429,7 +1429,6 @@ Type *SPIRVToLLVM::transType(
                    StructType::get(*Context, {transType(SIT->getImageType()),
                                               getBuilder()->GetSamplerDescTy()}));
   }
-
 #define HANDLE_OPCODE(op) case (op): {                                         \
     Type *NewTy = transTypeWithOpcode<op>(T, MatrixStride, ColumnMajor,        \
       ParentIsPointer, ExplicitlyLaidOut);                                     \
@@ -5237,7 +5236,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         }
     }
 
-    const uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
+    uint32_t addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
     string varName = pSpvVar->getName();
 
     GlobalVariable* const pGlobalVar = new GlobalVariable(*M,
@@ -6380,9 +6379,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpImage);
   HANDLE_OPCODE(OpSampledImage);
   HANDLE_OPCODE(OpKill);
-#if VKI_KHR_SHADER_CLOCK
   HANDLE_OPCODE(OpReadClockKHR);
-#endif
   HANDLE_OPCODE(OpGroupAll);
   HANDLE_OPCODE(OpGroupAny);
   HANDLE_OPCODE(OpGroupBroadcast);
@@ -8696,7 +8693,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *BV, Value *V) {
       while (BlockTy->isTypeArray())
         BlockTy = BlockTy->getArrayElementType();
       bool IsStructTy = BlockTy->isTypeStruct();
-      assert(IsStructTy);
+     assert(IsStructTy);
 
       // Get values of descriptor binding and set based on corresponding
       // decorations

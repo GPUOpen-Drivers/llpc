@@ -110,6 +110,9 @@ public:
                           llvm::Timer*                pLowerTimer,
                           uint32_t                    forceLoopUnrollCount);
 
+    static void RemoveConstantExpr(Context* pContext, llvm::GlobalVariable* pGlobal);
+    static void ReplaceConstWithInsts(Context* pContext, llvm::Constant* const pConst);
+
 protected:
     void Init(llvm::Module* pModule);
 

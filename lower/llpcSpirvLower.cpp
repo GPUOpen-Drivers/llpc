@@ -28,7 +28,7 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLower.
  ***********************************************************************************************************************
  */
-
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Verifier.h"
@@ -48,6 +48,7 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Vectorize.h"
 
+#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
@@ -74,6 +75,109 @@ static opt<bool> LowerDynIndex("lower-dyn-index", desc("Lower SPIR-V dynamic (no
 
 namespace Llpc
 {
+// =====================================================================================================================
+// Replace a constant with instructions using a builder.
+void SpirvLower::ReplaceConstWithInsts(
+    Context*        pContext,      // [in] The context
+    Constant* const pConst)        // [in/out] The constant to replace with instructions.
+
+{
+    SmallSet<Constant*, 8> otherConsts;
+    Builder* pBuilder = pContext->GetBuilder();
+    for (User* const pUser : pConst->users())
+    {
+        if (Constant* const pOtherConst = dyn_cast<Constant>(pUser))
+        {
+            otherConsts.insert(pOtherConst);
+        }
+    }
+
+    for (Constant* const pOtherConst : otherConsts)
+    {
+        ReplaceConstWithInsts(pContext, pOtherConst);
+    }
+
+    otherConsts.clear();
+
+    SmallVector<Value*, 8> users;
+
+    for (User* const pUser : pConst->users())
+    {
+        users.push_back(pUser);
+    }
+
+    for (Value* const pUser : users)
+    {
+        Instruction* const pInst = dyn_cast<Instruction>(pUser);
+        LLPC_ASSERT(pInst != nullptr);
+
+        // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
+        if (PHINode* const pPhiNode = dyn_cast<PHINode>(pInst))
+        {
+            const uint32_t incomingValueCount = pPhiNode->getNumIncomingValues();
+            for (uint32_t i = 0; i < incomingValueCount; i++)
+            {
+                if (pPhiNode->getIncomingValue(i) == pConst)
+                {
+                    pBuilder->SetInsertPoint(pPhiNode->getIncomingBlock(i)->getTerminator());
+                    break;
+                }
+            }
+        }
+        else
+        {
+            pBuilder->SetInsertPoint(pInst);
+        }
+
+        if (ConstantExpr* const pConstExpr = dyn_cast<ConstantExpr>(pConst))
+        {
+            Instruction* const pInsertPos = pBuilder->Insert(pConstExpr->getAsInstruction());
+            pInst->replaceUsesOfWith(pConstExpr, pInsertPos);
+        }
+        else if (ConstantVector* const pConstVector = dyn_cast<ConstantVector>(pConst))
+        {
+            Value* pResultValue = UndefValue::get(pConstVector->getType());
+            for (uint32_t i = 0; i < pConstVector->getNumOperands(); i++)
+            {
+                // Have to not use the builder here because it will constant fold and we are trying to undo that now!
+                Instruction* const pInsertPos = InsertElementInst::Create(pResultValue,
+                    pConstVector->getOperand(i),
+                    pBuilder->getInt32(i));
+                pResultValue = pBuilder->Insert(pInsertPos);
+            }
+            pInst->replaceUsesOfWith(pConstVector, pResultValue);
+        }
+        else
+        {
+            LLPC_NEVER_CALLED();
+        }
+    }
+
+    pConst->removeDeadConstantUsers();
+    pConst->destroyConstant();
+}
+
+// =====================================================================================================================
+// Removes those constant expressions that reference global variables.
+void SpirvLower::RemoveConstantExpr(
+    Context*        pContext,   // [in] The context
+    GlobalVariable* pGlobal)    // [in] The global variable
+{
+    SmallVector<Constant*, 8> constantUsers;
+
+    for (User* const pUser : pGlobal->users())
+    {
+        if (Constant* const pConst = dyn_cast<Constant>(pUser))
+        {
+            constantUsers.push_back(pConst);
+        }
+    }
+
+    for (Constant* const pConst : constantUsers)
+    {
+        ReplaceConstWithInsts(pContext, pConst);
+    }
+}
 
 // =====================================================================================================================
 // Add per-shader lowering passes to pass manager
