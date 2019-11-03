@@ -79,40 +79,22 @@ ConfigBuilderBase::~ConfigBuilderBase()
 }
 
 // =====================================================================================================================
-// Builds metadata API_HW_SHADER_MAPPING_HI/LO.
-void ConfigBuilderBase::BuildApiHwShaderMapping(
-    uint32_t           vsHwShader,    // Hardware shader mapping for vertex shader
-    uint32_t           tcsHwShader,   // Hardware shader mapping for tessellation control shader
-    uint32_t           tesHwShader,   // Hardware shader mapping for tessellation evaluation shader
-    uint32_t           gsHwShader,    // Hardware shader mapping for geometry shader
-    uint32_t           fsHwShader,    // Hardware shader mapping for fragment shader
-    uint32_t           csHwShader)    // Hardware shader mapping for compute shader
+/// Adds the .shaders.$(apiStage).hardware_mapping node to the PAL metadata.
+///
+/// @param [in] apiStage The API shader stage
+/// @param [in] hwStages The HW stage(s) that the API shader is mapped to, as a combination of
+///                      @ref Util::Abi::HardwareStageFlagBits.
+void ConfigBuilderBase::AddApiHwShaderMapping(
+    ShaderStage apiStage,
+    uint32_t hwStages)
 {
-    uint32_t hwStageMappings[] =
+    auto hwMappingNode = GetApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
+                            .getArray(true);
+    for (uint32_t hwStage = 0; hwStage < uint32_t(Util::Abi::HardwareStage::Count); ++hwStage)
     {
-        // In ShaderStage order:
-        vsHwShader,
-        tcsHwShader,
-        tesHwShader,
-        gsHwShader,
-        fsHwShader,
-        csHwShader
-    };
-
-    for (uint32_t apiStage = 0; apiStage < ShaderStageNativeStageCount; ++apiStage)
-    {
-        uint32_t hwStageMapping = hwStageMappings[apiStage];
-        if (hwStageMapping != 0)
+        if (hwStages & (1 << hwStage))
         {
-            auto hwMappingNode = GetApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping]
-                                    .getArray(true);
-            for (uint32_t hwStage = 0; hwStage < uint32_t(Util::Abi::HardwareStage::Count); ++hwStage)
-            {
-                if ((hwStageMapping & (1 << hwStage)) != 0)
-                {
-                    hwMappingNode.push_back(m_document->getNode(HwStageNames[hwStage]));
-                }
-            }
+            hwMappingNode.push_back(m_document->getNode(HwStageNames[hwStage]));
         }
     }
 }

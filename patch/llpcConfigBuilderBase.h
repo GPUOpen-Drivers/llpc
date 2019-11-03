@@ -47,13 +47,7 @@ public:
     void WritePalMetadata();
 
 protected:
-    // Builds metadata API_HW_SHADER_MAPPING_HI/LO.
-    void BuildApiHwShaderMapping(uint32_t           vsHwShader,
-                                 uint32_t           tcsHwShader,
-                                 uint32_t           tesHwShader,
-                                 uint32_t           gsHwShader,
-                                 uint32_t           fsHwShader,
-                                 uint32_t           csHwShader);
+    void AddApiHwShaderMapping(ShaderStage apiStage, uint32_t hwStages);
 
     void SetShaderHash(ShaderStage apiStage, ShaderHash hash);
     void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
