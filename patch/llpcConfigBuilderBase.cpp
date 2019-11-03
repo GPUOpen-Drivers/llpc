@@ -75,7 +75,6 @@ ConfigBuilderBase::ConfigBuilderBase(
 // =====================================================================================================================
 ConfigBuilderBase::~ConfigBuilderBase()
 {
-    delete[] m_pConfig;
 }
 
 // =====================================================================================================================
@@ -347,6 +346,47 @@ void ConfigBuilderBase::SetPipelineHash()
 }
 
 // =====================================================================================================================
+/// Append a single entry to the PAL register metadata.
+///
+/// @param [in] key The metadata key (usually a register address).
+/// @param [in] value The metadata value.
+void ConfigBuilderBase::AppendConfig(uint32_t key, uint32_t value)
+{
+    LLPC_ASSERT(key != InvalidMetadataKey);
+
+    Util::Abi::PalMetadataNoteEntry entry;
+    entry.key = key;
+    entry.value = value;
+    m_config.push_back(entry);
+}
+
+// =====================================================================================================================
+/// Append an array of entries to the PAL register metadata. Invalid keys are filtered out.
+///
+/// @param [in] config The array of register metadata entries.
+void ConfigBuilderBase::AppendConfig(llvm::ArrayRef<Util::Abi::PalMetadataNoteEntry> config)
+{
+    uint32_t count = 0;
+
+    for (const auto &entry : config)
+    {
+        if (entry.key != InvalidMetadataKey)
+            ++count;
+    }
+
+    uint32_t idx = m_config.size();
+    m_config.resize(idx + count);
+
+    for (const auto &entry : config)
+    {
+        if (entry.key != InvalidMetadataKey)
+        {
+            m_config[idx++] = entry;
+        }
+    }
+}
+
+// =====================================================================================================================
 // Write the config into PAL metadata in the LLVM IR module
 void ConfigBuilderBase::WritePalMetadata()
 {
@@ -363,22 +403,13 @@ void ConfigBuilderBase::WritePalMetadata()
 
     // Add the register values to the MsgPack document.
     msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
-    size_t sizeInDword = m_configSize / sizeof(uint32_t);
-    // Configs are composed of DWORD key/value pair, the size should be even
-    LLPC_ASSERT((sizeInDword % 2) == 0);
-    for (size_t i = 0; i < sizeInDword; i += 2)
+    for (const auto& entry : m_config)
     {
-        auto key   = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i]);
-        auto value = m_document->getNode((reinterpret_cast<uint32_t*>(m_pConfig))[i + 1]);
-        // Don't export invalid metadata key and value
-        if (key.getUInt() == InvalidMetadataKey)
-        {
-            LLPC_ASSERT(value.getUInt() == InvalidMetadataValue);
-        }
-        else
-        {
-            registers[key] = value;
-        }
+        LLPC_ASSERT(entry.key != InvalidMetadataKey);
+        auto key   = m_document->getNode(entry.key);
+        auto value = m_document->getNode(entry.value);
+        registers[key] = value;
+
     }
 
     // Add the metadata version number.
