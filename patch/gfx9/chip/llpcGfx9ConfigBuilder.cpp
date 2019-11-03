@@ -154,12 +154,8 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig(
     PipelineVsFsRegConfig* pConfig = reinterpret_cast<PipelineVsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderVs,
-                            0,
-                            0,
-                            0,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderVs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::VsPs);
 
@@ -261,12 +257,10 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig(
     PipelineVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderVs,
-                            0,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessEval, Util::Abi::HwShaderVs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::Tess);
 
@@ -425,12 +419,9 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig(
     PipelineVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsGsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderGs,
-                            0,
-                            0,
-                            Util::Abi::HwShaderGs | Util::Abi::HwShaderVs,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs | Util::Abi::HwShaderVs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::Gs);
 
@@ -562,12 +553,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig(
     PipelineVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineVsTsGsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderGs,
-                            Util::Abi::HwShaderGs | Util::Abi::HwShaderVs,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessEval, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs | Util::Abi::HwShaderVs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::GsTess);
 
@@ -768,12 +758,8 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig(
     PipelineNggVsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderGs,
-                            0,
-                            0,
-                            0,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::Ngg);
 
@@ -872,12 +858,10 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig(
     PipelineNggVsTsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsTsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderGs,
-                            0,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessEval, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::NggTess);
 
@@ -1018,12 +1002,9 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig(
     PipelineNggVsGsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsGsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderGs,
-                            0,
-                            0,
-                            Util::Abi::HwShaderGs,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::Ngg);
 
@@ -1131,12 +1112,11 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig(
     PipelineNggVsTsGsFsRegConfig* pConfig = reinterpret_cast<PipelineNggVsTsGsFsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderHs,
-                            Util::Abi::HwShaderGs,
-                            Util::Abi::HwShaderGs,
-                            Util::Abi::HwShaderPs,
-                            0);
+    AddApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
+    AddApiHwShaderMapping(ShaderStageTessEval, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs);
+    AddApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
     SetPipelineType(Util::Abi::PipelineType::NggTess);
 
@@ -1304,12 +1284,7 @@ Result ConfigBuilder::BuildPipelineCsRegConfig(
     PipelineCsRegConfig* pConfig = reinterpret_cast<PipelineCsRegConfig*>(pAllocBuf);
     pConfig->Init(gfxIp);
 
-    BuildApiHwShaderMapping(0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            Util::Abi::HwShaderCs);
+    AddApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
 
     SetPipelineType(Util::Abi::PipelineType::Cs);
 
