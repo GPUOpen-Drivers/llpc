@@ -89,7 +89,8 @@ LCXXOPTS +=                                \
 	    -Wno-error=delete-non-virtual-dtor \
 	    -Wno-sign-compare
     ifeq ($(USING_CLANG),)
-        LCXXOPTS += -Wno-error=maybe-uninitialized
+        LCXXOPTS += -Wno-error=maybe-uninitialized \
+                    -fno-lto
     else
         LCXXOPTS += -Wno-error=conditional-uninitialized
     endif
