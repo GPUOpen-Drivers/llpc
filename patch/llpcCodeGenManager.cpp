@@ -206,6 +206,16 @@ void CodeGenManager::SetupTargetFeatures(
                 // Force s_barrier to be present (ignore optimization)
                 builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
             }
+            if (pFunc->getCallingConv() == CallingConv::AMDGPU_CS)
+            {
+                // Set the work group size
+                const auto& csBuiltInUsage = pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+                uint32_t flatWorkGroupSize =
+                    csBuiltInUsage.workgroupSizeX * csBuiltInUsage.workgroupSizeY * csBuiltInUsage.workgroupSizeZ;
+                auto flatWorkGroupSizeString = std::to_string(flatWorkGroupSize);
+                builder.addAttribute("amdgpu-flat-work-group-size",
+                                     flatWorkGroupSizeString + "," + flatWorkGroupSizeString);
+            }
 
             auto gfxIp = pContext->GetGfxIpVersion();
             if (gfxIp.major >= 9)
