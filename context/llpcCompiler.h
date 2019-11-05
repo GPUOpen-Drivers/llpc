@@ -183,7 +183,6 @@ private:
     ShaderCache* m_pNonFragmentShaderCache[ShaderCacheCount] = {};
     CacheEntryHandle m_hNonFragmentEntry[ShaderCacheCount] = {};
 #else
-    ShaderCache* m_pNonFragmentShaderCache = nullptr;
     CacheEntryHandle m_hNonFragmentEntry = {};
 #endif
     BinaryData m_nonFragmentElf = {};
@@ -193,7 +192,6 @@ private:
     ShaderCache* m_pFragmentShaderCache[ShaderCacheCount] = {};
     CacheEntryHandle m_hFragmentEntry[ShaderCacheCount] = {};
 #else
-    ShaderCache* m_pFragmentShaderCache = nullptr
     CacheEntryHandle m_hFragmentEntry = {};
 #endif
     BinaryData m_fragmentElf = {};
@@ -267,9 +265,9 @@ public:
                                        BinaryData*         pElfBin,
                                        CacheEntryHandle*   phEntry);
 
-    static void UpdateShaderCache(bool                insert,
-                                  const BinaryData*   pElfBin,
-                                  CacheEntryHandle    phEntry);
+    void UpdateShaderCache(bool                insert,
+                           const BinaryData*   pElfBin,
+                           CacheEntryHandle    phEntry);
 #endif
     static void BuildShaderCacheHash(Context*                                 pContext,
                                      uint32_t                                 stageMask,

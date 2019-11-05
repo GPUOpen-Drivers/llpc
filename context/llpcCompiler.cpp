@@ -1132,9 +1132,9 @@ uint32_t GraphicsShaderCacheChecker::Check(
                                                                        m_pNonFragmentShaderCache,
                                                                        m_hNonFragmentEntry);
 #else
-        m_fragmentCacheEntryState = m_pCompiler->LookUpShaderCache(&nonFragmentHash,
-                                                                   &m_nonFragmentElf,
-                                                                   &m_hNonFragmentEntry);
+        m_nonFragmentCacheEntryState = m_pCompiler->LookUpShaderCache(&nonFragmentHash,
+                                                                      &m_nonFragmentElf,
+                                                                      &m_hNonFragmentEntry);
 #endif
     }
 
@@ -1188,7 +1188,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
                                      m_hNonFragmentEntry,
                                      ShaderCacheCount);
 #else
-        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
+        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
 #endif
     }
 
@@ -1223,7 +1223,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
                                      m_hFragmentEntry,
                                      ShaderCacheCount);
 #else
-        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hFragmentEntry);
+        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_hFragmentEntry);
 #endif
     }
 
@@ -1256,8 +1256,8 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
                                      m_hNonFragmentEntry,
                                      ShaderCacheCount);
 #else
-        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hFragmentEntry);
-        Compiler::UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
+        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_hFragmentEntry);
+        m_pCompiler->UpdateShaderCache(result == Result::Success, &pipelineElf, m_hNonFragmentEntry);
 #endif
     }
 }
@@ -2155,14 +2155,17 @@ void Compiler::UpdateShaderCache(
     const BinaryData*                pElfBin,           // [in] Pointer to shader data
     CacheEntryHandle                 hEntry)            // [in] Handle of the shader caches entry
 {
-    if (insert)
+    if (hEntry != nullptr)
     {
-        LLPC_ASSERT(pElfBin->codeSize > 0);
-        m_shaderCache->InsertShader(hEntry, pElfBin->pCode, pElfBin->codeSize);
-    }
-    else
-    {
-        m_shaderCache->ResetShader(hEntry);
+        if (insert)
+        {
+            LLPC_ASSERT(pElfBin->codeSize > 0);
+            m_shaderCache->InsertShader(hEntry, pElfBin->pCode, pElfBin->codeSize);
+        }
+        else
+        {
+            m_shaderCache->ResetShader(hEntry);
+        }
     }
 }
 #endif
