@@ -21,7 +21,7 @@ void main (void)
 ; SHADERTEST: call void @llpc.output.export.generic.i32.i32.i8(i32 0, i32 0, i8 %{{[0-9]*}})
 ; SHADERTEST: call void @llpc.output.export.generic.i32.i32.v3i8(i32 1, i32 0, <3 x i8> %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 32, i32 1, float %{{[0-9]*}}, float undef, float undef, float undef, i1 false, i1 false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 32, i32 immarg 1, float %{{[0-9]*}}, float undef, float undef, float undef, i1 immarg false, i1 immarg false)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

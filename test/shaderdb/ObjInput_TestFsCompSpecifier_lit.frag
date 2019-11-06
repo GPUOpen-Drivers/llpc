@@ -18,10 +18,10 @@ void main (void)
 ; SHADERTEST: call <2 x float> @llpc.input.import.generic.v2f32{{.*}}
 ; SHADERTEST: call float @llpc.input.import.generic.f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 1, i32 0, i32 %{{[0-9]*}})
-; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 1, i32 0, i32 %{{[0-9]*}})
-; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 3, i32 0, i32 %{{[0-9]*}})
-; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 3, i32 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 immarg 1, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 1, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[0-9]*}}, i32 immarg 3, i32 immarg 0, i32 %{{[0-9]*}})
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[0-9]*}}, float %{{[0-9]*}}, i32 immarg 3, i32 immarg 0, i32 %{{[0-9]*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -23,7 +23,7 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.pow.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract float @llvm.pow.f32(float
 ; SHADERTEST-NOT: = call reassoc nnan nsz arcp contract float @llvm.pow.f32(float
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 0, i32 15, float 1.200000e+01, float
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float 1.200000e+01, float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

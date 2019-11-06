@@ -5237,7 +5237,7 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpVariable>(
         }
     }
 
-    const uint32_t addrSpace = pPtrType->getPointerAddressSpace();
+    uint32_t addrSpace = pPtrType->getPointerAddressSpace();
     string varName = pSpvVar->getName();
 
     GlobalVariable* const pGlobalVar = new GlobalVariable(*M,
