@@ -29,9 +29,9 @@ void main()
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
 ; SHADERTEST: = call float @llpc.input.import.interpolant.f32{{.*}}v2f32(
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.mov(i32 2, i32 1, i32 1, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 immarg 0, i32 immarg 0, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.mov(i32 2, i32 immarg 1, i32 immarg 1, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

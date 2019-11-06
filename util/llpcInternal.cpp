@@ -115,7 +115,11 @@ CallInst* EmitCall(
         }
     }
 
-    return builder.CreateCall(pFunc, args);
+    auto pCall = builder.CreateCall(pFunc, args);
+    pCall->setCallingConv(CallingConv::C);
+    pCall->setAttributes(pFunc->getAttributes());
+
+    return pCall;
 }
 
 // =====================================================================================================================
