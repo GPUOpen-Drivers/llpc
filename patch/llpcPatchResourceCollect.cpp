@@ -3484,35 +3484,32 @@ LocMapIterator PatchResourceCollect::CreatePackedGenericInput(
                 CallInst* pCall = m_importedCalls[locMapIt->second];
 
                 // Update the component index of the new input call
-                const uint32_t newCompIdx = is64Bit ? (compIdx * 2) : compIdx;
-                args[1] = ConstantInt::get(m_pContext->Int32Ty(), newCompIdx);
+                args[1] = ConstantInt::get(m_pContext->Int32Ty(), compIdx);
                 args[2] = pCall->getOperand(2);
                 args[3] = pCall->getOperand(3);
 
                 Type* pOrigReturnTy = pCall->getCalledFunction()->getReturnType();
-                Type* pReturnTy = is64Bit ? m_pContext->Floatx2Ty() : m_pContext->FloatTy();
+                Type* pReturnTy = is64Bit ? m_pContext->DoubleTy() : m_pContext->FloatTy();
                 std::string callName = LlpcName::InputImportGeneric;
                 AddTypeMangling(pReturnTy, args, callName);
 
                 Value* pOutValue = EmitCall(callName,
-                    pReturnTy,
-                    args,
-                    NoAttrib,
-                    pInsertPos);
+                                            pReturnTy,
+                                            args,
+                                            NoAttrib,
+                                            pInsertPos);
 
-                // VS' packed output converts non-float type to float type
-                // So a reverse conversion is required for reading non-float type
-                if (is64Bit)
+                // VS' packed output' type is either double or float which need to convert to original type
+                if (pOrigReturnTy->isHalfTy())
                 {
-                    pOutValue = builder.CreateBitCast(pOutValue, pOrigReturnTy);
-                }
-                else if (pOrigReturnTy->isHalfTy())
-                {
+                    // f16
                     pOutValue = builder.CreateFPTrunc(pOutValue, pOrigReturnTy);
                 }
                 else if (pOrigReturnTy->isIntegerTy())
                 {
-                    pOutValue = builder.CreateBitCast(pOutValue, m_pContext->Int32Ty());
+                    // i8, i16, i32, i64
+                    Type* pCastIntTy = is64Bit ? m_pContext->Int64Ty() : m_pContext->Int32Ty();
+                    pOutValue = builder.CreateBitCast(pOutValue, pCastIntTy);
                     if (pOrigReturnTy->getScalarSizeInBits() < 32)
                     {
                         pOutValue = builder.CreateTrunc(pOutValue, pOrigReturnTy);
@@ -3553,88 +3550,74 @@ void PatchResourceCollect::CreatePackedGenericOutput(
     // [1]: The count of component for packed calls occupied partial chanels
     const uint32_t compCounts[2] = { compCount, outputCallCount - callCounts[0] * compCount };
 
-    // [0]: The count of channels of output value corresponding to callCount[0]
-    // [1]: The count of channels of output value corresponding to callCount[1]
-    uint32_t channelCounts[2];
-    channelCounts[0] = 4;
-    channelCounts[1] = is64Bit ? 2 : compCounts[1];
-
     IRBuilder<> builder(*m_pContext);
     CallInst* pInsertPos = m_exportedCalls.back();
     builder.SetInsertPoint(pInsertPos);
 
     auto& outLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocMap;
 
-    // Traverse the two cases
+    // Traverse the two elements of callCounts
     for (uint32_t i = 0; i < 2; ++i)
     {
-        const uint32_t callCount    = callCounts[i];
-        const uint32_t compCount    = compCounts[i];
-        const uint32_t channelCount = channelCounts[i];
+        const uint32_t callCount = callCounts[i];
+        const uint32_t compCount = compCounts[i];
         if ((callCount == 0) || (compCount == 0))
         {
             continue;
         }
 
         SmallVector<Value*, 3> args(3, nullptr);
-        Value* pOutValue = UndefValue::get(VectorType::get(m_pContext->FloatTy(), channelCount));
+        // VS output' type is either double or float
+        Type* pOutputTy = is64Bit ? m_pContext->DoubleTy() : m_pContext->FloatTy();
+        Value* pOutValue = UndefValue::get(VectorType::get(pOutputTy, compCount));
 
         for (uint32_t j = 0; j < callCount; ++j)
         {
             CallInst* pCall = m_exportedCalls[orderedOutputCallIndices[callIndexPos]];
-            InOutPackInfo outPackInfo = {};
-            outPackInfo.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
-            outPackInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+            InOutPackInfo packInfo = {};
+            packInfo.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+            packInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
             // The new output will export a vector from packed location
-            args[0] = ConstantInt::get(m_pContext->Int32Ty(), outPackInfo.u32All);
+            args[0] = ConstantInt::get(m_pContext->Int32Ty(), packInfo.u32All);
             args[1] = ConstantInt::get(m_pContext->Int32Ty(), 0);
 
-            // Construct the new output value from scalar calls
-            for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+            if (compCount == 1)
             {
-                CallInst* pCall = m_exportedCalls[orderedOutputCallIndices[callIndexPos + compIdx]];
-
-                InOutPackInfo packInfo = {};
-                packInfo.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
-                packInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
-                outLocMap.erase(packInfo.u32All);
-                //outLocMap[packInfo.u32All] = packLoc;
-
-                Value* pComp = pCall->getOperand(2);
-
-                SmallVector<Value*, 2> comps;
-                // 64-bit scalar call is converted into <2xfloat>
-                if (is64Bit)
+                pOutValue = pCall->getOperand(2);
+                outLocMap[packInfo.u32All] = packLoc;
+            }
+            else
+            {
+                // Construct the new output value from scalar calls
+                for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
                 {
-                    pComp = builder.CreateBitCast(pComp, m_pContext->Floatx2Ty());
-                    comps.push_back(builder.CreateExtractElement(pComp, uint64_t(0)));
-                    comps.push_back(builder.CreateExtractElement(pComp, uint64_t(1)));
-                }
-                else
-                {
-                    comps.push_back(pComp);
-                }
+                    CallInst* pCall = m_exportedCalls[orderedOutputCallIndices[callIndexPos + compIdx]];
 
-                const uint32_t newCompIdx = is64Bit ? (compIdx * 2) : compIdx;
-                uint32_t j = 0;
-                for (auto& pComp : comps)
-                {
-                    // Non-float type is converted into float type as the element of output vector
-                    if (pComp->getType()->isIntegerTy())
+                    packInfo.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+                    packInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+                    outLocMap[packInfo.u32All] = packLoc;
+
+                    Value* pComp = pCall->getOperand(2);
+                    Type* pCompTy = pComp->getType();
+                    if (pCompTy->isHalfTy())
                     {
+                        // f16 -> float
+                        pComp = builder.CreateFPExt(pComp, m_pContext->FloatTy());
+                    }
+                    else if (pCompTy->isIntegerTy())
+                    {
+                        // i8, i16 -> i32
                         if (pComp->getType()->getScalarSizeInBits() < 32)
                         {
                             pComp = builder.CreateZExt(pComp, m_pContext->Int32Ty());
                         }
-                        pComp = builder.CreateBitCast(pComp, m_pContext->FloatTy());
+
+                        // i32 -> float, i64 -> double
+                        Type* pCastTy = is64Bit ? m_pContext->DoubleTy() : m_pContext->FloatTy();
+                        pComp = builder.CreateBitCast(pComp, pCastTy);
                     }
-                    else if (pComp->getType()->isHalfTy())
-                    {
-                        pComp = builder.CreateFPExt(pComp, m_pContext->FloatTy());
-                    }
-                    Value* pCompIdx = ConstantInt::get(m_pContext->Int32Ty(), newCompIdx + j);
+                    Value* pCompIdx = ConstantInt::get(m_pContext->Int32Ty(), compIdx);
                     pOutValue = builder.CreateInsertElement(pOutValue, pComp, pCompIdx);
-                    ++j;
                 }
             }
             args[2] = pOutValue;
@@ -3651,8 +3634,7 @@ void PatchResourceCollect::CreatePackedGenericOutput(
             callIndexPos += compCount;
 
             // Update final packed location for vector calls
-            outLocMap[outPackInfo.u32All] = packLoc++;
-            //++packLoc;
+            ++packLoc;
         }
     }
 }
