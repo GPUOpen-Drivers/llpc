@@ -3597,8 +3597,8 @@ void PatchResourceCollect::CreatePackedGenericOutput(
                 InOutPackInfo packInfo = {};
                 packInfo.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
                 packInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
-                //outLocMap.erase(packInfo.u32All);
-                outLocMap[packInfo.u32All] = packLoc;
+                outLocMap.erase(packInfo.u32All);
+                //outLocMap[packInfo.u32All] = packLoc;
 
                 Value* pComp = pCall->getOperand(2);
 
@@ -3651,8 +3651,8 @@ void PatchResourceCollect::CreatePackedGenericOutput(
             callIndexPos += compCount;
 
             // Update final packed location for vector calls
-            //outLocMap[outPackInfo.u32All] = packLoc++;
-            ++packLoc;
+            outLocMap[outPackInfo.u32All] = packLoc++;
+            //++packLoc;
         }
     }
 }
