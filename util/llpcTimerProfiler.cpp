@@ -41,6 +41,19 @@
 
 using namespace llvm;
 
+namespace llvm
+{
+
+namespace cl
+{
+
+// -enable-time-profile : profile the compile time of pipeline
+opt<bool> EnableTimerProfile("enable-timer-profile", desc("profile the compile time of pipeline"), init(false));
+
+} // cl
+
+} // llvm
+
 namespace Llpc
 {
 
@@ -53,7 +66,7 @@ TimerProfiler::TimerProfiler(
     m_total("", "", GetDummyTimeRecords()),
     m_phases("", "", GetDummyTimeRecords())
 {
-    if (TimePassesIsEnabled)
+    if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
         std::string hashString;
         raw_string_ostream ostream(hashString);
@@ -113,7 +126,7 @@ TimerProfiler::TimerProfiler(
 // =====================================================================================================================
 TimerProfiler::~TimerProfiler()
 {
-    if (TimePassesIsEnabled)
+    if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
         // Stop whole timer
         m_wholeTimer.stopTimer();
@@ -127,7 +140,7 @@ void TimerProfiler::AddTimerStartStopPass(
     TimerKind    timerKind,      // Kind of phase timer
     bool         start)          // Start or  stop timer
 {
-    if (TimePassesIsEnabled)
+    if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
         pPassMgr->add(CreateStartStopTimer(&m_phaseTimers[timerKind], start));
     }
@@ -139,7 +152,7 @@ void TimerProfiler::StartStopTimer(
     TimerKind timerKind,         // Kind of phase timer
     bool      start)             // Start or  stop timer
 {
-    if (TimePassesIsEnabled)
+    if (TimePassesIsEnabled || cl::EnableTimerProfile)
     {
         if (start)
         {
@@ -157,7 +170,7 @@ void TimerProfiler::StartStopTimer(
 llvm::Timer* TimerProfiler::GetTimer(
     TimerKind    timerKind)           // Kind of phase timer
 {
-    return TimePassesIsEnabled ? &m_phaseTimers[timerKind] : nullptr;
+    return (TimePassesIsEnabled || cl::EnableTimerProfile) ? &m_phaseTimers[timerKind] : nullptr;
 }
 
 // =====================================================================================================================
@@ -165,7 +178,7 @@ llvm::Timer* TimerProfiler::GetTimer(
 const StringMap<TimeRecord>& TimerProfiler::GetDummyTimeRecords()
 {
     static StringMap<TimeRecord> dummyTimeRecords;
-    if (TimePassesIsEnabled && dummyTimeRecords.empty())
+    if ((TimePassesIsEnabled || cl::EnableTimerProfile) && dummyTimeRecords.empty())
     {
         // NOTE: It is a workaround to get fixed layout in timer reports. Please remove it if we find a better solution.
         // LLVM timer skips the field if it is zero in all timers, it causes the layout of the report isn't stable when
