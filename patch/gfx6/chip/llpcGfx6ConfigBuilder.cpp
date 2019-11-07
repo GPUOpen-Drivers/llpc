@@ -843,6 +843,7 @@ Result ConfigBuilder::BuildEsRegConfig(
                       LDS_SIZE__CI__VI,
                       (calcFactor.gsOnChipLdsSize >>
                        pContext->GetGpuProperty()->ldsSizeDwordGranularityShift));
+        SetEsGsLdsSize(calcFactor.esGsLdsSize * 4);
     }
 
     uint32_t vgprCompCnt = 0;
