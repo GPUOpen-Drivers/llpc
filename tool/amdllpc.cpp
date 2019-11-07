@@ -276,6 +276,7 @@ namespace cl
 extern opt<bool> EnablePipelineDump;
 extern opt<std::string> PipelineDumpDir;
 extern opt<bool> DisableNullFragShader;
+extern opt<bool> EnableTimerProfile;
 
 // -filter-pipeline-dump-by-type: filter which kinds of pipeline should be disabled.
 static opt<uint32_t> FilterPipelineDumpByType("filter-pipeline-dump-by-type",
@@ -1162,7 +1163,7 @@ static Result BuildPipeline(
 #endif
         }
 
-        if (TimePassesIsEnabled)
+        if (TimePassesIsEnabled || cl::EnableTimerProfile)
         {
             auto hash = Llpc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
@@ -1245,7 +1246,7 @@ static Result BuildPipeline(
 #endif
         }
 
-        if (TimePassesIsEnabled)
+        if (TimePassesIsEnabled || cl::EnableTimerProfile)
         {
             auto hash = Llpc::IPipelineDumper::GetPipelineHash(pPipelineInfo);
             outs() << "LLPC PipelineHash: " << format("0x%016" PRIX64, hash)
