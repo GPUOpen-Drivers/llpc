@@ -1107,7 +1107,9 @@ uint32_t GraphicsShaderCacheChecker::Check(
         }
     }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
     auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+#endif
     if (stageMask & ShaderStageToMask(ShaderStageFragment))
     {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 38
