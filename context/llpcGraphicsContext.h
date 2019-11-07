@@ -106,6 +106,9 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
+    // Determine whether pack input/output is valid. Current VS output and FS input in VS-FS pipeline is packable
+    virtual bool CheckPackInOutValidity(ShaderStage shaderStage, bool isOutput) const;
+
     void InitShaderInfoForNullFs();
 
 private:

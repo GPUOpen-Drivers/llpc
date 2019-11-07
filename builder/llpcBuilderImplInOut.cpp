@@ -351,23 +351,27 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
         }
     }
 
-    if ((isOutput == false) || (m_shaderStage != ShaderStageGeometry))
+    // Don't fill pInOutLocMap if we need pack this variable
+    if (getContext().CheckPackInOutValidity(m_shaderStage, isOutput) == false)
     {
-        // Non-GS-output case.
-        for (uint32_t i = 0; i < locationCount; ++i)
+        if ((isOutput == false) || (m_shaderStage != ShaderStageGeometry))
         {
-            (*pInOutLocMap)[location + i] = InvalidValue;
+            // Non-GS-output case.
+            for (uint32_t i = 0; i < locationCount; ++i)
+            {
+                (*pInOutLocMap)[location + i] = InvalidValue;
+            }
         }
-    }
-    else
-    {
-        // GS output. We include the stream ID with the location in the map key.
-        for (uint32_t i = 0; i < locationCount; ++i)
+        else
         {
-            GsOutLocInfo outLocInfo = {};
-            outLocInfo.location = location + i;
-            outLocInfo.streamId = inOutInfo.GetStreamId();
-            (*pInOutLocMap)[outLocInfo.u32All] = InvalidValue;
+            // GS output. We include the stream ID with the location in the map key.
+            for (uint32_t i = 0; i < locationCount; ++i)
+            {
+                GsOutLocInfo outLocInfo = {};
+                outLocInfo.location = location + i;
+                outLocInfo.streamId = inOutInfo.GetStreamId();
+                (*pInOutLocMap)[outLocInfo.u32All] = InvalidValue;
+            }
         }
     }
 

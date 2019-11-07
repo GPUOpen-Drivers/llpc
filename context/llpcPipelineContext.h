@@ -398,8 +398,11 @@ struct ResourceUsage
     // Usage of generic input/output
     struct
     {
-        // Map from shader specified locations to tightly packed locations
+        // Map from shader specified locations to tightly packed locations.
+        // Pack in/out reuses the two maps to obtain tightly packed locations when pack condition is satified
+        // FS' inputLocMap uses all fields of InOutPackInfo.u32All as key
         std::map<uint32_t, uint32_t> inputLocMap;
+        // VS' outputLocMap uses two fields of InOutPackInfo.u32All (compIdx and location) as key
         std::map<uint32_t, uint32_t> outputLocMap;
 
         std::map<uint32_t, uint32_t> perPatchInputLocMap;
@@ -810,6 +813,8 @@ public:
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const = 0;
+
+    virtual bool CheckPackInOutValidity(ShaderStage shaderStage, bool isOutput) const { return false; };
 
     // Set pipeline state in Builder
     void SetBuilderPipelineState(Builder* pBuilder) const;

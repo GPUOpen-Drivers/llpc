@@ -39,6 +39,8 @@
 namespace Llpc
 {
 
+typedef std::map<uint32_t, uint32_t>::iterator LocMapIterator; // Iterator of the map from uint32_t to uint32_t
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
 class PatchResourceCollect:
@@ -64,6 +66,41 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchResourceCollect);
 
+    // Enumerates bit width
+    enum BitWidth: uint32_t
+    {
+        BitWidth8,
+        BitWidth16,
+        BitWidth32,
+        BitWidth64,
+    };
+
+    // The infos used to partition ordered call indices into a pack group
+    // The non-64-bit and 64-bit are packed respectively in a pack group
+    struct PackGroup
+    {
+        uint32_t scalarCallCount;     // The scalar call count in a pack group
+        bool     is64Bit;             // Wether is 64-bits
+    };
+
+    // Represents pack info of input or output
+    union InOutPackInfo
+    {
+        struct
+        {
+            uint32_t compIdx              : 2;  // Component index of input or output vector
+            uint32_t location             : 16; // Location of the input or output
+            uint32_t bitWidth             : 2;  // Correspond to enumerants of BitWidth
+            uint32_t interpMode           : 2;  // Interpolation mode: 0-Smooth, 1-Flat, 2-NoPersp, 3-Custom
+                                                // (valid for FS)
+            uint32_t interpLoc            : 3;  // Interpolation location: 0-Unknown, 1-Center, 2-Centroid,
+                                                // 3-Smaple, 4-Custom (valid for FS)
+            uint32_t interpolantCompCount : 3;  // The component count of interpolant (valid for FS)
+            uint32_t isInterpolant        : 1;  // Whether it is interpolant input (valid for FS)
+        };
+        uint32_t u32All;
+    };
+
     void ProcessShader();
 
     void ClearInactiveInput();
@@ -76,6 +113,29 @@ private:
     void MapGsGenericOutput(GsOutLocInfo outLocInfo);
     void MapGsBuiltInOutput(uint32_t builtInId, uint32_t elemCount);
 
+    bool CheckValidityForInOutPack() const;
+    void ProcessCallForInOutPack(CallInst* pCall);
+    void MatchGenericInOutWithPack();
+    void MatchGenericOutForOnlyVS();
+    void MapBuiltInToGenericInOutWithPack();
+    void PackGenericInOut();
+    void PrepareForInOutPack(std::vector<PackGroup>& packGroups,
+                             std::vector<uint32_t>& orderedOutputCallIndices);
+    void CreatePackedGenericInOut(const std::vector<PackGroup>& packGroups,
+                                  const std::vector<uint32_t>& orderedOutputCallIndices,
+                                  uint32_t& inputPackLoc,
+                                  uint32_t& outputPackLoc);
+    void CreateInterpolateInOut(uint32_t& inputPackLoc, uint32_t& outputPackLoc);
+    LocMapIterator CreatePackedGenericInput(bool is64Bit,
+                                            uint32_t inputCallCount,
+                                            uint32_t& locId,
+                                            LocMapIterator locMapIt);
+    void CreatePackedGenericOutput(const std::vector<uint32_t>& orderedOutputCallIndices,
+                                   bool is64Bit,
+                                   uint32_t outputCallCount,
+                                   uint32_t& callIndexPos,
+                                   uint32_t& packLoc);
+
     // -----------------------------------------------------------------------------------------------------------------
 
     std::unordered_set<llvm::CallInst*> m_deadCalls;            // Dead calls
@@ -87,11 +147,15 @@ private:
     std::unordered_set<uint32_t>    m_importedOutputLocs;       // Locations of imported generic outputs
     std::unordered_set<uint32_t>    m_importedOutputBuiltIns;   // IDs of imported built-in outputs
 
+    std::vector<llvm::CallInst*>    m_importedCalls;            // Imported calls
+    std::vector<llvm::CallInst*>    m_exportedCalls;            // Exported calls
+
     bool            m_hasPushConstOp;           // Whether push constant is active
     bool            m_hasDynIndexedInput;       // Whether dynamic indices are used in generic input addressing (valid
                                                 // for tessellation shader, fragment shader with input interpolation)
     bool            m_hasDynIndexedOutput;      // Whether dynamic indices are used in generic output addressing (valid
                                                 // for tessellation control shader)
+    bool            m_hasInterpolantInput;      // Whether interpolant funtions are used
     ResourceUsage*  m_pResUsage;                // Pointer to shader resource usage
 };
 

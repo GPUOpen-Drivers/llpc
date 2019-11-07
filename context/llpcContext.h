@@ -294,6 +294,11 @@ public:
         m_pResUsage = pResUsage;
     }
 
+    bool CheckPackInOutValidity(ShaderStage shaderStage, bool isOutput) const
+    {
+        return m_pPipelineContext->CheckPackInOutValidity(shaderStage, isOutput);
+    }
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);

@@ -62,6 +62,9 @@ opt<bool> DisableGsOnChip("disable-gs-onchip",
                           desc("Disable geometry shader on-chip mode"),
                           init(false));
 
+// -pack-io: pack input/output
+opt<bool> PackIo("pack-io", desc("Pack input/output"), init(true));
+
 #if LLPC_BUILD_GFX10
 extern opt<int> SubgroupSize;
 #endif
@@ -1590,5 +1593,48 @@ void GraphicsContext::BuildNggCullingControlRegister()
     pipelineState.paClVteCntl = paClVteCntl.u32All;
 }
 #endif
+
+// =====================================================================================================================
+// Determine whether pack io is valid. Current VS output and FS input in VS-FS pipeline is packable
+bool GraphicsContext::CheckPackInOutValidity(
+    ShaderStage shaderStage,    // Current shader stage
+    bool isOutput               // Whether it is to pack an output
+    ) const
+{
+    // Pack in/out requirements:
+    // 1) cl::PackIo is enable.
+    // 2) Pipeline doesn't have CS, TCS, TES, GS stage.
+    // 3) It is VS' output or FS'input.
+
+    if (cl::PackIo)
+    {
+        const bool hasNoCs = ((GetShaderStageMask() & ShaderStageToMask(ShaderStageCompute)) == 0);
+        const bool hasNoTcs = ((GetShaderStageMask() & ShaderStageToMask(ShaderStageTessControl)) == 0);
+        const bool hasNoTes = ((GetShaderStageMask() & ShaderStageToMask(ShaderStageTessEval)) == 0);
+        const bool hasNoGs = ((GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) == 0);
+
+        if (hasNoCs && hasNoTcs && hasNoTes && hasNoGs)
+        {
+            // NOTE: only VS and VS + null FS can't be identified at lower phase
+            // Signle VS' output will be splitted to avoid missing the case of VS + null FS
+            if ((shaderStage == ShaderStageVertex) && isOutput)
+            {
+                // It is VS' output
+                return true;
+            }
+
+            // NOTE: Single FS can be identified and its input will not be splitted
+            if ((shaderStage == ShaderStageFragment) &&
+                (isOutput == false) &&
+                (GetPrevShaderStage(shaderStage) == ShaderStageVertex))
+            {
+                // It is FS' input
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 
 } // Llpc
