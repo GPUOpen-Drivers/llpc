@@ -2932,7 +2932,17 @@ void NggPrimShader::RunEsOrEsVariant(
     // Call ES entry
     Argument* pArg = pSysValueStart;
 
+    Value* pEsGsOffset = nullptr;
+    if (m_hasGs)
+    {
+        auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+        pEsGsOffset = m_pBuilder->CreateMul(m_nggFactor.pWaveIdInSubgroup,
+                                            m_pBuilder->getInt32(64 * 4 * calcFactor.esGsRingItemSize));
+    }
+
     Value* pOffChipLdsBase = (pArg + EsGsSysValueOffChipLdsBase);
+    Value* pIsOffChip = UndefValue::get(m_pBuilder->getInt32Ty()); // NOTE: This flag is unused.
+
     pArg += EsGsSpecialSysValueCount;
 
     Value* pUserData = pArg++;
@@ -3033,14 +3043,12 @@ void NggPrimShader::RunEsOrEsVariant(
     auto pEsArgBegin = pEsEntry->arg_begin();
     const uint32_t esArgCount = pEsEntry->arg_size();
 
-    uint32_t esArgIdx = 0;
-
     // Set up user data SGPRs
     while (userDataIdx < userDataCount)
     {
-        LLPC_ASSERT(esArgIdx < esArgCount);
+        LLPC_ASSERT(args.size() < esArgCount);
 
-        auto pEsArg = (pEsArgBegin + esArgIdx);
+        auto pEsArg = (pEsArgBegin + args.size());
         LLPC_ASSERT(pEsArg->hasAttribute(Attribute::InReg));
 
         auto pEsArgTy = pEsArg->getType();
@@ -3069,8 +3077,6 @@ void NggPrimShader::RunEsOrEsVariant(
             args.push_back(pEsUserData);
             ++userDataIdx;
         }
-
-        ++esArgIdx;
     }
 
     if (hasTs)
@@ -3078,55 +3084,37 @@ void NggPrimShader::RunEsOrEsVariant(
         // Set up system value SGPRs
         if (m_pContext->IsTessOffChip())
         {
-            args.push_back(pOffChipLdsBase);
-            ++esArgIdx;
+            args.push_back(m_hasGs ? pOffChipLdsBase : pIsOffChip);
+            args.push_back((m_hasGs == false) ? pIsOffChip : pOffChipLdsBase);
+        }
 
-            args.push_back(pOffChipLdsBase);
-            ++esArgIdx;
+        if (m_hasGs)
+        {
+            args.push_back(pEsGsOffset);
         }
 
         // Set up system value VGPRs
         args.push_back(pTessCoordX);
-        ++esArgIdx;
-
         args.push_back(pTessCoordY);
-        ++esArgIdx;
-
         args.push_back(pRelPatchId);
-        ++esArgIdx;
-
         args.push_back(pPatchId);
-        ++esArgIdx;
     }
     else
     {
+        // Set up system value SGPRs
+        if (m_hasGs)
+        {
+            args.push_back(pEsGsOffset);
+        }
+
         // Set up system value VGPRs
-        if (esArgIdx < esArgCount)
-        {
-            args.push_back(pVertexId);
-            ++esArgIdx;
-        }
-
-        if (esArgIdx < esArgCount)
-        {
-            args.push_back(pRelVertexId);
-            ++esArgIdx;
-        }
-
-        if (esArgIdx < esArgCount)
-        {
-            args.push_back(pVsPrimitiveId);
-            ++esArgIdx;
-        }
-
-        if (esArgIdx < esArgCount)
-        {
-            args.push_back(pInstanceId);
-            ++esArgIdx;
-        }
+        args.push_back(pVertexId);
+        args.push_back(pRelVertexId);
+        args.push_back(pVsPrimitiveId);
+        args.push_back(pInstanceId);
     }
 
-    LLPC_ASSERT(esArgIdx == esArgCount); // Must have visit all arguments of ES entry point
+    LLPC_ASSERT(args.size() == esArgCount); // Must have visit all arguments of ES entry point
 
     if (runEsVariant)
     {
@@ -3438,14 +3426,12 @@ Value* NggPrimShader::RunGsVariant(
     auto pGsArgBegin = pGsEntry->arg_begin();
     const uint32_t gsArgCount = pGsEntry->arg_size();
 
-    uint32_t gsArgIdx = 0;
-
     // Set up user data SGPRs
     while (userDataIdx < userDataCount)
     {
-        LLPC_ASSERT(gsArgIdx < gsArgCount);
+        LLPC_ASSERT(args.size() < gsArgCount);
 
-        auto pGsArg = (pGsArgBegin + gsArgIdx);
+        auto pGsArg = (pGsArgBegin + args.size());
         LLPC_ASSERT(pGsArg->hasAttribute(Attribute::InReg));
 
         auto pGsArgTy = pGsArg->getType();
@@ -3474,42 +3460,23 @@ Value* NggPrimShader::RunGsVariant(
             args.push_back(pGsUserData);
             ++userDataIdx;
         }
-
-        ++gsArgIdx;
     }
 
     // Set up system value SGPRs
     args.push_back(pGsVsOffset);
-    ++gsArgIdx;
-
     args.push_back(pGsWaveId);
-    ++gsArgIdx;
 
     // Set up system value VGPRs
     args.push_back(pEsGsOffset0);
-    ++gsArgIdx;
-
     args.push_back(pEsGsOffset1);
-    ++gsArgIdx;
-
     args.push_back(pGsPrimitiveId);
-    ++gsArgIdx;
-
     args.push_back(pEsGsOffset2);
-    ++gsArgIdx;
-
     args.push_back(pEsGsOffset3);
-    ++gsArgIdx;
-
     args.push_back(pEsGsOffset4);
-    ++gsArgIdx;
-
     args.push_back(pEsGsOffset5);
-    ++gsArgIdx;
-
     args.push_back(pInvocationId);
-    ++gsArgIdx;
-    LLPC_ASSERT(gsArgIdx == gsArgCount); // Must have visit all arguments of ES entry point
+
+    LLPC_ASSERT(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
 
     return EmitCall(LlpcName::NggGsEntryVariant,
                     pGsEntry->getReturnType(),
