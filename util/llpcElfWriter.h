@@ -95,6 +95,7 @@ public:
 
     void WriteToBuffer(ElfPackage* pElf);
 
+    Result LinkRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *pContext);
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ElfWriter);
 
@@ -107,6 +108,8 @@ private:
     void AssembleNotes();
 
     void AssembleSymbols();
+
+    void Reinitialize();
 
     // -----------------------------------------------------------------------------------------------------------------
 

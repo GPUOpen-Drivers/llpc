@@ -48,7 +48,8 @@ ElfReader<Elf>::ElfReader(
     m_header(),
     m_symSecIdx(InvalidValue),
     m_relocSecIdx(InvalidValue),
-    m_strtabSecIdx(InvalidValue)
+    m_strtabSecIdx(InvalidValue),
+    m_textSecIdx(InvalidValue)
 {
 }
 
@@ -151,6 +152,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
     m_symSecIdx    = GetSectionIndex(SymTabName);
     m_relocSecIdx  = GetSectionIndex(RelocName);
     m_strtabSecIdx = GetSectionIndex(StrTabName);
+    m_textSecIdx   = GetSectionIndex(TextName);
 
     return result;
 }

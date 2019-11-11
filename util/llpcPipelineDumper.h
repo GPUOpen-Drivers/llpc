@@ -82,7 +82,10 @@ public:
     static void DumpPipelineExtraInfo(PipelineDumpFile*             pBinaryFile,
                                       const std::string*            pStr);
 
-    static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline, bool isCacheHash);
+    static MetroHash::Hash GenerateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo* pPipeline,
+                                                           bool                             isCacheHash,
+                                                           uint32_t                         stage = ShaderStageInvalid);
+
     static MetroHash::Hash GenerateHashForComputePipeline(const ComputePipelineBuildInfo* pPipeline, bool isCacheHash);
 
     static std::string GetPipelineInfoFileName(PipelineBuildInfo                pipelineInfo,

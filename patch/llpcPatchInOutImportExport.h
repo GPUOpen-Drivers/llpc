@@ -38,6 +38,8 @@
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 
+#include <set>
+
 namespace Llpc
 {
 
@@ -344,6 +346,8 @@ private:
     std::vector<llvm::CallInst*> m_importCalls; // List of "call" instructions to import inputs
     std::vector<llvm::CallInst*> m_exportCalls; // List of "call" instructions to export outputs
     PipelineState*          m_pPipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
+
+    std::set<uint32_t>       m_expLocs; // The locations that already have an export instruction for the vertex shader.
 };
 
 } // Llpc

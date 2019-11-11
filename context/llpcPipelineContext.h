@@ -117,6 +117,9 @@ public:
     // Gets the mask of active shader stages bound to this pipeline
     virtual uint32_t GetShaderStageMask() const = 0;
 
+    // Sets the mask of active shader stages bound to this pipeline
+    virtual void SetShaderStageMask(uint32_t mask) = 0;
+
     // Gets the count of active shader stages
     virtual uint32_t GetActiveShaderStageCount() const = 0;
 

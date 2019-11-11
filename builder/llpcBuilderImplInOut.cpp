@@ -28,6 +28,7 @@
  * @brief LLPC source file: implementation of Builder methods for shader input and output
  ***********************************************************************************************************************
  */
+#include "llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
@@ -348,10 +349,23 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
 
     if ((isOutput == false) || (m_shaderStage != ShaderStageGeometry))
     {
-        // Non-GS-output case.
-        for (uint32_t i = 0; i < locationCount; ++i)
+        bool keepAllLocations = false;
+        if (GetBuilderContext()->BuildingRelocatableElf())
         {
-            (*pInOutLocMap)[location + i] = InvalidValue;
+            if (m_shaderStage == ShaderStageVertex && isOutput)
+            {
+                keepAllLocations = true;
+            }
+            if (m_shaderStage == ShaderStageFragment && !isOutput)
+            {
+                keepAllLocations = true;
+            }
+        }
+        uint32_t startLocation = (keepAllLocations ? 0 : location);
+        // Non-GS-output case.
+        for (uint32_t i = startLocation; i < location + locationCount; ++i)
+        {
+            (*pInOutLocMap)[i] = InvalidValue;
         }
     }
     else

@@ -57,6 +57,9 @@ public:
     // Gets the mask of active shader stages bound to this pipeline
     virtual uint32_t GetShaderStageMask() const { return ShaderStageToMask(ShaderStageCompute); }
 
+    // Sets the mask of active shader stages bound to this pipeline
+    void SetShaderStageMask(uint32_t mask) { LLPC_ASSERT(mask == GetShaderStageMask()); }
+
     // Gets the count of active shader stages
     virtual uint32_t GetActiveShaderStageCount() const { return 1; }
 
