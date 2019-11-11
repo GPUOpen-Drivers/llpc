@@ -1139,11 +1139,7 @@ public:
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
     static const uint32_t  MemberCount = 7;
-#else
-    static const uint32_t  MemberCount = 6;
-#endif
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1193,42 +1189,13 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
 #endif
-
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-#if VKI_BUILD_GFX10
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 34
-        static const uint32_t  MemberCount = 15;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-         static const uint32_t  MemberCount = 14;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-         static const uint32_t  MemberCount = 13;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        static const uint32_t  MemberCount = 12;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-        static const uint32_t  MemberCount = 11;
-    #else
-        static const uint32_t  MemberCount = 10;
-    #endif
-#else
-    #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 34
-        static const uint32_t  MemberCount = 12;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-        static const uint32_t  MemberCount = 11;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-        static const uint32_t  MemberCount = 10;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-        static const uint32_t  MemberCount = 9;
-    #elif LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 24
-        static const uint32_t  MemberCount = 8;
-    #else
-        static const uint32_t  MemberCount = 7;
-    #endif
-#endif
+    static const uint32_t  MemberCount = 15;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
@@ -1343,11 +1310,9 @@ public:
 
 private:
 #if VKI_BUILD_GFX10
-    static const uint32_t  MemberCount = 21;
     SectionNggState        nggState;
-#else
-    static const uint32_t  MemberCount = 20;
 #endif
+    static const uint32_t  MemberCount = 21;
     static StrToMemberAddr m_addrTable[MemberCount];
     SubState               m_state;
     SectionColorBuffer     colorBuffer[MaxColorTargets]; // Color buffer
