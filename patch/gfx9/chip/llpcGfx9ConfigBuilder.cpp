@@ -2602,11 +2602,13 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     for (uint32_t i = 0; i < pInterpInfo->size(); ++i)
     {
-        const auto& interpInfoElem = (*pInterpInfo)[i];
-        LLPC_ASSERT(((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
-                     (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
-                     (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
-                     (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit)) == false);
+        auto interpInfoElem = (*pInterpInfo)[i];
+        if (((interpInfoElem.loc     == InvalidFsInterpInfo.loc) &&
+             (interpInfoElem.flat    == InvalidFsInterpInfo.flat) &&
+             (interpInfoElem.custom  == InvalidFsInterpInfo.custom) &&
+             (interpInfoElem.is16bit == InvalidFsInterpInfo.is16bit))) {
+          interpInfoElem.loc = i;
+        }
 
         regSPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
         spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat;

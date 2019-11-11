@@ -441,6 +441,10 @@ size_t ElfWriter<Elf>::GetRequiredBufferSizeBytes()
 template<class Elf>
 void ElfWriter<Elf>::AssembleNotes()
 {
+    if (m_noteSecIdx == InvalidValue)
+    {
+        return;
+    }
     auto pNoteSection = &m_sections[m_noteSecIdx];
     const uint32_t noteHeaderSize = sizeof(NoteHeader) - 8;
     uint32_t noteSize = 0;
@@ -476,6 +480,10 @@ void ElfWriter<Elf>::AssembleNotes()
 template<class Elf>
 void ElfWriter<Elf>::AssembleSymbols()
 {
+    if (m_symSecIdx == InvalidValue)
+    {
+        return;
+    }
     auto pStrTabSection = &m_sections[m_strtabSecIdx];
     auto newStrTabSize = 0;
     uint32_t symbolCount = 0;
@@ -518,10 +526,12 @@ void ElfWriter<Elf>::AssembleSymbols()
 
     auto symSectionSize = sizeof(typename Elf::Symbol) * symbolCount;
     auto pSymbolSection = &m_sections[m_symSecIdx];
-    LLPC_ASSERT(pSymbolSection->pData != nullptr);
-    LLPC_ASSERT(pSymbolSection->secHead.sh_size > 0);
 
-    if (symSectionSize > pSymbolSection->secHead.sh_size)
+    if (pSymbolSection->pData == nullptr)
+    {
+        pSymbolSection->pData = new uint8_t[symSectionSize];
+    }
+    else if (symSectionSize > pSymbolSection->secHead.sh_size)
     {
         delete[] pSymbolSection->pData;
         pSymbolSection->pData = new uint8_t[symSectionSize];
@@ -569,6 +579,8 @@ void ElfWriter<Elf>::CalcSectionHeaderOffset()
 
     m_header.e_phoff = m_header.e_phnum > 0 ? elfHdrSize : 0;
     m_header.e_shoff = sharedHdrOffset;
+    m_header.e_shstrndx = m_strtabSecIdx;
+    m_header.e_shnum = m_sections.size();
 }
 
 // =====================================================================================================================
@@ -607,7 +619,6 @@ void ElfWriter<Elf>::WriteToBuffer(
         pBuffer += Pow2Align(sizeBytes, sizeof(uint32_t));
     }
 
-    LLPC_ASSERT(m_header.e_shoff == static_cast<uint32_t>(pBuffer - pData));
     const uint32_t secHdrSize = sizeof(typename Elf::SectionHeader);
     for (auto& section : m_sections)
     {
@@ -953,6 +964,126 @@ void ElfWriter<Elf>::MergeElfBinary(
     SetNote(&newMetaNote);
 
     WriteToBuffer(pPipelineElf);
+}
+
+// =====================================================================================================================
+// Reset the contents to an empty ELF file.
+template<class Elf>
+void ElfWriter<Elf>::Reinitialize()
+{
+    m_map.clear();
+    m_notes.clear();
+    m_symbols.clear();
+
+    m_sections.push_back({});
+
+    m_strtabSecIdx = m_sections.size();
+    m_sections.push_back({});
+    m_map[StrTabName] = m_strtabSecIdx;
+
+    m_textSecIdx = m_sections.size();
+    m_sections.push_back({});
+    m_map[TextName] = m_textSecIdx;
+
+    m_symSecIdx = m_sections.size();
+    m_sections.push_back({});
+    m_map[SymTabName] = m_symSecIdx;
+
+    m_noteSecIdx = m_sections.size();
+    m_sections.push_back({});
+    m_map[NoteName] = m_noteSecIdx;
+}
+
+// =====================================================================================================================
+// Link the relocatable ELF readers into a pipeline ELF.
+template<class Elf>
+Result ElfWriter<Elf>::LinkRelocatableElf(
+    const ArrayRef<ElfReader<Elf>*>& relocatableElfs, // An array of relocatable ELF objects
+    Context* pContext)                                // [in] Acquired context
+{
+    Reinitialize();
+    LLPC_ASSERT(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
+
+    // Get the main data for the header, the parts that change will be updated when writing to buffer.
+    m_header = relocatableElfs[0]->m_header;
+
+    // Copy the contents of the string table
+    ElfSectionBuffer<typename Elf::SectionHeader>* pStringTable1 = nullptr;
+    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->m_strtabSecIdx, &pStringTable1);
+
+    ElfSectionBuffer<typename Elf::SectionHeader>* pStringTable2 = nullptr;
+    relocatableElfs[1]->GetSectionDataBySectionIndex(relocatableElfs[1]->m_strtabSecIdx, &pStringTable2);
+
+    MergeSection(pStringTable1,
+                 pStringTable1->secHead.sh_size,
+                 nullptr,
+                 pStringTable2,
+                 0,
+                 nullptr,
+                 &m_sections[m_strtabSecIdx]);
+
+    // Merge text sections
+    ElfSectionBuffer<typename Elf::SectionHeader>* pTextSection1 = nullptr;
+    relocatableElfs[0]->GetTextSectionData(&pTextSection1);
+    ElfSectionBuffer<typename Elf::SectionHeader> *pTextSection2 = nullptr;
+    relocatableElfs[1]->GetTextSectionData(&pTextSection2);
+
+    MergeSection(pTextSection1,
+                 Pow2Align(pTextSection1->secHead.sh_size, 0x100),
+                 nullptr,
+                 pTextSection2,
+                 0,
+                 nullptr,
+                 &m_sections[m_textSecIdx]);
+
+    // Build the symbol table.  First set the symbol table section header.
+    ElfSectionBuffer<typename Elf::SectionHeader>* pSymbolTableSection = nullptr;
+    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->m_symSecIdx, &pSymbolTableSection);
+    m_sections[m_symSecIdx].secHead = pSymbolTableSection->secHead;
+
+    // Now get the symbols that belong in the symbol table.
+    uint32_t offset = 0;
+    for (const ElfReader<Elf>* pElf : relocatableElfs)
+    {
+        uint32_t relocElfTextSectionId = pElf->GetSectionIndex(TextName);
+        std::vector<ElfSymbol> symbols;
+        pElf->GetSymbolsBySectionIndex(relocElfTextSectionId, symbols);
+        for (auto sym : symbols)
+        {
+            // When relocations start being used, we will have to filter out symbols related to relocations.
+            // We should be able to filter the BB* symbols as well.
+            ElfSymbol *pNewSym = GetSymbol(sym.pSymName);
+            pNewSym->secIdx = m_textSecIdx;
+            pNewSym->pSecName = nullptr;
+            pNewSym->value = sym.value + offset;
+            pNewSym->size = sym.size;
+            pNewSym->info = sym.info;
+        }
+
+        // Update the offset for the next elf file.
+        ElfSectionBuffer<typename Elf::SectionHeader>* pTextSection = nullptr;
+        pElf->GetSectionDataBySectionIndex(relocElfTextSectionId, &pTextSection);
+        offset += Pow2Align(pTextSection->secHead.sh_size, 0x100);
+    }
+
+    // Apply relocations
+    // There are no relocations to apply yet.
+
+    // Set the .note section header
+    ElfSectionBuffer<typename Elf::SectionHeader>* pNoteSection = nullptr;
+    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->GetSectionIndex(NoteName), &pNoteSection);
+    m_sections[m_noteSecIdx].secHead = pNoteSection->secHead;
+
+    // Merge and update the .note data
+    // The merged note info will be updated using data in the pipeline create info, but nothing needs to be done yet.
+    ElfNote noteInfo1 = relocatableElfs[0]->GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    ElfNote noteInfo2 = relocatableElfs[1]->GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    m_notes.push_back({});
+    MergeMetaNote(pContext, &noteInfo1, &noteInfo2, &m_notes.back());
+
+    // Merge other sections.  For now, none of the other sections are important, so we will not do anything.
+
+    return Result::Success;
 }
 
 template class ElfWriter<Elf64>;

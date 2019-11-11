@@ -119,15 +119,21 @@ public:
     virtual Result BuildComputePipeline(const ComputePipelineBuildInfo* pPipelineInfo,
                                         ComputePipelineBuildOut*        pPipelineOut,
                                         void*                           pPipelineDumpFile = nullptr);
-    Result BuildGraphicsPipelineInternal(GraphicsContext*                           pGraphicsContext,
-                                         llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
-                                         uint32_t                                   forceLoopUnrollCount,
-                                         ElfPackage*                                pPipelineElf);
+    Result BuildGraphicsPipelineInternal(GraphicsContext*                          pGraphicsContext,
+                                         llvm::ArrayRef<const PipelineShaderInfo*> shaderInfo,
+                                         uint32_t                                  forceLoopUnrollCount,
+                                         bool                                      buildingRelocatableElf,
+                                         ElfPackage*                               pPipelineElf);
 
     Result BuildComputePipelineInternal(ComputeContext*                 pComputeContext,
                                         const ComputePipelineBuildInfo* pPipelineInfo,
                                         uint32_t                        forceLoopUnrollCount,
                                         ElfPackage*                     pPipelineElf);
+
+    Result BuildPipelineWithRelocatableElf(Context*                                   pContext,
+                                           llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
+                                           uint32_t                                   forceLoopUnrollCount,
+                                           ElfPackage*                                pPipelineElf);
 
     Result BuildPipelineInternal(Context*                                   pContext,
                                  llvm::ArrayRef<const PipelineShaderInfo*>  shaderInfo,
@@ -184,6 +190,9 @@ private:
     void ReleaseContext(Context* pContext) const;
 
     bool RunPasses(PassManager* pPassMgr, llvm::Module* pModule) const;
+    void LinkRelocatableShaderElf(ElfPackage *pShaderElfs, ElfPackage* pPipelineElf, Context* pContext);
+    bool CanUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo*>& shaderInfo) const;
+
     // -----------------------------------------------------------------------------------------------------------------
 
     std::vector<std::string>      m_options;          // Compilation options

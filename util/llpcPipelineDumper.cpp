@@ -905,24 +905,59 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
 }
 
 // =====================================================================================================================
-// Builds hash code from graphics pipline build info.
+// Builds hash code from graphics pipline build info.  If stage is a specific stage of the graphics pipeline, then only
+// the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
+// be ShaderStageInvalid, and all values in the build info will be included.
 MetroHash::Hash PipelineDumper::GenerateHashForGraphicsPipeline(
     const GraphicsPipelineBuildInfo* pPipeline,   // [in] Info to build a graphics pipeline
-    bool                            isCacheHash   // TRUE if the hash is used by shader cache
-    )
+    bool                            isCacheHash,  // TRUE if the hash is used by shader cache
+    uint32_t                        stage)        // [in] The stage for which we are building the hash.
+                                                  // ShaderStageInvalid if building for the entire pipeline.
 {
     MetroHash64 hasher;
 
-    UpdateHashForPipelineShaderInfo(ShaderStageVertex, &pPipeline->vs, isCacheHash, &hasher);
-    UpdateHashForPipelineShaderInfo(ShaderStageTessControl, &pPipeline->tcs, isCacheHash, &hasher);
-    UpdateHashForPipelineShaderInfo(ShaderStageTessEval, &pPipeline->tes, isCacheHash, &hasher);
-    UpdateHashForPipelineShaderInfo(ShaderStageGeometry, &pPipeline->gs, isCacheHash, &hasher);
-    UpdateHashForPipelineShaderInfo(ShaderStageFragment, &pPipeline->fs, isCacheHash, &hasher);
+    switch (stage)
+    {
+        case ShaderStageVertex:
+            UpdateHashForPipelineShaderInfo(ShaderStageVertex, &pPipeline->vs, isCacheHash, &hasher);
+            break;
+        case ShaderStageTessControl:
+            UpdateHashForPipelineShaderInfo(ShaderStageTessControl, &pPipeline->tcs, isCacheHash, &hasher);
+            break;
+        case ShaderStageTessEval:
+            UpdateHashForPipelineShaderInfo(ShaderStageTessEval, &pPipeline->tes, isCacheHash, &hasher);
+            break;
+        case ShaderStageGeometry:
+            UpdateHashForPipelineShaderInfo(ShaderStageGeometry, &pPipeline->gs, isCacheHash, &hasher);
+            break;
+        case ShaderStageFragment:
+            UpdateHashForPipelineShaderInfo(ShaderStageFragment, &pPipeline->fs, isCacheHash, &hasher);
+            break;
+        case ShaderStageInvalid:
+            UpdateHashForPipelineShaderInfo(ShaderStageVertex, &pPipeline->vs, isCacheHash, &hasher);
+            UpdateHashForPipelineShaderInfo(ShaderStageTessControl, &pPipeline->tcs, isCacheHash, &hasher);
+            UpdateHashForPipelineShaderInfo(ShaderStageTessEval, &pPipeline->tes, isCacheHash, &hasher);
+            UpdateHashForPipelineShaderInfo(ShaderStageGeometry, &pPipeline->gs, isCacheHash, &hasher);
+            UpdateHashForPipelineShaderInfo(ShaderStageFragment, &pPipeline->fs, isCacheHash, &hasher);
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+    }
 
     hasher.Update(pPipeline->iaState.deviceIndex);
-    UpdateHashForVertexInputState(pPipeline->pVertexInput, &hasher);
-    UpdateHashForNonFragmentState(pPipeline, isCacheHash, &hasher);
-    UpdateHashForFragmentState(pPipeline, &hasher);
+
+    if (stage != ShaderStageFragment)
+    {
+        UpdateHashForVertexInputState(pPipeline->pVertexInput, &hasher);
+        UpdateHashForNonFragmentState(pPipeline, isCacheHash, &hasher);
+    }
+
+    if (stage == ShaderStageFragment || stage == ShaderStageInvalid)
+    {
+        UpdateHashForFragmentState(pPipeline, &hasher);
+    }
+
 
     MetroHash::Hash hash = {};
     hasher.Finalize(hash.bytes);

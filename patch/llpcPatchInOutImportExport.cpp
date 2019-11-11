@@ -37,6 +37,7 @@
 
 #include <unordered_set>
 #include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
 #include "llpcFragColorExport.h"
 #include "llpcPatchInOutImportExport.h"
@@ -1536,6 +1537,22 @@ void PatchInOutImportExport::visitReturnInst(
                 ++inOutUsage.expCount;
             }
         }
+
+        if (m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf())
+        {
+            // If we are building relocatable shaders, it is possible there are
+            // generic outputs that are not written to.  We need to count them in
+            // the export count.
+            auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
+            for(auto locMap : pResUsage->inOutUsage.outputLocMap)
+            {
+                if (m_expLocs.count(locMap.second) != 0)
+                {
+                    continue;
+                }
+                ++inOutUsage.expCount;
+            }
+        }
     }
     else if (m_shaderStage == ShaderStageGeometry)
     {
@@ -2119,6 +2136,8 @@ void PatchInOutImportExport::PatchVsGenericOutputExport(
     Instruction* pInsertPos)     // [in] Where to insert the patch instruction
 {
     auto pOutputTy = pOutput->getType();
+
+    m_expLocs.insert(location);
 
     if (m_hasTs)
     {

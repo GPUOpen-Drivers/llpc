@@ -35,6 +35,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
@@ -1539,8 +1540,10 @@ void PatchResourceCollect::visitCallInst(
 // Clears inactive (those actually unused) inputs.
 void PatchResourceCollect::ClearInactiveInput()
 {
+    bool buildingRelocatableElf = m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf();
     // Clear those inactive generic inputs, remove them from location mappings
-    if (m_pPipelineState->IsGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval))
+    if (m_pPipelineState->IsGraphics() && (m_hasDynIndexedInput == false) && (m_shaderStage != ShaderStageTessEval)
+        && !buildingRelocatableElf)
     {
         // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
         // generic outputs of tessellation control shader might involve in output import and dynamic indexing, which
@@ -2026,7 +2029,7 @@ void PatchResourceCollect::MatchGenericInOut()
     auto& perPatchOutLocMap = inOutUsage.perPatchOutputLocMap;
 
     // Do input/output matching
-    if (m_shaderStage != ShaderStageFragment)
+    if (!m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf() && m_shaderStage != ShaderStageFragment)
     {
         const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
 
@@ -2137,7 +2140,8 @@ void PatchResourceCollect::MatchGenericInOut()
         LLPC_ASSERT(inOutUsage.inputMapLocCount == 0);
         for (auto& locMap : inLocMap)
         {
-            LLPC_ASSERT(locMap.second == InvalidValue);
+            LLPC_ASSERT(locMap.second == InvalidValue ||
+                        m_pPipelineState->GetBuilderContext()->BuildingRelocatableElf());
             // NOTE: For vertex shader, the input location mapping is actually trivial.
             locMap.second = (m_shaderStage == ShaderStageVertex) ? locMap.first : nextMapLoc++;
             inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, locMap.second + 1);
