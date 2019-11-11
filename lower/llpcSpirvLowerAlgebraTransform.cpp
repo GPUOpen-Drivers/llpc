@@ -231,12 +231,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             auto pOne = ConstantFP::get(m_pContext->Float16Ty(), 1.0);
             if (pDestTy->isVectorTy())
             {
-                std::vector<Constant*> ones;
-                for (uint32_t i = 0; i < pDestTy->getVectorNumElements(); ++i)
-                {
-                    ones.push_back(pOne);
-                }
-                pOne = ConstantVector::get(ones);
+                pOne = ConstantVector::getSplat(pDestTy->getVectorNumElements(), pOne);
             }
 
             // -trunc(x * 1/y)
