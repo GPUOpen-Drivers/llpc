@@ -3076,7 +3076,7 @@ void NggPrimShader::RunEsOrEsVariant(
         if (m_pContext->IsTessOffChip())
         {
             args.push_back(m_hasGs ? pOffChipLdsBase : pIsOffChip);
-            args.push_back((m_hasGs == false) ? pIsOffChip : pOffChipLdsBase);
+            args.push_back(m_hasGs ? pIsOffChip : pOffChipLdsBase);
         }
 
         if (m_hasGs)
