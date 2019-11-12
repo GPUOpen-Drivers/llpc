@@ -3032,6 +3032,7 @@ void NggPrimShader::RunEsOrEsVariant(
 
     auto pEsArgBegin = pEsEntry->arg_begin();
     const uint32_t esArgCount = pEsEntry->arg_size();
+    LLPC_UNUSED(esArgCount);
 
     // Set up user data SGPRs
     while (userDataIdx < userDataCount)
