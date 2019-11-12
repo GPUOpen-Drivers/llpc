@@ -147,11 +147,12 @@ bool SpirvLowerLoopUnrollControl::runOnModule(
                 // one operand pointing to itself, meaning that the SPIR-V did not
                 // have an unroll or don't-unroll directive, so we can add the force
                 // unroll count metadata.
-                SmallVector<llvm::Metadata*, 2> opUnrollCountMeta;
-                opUnrollCountMeta.push_back(MDString::get(*m_pContext, "llvm.loop.unroll.count"));
-                opUnrollCountMeta.push_back(ConstantAsMetadata::get(
-                    ConstantInt::get(Type::getInt32Ty(*m_pContext), m_forceLoopUnrollCount)));
-                MDNode* pLoopUnrollCountMetaNode = MDNode::get(*m_pContext, opUnrollCountMeta);
+                llvm::Metadata* unrollCountMeta[] = {
+                    MDString::get(*m_pContext, "llvm.loop.unroll.count"),
+                    ConstantAsMetadata::get(
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), m_forceLoopUnrollCount))
+                };
+                MDNode* pLoopUnrollCountMetaNode = MDNode::get(*m_pContext, unrollCountMeta);
                 pLoopMetaNode = MDNode::concatenate(pLoopMetaNode,
                                                     MDNode::get(*m_pContext, pLoopUnrollCountMetaNode));
 

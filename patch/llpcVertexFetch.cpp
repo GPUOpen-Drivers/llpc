@@ -1105,54 +1105,25 @@ VertexFetch::VertexFetch(
     }
 
     // Initialize default fetch values
-    std::vector<Constant*> defaults;
     auto pZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
+    auto pOne = ConstantInt::get(m_pContext->Int32Ty(), 1);
 
     // Int8 (0, 0, 0, 1)
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-    m_fetchDefaults.pInt8 = ConstantVector::get(defaults);
+    m_fetchDefaults.pInt8 = ConstantVector::get({ pZero, pZero, pZero, pOne });
 
     // Int16 (0, 0, 0, 1)
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-    m_fetchDefaults.pInt16 = ConstantVector::get(defaults);
+    m_fetchDefaults.pInt16 = ConstantVector::get({ pZero, pZero, pZero, pOne });
 
     // Int (0, 0, 0, 1)
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-    m_fetchDefaults.pInt = ConstantVector::get(defaults);
+    m_fetchDefaults.pInt = ConstantVector::get({ pZero, pZero, pZero, pOne });
 
     // Int64 (0, 0, 0, 1)
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-    m_fetchDefaults.pInt64 = ConstantVector::get(defaults);
+    m_fetchDefaults.pInt64 = ConstantVector::get({ pZero, pZero, pZero, pZero, pZero, pZero, pZero, pOne });
 
     // Float16 (0, 0, 0, 1.0)
     const uint16_t float16One = 0x3C00;
-
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), float16One));
-    m_fetchDefaults.pFloat16 = ConstantVector::get(defaults);
+    auto pFloat16One = ConstantInt::get(m_pContext->Int32Ty(), float16One);
+    m_fetchDefaults.pFloat16 = ConstantVector::get({ pZero, pZero, pZero, pFloat16One });
 
     // Float (0.0, 0.0, 0.0, 1.0)
     union
@@ -1160,13 +1131,8 @@ VertexFetch::VertexFetch(
         float    f;
         uint32_t u32;
     } floatOne = { 1.0f };
-
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), floatOne.u32));
-    m_fetchDefaults.pFloat = ConstantVector::get(defaults);
+    auto pFloatOne = ConstantInt::get(m_pContext->Int32Ty(), floatOne.u32);
+    m_fetchDefaults.pFloat = ConstantVector::get({ pZero, pZero, pZero, pFloatOne });
 
     // Double (0.0, 0.0, 0.0, 1.0)
     union
@@ -1174,17 +1140,12 @@ VertexFetch::VertexFetch(
         double   d;
         uint32_t u32[2];
     } doubleOne = { 1.0 };
-
-    defaults.clear();
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(pZero);
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), doubleOne.u32[0]));
-    defaults.push_back(ConstantInt::get(m_pContext->Int32Ty(), doubleOne.u32[1]));
-    m_fetchDefaults.pDouble = ConstantVector::get(defaults);
+    auto pDoubleOne0 = ConstantInt::get(m_pContext->Int32Ty(), doubleOne.u32[0]);
+    auto pDoubleOne1 = ConstantInt::get(m_pContext->Int32Ty(), doubleOne.u32[1]);
+    m_fetchDefaults.pDouble = ConstantVector::get({ pZero, pZero,
+                                                    pZero, pZero,
+                                                    pZero, pZero,
+                                                    pDoubleOne0, pDoubleOne1 });
 }
 
 // =====================================================================================================================
@@ -1419,11 +1380,12 @@ Value* VertexFetch::Run(
             // the same types.
 
             // %vf1 = shufflevector %vf1, %vf1, <0, 1, undef, undef>
-            shuffleMask.clear();
-            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-            shuffleMask.push_back(UndefValue::get(m_pContext->Int32Ty()));
-            shuffleMask.push_back(UndefValue::get(m_pContext->Int32Ty()));
+            Constant* shuffleMask[] = {
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(m_pContext->Int32Ty(), 1),
+                UndefValue::get(m_pContext->Int32Ty()),
+                UndefValue::get(m_pContext->Int32Ty())
+            };
             vertexFetch[1] = new ShuffleVectorInst(vertexFetch[1],
                                                    vertexFetch[1],
                                                    ConstantVector::get(shuffleMask),
@@ -1659,9 +1621,10 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
     Instruction* pInsertPos     // [in] Where to insert instructions
     ) const
 {
-    std::vector<Value*> idxs;
-    idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), 0, false));
-    idxs.push_back(ConstantInt::get(m_pContext->Int64Ty(), binding, false));
+    Value* idxs[] = {
+        ConstantInt::get(m_pContext->Int64Ty(), 0, false),
+        ConstantInt::get(m_pContext->Int64Ty(), binding, false)
+    };
 
     auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr();
     auto pVbDescPtr = GetElementPtrInst::Create(nullptr, pVbTablePtr, idxs, "", pInsertPos);
@@ -1761,13 +1724,14 @@ void VertexFetch::AddVertexFetchInst(
         }
 
         // Do vertex fetch
-        std::vector<Value*> args;
-        args.push_back(pVbDesc);                                                              // rsrc
-        args.push_back(pVbIndex);                                                             // vindex
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), offset));                      // offset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                           // soffset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), MapVertexFormat(dfmt, nfmt))); // dfmt, nfmt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                           // glc, slc
+        Value* args[] = {
+            pVbDesc,                                                                // rsrc
+            pVbIndex,                                                               // vindex
+            ConstantInt::get(m_pContext->Int32Ty(), offset),                        // offset
+            ConstantInt::get(m_pContext->Int32Ty(), 0),                             // soffset
+            ConstantInt::get(m_pContext->Int32Ty(), MapVertexFormat(dfmt, nfmt)),   // dfmt, nfmt
+            ConstantInt::get(m_pContext->Int32Ty(), 0)                              // glc, slc
+        };
 
         StringRef suffix = "";
         Type* pFetchTy = nullptr;
@@ -1846,10 +1810,11 @@ void VertexFetch::AddVertexFetchInst(
         {
             // NOTE: If valid number of channels is 3, the actual fetch type should be revised from <4 x i32>
             // to <3 x i32>.
-            std::vector<Constant*> shuffleMask;
-            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
+            Constant* shuffleMask[] = {
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(m_pContext->Int32Ty(), 1),
+                ConstantInt::get(m_pContext->Int32Ty(), 2)
+            };
             *ppFetch = new ShuffleVectorInst(pFetch, pFetch, ConstantVector::get(shuffleMask), "", pInsertPos);
         }
         else
@@ -1895,14 +1860,15 @@ void VertexFetch::AddVertexFetchInst(
         // Do vertex per-component fetches
         for (uint32_t i = 0; i < pFormatInfo->compCount; ++i)
         {
-            std::vector<Value*> args;
-            args.push_back(pVbDesc);                                                        // rsrc
-            args.push_back(compVbIndices[i]);                                               // vindex
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]));        // offset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // soffset
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(),
-                                            MapVertexFormat(pFormatInfo->compDfmt, nfmt))); // dfmt, nfmt
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                     // glc, slc
+            Value* args[] = {
+                pVbDesc,                                                        // rsrc
+                compVbIndices[i],                                               // vindex
+                ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]),        // offset
+                ConstantInt::get(m_pContext->Int32Ty(), 0),                     // soffset
+                ConstantInt::get(m_pContext->Int32Ty(),
+                                 MapVertexFormat(pFormatInfo->compDfmt, nfmt)), // dfmt, nfmt
+                ConstantInt::get(m_pContext->Int32Ty(), 0)                      // glc, slc
+            };
 
             Value* pCompFetch = nullptr;
             if (is16bitFetch)
