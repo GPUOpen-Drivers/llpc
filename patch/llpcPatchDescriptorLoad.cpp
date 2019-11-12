@@ -665,6 +665,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
                                             "",
                                             pInsertPoint);
     }
+#ifdef LLPC_BUILD_GFX10
     else if (gfxIp.major == 10)
     {
         SqBufRsrcWord3 sqBufRsrcWord3 = {};
@@ -683,6 +684,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
                                             "",
                                             pInsertPoint);
     }
+#endif
     else
     {
         LLPC_NOT_IMPLEMENTED();
