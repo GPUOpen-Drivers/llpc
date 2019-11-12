@@ -4167,8 +4167,8 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
         EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else
-    {
 #endif
+    {
         switch (builtInId)
         {
         case BuiltInPosition:

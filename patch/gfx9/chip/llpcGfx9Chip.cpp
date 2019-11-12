@@ -30,6 +30,8 @@
  */
 #define DEBUG_TYPE "llpc-gfx9-chip"
 
+#include <stdio.h>
+
 #include "llpcGfx9Chip.h"
 
 namespace Llpc
