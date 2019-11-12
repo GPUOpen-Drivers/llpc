@@ -501,10 +501,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                                             InterpLocUnknown,
                                                             nullptr,
                                                             &loadInst);
-
-                std::vector<uint32_t> idxs;
-                idxs.push_back(i);
-                pLoadValue = InsertValueInst::Create(pLoadValue, pElemValue, idxs, "", &loadInst);
+                pLoadValue = InsertValueInst::Create(pLoadValue, pElemValue, { i }, "", &loadInst);
             }
         }
         else
@@ -680,10 +677,7 @@ void SpirvLowerGlobal::visitStoreInst(
             const uint32_t elemCount = pOutputy->getArrayNumElements();
             for (uint32_t i = 0; i < elemCount; ++i)
             {
-                std::vector<uint32_t> idxs;
-                idxs.push_back(i);
-                auto pElemValue = ExtractValueInst::Create(pStoreValue, idxs, "", &storeInst);
-
+                auto pElemValue = ExtractValueInst::Create(pStoreValue, { i }, "", &storeInst);
                 Value* pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
                 AddCallInstForOutputExport(pElemValue,
                                            pElemMeta,
@@ -1219,10 +1213,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            interpLoc,
                                                            pAuxInterpValue,
                                                            pInsertPos);
-
-                    std::vector<uint32_t> idxs;
-                    idxs.push_back(elemIdx);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, idxs, "", pInsertPos);
+                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { elemIdx }, "", pInsertPos);
                 }
             }
             else
@@ -1273,10 +1264,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            InterpLocUnknown,
                                                            nullptr,
                                                            pInsertPos);
-
-                    std::vector<uint32_t> idxs;
-                    idxs.push_back(elemIdx);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, idxs, "", pInsertPos);
+                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { elemIdx }, "", pInsertPos);
                 }
             }
             else
@@ -1308,10 +1296,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            InterpLocUnknown,
                                                            nullptr,
                                                            pInsertPos);
-
-                    std::vector<uint32_t> idxs;
-                    idxs.push_back(elemIdx);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, idxs, "", pInsertPos);
+                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { elemIdx }, "", pInsertPos);
                 }
             }
         }
@@ -1338,15 +1323,11 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                      InterpLocUnknown,
                                                      nullptr,
                                                      pInsertPos);
-
-            std::vector<uint32_t> idxs;
-            idxs.push_back(memberIdx);
-            pInOutValue = InsertValueInst::Create(pInOutValue, pMember, idxs, "", pInsertPos);
+            pInOutValue = InsertValueInst::Create(pInOutValue, pMember, { memberIdx }, "", pInsertPos);
         }
     }
     else
     {
-        std::vector<Value*> args;
         Constant* pInOutMetaConst = cast<Constant>(pInOutMeta);
         inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
         inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
@@ -1521,9 +1502,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
                 {
                     // Handle array elements recursively
-                    std::vector<uint32_t> idxs;
-                    idxs.push_back(elemIdx);
-                    auto pElem = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
+		  auto pElem = ExtractValueInst::Create(pOutputValue, { elemIdx }, "", pInsertPos);
 
                     auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset +
                                                            outputMeta.XfbExtraOffset +
@@ -1568,9 +1547,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
             {
                 // Handle array elements recursively
-                std::vector<uint32_t> idxs;
-                idxs.push_back(elemIdx);
-                Value* pElem = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
+	      Value* pElem = ExtractValueInst::Create(pOutputValue, { elemIdx }, "", pInsertPos);
 
                 Value* pElemLocOffset = nullptr;
                 ConstantInt* pLocOffsetConst = dyn_cast<ConstantInt>(pLocOffset);
@@ -1617,11 +1594,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         {
             // Handle structure member recursively
             auto pMemberMeta = cast<Constant>(pOutputMeta->getOperand(memberIdx));
-
-            std::vector<uint32_t> idxs;
-            idxs.push_back(memberIdx);
-            Value* pMember = ExtractValueInst::Create(pOutputValue, idxs, "", pInsertPos);
-
+            Value* pMember = ExtractValueInst::Create(pOutputValue, { memberIdx }, "", pInsertPos);
             AddCallInstForOutputExport(pMember,
                                        pMemberMeta,
                                        pLocOffset,
@@ -1637,7 +1610,6 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     else
     {
         // Normal scalar or vector type
-        std::vector<Value*> args;
         m_pBuilder->SetInsertPoint(pInsertPos);
         Constant* pInOutMetaConst = cast<Constant>(pOutputMeta);
         outputMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();

@@ -67,8 +67,7 @@ Context::Context(
     m_gfxIp(gfxIp),
     m_glslEmuLib(this)
 {
-    std::vector<Metadata*> emptyMeta;
-    m_pEmptyMetaNode = MDNode::get(*this, emptyMeta);
+    m_pEmptyMetaNode = MDNode::get(*this, {});
 
     // Initialize pre-constructed LLVM derived types
     m_tys.pBoolTy     = Type::getInt1Ty(*this);

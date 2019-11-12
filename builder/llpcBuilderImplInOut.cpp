@@ -487,30 +487,31 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
     {
         // Add intrinsic to calculate I/J for interpolation function
         std::string evalInstName;
-        std::vector<Value*> evalArgs;
         auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
 
         if (inputInfo.GetInterpLoc() == InOutInfo::InterpLocCentroid)
         {
+            Value* evalArg = nullptr;
+
             evalInstName = LlpcName::InputImportBuiltIn;
             if (inputInfo.GetInterpMode() == InOutInfo::InterpModeNoPersp)
             {
                 evalInstName += "InterpLinearCentroid";
-                evalArgs.push_back(getInt32(spv::BuiltInInterpLinearCentroid));
+                evalArg = getInt32(spv::BuiltInInterpLinearCentroid);
                 pResUsage->builtInUsage.fs.noperspective = true;
                 pResUsage->builtInUsage.fs.centroid = true;
             }
             else
             {
                 evalInstName += "InterpPerspCentroid";
-                evalArgs.push_back(getInt32(spv::BuiltInInterpPerspCentroid));
+                evalArg = getInt32(spv::BuiltInInterpPerspCentroid);
                 pResUsage->builtInUsage.fs.smooth = true;
                 pResUsage->builtInUsage.fs.centroid = true;
             }
 
             pAuxInterpValue = EmitCall(evalInstName,
                                        VectorType::get(getFloatTy(), 2),
-                                       evalArgs,
+                                       { evalArg },
                                        Attribute::ReadOnly,
                                        &*GetInsertPoint());
         }

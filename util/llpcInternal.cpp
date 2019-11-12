@@ -295,8 +295,7 @@ void SetShaderStageToModule(
     LLVMContext& context = pModule->getContext();
     Function* pFunc = GetEntryPoint(pModule);
     auto execModel = ConvertToExecModel(shaderStage);
-    std::vector<Metadata*> execModelMeta =
-    {
+    Metadata* execModelMeta[] = {
         ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), execModel))
     };
     auto pExecModelMetaNode = MDNode::get(context, execModelMeta);

@@ -201,8 +201,6 @@ bool PatchCopyShader::runOnModule(
 
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
 
-    std::vector<Value*> args;
-
     // Load GS-VS ring buffer descriptor
     m_pGsVsRingBufDesc = LoadGsVsRingBufferDescriptor(pEntryPoint, pInsertPos);
 
@@ -230,10 +228,11 @@ bool PatchCopyShader::runOnModule(
         // StreamId = streamInfo[25:24]
         auto pStreamInfo = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxStreamInfo);
 
-        args.clear();
-        args.push_back(pStreamInfo);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 24));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
+        Value* args[] = {
+            pStreamInfo,
+            ConstantInt::get(m_pContext->Int32Ty(), 24),
+            ConstantInt::get(m_pContext->Int32Ty(), 2)
+        };
         Value* pStreamId = EmitCall("llvm.amdgcn.ubfe.i32",
                                     m_pContext->Int32Ty(),
                                     args,
@@ -377,8 +376,6 @@ void PatchCopyShader::ExportOutput(
     uint32_t        streamId,     // Export output of this stream
     Instruction*    pInsertPos)   // [in] Where to insert the instruction
 {
-    std::vector<Value*> args;
-
     std::string instName;
 
     Value* pOutputValue = nullptr;
@@ -408,10 +405,11 @@ void PatchCopyShader::ExportOutput(
         {
             // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
             // real instructions when when NGG primitive shader is generated.
-            std::vector<Value*> args;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+            Value* args[] = {
+                ConstantInt::get(m_pContext->Int32Ty(), loc),
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(m_pContext->Int32Ty(), streamId)
+            };
 
             std::string callName = LlpcName::NggGsOutputImport + GetTypeName(pOutputTy);
             pOutputValue = EmitCall(callName, pOutputTy, args, NoAttrib, pInsertPos);
@@ -490,10 +488,11 @@ void PatchCopyShader::ExportOutput(
 
             // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced
             // with real instructions when when NGG primitive shader is generated.
-            std::vector<Value*> args;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), loc));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), streamId));
+            Value* args[] = {
+                ConstantInt::get(m_pContext->Int32Ty(), loc),
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(m_pContext->Int32Ty(), streamId)
+            };
 
             std::string callName = LlpcName::NggGsOutputImport + GetTypeName(pBuiltInTy);
             pOutputValue = EmitCall(callName, pBuiltInTy, args, NoAttrib, pInsertPos);
@@ -581,11 +580,9 @@ void PatchCopyShader::ExportOutput(
             for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
             {
                 auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
-                std::vector<uint32_t> idxs;
-                idxs.push_back(i);
                 pOutputValue = InsertValueInst::Create(pOutputValue,
                                                        pLoadValue,
-                                                       idxs,
+                                                       { i },
                                                        "",
                                                        pInsertPos);
             }
@@ -604,12 +601,9 @@ void PatchCopyShader::ExportOutput(
             for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
             {
                 auto pLoadValue = LoadValueFromGsVsRingBuffer(loc + i / 4, i % 4, streamId, pInsertPos);
-
-                std::vector<uint32_t> idxs;
-                idxs.push_back(i);
                 pOutputValue = InsertValueInst::Create(pOutputValue,
                                                        pLoadValue,
-                                                       idxs,
+                                                       { i },
                                                        "",
                                                        pInsertPos);
             }
@@ -722,9 +716,10 @@ Value* PatchCopyShader::LoadValueFromGsVsRingBuffer(
 
     if (m_pContext->IsGsOnChip())
     {
-        std::vector<Value*> idxs;
-        idxs.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        idxs.push_back(pRingOffset);
+        Value* idxs[] = {
+            ConstantInt::get(m_pContext->Int32Ty(), 0),
+            pRingOffset
+        };
 
         Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
         auto pLoadInst = new LoadInst(pLoadPtr, "", false, pInsertPos);
@@ -734,14 +729,15 @@ Value* PatchCopyShader::LoadValueFromGsVsRingBuffer(
     }
     else
     {
-        std::vector<Value*> args;
-        args.push_back(m_pGsVsRingBufDesc);                                         // rsrc
-        args.push_back(pRingOffset);                                                // offset
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));                 // soffset
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
         coherent.bits.slc = true;
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All));   // glc, slc
+        Value* args[] = {
+            m_pGsVsRingBufDesc,                                         // rsrc
+            pRingOffset,                                                // offset
+            ConstantInt::get(m_pContext->Int32Ty(), 0),                 // soffset
+            ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)    // glc, slc
+        };
 
         pLoadValue = EmitCall("llvm.amdgcn.raw.buffer.load.f32",
                               m_pContext->FloatTy(),
@@ -761,8 +757,7 @@ Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
 {
     Value* pInternalTablePtrLow = GetFunctionArgument(pEntryPoint, EntryArgIdxInternalTablePtrLow);
 
-    std::vector<Value*> args;
-    Value* pPc = EmitCall("llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), args, NoAttrib, pInsertPos);
+    Value* pPc = EmitCall("llvm.amdgcn.s.getpc", m_pContext->Int64Ty(), {}, NoAttrib, pInsertPos);
     pPc = new BitCastInst(pPc, m_pContext->Int32x2Ty(), "", &*pInsertPos);
 
     auto pInternalTablePtrHigh =
@@ -813,7 +808,6 @@ void PatchCopyShader::ExportGenericOutput(
 {
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
 
-    std::vector<Value*> args;
     std::string instName;
 
     if (pResUsage->inOutUsage.enableXfb)
@@ -869,12 +863,13 @@ void PatchCopyShader::ExportGenericOutput(
 
             }
 
-            args.clear();
             instName = LlpcName::OutputExportXfb;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbBuffer));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbOffset));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbExtraOffset));
-            args.push_back(pOutputValue);
+            Value* args[] = {
+                ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbBuffer),
+                ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbOffset),
+                ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbExtraOffset),
+                pOutputValue
+            };
             AddTypeMangling(nullptr, args, instName);
             EmitCall(instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
@@ -885,9 +880,10 @@ void PatchCopyShader::ExportGenericOutput(
         auto pOutputTy = pOutputValue->getType();
         LLPC_ASSERT(pOutputTy->isSingleValueType());
 
-        args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), location));
-        args.push_back(pOutputValue);
+        Value* args[] = {
+            ConstantInt::get(m_pContext->Int32Ty(), location),
+            pOutputValue
+        };
 
         instName = LlpcName::OutputExportGeneric;
         instName += GetTypeName(pOutputTy);
@@ -906,7 +902,6 @@ void PatchCopyShader::ExportBuiltInOutput(
 {
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
 
-    std::vector<Value*> args;
     std::string instName;
 
     if (pResUsage->inOutUsage.enableXfb)
@@ -923,12 +918,13 @@ void PatchCopyShader::ExportBuiltInOutput(
             uint32_t xfbOutInfo = xfbOutsInfo[locIter->first];
             XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutInfo);
 
-            args.clear();
             instName = LlpcName::OutputExportXfb;
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbBuffer));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbOffset));
-            args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-            args.push_back(pOutputValue);
+            Value* args[] = {
+                ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbBuffer),
+                ConstantInt::get(m_pContext->Int32Ty(), pXfbOutInfo->xfbOffset),
+                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                pOutputValue
+            };
             AddTypeMangling(nullptr, args, instName);
             EmitCall(instName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
         }
@@ -936,9 +932,10 @@ void PatchCopyShader::ExportBuiltInOutput(
 
     if (pResUsage->inOutUsage.gs.rasterStream == streamId)
     {
-        args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), builtInId));
-        args.push_back(pOutputValue);
+        Value* args[] = {
+            ConstantInt::get(m_pContext->Int32Ty(), builtInId),
+            pOutputValue
+        };
 
         std::string builtInName = getNameMap(builtInId).map(builtInId);
         LLPC_ASSERT(builtInName.find("BuiltIn") == 0);

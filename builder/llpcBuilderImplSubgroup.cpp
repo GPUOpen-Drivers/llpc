@@ -1476,14 +1476,12 @@ Value* BuilderImplSubgroup::CreateGroupBallot(
     // The not equal predicate for the icmp intrinsic is 33.
     Constant* const pPredicateNE = getInt32(33);
 
-    SmallVector<Type*, 2> types;
-
     // icmp has a new signature (requiring the return type as the first type).
-    types.push_back(getIntNTy(GetShaderSubgroupSize()));
-    types.push_back(getInt32Ty());
-
     Value* pResult = CreateIntrinsic(Intrinsic::amdgcn_icmp,
-                                     types,
+                                     {
+                                          getIntNTy(GetShaderSubgroupSize()),
+                                          getInt32Ty()
+                                     },
                                      {
                                           pValueAsInt32,
                                           getInt32(0),

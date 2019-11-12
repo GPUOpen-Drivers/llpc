@@ -1234,8 +1234,6 @@ Value* FragColorExport::Run(
     bool comprExp = false;
     bool needPack = false;
 
-    std::vector<Value*> args;
-
     const auto pUndefFloat     = UndefValue::get(m_pContext->FloatTy());
     const auto pUndefFloat16   = UndefValue::get(m_pContext->Float16Ty());
     const auto pUndefFloat16x2 = UndefValue::get(m_pContext->Float16x2Ty());
@@ -1376,27 +1374,22 @@ Value* FragColorExport::Run(
                     comps[i] = pUndefFloat;
                 }
 
-                std::vector<Attribute::AttrKind> attribs;
-                attribs.push_back(Attribute::ReadNone);
+                Attribute::AttrKind attribs[] = {
+                    Attribute::ReadNone
+                };
 
                 // Do packing
-                args.clear();
-                args.push_back(comps[0]);
-                args.push_back(comps[1]);
                 comps[0] = EmitCall("llvm.amdgcn.cvt.pkrtz",
                                     m_pContext->Float16x2Ty(),
-                                    args,
+                                    { comps[0], comps[1] },
                                     attribs,
                                     pInsertPos);
 
                 if (compCount > 2)
                 {
-                    args.clear();
-                    args.push_back(comps[2]);
-                    args.push_back(comps[3]);
                     comps[1] = EmitCall("llvm.amdgcn.cvt.pkrtz",
                                         m_pContext->Float16x2Ty(),
-                                        args,
+                                        { comps[2], comps[3] },
                                         attribs,
                                         pInsertPos);
                 }
@@ -1433,12 +1426,9 @@ Value* FragColorExport::Run(
 
             for (uint32_t i = 0; i < compCount; i += 2)
             {
-                args.clear();
-                args.push_back(comps[i]);
-                args.push_back(comps[i + 1]);
                 Value* pComps = EmitCall(funcName,
                                          m_pContext->Int16x2Ty(),
-                                         args,
+                                         { comps[i], comps[i + 1] },
                                          NoAttrib,
                                          pInsertPos);
 
@@ -1488,12 +1478,9 @@ Value* FragColorExport::Run(
 
             for (uint32_t i = 0; i < compCount; i += 2)
             {
-                args.clear();
-                args.push_back(comps[i]);
-                args.push_back(comps[i + 1]);
                 Value* pComps = EmitCall(funcName,
                                          m_pContext->Int16x2Ty(),
-                                         args,
+                                         { comps[i], comps[i + 1] },
                                          NoAttrib,
                                          pInsertPos);
 
@@ -1573,28 +1560,30 @@ Value* FragColorExport::Run(
             }
         }
 
-        args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0 + location)); // tgt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), (compCount > 2) ? 0xF : 0x3)); // en
-        args.push_back(comps[0]);                                                             // src0
-        args.push_back(comps[1]);                                                             // src1
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                        // done
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                         // vm
+        Value* args[] = {
+            ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0 + location), // tgt
+            ConstantInt::get(m_pContext->Int32Ty(), (compCount > 2) ? 0xF : 0x3), // en
+            comps[0],                                                             // src0
+            comps[1],                                                             // src1
+            ConstantInt::get(m_pContext->BoolTy(), false),                        // done
+            ConstantInt::get(m_pContext->BoolTy(), true)                          // vm
+        };
 
         pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }
     else
     {
         // 32-bit export
-        args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0 + location)); // tgt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), (1 << compCount) - 1));        // en
-        args.push_back(comps[0]);                                                             // src0
-        args.push_back(comps[1]);                                                             // src1
-        args.push_back(comps[2]);                                                             // src2
-        args.push_back(comps[3]);                                                             // src3
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));                        // done
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), true));                         // vm
+        Value* args[] = {
+            ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0 + location), // tgt
+            ConstantInt::get(m_pContext->Int32Ty(), (1 << compCount) - 1),        // en
+            comps[0],                                                             // src0
+            comps[1],                                                             // src1
+            comps[2],                                                             // src2
+            comps[3],                                                             // src3
+            ConstantInt::get(m_pContext->BoolTy(), false),                        // done
+            ConstantInt::get(m_pContext->BoolTy(), true)                          // vm
+        };
 
         pExport = EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
     }

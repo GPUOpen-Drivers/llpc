@@ -2896,7 +2896,7 @@ Constant* SPIRVToLLVM::buildConstStoreRecursively(
         for (uint32_t i = 0, memberCount = pSpvType->getStructMemberCount(); i < memberCount; i++)
         {
             const uint32_t memberIndex = needsPad ? lookupRemappedTypeElements(pSpvType, i) : i;
-            const std::array<Constant*, 2> indices = { pZero, getBuilder()->getInt32(memberIndex) };
+            Constant* indices[] = { pZero, getBuilder()->getInt32(memberIndex) };
             Type* const pMemberStoreType = GetElementPtrInst::getIndexedType(pStoreType, indices);
             constMembers[memberIndex] = buildConstStoreRecursively(pSpvType->getStructMemberType(i),
                                                                    pMemberStoreType->getPointerTo(addrSpace),
