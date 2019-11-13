@@ -120,7 +120,7 @@ public:
   SPIRVTypeVoid() : SPIRVType(OpTypeVoid) {}
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
 };
 
 class SPIRVTypeBool : public SPIRVType {
@@ -132,7 +132,7 @@ public:
   SPIRVTypeBool() : SPIRVType(OpTypeBool) {}
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
 };
 
 class SPIRVTypeInt : public SPIRVType {
@@ -169,7 +169,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Id, BitWidth, IsSigned)
+  _SPIRV_DEF_DECODE3(Id, BitWidth, IsSigned)
   void validate() const override {
     SPIRVEntry::validate();
     assert(BitWidth > 1 && BitWidth <= 64 && "Invalid bit width");
@@ -205,7 +205,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC2(Id, BitWidth)
+  _SPIRV_DEF_DECODE2(Id, BitWidth)
   void validate() const override {
     SPIRVEntry::validate();
     assert(BitWidth >= 16 && BitWidth <= 64 && "Invalid bit width");
@@ -247,7 +247,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Id, ElemStorageClass, ElemTypeId)
+  _SPIRV_DEF_DECODE3(Id, ElemStorageClass, ElemTypeId)
   void validate() const override {
     SPIRVEntry::validate();
     assert(isValid(ElemStorageClass));
@@ -270,7 +270,7 @@ public:
   void setPointer(SPIRVTypePointer *const P) { Pointer = P; }
   SPIRVStorageClassKind getStorageClass() const { return SC; }
 
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
 private:
   SPIRVTypePointer *Pointer;
   SPIRVStorageClassKind SC;
@@ -306,7 +306,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Id, CompType, CompCount)
+  _SPIRV_DEF_DECODE3(Id, CompType, CompCount)
   void validate() const override {
     SPIRVEntry::validate();
     CompType->validate();
@@ -346,7 +346,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Id, ColumnType, ColumnCount)
+  _SPIRV_DEF_DECODE3(Id, ColumnType, ColumnCount)
   void validate() const override {
     SPIRVEntry::validate();
     ColumnType->validate();
@@ -379,7 +379,7 @@ public:
   }
 
 protected:
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
   void validate() const override;
 
 private:
@@ -405,7 +405,7 @@ public:
   }
 
 protected:
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
   void validate() const override;
 private:
   SPIRVType *ElemType;                // Element Type
@@ -423,7 +423,7 @@ public:
   SPIRVTypeOpaque() : SPIRVType(OpTypeOpaque) {}
 
 protected:
-  _SPIRV_DEF_ENCDEC2(Id, Name)
+  _SPIRV_DEF_DECODE2(Id, Name)
   void validate() const override { SPIRVEntry::validate(); }
 };
 
@@ -525,7 +525,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC9(Id, SampledType, Desc.Dim, Desc.Depth, Desc.Arrayed,
+  _SPIRV_DEF_DECODE9(Id, SampledType, Desc.Dim, Desc.Depth, Desc.Arrayed,
                      Desc.MS, Desc.Sampled, Desc.Format, Acc)
   // The validation assumes OpenCL image or sampler type.
   void validate() const override {
@@ -560,7 +560,7 @@ public:
   SPIRVTypeSampler() : SPIRVType(OC) {}
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
   void validate() const override {
     assert(OpCode == OC);
     assert(WordCount == FixedWC);
@@ -587,7 +587,7 @@ public:
 
 protected:
   SPIRVTypeImage *ImgTy;
-  _SPIRV_DEF_ENCDEC2(Id, ImgTy)
+  _SPIRV_DEF_DECODE2(Id, ImgTy)
   void validate() const override {
     assert(OpCode == OC);
     assert(WordCount == FixedWC);
@@ -606,7 +606,7 @@ public:
   SPIRVTypePipeStorage() : SPIRVType(OC) {}
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
   void validate() const override {
     assert(OpCode == OC);
     assert(WordCount == FixedWC);
@@ -664,7 +664,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC2(Id, MemberTypeIdVec)
+  _SPIRV_DEF_DECODE2(Id, MemberTypeIdVec)
 
   void validate() const override { SPIRVEntry::validate(); }
 
@@ -696,7 +696,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Id, ReturnType, ParamTypeVec)
+  _SPIRV_DEF_DECODE3(Id, ReturnType, ParamTypeVec)
   void setWordCount(SPIRVWord WordCount) override {
     SPIRVType::setWordCount(WordCount);
     ParamTypeVec.resize(WordCount - 3);
@@ -728,7 +728,7 @@ public:
   SPIRVValue *getOperand() { return getValue(Opn); }
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
   void validate() const override { SPIRVEntry::validate(); }
   SPIRVId Opn;
 };
@@ -764,7 +764,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
   void validate() const override { SPIRVEntry::validate(); }
 };
 
@@ -784,7 +784,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
 };
 
 class SPIRVTypePipe : public SPIRVType {
@@ -812,7 +812,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC2(Id, AccessQualifier)
+  _SPIRV_DEF_DECODE2(Id, AccessQualifier)
   void validate() const override { SPIRVEntry::validate(); }
 
 private:

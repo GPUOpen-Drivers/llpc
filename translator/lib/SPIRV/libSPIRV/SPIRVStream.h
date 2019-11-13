@@ -52,15 +52,6 @@
 
 namespace SPIRV {
 
-#ifndef _SPIRV_SUPPORT_TEXT_FMT
-#define _SPIRV_SUPPORT_TEXT_FMT
-#endif
-
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-// Use textual format for SPIRV.
-extern bool SPIRVUseTextFormat;
-#endif
-
 class SPIRVFunction;
 class SPIRVBasicBlock;
 
@@ -83,37 +74,16 @@ public:
   SPIRVEntry *Scope; // A function or basic block
 };
 
-class SPIRVEncoder {
-public:
-  explicit SPIRVEncoder(spv_ostream &OutputStream) : OS(OutputStream) {}
-  spv_ostream &OS;
-};
-
-/// Output a new line in text mode. Do nothing in binary mode.
-class SPIRVNL {
-  friend spv_ostream &operator<<(spv_ostream &O, const SPIRVNL &E);
-};
-
 template <typename T>
 const SPIRVDecoder &decodeBinary(const SPIRVDecoder &I, T &V) {
   uint32_t W;
   I.IS.read(reinterpret_cast<char *>(&W), sizeof(W));
   V = static_cast<T>(W);
-  SPIRVDBG(spvdbgs() << "Read word: W = " << W << " V = " << V << '\n');
   return I;
 }
 
 template <typename T>
 const SPIRVDecoder &operator>>(const SPIRVDecoder &I, T &V) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    uint32_t W;
-    I.IS >> W;
-    V = static_cast<T>(W);
-    SPIRVDBG(spvdbgs() << "Read word: W = " << W << " V = " << V << '\n');
-    return I;
-  }
-#endif
   return decodeBinary(I, V);
 }
 
@@ -140,41 +110,7 @@ const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::vector<T> &V) {
   return I;
 }
 
-template <typename T>
-const SPIRVEncoder &operator<<(const SPIRVEncoder &O, T V) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    O.OS << V << " ";
-    return O;
-  }
-#endif
-  uint32_t W = static_cast<uint32_t>(V);
-  O.OS.write(reinterpret_cast<char *>(&W), sizeof(W));
-  return O;
-}
-
-template <typename T>
-const SPIRVEncoder &operator<<(const SPIRVEncoder &O, T *P) {
-  return O << P->getId();
-}
-
-template <typename T>
-const SPIRVEncoder &operator<<(const SPIRVEncoder &O, const std::vector<T> &V) {
-  for (size_t I = 0, E = V.size(); I != E; ++I)
-    O << V[I];
-  return O;
-}
-
-template <typename IterTy>
-const SPIRVEncoder &operator<<(const SPIRVEncoder &Encoder,
-                               const std::pair<IterTy, IterTy> &Range) {
-  for (IterTy I = Range.first, E = Range.second; I != E; ++I)
-    Encoder << *I;
-  return Encoder;
-}
-
 #define SPIRV_DEC_ENCDEC(Type)                                                 \
-  const SPIRVEncoder &operator<<(const SPIRVEncoder &O, Type V);               \
   const SPIRVDecoder &operator>>(const SPIRVDecoder &I, Type &V);
 
 SPIRV_DEC_ENCDEC(Op)
@@ -184,7 +120,6 @@ SPIRV_DEC_ENCDEC(OCLExtOpKind)
 SPIRV_DEC_ENCDEC(GLSLExtOpKind)
 SPIRV_DEC_ENCDEC(LinkageType)
 
-const SPIRVEncoder &operator<<(const SPIRVEncoder &O, const std::string &Str);
 const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::string &Str);
 
 } // namespace SPIRV

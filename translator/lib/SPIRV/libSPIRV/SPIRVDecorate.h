@@ -112,13 +112,9 @@ public:
   iterator insert(const value_type& Dec) {
     auto ER = BaseType::equal_range(Dec);
     for (auto I = ER.first, E = ER.second; I != E; ++I) {
-      SPIRVDBG(spvdbgs() << "[compare decorate] " << *Dec << " vs " << **I
-                         << " : ");
       if (**I == *Dec)
         return I;
-      SPIRVDBG(spvdbgs() << " diff\n");
     }
-    SPIRVDBG(spvdbgs() << "[add decorate] " << *Dec << '\n');
     return BaseType::insert(Dec);
   }
 };
@@ -136,7 +132,7 @@ public:
   // Incomplete constructor
   SPIRVDecorate() : SPIRVDecorateGeneric(OC) {}
 
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
   void setWordCount(SPIRVWord) override;
   void validate() const override {
     SPIRVDecorateGeneric::validate();
@@ -165,31 +161,9 @@ public:
     return (SPIRVLinkageTypeKind)Literals.back();
   }
 
-  static void encodeLiterals(SPIRVEncoder &Encoder,
-                             const std::vector<SPIRVWord> &Literals) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-    if (SPIRVUseTextFormat) {
-      Encoder << getString(Literals.cbegin(), Literals.cend() - 1);
-      Encoder.OS << " ";
-      Encoder << (SPIRVLinkageTypeKind)Literals.back();
-    } else
-#endif
-      Encoder << Literals;
-  }
-
   static void decodeLiterals(SPIRVDecoder &Decoder,
                              std::vector<SPIRVWord> &Literals) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-    if (SPIRVUseTextFormat) {
-      std::string Name;
-      Decoder >> Name;
-      SPIRVLinkageTypeKind Kind;
-      Decoder >> Kind;
-      std::copy_n(getVec(Name).begin(), Literals.size() - 1, Literals.begin());
-      Literals.back() = Kind;
-    } else
-#endif
-      Decoder >> Literals;
+    Decoder >> Literals;
   }
 };
 
@@ -219,7 +193,7 @@ public:
     return std::make_pair(MemberNumber, Dec);
   }
 
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
   void setWordCount(SPIRVWord) override;
 
   void validate() const override {
@@ -244,8 +218,7 @@ public:
   };
   // Incomplete constructor
   SPIRVDecorationGroup() : SPIRVEntry(OC) {}
-  void encodeAll(spv_ostream &O) const override;
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
   // Move the given decorates to the decoration group
   void takeDecorates(SPIRVDecorateSet &Decs) {
     for (auto &I:Decs) {
@@ -304,7 +277,7 @@ public:
     Targets.resize(WC - FixedWC);
   }
   virtual void decorateTargets() override;
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
 };
 
 class SPIRVGroupMemberDecorate : public SPIRVGroupDecorateGeneric {
@@ -321,7 +294,7 @@ public:
     SPIRVEntryNoIdGeneric::setWordCount(WC);
   }
   virtual void decorateTargets() override;
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
 protected:
   std::vector<SPIRVWord> MemberNumbers;
 };

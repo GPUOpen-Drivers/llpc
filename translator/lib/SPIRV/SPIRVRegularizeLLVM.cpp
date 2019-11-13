@@ -158,7 +158,6 @@ bool SPIRVRegularizeLLVM::regularize() {
   std::string Err;
   raw_string_ostream ErrorOS(Err);
   if (verifyModule(*M, &ErrorOS)) {
-    SPIRVDBG(errs() << "Fails to verify module: " << ErrorOS.str();)
     return false;
   }
 

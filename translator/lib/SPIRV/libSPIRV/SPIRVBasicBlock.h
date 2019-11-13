@@ -88,8 +88,7 @@ public:
   }
 
   void setAttr() { setHasNoType(); }
-  _SPIRV_DCL_ENCDEC
-  void encodeChildren(spv_ostream &) const override;
+  _SPIRV_DCL_DECODE
   void validate() const override {
     SPIRVValue::validate();
     assert(ParentF && "Invalid parent function");

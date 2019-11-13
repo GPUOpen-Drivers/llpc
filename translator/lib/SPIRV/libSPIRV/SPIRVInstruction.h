@@ -343,14 +343,6 @@ public:
   void setHasVariableWordCount(bool VariWC) { HasVariWC = VariWC; }
 
 protected:
-  void encode(spv_ostream &O) const override {
-    auto E = getEncoder(O);
-    if (hasType())
-      E << Type;
-    if (hasId())
-      E << Id;
-    E << Ops;
-  }
   void decode(std::istream &I) override {
     auto D = getDecoder(I);
     if (hasType())
@@ -522,7 +514,7 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     Initializer.resize(WordCount - 4);
   }
-  _SPIRV_DEF_ENCDEC4(Type, Id, StorageClass, Initializer)
+  _SPIRV_DEF_DECODE4(Type, Id, StorageClass, Initializer)
 
   SPIRVStorageClassKind StorageClass;
   std::vector<SPIRVId> Initializer;
@@ -552,7 +544,7 @@ public:
   SPIRVValue *getSample() { return getValue(Sample); }
 
 protected:
-  _SPIRV_DEF_ENCDEC5(Type, Id, Image, Coordinate, Sample)
+  _SPIRV_DEF_DECODE5(Type, Id, Image, Coordinate, Sample)
   void validate()const override {
     SPIRVInstruction::validate();
     assert(Type->isTypePointer() &&
@@ -587,7 +579,7 @@ public:
 
   SPIRVValue *getResidentCode() { return getValue(ResidentCode); }
 protected:
-  _SPIRV_DEF_ENCDEC3(Type, Id, ResidentCode)
+  _SPIRV_DEF_DECODE3(Type, Id, ResidentCode)
 
   void validate()const override {
     assert(Type->isTypeBool() && Type->isTypeScalar());
@@ -639,9 +631,6 @@ protected:
   void setWordCount(SPIRVWord TheWordCount) override {
     SPIRVEntry::setWordCount(TheWordCount);
     MemoryAccess.resize(TheWordCount - FixedWords);
-  }
-  void encode(spv_ostream &O) const override {
-    getEncoder(O) << PtrId << ValId << MemoryAccess;
   }
 
   void decode(std::istream &I) override {
@@ -695,10 +684,6 @@ protected:
   void setWordCount(SPIRVWord TheWordCount) override {
     SPIRVEntry::setWordCount(TheWordCount);
     MemoryAccess.resize(TheWordCount - FixedWords);
-  }
-
-  void encode(spv_ostream &O) const override {
-    getEncoder(O) << Type << Id << PtrId << MemoryAccess;
   }
 
   void decode(std::istream &I) override {
@@ -846,7 +831,7 @@ protected:
     setHasNoId();
     setHasNoType();
   }
-  _SPIRV_DEF_ENCDEC0
+  _SPIRV_DEF_DECODE0
 };
 
 typedef SPIRVInstNoOperand<OpReturn> SPIRVReturn;
@@ -876,7 +861,7 @@ protected:
     setHasNoId();
     setHasNoType();
   }
-  _SPIRV_DEF_ENCDEC1(ReturnValueId)
+  _SPIRV_DEF_DECODE1(ReturnValueId)
   void validate() const override { SPIRVInstruction::validate(); }
   SPIRVId ReturnValueId;
 };
@@ -898,7 +883,7 @@ public:
   SPIRVValue *getTargetLabel() const { return getValue(TargetLabelId); }
 
 protected:
-  _SPIRV_DEF_ENCDEC1(TargetLabelId)
+  _SPIRV_DEF_DECODE1(TargetLabelId)
   void validate() const override {
     SPIRVInstruction::validate();
     assert(WordCount == 2);
@@ -946,7 +931,7 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     BranchWeights.resize(TheWordCount - 4);
   }
-  _SPIRV_DEF_ENCDEC4(ConditionId, TrueLabelId, FalseLabelId, BranchWeights)
+  _SPIRV_DEF_DECODE4(ConditionId, TrueLabelId, FalseLabelId, BranchWeights)
   void validate() const override {
     SPIRVInstruction::validate();
     assert(WordCount == 4 || WordCount == 6);
@@ -1016,7 +1001,7 @@ public:
     SPIRVEntry::setWordCount(TheWordCount);
     Pairs.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC3(Type, Id, Pairs)
+  _SPIRV_DEF_DECODE3(Type, Id, Pairs)
   void validate() const override {
     assert(WordCount == Pairs.size() + FixedWordCount);
     assert(OpCode == OC);
@@ -1181,7 +1166,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC5(Type, Id, Condition, Op1, Op2)
+  _SPIRV_DEF_DECODE5(Type, Id, Condition, Op1, Op2)
   void validate() const override {
     SPIRVInstruction::validate();
     if (getValue(Condition)->isForward() || getValue(Op1)->isForward() ||
@@ -1245,7 +1230,7 @@ public:
   SPIRVId getMergeBlock() { return MergeBlock; }
   SPIRVWord getSelectionControl() { return SelectionControl; }
 
-  _SPIRV_DEF_ENCDEC2(MergeBlock, SelectionControl)
+  _SPIRV_DEF_DECODE2(MergeBlock, SelectionControl)
 
 protected:
   SPIRVId MergeBlock;
@@ -1285,7 +1270,7 @@ public:
     SPIRVEntry::setWordCount(TheWordCount);
     LoopControlParameters.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC4(MergeBlock, ContinueTarget, LoopControl,
+  _SPIRV_DEF_DECODE4(MergeBlock, ContinueTarget, LoopControl,
      LoopControlParameters)
 
 protected:
@@ -1353,7 +1338,7 @@ public:
     SPIRVEntry::setWordCount(TheWordCount);
     Pairs.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC3(Select, Default, Pairs)
+  _SPIRV_DEF_DECODE3(Select, Default, Pairs)
   void validate() const override {
     assert(WordCount == Pairs.size() + FixedWordCount);
     assert(OpCode == OC);
@@ -1399,7 +1384,7 @@ public:
   void setWordCount(SPIRVWord FixedWordCount) override {
     SPIRVEntry::setWordCount(FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC4(Type, Id, Dividend, Divisor)
+  _SPIRV_DEF_DECODE4(Type, Id, Dividend, Divisor)
   void validate() const override {
     SPIRVInstruction::validate();
     if (getValue(Dividend)->isForward() || getValue(Divisor)->isForward())
@@ -1441,7 +1426,7 @@ public:
   void setWordCount(SPIRVWord FixedWordCount) override {
     SPIRVEntry::setWordCount(FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC4(Type, Id, Vector, Scalar)
+  _SPIRV_DEF_DECODE4(Type, Id, Vector, Scalar)
   void validate() const override {
     SPIRVInstruction::validate();
     if (getValue(Vector)->isForward() || getValue(Scalar)->isForward())
@@ -1682,7 +1667,7 @@ public:
                     const std::vector<SPIRVWord> &TheArgs, SPIRVBasicBlock *BB);
   SPIRVFunctionCall() : FunctionId(SPIRVID_INVALID) {}
   SPIRVFunction *getFunction() const { return get<SPIRVFunction>(FunctionId); }
-  _SPIRV_DEF_ENCDEC4(Type, Id, FunctionId, Args)
+  _SPIRV_DEF_DECODE4(Type, Id, FunctionId, Args)
   void validate() const override;
   bool isOperandLiteral(unsigned Index) const override { return false; }
 
@@ -1725,33 +1710,6 @@ public:
             ExtSetKind == SPIRVEIS_GcnShaderAMD ||
             ExtSetKind == SPIRVEIS_ShaderTrinaryMinMaxAMD) &&
            "not supported");
-  }
-  void encode(spv_ostream &O) const override {
-    getEncoder(O) << Type << Id << ExtSetId;
-    switch (ExtSetKind) {
-    case SPIRVEIS_OpenCL:
-      getEncoder(O) << ExtOpOCL;
-      break;
-    case SPIRVEIS_GLSL:
-      getEncoder(O) << ExtOpGLSL;
-      break;
-    case SPIRVEIS_ShaderBallotAMD:
-      getEncoder(O) << ExtOpShaderBallotAMD;
-      break;
-    case SPIRVEIS_ShaderExplicitVertexParameterAMD:
-      getEncoder(O) << ExtOpShaderExplicitVertexParameterAMD;
-      break;
-    case SPIRVEIS_GcnShaderAMD:
-      getEncoder(O) << ExtOpGcnShaderAMD;
-      break;
-    case SPIRVEIS_ShaderTrinaryMinMaxAMD:
-      getEncoder(O) << ExtOpShaderTrinaryMinMaxAMD;
-      break;
-    default:
-      assert(0 && "not supported");
-      getEncoder(O) << ExtOp;
-    }
-    getEncoder(O) << Args;
   }
   void decode(std::istream &I) override {
     getDecoder(I) >> Type >> Id >> ExtSetId;
@@ -1844,7 +1802,7 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     Constituents.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC3(Type, Id, Constituents)
+  _SPIRV_DEF_DECODE3(Type, Id, Constituents)
   void validate() const override {
     SPIRVInstruction::validate();
     switch (getValueType(this->getId())->getOpCode()) {
@@ -1885,7 +1843,7 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     Indices.resize(TheWordCount - 4);
   }
-  _SPIRV_DEF_ENCDEC4(Type, Id, Composite, Indices)
+  _SPIRV_DEF_DECODE4(Type, Id, Composite, Indices)
   // ToDo: validate the result type is consistent with the base type and indices
   // need to trace through the base type for struct types
   void validate() const override {
@@ -1929,7 +1887,7 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     Indices.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC5(Type, Id, Object, Composite, Indices)
+  _SPIRV_DEF_DECODE5(Type, Id, Object, Composite, Indices)
   // ToDo: validate the object type is consistent with the base type and indices
   // need to trace through the base type for struct types
   void validate() const override {
@@ -1963,7 +1921,7 @@ public:
   SPIRVValue *getOperand() { return getValue(Operand); }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(Type, Id, Operand)
+  _SPIRV_DEF_DECODE3(Type, Id, Operand)
   SPIRVId Operand;
 };
 
@@ -2096,10 +2054,6 @@ protected:
     MemoryAccess.resize(TheWordCount - FixedWords);
   }
 
-  void encode(spv_ostream &O) const override {
-    getEncoder(O) << Target << Source << MemoryAccess;
-  }
-
   void decode(std::istream &I) override {
     getDecoder(I) >> Target >> Source >> MemoryAccess;
     memoryAccessUpdate(MemoryAccess);
@@ -2154,10 +2108,6 @@ protected:
     MemoryAccess.resize(TheWordCount - FixedWords);
   }
 
-  void encode(spv_ostream &O) const override {
-    getEncoder(O) << Target << Source << Size << MemoryAccess;
-  }
-
   void decode(std::istream &I) override {
     getDecoder(I) >> Target >> Source >> Size >> MemoryAccess;
     memoryAccessUpdate(MemoryAccess);
@@ -2192,7 +2142,7 @@ public:
   SPIRVValue *getIndex() const { return getValue(IndexId); }
 
 protected:
-  _SPIRV_DEF_ENCDEC4(Type, Id, VectorId, IndexId)
+  _SPIRV_DEF_DECODE4(Type, Id, VectorId, IndexId)
   void validate() const override {
     SPIRVInstruction::validate();
     if (getValue(VectorId)->isForward())
@@ -2227,7 +2177,7 @@ public:
   SPIRVValue *getComponent() { return getValue(ComponentId); }
 
 protected:
-  _SPIRV_DEF_ENCDEC5(Type, Id, VectorId, ComponentId, IndexId)
+  _SPIRV_DEF_DECODE5(Type, Id, VectorId, ComponentId, IndexId)
   void validate() const override {
     SPIRVInstruction::validate();
     if (getValue(VectorId)->isForward())
@@ -2275,7 +2225,7 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     Components.resize(TheWordCount - FixedWordCount);
   }
-  _SPIRV_DEF_ENCDEC5(Type, Id, Vector1, Vector2, Components)
+  _SPIRV_DEF_DECODE5(Type, Id, Vector1, Vector2, Components)
   void validate() const override {
     SPIRVInstruction::validate();
     assert(OpCode == OC);
@@ -2324,7 +2274,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC3(ExecScope, MemScope, MemSema)
+  _SPIRV_DEF_DECODE3(ExecScope, MemScope, MemSema)
   void validate() const override {
     assert(OpCode == OC);
     assert(WordCount == 4);
@@ -2358,7 +2308,7 @@ public:
     return getValues(Operands);
   }
 protected:
-  _SPIRV_DEF_ENCDEC4(Type, Id, Struct, MemberIndex)
+  _SPIRV_DEF_DECODE4(Type, Id, Struct, MemberIndex)
   void validate() const override {
     SPIRVInstruction::validate();
     assert(Type->isTypeInt() && Type->getBitWidth() == 32);
@@ -2402,7 +2352,7 @@ protected:
         !Module->hasCapability(CapabilityAddresses))
       assert(Size == 0 && "Size must be 0");
   }
-  _SPIRV_DEF_ENCDEC2(Object, Size)
+  _SPIRV_DEF_DECODE2(Object, Size)
   SPIRVId Object;
   SPIRVWord Size;
 };
@@ -2449,7 +2399,7 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_ENCDEC8(Type, Id, ExecScope, Destination, Source, NumElements,
+  _SPIRV_DEF_DECODE8(Type, Id, ExecScope, Destination, Source, NumElements,
                      Stride, Event)
   void validate() const override {
     assert(OpCode == OC);

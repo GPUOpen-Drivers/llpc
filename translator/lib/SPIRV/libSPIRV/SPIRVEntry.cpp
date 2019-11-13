@@ -83,7 +83,6 @@ SPIRVEntry *SPIRVEntry::create(Op OpCode) {
   if (Loc != OpToFactoryMap.end())
     return Loc->second();
 
-  SPIRVDBG(spvdbgs() << "No factory for OpCode " << (unsigned)OpCode << '\n';)
   assert(0 && "Not implemented");
   return 0;
 }
@@ -117,10 +116,6 @@ SPIRVType *SPIRVEntry::getValueType(SPIRVId TheId) const {
   return get<SPIRVValue>(TheId)->getType();
 }
 
-SPIRVEncoder SPIRVEntry::getEncoder(spv_ostream &O) const {
-  return SPIRVEncoder(O);
-}
-
 SPIRVDecoder SPIRVEntry::getDecoder(std::istream &I) {
   return SPIRVDecoder(I, *Module);
 }
@@ -131,7 +126,6 @@ void SPIRVEntry::setWordCount(SPIRVWord TheWordCount) {
 
 void SPIRVEntry::setName(const std::string &TheName) {
   Name = TheName;
-  SPIRVDBG(spvdbgs() << "Set name for obj " << Id << " " << Name << '\n');
 }
 
 void SPIRVEntry::setModule(SPIRVModule *TheModule) {
@@ -140,15 +134,6 @@ void SPIRVEntry::setModule(SPIRVModule *TheModule) {
     return;
   assert(Module == NULL && "Cannot change owner of entry");
   Module = TheModule;
-}
-
-void SPIRVEntry::encode(spv_ostream &O) const {
-  assert(0 && "Not implemented");
-}
-
-void SPIRVEntry::encodeName(spv_ostream &O) const {
-  if (!Name.empty())
-    O << SPIRVName(this, Name);
 }
 
 bool SPIRVEntry::isEndOfBlock() const {
@@ -166,36 +151,6 @@ bool SPIRVEntry::isEndOfBlock() const {
   }
 }
 
-void SPIRVEntry::encodeLine(spv_ostream &O) const {
-  if (!Module)
-    return;
-  const std::shared_ptr<const SPIRVLine> &CurrLine = Module->getCurrentLine();
-  if (Line && ((CurrLine && *Line != *CurrLine) || !CurrLine)) {
-    O << *Line;
-    Module->setCurrentLine(Line);
-  }
-  if (isEndOfBlock() || OpCode == OpNoLine)
-    Module->setCurrentLine(nullptr);
-}
-
-void SPIRVEntry::encodeAll(spv_ostream &O) const {
-  encodeLine(O);
-  encodeWordCountOpCode(O);
-  encode(O);
-  encodeChildren(O);
-}
-
-void SPIRVEntry::encodeChildren(spv_ostream &O) const {}
-
-void SPIRVEntry::encodeWordCountOpCode(spv_ostream &O) const {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    getEncoder(O) << WordCount << OpCode;
-    return;
-  }
-#endif
-  getEncoder(O) << mkWord(WordCount, OpCode);
-}
 // Read words from SPIRV binary and create members for SPIRVEntry.
 // The word count and op code has already been read before calling this
 // function for creating the SPIRVEntry. Therefore the input stream only
@@ -253,7 +208,6 @@ void SPIRVEntry::addDecorate(const SPIRVDecorate *Dec) {
     auto *LinkageAttr = static_cast<const SPIRVDecorateLinkageAttr *>(Dec);
     setName(LinkageAttr->getLinkageName());
   }
-  SPIRVDBG(spvdbgs() << "[addDecorate] " << *Dec << '\n';)
 }
 
 void SPIRVEntry::addDecorate(Decoration Kind) {
@@ -269,14 +223,10 @@ void SPIRVEntry::eraseDecorate(Decoration Dec) { Decorates.erase(Dec); }
 void SPIRVEntry::takeDecorates(SPIRVEntry *E) {
   assert(E);
   Decorates = std::move(E->Decorates);
-  SPIRVDBG(spvdbgs() << "[takeDecorates] " << Id << '\n';)
 }
 
 void SPIRVEntry::setLine(const std::shared_ptr<const SPIRVLine> &L) {
   Line = L;
-  SPIRVDBG(spvdbgs() << "[setLine] ";
-           if (L) spvdbgs() << *L << '\n';
-           else spvdbgs() << "<nullptr> \n";)
 }
 
 void SPIRVEntry::addMemberDecorate(const SPIRVMemberDecorate *Dec){
@@ -284,7 +234,6 @@ void SPIRVEntry::addMemberDecorate(const SPIRVMemberDecorate *Dec){
   assert(canHaveMemberDecorates());
   MemberDecorates[Dec->getPair()] = Dec;
   Module->addDecorate(Dec);
-  SPIRVDBG(spvdbgs() << "[addMemberDecorate] " << *Dec << '\n';)
 }
 
 void SPIRVEntry::addMemberDecorate(SPIRVWord MemberNumber, Decoration Kind) {
@@ -303,7 +252,6 @@ void SPIRVEntry::eraseMemberDecorate(SPIRVWord MemberNumber, Decoration Dec) {
 void SPIRVEntry::takeMemberDecorates(SPIRVEntry *E) {
   assert(E);
   MemberDecorates = std::move(E->MemberDecorates);
-  SPIRVDBG(spvdbgs() << "[takeMemberDecorates] " << Id << '\n';)
 }
 
 void SPIRVEntry::takeAnnotations(SPIRVForward *E) {
@@ -356,11 +304,6 @@ bool SPIRVEntry::hasLinkageType() const {
   return OpCode == OpFunction || OpCode == OpVariable;
 }
 
-void SPIRVEntry::encodeDecorate(spv_ostream &O) const {
-  for (auto &I : Decorates)
-    O << *I.second;
-}
-
 SPIRVLinkageTypeKind SPIRVEntry::getLinkageType() const {
   assert(hasLinkageType());
   DecorateMapType::const_iterator Loc =
@@ -384,13 +327,6 @@ void SPIRVEntry::updateModuleVersion() const {
   Module->setMinSPIRVVersion(getRequiredSPIRVVersion());
 }
 
-spv_ostream &operator<<(spv_ostream &O, const SPIRVEntry &E) {
-  E.validate();
-  E.encodeAll(O);
-  O << SPIRVNL();
-  return O;
-}
-
 std::istream &operator>>(std::istream &I, SPIRVEntry &E) {
   E.decode(I);
   return I;
@@ -403,10 +339,6 @@ SPIRVEntryPoint::SPIRVEntryPoint(SPIRVModule *TheModule,
                       getSizeInWords(TheName) + 3),
       ExecModel(TheExecModel), Name(TheName) {}
 
-void SPIRVEntryPoint::encode(spv_ostream &O) const {
-  getEncoder(O) << ExecModel << Target << Name;
-}
-
 void SPIRVEntryPoint::decode(std::istream &I) {
   uint32_t Start = I.tellg();
   getDecoder(I) >> ExecModel >> Target >> Name;
@@ -416,10 +348,6 @@ void SPIRVEntryPoint::decode(std::istream &I) {
   getDecoder(I) >> InOuts;
   Module->setName(getOrCreateTarget(), Name);
   Module->addEntryPoint(this);
-}
-
-void SPIRVExecutionMode::encode(spv_ostream &O) const {
-  getEncoder(O) << Target << ExecMode << WordLiterals;
 }
 
 void SPIRVExecutionMode::decode(std::istream &I) {
@@ -467,8 +395,6 @@ SPIRVForward *SPIRVAnnotationGeneric::getOrCreateTarget() const {
 SPIRVName::SPIRVName(const SPIRVEntry *TheTarget, const std::string &TheStr)
     : SPIRVAnnotation(TheTarget, getSizeInWords(TheStr) + 2), Str(TheStr) {}
 
-void SPIRVName::encode(spv_ostream &O) const { getEncoder(O) << Target << Str; }
-
 void SPIRVName::decode(std::istream &I) {
   getDecoder(I) >> Target >> Str;
   Module->setName(getOrCreateTarget(), Str);
@@ -479,11 +405,7 @@ void SPIRVName::validate() const {
 }
 
 _SPIRV_IMP_ENCDEC2(SPIRVString, Id, Str)
-_SPIRV_IMP_ENCDEC3(SPIRVMemberName, Target, MemberNumber, Str)
-
-void SPIRVLine::encode(spv_ostream &O) const {
-  getEncoder(O) << FileName << Line << Column;
-}
+_SPIRV_IMP_DECODE3(SPIRVMemberName, Target, MemberNumber, Str)
 
 void SPIRVLine::decode(std::istream &I) {
   getDecoder(I) >> FileName >> Line >> Column;
@@ -514,10 +436,6 @@ SPIRVExtInstImport::SPIRVExtInstImport(SPIRVModule *TheModule, SPIRVId TheId,
   validate();
 }
 
-void SPIRVExtInstImport::encode(spv_ostream &O) const {
-  getEncoder(O) << Id << Str;
-}
-
 void SPIRVExtInstImport::decode(std::istream &I) {
   getDecoder(I) >> Id >> Str;
   Module->importBuiltinSetWithId(Str, Id);
@@ -526,10 +444,6 @@ void SPIRVExtInstImport::decode(std::istream &I) {
 void SPIRVExtInstImport::validate() const {
   SPIRVEntry::validate();
   assert(!Str.empty() && "Invalid builtin set");
-}
-
-void SPIRVMemoryModel::encode(spv_ostream &O) const {
-  getEncoder(O) << Module->getAddressingModel() << Module->getMemoryModel();
 }
 
 void SPIRVMemoryModel::decode(std::istream &I) {
@@ -548,12 +462,6 @@ void SPIRVMemoryModel::validate() const {
   SPIRVCK(isValid(MM), InvalidMemoryModel, "Actual is " + std::to_string(MM));
 }
 
-void SPIRVSource::encode(spv_ostream &O) const {
-  SPIRVWord Ver = SPIRVWORD_MAX;
-  auto Language = Module->getSourceLanguage(&Ver);
-  getEncoder(O) << Language << Ver;
-}
-
 void SPIRVSource::decode(std::istream &I) {
   SourceLanguage Lang = SourceLanguageUnknown;
   SPIRVWord Ver = SPIRVWORD_MAX;
@@ -569,10 +477,6 @@ SPIRVSourceContinued::SPIRVSourceContinued(SPIRVModule *M,
     const std::string &SS)
   :SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), Str(SS){}
 
-void SPIRVSourceContinued::encode(spv_ostream &O) const {
-  getEncoder(O) << Str;
-}
-
 void SPIRVSourceContinued::decode(std::istream &I) {
   getDecoder(I) >> Str;
 }
@@ -581,8 +485,6 @@ SPIRVSourceExtension::SPIRVSourceExtension(SPIRVModule *M,
                                            const std::string &SS)
     : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), S(SS) {}
 
-void SPIRVSourceExtension::encode(spv_ostream &O) const { getEncoder(O) << S; }
-
 void SPIRVSourceExtension::decode(std::istream &I) {
   getDecoder(I) >> S;
   Module->getSourceExtension().insert(S);
@@ -590,8 +492,6 @@ void SPIRVSourceExtension::decode(std::istream &I) {
 
 SPIRVExtension::SPIRVExtension(SPIRVModule *M, const std::string &SS)
     : SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), S(SS) {}
-
-void SPIRVExtension::encode(spv_ostream &O) const { getEncoder(O) << S; }
 
 void SPIRVExtension::decode(std::istream &I) {
   getDecoder(I) >> S;
@@ -603,8 +503,6 @@ SPIRVCapability::SPIRVCapability(SPIRVModule *M, SPIRVCapabilityKind K)
   updateModuleVersion();
 }
 
-void SPIRVCapability::encode(spv_ostream &O) const { getEncoder(O) << Kind; }
-
 void SPIRVCapability::decode(std::istream &I) {
   getDecoder(I) >> Kind;
   Module->addCapability(Kind);
@@ -613,10 +511,6 @@ void SPIRVCapability::decode(std::istream &I) {
 SPIRVModuleProcessed::SPIRVModuleProcessed(SPIRVModule *M,
     const std::string &SS)
   :SPIRVEntryNoId(M, 1 + getSizeInWords(SS)), Str(SS){}
-
-void SPIRVModuleProcessed::encode(spv_ostream &O) const {
-  getEncoder(O) << Str;
-}
 
 void SPIRVModuleProcessed::decode(std::istream &I) {
   getDecoder(I) >> Str;

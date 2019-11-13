@@ -75,7 +75,7 @@ protected:
     SPIRVValue::validate();
     assert(ParentFunc && "Invalid parent function");
   }
-  _SPIRV_DEF_ENCDEC2(Type, Id)
+  _SPIRV_DEF_DECODE2(Type, Id)
 private:
   SPIRVFunction *ParentFunc;
   unsigned ArgNo;
@@ -127,9 +127,7 @@ public:
     return BB;
   }
 
-  void encodeChildren(spv_ostream &) const override;
-  void encodeExecutionModes(spv_ostream &) const;
-  _SPIRV_DCL_ENCDEC
+  _SPIRV_DCL_DECODE
   void validate() const override {
     SPIRVValue::validate();
     assert(FuncType && "Invalid func type");

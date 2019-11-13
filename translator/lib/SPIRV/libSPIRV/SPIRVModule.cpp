@@ -465,24 +465,17 @@ void SPIRVModuleImpl::addLine(SPIRVEntry *E, SPIRVId FileNameId, SPIRVWord Line,
 // Creates decoration group and group decorates from decorates shared by
 // multiple targets.
 void SPIRVModuleImpl::optimizeDecorates() {
-  SPIRVDBG(spvdbgs() << "[optimizeDecorates] begin\n");
   for (auto I = DecorateSet.begin(), E = DecorateSet.end(); I != E;) {
     auto D = *I;
-    SPIRVDBG(spvdbgs() << "  check " << *D << '\n');
     if (D->getOpCode() == OpMemberDecorate) {
       ++I;
       continue;
     }
     auto ER = DecorateSet.equal_range(D);
-    SPIRVDBG(spvdbgs() << "  equal range " << **ER.first << " to ";
-             if (ER.second != DecorateSet.end()) spvdbgs() << **ER.second;
-             else spvdbgs() << "end"; spvdbgs() << '\n');
     if (std::distance(ER.first, ER.second) < 2) {
       I = ER.second;
-      SPIRVDBG(spvdbgs() << "  skip equal range \n");
       continue;
     }
-    SPIRVDBG(spvdbgs() << "  add deco group. erase equal range\n");
     auto G = add(new SPIRVDecorationGroup(this, getId()));
     std::vector<SPIRVId> Targets;
     Targets.push_back(D->getTargetId());
@@ -525,7 +518,6 @@ SPIRVValue *SPIRVModuleImpl::addPipeStorageConstant(SPIRVType *TheType,
 
 void SPIRVModuleImpl::addCapability(SPIRVCapabilityKind Cap) {
   addCapabilities(SPIRV::getCapability(Cap));
-  SPIRVDBG(spvdbgs() << "addCapability: " << Cap << '\n');
   if (hasCapability(Cap))
     return;
 
@@ -1297,8 +1289,6 @@ SPIRVModuleImpl::addDecorationGroup(SPIRVDecorationGroup *Group) {
   add(Group);
   Group->takeDecorates(DecorateSet);
   DecGroupVec.push_back(Group);
-  SPIRVDBG(spvdbgs() << "[addDecorationGroup] {" << *Group << "}\n";
-           spvdbgs() << "  Remaining DecorateSet: {" << DecorateSet << "}\n");
   return Group;
 }
 
