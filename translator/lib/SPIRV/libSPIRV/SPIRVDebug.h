@@ -51,14 +51,6 @@ namespace SPIRV {
 #define _SPIRVDBG
 #ifdef _SPIRVDBG
 
-#define SPIRVDBG(x)                                                            \
-  if (SPIRVDbgEnable) {                                                        \
-    x;                                                                         \
-  }
-
-// Enable debug output.
-extern bool SPIRVDbgEnable;
-
 // Include source file and line number in error message.
 extern bool SPIRVDbgErrorMsgIncludesSourceInfo;
 

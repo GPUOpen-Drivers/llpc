@@ -78,10 +78,6 @@ static void readQuotedString(std::istream &IS, std::string &Str) {
   }
 }
 
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-bool SPIRVUseTextFormat = false;
-#endif
-
 SPIRVDecoder::SPIRVDecoder(std::istream &InputStream, SPIRVFunction &F)
     : IS(InputStream), M(*F.getModule()), WordCount(0), OpCode(OpNop),
       Scope(&F) {}
@@ -97,35 +93,13 @@ void SPIRVDecoder::setScope(SPIRVEntry *TheScope) {
 }
 
 template <class T> const SPIRVDecoder &decode(const SPIRVDecoder &I, T &V) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    std::string W;
-    I.IS >> W;
-    V = getNameMap(V).rmap(W);
-    SPIRVDBG(spvdbgs() << "Read word: W = " << W << " V = " << V << '\n');
-    return I;
-  }
-#endif
   return decodeBinary(I, V);
-}
-
-template <class T> const SPIRVEncoder &encode(const SPIRVEncoder &O, T V) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    O.OS << getNameMap(V).map(V) << " ";
-    return O;
-  }
-#endif
-  return O << static_cast<SPIRVWord>(V);
 }
 
 #define SPIRV_DEF_ENCDEC(Type)                                                 \
   const SPIRVDecoder &operator>>(const SPIRVDecoder &I, Type &V) {             \
     return decode(I, V);                                                       \
   }                                                                            \
-  const SPIRVEncoder &operator<<(const SPIRVEncoder &O, Type V) {              \
-    return encode(O, V);                                                       \
-  }
 
 SPIRV_DEF_ENCDEC(Op)
 SPIRV_DEF_ENCDEC(Capability)
@@ -137,14 +111,6 @@ SPIRV_DEF_ENCDEC(LinkageType)
 // Read a string with padded 0's at the end so that they form a stream of
 // words.
 const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::string &Str) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    readQuotedString(I.IS, Str);
-    SPIRVDBG(spvdbgs() << "Read string: \"" << Str << "\"\n");
-    return I;
-  }
-#endif
-
   uint64_t Count = 0;
   char Ch;
   while (I.IS.get(Ch) && Ch != '\0') {
@@ -157,66 +123,25 @@ const SPIRVDecoder &operator>>(const SPIRVDecoder &I, std::string &Str) {
     I.IS >> Ch;
     assert(Ch == '\0' && "Invalid string in SPIRV");
   }
-  SPIRVDBG(spvdbgs() << "Read string: \"" << Str << "\"\n");
   return I;
-}
-
-// Write a string with padded 0's at the end so that they form a stream of
-// words.
-const SPIRVEncoder &operator<<(const SPIRVEncoder &O, const std::string &Str) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    writeQuotedString(O.OS, Str);
-    return O;
-  }
-#endif
-
-  size_t L = Str.length();
-  O.OS.write(Str.c_str(), L);
-  char Zeros[4] = {0, 0, 0, 0};
-  O.OS.write(Zeros, 4 - L % 4);
-  return O;
 }
 
 bool SPIRVDecoder::getWordCountAndOpCode() {
   if (IS.eof()) {
     WordCount = 0;
     OpCode = OpNop;
-    SPIRVDBG(spvdbgs() << "[SPIRVDecoder] getWordCountAndOpCode EOF "
-                       << WordCount << " " << OpCode << '\n');
     return false;
   }
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat) {
-    *this >> WordCount;
-    assert(!IS.bad() && "SPIRV stream is bad");
-    if (IS.fail()) {
-      WordCount = 0;
-      OpCode = OpNop;
-      SPIRVDBG(spvdbgs() << "[SPIRVDecoder] getWordCountAndOpCode FAIL "
-                         << WordCount << " " << OpCode << '\n');
-      return false;
-    }
-    *this >> OpCode;
-  } else {
-#endif
-    SPIRVWord WordCountAndOpCode;
-    *this >> WordCountAndOpCode;
-    WordCount = WordCountAndOpCode >> 16;
-    OpCode = static_cast<Op>(WordCountAndOpCode & 0xFFFF);
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  }
-#endif
+  SPIRVWord WordCountAndOpCode;
+  *this >> WordCountAndOpCode;
+  WordCount = WordCountAndOpCode >> 16;
+  OpCode = static_cast<Op>(WordCountAndOpCode & 0xFFFF);
   assert(!IS.bad() && "SPIRV stream is bad");
   if (IS.fail()) {
     WordCount = 0;
     OpCode = OpNop;
-    SPIRVDBG(spvdbgs() << "[SPIRVDecoder] getWordCountAndOpCode FAIL "
-                       << WordCount << " " << OpCode << '\n');
     return false;
   }
-  SPIRVDBG(spvdbgs() << "[SPIRVDecoder] getWordCountAndOpCode " << WordCount
-                     << " " << OpCodeNameMap::map(OpCode) << '\n');
   return true;
 }
 
@@ -243,14 +168,6 @@ void SPIRVDecoder::validate() const {
   assert(OpCode != OpNop && "Invalid op code");
   assert(WordCount && "Invalid word count");
   assert(!IS.bad() && "Bad iInput stream");
-}
-
-spv_ostream &operator<<(spv_ostream &O, const SPIRVNL &E) {
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-  if (SPIRVUseTextFormat)
-    O << '\n';
-#endif
-  return O;
 }
 
 } // namespace SPIRV

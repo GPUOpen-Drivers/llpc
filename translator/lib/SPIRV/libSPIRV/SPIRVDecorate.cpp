@@ -43,12 +43,6 @@
 #include "SPIRVValue.h"
 
 namespace SPIRV {
-template <class T, class B>
-spv_ostream &operator<<(spv_ostream &O, const std::multiset<T *, B> &V) {
-  for (auto &I : V)
-    O << *I;
-  return O;
-}
 
 SPIRVDecorateGeneric::SPIRVDecorateGeneric(Op OC, SPIRVWord WC,
                                            Decoration TheDec,
@@ -84,15 +78,6 @@ SPIRVWord SPIRVDecorateGeneric::getLiteral(size_t I) const {
 
 size_t SPIRVDecorateGeneric::getLiteralCount() const { return Literals.size(); }
 
-void SPIRVDecorate::encode(spv_ostream &O) const {
-  SPIRVEncoder Encoder = getEncoder(O);
-  Encoder << Target << Dec;
-  if (Dec == DecorationLinkageAttributes)
-    SPIRVDecorateLinkageAttr::encodeLiterals(Encoder, Literals);
-  else
-    Encoder << Literals;
-}
-
 void SPIRVDecorate::setWordCount(SPIRVWord Count) {
   WordCount = Count;
   Literals.resize(WordCount - FixedWC);
@@ -108,10 +93,6 @@ void SPIRVDecorate::decode(std::istream &I) {
   getOrCreateTarget()->addDecorate(this);
 }
 
-void SPIRVMemberDecorate::encode(spv_ostream &O) const {
-  getEncoder(O) << Target << MemberNumber << Dec << Literals;
-}
-
 void SPIRVMemberDecorate::setWordCount(SPIRVWord Count) {
   WordCount = Count;
   Literals.resize(WordCount - FixedWC);
@@ -122,20 +103,9 @@ void SPIRVMemberDecorate::decode(std::istream &I) {
   getOrCreateTarget()->addMemberDecorate(this);
 }
 
-void SPIRVDecorationGroup::encode(spv_ostream &O) const { getEncoder(O) << Id; }
-
 void SPIRVDecorationGroup::decode(std::istream &I) {
   getDecoder(I) >> Id;
   Module->addDecorationGroup(this);
-}
-
-void SPIRVDecorationGroup::encodeAll(spv_ostream &O) const {
-  O << Decorations;
-  SPIRVEntry::encodeAll(O);
-}
-
-void SPIRVGroupDecorate::encode(spv_ostream &O) const {
-  getEncoder(O) << DecorationGroup << Targets;
 }
 
 void SPIRVGroupDecorate::decode(std::istream &I) {
@@ -151,16 +121,6 @@ void SPIRVGroupDecorate::decorateTargets() {
       Target->addDecorate(static_cast<const SPIRVDecorate *const>(Dec));
     }
   }
-}
-
-void SPIRVGroupMemberDecorate::encode(spv_ostream &O) const {
-  std::vector<SPIRVWord> Pairs;
-  assert(Targets.size() == MemberNumbers.size());
-  for (uint32_t J = 0, E = Targets.size(); J < E; ++J) {
-    Pairs.push_back(Targets[J]);
-    Pairs.push_back(MemberNumbers[J]);
-  }
-  getEncoder(O) << DecorationGroup << Pairs;
 }
 
 void SPIRVGroupMemberDecorate::decode(std::istream &I) {

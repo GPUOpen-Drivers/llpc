@@ -68,19 +68,6 @@
 
 namespace SPIRV {
 
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-cl::opt<bool, true>
-    UseTextFormat("spirv-text",
-                  cl::desc("Use text format for SPIR-V for debugging purpose"),
-                  cl::location(SPIRVUseTextFormat));
-#endif
-
-#ifdef _SPIRVDBG
-cl::opt<bool, true> EnableDbgOutput("spirv-debug",
-                                    cl::desc("Enable SPIR-V debug output"),
-                                    cl::location(SPIRVDbgEnable));
-#endif
-
 void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr) {
   Call->addAttribute(AttributeList::FunctionIndex, Attr);
 }
@@ -104,7 +91,6 @@ void saveLLVMModule(Module *M, const std::string &OutputFile) {
   std::error_code EC;
   ToolOutputFile Out(OutputFile.c_str(), EC, sys::fs::F_None);
   if (EC) {
-    SPIRVDBG(errs() << "Fails to open output file: " << EC.message();)
     return;
   }
 

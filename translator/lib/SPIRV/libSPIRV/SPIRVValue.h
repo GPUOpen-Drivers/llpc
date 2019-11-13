@@ -170,11 +170,6 @@ protected:
     SPIRVValue::validate();
     assert(NumWords >= 1 && NumWords <= 2 && "Invalid constant size");
   }
-  void encode(spv_ostream &O) const override {
-    getEncoder(O) << Type << Id;
-    for (unsigned I = 0; I < NumWords; ++I)
-      getEncoder(O) << Union.Words[I];
-  }
   void setWordCount(SPIRVWord WordCount) override {
     SPIRVValue::setWordCount(WordCount);
     NumWords = WordCount - 3;
@@ -207,7 +202,7 @@ public:
 
 protected:
   void validate() const override { SPIRVValue::validate(); }
-  _SPIRV_DEF_ENCDEC2(Type, Id)
+  _SPIRV_DEF_DECODE2(Type, Id)
 };
 
 template <Op OC> class SPIRVConstantBool : public SPIRVConstantEmpty<OC> {
@@ -296,7 +291,7 @@ protected:
     SPIRVEntry::setWordCount(WordCount);
     Elements.resize(WordCount - 3);
   }
-  _SPIRV_DEF_ENCDEC3(Type, Id, Elements)
+  _SPIRV_DEF_DECODE3(Type, Id, Elements)
 
   std::vector<SPIRVId> Elements;
 };
@@ -337,7 +332,7 @@ protected:
     assert(WordCount == WC);
     assert(Type->isTypeSampler());
   }
-  _SPIRV_DEF_ENCDEC5(Type, Id, AddrMode, Normalized, FilterMode)
+  _SPIRV_DEF_DECODE5(Type, Id, AddrMode, Normalized, FilterMode)
 };
 
 class SPIRVConstantPipeStorage : public SPIRVValue {
@@ -375,7 +370,7 @@ protected:
     assert(WordCount == WC);
     assert(Type->isTypePipeStorage());
   }
-  _SPIRV_DEF_ENCDEC5(Type, Id, PacketSize, PacketAlign, Capacity)
+  _SPIRV_DEF_DECODE5(Type, Id, PacketSize, PacketAlign, Capacity)
 };
 
 class SPIRVSpecConstantTrue : public SPIRVConstantBool<OpSpecConstantTrue> {
@@ -412,7 +407,7 @@ public:
       setType(TheTy);
   }
   SPIRVForward() : SPIRVValue(OC) { assert(0 && "should never be called"); }
-  _SPIRV_DEF_ENCDEC1(Id)
+  _SPIRV_DEF_DECODE1(Id)
   friend class SPIRVFunction;
 
 protected:
