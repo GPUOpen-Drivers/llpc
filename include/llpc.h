@@ -239,16 +239,76 @@ struct ShaderModuleBuildInfo
 #endif
 };
 
-/// Represents the header part of LLPC shader module data
-struct ShaderModuleDataHeader
+/// Represents the base data type
+enum class BasicType : uint32_t
 {
-    uint32_t hash[4];       // Shader hash code
+    Unknown = 0,          ///< Unknown
+    Float,                ///< Float
+    Double,               ///< Double
+    Int,                  ///< Signed integer
+    Uint,                 ///< Unsigned integer
+    Int64,                ///< 64-bit signed integer
+    Uint64,               ///< 64-bit unsigned integer
+    Float16,              ///< 16-bit floating-point
+    Int16,                ///< 16-bit signed integer
+    Uint16,               ///< 16-bit unsigned integer
+    Int8,                 ///< 8-bit signed integer
+    Uint8,                ///< 8-bit unsigned integer
+};
+
+/// Enumerates types of shader binary.
+enum class BinaryType : uint32_t
+{
+    Unknown = 0,  ///< Invalid type
+    Spirv,        ///< SPIR-V binary
+    LlvmBc,       ///< LLVM bitcode
+    MultiLlvmBc,  ///< Multiple LLVM bitcode
+    Elf,          ///< ELF
+};
+
+/// Represents the information of one shader entry in ShaderModuleExtraData
+struct ShaderModuleEntryData
+{
+    ShaderStage stage;              ///< Shader stage
+    void*       pShaderEntry;       ///< Private shader module entry info
+};
+
+/// Represents usage info of a shader module
+struct ShaderModuleUsage
+{
+    bool                  enableVarPtrStorageBuf;  ///< Whether to enable "VariablePointerStorageBuffer" capability
+    bool                  enableVarPtr;            ///< Whether to enable "VariablePointer" capability
+    bool                  useSubgroupSize;         ///< Whether gl_SubgroupSize is used
+    bool                  useHelpInvocation;       ///< Whether fragment shader has helper-invocation for subgroup
+    bool                  useSpecConstant;         ///< Whether specializaton constant is used
+    bool                  keepUnusedFunctions;     ///< Whether to keep unused function
+};
+
+/// Represents common part of shader module data
+struct ShaderModuleData
+{
+    uint32_t         hash[4];       ///< Shader hash code
+    BinaryType       binType;       ///< Shader binary type
+    BinaryData       binCode;       ///< Shader binary data
+    uint32_t         cacheHash[4];  ///< Hash code for calculate pipeline cache key
+    ShaderModuleUsage usage;        ///< Usage info of a shader module
+};
+
+/// Represents extended output of building a shader module (taking extra data info)
+struct ShaderModuleDataEx
+{
+    ShaderModuleData        common;        ///< Shader module common data
+    struct
+    {
+        uint32_t              entryCount;              ///< Shader entry count in the module
+        ShaderModuleEntryData entryDatas[1];           ///< Array of all shader entries in this module
+    } extra;                              ///< Represents extra part of shader module data
 };
 
 /// Represents output of building a shader module.
 struct ShaderModuleBuildOut
 {
-    void*                pModuleData;       ///< Output shader module data (opaque)
+    ShaderModuleData*   pModuleData;       ///< Output shader module data (opaque)
 };
 
 /// Represents the options for pipeline dump.

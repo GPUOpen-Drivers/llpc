@@ -46,8 +46,9 @@ namespace Llpc
 // Collect information from SPIR-V binary
 Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
     const BinaryData*                pSpvBinCode,           // [in] SPIR-V binary data
-    ShaderModuleInfo*                pShaderModuleInfo,     // [out] Shader module information
-    std::vector<ShaderEntryName>&    shaderEntryNames)      // [out] Entry names for this shader module
+    ShaderModuleUsage*               pShaderModuleUsage,    // [out] Shader module usage info
+    std::vector<ShaderEntryName>&    shaderEntryNames,      // [out] Entry names for this shader module
+    uint32_t*                        pDebugInfoSize)        // Debug info size
 {
     Result result = Result::Success;
 
@@ -84,9 +85,9 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpExtension:
             {
                 if ((strncmp(reinterpret_cast<const char*>(&pCodePos[1]), "SPV_AMD_shader_ballot",
-                    strlen("SPV_AMD_shader_ballot")) == 0) && (pShaderModuleInfo->useSubgroupSize == false))
+                    strlen("SPV_AMD_shader_ballot")) == 0) && (pShaderModuleUsage->useSubgroupSize == false))
                 {
-                    pShaderModuleInfo->useSubgroupSize = true;
+                    pShaderModuleUsage->useSubgroupSize = true;
                 }
                 break;
             }
@@ -104,7 +105,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpImageSparseSampleProjDrefImplicitLod:
         case OpImageSparseSampleProjImplicitLod:
             {
-                pShaderModuleInfo->useHelpInvocation = true;
+                pShaderModuleUsage->useHelpInvocation = true;
                 break;
             }
         case OpString:
@@ -118,7 +119,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpNoLine:
         case OpModuleProcessed:
             {
-                pShaderModuleInfo->debugInfoSize += wordCount * sizeof(uint32_t);
+                *pDebugInfoSize += wordCount * sizeof(uint32_t);
                 break;
             }
         case OpSpecConstantTrue:
@@ -127,7 +128,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         case OpSpecConstantComposite:
         case OpSpecConstantOp:
             {
-                pShaderModuleInfo->useSpecConstant = true;
+                pShaderModuleUsage->useSpecConstant = true;
                 break;
             }
         case OpEntryPoint:
@@ -149,15 +150,15 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
 
     if (capabilities.find(CapabilityVariablePointersStorageBuffer) != capabilities.end())
     {
-        pShaderModuleInfo->enableVarPtrStorageBuf = true;
+        pShaderModuleUsage->enableVarPtrStorageBuf = true;
     }
 
     if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
     {
-        pShaderModuleInfo->enableVarPtr = true;
+        pShaderModuleUsage->enableVarPtr = true;
     }
 
-    if ((pShaderModuleInfo->useSubgroupSize == false) &&
+    if ((pShaderModuleUsage->useSubgroupSize == false) &&
         ((capabilities.find(CapabilityGroupNonUniform) != capabilities.end()) ||
         (capabilities.find(CapabilityGroupNonUniformVote) != capabilities.end()) ||
         (capabilities.find(CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
@@ -170,7 +171,7 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
         (capabilities.find(CapabilitySubgroupVoteKHR) != capabilities.end()) ||
         (capabilities.find(CapabilityGroups) != capabilities.end())))
     {
-        pShaderModuleInfo->useSubgroupSize = true;
+        pShaderModuleUsage->useSubgroupSize = true;
     }
 
     return result;
