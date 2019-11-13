@@ -565,7 +565,6 @@ private:
   Llpc::Builder *getBuilder() const { return m_pBuilder; }
 
   Type *mapType(SPIRVType *BT, Type *T) {
-    SPIRVDBG(dbgs() << *T << '\n';)
     TypeMap[BT] = T;
     return T;
   }
@@ -667,8 +666,6 @@ private:
   MDString *transOCLKernelArgTypeName(SPIRVFunctionParameter *);
 
   Value *mapFunction(SPIRVFunction *BF, Function *F) {
-    SPIRVDBG(spvdbgs() << "[mapFunction] " << *BF << " -> ";
-             dbgs() << *F << '\n';)
     FuncMap[BF] = F;
     return F;
   }
@@ -834,8 +831,6 @@ bool SPIRVToLLVM::transOCLBuiltinFromVariable(GlobalVariable *GV,
     auto Call = CallInst::Create(Func, Arg, "", I);
     Call->takeName(I);
     setAttrByCalledFunc(Call);
-    SPIRVDBG(dbgs() << "[transOCLBuiltinFromVariable] " << *I << " -> " << *Call
-                    << '\n';)
     I->replaceAllUsesWith(Call);
   }
   for (auto &I : Deletes) {
@@ -1382,7 +1377,6 @@ Type *SPIRVToLLVM::transType(
       return Loc->second;
   }
 
-  SPIRVDBG(spvdbgs() << "[transType] " << *T << " -> ";)
   T->validate();
   switch (T->getOpCode()) {
   case OpTypeVoid:
@@ -1653,12 +1647,10 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *BV, Function *F, BasicBlock *BB,
   if (Loc != ValueMap.end() && (!PlaceholderMap.count(BV) || CreatePlaceHolder))
     return Loc->second;
 
-  SPIRVDBG(spvdbgs() << "[transValue] " << *BV << " -> ";)
   BV->validate();
 
   auto V = transValueWithoutDecoration(BV, F, BB, CreatePlaceHolder);
   if (!V) {
-    SPIRVDBG(dbgs() << " Warning ! nullptr\n";)
     return nullptr;
   }
   setName(V, BV);
@@ -1666,8 +1658,6 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *BV, Function *F, BasicBlock *BB,
     assert(0 && "trans decoration fail");
     return nullptr;
   }
-
-  SPIRVDBG(dbgs() << *V << '\n';)
 
   return V;
 }
@@ -1715,10 +1705,6 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *BV, Function *F,
     return Src;
   else {
     assert(CastInst::isCast(CO) && "Invalid cast op code");
-    SPIRVDBG(if (!CastInst::castIsValid(CO, Src, Dst)) {
-      spvdbgs() << "Invalid cast: " << *BV << " -> ";
-      dbgs() << "Op = " << CO << ", Src = " << *Src << " Dst = " << *Dst << '\n';
-    })
     if (BB)
       return CastInst::Create(CO, Src, Dst, BV->getName(), BB);
     return ConstantExpr::getCast(CO, dyn_cast<Constant>(Src), Dst);
@@ -6481,7 +6467,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         BV, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(BV), BB));
   }
 
-    SPIRVDBG(spvdbgs() << "Cannot translate " << *BV << '\n';)
     llvm_unreachable("Translation of SPIRV instruction not implemented");
     return NULL;
   }
@@ -6988,17 +6973,7 @@ Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
   // names. However it is better to have a way to differentiate
   // between intermidiate functions and final functions and make
   // sure final functions have unique names.
-  SPIRVDBG(
-  if (!HasFuncPtrArg && Func && Func->getFunctionType() != FT) {
-    dbgs() << "Warning: Function name conflict:\n"
-       << *Func << '\n'
-       << " => " << *FT << '\n';
-  }
-  )
   if (!Func || Func->getFunctionType() != FT) {
-    SPIRVDBG(for (auto& I:ArgTys) {
-      dbgs() << *I << '\n';
-    });
     Func = Function::Create(FT, GlobalValue::ExternalLinkage, MangledName, M);
     Func->setCallingConv(CallingConv::SPIR_FUNC);
     if (isFuncNoUnwind())
@@ -7007,8 +6982,6 @@ Instruction * SPIRVToLLVM::transBuiltinFromInst(const std::string& FuncName,
   auto Call = CallInst::Create(Func, Args, "", BB);
   setName(Call, BI);
   setAttrByCalledFunc(Call);
-  SPIRVDBG(spvdbgs() << "[transInstToBuiltinCall] " << *BI << " -> "; dbgs() <<
-      *Call << '\n';)
   Instruction *Inst = Call;
   Inst = transOCLBuiltinPostproc(BI, Call, BB, FuncName);
   return Inst;
@@ -9506,8 +9479,6 @@ Instruction *SPIRVToLLVM::transOCLBuiltinFromExtInst(SPIRVExtInst *BC,
     UnmangledName = OCLExtOpMap::map(static_cast<OCLExtOpKind>(EntryPoint));
   }
 
-  SPIRVDBG(spvdbgs() << "[transOCLBuiltinFromExtInst] OrigUnmangledName: "
-                     << UnmangledName << '\n');
   transOCLVectorLoadStore(UnmangledName, BArgs);
 
   std::vector<Type *> ArgTypes = transTypeVector(BC->getValueTypes(BArgs));
@@ -9523,9 +9494,6 @@ Instruction *SPIRVToLLVM::transOCLBuiltinFromExtInst(SPIRVExtInst *BC,
   } else {
     mangleOpenClBuiltin(UnmangledName, ArgTypes, MangledName);
   }
-  SPIRVDBG(spvdbgs() << "[transOCLBuiltinFromExtInst] ModifiedUnmangledName: "
-                     << UnmangledName << " MangledName: " << MangledName
-                     << '\n');
 
   FunctionType *FT =
       FunctionType::get(transType(BC->getType()), ArgTypes, IsVarArg);
@@ -9537,12 +9505,6 @@ Instruction *SPIRVToLLVM::transOCLBuiltinFromExtInst(SPIRVExtInst *BC,
       F->addFnAttr(Attribute::NoUnwind);
   }
   auto Args = transValue(BC->getValues(BArgs), F, BB);
-  SPIRVDBG(dbgs() << "[transOCLBuiltinFromExtInst] Function: " << *F
-                  << ", Args: ";
-           for (auto &I
-                : Args) dbgs()
-           << *I << ", ";
-           dbgs() << '\n');
   CallInst *Call = CallInst::Create(F, Args, BC->getName(), BB);
   setCallingConv(Call);
   addFnAttr(Context, Call, Attribute::NoUnwind);
@@ -10233,9 +10195,6 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *BC,
       Func->addFnAttr(Attribute::NoUnwind);
   }
   auto Args = transValue(BC->getValues(BArgs), Func, BB);
-  SPIRVDBG(dbgs() << "[transGLSLBuiltinFromExtInst] Function: " << *Func <<
-    ", Args: ";
-  for (auto &iter : Args) dbgs() << *iter << ", "; dbgs() << '\n');
   CallInst *Call = CallInst::Create(Func,
                                     Args,
                                     BC->getName(),
@@ -10422,9 +10381,6 @@ Instruction *SPIRVToLLVM::transOCLBarrierFence(SPIRVInstruction *MB,
 
   if (CallInst *Call = dyn_cast<CallInst>(Barrier))
     setAttrByCalledFunc(Call);
-
-  SPIRVDBG(spvdbgs() << "[transBarrier] " << *MB << " -> ";
-           dbgs() << *Barrier << '\n';)
 
   return Barrier;
 }

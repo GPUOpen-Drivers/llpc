@@ -130,17 +130,13 @@ void SPIRVLowerConstExpr::visit(Module *M) {
         auto Op = II->getOperand(OI);
 
         if (auto CE = dyn_cast<ConstantExpr>(Op)) {
-          SPIRVDBG(dbgs() << "[lowerConstantExpressions] " << *CE;)
           auto ReplInst = CE->getAsInstruction();
           auto InsPoint = II->getParent() == &*FBegin ? II : &FBegin->back();
           ReplInst->insertBefore(InsPoint);
-          SPIRVDBG(dbgs() << " -> " << *ReplInst << '\n';)
           WorkList.push_front(ReplInst);
           std::vector<Instruction *> Users;
           // Do not replace use during iteration of use. Do it in another loop
           for (auto U : CE->users()) {
-            SPIRVDBG(dbgs()
-                         << "[lowerConstantExpressions] Use: " << *U << '\n';)
             if (auto InstUser = dyn_cast<Instruction>(U)) {
               // Only replace users in scope of current function
               if (InstUser->getParent()->getParent() == &I)

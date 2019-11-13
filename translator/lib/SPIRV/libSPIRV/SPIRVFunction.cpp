@@ -70,30 +70,10 @@ SPIRVDecoder SPIRVFunction::getDecoder(std::istream &IS) {
   return SPIRVDecoder(IS, *this);
 }
 
-void SPIRVFunction::encode(spv_ostream &O) const {
-  getEncoder(O) << Type << Id << FCtrlMask << FuncType;
-}
-
-void SPIRVFunction::encodeChildren(spv_ostream &O) const {
-  O << SPIRVNL();
-  for (auto &I : Parameters)
-    O << *I;
-  O << SPIRVNL();
-  for (auto &I : BBVec)
-    O << *I;
-  O << SPIRVFunctionEnd();
-}
-
-void SPIRVFunction::encodeExecutionModes(spv_ostream &O) const {
-  for (auto &I : ExecModes)
-    O << *I.second;
-}
-
 void SPIRVFunction::decode(std::istream &I) {
   SPIRVDecoder Decoder = getDecoder(I);
   Decoder >> Type >> Id >> FCtrlMask >> FuncType;
   Module->addFunction(this);
-  SPIRVDBG(spvdbgs() << "Decode function: " << Id << '\n');
 
   Decoder.getWordCountAndOpCode();
   while (!I.eof()) {
@@ -132,7 +112,6 @@ void SPIRVFunction::decodeBB(SPIRVDecoder &Decoder) {
   SPIRVBasicBlock *BB = static_cast<SPIRVBasicBlock *>(Decoder.getEntry());
   assert(BB);
   addBasicBlock(BB);
-  SPIRVDBG(spvdbgs() << "Decode BB: " << BB->getId() << '\n');
 
   Decoder.setScope(BB);
   while (Decoder.getWordCountAndOpCode()) {

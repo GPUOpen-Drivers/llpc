@@ -306,7 +306,7 @@ SPIRVConstant *SPIRVTypeArray::getLength() const {
   return get<SPIRVConstant>(Length);
 }
 
-_SPIRV_IMP_ENCDEC3(SPIRVTypeArray, Id, ElemType, Length)
+_SPIRV_IMP_DECODE3(SPIRVTypeArray, Id, ElemType, Length)
 
 SPIRVTypeRuntimeArray::SPIRVTypeRuntimeArray(SPIRVModule *M, SPIRVId TheId,
   SPIRVType *TheElemType)
@@ -321,10 +321,6 @@ SPIRVTypeRuntimeArray::validate()const {
 }
 
 _SPIRV_IMP_ENCDEC2(SPIRVTypeRuntimeArray, Id, ElemType)
-
-void SPIRVTypeForwardPointer::encode(spv_ostream &O) const {
-  getEncoder(O) << Pointer << SC;
-}
 
 void SPIRVTypeForwardPointer::decode(std::istream &I) {
   auto Decoder = getDecoder(I);

@@ -67,13 +67,7 @@ SPIRVInstruction *SPIRVBasicBlock::addInstruction(SPIRVInstruction *I) {
   return I;
 }
 
-void SPIRVBasicBlock::encodeChildren(spv_ostream &O) const {
-  O << SPIRVNL();
-  for (size_t I = 0, E = InstVec.size(); I != E; ++I)
-    O << *InstVec[I];
-}
-
-_SPIRV_IMP_ENCDEC1(SPIRVBasicBlock, Id)
+_SPIRV_IMP_DECODE1(SPIRVBasicBlock, Id)
 
 void SPIRVBasicBlock::setScope(SPIRVEntry *Scope) {
   assert(Scope && Scope->getOpCode() == OpFunction && "Invalid scope");

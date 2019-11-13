@@ -49,7 +49,6 @@ void SPIRVValue::setAlignment(SPIRVWord A) {
     return;
   }
   addDecorate(new SPIRVDecorate(DecorationAlignment, this, A));
-  SPIRVDBG(spvdbgs() << "Set alignment " << A << " for obj " << Id << "\n")
 }
 
 bool SPIRVValue::hasAlignment(SPIRVWord *Result) const {
@@ -64,8 +63,6 @@ void SPIRVValue::setVolatile(bool IsVolatile) {
     return;
   }
   addDecorate(new SPIRVDecorate(DecorationVolatile, this));
-  SPIRVDBG(spvdbgs() << "Set volatile "
-                     << " for obj " << Id << "\n")
 }
 
 bool SPIRVValue::isCoherent() { return hasDecorate(DecorationCoherent); }
@@ -76,8 +73,6 @@ void SPIRVValue::setCoherent(bool IsCoherent) {
     return;
   }
   addDecorate(new SPIRVDecorate(DecorationCoherent, this));
-  SPIRVDBG(spvdbgs() << "Set coherent "
-                     << " for obj " << Id << "\n")
 }
 
 } // namespace SPIRV
