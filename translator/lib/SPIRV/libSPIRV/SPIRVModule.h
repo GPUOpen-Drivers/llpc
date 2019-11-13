@@ -370,8 +370,7 @@ public:
                                                        SPIRVValue *,
                                                        SPIRVValue *,
                                                        SPIRVBasicBlock *) = 0;
-  // I/O functions
-  friend spv_ostream &operator<<(spv_ostream &O, SPIRVModule &M);
+  // Input functions
   friend std::istream &operator>>(std::istream &I, SPIRVModule &M);
 
 protected:
@@ -391,21 +390,6 @@ private:
   const std::string ModuleFileStr;
   SPIRVModule *M;
 };
-
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-
-/// Convert SPIR-V between binary and internel text formats.
-/// This function is not thread safe and should not be used in multi-thread
-/// applications unless guarded by a critical section.
-bool ConvertSPIRV(std::istream &IS, spv_ostream &OS, std::string &ErrMsg,
-                  bool FromText, bool ToText);
-
-/// Convert SPIR-V between binary and internel text formats.
-/// This function is not thread safe and should not be used in multi-thread
-/// applications unless guarded by a critical section.
-bool ConvertSPIRV(std::string &Input, std::string &Out, std::string &ErrMsg,
-                  bool ToText);
-#endif
 } // namespace SPIRV
 
 #endif // SPIRV_LIBSPIRV_SPIRVMODULE_H

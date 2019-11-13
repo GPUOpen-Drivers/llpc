@@ -363,8 +363,7 @@ public:
                                                SPIRVValue *,
                                                SPIRVBasicBlock *) override;
 
-  // I/O functions
-  friend spv_ostream &operator<<(spv_ostream &O, SPIRVModule &M);
+  // Input functions
   friend std::istream &operator>>(std::istream &I, SPIRVModule &M);
 
 private:
@@ -1274,158 +1273,10 @@ SPIRVInstruction *SPIRVModuleImpl::addVariable(
   return Variable;
 }
 
-template <class T>
-spv_ostream &operator<<(spv_ostream &O, const std::vector<T *> &V) {
-  for (auto &I : V)
-    O << *I;
-  return O;
-}
-
 template <class T, class B>
 spv_ostream &operator<<(spv_ostream &O, const std::multiset<T *, B> &V) {
   for (auto &I : V)
     O << *I;
-  return O;
-}
-
-// To satisfy SPIR-V spec requirement:
-// "All operands must be declared before being used",
-// we do DFS based topological sort
-// https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
-class TopologicalSort {
-  enum DFSState : char { Unvisited, Discovered, Visited };
-  typedef std::vector<SPIRVType *> SPIRVTypeVec;
-  typedef std::vector<SPIRVValue *> SPIRVConstantVector;
-  typedef std::vector<SPIRVVariable *> SPIRVVariableVec;
-  typedef std::vector<SPIRVEntry *> SPIRVConstAndVarVec;
-  typedef std::vector<SPIRVTypeForwardPointer *> SPIRVForwardPointerVec;
-  typedef std::function<bool(SPIRVEntry *, SPIRVEntry *)> IdComp;
-  typedef std::map<SPIRVEntry *, DFSState, IdComp> EntryStateMapTy;
-
-  SPIRVTypeVec TypeIntVec;
-  SPIRVConstantVector ConstIntVec;
-  SPIRVTypeVec TypeVec;
-  SPIRVConstAndVarVec ConstAndVarVec;
-  const SPIRVForwardPointerVec &ForwardPointerVec;
-  EntryStateMapTy EntryStateMap;
-
-  friend spv_ostream &operator<<(spv_ostream &O, const TopologicalSort &S);
-
-  // This method implements recursive depth-first search among all Entries in
-  // EntryStateMap. Traversing entries and adding them to corresponding
-  // container after visiting all dependent entries(post-order traversal)
-  // guarantees that the entry's operands will appear in the container before
-  // the entry itslef.
-  void visit(SPIRVEntry *E) {
-    DFSState &State = EntryStateMap[E];
-    assert(State != Discovered && "Cyclic dependency detected");
-    if (State == Visited)
-      return;
-    State = Discovered;
-    for (SPIRVEntry *Op : E->getNonLiteralOperands()) {
-      auto Comp = [&Op](SPIRVTypeForwardPointer *FwdPtr) {
-        return FwdPtr->getPointer() == Op;
-      };
-      // Skip forward referenced pointers
-      if (Op->getOpCode() == OpTypePointer &&
-          find_if(ForwardPointerVec.begin(), ForwardPointerVec.end(), Comp) !=
-              ForwardPointerVec.end())
-        continue;
-      visit(Op);
-    }
-    State = Visited;
-    Op OC = E->getOpCode();
-    if (OC == OpTypeInt)
-      TypeIntVec.push_back(static_cast<SPIRVType *>(E));
-    else if (isConstantOpCode(OC)) {
-      SPIRVConstant *C = static_cast<SPIRVConstant *>(E);
-      if (C->getType()->isTypeInt())
-        ConstIntVec.push_back(C);
-      else
-        ConstAndVarVec.push_back(E);
-    } else if (isTypeOpCode(OC))
-      TypeVec.push_back(static_cast<SPIRVType *>(E));
-    else
-      ConstAndVarVec.push_back(E);
-  }
-
-public:
-  TopologicalSort(const SPIRVTypeVec &TypeVec,
-                  const SPIRVConstantVector &ConstVec,
-                  const SPIRVVariableVec &VariableVec,
-                  const SPIRVForwardPointerVec &ForwardPointerVec)
-      : ForwardPointerVec(ForwardPointerVec),
-        EntryStateMap([](SPIRVEntry *A, SPIRVEntry *B) -> bool {
-          return A->getId() < B->getId();
-        }) {
-    // Collect entries for sorting
-    for (auto *T : TypeVec)
-      EntryStateMap[T] = DFSState::Unvisited;
-    for (auto *C : ConstVec)
-      EntryStateMap[C] = DFSState::Unvisited;
-    for (auto *V : VariableVec)
-      EntryStateMap[V] = DFSState::Unvisited;
-    // Run topoligical sort
-    for (auto ES : EntryStateMap)
-      visit(ES.first);
-  }
-};
-
-spv_ostream &operator<<(spv_ostream &O, const TopologicalSort &S) {
-  O << S.TypeIntVec << S.ConstIntVec << S.TypeVec << S.ConstAndVarVec;
-  return O;
-}
-
-spv_ostream &operator<<(spv_ostream &O, SPIRVModule &M) {
-  SPIRVModuleImpl &MI = *static_cast<SPIRVModuleImpl *>(&M);
-
-  SPIRVEncoder Encoder(O);
-  Encoder << MagicNumber << MI.SPIRVVersion
-          << (((SPIRVWord)MI.GeneratorId << 16) | MI.GeneratorVer)
-          << MI.NextId /* Bound for Id */
-          << MI.InstSchema;
-  O << SPIRVNL();
-
-  for (auto &I : MI.CapMap)
-    O << *I.second;
-
-  for (auto &I : M.getExtension()) {
-    assert(!I.empty() && "Invalid extension");
-    O << SPIRVExtension(&M, I);
-  }
-
-  for (auto &I : MI.IdBuiltinMap)
-    O << SPIRVExtInstImport(&M, I.first, SPIRVBuiltinSetNameMap::map(I.second));
-
-  O << SPIRVMemoryModel(&M);
-
-  for (auto &I:MI.EntryPointVec)
-      O << *I;
-
-  for (auto &I:MI.EntryPointVec)
-      MI.get<SPIRVFunction>(I->getId())->encodeExecutionModes(O);
-
-  O << MI.StringVec;
-
-  for (auto &I : M.getSourceExtension()) {
-    assert(!I.empty() && "Invalid source extension");
-    O << SPIRVSourceExtension(&M, I);
-  }
-
-  O << SPIRVSource(&M);
-
-  for (auto &I:MI.NamedId) {
-    // Don't output name for entry point since it is redundant
-    bool IsEntryPoint = M.getEntryPoint(I) != nullptr;
-    if (!IsEntryPoint)
-      M.getEntry(I)->encodeName(O);
-  }
-
-  O << MI.MemberNameVec << MI.DecGroupVec << MI.DecorateSet << MI.GroupDecVec
-    << MI.ForwardPointerVec
-    << TopologicalSort(MI.TypeVec, MI.ConstVec, MI.VariableVec,
-                       MI.ForwardPointerVec)
-    << SPIRVNL() << MI.FuncVec;
   return O;
 }
 
@@ -1615,57 +1466,5 @@ bool isSpirvBinary(const std::string &Img) {
   auto Magic = reinterpret_cast<const unsigned *>(Img.data());
   return *Magic == MagicNumber;
 }
-
-#ifdef _SPIRV_SUPPORT_TEXT_FMT
-
-bool convertSpirv(std::istream &IS, spv_ostream &OS, std::string &ErrMsg,
-                  bool FromText, bool ToText) {
-  auto SaveOpt = SPIRVUseTextFormat;
-  SPIRVUseTextFormat = FromText;
-  SPIRVModuleImpl M;
-  IS >> M;
-  if (M.getError(ErrMsg) != SPIRVEC_Success) {
-    SPIRVUseTextFormat = SaveOpt;
-    return false;
-  }
-  SPIRVUseTextFormat = ToText;
-  OS << M;
-  if (M.getError(ErrMsg) != SPIRVEC_Success) {
-    SPIRVUseTextFormat = SaveOpt;
-    return false;
-  }
-  SPIRVUseTextFormat = SaveOpt;
-  return true;
-}
-
-bool isSpirvText(const std::string &Img) {
-  std::istringstream SS(Img);
-  unsigned Magic = 0;
-  SS >> Magic;
-  if (SS.bad())
-    return false;
-  return Magic == MagicNumber;
-}
-
-bool convertSpirv(std::string &Input, std::string &Out, std::string &ErrMsg,
-                  bool ToText) {
-  auto FromText = isSpirvText(Input);
-  if (ToText == FromText) {
-    Out = Input;
-    return true;
-  }
-  std::istringstream IS(Input);
-#ifdef _SPIRV_LLVM_API
-  llvm::raw_string_ostream OS(Out);
-#else
-  std::ostringstream OS;
-#endif
-  if (!convertSpirv(IS, OS, ErrMsg, FromText, ToText))
-    return false;
-  Out = OS.str();
-  return true;
-}
-
-#endif // _SPIRV_SUPPORT_TEXT_FMT
 
 } // namespace SPIRV
