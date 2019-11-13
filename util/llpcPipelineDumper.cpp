@@ -78,8 +78,7 @@ std::ostream& operator<<(std::ostream& out, WaveBreakSize           waveBreakSiz
 
 template std::ostream& operator<<(std::ostream& out, ElfReader<Elf64>& reader);
 template raw_ostream& operator<<(raw_ostream& out, ElfReader<Elf64>& reader);
-constexpr size_t ShaderModuleCacheHashOffset =
-    offsetof(ShaderModuleData, moduleInfo) + offsetof(ShaderModuleInfo, cacheHash);
+constexpr size_t ShaderModuleCacheHashOffset = offsetof(ShaderModuleData, cacheHash);
 
 // =====================================================================================================================
 // Represents LLVM based mutex.
@@ -204,9 +203,8 @@ void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(
 uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(
     const void* pModuleData)   // [in] Pointer to the shader module data
 {
-    const ShaderModuleDataHeader* pModule =
-            reinterpret_cast<const ShaderModuleDataHeader*>(pModuleData);
-    return MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pModule->hash));
+    const ShaderModuleData* pShaderModuleData = reinterpret_cast<const ShaderModuleData*>(pModuleData);
+    return MetroHash::Compact64(reinterpret_cast<const MetroHash::Hash*>(&pShaderModuleData->hash));
 }
 
 // =====================================================================================================================
@@ -526,7 +524,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     const PipelineShaderInfo* pShaderInfo, // [in] Shader info of specified shader stage
     std::ostream&             dumpFile)    // [out] dump file
 {
-    const ShaderModuleDataHeader* pModuleData = reinterpret_cast<const ShaderModuleDataHeader*>(pShaderInfo->pModuleData);
+    const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
     auto pModuleHash = reinterpret_cast<const MetroHash::Hash*>(&pModuleData->hash[0]);
 
     // Output shader binary file
@@ -1117,8 +1115,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 {
     if (pShaderInfo->pModuleData)
     {
-        const ShaderModuleDataHeader* pModuleData =
-            reinterpret_cast<const ShaderModuleDataHeader*>(pShaderInfo->pModuleData);
+        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
         pHasher->Update(stage);
         if (isCacheHash)
         {

@@ -1478,7 +1478,7 @@ uint32_t GraphicsContext::GetShaderWaveSize(
             const ShaderModuleData* pModuleData =
                 reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
 
-            if ((pModuleData != nullptr) && pModuleData->moduleInfo.useSubgroupSize
+            if ((pModuleData != nullptr) && pModuleData->usage.useSubgroupSize
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
              && (pShaderInfo->options.allowVaryWaveSize == false)
 #endif

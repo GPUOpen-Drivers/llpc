@@ -36,15 +36,6 @@
 namespace Llpc
 {
 
-// Enumerates types of shader binary.
-enum class BinaryType : uint32_t
-{
-    Unknown = 0,  // Invalid type
-    Spirv,        // SPIR-V binary
-    LlvmBc,       // LLVM bitcode
-    MultiLlvmBc,  // Multiple LLVM bitcode
-    Elf,          // ELF
-};
 
 // Represents the special header of SPIR-V token stream (the first DWORD).
 struct SpirvHeader
@@ -59,7 +50,6 @@ struct SpirvHeader
 // Represents the information of one shader entry in ShaderModuleData
 struct ShaderModuleEntry
 {
-    ShaderStage stage;              // Shader stage
     uint32_t    entryNameHash[4];   // Hash code of entry name
     uint32_t    entryOffset;        // Byte offset of the entry data in the binCode of ShaderModuleData
     uint32_t    entrySize;          // Byte size of the entry data
@@ -76,29 +66,6 @@ struct ShaderEntryName
     const char* pName;             // Entry name
 };
 
-// Represents the information of a shader module
-struct ShaderModuleInfo
-{
-    uint32_t              cacheHash[4];            // hash code for calculate pipeline cache key
-    uint32_t              debugInfoSize;           // Byte size of debug instructions
-    bool                  enableVarPtrStorageBuf;  // Whether to enable "VariablePointerStorageBuffer" capability
-    bool                  enableVarPtr;            // Whether to enable "VariablePointer" capability
-    bool                  useSubgroupSize;         // Whether gl_SubgroupSize is used
-    bool                  useHelpInvocation;       // Whether fragment shader has helper-invocation for subgroup
-    bool                  useSpecConstant;         // Whether specializaton constant is used
-    bool                  keepUnusedFunctions;     // Whether to keep unused function
-    uint32_t              entryCount;              // Entry count in the module
-    ShaderModuleEntry     entries[1];              // Array of all entries
-};
-
-// Represents output data of building a shader module.
-struct ShaderModuleData : public ShaderModuleDataHeader
-{
-    BinaryType       binType;                 // Shader binary type
-    BinaryData       binCode;                 // Shader binary data
-    ShaderModuleInfo moduleInfo;              // Shader module info
-};
-
 // =====================================================================================================================
 // Represents LLPC shader module helper class
 class ShaderModuleHelper
@@ -106,8 +73,9 @@ class ShaderModuleHelper
 public:
     static Result CollectInfoFromSpirvBinary(
         const BinaryData*             pSpvBinCode,
-        ShaderModuleInfo*             pShaderModuleInfo,
-        std::vector<ShaderEntryName>& shaderEntryNames);
+        ShaderModuleUsage*            pShaderModuleUsage,
+        std::vector<ShaderEntryName>& shaderEntryNames,
+        uint32_t*                     pDebugInfoSize);
 
     static void TrimSpirvDebugInfo(
         const BinaryData* pSpvBin,
