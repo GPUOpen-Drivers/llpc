@@ -266,11 +266,22 @@ enum class BinaryType : uint32_t
     Elf,          ///< ELF
 };
 
+/// Represents resource node data
+struct ResourceNodeData
+{
+    ResourceMappingNodeType type;       ///< Type of this resource mapping node
+    uint32_t                set;        ///< ID of descriptor set
+    uint32_t                binding;    ///< ID of descriptor binding
+    uint32_t                arraySize;  ///< Element count for arrayed binding
+};
+
 /// Represents the information of one shader entry in ShaderModuleExtraData
 struct ShaderModuleEntryData
 {
-    ShaderStage stage;              ///< Shader stage
-    void*       pShaderEntry;       ///< Private shader module entry info
+    ShaderStage             stage;              ///< Shader stage
+    void*                   pShaderEntry;       ///< Private shader module entry info
+    uint32_t                resNodeDataCount;  ///< Resource node data count
+    const ResourceNodeData* pResNodeDatas;     ///< Resource node data array
 };
 
 /// Represents usage info of a shader module
@@ -294,12 +305,27 @@ struct ShaderModuleData
     ShaderModuleUsage usage;        ///< Usage info of a shader module
 };
 
+/// Represents fragment shader output info
+struct FsOutInfo
+{
+    uint32_t    location;       ///< Output location in resource layout
+    uint32_t    index;          ///< Output index in resource layout
+    BasicType   basicType;      ///< Output data type
+    uint32_t    componentCount; ///< Count of components of output data
+};
+
 /// Represents extended output of building a shader module (taking extra data info)
 struct ShaderModuleDataEx
 {
-    ShaderModuleData        common;        ///< Shader module common data
+    ShaderModuleData        common;         ///< Shader module common data
+    uint32_t                codeOffset;     ///< Binary offset of binCode in ShaderModuleDataEx
+    uint32_t                entryOffset;    ///< Shader entry offset in ShaderModuleDataEx
+    uint32_t                resNodeOffset;  ///< Resource node offset in ShaderModuleDataEX
+    uint32_t                fsOutInfoOffset;///< FsOutInfo offset in ShaderModuleDataEX
     struct
     {
+        uint32_t              fsOutInfoCount;           ///< Count of fragment shader output
+        const FsOutInfo*      pFsOutInfos;              ///< Fragment output info array
         uint32_t              entryCount;              ///< Shader entry count in the module
         ShaderModuleEntryData entryDatas[1];           ///< Array of all shader entries in this module
     } extra;                              ///< Represents extra part of shader module data

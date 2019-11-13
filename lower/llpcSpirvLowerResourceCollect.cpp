@@ -52,19 +52,103 @@ char SpirvLowerResourceCollect::ID = 0;
 
 // =====================================================================================================================
 // Pass creator, creates the pass of SPIR-V lowering opertions for resource collecting
-ModulePass* CreateSpirvLowerResourceCollect()
+ModulePass* CreateSpirvLowerResourceCollect(
+    bool collectDetailUsage) // Whether to collect detailed usages of resource node datas and FS output infos
 {
-    return new SpirvLowerResourceCollect();
+    return new SpirvLowerResourceCollect(collectDetailUsage);
 }
 
 // =====================================================================================================================
-SpirvLowerResourceCollect::SpirvLowerResourceCollect()
+SpirvLowerResourceCollect::SpirvLowerResourceCollect(
+    bool collectDetailUsage) // Whether to collect detailed usages of resource node datas and FS output infos
     :
-    SpirvLower(ID)
+    SpirvLower(ID),
+    m_collectDetailUsage(collectDetailUsage),
+    m_detailUsageValid(false)
 {
     initializeSpirvLowerResourceCollectPass(*PassRegistry::getPassRegistry());
 }
 
+// =====================================================================================================================
+// Collect resource node data
+void SpirvLowerResourceCollect::CollectResourceNodeData(
+    const GlobalVariable* pGlobal)       // [in] Global variable to collect resource node data
+{
+    auto pGlobalTy = pGlobal->getType()->getContainedType(0);
+
+    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
+    auto descSet = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+    auto binding = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(1))->getZExtValue();
+    auto spvOpCode = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(2))->getZExtValue();
+
+    // Map the SPIR-V opcode to descriptor type.
+    ResourceMappingNodeType nodeType = ResourceMappingNodeType::Unknown;
+    switch (spvOpCode)
+    {
+    case OpTypeSampler:
+        {
+            // Sampler descriptor.
+            nodeType = ResourceMappingNodeType::DescriptorSampler;
+            break;
+        }
+    case OpTypeImage:
+        {
+            nodeType = ResourceMappingNodeType::DescriptorResource;
+            // Image descriptor.
+            Type* pImageType = pGlobalTy->getPointerElementType();
+            std::string imageTypeName = pImageType->getStructName();
+            // Format of image opaque type: ...[.SampledImage.<date type><dim>]...
+            if (imageTypeName.find(".SampledImage") != std::string::npos)
+            {
+                auto pos = imageTypeName.find("_");
+                LLPC_ASSERT(pos != std::string::npos);
+
+                ++pos;
+                Dim dim = static_cast<Dim>(imageTypeName[pos] - '0');
+                nodeType = (dim == DimBuffer) ?
+                           ResourceMappingNodeType::DescriptorTexelBuffer :
+                           ResourceMappingNodeType::DescriptorResource;
+            }
+            break;
+        }
+    case OpTypeSampledImage:
+        {
+            // Combined image and sampler descriptors.
+            nodeType = ResourceMappingNodeType::DescriptorCombinedTexture;
+            break;
+        }
+    default:
+        {
+            // Normal buffer.
+            nodeType = ResourceMappingNodeType::DescriptorBuffer;
+            break;
+        }
+    }
+
+    ResourceNodeDataKey nodeData = {};
+
+    nodeData.value.set = descSet;
+    nodeData.value.binding = binding;
+    nodeData.value.arraySize = GetFlattenArrayElementCount(pGlobalTy);
+    auto result = m_resNodeDatas.insert(std::pair<ResourceNodeDataKey, ResourceMappingNodeType>(nodeData, nodeType));
+
+    // Check if the node already had a different pair of node data/type. A DescriptorResource/DescriptorTexelBuffer
+    // and a DescriptorSampler can use the same set/binding, in which case it is
+    // DescriptorCombinedTexture.
+    if (result.second == false)
+    {
+        LLPC_ASSERT(((nodeType == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                     (nodeType == ResourceMappingNodeType::DescriptorResource) ||
+                     (nodeType == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                     (nodeType == ResourceMappingNodeType::DescriptorSampler)) &&
+                    ((result.first->second == ResourceMappingNodeType::DescriptorCombinedTexture) ||
+                     (result.first->second == ResourceMappingNodeType::DescriptorResource) ||
+                     (result.first->second == ResourceMappingNodeType::DescriptorTexelBuffer) ||
+                     (result.first->second == ResourceMappingNodeType::DescriptorSampler)));
+        result.first->second = ResourceMappingNodeType::DescriptorCombinedTexture;
+    }
+
+}
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 bool SpirvLowerResourceCollect::runOnModule(
@@ -157,6 +241,11 @@ bool SpirvLowerResourceCollect::runOnModule(
                             }
                         }
                     }
+                    // Only collect resource node data when requested
+                    if (m_collectDetailUsage == true)
+                    {
+                        CollectResourceNodeData(&*pGlobal);
+                    }
                 }
                 break;
             }
@@ -164,18 +253,85 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Global:
         case SPIRAS_Local:
         case SPIRAS_Input:
+            {
+                break;
+            }
         case SPIRAS_Output:
             {
+                // Only collect FS out info when requested.
+                if (m_collectDetailUsage == false || pGlobalTy->isSingleValueType() == false)
+                {
+                    break;
+                }
+
+                FsOutInfo fsOutInfo = {};
+                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::InOut);
+                auto pMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+
+                ShaderInOutMetadata inOutMeta = {};
+                Constant* pInOutMetaConst = cast<Constant>(pMeta);
+                inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
+                inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
+
+                const uint32_t location = inOutMeta.Value;
+                const uint32_t index = inOutMeta.Index;
+
+                // Collect basic types of fragment outputs
+                BasicType basicTy = BasicType::Unknown;
+
+                const auto pCompTy = pGlobalTy->isVectorTy() ? pGlobalTy->getVectorElementType() : pGlobalTy;
+                const uint32_t bitWidth = pCompTy->getScalarSizeInBits();
+                const bool signedness = (inOutMeta.Signedness != 0);
+
+                if (pCompTy->isIntegerTy())
+                {
+                    // Integer type
+                    if (bitWidth == 8)
+                    {
+                        basicTy = signedness ? BasicType::Int8 : BasicType::Uint8;
+                    }
+                    else if (bitWidth == 16)
+                    {
+                        basicTy = signedness ? BasicType::Int16 : BasicType::Uint16;
+                    }
+                    else
+                    {
+                        LLPC_ASSERT(bitWidth == 32);
+                        basicTy = signedness ? BasicType::Int : BasicType::Uint;
+                    }
+                }
+                else if (pCompTy->isFloatingPointTy())
+                {
+                    // Floating-point type
+                    if (bitWidth == 16)
+                    {
+                        basicTy = BasicType::Float16;
+                    }
+                    else
+                    {
+                        LLPC_ASSERT(bitWidth == 32);
+                        basicTy = BasicType::Float;
+                    }
+                }
+                else
+                {
+                    LLPC_NEVER_CALLED();
+                }
+
+                fsOutInfo.location = location;
+                fsOutInfo.location = index;
+                fsOutInfo.componentCount = pGlobalTy->isVectorTy() ? pGlobalTy->getVectorNumElements() : 1;;
+                fsOutInfo.basicType = basicTy;
+                m_fsOutInfos.push_back(fsOutInfo);
                 break;
             }
         case SPIRAS_Uniform:
             {
-                // Buffer block
-#ifndef NDEBUG
-                MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::Resource);
-                auto blockType = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(2))->getZExtValue();
-                LLPC_ASSERT((blockType == BlockTypeUniform) || (blockType == BlockTypeShaderStorage));
-#endif
+                // Only collect resource node data when requested
+                if (m_collectDetailUsage == true)
+                {
+                    CollectResourceNodeData(&*pGlobal);
+                }
                 break;
             }
         default:
@@ -184,6 +340,10 @@ bool SpirvLowerResourceCollect::runOnModule(
                 break;
             }
         }
+    }
+    if (!m_fsOutInfos.empty() || !m_resNodeDatas.empty())
+    {
+        m_detailUsageValid = true;
     }
 
     if (m_shaderStage == ShaderStageCompute)

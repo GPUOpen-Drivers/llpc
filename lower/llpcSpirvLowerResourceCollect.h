@@ -42,6 +42,27 @@ namespace Llpc
 struct DescriptorBinding;
 struct ResourceUsage;
 
+// Compact ResourceNodeData into an uint64 key
+union ResourceNodeDataKey
+{
+    struct
+    {
+        uint64_t set        :   16;  // Resource set
+        uint64_t binding    :   16;  // Resource binding
+        uint64_t arraySize  :   16;  // Resource array size
+        uint64_t reserved   :   16;
+    } value;
+    uint64_t u64All;
+};
+
+struct ResNodeDataSortingComparer
+{
+    bool operator()(const ResourceNodeDataKey& set1, const ResourceNodeDataKey& set2) const
+    {
+        return set1.u64All < set2.u64All;
+    }
+};
+
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering opertions for resource collecting.
 class SpirvLowerResourceCollect:
@@ -49,7 +70,13 @@ class SpirvLowerResourceCollect:
     public llvm::InstVisitor<SpirvLowerResourceCollect>
 {
 public:
-    SpirvLowerResourceCollect();
+    SpirvLowerResourceCollect(bool collectDetailUsage = false);
+    auto& GetResourceNodeDatas()
+    {
+        return m_resNodeDatas;
+    }
+    auto& GetFsOutInfos() { return m_fsOutInfos; }
+    bool DetailUsageValid() { return m_detailUsageValid; }
 
     virtual bool runOnModule(llvm::Module& module);
 
@@ -64,10 +91,18 @@ private:
     const llvm::Type* GetFlattenArrayElementType(const llvm::Type* pTy) const;
 
     void CollectExecutionModeUsage();
+    void CollectResourceNodeData(const GlobalVariable* pGlobal);
 
     // -----------------------------------------------------------------------------------------------------------------
 
     ResourceUsage*  m_pResUsage;    // Resource usage of the shader stage
+
+    bool m_collectDetailUsage;      // If enabled, collect detailed usages of resource node datas and FS output infos
+    std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
+                                                                                                       // node data
+    std::vector<FsOutInfo> m_fsOutInfos;   // FS output info array
+    bool m_detailUsageValid; // Indicate whether detailed usages (resource node datas
+                             // or fragment shader output infos) are valid
 };
 
 } // Llpc

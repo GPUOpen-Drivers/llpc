@@ -68,6 +68,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
+#include "llpcSpirvLowerResourceCollect.h"
 #include "llpcTimerProfiler.h"
 #include "llpcVertexFetch.h"
 #include <mutex>
@@ -495,6 +496,8 @@ Result Compiler::BuildShaderModule(
     std::vector<ShaderEntryName> entryNames;
     SmallVector<ShaderModuleEntryData, 4> moduleEntryDatas;
     SmallVector<ShaderModuleEntry, 4> moduleEntries;
+    SmallVector<FsOutInfo, 4> fsOutInfos;
+    std::map<uint32_t, std::vector<ResourceNodeData>> entryResourceNodeDatas; // Map entry ID and resourceNodeData
 
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     CacheEntryHandle hEntry = nullptr;
@@ -646,7 +649,10 @@ Result Compiler::BuildShaderModule(
                     shaderInfo.pEntryTarget = entryNames[i].pName;
                     lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
-                    lowerPassMgr.add(CreateSpirvLowerResourceCollect());
+                    bool collectDetailUsage = (entryNames[i].stage == ShaderStageFragment) ? true : false;
+                    auto pResCollectPass = static_cast<SpirvLowerResourceCollect*>(
+                                           CreateSpirvLowerResourceCollect(collectDetailUsage));
+                    lowerPassMgr.add(pResCollectPass);
                     if (EnableOuts())
                     {
                         lowerPassMgr.add(createPrintModulePass(outs(), "\n"
@@ -683,6 +689,26 @@ Result Compiler::BuildShaderModule(
 
                     moduleEntry.resUsageSize = moduleBinary.size() - moduleEntry.entryOffset - moduleEntry.entrySize;
                     moduleEntry.passIndex = passIndex;
+                    if (pResCollectPass->DetailUsageValid())
+                    {
+                        auto& resNodeDatas = pResCollectPass->GetResourceNodeDatas();
+                        moduleEntryData.resNodeDataCount = resNodeDatas.size();
+                        for (auto resNodeData : resNodeDatas)
+                        {
+                            ResourceNodeData data = {};
+                            data.type = resNodeData.second;
+                            data.set = resNodeData.first.value.set;
+                            data.binding = resNodeData.first.value.binding;
+                            data.arraySize = resNodeData.first.value.arraySize;
+                            entryResourceNodeDatas[i].push_back(data);
+                        }
+
+                        auto& fsOutInfos = pResCollectPass->GetFsOutInfos();
+                        for (auto& fsOutInfo : fsOutInfos)
+                        {
+                            fsOutInfos.push_back(fsOutInfo);
+                        }
+                    }
                     moduleEntries.push_back(moduleEntry);
                     moduleEntryDatas.push_back(moduleEntryData);
                     delete pModule;
@@ -702,15 +728,23 @@ Result Compiler::BuildShaderModule(
     }
 
     // Allocate memory and copy output data
+    uint32_t totalNodeCount = 0;
     if (result == Result::Success)
     {
         if (pShaderInfo->pfnOutputAlloc != nullptr)
         {
             if (cacheEntryState != ShaderEntryState::Ready)
             {
+                for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
+                {
+                    totalNodeCount += moduleEntryDatas[i].resNodeDataCount;
+                }
+
                 allocSize = sizeof(ShaderModuleDataEx) +
                     moduleDataEx.common.binCode.codeSize +
-                    (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry)));
+                    (moduleDataEx.extra.entryCount * (sizeof(ShaderModuleEntryData) + sizeof(ShaderModuleEntry))) +
+                    totalNodeCount * sizeof(ResourceNodeData) +
+                    fsOutInfos.size() * sizeof(FsOutInfo);
             }
 
             pAllocBuf = pShaderInfo->pfnOutputAlloc(pShaderInfo->pInstance,
@@ -728,21 +762,44 @@ Result Compiler::BuildShaderModule(
 
     if (result == Result::Success)
     {
-        // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode.
+        // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
+        //                             | Resource nodes | FsOutInfo
         ShaderModuleDataEx* pModuleDataEx = reinterpret_cast<ShaderModuleDataEx*>(pAllocBuf);
 
         ShaderModuleEntryData* pEntryData = &pModuleDataEx->extra.entryDatas[0];
-        size_t entryOffset = sizeof(ShaderModuleDataEx) +
-                                 moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
-        ShaderModuleEntry* pEntry = reinterpret_cast<ShaderModuleEntry*>(VoidPtrInc(pAllocBuf, entryOffset));
-        size_t codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
-
         if (cacheEntryState != ShaderEntryState::Ready)
         {
             // Copy module data
             memcpy(pModuleDataEx, &moduleDataEx, sizeof(moduleDataEx));
             pModuleDataEx->common.binCode.pCode = nullptr;
 
+            size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
+
+            entryOffset = sizeof(ShaderModuleDataEx) +
+                                 moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntryData);
+            codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
+            resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
+            fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
+            pModuleDataEx->codeOffset = codeOffset;
+            pModuleDataEx->entryOffset = entryOffset;
+            pModuleDataEx->resNodeOffset   = resNodeOffset;
+            pModuleDataEx->fsOutInfoOffset   = fsOutInfoOffset;
+        }
+        else
+        {
+            memcpy(pModuleDataEx, pCacheData, allocSize);
+        }
+
+        ShaderModuleEntry* pEntry = reinterpret_cast<ShaderModuleEntry*>(VoidPtrInc(pAllocBuf,
+                                                                         pModuleDataEx->entryOffset));
+        ResourceNodeData* pResNodeData = reinterpret_cast<ResourceNodeData*>(VoidPtrInc(pAllocBuf,
+                                                                             pModuleDataEx->resNodeOffset));
+        FsOutInfo* pFsOutInfo = reinterpret_cast<FsOutInfo*>(VoidPtrInc(pAllocBuf,
+                                                                        pModuleDataEx->fsOutInfoOffset));
+        void* pCode = VoidPtrInc(pAllocBuf, pModuleDataEx->codeOffset);
+
+        if (cacheEntryState != ShaderEntryState::Ready)
+        {
             // Copy entry info
             for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
             {
@@ -751,11 +808,23 @@ Result Compiler::BuildShaderModule(
                 pEntryData[i].pShaderEntry = &pEntry[i];
                 // Copy module entry
                 memcpy(pEntryData[i].pShaderEntry, &moduleEntries[i], sizeof(ShaderModuleEntry));
+                // Copy resourceNodeData and set resource node pointer
+                memcpy(pResNodeData, &entryResourceNodeDatas[i][0],
+                       moduleEntryDatas[i].resNodeDataCount* sizeof(ResourceNodeData));
+                pEntryData[i].pResNodeDatas = pResNodeData;
+                pEntryData[i].resNodeDataCount = moduleEntryDatas[i].resNodeDataCount;
+                pResNodeData += moduleEntryDatas[i].resNodeDataCount;
             }
 
             // Copy binary code
-            void* pCode = VoidPtrInc(pAllocBuf, codeOffset);
             memcpy(pCode, moduleDataEx.common.binCode.pCode, moduleDataEx.common.binCode.codeSize);
+
+            // Copy fragment shader output variables
+            pModuleDataEx->extra.fsOutInfoCount = fsOutInfos.size();
+            if (fsOutInfos.size() > 0)
+            {
+                memcpy(pFsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
+            }
             if (cacheEntryState == ShaderEntryState::Compiling)
             {
                 if (hEntry != nullptr)
@@ -766,15 +835,16 @@ Result Compiler::BuildShaderModule(
         }
         else
         {
-            memcpy(pModuleDataEx, pCacheData, allocSize);
+            // Update the pointers
+            for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
+            {
+                pEntryData[i].pShaderEntry = &pEntry[i];
+                pEntryData[i].pResNodeDatas = pResNodeData;
+                pResNodeData += pEntryData[i].resNodeDataCount;
+            }
         }
-
-        // Update the pointers
-        for (uint32_t i = 0; i < moduleDataEx.extra.entryCount; ++i)
-        {
-            pEntryData[i].pShaderEntry = &pEntry[i];
-        }
-        pModuleDataEx->common.binCode.pCode = VoidPtrInc(pAllocBuf, codeOffset);
+        pModuleDataEx->common.binCode.pCode = pCode;
+        pModuleDataEx->extra.pFsOutInfos = pFsOutInfo;
         pShaderOut->pModuleData = &pModuleDataEx->common;
     }
     else
@@ -942,7 +1012,7 @@ Result Compiler::BuildPipelineInternal(
                             "// LLPC SPIRV-to-LLVM translation results\n"));
             }
             {
-                lowerPassMgr.add(CreateSpirvLowerResourceCollect());
+                lowerPassMgr.add(CreateSpirvLowerResourceCollect(false));
             }
 
             // Stop timer for translate.
