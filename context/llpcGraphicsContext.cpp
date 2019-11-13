@@ -62,6 +62,9 @@ opt<bool> DisableGsOnChip("disable-gs-onchip",
                           desc("Disable geometry shader on-chip mode"),
                           init(false));
 
+// -pack-in-out: pack input/output
+opt<bool> PackInOut("pack-in-out", desc("Pack input/output"), init(true));
+
 #if LLPC_BUILD_GFX10
 extern opt<int> SubgroupSize;
 #endif
@@ -87,7 +90,8 @@ GraphicsContext::GraphicsContext(
     m_stageMask(0),
     m_activeStageCount(0),
     m_tessOffchip(cl::EnableTessOffChip),
-    m_gsOnChip(false)
+    m_gsOnChip(false),
+    m_packInOut(cl::PackInOut)
 {
     if (gfxIp.major >= 9)
     {
@@ -1590,5 +1594,32 @@ void GraphicsContext::BuildNggCullingControlRegister()
     pipelineState.paClVteCntl = paClVteCntl.u32All;
 }
 #endif
+
+// =====================================================================================================================
+// Determine whether pack io is valid. Current VS output and FS input in VS-FS pipeline is packable
+bool GraphicsContext::CheckPackInOutValidity(
+    ShaderStage shaderStage,    // Current shader stage
+    bool        isOutput        // Whether it is to pack an output
+    ) const
+{
+    // Pack in/out requirements:
+    // 1) Both cl::PackInOut and m_packInOut are enabled..
+    // 2) It is a VS-FS pipeline.
+    // 3) It is VS' output or FS'input.
+    bool isPackInOut = cl::PackInOut && m_packInOut;
+    if (isPackInOut)
+    {
+        const uint32_t supportedMask = ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment);
+        isPackInOut = (GetShaderStageMask() == supportedMask);
+
+        if (isPackInOut)
+        {
+            isPackInOut = (((shaderStage == ShaderStageVertex) && isOutput) ||             // It's VS' output
+                           ((shaderStage == ShaderStageFragment) && (isOutput == false))); // It's FS' input
+        }
+    }
+
+    return isPackInOut;
+}
 
 } // Llpc

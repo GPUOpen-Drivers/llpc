@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilder.h"
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchResourceCollect.h"
@@ -63,6 +64,7 @@ PatchResourceCollect::PatchResourceCollect()
     m_hasPushConstOp(false),
     m_hasDynIndexedInput(false),
     m_hasDynIndexedOutput(false),
+    m_hasInterpolantInput(false),
     m_pResUsage(nullptr)
 {
     initializePipelineShadersPass(*PassRegistry::getPassRegistry());
@@ -138,8 +140,58 @@ void PatchResourceCollect::ProcessShader()
 
     if (m_pContext->IsGraphics())
     {
-        MatchGenericInOut();
-        MapBuiltInToGenericInOut();
+        // Check if it is valid to pack in patch phase
+        if (CheckValidityForInOutPack())
+        {
+            // Do pack input/output in vertex stage
+            if (m_shaderStage == ShaderStageVertex)
+            {
+                // The description of pack in/out workflow
+                // NOTE: Pack input/output performs is controled by cl::PackInOut and turned on by default.
+                // Use GraphicsContext::m_packInOut to disable pack for non-supported cases (e.g. VS + null FS)
+                // In phase one, support packing for VS-FS pipeline first.
+
+                // 1. In lower global pass, split a vector-based call from VS' output or FS' generic input
+                // into multiple scalar-based calls.
+
+                // 2. Patch resource collecting, merge scalar-based calls into tightly packed vector-based call
+                // 1) Collect pack info for each scalar-based call by reusing VS' outputLocMap and FS' inputLocMap
+                // but changing the key as new defined InOutPackInfo.u32All (see ProcessCallForInOutPack())
+
+                // 2) Remove unused elements from VS' outputLocMap without mappings in FS' inputLocMap.
+
+                // 3) Core function of packing in/out (see PackGenericInOut())
+                // 3.1) Build a unified rule for both VS and FS to group their scalar-based calls into pack groups.
+                // The union of interpMod, interpLoc and bitWidth from FS' pack info is used as grouping metirc.
+                // Add all scalar-based calls to dead call set. (see PrepareForInOutPack())
+
+                // 3.2) Create new generic input/output calls (CreateGenericInOut())
+                // - For VS output, scalar-based calls in the same pack group are used to generate four channels
+                // occupied vector-based calls as many as possible. The union of location, component index and
+                // channel mask is used as the key of outputLocMap and the location argument to map the new call
+                // with the final packed and continus location. (see CreateGenericOutput())
+                // - For FS input, scalar-based calls in the same pack group are recreated with packed component
+                // index. Use the key of inputLocMap as the location argument to map the new call with the final
+                // packed and continus location. (see CreateGenericInput())
+
+                // 3.2) Create new input/output calls for interpolant usage (CreateInterpolantInOut())
+                // - For VS output, the scalar-based calls related to an interpolant call are restored to the
+                // vector without splitting. Use the key of inputLocMap as the location argument to map the new
+                // call with the final packed and continus location.
+                // - For FS interpolant input, the call is recreated with the key of inputLocMap as the location
+                // argument to map it with the final packed and continus location
+
+                MatchGenericInOutWithPack();
+
+                // Map FS built-in then VS built-in
+                MapBuiltInToGenericInOutWithPack();
+            }
+        }
+        else
+        {
+            MatchGenericInOut();
+            MapBuiltInToGenericInOut();
+        }
     }
 
     if ((m_shaderStage == ShaderStageTessControl) || (m_shaderStage == ShaderStageTessEval))
@@ -304,11 +356,19 @@ void PatchResourceCollect::visitCallInst(
             }
             else
             {
-                m_activeInputLocs.insert(loc);
-                if (pInputTy->getPrimitiveSizeInBits() > (8 * SizeOfVec4))
+                // Currently support to pack for VS export and FS import
+                if (m_pContext->CheckPackInOutValidity(m_shaderStage, false))
                 {
-                    LLPC_ASSERT(pInputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
-                    m_activeInputLocs.insert(loc + 1);
+                    ProcessCallForInOutPack(&callInst);
+                }
+                else
+                {
+                    m_activeInputLocs.insert(loc);
+                    if (pInputTy->getPrimitiveSizeInBits() > (8 * SizeOfVec4))
+                    {
+                        LLPC_ASSERT(pInputTy->getPrimitiveSizeInBits() <= (8 * 2 * SizeOfVec4));
+                        m_activeInputLocs.insert(loc + 1);
+                    }
                 }
             }
         }
@@ -326,21 +386,29 @@ void PatchResourceCollect::visitCallInst(
         {
             LLPC_ASSERT(callInst.getType()->isSingleValueType());
 
-            auto pLocOffset = callInst.getOperand(1);
-            if (isa<ConstantInt>(pLocOffset))
+            // Currently support to pack for VS export and FS import
+            if (m_pContext->CheckPackInOutValidity(m_shaderStage, false))
             {
-                // Location offset is constant
-                auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-                auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                loc += locOffset;
-
-                LLPC_ASSERT(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
-                m_activeInputLocs.insert(loc);
+                ProcessCallForInOutPack(&callInst);
             }
             else
             {
-                // NOTE: If location offset is not constant, we consider dynamic indexing occurs.
-                m_hasDynIndexedInput = true;
+                auto pLocOffset = callInst.getOperand(1);
+                if (isa<ConstantInt>(pLocOffset))
+                {
+                    // Location offset is constant
+                    auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
+                    auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+                    loc += locOffset;
+
+                    LLPC_ASSERT(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
+                    m_activeInputLocs.insert(loc);
+                }
+                else
+                {
+                    // NOTE: If location offset is not constant, we consider dynamic indexing occurs.
+                    m_hasDynIndexedInput = true;
+                }
             }
         }
     }
@@ -446,6 +514,12 @@ void PatchResourceCollect::visitCallInst(
                 // NOTE: If location offset is not constant, we consider dynamic indexing occurs.
                 m_hasDynIndexedOutput = true;
             }
+        }
+
+        // Currently support to pack for VS export and FS import
+        if (m_pContext->CheckPackInOutValidity(m_shaderStage, true))
+        {
+            ProcessCallForInOutPack(&callInst);
         }
     }
     else if (mangledName.startswith(LlpcName::OutputExportBuiltIn))
@@ -2370,6 +2444,1071 @@ void PatchResourceCollect::MapGsBuiltInOutput(
                             inOutUsage.outLocCount[3];
 
     pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
+}
+
+// =====================================================================================================================
+// Determine whether pack in/out is valid in patch phase
+bool PatchResourceCollect::CheckValidityForInOutPack() const
+{
+    // Pack input/output requirements:
+    // 1) GraphicsContext::m_packInOut is enable
+    // 2) It is VS->FS pipeline
+    bool packInOut = m_pContext->IsPackInOut();
+    if (packInOut)
+    {
+        const uint32_t supportedMask = ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment);
+        packInOut = (m_pContext->GetShaderStageMask() == supportedMask);
+    }
+    return packInOut;
+}
+
+// =====================================================================================================================
+// Process input/output call to collect InOutPackInfo for each call
+void PatchResourceCollect::ProcessCallForInOutPack(
+    CallInst* pCall)    // [in] Call to process
+{
+    auto pCallee = pCall->getCalledFunction();
+    auto mangledName = pCallee->getName();
+    if (mangledName.startswith(LlpcName::InputImportGeneric))
+    {
+        // The key of inputLocMap is InOutPackInfo.u64All
+        // The fields of compIdx, location, bitWidth, interpMode, interpLoc are used
+        InOutPackInfo inPackInfo = {};
+        inPackInfo.fs.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        inPackInfo.fs.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+
+        inPackInfo.fs.interpMode = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+        LLPC_ASSERT(inPackInfo.fs.interpMode < 4); // Valid range is : 0 ~ 3
+
+        inPackInfo.fs.interpLoc = cast<ConstantInt>(pCall->getOperand(3))->getZExtValue();
+        LLPC_ASSERT(inPackInfo.fs.interpLoc < 5);  // Valid range is : 0 ~ 4
+
+        uint32_t bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        switch (bitWidth)
+        {
+        case 8:
+            inPackInfo.fs.bitWidth = BitWidth8;
+            break;
+        case 16:
+            inPackInfo.fs.bitWidth = BitWidth16;
+            break;
+        case 32:
+            inPackInfo.fs.bitWidth = BitWidth32;
+            break;
+        case 64:
+            inPackInfo.fs.bitWidth = BitWidth64;
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+        }
+
+        m_activeInputLocs.insert(inPackInfo.u32All);
+
+        // The input scalar calls are unique due to being splitted once in lower phase
+        // Each generic input adds a new pair into inLocMap and stores the index of call temporarily
+        auto& inLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.inputLocMap;
+        LLPC_ASSERT((inLocMap.find(inPackInfo.u32All) == inLocMap.end()));
+        inLocMap[inPackInfo.u32All] = m_importedCalls.size();
+
+        m_importedCalls.push_back(pCall);
+    }
+    else if (mangledName.startswith(LlpcName::InputImportInterpolant))
+    {
+        auto pLocOffset = pCall->getOperand(1);
+        if (isa<ConstantInt>(pLocOffset))
+        {
+            // Location offset is constant
+            auto loc = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+            auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
+            loc += locOffset;
+
+            LLPC_ASSERT(pCall->getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
+
+            // The key of inputLocMap is InOutPackInfo.u32All
+            // The fields of compIdx, location, interpolantCompCount, isInterpolant are used
+            InOutPackInfo inPackInfo = {};
+            inPackInfo.fs.compIdx = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+            LLPC_ASSERT(inPackInfo.fs.compIdx == 0);
+
+            inPackInfo.fs.location = loc;
+
+            Type* pReturnTy = pCallee->getReturnType();
+            inPackInfo.fs.interpolantCompCount = pReturnTy->isVectorTy() ? pReturnTy->getVectorNumElements() : 1;
+
+            inPackInfo.fs.isInterpolant = true;
+
+            m_activeInputLocs.insert(inPackInfo.u32All);
+
+            // Interpolant input calls are kept original and need to update the matched location
+            auto& inLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.inputLocMap;
+            inLocMap[inPackInfo.u32All] = InvalidValue;
+
+            m_importedCalls.push_back(pCall);
+            m_hasInterpolantInput = true;
+        }
+        else
+        {
+            // NOTE: If location offset is not constant, we consider dynamic indexing occurs.
+            m_hasDynIndexedInput = true;
+        }
+    }
+    else
+    {
+        LLPC_ASSERT(mangledName.startswith(LlpcName::OutputExportGeneric) && "Invalid mangle name");
+
+        // The key of inputLocMap is InOutPackInfo.u32All
+        // The fields of compIdx, location are used to identify a scalar VS output call
+        // The fields of compIdx, location and channelMask are used to identify a packed VS output call
+        InOutPackInfo outPackInfo = {};
+        outPackInfo.vs.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        outPackInfo.vs.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+
+        auto& outLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocMap;
+        outLocMap[outPackInfo.u32All] = m_exportedCalls.size();
+        m_exportedCalls.push_back(pCall);
+    }
+}
+
+// =====================================================================================================================
+// Does generic input/output matching and does location mapping afterwards for packing input/output.
+//
+// NOTE: This function should be called after the cleanup work of inactive inputs is done.
+void PatchResourceCollect::MatchGenericInOutWithPack()
+{
+    LLPC_ASSERT(m_pContext->IsGraphics());
+    auto pCurResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    auto& curOutLocMap = pCurResUsage->inOutUsage.outputLocMap;
+
+    const auto& nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    LLPC_ASSERT(nextStage == ShaderStageFragment);
+
+    // Collect locations of those outputs that are used by next shader stage
+    auto pNextResUsage = m_pContext->GetShaderResourceUsage(nextStage);
+    auto& nextInLocMap = pNextResUsage->inOutUsage.inputLocMap;
+
+    std::set<uint64_t> usedLocs;
+
+    for (auto locMap : nextInLocMap)
+    {
+        auto loc = locMap.first;
+        InOutPackInfo* pInPackInfo = reinterpret_cast<InOutPackInfo*>(&loc);
+        InOutPackInfo  outPackInfo = {};
+        outPackInfo.vs.location = pInPackInfo->fs.location;
+
+        if (pInPackInfo->fs.isInterpolant)
+        {
+            for (uint32_t compIdx = 0; compIdx < pInPackInfo->fs.interpolantCompCount; ++compIdx)
+            {
+                outPackInfo.vs.compIdx = compIdx;
+                if (curOutLocMap.find(outPackInfo.u32All) != curOutLocMap.end())
+                {
+                    usedLocs.insert(outPackInfo.u32All);
+                }
+            }
+        }
+        else
+        {
+            outPackInfo.vs.compIdx = pInPackInfo->fs.compIdx;
+            if (curOutLocMap.find(outPackInfo.u32All) != curOutLocMap.end())
+            {
+                usedLocs.insert(outPackInfo.u32All);
+            }
+
+        }
+    }
+    // Remove unused locations from outputLocMap
+    for (auto locMapIt = curOutLocMap.begin(); locMapIt != curOutLocMap.end();)
+    {
+        if (usedLocs.find(locMapIt->first) == usedLocs.end())
+        {
+            locMapIt = curOutLocMap.erase(locMapIt);
+        }
+        else
+        {
+            ++locMapIt;
+        }
+    }
+
+    // Do pack for VS' output and FS' input
+    PackGenericInOut();
+
+    // Print inputLocMap and outputLocMap info and fill inputMapLocCount and outputMapLocCount
+    const uint32_t stageCount = 2;
+    for (uint32_t stageIdx = 0; stageIdx < stageCount; ++stageIdx)
+    {
+        const bool isNextStage = (stageIdx == 0);
+        const auto& shaderStage = isNextStage ? nextStage : m_shaderStage;
+
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC location input/output mapping results (" << GetShaderStageName(shaderStage)
+                  << " shader)\n\n");
+
+        auto& inOutUsage = isNextStage ? pNextResUsage->inOutUsage : pCurResUsage->inOutUsage;
+        auto& inputLocMap = inOutUsage.inputLocMap;
+        if (inputLocMap.empty() == false)
+        {
+            LLPC_ASSERT(inOutUsage.inputMapLocCount == 0);
+            for (auto& locMap : inputLocMap)
+            {
+                uint32_t location;
+                // NOTE: For vertex shader, the input location mapping is actually trivial.
+                if (shaderStage == ShaderStageVertex)
+                {
+                    LLPC_ASSERT(locMap.second == InvalidValue);
+                    locMap.second = locMap.first;
+                    location = locMap.first;
+                }
+                else
+                {
+                    // NOTE: For fragement shader, the input location mapping is done in packing process
+                    InOutPackInfo inPackInfo;
+                    inPackInfo.u32All = locMap.first;
+                    location = inPackInfo.fs.location;
+                }
+
+                inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, locMap.second + 1);
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Input:  loc = "
+                              << location << "  =>  Mapped = " << locMap.second << "\n");
+            }
+            LLPC_OUTS("\n");
+        }
+
+        auto& outputLocMap = inOutUsage.outputLocMap;
+        if (outputLocMap.empty() == false)
+        {
+            auto& outOrigLocs = inOutUsage.fs.outputOrigLocs;
+            auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+            if (shaderStage == ShaderStageFragment)
+            {
+                memset(&outOrigLocs, InvalidValue, sizeof(inOutUsage.fs.outputOrigLocs));
+            }
+
+            uint32_t nextMapLoc = 0;
+            LLPC_ASSERT(inOutUsage.outputMapLocCount == 0);
+            for (auto locMapIt = outputLocMap.begin(); locMapIt != outputLocMap.end();)
+            {
+                auto& locMap = *locMapIt;
+                if (shaderStage == ShaderStageFragment)
+                {
+                    auto location = locMap.first;
+                    if (pPipelineInfo->cbState.dualSourceBlendEnable && (location == 1))
+                    {
+                        location = 0;
+                    }
+                    if (pPipelineInfo->cbState.target[location].format == VK_FORMAT_UNDEFINED)
+                    {
+                        locMapIt = outputLocMap.erase(locMapIt);
+                        continue;
+                    }
+                }
+
+                auto loc = locMap.first;
+                if (isNextStage == false)
+                {
+                    InOutPackInfo outPackInfo = {};
+                    outPackInfo.u32All = locMap.first;
+                    loc = outPackInfo.vs.location;
+                }
+                else if (locMap.second == InvalidValue)
+                {
+                    // Only do location mapping if the output has not been mapped
+                    locMap.second = nextMapLoc++;
+                }
+
+                inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, locMap.second + 1);
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Output: loc = "
+                              << loc << "  =>  Mapped = " << locMap.second << "\n");
+
+                if (shaderStage == ShaderStageFragment)
+                {
+                    outOrigLocs[locMap.second] = locMap.first;
+                }
+
+                ++locMapIt;
+            }
+            LLPC_OUTS("\n");
+        }
+
+        LLPC_OUTS("// LLPC location count results (after input/output matching) \n\n");
+        LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Input:  loc count = "
+                      << inOutUsage.inputMapLocCount << "\n");
+        LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Output: loc count = "
+                      << inOutUsage.outputMapLocCount << "\n");
+        LLPC_OUTS("\n");
+    }
+}
+
+// =====================================================================================================================
+// Maps special built-in input/output to generic ones for packing input/output
+//
+// NOTE: This function should be called after generic input/output matching is done.
+void PatchResourceCollect::MapBuiltInToGenericInOutWithPack()
+{
+    LLPC_ASSERT(m_pContext->IsGraphics());
+    LLPC_ASSERT(m_shaderStage == ShaderStageVertex);
+
+    // NOTE: The rules of mapping built-ins to generic inputs/outputs are as follow:
+    //       (1) For built-in outputs, if next shader stager has corresponding built-in input used,
+    //           get the mapped location from next shader stage inout usage and use it. If next shader stage
+    //           is absent or it does not have such input used, we allocate the mapped location.
+    //       (2) For built-in inputs, we always allocate the mapped location based its actual usage.
+
+    if (m_shaderStage == ShaderStageVertex)
+    {
+        const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+        if (nextStage == ShaderStageFragment)
+        {
+            // Map FS built-in to generic input
+            auto pNextResUsage = m_pContext->GetShaderResourceUsage(nextStage);
+            // FS built-in inputs
+            const auto& nextBuiltInUsage = pNextResUsage->builtInUsage.fs;
+            auto& nextInOutUsage = pNextResUsage->inOutUsage;
+            uint32_t availInMapLoc = nextInOutUsage.inputMapLocCount;
+            if (nextBuiltInUsage.pointCoord)
+            {
+                nextInOutUsage.builtInInputLocMap[BuiltInPointCoord] = availInMapLoc++;
+            }
+
+            if (nextBuiltInUsage.primitiveId)
+            {
+                nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId] = availInMapLoc++;
+            }
+
+            if (nextBuiltInUsage.layer)
+            {
+                nextInOutUsage.builtInInputLocMap[BuiltInLayer] = availInMapLoc++;
+            }
+
+            if (nextBuiltInUsage.viewIndex)
+            {
+                nextInOutUsage.builtInInputLocMap[BuiltInViewIndex] = availInMapLoc++;
+            }
+
+            if (nextBuiltInUsage.viewportIndex)
+            {
+                nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex] = availInMapLoc++;
+            }
+
+            if ((nextBuiltInUsage.clipDistance > 0) || (nextBuiltInUsage.cullDistance > 0))
+            {
+                uint32_t mapLoc = availInMapLoc++;
+                if (nextBuiltInUsage.clipDistance + nextBuiltInUsage.cullDistance > 4)
+                {
+                    LLPC_ASSERT(nextBuiltInUsage.clipDistance +
+                        nextBuiltInUsage.cullDistance <= MaxClipCullDistanceCount);
+                    ++availInMapLoc; // Occupy two locations
+                }
+
+                if (nextBuiltInUsage.clipDistance > 0)
+                {
+                    nextInOutUsage.builtInInputLocMap[BuiltInClipDistance] = mapLoc;
+                }
+
+                if (nextBuiltInUsage.cullDistance > 0)
+                {
+                    if (nextBuiltInUsage.clipDistance >= 4)
+                    {
+                        ++mapLoc;
+                    }
+                    nextInOutUsage.builtInInputLocMap[BuiltInCullDistance] = mapLoc;
+                }
+            }
+
+            nextInOutUsage.inputMapLocCount = std::max(nextInOutUsage.inputMapLocCount, availInMapLoc);
+
+            // Map VS built-in to generic in/out
+            auto pCurResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+            auto& curInOutUsage = pCurResUsage->inOutUsage;
+            LLPC_ASSERT(curInOutUsage.builtInInputLocMap.empty()); // Should be empty
+            LLPC_ASSERT(curInOutUsage.builtInOutputLocMap.empty());
+            auto& curBuiltInUsage = pCurResUsage->builtInUsage;
+
+            uint32_t availOutMapLoc = curInOutUsage.outputMapLocCount;
+
+            if (nextBuiltInUsage.clipDistance > 0)
+            {
+                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) !=
+                    nextInOutUsage.builtInInputLocMap.end());
+                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+                curInOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
+            }
+
+            if (nextBuiltInUsage.cullDistance > 0)
+            {
+                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) !=
+                    nextInOutUsage.builtInInputLocMap.end());
+                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+                curInOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
+            }
+
+            if (nextBuiltInUsage.primitiveId)
+            {
+                // NOTE: The usage flag of gl_PrimitiveID must be set if fragment shader uses it.
+                curBuiltInUsage.vs.primitiveId = true;
+
+                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInPrimitiveId) !=
+                    nextInOutUsage.builtInInputLocMap.end());
+                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPrimitiveId];
+                curInOutUsage.builtInOutputLocMap[BuiltInPrimitiveId] = mapLoc;
+            }
+
+            if (nextBuiltInUsage.layer)
+            {
+                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) !=
+                    nextInOutUsage.builtInInputLocMap.end());
+                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+                curInOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
+            }
+
+            if (nextBuiltInUsage.viewIndex)
+            {
+                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewIndex) !=
+                    nextInOutUsage.builtInInputLocMap.end());
+                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewIndex];
+                curInOutUsage.builtInOutputLocMap[BuiltInViewIndex] = mapLoc;
+            }
+
+            if (nextBuiltInUsage.viewportIndex)
+            {
+                LLPC_ASSERT(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) !=
+                    nextInOutUsage.builtInInputLocMap.end());
+                const uint32_t mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+                curInOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
+            }
+
+            curInOutUsage.outputMapLocCount = std::max(curInOutUsage.outputMapLocCount, availOutMapLoc);
+
+            // Print builtin-to-generic mapping for current stage and next stage
+            const uint32_t stageCount = 2;
+            for (uint32_t stageIdx = 0; stageIdx < stageCount; ++stageIdx)
+            {
+                const bool isNextStage = (stageIdx == 0);
+                const auto& shaderStage = isNextStage ? nextStage : m_shaderStage;
+                const auto& inOutUsage = isNextStage ? nextInOutUsage : curInOutUsage;
+
+                LLPC_OUTS("===============================================================================\n");
+                LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << GetShaderStageName(shaderStage)
+                    << " shader)\n\n");
+
+                if (inOutUsage.builtInInputLocMap.empty() == false)
+                {
+                    for (const auto& builtInMap : inOutUsage.builtInInputLocMap)
+                    {
+                        const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
+                        const uint32_t loc = builtInMap.second;
+                        LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Input:  builtin = "
+                            << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                            << "  =>  Mapped = " << loc << "\n");
+                    }
+                    LLPC_OUTS("\n");
+                }
+
+                if (inOutUsage.builtInOutputLocMap.empty() == false)
+                {
+                    for (const auto& builtInMap : inOutUsage.builtInOutputLocMap)
+                    {
+                        const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
+                        const uint32_t loc = builtInMap.second;
+
+                        LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true)
+                            << ") Output: builtin = "
+                            << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                            << "  =>  Mapped = " << loc << "\n");
+
+                    }
+                    LLPC_OUTS("\n");
+                }
+
+                LLPC_OUTS("// LLPC location count results (after builtin-to-generic mapping)\n\n");
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Input:  loc count = "
+                    << inOutUsage.inputMapLocCount << "\n");
+                LLPC_OUTS("(" << GetShaderStageAbbreviation(shaderStage, true) << ") Output: loc count = "
+                    << inOutUsage.outputMapLocCount << "\n");
+                LLPC_OUTS("\n");
+            }
+        }
+        else
+        {
+            // TODO: Unsupported cases
+            LLPC_NEVER_CALLED();
+        }
+    }
+    else
+    {
+        // TODO: Unsupported cases
+        LLPC_NEVER_CALLED();
+    }
+}
+
+// =====================================================================================================================
+// Pack in/out will create calls with mapped location and packed component index
+// Pack generic output of current stage and generic input of next stage
+void PatchResourceCollect::PackGenericInOut()
+{
+    if (m_importedCalls.empty() && m_exportedCalls.empty())
+    {
+        // Skip. No need pack
+        return;
+    }
+
+    SmallVector<PackGroup, 4> packGroups;
+    std::vector<uint32_t>     orderedOutputCallIndices;
+    PrepareForInOutPack(packGroups, orderedOutputCallIndices);
+
+    uint32_t outputPackLoc = 0;
+    uint32_t inputPackLoc = 0;
+
+    // Create generic import calls with mapped location and component index
+    CreatePackedGenericInOut(packGroups, orderedOutputCallIndices, inputPackLoc, outputPackLoc);
+
+    // Create input and output calls for interpolant with matched location and component index
+    CreateInterpolateInOut(inputPackLoc, outputPackLoc);
+
+    // Remove unused location of VS outputLocMap
+    auto& outLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocMap;
+    for (auto locMapIt = outLocMap.begin(); locMapIt != outLocMap.end(); )
+    {
+        if (locMapIt->second == InvalidValue)
+        {
+            locMapIt = outLocMap.erase(locMapIt);
+        }
+        else
+        {
+            ++locMapIt;
+        }
+    }
+}
+
+// =====================================================================================================================
+// Prepare data for creating packed in/out
+void PatchResourceCollect::PrepareForInOutPack(
+    SmallVector<PackGroup, 4>& packGroups,                 // [in, out] Info of pack groups
+    std::vector<uint32_t>&     orderedOutputCallIndices)   // [in, out] A set of indices of ordered output calls
+{
+    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    LLPC_ASSERT(nextStage != ShaderStageInvalid);
+    const auto& nextInLocMap = m_pContext->GetShaderResourceUsage(nextStage)->inOutUsage.inputLocMap;
+
+    // nextStage's inputLocMap is used for partioning m_shaderStage's output calls in VS-FS pipeline
+    if (m_exportedCalls.empty() == false)
+    {
+        auto& outLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocMap;
+
+        orderedOutputCallIndices.reserve(m_exportedCalls.size());
+        for (const auto& locMap : nextInLocMap)
+        {
+            auto loc = locMap.first;
+            InOutPackInfo* pInPackInfo = reinterpret_cast<InOutPackInfo*>(&loc);
+            InOutPackInfo  outPackInfo = {};
+            outPackInfo.vs.compIdx = pInPackInfo->fs.compIdx;
+            outPackInfo.vs.location = pInPackInfo->fs.location;
+
+            if (pInPackInfo->fs.isInterpolant)
+            {
+                // Skip. Not join in packing.
+                break;
+            }
+
+            LLPC_ASSERT(outLocMap.find(outPackInfo.u32All) != outLocMap.end());
+            uint32_t callIndex = outLocMap[outPackInfo.u32All];
+            orderedOutputCallIndices.push_back(callIndex);
+        }
+    }
+
+    // A pack group has the same bitWdith, interpMode and interpLoc
+    uint32_t callCount = 0;
+    InOutPackInfo packInfo = {};
+
+    for (auto locMapIt = nextInLocMap.begin(); locMapIt != nextInLocMap.end(); ++locMapIt, ++callCount)
+    {
+        auto loc = locMapIt->first;
+        InOutPackInfo* pCurPackInfo = reinterpret_cast<InOutPackInfo*>(&loc);
+        // No need pack info for interpolant calls
+        if (pCurPackInfo->fs.isInterpolant)
+        {
+            break;
+        }
+
+        if (locMapIt != nextInLocMap.begin())
+        {
+            InOutPackInfo curPackInfo = {};
+            curPackInfo.fs.interpLoc  = pCurPackInfo->fs.interpLoc;
+            curPackInfo.fs.interpMode = pCurPackInfo->fs.interpMode;
+            curPackInfo.fs.bitWidth   = (pCurPackInfo->fs.bitWidth == BitWidth64) ? BitWidth64 : BitWidth32;
+
+            if (curPackInfo.u32All != packInfo.u32All)
+            {
+                // Update the current pack group
+                auto& curPackGroup = packGroups.back();
+                curPackGroup.scalarizedCallCount = callCount;
+
+                // Add a new pack group
+                PackGroup packGroup = {};
+                packGroup.is64Bit = (curPackInfo.fs.bitWidth == BitWidth64);
+                packGroups.push_back(packGroup);
+
+                packInfo.u32All = curPackInfo.u32All; // Reset packInfo
+                callCount = 0; // Reset call count for a new pack group
+            }
+        }
+        else
+        {
+            packInfo.fs.interpLoc  = pCurPackInfo->fs.interpLoc;
+            packInfo.fs.interpMode = pCurPackInfo->fs.interpMode;
+            packInfo.fs.bitWidth   = (pCurPackInfo->fs.bitWidth == BitWidth64) ? BitWidth64 : BitWidth32;
+
+            // Add the first pack group
+            PackGroup packGroup = {};
+            packGroup.is64Bit = (packInfo.fs.bitWidth == BitWidth64);
+            packGroups.push_back(packGroup);
+        }
+    }
+
+    if (packGroups.empty() == false)
+    {
+        auto& lastPackGroup = packGroups.back();
+        lastPackGroup.scalarizedCallCount = callCount;
+    }
+
+    // All current stage's output and next stage's inputs should be added to dead calls list.
+    // Because they will be recreated with new location and component index
+    for (auto pCall : m_importedCalls)
+    {
+        m_deadCalls.insert(pCall);
+    }
+
+    for (auto pCall : m_exportedCalls)
+    {
+        m_deadCalls.insert(pCall);
+    }
+}
+
+// =====================================================================================================================
+// Create generic import and export calls with new mapped location and component index
+void PatchResourceCollect::CreatePackedGenericInOut(
+    const SmallVector<PackGroup, 4>& packGroups,               // [in] Info of pack groups
+    const std::vector<uint32_t>&     orderedOutputCallIndices, // [in] A set of indices of ordered output calls
+    uint32_t&                        inputPackLoc,             // [out] The final packed location for input
+    uint32_t&                        outputPackLoc)            // [Out] The final packed location for output
+{
+    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    LLPC_ASSERT(nextStage != ShaderStageInvalid);
+    auto& nextInLocMap = m_pContext->GetShaderResourceUsage(nextStage)->inOutUsage.inputLocMap;
+    auto inlocMapIt = nextInLocMap.begin();
+
+    uint32_t callIndexPos = 0;
+
+    for (const auto& packGroup : packGroups)
+    {
+        const uint32_t scalarizedCount = packGroup.scalarizedCallCount;
+        if (scalarizedCount > 0)
+        {
+            inlocMapIt = CreatePackedGenericInput(packGroup.is64Bit, scalarizedCount, inputPackLoc, inlocMapIt);
+
+            CreatePackedGenericOutput(orderedOutputCallIndices, packGroup.is64Bit, scalarizedCount, callIndexPos, outputPackLoc);
+        }
+    }
+}
+
+// =====================================================================================================================
+// Create input and output calls for interpolant with packed location and component index
+void PatchResourceCollect::CreateInterpolateInOut(
+    uint32_t& inputPackLoc,        // [int, out] The final packed output location
+    uint32_t& outputPackLoc)       // [int, out] The final packed output location
+{
+    if (m_hasInterpolantInput == false)
+    {
+        return;
+    }
+
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(m_importedCalls.front());
+
+    const auto nextStage = m_pContext->GetNextShaderStage(m_shaderStage);
+    auto& nextInLocMap = m_pContext->GetShaderResourceUsage(nextStage)->inOutUsage.inputLocMap;
+    for (auto pCall : m_importedCalls)
+    {
+        auto mangledName = pCall->getCalledFunction()->getName();
+        if (mangledName.startswith(LlpcName::InputImportInterpolant) == false)
+        {
+            continue;
+        }
+
+        // Create interpolant input with matched location
+        InOutPackInfo inPackInfo = {};
+        inPackInfo.fs.compIdx = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+        LLPC_ASSERT(inPackInfo.fs.compIdx == 0);
+
+        auto loc = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+        auto locOffset = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        loc += locOffset;
+        inPackInfo.fs.location = loc;
+
+        // Check if the location is proccessed by generic input
+        bool found = false;
+        InOutPackInfo usedPackInfo = {};
+        for (auto locMap : nextInLocMap)
+        {
+            usedPackInfo.u32All = locMap.first;
+            if (usedPackInfo.fs.isInterpolant)
+            {
+                break;
+            }
+            if ((inPackInfo.fs.compIdx == usedPackInfo.fs.compIdx) && (inPackInfo.fs.location == usedPackInfo.fs.location))
+            {
+                found = true;
+                break;
+            }
+        }
+
+        Type* pReturnTy = pCall->getCalledFunction()->getReturnType();
+        inPackInfo.fs.interpolantCompCount = pReturnTy->isVectorTy() ? pReturnTy->getVectorNumElements() : 1;
+
+        inPackInfo.fs.isInterpolant = true;
+
+        uint32_t matchedLoc = InvalidValue;
+
+        if (found)
+        {
+            matchedLoc = usedPackInfo.u32All;
+            nextInLocMap.erase(inPackInfo.u32All);
+        }
+        else
+        {
+            matchedLoc = inPackInfo.u32All;
+
+            // InvalidValue means the variable is only used for interpolation, we should update it here
+            if (nextInLocMap[inPackInfo.u32All] == InvalidValue)
+            {
+                nextInLocMap[inPackInfo.u32All] = inputPackLoc++;
+            }
+        }
+
+        SmallVector<Value*, 5> args;
+        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), matchedLoc));
+        for (uint32_t operandIdx = 1; operandIdx < pCall->getNumArgOperands(); ++operandIdx)
+        {
+            args.push_back(pCall->getOperand(operandIdx));
+        }
+
+        Value* pOutValue = EmitCall(mangledName,
+                                    pCall->getCalledFunction()->getReturnType(),
+                                    args,
+                                    NoAttrib,
+                                    pCall);
+        pCall->replaceAllUsesWith(pOutValue);
+    }
+
+    // Restore splitted scalar-like VS generic outputs back to original vectors
+    builder.SetInsertPoint(m_exportedCalls.back());
+
+    auto& outLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocMap;
+
+    for (auto inLocMap : nextInLocMap)
+    {
+        auto loc = inLocMap.first;
+        InOutPackInfo* pInPackInfo = reinterpret_cast<InOutPackInfo*>(&loc);
+        if (pInPackInfo->fs.isInterpolant == false)
+        {
+            continue;
+        }
+
+        InOutPackInfo outPackInfo = {};
+        outPackInfo.vs.location = pInPackInfo->fs.location;
+        const uint32_t compCount = pInPackInfo->fs.interpolantCompCount;
+        uint32_t callIndices[4] = {};
+        for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+        {
+            outPackInfo.vs.compIdx = compIdx;
+            callIndices[compIdx] = outLocMap[outPackInfo.u32All];
+        }
+
+        CallInst* pCall = m_exportedCalls[callIndices[0]];
+        LLPC_ASSERT(cast<ConstantInt>(pCall->getOperand(1))->getZExtValue() == 0);
+        outPackInfo.vs.compIdx = 0;
+
+        Value* args[3] = {nullptr};
+        // The restored output with matched Location and elem index 0
+        args[0] = ConstantInt::get(m_pContext->Int32Ty(), outPackInfo.u32All);
+        args[1] = ConstantInt::get(m_pContext->Int32Ty(), 0);
+
+        std::string callName = LlpcName::OutputExportGeneric;
+
+        if (compCount == 1)
+        {
+            // The restored output is scalar output
+            outLocMap[outPackInfo.u32All] = outputPackLoc;
+
+            args[2] = pCall->getOperand(2);
+
+            AddTypeMangling(m_pContext->VoidTy(), args, callName);
+
+            EmitCall(callName,
+                     m_pContext->VoidTy(),
+                     args,
+                     NoAttrib,
+                     builder);
+        }
+        else
+        {
+            // Construct the vector for output value
+            CallInst* pCall = m_exportedCalls[callIndices[0]];
+
+            Value* pOutValue = UndefValue::get(VectorType::get(pCall->getOperand(2)->getType(), compCount));
+            for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+            {
+                outPackInfo.vs.compIdx = compIdx;
+                LLPC_ASSERT(outLocMap.find(outPackInfo.u32All) != outLocMap.end());
+                // The scalar item is merged into a vector and it marked invalid to be removed from map later
+                outLocMap[outPackInfo.u32All] = InvalidValue;
+
+                pCall = m_exportedCalls[callIndices[compIdx]];
+                Value* pCompIdx = ConstantInt::get(m_pContext->Int32Ty(), compIdx);
+                pOutValue = builder.CreateInsertElement(pOutValue, pCall->getOperand(2), pCompIdx);
+            }
+            args[2] = pOutValue;
+
+            AddTypeMangling(m_pContext->VoidTy(), args, callName);
+
+            EmitCall(callName,
+                     m_pContext->VoidTy(),
+                     args,
+                     NoAttrib,
+                     builder);
+
+            outPackInfo.vs.compIdx = 0;
+            outLocMap[outPackInfo.u32All] = outputPackLoc;
+        }
+        ++outputPackLoc;
+    }
+}
+
+// =====================================================================================================================
+// Create generic import calls with packed location and component index
+//
+// NOTE: In this function, the pack is for VS-FS pipeline
+LocMapIterator PatchResourceCollect::CreatePackedGenericInput(
+    bool            is64Bit,            // Whether the pack group is 64-bit
+    uint32_t        inputCallCount,     // The count of input calls
+    uint32_t&       packLoc,            // [in, out] The packed location (continuous)
+    LocMapIterator  locMapIt)           // The iterator of next stage's inputLocMap
+{
+    const uint32_t compCount = is64Bit ? 2 : 4;
+
+    // [0]: The count of packed calls occupied four channels
+    // [1]: The count of packed call is 1 when the count of (remianed) input calls is less than 4
+    const uint32_t callCounts[2] = { inputCallCount / compCount, 1 };
+
+    // [0]: The count of component for packed calls occupied four channels
+    // [1]: The count of component for packed calls occupied partial channels
+    const uint32_t compCounts[2] = { compCount, inputCallCount - callCounts[0] * compCount };
+
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(m_importedCalls.front());
+
+    // FS' input scalar calls follow the merging rule of VS' output scalar calls
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        const uint32_t callCount = callCounts[i];
+        const uint32_t compCount = compCounts[i];
+        if ((callCount == 0) || (compCount == 0))
+        {
+            continue;
+        }
+
+        for (uint32_t j = 0; j < callCount; ++j)
+        {
+            Value* args[4] = { nullptr };
+
+            args[0] = ConstantInt::get(m_pContext->Int32Ty(), locMapIt->first);
+
+            for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+            {
+                // Create generic input with matched location and component index
+                CallInst* pCall = m_importedCalls[locMapIt->second];
+
+                // Update the component index of the new input call
+                const uint32_t newCompIdx = is64Bit ? (compIdx * 2) : compIdx;
+                args[1] = ConstantInt::get(m_pContext->Int32Ty(), newCompIdx);
+                args[2] = pCall->getOperand(2);
+                args[3] = pCall->getOperand(3);
+
+                Type* pOrigReturnTy = pCall->getCalledFunction()->getReturnType();
+                Type* pReturnTy = is64Bit ? m_pContext->Floatx2Ty() : m_pContext->FloatTy();
+                std::string callName = LlpcName::InputImportGeneric;
+                AddTypeMangling(pReturnTy, args, callName);
+
+                Value* pOutValue = EmitCall(callName,
+                                            pReturnTy,
+                                            args,
+                                            NoAttrib,
+                                            builder);
+
+                // VS' packed output converts non-float type to float type
+               // So a reverse conversion is required for reading non-float type
+                if (is64Bit)
+                {
+                    pOutValue = builder.CreateBitCast(pOutValue, pOrigReturnTy);
+                }
+                else if (pOrigReturnTy->isHalfTy())
+                {
+                    // f16 -> float
+                    pOutValue = builder.CreateFPTrunc(pOutValue, pOrigReturnTy);
+                }
+                else if (pOrigReturnTy->isIntegerTy())
+                {
+                    pOutValue = builder.CreateBitCast(pOutValue, m_pContext->Int32Ty());
+                    if (pOrigReturnTy->getScalarSizeInBits() < 32)
+                    {
+                        pOutValue = builder.CreateTrunc(pOutValue, pOrigReturnTy);
+                    }
+                }
+
+                pCall->replaceAllUsesWith(pOutValue);
+
+                // Update the mapped location
+                locMapIt->second = packLoc;
+
+                ++locMapIt;
+            }
+
+            ++packLoc;
+        }
+    }
+    return locMapIt;
+}
+
+// =====================================================================================================================
+// Create merged import calls with packed location and component index
+//
+// NOTE: In this function, the pack is for VS-FS pipeline
+void PatchResourceCollect::CreatePackedGenericOutput(
+    const std::vector<uint32_t>& orderedOutputCallIndices,  // [in] A set of indices of ordered output calls
+    bool                         is64Bit,                   // Whether the pack group is 64-bit
+    uint32_t                     outputCallCount,           // The count of output calls
+    uint32_t&                    callIndexPos,              // [in,out] The position of the call index
+    uint32_t&                    packLoc)                   // [in,out] The packed location (continuous)
+{
+    if (orderedOutputCallIndices.empty())
+    {
+        return;
+    }
+
+    const uint32_t compCount = is64Bit ? 2 : 4;
+
+    // [0]: The count of packed calls occupied four channels
+    // [1]: The count of packed call is 1 when the count of (remained) input calls is less than 4
+    const uint32_t callCounts[2] = { outputCallCount / compCount, 1 };
+
+    // [0]: The count of component for packed calls occupied four channels
+    // [1]: The count of component for packed calls occupied partial channels
+    const uint32_t compCounts[2] = { compCount, outputCallCount - callCounts[0] * compCount };
+
+    // [0]: The count of channels of output value corresponding to callCount[0]
+    // [1]: The count of channels of output value corresponding to callCount[1]
+    uint32_t channelCounts[2];
+    channelCounts[0] = 4;
+    channelCounts[1] = is64Bit ? 2 : compCounts[1];
+
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(m_exportedCalls.back());
+
+    auto& outLocMap = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocMap;
+
+    // Traverse the two cases
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        const uint32_t callCount = callCounts[i];
+        const uint32_t compCount = compCounts[i];
+        const uint32_t channelCount = channelCounts[i];
+        if ((callCount == 0) || (compCount == 0))
+        {
+            continue;
+        }
+
+        Value* pOutValue = UndefValue::get(VectorType::get(m_pContext->FloatTy(), channelCount));
+
+        for (uint32_t j = 0; j < callCount; ++j)
+        {
+            CallInst* pCall = m_exportedCalls[orderedOutputCallIndices[callIndexPos]];
+            // NOTE: a packed vs output call can be identified by the combination of component index,
+            // location and channel mask to gurantee the unique of shader cache
+            InOutPackInfo outPackInfo = {};
+            outPackInfo.vs.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+            outPackInfo.vs.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+
+            // Construct the new output value from scalar calls
+            for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+            {
+                CallInst* pCall = m_exportedCalls[orderedOutputCallIndices[callIndexPos + compIdx]];
+
+                // Mark item related to the scalar call as invald to be removed later
+                InOutPackInfo packInfo = {};
+                packInfo.vs.compIdx = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+                packInfo.vs.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+                outLocMap[packInfo.u32All] = InvalidValue;
+
+                outPackInfo.vs.channelMask |= (1 << packInfo.vs.compIdx);
+
+                Value* pComp = pCall->getOperand(2);
+
+                SmallVector<Value*, 2> comps;
+                // 64-bit scalar call is converted into <2xfloat>
+                if (is64Bit)
+                {
+                    pComp = builder.CreateBitCast(pComp, m_pContext->Floatx2Ty());
+                    comps.push_back(builder.CreateExtractElement(pComp, uint64_t(0)));
+                    comps.push_back(builder.CreateExtractElement(pComp, uint64_t(1)));
+                }
+                else
+                {
+                    comps.push_back(pComp);
+                }
+
+                const uint32_t newCompIdx = is64Bit ? (compIdx * 2) : compIdx;
+                uint32_t j = 0;
+                for (auto& pComp : comps)
+                {
+                    // Non-float type is converted into float type as the element of output vector
+                    if (pComp->getType()->isIntegerTy())
+                    {
+                        if (pComp->getType()->getScalarSizeInBits() < 32)
+                        {
+                            pComp = builder.CreateZExt(pComp, m_pContext->Int32Ty());
+                        }
+                        pComp = builder.CreateBitCast(pComp, m_pContext->FloatTy());
+                    }
+                    else if (pComp->getType()->isHalfTy())
+                    {
+                        pComp = builder.CreateFPExt(pComp, m_pContext->FloatTy());
+                    }
+                    Value* pCompIdx = ConstantInt::get(m_pContext->Int32Ty(), newCompIdx + j);
+                    pOutValue = builder.CreateInsertElement(pOutValue, pComp, pCompIdx);
+                    ++j;
+                }
+            }
+            Value* args[3] = { nullptr };
+            args[0] = ConstantInt::get(m_pContext->Int32Ty(), outPackInfo.u32All);
+            // The new output will export a vector from packed location
+            args[1] = ConstantInt::get(m_pContext->Int32Ty(), 0);
+            args[2] = pOutValue;
+
+            std::string callName = LlpcName::OutputExportGeneric;
+            AddTypeMangling(m_pContext->VoidTy(), args, callName);
+
+            EmitCall(callName,
+                     m_pContext->VoidTy(),
+                     args,
+                     NoAttrib,
+                     builder);
+
+            callIndexPos += compCount;
+
+            // Update final packed location for vector calls
+            outLocMap[outPackInfo.u32All] = packLoc++;
+        }
+    }
 }
 
 } // Llpc

@@ -164,6 +164,9 @@ bool PatchNullFragShader::runOnModule(
     GraphicsContext* pGraphicsContext = static_cast<GraphicsContext*>(m_pContext->GetPipelineContext());
     pGraphicsContext->InitShaderInfoForNullFs();
 
+    // Disable pack in/out for null FS
+    pGraphicsContext->SetPackInOut(false);
+
     return true;
 }
 

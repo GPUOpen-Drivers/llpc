@@ -40,6 +40,7 @@
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcContext.h"
+#include "llpcPipelineContext.h"
 #include "llpcSpirvLowerGlobal.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-global"
@@ -1426,13 +1427,48 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     inOutInfo.SetInterpLoc(interpLoc);
                     inOutInfo.SetInterpMode(inOutMeta.InterpMode);
                 }
-                pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
-                                                                 inOutMeta.Value,
-                                                                 pLocOffset,
-                                                                 pElemIdx,
-                                                                 maxLocOffset,
-                                                                 inOutInfo,
-                                                                 pVertexIdx);
+
+                // Split vector into scalar for generic input, which is executed once by MapInputToProxy()
+                if ((inOutInfo.HasInterpAux() == false) &&
+                    pInOutTy->isVectorTy() &&
+                    m_pContext->CheckPackInOutValidity(m_shaderStage, false))
+                {
+                    const uint32_t compCount = pInOutTy->getVectorNumElements();
+
+                    uint32_t locAdjust[]   = { 0, 0, 0, 0 };
+                    uint32_t locAdjust64[] = { 0, 0, 1, 1 };
+                    uint32_t* pLocAdjust   = (pInOutTy->getScalarSizeInBits() != 64) ? locAdjust : locAdjust64;
+
+                    uint32_t compAdjust[]   = { 0, 1, 2, 3 };
+                    uint32_t compAdjust64[] = { 0, 1, 0, 1 };
+                    uint32_t* pCompAdjust   = (pInOutTy->getScalarSizeInBits() != 64) ? compAdjust : compAdjust64;
+
+                    for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+                    {
+                        uint32_t loc = inOutMeta.Value + (*pLocAdjust++);
+                        pElemIdx = m_pBuilder->getInt32((*pCompAdjust++) + elemIdx);
+
+                        Value* pElem = m_pBuilder->CreateReadGenericInput(pInOutTy->getVectorElementType(),
+                                                                          loc,
+                                                                          pLocOffset,
+                                                                          pElemIdx,
+                                                                          maxLocOffset,
+                                                                          inOutInfo,
+                                                                          pVertexIdx);
+
+                        pInOutValue = m_pBuilder->CreateInsertElement(pInOutValue, pElem, m_pBuilder->getInt32(compIdx));
+                    }
+                }
+                else
+                {
+                    pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
+                                                                     inOutMeta.Value,
+                                                                     pLocOffset,
+                                                                     pElemIdx,
+                                                                     maxLocOffset,
+                                                                     inOutInfo,
+                                                                     pVertexIdx);
+                }
             }
             else
             {
@@ -1741,13 +1777,44 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                       "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
         }
 
-        m_pBuilder->CreateWriteGenericOutput(pOutputValue,
-                                             location,
-                                             pLocOffset,
-                                             pElemIdx,
-                                             maxLocOffset,
-                                             outputInfo,
-                                             pVertexIdx);
+        // Split vector into scalars for generic output, which is executed once by MapOutputToProxy()
+        if (pOutputTy->isVectorTy() && m_pContext->CheckPackInOutValidity(m_shaderStage, true))
+        {
+            const uint32_t compCount = pOutputTy->getVectorNumElements();
+
+            uint32_t locAdjust[]   = { 0, 0, 0, 0 };
+            uint32_t locAdjust64[] = { 0, 0, 1, 1 };
+            uint32_t* pLocAdjust   = (pOutputTy->getScalarSizeInBits() != 64) ? locAdjust : locAdjust64;
+
+            uint32_t compAdjust[]   = { 0, 1, 2, 3 };
+            uint32_t compAdjust64[] = { 0, 1, 0, 1 };
+            uint32_t* pCompAdjust   = (pOutputTy->getScalarSizeInBits() != 64) ? compAdjust : compAdjust64;
+
+            for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
+            {
+                Value* pElem = m_pBuilder->CreateExtractElement(pOutputValue, m_pBuilder->getInt32(compIdx));
+                uint32_t loc = location + *pLocAdjust++;
+                pElemIdx = m_pBuilder->getInt32((*pCompAdjust++) + elemIdx);
+
+                m_pBuilder->CreateWriteGenericOutput(pElem,
+                                                     loc,
+                                                     pLocOffset,
+                                                     pElemIdx,
+                                                     maxLocOffset,
+                                                     outputInfo,
+                                                     pVertexIdx);
+            }
+        }
+        else
+        {
+            m_pBuilder->CreateWriteGenericOutput(pOutputValue,
+                                                 location,
+                                                 pLocOffset,
+                                                 pElemIdx,
+                                                 maxLocOffset,
+                                                 outputInfo,
+                                                 pVertexIdx);
+        }
     }
 }
 

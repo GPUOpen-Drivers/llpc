@@ -103,6 +103,19 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
+    // Checks whether pack in/out is valid for VS-FS pipeline
+    virtual bool CheckPackInOutValidity(ShaderStage shaderStage, bool isOutput) const 
+    { 
+        LLPC_NEVER_CALLED();
+        return false; 
+    }
+
+    // Checks whether pack in/out is enabled
+    virtual bool IsPackInOut() const { LLPC_NEVER_CALLED(); return false; }
+
+    // Sets pack in/out in
+    virtual void SetPackInOut(bool packInOut) { LLPC_NEVER_CALLED(); }
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(ComputeContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(ComputeContext);

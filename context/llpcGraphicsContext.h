@@ -106,6 +106,15 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
+    // Checks whether pack input/output is valid. Current VS output and FS input in VS-FS pipeline is packable
+    virtual bool CheckPackInOutValidity(ShaderStage shaderStage, bool isOutput) const;
+
+    // Checks whether pack in/out is enabled
+    virtual bool IsPackInOut() const { return m_packInOut; }
+
+    // Sets pack in/out in
+    virtual void SetPackInOut(bool packInOut) { m_packInOut = packInOut; }
+
     void InitShaderInfoForNullFs();
 
 private:
@@ -132,6 +141,8 @@ private:
 #if LLPC_BUILD_GFX10
     NggControl      m_nggControl;   // NGG control settings
 #endif
+
+    bool            m_packInOut;    // Whether to enable pack in/out
 
     llvm::SmallVector<std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingNode>>, 4>
                     m_allocUserDataNodes;               // Allocated merged user data nodes
