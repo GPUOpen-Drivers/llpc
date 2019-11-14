@@ -83,6 +83,16 @@ struct ResourceNode
     };
 };
 
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
+struct NggControl : NggState
+{
+    bool                            passthroughMode; // Whether NGG passthrough mode is enabled
+    Util::Abi::PrimShaderCbLayout   primShaderTable; // Primitive shader table (only some registers are used)
+};
+#endif
+
 // =====================================================================================================================
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
 class PipelineState : public Pipeline
@@ -129,6 +139,23 @@ public:
     // need a BuilderReplayer pass.
     void SetNoReplayer() { m_noReplayer = true; }
 
+    // Determine whether to use off-chip tessellation mode
+    bool IsTessOffChip();
+
+    // Set GS on-chip mode
+    void SetGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
+
+    // Checks whether GS on-chip mode is enabled
+    // NOTE: GS on-chip mode has different meaning for GFX6~8 and GFX9: on GFX6~8, GS on-chip mode means ES -> GS ring
+    // and GS -> VS ring are both on-chip; on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
+    // ring is on-chip.
+    bool IsGsOnChip() const { return m_gsOnChip; }
+
+#if LLPC_BUILD_GFX10
+    // Get NGG control settings
+    NggControl* GetNggControl() { return &m_nggControl; }
+#endif
+
 private:
     // Type of immutable nodes map used in SetUserDataNodes
     typedef std::map<std::pair<uint32_t, uint32_t>, const DescriptorRangeValue*> ImmutableNodesMap;
@@ -151,6 +178,11 @@ private:
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
                                                                         // Cached MDString for each resource node type
+
+    bool                            m_gsOnChip = false;                 // Whether to use GS on-chip mode
+#if LLPC_BUILD_GFX10
+    NggControl                      m_nggControl = {};                  // NGG control settings
+#endif
 };
 
 // =====================================================================================================================

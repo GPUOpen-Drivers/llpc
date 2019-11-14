@@ -484,7 +484,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     }
 
 #if LLPC_BUILD_GFX10
-    const bool enableNgg = m_pContext->IsGraphics() ? m_pContext->GetNggControl()->enableNgg : false;
+    const bool enableNgg = m_pContext->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
 #endif
 
     switch (m_shaderStage)
@@ -532,7 +532,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
             const auto gfxIp = m_pContext->GetGfxIpVersion();
-            if (((gfxIp.major >= 9) && (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize))
+            if (((gfxIp.major >= 9) && (m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize))
 #if LLPC_BUILD_GFX10
                 || (enableNgg && (m_hasTs == false))
 #endif
@@ -576,7 +576,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
             // with PAL's GS on-chip behavior. i.e. GS is GFX8
-            if ((m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
+            if ((m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize)
 #if LLPC_BUILD_GFX10
                 || enableNgg
 #endif
@@ -1002,7 +1002,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     case ShaderStageTessControl:
         {
-            if (m_pContext->IsTessOffChip())
+            if (m_pPipelineState->IsTessOffChip())
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tcs.offChipLdsBase = argTys.size();
@@ -1025,7 +1025,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         {
             if (m_hasGs)    // TES acts as hardware ES
             {
-                if (m_pContext->IsTessOffChip())
+                if (m_pPipelineState->IsTessOffChip())
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.offChipLdsBase = argTys.size(); // Off-chip LDS buffer base
@@ -1040,7 +1040,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             }
             else  // TES acts as hardware VS
             {
-                if (m_pContext->IsTessOffChip() || enableXfb)
+                if (m_pPipelineState->IsTessOffChip() || enableXfb)
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.streamOutData.streamInfo = argTys.size();
@@ -1064,7 +1064,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     }
                 }
 
-                if (m_pContext->IsTessOffChip()) // Off-chip LDS buffer base
+                if (m_pPipelineState->IsTessOffChip()) // Off-chip LDS buffer base
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.offChipLdsBase = argTys.size();

@@ -35,6 +35,7 @@
 #include "llpcCodeGenManager.h"
 #include "llpcElfReader.h"
 #include "llpcGfx9ConfigBuilder.h"
+#include "llpcPipelineState.h"
 
 namespace llvm
 {
@@ -71,7 +72,7 @@ void ConfigBuilder::BuildPalMetadata()
     {
         const bool hasTs = (m_hasTcs || m_hasTes);
 #if LLPC_BUILD_GFX10
-        const bool enableNgg = m_pContext->GetNggControl()->enableNgg;
+        const bool enableNgg = m_pPipelineState->GetNggControl()->enableNgg;
 #endif
 
         if ((hasTs == false) && (m_hasGs == false))
@@ -718,7 +719,7 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    const auto pNggControl = m_pContext->GetNggControl();
+    const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
@@ -811,7 +812,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    const auto pNggControl = m_pContext->GetNggControl();
+    const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
@@ -948,7 +949,7 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    LLPC_ASSERT(m_pContext->GetNggControl()->enableNgg);
+    LLPC_ASSERT(m_pPipelineState->GetNggControl()->enableNgg);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
 
@@ -1051,7 +1052,7 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    LLPC_ASSERT(m_pContext->GetNggControl()->enableNgg);
+    LLPC_ASSERT(m_pPipelineState->GetNggControl()->enableNgg);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
 
@@ -1416,7 +1417,7 @@ Result ConfigBuilder::BuildVsRegConfig(
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 2);
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
         }
@@ -1447,7 +1448,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         }
 
         const auto pGsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
-        if (m_pContext->IsGsOnChip() && cl::InRegEsGsLdsSize)
+        if (m_pPipelineState->IsGsOnChip() && cl::InRegEsGsLdsSize)
         {
             LLPC_ASSERT(pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize != 0);
 
@@ -1653,7 +1654,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     const auto& calcFactor = pTcsResUsage->inOutUsage.tcs.calcFactor;
     uint32_t ldsSizeInDwords = calcFactor.onChip.patchConstStart +
                                calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
     }
@@ -1827,7 +1828,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
             esVgprCompCnt = 2;
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
         }
@@ -1857,7 +1858,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     // TODO: Currently only support offchip GS
     SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_ON);
         SET_REG_FIELD(&pConfig->m_esGsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
@@ -2037,7 +2038,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     const auto gfxIp = m_pContext->GetGfxIpVersion();
     LLPC_ASSERT(gfxIp.major >= 10);
 
-    const auto pNggControl = m_pContext->GetNggControl();
+    const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
     const uint32_t stageMask = m_pContext->GetShaderStageMask();
@@ -2134,7 +2135,7 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
             esVgprCompCnt = 2;
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
         }
@@ -2967,7 +2968,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     }
 
 #if LLPC_BUILD_GFX10
-    const bool enableNgg = m_pContext->IsGraphics() ? m_pContext->GetNggControl()->enableNgg : false;
+    const bool enableNgg = m_pContext->IsGraphics() ? m_pPipelineState->GetNggControl()->enableNgg : false;
     LLPC_UNUSED(enableNgg);
 #endif
 
@@ -3259,7 +3260,7 @@ void ConfigBuilder::SetupVgtTfParam(
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, PARTITIONING, partition);
     SET_REG_FIELD(pConfig, VGT_TF_PARAM, TOPOLOGY, topology);
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         SET_REG_FIELD(pConfig, VGT_TF_PARAM, DISTRIBUTION_MODE, TRAPEZOIDS);
     }

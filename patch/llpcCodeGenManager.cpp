@@ -46,6 +46,7 @@
 #include "llpcFile.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
+#include "llpcPipelineState.h"
 
 namespace llvm
 {
@@ -143,7 +144,8 @@ Result CodeGenManager::CreateTargetMachine(
 // =====================================================================================================================
 // Setup LLVM target features, target features are set per entry point function.
 void CodeGenManager::SetupTargetFeatures(
-    Module* pModule)  // [in, out] LLVM module
+    PipelineState*      pPipelineState, // [in] Pipeline state
+    Module*             pModule)        // [in, out] LLVM module
 {
     Context* pContext = static_cast<Context*>(&pModule->getContext());
     auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
@@ -193,7 +195,7 @@ void CodeGenManager::SetupTargetFeatures(
             {
                 // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
                 // read/write. This usage must enable the feature of using CI+ additional instructions.
-                const auto pNggControl = pContext->GetNggControl();
+                const auto pNggControl = pPipelineState->GetNggControl();
                 if (pNggControl->enableNgg && (pNggControl->passthroughMode == false))
                 {
                     targetFeatures += ",+ci-insts,+enable-ds128";

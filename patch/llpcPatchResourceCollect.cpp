@@ -30,18 +30,29 @@
  */
 #define DEBUG_TYPE "llpc-patch-resource-collect"
 
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "SPIRVInternal.h"
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
+#include "llpcGfx6Chip.h"
+#include "llpcGfx9Chip.h"
 #include "llpcIntrinsDefs.h"
+#if LLPC_BUILD_GFX10
+#include "llpcNggLdsManager.h"
+#endif
 #include "llpcPatchResourceCollect.h"
 #include "llpcPipelineShaders.h"
 
 using namespace llvm;
 using namespace Llpc;
+
+// -disable-gs-onchip: disable geometry shader on-chip mode
+cl::opt<bool> DisableGsOnChip("disable-gs-onchip",
+                              cl::desc("Disable geometry shader on-chip mode"),
+                              cl::init(false));
 
 namespace Llpc
 {
@@ -78,6 +89,7 @@ bool PatchResourceCollect::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
     Patch::Init(&module);
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
     // Process each shader stage, in reverse order.
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
@@ -95,25 +107,940 @@ bool PatchResourceCollect::runOnModule(
     {
 #if LLPC_BUILD_GFX10
         // Set NGG control settings
-        m_pContext->SetNggControl();
+        SetNggControl();
 #endif
 
         // Determine whether or not GS on-chip mode is valid for this pipeline
         bool hasGs = ((m_pContext->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
 #if LLPC_BUILD_GFX10
-        bool checkGsOnChip = hasGs || m_pContext->GetNggControl()->enableNgg;
+        bool checkGsOnChip = hasGs || m_pPipelineState->GetNggControl()->enableNgg;
 #else
         bool checkGsOnChip = hasGs;
 #endif
 
         if (checkGsOnChip)
         {
-            bool gsOnChip = m_pContext->CheckGsOnChipValidity();
-            m_pContext->SetGsOnChip(gsOnChip);
+            bool gsOnChip = CheckGsOnChipValidity();
+            m_pPipelineState->SetGsOnChip(gsOnChip);
         }
     }
 
     return true;
+}
+
+#if LLPC_BUILD_GFX10
+// =====================================================================================================================
+// Sets NGG control settings
+void PatchResourceCollect::SetNggControl()
+{
+    // For GFX10+, initialize NGG control settings
+    if (m_pContext->GetGfxIpVersion().major < 10)
+    {
+        return;
+    }
+
+    uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
+                                        ShaderStageToMask(ShaderStageTessEval))) != 0);
+    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+
+    // Check the use of cull distance for NGG primitive shader
+    bool useCullDistance = false;
+    bool enableXfb = false;
+    if (hasGs)
+    {
+        const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+        enableXfb = pResUsage->inOutUsage.enableXfb;
+    }
+    else
+    {
+        if (hasTs)
+        {
+            const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval);
+            const auto& builtInUsage = pResUsage->builtInUsage.tes;
+            useCullDistance = (builtInUsage.cullDistance > 0);
+            enableXfb = pResUsage->inOutUsage.enableXfb;
+        }
+        else
+        {
+            const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+            const auto& builtInUsage = pResUsage->builtInUsage.vs;
+            useCullDistance = (builtInUsage.cullDistance > 0);
+            enableXfb = pResUsage->inOutUsage.enableXfb;
+        }
+    }
+
+    const auto& nggState = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo())->nggState;
+    NggControl& nggControl = *m_pPipelineState->GetNggControl();
+
+    bool enableNgg = nggState.enableNgg;
+    if (enableXfb)
+    {
+        // TODO: If transform feedback is enabled, disable NGG.
+        enableNgg = false;
+    }
+
+    if (hasGs && (nggState.enableGsUse == false))
+    {
+        // NOTE: NGG used on GS is disabled by default
+        enableNgg = false;
+    }
+
+    if (m_pContext->GetGpuWorkarounds()->gfx10.waNggDisabled)
+    {
+        enableNgg = false;
+    }
+
+    nggControl.enableNgg                  = enableNgg;
+    nggControl.enableGsUse                = nggState.enableGsUse;
+    nggControl.alwaysUsePrimShaderTable   = nggState.alwaysUsePrimShaderTable;
+    nggControl.compactMode                = nggState.compactMode;
+
+    nggControl.enableFastLaunch           = nggState.enableFastLaunch;
+    nggControl.enableVertexReuse          = nggState.enableVertexReuse;
+    nggControl.enableBackfaceCulling      = nggState.enableBackfaceCulling;
+    nggControl.enableFrustumCulling       = nggState.enableFrustumCulling;
+    nggControl.enableBoxFilterCulling     = nggState.enableBoxFilterCulling;
+    nggControl.enableSphereCulling        = nggState.enableSphereCulling;
+    nggControl.enableSmallPrimFilter      = nggState.enableSmallPrimFilter;
+    nggControl.enableCullDistanceCulling  = (nggState.enableCullDistanceCulling && useCullDistance);
+
+    nggControl.backfaceExponent           = nggState.backfaceExponent;
+    nggControl.subgroupSizing             = nggState.subgroupSizing;
+    nggControl.primsPerSubgroup           = std::min(nggState.primsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+    nggControl.vertsPerSubgroup           = std::min(nggState.vertsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+
+    if (nggState.enableNgg)
+    {
+        if (nggState.forceNonPassthrough)
+        {
+            nggControl.passthroughMode = false;
+        }
+        else
+        {
+            nggControl.passthroughMode = (nggControl.enableVertexReuse == false) &&
+                                           (nggControl.enableBackfaceCulling == false) &&
+                                           (nggControl.enableFrustumCulling == false) &&
+                                           (nggControl.enableBoxFilterCulling == false) &&
+                                           (nggControl.enableSphereCulling == false) &&
+                                           (nggControl.enableSmallPrimFilter == false) &&
+                                           (nggControl.enableCullDistanceCulling == false);
+        }
+
+        // NOTE: Further check if we have to turn on pass-through mode forcibly.
+        if (nggControl.passthroughMode == false)
+        {
+            // NOTE: Further check if pass-through mode should be enabled
+            auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+            const auto topology = pPipelineInfo->iaState.topology;
+            if ((topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST)  ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP) ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY) ||
+                (topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY))
+            {
+                // NGG runs in pass-through mode for non-triangle primitives
+                nggControl.passthroughMode = true;
+            }
+            else if (topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST)
+            {
+                // NGG runs in pass-through mode for non-triangle tessellation output
+                LLPC_ASSERT(hasTs);
+
+                const auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+                if (builtInUsage.pointMode || (builtInUsage.primitiveMode == Isolines))
+                {
+                    nggControl.passthroughMode = true;
+                }
+            }
+
+            const auto polygonMode = pPipelineInfo->rsState.polygonMode;
+            if ((polygonMode == VK_POLYGON_MODE_LINE) || (polygonMode == VK_POLYGON_MODE_POINT))
+            {
+                // NGG runs in pass-through mode for non-fill polygon mode
+                nggControl.passthroughMode = true;
+            }
+
+            if (hasGs)
+            {
+                const auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+                if (builtInUsage.outputPrimitive != OutputTriangleStrip)
+                {
+                    // If GS output primitive type is not triangle strip, NGG runs in "pass-through"
+                    // (actual no culling) mode
+                    nggControl.passthroughMode = true;
+                }
+            }
+        }
+
+        // Build NGG culling-control registers
+        BuildNggCullingControlRegister(nggControl);
+
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC NGG control settings results\n\n");
+
+        // Control option
+        LLPC_OUTS("EnableNgg                    = " << nggControl.enableNgg << "\n");
+        LLPC_OUTS("EnableGsUse                  = " << nggControl.enableGsUse << "\n");
+        LLPC_OUTS("AlwaysUsePrimShaderTable     = " << nggControl.alwaysUsePrimShaderTable << "\n");
+        LLPC_OUTS("PassthroughMode              = " << nggControl.passthroughMode << "\n");
+        LLPC_OUTS("CompactMode                  = ");
+        switch (nggControl.compactMode)
+        {
+        case NggCompactSubgroup:
+            LLPC_OUTS("Subgroup\n");
+            break;
+        case NggCompactVertices:
+            LLPC_OUTS("Vertices\n");
+            break;
+        default:
+            break;
+        }
+        LLPC_OUTS("EnableFastLaunch             = " << nggControl.enableFastLaunch << "\n");
+        LLPC_OUTS("EnableVertexReuse            = " << nggControl.enableVertexReuse << "\n");
+        LLPC_OUTS("EnableBackfaceCulling        = " << nggControl.enableBackfaceCulling << "\n");
+        LLPC_OUTS("EnableFrustumCulling         = " << nggControl.enableFrustumCulling << "\n");
+        LLPC_OUTS("EnableBoxFilterCulling       = " << nggControl.enableBoxFilterCulling << "\n");
+        LLPC_OUTS("EnableSphereCulling          = " << nggControl.enableSphereCulling << "\n");
+        LLPC_OUTS("EnableSmallPrimFilter        = " << nggControl.enableSmallPrimFilter << "\n");
+        LLPC_OUTS("EnableCullDistanceCulling    = " << nggControl.enableCullDistanceCulling << "\n");
+        LLPC_OUTS("BackfaceExponent             = " << nggControl.backfaceExponent << "\n");
+        LLPC_OUTS("SubgroupSizing               = ");
+        switch (nggControl.subgroupSizing)
+        {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+        case NggSubgroupSizingType::Auto:
+            LLPC_OUTS("Auto\n");
+            break;
+#endif
+        case NggSubgroupSizingType::MaximumSize:
+            LLPC_OUTS("MaximumSize\n");
+            break;
+        case NggSubgroupSizingType::HalfSize:
+            LLPC_OUTS("HalfSize\n");
+            break;
+        case NggSubgroupSizingType::OptimizeForVerts:
+            LLPC_OUTS("OptimizeForVerts\n");
+            break;
+        case NggSubgroupSizingType::OptimizeForPrims:
+            LLPC_OUTS("OptimizeForPrims\n");
+            break;
+        case NggSubgroupSizingType::Explicit:
+            LLPC_OUTS("Explicit\n");
+            break;
+        default:
+            LLPC_NEVER_CALLED();
+            break;
+        }
+        LLPC_OUTS("PrimsPerSubgroup             = " << nggControl.primsPerSubgroup << "\n");
+        LLPC_OUTS("VertsPerSubgroup             = " << nggControl.vertsPerSubgroup << "\n");
+        LLPC_OUTS("\n");
+    }
+}
+
+// =====================================================================================================================
+// Builds NGG culling-control registers (fill part of compile-time primitive shader table).
+void PatchResourceCollect::BuildNggCullingControlRegister(
+    NggControl& nggControl)   // [in/out] NggControl struct
+{
+    auto pPipelineInfo = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
+    const auto& vpState = pPipelineInfo->vpState;
+    const auto& rsState = pPipelineInfo->rsState;
+
+    auto& pipelineState = nggControl.primShaderTable.pipelineStateCb;
+
+    //
+    // Program register PA_SU_SC_MODE_CNTL
+    //
+    PaSuScModeCntl paSuScModeCntl;
+    paSuScModeCntl.u32All = 0;
+
+    paSuScModeCntl.bits.POLY_OFFSET_FRONT_ENABLE = rsState.depthBiasEnable;
+    paSuScModeCntl.bits.POLY_OFFSET_BACK_ENABLE  = rsState.depthBiasEnable;
+    paSuScModeCntl.bits.MULTI_PRIM_IB_ENA        = true;
+
+    paSuScModeCntl.bits.POLY_MODE            = (rsState.polygonMode != VK_POLYGON_MODE_FILL);
+
+    if (rsState.polygonMode == VK_POLYGON_MODE_FILL)
+    {
+        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_TRIANGLES;
+        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_TRIANGLES;
+    }
+    else if (rsState.polygonMode == VK_POLYGON_MODE_LINE)
+    {
+        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_LINES;
+        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_LINES;
+    }
+    else if (rsState.polygonMode == VK_POLYGON_MODE_POINT)
+    {
+        paSuScModeCntl.bits.POLYMODE_BACK_PTYPE  = POLY_MODE_POINTS;
+        paSuScModeCntl.bits.POLYMODE_FRONT_PTYPE = POLY_MODE_POINTS;
+    }
+    else
+    {
+        LLPC_NEVER_CALLED();
+    }
+
+    paSuScModeCntl.bits.CULL_FRONT = ((rsState.cullMode == VK_CULL_MODE_FRONT_BIT) ||
+                                      (rsState.cullMode == VK_CULL_MODE_FRONT_AND_BACK));
+    paSuScModeCntl.bits.CULL_BACK  = ((rsState.cullMode == VK_CULL_MODE_BACK_BIT) ||
+                                      (rsState.cullMode == VK_CULL_MODE_FRONT_AND_BACK));
+
+    paSuScModeCntl.bits.FACE = rsState.frontFace;
+
+    pipelineState.paSuScModeCntl = paSuScModeCntl.u32All;
+
+    //
+    // Program register PA_CL_CLIP_CNTL
+    //
+    PaClClipCntl paClClipCntl;
+    LLPC_ASSERT((rsState.usrClipPlaneMask & ~0x3F) == 0);
+    paClClipCntl.u32All = rsState.usrClipPlaneMask;
+
+    paClClipCntl.bits.DX_CLIP_SPACE_DEF = true;
+    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+
+    if (vpState.depthClipEnable == false)
+    {
+        paClClipCntl.bits.ZCLIP_NEAR_DISABLE = true;
+        paClClipCntl.bits.ZCLIP_FAR_DISABLE  = true;
+    }
+
+    if (rsState.rasterizerDiscardEnable)
+    {
+        paClClipCntl.bits.DX_RASTERIZATION_KILL = true;
+    }
+
+    pipelineState.paClClipCntl = paClClipCntl.u32All;
+
+    //
+    // Program register PA_CL_VTE_CNTL
+    //
+    PaClVteCntl paClVteCntl;
+    paClVteCntl.u32All = 0;
+
+    paClVteCntl.bits.VPORT_X_SCALE_ENA  = true;
+    paClVteCntl.bits.VPORT_X_OFFSET_ENA = true;
+    paClVteCntl.bits.VPORT_Y_SCALE_ENA  = true;
+    paClVteCntl.bits.VPORT_Y_OFFSET_ENA = true;
+    paClVteCntl.bits.VPORT_Z_SCALE_ENA  = true;
+    paClVteCntl.bits.VPORT_Z_OFFSET_ENA = true;
+    paClVteCntl.bits.VTX_W0_FMT         = true;
+
+    pipelineState.paClVteCntl = paClVteCntl.u32All;
+}
+#endif
+
+// =====================================================================================================================
+// Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
+bool PatchResourceCollect::CheckGsOnChipValidity()
+{
+    bool gsOnChip = true;
+
+    uint32_t stageMask = m_pContext->GetShaderStageMask();
+    const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
+                                      ShaderStageToMask(ShaderStageTessEval))) != 0);
+#if LLPC_BUILD_GFX10
+    const bool hasGs = ((stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0);
+#endif
+
+    auto pGsResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+
+    uint32_t inVertsPerPrim = 0;
+    bool useAdjacency = false;
+    switch (pGsResUsage->builtInUsage.gs.inputPrimitive)
+    {
+    case InputPoints:
+        inVertsPerPrim = 1;
+        break;
+    case InputLines:
+        inVertsPerPrim = 2;
+        break;
+    case InputLinesAdjacency:
+        useAdjacency = true;
+        inVertsPerPrim = 4;
+        break;
+    case InputTriangles:
+        inVertsPerPrim = 3;
+        break;
+    case InputTrianglesAdjacency:
+        useAdjacency = true;
+        inVertsPerPrim = 6;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    pGsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
+
+    uint32_t outVertsPerPrim = 0;
+    switch (pGsResUsage->builtInUsage.gs.outputPrimitive)
+    {
+    case OutputPoints:
+        outVertsPerPrim = 1;
+        break;
+    case OutputLineStrip:
+        outVertsPerPrim = 2;
+        break;
+    case OutputTriangleStrip:
+        outVertsPerPrim = 3;
+        break;
+    default:
+        LLPC_NEVER_CALLED();
+        break;
+    }
+
+    if (m_pContext->GetGfxIpVersion().major <= 8)
+    {
+        uint32_t gsPrimsPerSubgroup = m_pContext->GetGpuProperty()->gsOnChipDefaultPrimsPerSubgroup;
+
+        const uint32_t esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
+        const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
+        const uint32_t gsVsRingItemSize = 4 * std::max(1u,
+                                                       (pGsResUsage->inOutUsage.outputMapLocCount *
+                                                        pGsResUsage->builtInUsage.gs.outputVertices));
+
+        uint32_t esGsRingItemSizeOnChip = esGsRingItemSize;
+        uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize;
+
+        // Optimize ES -> GS ring and GS -> VS ring layout for bank conflicts
+        esGsRingItemSizeOnChip |= 1;
+        gsVsRingItemSizeOnChip |= 1;
+
+        uint32_t gsVsRingItemSizeOnChipInstanced = gsVsRingItemSizeOnChip * gsInstanceCount;
+
+        uint32_t esMinVertsPerSubgroup = inVertsPerPrim;
+
+        // If the primitive has adjacency half the number of vertices will be reused in multiple primitives.
+        if (useAdjacency)
+        {
+            esMinVertsPerSubgroup >>= 1;
+        }
+
+        // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by GsOnChipMaxPrimsPerSubgroup
+        // for adjacency primitive or when GS instanceing is used.
+        if (useAdjacency || (gsInstanceCount > 1))
+        {
+            gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, (Gfx6::GsOnChipMaxPrimsPerSubgroup / gsInstanceCount));
+        }
+
+        // Compute GS-VS LDS size based on target GS primitives per subgroup
+        uint32_t gsVsLdsSize = (gsVsRingItemSizeOnChipInstanced * gsPrimsPerSubgroup);
+
+        // Compute ES-GS LDS size based on the worst case number of ES vertices needed to create the target number of
+        // GS primitives per subgroup.
+        uint32_t esGsLdsSize = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * gsPrimsPerSubgroup;
+
+        // Total LDS use per subgroup aligned to the register granularity
+        uint32_t gsOnChipLdsSize = Pow2Align((esGsLdsSize + gsVsLdsSize),
+                                             static_cast<uint32_t>((1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift)));
+
+        // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
+        // reasonable default. The final amount must be 128-DWORD aligned.
+
+        uint32_t maxLdsSize = m_pContext->GetGpuProperty()->gsOnChipDefaultLdsSizePerSubgroup;
+
+        // TODO: For BONAIRE A0, GODAVARI and KALINDI, set maxLdsSize to 1024 due to SPI barrier management bug
+
+        // If total LDS usage is too big, refactor partitions based on ratio of ES-GS and GS-VS item sizes.
+        if (gsOnChipLdsSize > maxLdsSize)
+        {
+            const uint32_t esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup;
+            const uint32_t itemSizeTotal       = esGsItemSizePerPrim + gsVsRingItemSizeOnChipInstanced;
+
+            esGsLdsSize = RoundUpToMultiple((esGsItemSizePerPrim * maxLdsSize) / itemSizeTotal, esGsItemSizePerPrim);
+            gsVsLdsSize = RoundDownToMultiple(maxLdsSize - esGsLdsSize, gsVsRingItemSizeOnChipInstanced);
+
+            gsOnChipLdsSize = maxLdsSize;
+        }
+
+        // Based on the LDS space, calculate how many GS prims per subgroup and ES vertices per subgroup can be dispatched.
+        gsPrimsPerSubgroup          = (gsVsLdsSize / gsVsRingItemSizeOnChipInstanced);
+        uint32_t esVertsPerSubgroup = (esGsLdsSize / esGsRingItemSizeOnChip);
+
+        LLPC_ASSERT(esVertsPerSubgroup >= esMinVertsPerSubgroup);
+
+        // Vertices for adjacency primitives are not always reused. According to
+        // hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
+        if (useAdjacency)
+        {
+            esMinVertsPerSubgroup = inVertsPerPrim;
+        }
+
+        // For normal primitives, the VGT only checks if they are past the ES verts per sub-group after allocating a full
+        // GS primitive and if they are, kick off a new sub group. But if those additional ES vertices are unique
+        // (e.g. not reused) we need to make sure there is enough LDS space to account for those ES verts beyond
+        // ES_VERTS_PER_SUBGRP.
+        esVertsPerSubgroup -= (esMinVertsPerSubgroup - 1);
+
+        // TODO: Accept GsOffChipDefaultThreshold from panel option
+        // TODO: Value of GsOffChipDefaultThreshold should be 64, due to an issue it's changed to 32 in order to test
+        // on-chip GS code generation before fixing that issue.
+        // The issue is because we only remove unused builtin output till final GS output store generation, when
+        // determining onchip/offchip mode, unused builtin output like PointSize and Clip/CullDistance is factored in
+        // LDS usage and deactivates onchip GS when GsOffChipDefaultThreshold  is 64. To fix this we will probably
+        // need to clear unused builtin ouput before determining onchip/offchip GS mode.
+        constexpr uint32_t GsOffChipDefaultThreshold = 32;
+
+        bool disableGsOnChip = DisableGsOnChip;
+        if (hasTs || (m_pContext->GetGfxIpVersion().major == 6))
+        {
+            // GS on-chip is not supportd with tessellation, and is not supportd on GFX6
+            disableGsOnChip = true;
+        }
+
+        if (disableGsOnChip ||
+            ((gsPrimsPerSubgroup * gsInstanceCount) < GsOffChipDefaultThreshold) ||
+            (esVertsPerSubgroup == 0))
+        {
+            gsOnChip = false;
+            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = 0;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = 0;
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = 0;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = 0;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
+        }
+        else
+        {
+            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = esGsLdsSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSizeOnChip;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSizeOnChip;
+        }
+    }
+    else
+    {
+#if LLPC_BUILD_GFX10
+        const auto pNggControl = m_pPipelineState->GetNggControl();
+
+        if (pNggControl->enableNgg)
+        {
+            // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
+            const uint32_t esGsRingItemSize = hasGs ? ((4 * std::max(1u,
+                                                                     pGsResUsage->inOutUsage.inputMapLocCount)) | 1) :
+                                                      4; // Always 4 components for NGG when GS is not present
+
+            const uint32_t gsVsRingItemSize = hasGs ? std::max(1u,
+                                                               4 * pGsResUsage->inOutUsage.outputMapLocCount
+                                                                 * pGsResUsage->builtInUsage.gs.outputVertices) : 0;
+
+            const uint32_t esExtraLdsSize = NggLdsManager::CalcEsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
+            const uint32_t gsExtraLdsSize = NggLdsManager::CalcGsExtraLdsSize(m_pPipelineState) / 4; // In DWORDs
+
+            // primAmpFactor = outputVertices - (outVertsPerPrim - 1)
+            const uint32_t primAmpFactor =
+                hasGs ? pGsResUsage->builtInUsage.gs.outputVertices - (outVertsPerPrim - 1) : 0;
+
+            const uint32_t vertsPerPrimitive = m_pContext->GetVerticesPerPrimitive();
+
+            const bool needsLds = (hasGs ||
+                                   (pNggControl->passthroughMode == false) ||
+                                   (esExtraLdsSize > 0) || (gsExtraLdsSize > 0));
+
+            uint32_t esVertsPerSubgroup = 0;
+            uint32_t gsPrimsPerSubgroup = 0;
+
+            // It is expected that regular launch NGG will be the most prevalent, so handle its logic first.
+            if (pNggControl->enableFastLaunch == false)
+            {
+                // The numbers below come from hardware guidance and most likely require further tuning.
+                switch (pNggControl->subgroupSizing)
+                {
+                case NggSubgroupSizingType::HalfSize:
+                    esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+                    gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+                    break;
+                case NggSubgroupSizingType::OptimizeForVerts:
+                    esVertsPerSubgroup = (hasTs)             ? 128 : 126;
+                    gsPrimsPerSubgroup = (hasTs || needsLds) ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
+                    break;
+                case NggSubgroupSizingType::OptimizeForPrims:
+                    esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+                    gsPrimsPerSubgroup = 128;
+                    break;
+                case NggSubgroupSizingType::Explicit:
+                    esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
+                    gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
+                    break;
+                default:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+                case NggSubgroupSizingType::Auto:
+                    esVertsPerSubgroup = 126;
+                    gsPrimsPerSubgroup = 128;
+                    break;
+#endif
+                case NggSubgroupSizingType::MaximumSize:
+                    esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+                    gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+                    break;
+                }
+            }
+            else
+            {
+                // Fast launch NGG launches like a compute shader and bypasses most of the fixed function hardware.
+                // As such, the values of esVerts and gsPrims have to be accurate for the primitive type
+                // (and vertsPerPrimitive) to avoid hanging.
+                switch (pNggControl->subgroupSizing)
+                {
+                case NggSubgroupSizingType::HalfSize:
+                    esVertsPerSubgroup = RoundDownToMultiple((Gfx9::NggMaxThreadsPerSubgroup / 2u), vertsPerPrimitive);
+                    gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
+                    break;
+                case NggSubgroupSizingType::OptimizeForVerts:
+                    // Currently the programming of OptimizeForVerts is an inverse of MaximumSize. OptimizeForVerts is
+                    // not expected to be a performant choice for fast launch, and as such MaximumSize, HalfSize, or
+                    // Explicit should be chosen, with Explicit being optimal for non-point topologies.
+                    gsPrimsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
+                    esVertsPerSubgroup = gsPrimsPerSubgroup / vertsPerPrimitive;
+                    break;
+                case NggSubgroupSizingType::Explicit:
+                    esVertsPerSubgroup = pNggControl->vertsPerSubgroup;
+                    gsPrimsPerSubgroup = pNggControl->primsPerSubgroup;
+                    break;
+                case NggSubgroupSizingType::OptimizeForPrims:
+                    // Currently the programming of OptimizeForPrims is the same as MaximumSize, it is possible that
+                    // this might change in the future. OptimizeForPrims is not expected to be a performant choice for
+                    // fast launch, and as such MaximumSize, HalfSize, or Explicit should be chosen, with Explicit
+                    // being optimal for non-point topologies.
+                    // Fallthrough intentional.
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 26
+                case NggSubgroupSizingType::Auto:
+#endif
+                case NggSubgroupSizingType::MaximumSize:
+                default:
+                    esVertsPerSubgroup = RoundDownToMultiple(Gfx9::NggMaxThreadsPerSubgroup, vertsPerPrimitive);
+                    gsPrimsPerSubgroup = esVertsPerSubgroup / vertsPerPrimitive;
+                    break;
+                }
+            }
+
+            if (hasGs)
+            {
+                // NOTE: If primitive amplification is active and the currently calculated gsPrimsPerSubgroup multipled
+                // by the amplification factor is larger than the supported number of primitives within a subgroup, we
+                // need to shrimp the number of gsPrimsPerSubgroup down to a reasonable level to prevent
+                // over-allocating LDS.
+                uint32_t maxVertOut = hasGs ? pGsResUsage->builtInUsage.gs.outputVertices : 1;
+
+                LLPC_ASSERT(maxVertOut >= primAmpFactor);
+
+                if ((gsPrimsPerSubgroup * maxVertOut) > Gfx9::NggMaxThreadsPerSubgroup)
+                {
+                    gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / maxVertOut;
+                }
+
+                // Let's take into consideration instancing:
+                const uint32_t gsInstanceCount = pGsResUsage->builtInUsage.gs.invocations;
+                LLPC_ASSERT(gsInstanceCount >= 1);
+                gsPrimsPerSubgroup /= gsInstanceCount;
+                esVertsPerSubgroup = gsPrimsPerSubgroup * maxVertOut;
+            }
+
+            // Make sure that we have at least one primitive
+            gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
+
+            uint32_t       expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
+            const uint32_t expectedGsLdsSize = gsPrimsPerSubgroup * gsVsRingItemSize + gsExtraLdsSize;
+
+            if (expectedGsLdsSize == 0)
+            {
+                LLPC_ASSERT(hasGs == false);
+
+                expectedEsLdsSize = (Gfx9::NggMaxThreadsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
+            }
+
+            const uint32_t ldsSizeDwords =
+                Pow2Align(expectedEsLdsSize + expectedGsLdsSize,
+                          static_cast<uint32_t>(1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift));
+
+            // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
+            LLPC_ASSERT(ldsSizeDwords <= 16384);
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+
+            // EsGsLdsSize is passed in a user data SGPR to the merged shader so that the API GS knows where to start
+            // reading out of LDS. EsGsLdsSize is unnecessary when there is no API GS.
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = hasGs ? expectedEsLdsSize : 0;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = needsLds ? ldsSizeDwords : 0;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsVsRingItemSize;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor        = primAmpFactor;
+
+            gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
+        }
+        else
+#endif
+        {
+            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift);
+
+            // gsPrimsPerSubgroup shouldn't be bigger than wave size.
+            uint32_t gsPrimsPerSubgroup = std::min(m_pContext->GetGpuProperty()->gsOnChipDefaultPrimsPerSubgroup,
+                                                   m_pContext->GetShaderWaveSize(ShaderStageGeometry));
+
+            // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
+            const uint32_t esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;
+
+            const uint32_t gsVsRingItemSize = 4 * std::max(1u,
+                                                           (pGsResUsage->inOutUsage.outputMapLocCount *
+                                                            pGsResUsage->builtInUsage.gs.outputVertices));
+
+            // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
+            const uint32_t gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
+
+            const uint32_t gsInstanceCount  = pGsResUsage->builtInUsage.gs.invocations;
+
+            // TODO: Confirm no ES-GS extra LDS space used.
+            const uint32_t esGsExtraLdsDwords  = 0;
+            const uint32_t maxEsVertsPerSubgroup = Gfx9::OnChipGsMaxEsVertsPerSubgroup;
+
+            uint32_t esMinVertsPerSubgroup = inVertsPerPrim;
+
+            // If the primitive has adjacency half the number of vertices will be reused in multiple primitives.
+            if (useAdjacency)
+            {
+                esMinVertsPerSubgroup >>= 1;
+            }
+
+            uint32_t maxGsPrimsPerSubgroup = Gfx9::OnChipGsMaxPrimPerSubgroup;
+
+            // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
+            // OnChipGsMaxPrimPerSubgroup for adjacency primitive or when GS instanceing is used.
+            if (useAdjacency || (gsInstanceCount > 1))
+            {
+                maxGsPrimsPerSubgroup = (Gfx9::OnChipGsMaxPrimPerSubgroupAdj / gsInstanceCount);
+            }
+
+            gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
+
+            uint32_t worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup,
+                                                            maxEsVertsPerSubgroup);
+
+            uint32_t esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
+
+            // Total LDS use per subgroup aligned to the register granularity.
+            uint32_t gsOnChipLdsSize = RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+
+            // Use the client-specified amount of LDS space per sub-group. If they specified zero, they want us to
+            // choose a reasonable default. The final amount must be 128-DWORD aligned.
+            // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
+            uint32_t maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
+
+            // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
+            if (gsOnChipLdsSize > maxLdsSize)
+            {
+                // Our target GS primitives per sub-group was too large
+
+                // Calculate the maximum number of GS primitives per sub-group that will fit into LDS, capped
+                // by the maximum that the hardware can support.
+                uint32_t availableLdsSize   = maxLdsSize - esGsExtraLdsDwords;
+                gsPrimsPerSubgroup          = std::min((availableLdsSize / (esGsRingItemSize * esMinVertsPerSubgroup)),
+                                                       maxGsPrimsPerSubgroup);
+                worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup,
+                                                       maxEsVertsPerSubgroup);
+
+                LLPC_ASSERT(gsPrimsPerSubgroup > 0);
+
+                esGsLdsSize     = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
+                gsOnChipLdsSize = RoundUpToMultiple(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+
+                LLPC_ASSERT(gsOnChipLdsSize <= maxLdsSize);
+            }
+
+            if (hasTs || DisableGsOnChip)
+            {
+                gsOnChip = false;
+            }
+            else
+            {
+                // Now let's calculate the onchip GSVS info and determine if it should be on or off chip.
+                uint32_t gsVsItemSize = gsVsRingItemSizeOnChip * gsInstanceCount;
+
+                // Compute GSVS LDS size based on target GS prims per subgroup.
+                uint32_t gsVsLdsSize = gsVsItemSize * gsPrimsPerSubgroup;
+
+                // Start out with the assumption that our GS prims per subgroup won't change.
+                uint32_t onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
+
+                // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
+                uint32_t onchipEsGsVsLdsSize = RoundUpToMultiple(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
+                uint32_t onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
+
+                if (onchipEsGsVsLdsSize > maxLdsSize)
+                {
+                    // TODO: This code only allocates the minimum required LDS to hit the on chip GS prims per subgroup
+                    //       threshold. This leaves some LDS space unused. The extra space could potentially be used to
+                    //       increase the GS Prims per subgroup.
+
+                    // Set the threshold at the minimum to keep things on chip.
+                    onchipGsPrimsPerSubgroup = maxGsPrimsPerSubgroup;
+
+                    if (onchipGsPrimsPerSubgroup > 0)
+                    {
+                        worstCaseEsVertsPerSubgroup = std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup,
+                                                               maxEsVertsPerSubgroup);
+
+                        // Calculate the LDS sizes required to hit this threshold.
+                        onchipEsGsLdsSizeOnchipGsVs = Pow2Align(esGsRingItemSize * worstCaseEsVertsPerSubgroup,
+                                                                ldsSizeDwordGranularity);
+                        gsVsLdsSize = gsVsItemSize * onchipGsPrimsPerSubgroup;
+                        onchipEsGsVsLdsSize = onchipEsGsLdsSizeOnchipGsVs + gsVsLdsSize;
+
+                        if (onchipEsGsVsLdsSize > maxLdsSize)
+                        {
+                            // LDS isn't big enough to hit the target GS prim per subgroup count for on chip GSVS.
+                            gsOnChip = false;
+                        }
+                    }
+                    else
+                    {
+                        // With high GS instance counts, it is possible that the number of on chip GS prims
+                        // calculated is zero. If this is the case, we can't expect to use on chip GS.
+                        gsOnChip = false;
+                    }
+                }
+
+                // If on chip GSVS is optimal, update the ESGS parameters with any changes that allowed for GSVS data.
+                if (gsOnChip)
+                {
+                    gsOnChipLdsSize    = onchipEsGsVsLdsSize;
+                    esGsLdsSize        = onchipEsGsLdsSizeOnchipGsVs;
+                    gsPrimsPerSubgroup = onchipGsPrimsPerSubgroup;
+                }
+            }
+
+            uint32_t esVertsPerSubgroup = std::min(esGsLdsSize / esGsRingItemSize, maxEsVertsPerSubgroup);
+
+            LLPC_ASSERT(esVertsPerSubgroup >= esMinVertsPerSubgroup);
+
+            // Vertices for adjacency primitives are not always reused (e.g. in the case of shadow volumes). Acording
+            // to hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
+            if (useAdjacency)
+            {
+                esMinVertsPerSubgroup = inVertsPerPrim;
+            }
+
+            // For normal primitives, the VGT only checks if they are past the ES verts per sub group after allocating
+            // a full GS primitive and if they are, kick off a new sub group.  But if those additional ES verts are
+            // unique (e.g. not reused) we need to make sure there is enough LDS space to account for those ES verts
+            // beyond ES_VERTS_PER_SUBGRP.
+            esVertsPerSubgroup -= (esMinVertsPerSubgroup - 1);
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup   = esVertsPerSubgroup;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup   = gsPrimsPerSubgroup;
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize          = esGsLdsSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize      = gsOnChipLdsSize;
+
+            pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize     = esGsRingItemSize;
+            pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize     = gsOnChip ?
+                                                                         gsVsRingItemSizeOnChip :
+                                                                         gsVsRingItemSize;
+
+#if LLPC_BUILD_GFX10
+            if ((m_pContext->GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
+            {
+                uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
+                uint32_t onChipGsLdsMagicSize = Pow2Align((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
+                            static_cast<uint32_t>((1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift)));
+
+                // If the new size is greater than the size we previously set
+                // then we need to either increase the size or decrease the verts
+                if (onChipGsLdsMagicSize > gsOnChipLdsSize)
+                {
+                    if (onChipGsLdsMagicSize > maxLdsSize)
+                    {
+                        // Decrease the verts
+                        esVertsNum = (maxLdsSize - esGsExtraLdsDwords) / esGsRingItemSize;
+                        pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
+                    }
+                    else
+                    {
+                        // Increase the size
+                        pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
+                    }
+                }
+                // Support multiple GS instances
+                uint32_t gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
+
+                pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
+                pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
+            }
+#endif
+        }
+    }
+
+    LLPC_OUTS("===============================================================================\n");
+    LLPC_OUTS("// LLPC geometry calculation factor results\n\n");
+    LLPC_OUTS("ES vertices per sub-group: " << pGsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
+    LLPC_OUTS("GS primitives per sub-group: " << pGsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
+    LLPC_OUTS("\n");
+    LLPC_OUTS("ES-GS LDS size: " << pGsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
+    LLPC_OUTS("On-chip GS LDS size: " << pGsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
+    LLPC_OUTS("\n");
+    LLPC_OUTS("ES-GS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
+    LLPC_OUTS("GS-VS ring item size: " << pGsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
+    LLPC_OUTS("\n");
+
+    LLPC_OUTS("GS stream item size:\n");
+    for (uint32_t i = 0; i < MaxGsStreams; ++i)
+    {
+        uint32_t streamItemSize = pGsResUsage->inOutUsage.gs.outLocCount[i] *
+                                    pGsResUsage->builtInUsage.gs.outputVertices * 4;
+        LLPC_OUTS("    stream " << i << " = " << streamItemSize);
+
+        if (pGsResUsage->inOutUsage.enableXfb)
+        {
+            LLPC_OUTS(", XFB buffer = ");
+            for (uint32_t j = 0; j < MaxTransformFeedbackBuffers; ++j)
+            {
+                if ((pGsResUsage->inOutUsage.streamXfbBuffers[i] & (1 << j)) != 0)
+                {
+                    LLPC_OUTS(j);
+                    if (j != MaxTransformFeedbackBuffers - 1)
+                    {
+                        LLPC_OUTS(", ");
+                    }
+                }
+            }
+        }
+
+        LLPC_OUTS("\n");
+    }
+    LLPC_OUTS("\n");
+
+    if (gsOnChip || (m_pContext->GetGfxIpVersion().major >= 9))
+    {
+#if LLPC_BUILD_GFX10
+        if (m_pPipelineState->GetNggControl()->enableNgg)
+        {
+            LLPC_OUTS("GS primitive amplification factor: "
+                      << pGsResUsage->inOutUsage.gs.calcFactor.primAmpFactor
+                      << "\n");
+            LLPC_OUTS("\n");
+
+            LLPC_OUTS("GS is on-chip (NGG)\n");
+        }
+        else
+#endif
+        {
+            LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
+        }
+    }
+    else
+    {
+        LLPC_OUTS("GS is off-chip\n");
+    }
+    LLPC_OUTS("\n");
+
+    return gsOnChip;
 }
 
 // =====================================================================================================================

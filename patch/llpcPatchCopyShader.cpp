@@ -42,6 +42,7 @@
 #include "llpcInternal.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -65,6 +66,7 @@ public:
 
     void getAnalysisUsage(AnalysisUsage& analysisUsage) const override
     {
+        analysisUsage.addRequired<PipelineStateWrapper>();
         analysisUsage.addRequired<PipelineShaders>();
         // Pass does not preserve PipelineShaders as it adds a new shader.
     }
@@ -89,6 +91,7 @@ private:
     // Low part of global internal table pointer
     static const uint32_t EntryArgIdxInternalTablePtrLow = 0;
 
+    PipelineState*        m_pPipelineState;             // Pipeline state
     GlobalVariable*       m_pLds = nullptr;             // Global variable representing LDS
     Value*                m_pGsVsRingBufDesc = nullptr; // Descriptor for GS-VS ring
 };
@@ -112,6 +115,7 @@ bool PatchCopyShader::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
     Patch::Init(&module);
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     auto pGsEntryPoint = pPipelineShaders->GetEntryPoint(ShaderStageGeometry);
     if (pGsEntryPoint == nullptr)
@@ -189,7 +193,7 @@ bool PatchCopyShader::runOnModule(
         pIntfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
     }
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         m_pLds = Patch::GetLdsVariable(&module);
     }
@@ -463,7 +467,7 @@ Value* PatchCopyShader::CalcGsVsRingOffsetForInput(
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
 
     Value* pRingOffset = nullptr;
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         // ringOffset = esGsLdsSize + vertexOffset + location * 4 + compIdx
         pRingOffset = builder.getInt32(pResUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
@@ -506,7 +510,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     LLPC_ASSERT(pElemTy->isIntegerTy(32) || pElemTy->isFloatTy()); // Must be 32-bit type
 
 #if LLPC_BUILD_GFX10
-    if (m_pContext->GetNggControl()->enableNgg)
+    if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
@@ -523,7 +527,7 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     }
 #endif
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         LLPC_ASSERT(m_pLds != nullptr);
 

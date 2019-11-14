@@ -35,6 +35,7 @@
 #include "llpcContext.h"
 #include "llpcCodeGenManager.h"
 #include "llpcGfx6ConfigBuilder.h"
+#include "llpcPipelineState.h"
 
 namespace llvm
 {
@@ -212,7 +213,7 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
         SetShaderHash(ShaderStageFragment, hash);
     }
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
     }
@@ -390,7 +391,7 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
     }
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         SET_REG_FIELD(pConfig, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
     }
@@ -600,7 +601,7 @@ Result ConfigBuilder::BuildVsRegConfig(
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 2);
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
         }
@@ -617,7 +618,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         cullDistanceCount = builtInUsage.gs.cullDistance;
 
         const auto pGsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
-        if (cl::InRegEsGsLdsSize && m_pContext->IsGsOnChip())
+        if (cl::InRegEsGsLdsSize && m_pPipelineState->IsGsOnChip())
         {
             AppendConfig(mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
                          static_cast<uint32_t>(Util::Abi::UserDataMapping::EsGsLdsSize));
@@ -745,7 +746,7 @@ Result ConfigBuilder::BuildHsRegConfig(
     SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
     SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, pIntfData->userDataCount);
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC2_HS, OC_LDS_EN, true);
     }
@@ -797,7 +798,7 @@ Result ConfigBuilder::BuildEsRegConfig(
     const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, DEBUG_MODE, pShaderInfo->options.debugMode);
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, TRAP_PRESENT, pShaderInfo->options.trapPresent);
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         LLPC_ASSERT(calcFactor.gsOnChipLdsSize <= m_pContext->GetGpuProperty()->gsOnChipMaxLdsSize);
         LLPC_ASSERT((calcFactor.gsOnChipLdsSize %
@@ -832,7 +833,7 @@ Result ConfigBuilder::BuildEsRegConfig(
             vgprCompCnt = 2;
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, OC_LDS_EN, true);
         }
@@ -888,7 +889,7 @@ Result ConfigBuilder::BuildLsRegConfig(
 
     uint32_t ldsSizeInDwords = calcFactor.onChip.patchConstStart +
                                calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
     }
@@ -986,7 +987,7 @@ Result ConfigBuilder::BuildGsRegConfig(
 
     // TODO: Currently only support offchip GS
     SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, ONCHIP__CI__VI, VGT_GS_MODE_ONCHIP_ON);
         SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);

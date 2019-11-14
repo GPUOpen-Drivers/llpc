@@ -120,7 +120,7 @@ bool PatchInOutImportExport::runOnModule(
 
     // Create the global variable that is to model LDS
     // NOTE: ES -> GS ring is always on-chip on GFX9.
-    if (m_hasTs || (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))))
+    if (m_hasTs || (m_hasGs && (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))))
     {
         m_pLds = Patch::GetLdsVariable(m_pModule);
     }
@@ -207,7 +207,7 @@ void PatchInOutImportExport::ProcessShader()
     }
 
     // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
-    bool useThreadId = (m_hasGs && (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9)));
+    bool useThreadId = (m_hasGs && (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9)));
 
     // Thread ID will also be used for stream-out buffer export
     const bool enableXfb = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
@@ -304,7 +304,7 @@ void PatchInOutImportExport::ProcessShader()
             calcFactor.onChip.outPatchStart = inPatchTotalSize;
             calcFactor.onChip.patchConstStart = inPatchTotalSize + outPatchTotalSize;
 
-            if (m_pContext->IsTessOffChip())
+            if (m_pPipelineState->IsTessOffChip())
             {
                 calcFactor.offChip.outPatchStart = 0;
                 calcFactor.offChip.patchConstStart = outPatchTotalSize;
@@ -1539,7 +1539,7 @@ void PatchInOutImportExport::visitReturnInst(
     else if (m_shaderStage == ShaderStageGeometry)
     {
 #if LLPC_BUILD_GFX10
-        if ((m_pContext->IsGsOnChip() == false) && (m_gfxIp.major >= 10))
+        if ((m_pPipelineState->IsGsOnChip() == false) && (m_gfxIp.major >= 10))
         {
             // NOTE: This is a workaround because backend compiler does not provide s_waitcnt_vscnt intrinsic, so we
             // use fence release to generate s_waitcnt vmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
@@ -2260,7 +2260,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     LLPC_UNUSED(genericOutByteSizes);
 
 #if LLPC_BUILD_GFX10
-    if (m_pContext->GetNggControl()->enableNgg)
+    if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
@@ -4154,7 +4154,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     uint32_t loc = builtInOutLocMap[builtInId];
 
 #if LLPC_BUILD_GFX10
-    if (m_pContext->GetNggControl()->enableNgg)
+    if (m_pPipelineState->GetNggControl()->enableNgg)
     {
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
@@ -5045,7 +5045,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
 
         auto pRingOffset = CalcEsGsRingOffsetForOutput(location, compIdx, pEsGsOffset, pInsertPos);
 
-        if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
+        if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
         {
             Value* idxs[] = {
                 ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -5121,7 +5121,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
     else
     {
         Value* pRingOffset = CalcEsGsRingOffsetForInput(location, compIdx, pVertexIdx, pInsertPos);
-        if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+        if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
         {
             Value* idxs[] = {
                 ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -5241,7 +5241,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
 
     auto pRingOffset = CalcGsVsRingOffsetForOutput(location, compIdx, streamId, pEmitCounter, pGsVsOffset, pInsertPos);
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         Value* idxs[] = {
             ConstantInt::get(m_pContext->Int32Ty(), 0),
@@ -5309,7 +5309,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
     Instruction*    pInsertPos)  // [in] Where to insert the instruction
 {
     Value* pRingOffset = nullptr;
-    if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+    if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
     {
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
@@ -5352,7 +5352,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForInput(
     Value* pRingOffset = nullptr;
     auto pEsGsOffsets = m_pipelineSysValues.Get(m_pEntryPoint)->GetEsGsOffsets();
 
-    if (m_pContext->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
+    if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
     {
         Value* pVertexOffset = ExtractElementInst::Create(pEsGsOffsets,
                                                           pVertexIdx,
@@ -5412,7 +5412,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
             pResUsage->builtInUsage.gs.outputVertices * 4);
     }
 
-    if (m_pContext->IsGsOnChip())
+    if (m_pPipelineState->IsGsOnChip())
     {
         // ringOffset = esGsLdsSize +
         //              gsVsOffset +
@@ -5496,7 +5496,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     const bool isTcsOutput = (isOutput && (m_shaderStage == ShaderStageTessControl));
     const bool isTesInput = ((isOutput == false) && (m_shaderStage == ShaderStageTessEval));
 
-    if (m_pContext->IsTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
+    if (m_pPipelineState->IsTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
     {
         const auto& offChipLdsBase = (m_shaderStage == ShaderStageTessEval) ?
             m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes.offChipLdsBase :
@@ -5659,7 +5659,7 @@ void PatchInOutImportExport::WriteValueToLds(
         }
     }
 
-    if (m_pContext->IsTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
+    if (m_pPipelineState->IsTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
     {
         auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
 
@@ -5880,7 +5880,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             if (m_gfxIp.major <= 8)
             {
                 // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-                tfValueOffset += (m_pContext->IsTessOffChip() ? 1 : 0);
+                tfValueOffset += (m_pPipelineState->IsTessOffChip() ? 1 : 0);
             }
             combineCount = CombineBufferStore(tfValues,
                                               i,
@@ -5902,7 +5902,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             CreateTessBufferStoreFunction();
         }
 
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             if (m_gfxIp.major <= 8)
             {
@@ -6145,10 +6145,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     const auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
 
-    auto outPatchStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
+    auto outPatchStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
         calcFactor.onChip.outPatchStart;
 
-    auto patchConstStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
+    auto patchConstStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
         calcFactor.onChip.patchConstStart;
 
     // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
@@ -6232,10 +6232,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
 
     const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
-    auto outPatchStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
+    auto outPatchStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
         calcFactor.onChip.outPatchStart;
 
-    auto patchConstStart = m_pContext->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
+    auto patchConstStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
         calcFactor.onChip.patchConstStart;
 
     const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes;
@@ -6342,7 +6342,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
         auto tessOffChipPatchCountPerThreadGroup =
@@ -6367,7 +6367,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 #endif
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
 
-    if (m_pContext->IsTessOffChip())
+    if (m_pPipelineState->IsTessOffChip())
     {
         // For all-offchip tessellation, we need to write an additional 4-byte TCS control word to the TF buffer whenever
         // the patch-ID is zero.

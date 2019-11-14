@@ -57,11 +57,12 @@ namespace Llpc
 
 // =====================================================================================================================
 NggPrimShader::NggPrimShader(
-    Context* pContext)  // [in] LLPC context
+    PipelineState*  pPipelineState) // [in] Pipeline state
     :
-    m_pContext(pContext),
-    m_gfxIp(m_pContext->GetGfxIpVersion()),
-    m_pNggControl(m_pContext->GetNggControl()),
+    m_pPipelineState(pPipelineState),
+    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_gfxIp(pPipelineState->GetBuilderContext()->GetGfxIpVersion()),
+    m_pNggControl(m_pPipelineState->GetNggControl()),
     m_pLdsManager(nullptr),
     m_pBuilder(new IRBuilder<>(*m_pContext))
 {
@@ -125,7 +126,7 @@ Function* NggPrimShader::Generate(
     // Create NGG LDS manager
     LLPC_ASSERT(pModule != nullptr);
     LLPC_ASSERT(m_pLdsManager == nullptr);
-    m_pLdsManager = new NggLdsManager(pModule, m_pContext, m_pBuilder.get());
+    m_pLdsManager = new NggLdsManager(pModule, m_pPipelineState, m_pBuilder.get());
 
     return GeneratePrimShaderEntryPoint(pModule);
 }
@@ -3076,7 +3077,7 @@ void NggPrimShader::RunEsOrEsVariant(
     if (hasTs)
     {
         // Set up system value SGPRs
-        if (m_pContext->IsTessOffChip())
+        if (m_pPipelineState->IsTessOffChip())
         {
             args.push_back(m_hasGs ? pOffChipLdsBase : pIsOffChip);
             args.push_back(m_hasGs ? pIsOffChip : pOffChipLdsBase);

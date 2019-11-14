@@ -63,6 +63,7 @@ namespace Gfx6
 
 class Context;
 class PassManager;
+class PipelineState;
 
 // Represents data entry in a ELF section, including associated ELF symbols.
 struct ElfDataEntry
@@ -81,7 +82,7 @@ class CodeGenManager
 public:
     static Result CreateTargetMachine(Context* pContext, const PipelineOptions* pPipelineOptions);
 
-    static void SetupTargetFeatures(llvm::Module* pModule);
+    static void SetupTargetFeatures(PipelineState* pPipelineState, llvm::Module* pModule);
 
     static void AddTargetPasses(Context*                    pContext,
                                 PassManager&                passMgr,

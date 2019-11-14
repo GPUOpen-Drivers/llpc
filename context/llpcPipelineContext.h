@@ -696,15 +696,6 @@ struct InterfaceData
     } entryArgIdxs;
 };
 
-#if LLPC_BUILD_GFX10
-// Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
-struct NggControl : NggState
-{
-    bool                            passthroughMode; // Whether NGG passthrough mode is enabled
-    Util::Abi::PrimShaderCbLayout   primShaderTable; // Primitive shader table (only some registers are used)
-};
-#endif
-
 // =====================================================================================================================
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext
@@ -744,28 +735,10 @@ public:
     // Gets the next active shader stage in this pipeline
     virtual ShaderStage GetNextShaderStage(ShaderStage shaderStage) const { return ShaderStageInvalid; }
 
-    // Checks whether tessellation off-chip mode is enabled
-    virtual bool IsTessOffChip() const = 0;
-
-    // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-    virtual bool CheckGsOnChipValidity() = 0;
-
-    // Checks whether GS on-chip mode is enabled
-    virtual bool IsGsOnChip() const = 0;
-
-    // Enables GS on-chip mode
-    virtual void SetGsOnChip(bool gsOnChip) = 0;
-
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
 
 #if LLPC_BUILD_GFX10
-    // Sets NGG control settings
-    virtual void SetNggControl() = 0;
-
-    // Gets NGG control settings
-    virtual const NggControl* GetNggControl() const = 0;
-
     // Gets WGP mode enablement for the specified shader stage
     virtual bool GetShaderWgpMode(ShaderStage shaderStage) const = 0;
 #endif
