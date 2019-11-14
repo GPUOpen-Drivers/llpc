@@ -30,6 +30,7 @@
  */
 #define DEBUG_TYPE "llpc-patch-buffer-op"
 
+#include "llvm/InitializePasses.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
