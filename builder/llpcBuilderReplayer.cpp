@@ -60,7 +60,6 @@ private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderReplayer);
 
     void ReplayCall(uint32_t opcode, CallInst* pCall);
-    void CheckCallAndReplay(Value* pValue);
 
     Value* ProcessCall(uint32_t opcode, CallInst* pCall);
 
@@ -203,28 +202,6 @@ void BuilderReplayer::ReplayCall(
         }
     }
     pCall->eraseFromParent();
-}
-
-// =====================================================================================================================
-// If the passed value is a recorded builder call, replay it now.
-// This is used in the waterfall loop workaround for not knowing the replay order.
-void BuilderReplayer::CheckCallAndReplay(
-    Value* pValue)    // [in] Value that might be a recorded call
-{
-    if (auto pCall = dyn_cast<CallInst>(pValue))
-    {
-        if (auto pFunc = pCall->getCalledFunction())
-        {
-            if (pFunc->getName().startswith(BuilderCallPrefix))
-            {
-                uint32_t opcode = cast<ConstantInt>(cast<ConstantAsMetadata>(
-                                      pFunc->getMetadata(m_opcodeMetaKindId)->getOperand(0))
-                                    ->getValue())->getZExtValue();
-
-                ReplayCall(opcode, pCall);
-            }
-        }
-    }
 }
 
 // =====================================================================================================================

@@ -270,6 +270,7 @@ endif
                     -Wno-invalid-offsetof              \
                     -Wno-sign-compare                  \
                     -Wno-delete-incomplete             \
+                    -Wunused-function                  \
                     -Wunused-variable
         ifeq ($(USING_CLANG),)
             LCXXOPTS += -Wno-maybe-uninitialized
