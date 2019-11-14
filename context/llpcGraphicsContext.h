@@ -69,30 +69,9 @@ public:
     virtual ShaderStage GetPrevShaderStage(ShaderStage shaderStage) const;
     virtual ShaderStage GetNextShaderStage(ShaderStage shaderStage) const;
 
-    // Checks whether tessellation off-chip mode is enabled
-    virtual bool IsTessOffChip() const { return m_tessOffchip; }
-
-    virtual bool CheckGsOnChipValidity();
-
-    // Checks whether GS on-chip mode is enabled
-
-    // NOTE: GS on-chip mode has different meaning for GFX6~8 and GFX9: on GFX6~8, GS on-chip mode means ES -> GS ring
-    // and GS -> VS ring are both on-chip; on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
-    // ring is on-chip.
-    virtual bool IsGsOnChip() const { return m_gsOnChip; }
-
-    // Enables GS on-chip mode
-    virtual void SetGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
-
     virtual void DoUserDataNodeMerge();
 
 #if LLPC_BUILD_GFX10
-    // Sets NGG control settings
-    virtual void SetNggControl();
-
-    // Gets NGG control settings
-    virtual const NggControl* GetNggControl() const { return &m_nggControl; }
-
     // Gets WGP mode enablement for the specified shader stage
     virtual bool GetShaderWgpMode(ShaderStage shaderStage) const;
 #endif
@@ -126,12 +105,7 @@ private:
     ResourceUsage   m_resUsages[ShaderStageGfxCount];   // Resource usages of all graphics shader stages
     InterfaceData   m_intfData[ShaderStageGfxCount];    // Interface data of all graphics shader stages
 
-    bool            m_tessOffchip; // Whether to enable tessellation off-chip mode
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode
-
-#if LLPC_BUILD_GFX10
-    NggControl      m_nggControl;   // NGG control settings
-#endif
 
     llvm::SmallVector<std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingNode>>, 4>
                     m_allocUserDataNodes;               // Allocated merged user data nodes

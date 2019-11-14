@@ -41,6 +41,7 @@
 #include "llpcGfx9Chip.h"
 #include "llpcNggLdsManager.h"
 #include "llpcPatch.h"
+#include "llpcPipelineState.h"
 
 using namespace llvm;
 
@@ -126,20 +127,21 @@ const char* NggLdsManager::LdsRegionNames[LdsRegionCount] =
 
 // =====================================================================================================================
 NggLdsManager::NggLdsManager(
-    Module*      pModule,    // [in] LLVM module
-    Context*     pContext,   // [in] LLPC context
-    IRBuilder<>* pBuilder)   // [in] LLVM IR builder
+    Module*             pModule,        // [in] LLVM module
+    PipelineState*      pPipelineState, // [in] Pipeline state
+    IRBuilder<>*        pBuilder)       // [in] LLVM IR builder
     :
-    m_pContext(pContext),
-    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / pContext->GetGpuProperty()->waveSize),
+    m_pPipelineState(pPipelineState),
+    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pContext->GetGpuProperty()->waveSize),
     m_pBuilder(pBuilder)
 {
     LLPC_ASSERT(pBuilder != nullptr);
 
-    const auto pNggControl = pContext->GetNggControl();
+    const auto pNggControl = m_pPipelineState->GetNggControl();
     LLPC_ASSERT(pNggControl->enableNgg);
 
-    const uint32_t stageMask = pContext->GetShaderStageMask();
+    const uint32_t stageMask = m_pContext->GetShaderStageMask();
     const bool hasGs = (stageMask & ShaderStageToMask(ShaderStageGeometry));
     const bool hasTs = ((stageMask & (ShaderStageToMask(ShaderStageTessControl) |
                                       ShaderStageToMask(ShaderStageTessEval))) != 0);
@@ -169,13 +171,12 @@ NggLdsManager::NggLdsManager(
         //              | GS out vertex  offset |
         //              +-----------------------+
         //
-        const auto& calcFactor = pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+        const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
         // NOTE: We round ES-GS LDS size to 4-DWORD alignment. This is for later LDS read/write operations of mutilple
         // DWORDs (such as DS128).
         const uint32_t esGsRingLdsSize = RoundUpToMultiple(calcFactor.esGsLdsSize, 4u) * SizeOfDword;
         const uint32_t gsVsRingLdsSize = calcFactor.gsOnChipLdsSize * SizeOfDword - esGsRingLdsSize -
-                                         CalcGsExtraLdsSize(static_cast<GraphicsContext*>(
-                                             pContext->GetPipelineContext()));
+                                         CalcGsExtraLdsSize(m_pPipelineState);
 
         uint32_t ldsRegionStart = 0;
 
@@ -298,9 +299,10 @@ NggLdsManager::NggLdsManager(
 // =====================================================================================================================
 // Calculates ES extra LDS size.
 uint32_t NggLdsManager::CalcEsExtraLdsSize(
-    GraphicsContext* pContext) // [in] LLPC graphics context
+    PipelineState* pPipelineState)  // [in] Pipeline state
 {
-    const auto pNggControl = pContext->GetNggControl();
+    Context* pContext = static_cast<Context*>(&pPipelineState->GetContext());
+    const auto pNggControl = pPipelineState->GetNggControl();
     if (pNggControl->enableNgg == false)
     {
         return 0;
@@ -385,9 +387,10 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
 // =====================================================================================================================
 // Calculates GS extra LDS size (used for operations other than ES-GS ring and GS-VS ring read/write).
 uint32_t NggLdsManager::CalcGsExtraLdsSize(
-    GraphicsContext* pContext) // [in] LLPC graphics context
+    PipelineState* pPipelineState)  // [in] Pipeline state
 {
-    const auto pNggControl = pContext->GetNggControl();
+    Context* pContext = static_cast<Context*>(&pPipelineState->GetContext());
+    const auto pNggControl = pPipelineState->GetNggControl();
     if (pNggControl->enableNgg == false)
     {
         return 0;

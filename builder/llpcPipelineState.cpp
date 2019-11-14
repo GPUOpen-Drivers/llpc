@@ -42,12 +42,18 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Target/TargetMachine.h"
 
 using namespace Llpc;
 using namespace llvm;
+
+// -enable-tess-offchip: enable tessellation off-chip mode
+static cl::opt<bool> EnableTessOffChip("enable-tess-offchip",
+                                       cl::desc("Enable tessellation off-chip mode"),
+                                       cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UserDataMetadataName[] = "llpc.user.data.nodes";
@@ -222,7 +228,7 @@ void PipelineState::Generate(
     // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
     // we do target feature setup here.
 #endif
-    CodeGenManager::SetupTargetFeatures(&*pipelineModule);
+    CodeGenManager::SetupTargetFeatures(this, &*pipelineModule);
 
     // A separate "whole pipeline" pass manager for code generation.
     std::unique_ptr<PassManager> codeGenPassMgr(PassManager::Create());
@@ -607,6 +613,14 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
         }
     }
     return ArrayRef<MDString*>(m_resourceNodeTypeNames);
+}
+
+// =====================================================================================================================
+// Determine whether to use off-chip tessellation mode
+bool PipelineState::IsTessOffChip()
+{
+    // For GFX9+, always enable tessellation off-chip mode
+    return EnableTessOffChip || (GetBuilderContext()->GetGfxIpVersion().major >= 9);
 }
 
 // =====================================================================================================================

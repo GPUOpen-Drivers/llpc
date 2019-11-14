@@ -48,7 +48,8 @@ namespace Gfx9
 class ConfigBuilder : public ConfigBuilderBase
 {
 public:
-    ConfigBuilder(llvm::Module* pModule) : ConfigBuilderBase(pModule) {}
+    ConfigBuilder(llvm::Module* pModule, PipelineState* pPipelineState)
+        : ConfigBuilderBase(pModule, pPipelineState) {}
 
     void BuildPalMetadata();
 

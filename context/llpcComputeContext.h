@@ -64,28 +64,10 @@ public:
     // Gets the count of active shader stages
     virtual uint32_t GetActiveShaderStageCount() const { return 1; }
 
-    // Checks whether tessellation off-chip mode is enabled
-    virtual bool IsTessOffChip() const { LLPC_NEVER_CALLED(); return false; }
-
-    // Determines whether GS on-chip mode is valid for this pipeline
-    virtual bool CheckGsOnChipValidity() { LLPC_NEVER_CALLED(); return false; }
-
-    // Checks whether GS on-chip mode is enabled
-    virtual bool IsGsOnChip() const { LLPC_NEVER_CALLED(); return false; }
-
-    // Enables GS on-chip mode
-    virtual void SetGsOnChip(bool gsOnChip) { LLPC_NEVER_CALLED(); }
-
     // Does user data node merging for all shader stages
     virtual void DoUserDataNodeMerge() { }
 
 #if LLPC_BUILD_GFX10
-    // Sets NGG control settings
-    virtual void SetNggControl() { LLPC_NEVER_CALLED(); }
-
-    // Gets NGG control settings
-    virtual const NggControl* GetNggControl() const { LLPC_NEVER_CALLED(); return nullptr; }
-
     // Gets WGP mode enablement for the specified shader stage
     virtual bool GetShaderWgpMode(ShaderStage shaderStage) const
     {

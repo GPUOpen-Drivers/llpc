@@ -214,44 +214,12 @@ public:
         return m_pEmptyMetaNode;
     }
 
-    bool IsTessOffChip() const
-    {
-        return m_pPipelineContext->IsTessOffChip();
-    }
-
-    bool CheckGsOnChipValidity()
-    {
-        return m_pPipelineContext->CheckGsOnChipValidity();
-    };
-
-    bool IsGsOnChip()
-    {
-        return m_pPipelineContext->IsGsOnChip();
-    }
-
-    void SetGsOnChip(bool gsOnChip)
-    {
-        m_pPipelineContext->SetGsOnChip(gsOnChip);
-    }
-
     void DoUserDataNodeMerge()
     {
         m_pPipelineContext->DoUserDataNodeMerge();
     }
 
 #if LLPC_BUILD_GFX10
-    // Sets NGG control settings
-    void SetNggControl()
-    {
-        return m_pPipelineContext->SetNggControl();
-    }
-
-    // Gets NGG control settings
-    const NggControl* GetNggControl() const
-    {
-        return m_pPipelineContext->GetNggControl();
-    }
-
     // Gets WGP mode enablement for the specified shader stage
     bool GetShaderWgpMode(ShaderStage shaderStage) const
     {

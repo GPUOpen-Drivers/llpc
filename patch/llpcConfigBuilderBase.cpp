@@ -36,13 +36,15 @@
 
 #include "llpcConfigBuilderBase.h"
 #include "llpcAbiMetadata.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
 
 // =====================================================================================================================
 ConfigBuilderBase::ConfigBuilderBase(
-    llvm::Module* pModule)  // [in/out] LLVM module
+    llvm::Module*   pModule,        // [in/out] LLVM module
+    PipelineState*  pPipelineState) // [in] Pipeline state
     :
     m_pModule(pModule),
     m_userDataLimit(0),

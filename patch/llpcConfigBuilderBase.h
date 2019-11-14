@@ -36,12 +36,14 @@
 namespace Llpc
 {
 
+class PipelineState;
+
 // =====================================================================================================================
 // Register configuration builder base class.
 class ConfigBuilderBase
 {
 public:
-    ConfigBuilderBase(llvm::Module* pModule);
+    ConfigBuilderBase(llvm::Module* pModule, PipelineState* pPipelineState);
     ~ConfigBuilderBase();
 
     void WritePalMetadata();
@@ -87,6 +89,7 @@ protected:
 
     llvm::Module*                   m_pModule;            // LLVM module being processed
     Context*                        m_pContext;           // LLPC context
+    PipelineState*                  m_pPipelineState;     // Pipeline state
     GfxIpVersion                    m_gfxIp;              // Graphics IP version info
 
     bool                            m_hasVs;              // Whether the pipeline has vertex shader
