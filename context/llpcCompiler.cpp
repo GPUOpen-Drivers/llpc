@@ -55,7 +55,6 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
-#include "llpcBinaryStream.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcElfReader.h"
 #include "llpcElfWriter.h"
@@ -597,8 +596,6 @@ Result Compiler::BuildShaderModule(
                 {
                     ShaderModuleEntry moduleEntry = {};
                     ShaderModuleEntryData moduleEntryData = {};
-                    ResourceUsage resUsage;
-                    PipelineContext::InitShaderResourceUsage(entryNames[i].stage, &resUsage);
 
                     moduleEntryData.pShaderEntry = &moduleEntry;
                     moduleEntryData.stage = entryNames[i].stage;
@@ -615,7 +612,6 @@ Result Compiler::BuildShaderModule(
                         *pContext);
 
                     pContext->SetModuleTargetMachine(pModule);
-                    pContext->SetResUsage(&resUsage);
 
                     uint32_t passIndex = 0;
                     std::unique_ptr<PassManager> lowerPassMgr(PassManager::Create());
@@ -671,10 +667,6 @@ Result Compiler::BuildShaderModule(
 
                     moduleEntry.entrySize = moduleBinary.size() - moduleEntry.entryOffset;
 
-                    // Serialize resource usage
-                    moduleBinaryStream << *pContext->GetShaderResourceUsage(entryNames[i].stage);
-
-                    moduleEntry.resUsageSize = moduleBinary.size() - moduleEntry.entryOffset - moduleEntry.entrySize;
                     moduleEntry.passIndex = passIndex;
                     if (pResCollectPass->DetailUsageValid())
                     {
@@ -932,14 +924,6 @@ Result Compiler::BuildPipelineInternal(
                         // LLVM bitcode
                         binCode.codeSize = pShaderEntry->entrySize;
                         binCode.pCode = VoidPtrInc(pModuleDataEx->common.binCode.pCode, pShaderEntry->entryOffset);
-
-                        // Resource usage
-                        const char* pResUsagePtr = reinterpret_cast<const char*>(
-                            VoidPtrInc(pModuleDataEx->common.binCode.pCode,
-                                       pShaderEntry->entryOffset + pShaderEntry->entrySize));
-                        std::string resUsageBuf(pResUsagePtr, pShaderEntry->resUsageSize);
-                        std::istringstream resUsageStrem(resUsageBuf);
-                        resUsageStrem >> *(pContext->GetShaderResourceUsage(static_cast<ShaderStage>(shaderIndex)));
                         break;
                     }
                 }
