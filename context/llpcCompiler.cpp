@@ -30,6 +30,7 @@
  */
 #define DEBUG_TYPE "llpc-compiler"
 
+#include "llvm/InitializePasses.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
