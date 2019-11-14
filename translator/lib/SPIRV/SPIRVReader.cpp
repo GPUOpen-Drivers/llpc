@@ -636,7 +636,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
             // Record that the array was remapped, even though we don't record a useful mapping for arrays.
             recordRemappedTypeElements(pSpvType, 0, 0);
 
-            pElementType = StructType::create({ pElementType, getPadType(padding) }, "llpc.array.element", true);
+            pElementType = StructType::get(*Context, { pElementType, getPadType(padding) }, true);
         }
     }
 
@@ -766,9 +766,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
             memberTypes.push_back(getPadType(padding));
         }
 
-        const StringRef typeName = isColumnMajor ? "llpc.matrix.column" : "llpc.matrix.row";
-
-        pColumnType = StructType::create(memberTypes, typeName, true);
+        pColumnType = StructType::get(*Context, memberTypes, true);
     }
 
     Type* const pMatrixType = ArrayType::get(pColumnType, columnCount);
@@ -900,7 +898,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
             // Record that the array was remapped, even though we don't record a useful mapping for arrays.
             recordRemappedTypeElements(pSpvType, 0, 0);
 
-            pElementType = StructType::create({pElementType, getPadType(padding)}, "llpc.runtime.array.element", true);
+            pElementType = StructType::get(*Context, {pElementType, getPadType(padding)}, true);
         }
     }
 
@@ -1052,8 +1050,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
     }
     else
     {
-        pStructType = StructType::create(*Context, pSpvStructType->getName());
-        pStructType->setBody(memberTypes, isPacked);
+        pStructType = StructType::create(*Context, memberTypes, pSpvStructType->getName(), isPacked);
     }
 
     return isExplicitlyLaidOut && hasMemberOffset ? recordTypeWithPad(pStructType) : pStructType;
