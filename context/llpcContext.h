@@ -135,14 +135,7 @@ public:
     // Wrappers of interfaces of pipeline context
     ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage)
     {
-        if (m_pResUsage != nullptr)
-        {
-            return m_pResUsage;
-        }
-        else
-        {
-            return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
-        }
+        return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
     }
 
     InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage)
@@ -257,12 +250,6 @@ public:
     // Sets triple and data layout in specified module from the context's target machine.
     void SetModuleTargetMachine(llvm::Module* pModule);
 
-    // Sets external resource usage.
-    void SetResUsage(ResourceUsage* pResUsage)
-    {
-        m_pResUsage = pResUsage;
-    }
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);
@@ -275,8 +262,6 @@ private:
     volatile  bool                m_isInUse;           // Whether this context is in use
     Builder*                      m_pBuilder = nullptr; // LLPC builder object
     std::unique_ptr<BuilderContext> m_builderContext;  // Builder context
-
-    ResourceUsage*                m_pResUsage;          // External resource usage
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine

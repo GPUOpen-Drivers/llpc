@@ -109,7 +109,6 @@ Context::~Context()
 void Context::Reset()
 {
     m_pPipelineContext = nullptr;
-    m_pResUsage = nullptr;
     delete m_pBuilder;
     m_pBuilder = nullptr;
 }
