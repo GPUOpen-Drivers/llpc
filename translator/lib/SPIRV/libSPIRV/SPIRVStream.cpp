@@ -44,40 +44,6 @@
 
 namespace SPIRV {
 
-/// Write string with quote. Replace " with \".
-static void writeQuotedString(spv_ostream &O, const std::string &Str) {
-  O << '"';
-  for (auto I : Str) {
-    if (I == '"')
-      O << '\\';
-    O << I;
-  }
-  O << '"';
-}
-
-/// Read quoted string. Replace \" with ".
-static void readQuotedString(std::istream &IS, std::string &Str) {
-  char Ch = ' ';
-  char PreCh = ' ';
-  while (IS >> Ch && Ch != '"')
-    ;
-
-  if (IS >> PreCh && PreCh != '"') {
-    while (IS >> Ch) {
-      if (Ch == '"') {
-        if (PreCh != '\\') {
-          Str += PreCh;
-          break;
-        } else
-          PreCh = Ch;
-      } else {
-        Str += PreCh;
-        PreCh = Ch;
-      }
-    }
-  }
-}
-
 SPIRVDecoder::SPIRVDecoder(std::istream &InputStream, SPIRVFunction &F)
     : IS(InputStream), M(*F.getModule()), WordCount(0), OpCode(OpNop),
       Scope(&F) {}
