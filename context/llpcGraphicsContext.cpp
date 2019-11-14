@@ -97,14 +97,6 @@ GraphicsContext::GraphicsContext(
 
 #if LLPC_BUILD_GFX10
     memset(&m_nggControl, 0, sizeof(m_nggControl));
-
-    if (gfxIp.major >= 10)
-    {
-        // NOTE: All fields of NGG controls are determined by the pass of resource collecting in patching. Here, we still
-        // set NGG enablement early. The field is used when deciding if we need extra optimizations after NGG primitive
-        // shader creation. At that time, the pass of resource collecting has not been run.
-        m_nggControl.enableNgg = pPipelineInfo->nggState.enableNgg;
-    }
 #endif
 
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =

@@ -188,7 +188,8 @@ void Patch::AddPasses(
     passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
 #if LLPC_BUILD_GFX10
-    if (pContext->IsGraphics() && pContext->GetNggControl()->enableNgg)
+    if (pContext->IsGraphics() && (pContext->GetGfxIpVersion().major >= 10) &&
+        static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo())->nggState.enableNgg)
     {
         // Stop timer for patching passes and restart timer for optimization passes.
         if (pPatchTimer != nullptr)
