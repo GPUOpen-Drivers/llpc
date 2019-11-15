@@ -36,6 +36,7 @@
 #include "llpcContext.h"
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
+#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-system-values"
 
@@ -95,7 +96,7 @@ Value* ShaderSystemValues::GetEsGsRingBufDesc()
 
         IRBuilder<> builder(&*m_pEntryPoint->front().getFirstInsertionPt());
         m_pEsGsRingBufDesc = LoadDescFromDriverTable(tableOffset, builder);
-        if ((m_shaderStage != ShaderStageGeometry) && (m_pContext->GetGfxIpVersion().major >= 8))
+        if ((m_shaderStage != ShaderStageGeometry) && (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 8))
         {
             // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
             // VS/TES output.
@@ -315,7 +316,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
 
             pDesc = builder.CreateInsertElement(pDesc, pGsVsRingBufDescElem1, (uint64_t)1);
 
-            if (m_pContext->GetGfxIpVersion().major >= 8)
+            if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 8)
             {
                 // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
                 pDesc = SetRingBufferDataFormat(pDesc, BUF_DATA_FORMAT_32, builder);

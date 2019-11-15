@@ -134,7 +134,7 @@ public:
                           llvm::Timer*                    pOptTimer,
                           Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc);
 
-    static llvm::GlobalVariable* GetLdsVariable(llvm::Module* pModule);
+    static llvm::GlobalVariable* GetLdsVariable(PipelineState* pPipelineState, llvm::Module* pModule);
 
 protected:
     void Init(llvm::Module* pModule);

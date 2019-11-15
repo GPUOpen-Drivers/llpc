@@ -43,6 +43,7 @@
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
 #include "llpcShaderMerger.h"
+#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-shader-merger"
 
@@ -56,7 +57,7 @@ ShaderMerger::ShaderMerger(
     :
     m_pPipelineState(pPipelineState),
     m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
-    m_gfxIp(pPipelineState->GetBuilderContext()->GetGfxIpVersion()),
+    m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
     m_pPipelineShaders(pPipelineShaders)
 #if LLPC_BUILD_GFX10
     , m_primShader(pPipelineState)
@@ -125,7 +126,7 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
         {
             pVsIntfData->userDataUsage.spillTable = userDataCount;
             ++userDataCount;
-            LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+            LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
         }
     }
 
@@ -299,7 +300,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     auto pHsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    auto pGpuWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
     if (pGpuWorkarounds->gfx9.fixLsVgprInput)
     {
         auto pNullHs = new ICmpInst(*pEntryBlock,
@@ -564,7 +565,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
             {
                 pTesIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+                LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
             }
         }
     }
@@ -579,7 +580,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
             {
                 pVsIntfData->userDataUsage.spillTable = userDataCount;
                 ++userDataCount;
-                LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+                LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
             }
         }
     }

@@ -38,6 +38,8 @@
 #include "llpcDebug.h"
 #include "llpcFragColorExport.h"
 #include "llpcIntrinsDefs.h"
+#include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 using namespace llvm;
 
@@ -1168,8 +1170,10 @@ const ColorFormatInfo FragColorExport::m_colorFormatInfo[] =
 
 // =====================================================================================================================
 FragColorExport::FragColorExport(
-    Module* pModule) // [in] LLVM module
+    PipelineState*  pPipelineState, // [in] Pipeline state
+    Module*         pModule)        // [in] LLVM module
     :
+    m_pPipelineState(pPipelineState),
     m_pModule(pModule),
     m_pContext(static_cast<Context*>(&pModule->getContext())),
     pPipelineInfo(static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo()))
@@ -1599,8 +1603,8 @@ ExportFormat FragColorExport::ComputeExportFormat(
     uint32_t location    // Location of fragment data output
     ) const
 {
-    GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
+    auto pGpuWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
     uint32_t outputMask = pOutputTy->isVectorTy() ? (1 << pOutputTy->getVectorNumElements()) - 1 : 1;
     const auto pCbState = &pPipelineInfo->cbState;
     const auto pTarget = &pCbState->target[location];

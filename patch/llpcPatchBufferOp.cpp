@@ -45,6 +45,8 @@
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchBufferOp.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 using namespace llvm;
 using namespace Llpc;
@@ -77,6 +79,7 @@ void PatchBufferOp::getAnalysisUsage(
     ) const
 {
     analysisUsage.addRequired<LegacyDivergenceAnalysis>();
+    analysisUsage.addRequired<PipelineStateWrapper>();
     analysisUsage.addRequired<PipelineShaders>();
     analysisUsage.addPreserved<PipelineShaders>();
     analysisUsage.addRequired<TargetTransformInfoWrapperPass>();
@@ -90,6 +93,7 @@ bool PatchBufferOp::runOnFunction(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
+    m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(function.getParent());
     m_pContext = static_cast<Context*>(&function.getContext());
     m_pBuilder.reset(new IRBuilder<>(*m_pContext));
 
@@ -1637,7 +1641,7 @@ Value* PatchBufferOp::ReplaceLoad(
                 CoherentFlag coherent = {};
                 coherent.bits.glc = isGlc;
 #if LLPC_BUILD_GFX10
-                if (m_pContext->GetGfxIpVersion().major >= 10)
+                if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
                 {
                     coherent.bits.dlc = isDlc;
                 }
@@ -1656,7 +1660,7 @@ Value* PatchBufferOp::ReplaceLoad(
                 coherent.bits.glc = isGlc;
                 coherent.bits.slc = isSlc;
 #if LLPC_BUILD_GFX10
-                if (m_pContext->GetGfxIpVersion().major >= 10)
+                if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10)
                 {
                     coherent.bits.dlc = isDlc;
                 }

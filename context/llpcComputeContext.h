@@ -41,8 +41,6 @@ class ComputeContext: public PipelineContext
 {
 public:
     ComputeContext(GfxIpVersion                    gfxIp,
-                   const GpuProperty*              pGpuProp,
-                   const WorkaroundFlags*          pGpuWorkarounds,
                    const ComputePipelineBuildInfo* pPipelineInfo,
                    MetroHash::Hash*                pPipelineHash,
                    MetroHash::Hash*                pCacheHash);

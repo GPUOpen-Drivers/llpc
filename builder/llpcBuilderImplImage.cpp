@@ -31,6 +31,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcTargetInfo.h"
 
 #include "llvm/IR/Intrinsics.h"
 
@@ -1337,7 +1338,7 @@ Value* BuilderImplImage::PreprocessIntegerImageGather(
     Value*&   pImageDesc, // [in/out] Image descriptor
     Value*&   pCoord)     // [in/out] Coordinate
 {
-    if (getContext().GetGfxIpVersion().major >= 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 9)
     {
         // GFX9+: Workaround not needed.
         return nullptr;
@@ -1847,7 +1848,7 @@ Value* BuilderImplImage::CreateImageQuerySize(
         // Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
         Value* pNumRecords = CreateExtractElement(pImageDesc, 2);
 
-        if (getContext().GetGfxIpVersion().major == 8)
+        if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major == 8)
         {
             // GFX8 only: extract STRIDE (SQ_BUF_RSRC_WORD1 [29:16]) and divide into NUM_RECORDS.
             Value* pStride = CreateIntrinsic(Intrinsic::amdgcn_ubfe,
@@ -1972,7 +1973,7 @@ Value* BuilderImplImage::CreateImageGetLod(
 uint32_t BuilderImplImage::Change1DTo2DIfNeeded(
     uint32_t                  dim)            // Image dimension
 {
-    if (getContext().GetGpuWorkarounds()->gfx9.treat1dImagesAs2d)
+    if (GetPipelineState()->GetTargetInfo().GetGpuWorkarounds().gfx9.treat1dImagesAs2d)
     {
         switch (dim)
         {
@@ -2333,7 +2334,7 @@ Value* BuilderImplImage::PatchCubeDescriptor(
     uint32_t  dim)    // Image dimensions
 {
     if (((dim != DimCube) && (dim != DimCubeArray)) ||
-        (getContext().GetGfxIpVersion().major >= 9))
+        (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 9))
     {
         return pDesc;
     }

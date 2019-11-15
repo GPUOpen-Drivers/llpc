@@ -51,7 +51,7 @@ namespace Llpc
 class Context : public llvm::LLVMContext
 {
 public:
-    Context(GfxIpVersion gfxIp, const WorkaroundFlags* pGpuWorkarounds);
+    Context(GfxIpVersion gfxIp);
     ~Context();
 
     void Reset();
@@ -82,18 +82,6 @@ public:
 
     // Get (create if necessary) BuilderContext
     BuilderContext* GetBuilderContext();
-
-    // Sets the target machine.
-    void SetTargetMachine(llvm::TargetMachine* pTargetMachine)
-    {
-        m_pTargetMachine.reset(pTargetMachine);
-    }
-
-    // Gets the target machine.
-    llvm::TargetMachine* GetTargetMachine()
-    {
-        return m_pTargetMachine.get();
-    }
 
     // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
     // starting a pipeline compile.
@@ -181,11 +169,6 @@ public:
         return m_pPipelineContext->GetActiveShaderStageCount();
     }
 
-    const char* GetGpuNameString() const
-    {
-        return PipelineContext::GetGpuNameString(m_gfxIp);
-    }
-
     const char* GetGpuNameAbbreviation() const
     {
         return PipelineContext::GetGpuNameAbbreviation(m_gfxIp);
@@ -194,16 +177,6 @@ public:
     GfxIpVersion GetGfxIpVersion() const
     {
         return m_gfxIp;
-    }
-
-    const GpuProperty* GetGpuProperty() const
-    {
-        return m_pPipelineContext->GetGpuProperty();
-    }
-
-    const WorkaroundFlags* GetGpuWorkarounds() const
-    {
-        return m_pPipelineContext->GetGpuWorkarounds();
     }
 
     llvm::MDNode* GetEmptyMetadataNode()

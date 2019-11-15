@@ -31,6 +31,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -95,14 +96,14 @@ Value* BuilderImplBase::CreateDotProduct(
 // Get whether the context we are building in supports DPP operations.
 bool BuilderImplBase::SupportDpp() const
 {
-    return getContext().GetGfxIpVersion().major >= 8;
+    return GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 8;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
 bool BuilderImplBase::SupportBPermute() const
 {
-    auto gfxIp = getContext().GetGfxIpVersion().major;
+    auto gfxIp = GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major;
     auto supportBPermute = (gfxIp == 8) || (gfxIp == 9);
 #if LLPC_BUILD_GFX10
     auto waveSize = GetPipelineState()->GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
@@ -116,7 +117,7 @@ bool BuilderImplBase::SupportBPermute() const
 // Get whether the context we are building in supports permute lane DPP operations.
 bool BuilderImplBase::SupportPermLaneDpp() const
 {
-    return getContext().GetGfxIpVersion().major >= 10;
+    return GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 10;
 }
 #endif
 

@@ -38,6 +38,7 @@
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
@@ -64,6 +65,13 @@ static const char UserDataMetadataName[] = "llpc.user.data.nodes";
 LLVMContext& Pipeline::GetContext() const
 {
     return GetBuilderContext()->GetContext();
+}
+
+// =====================================================================================================================
+// Get TargetInfo
+const TargetInfo& PipelineState::GetTargetInfo() const
+{
+    return GetBuilderContext()->GetTargetInfo();
 }
 
 // =====================================================================================================================
@@ -228,20 +236,13 @@ void PipelineState::Generate(
     // Run the "whole pipeline" passes, excluding the target backend.
     patchPassMgr->run(*pipelineModule);
     patchPassMgr.reset(nullptr);
-#if LLPC_BUILD_GFX10
-    // NOTE: Ideally, target feature setup should be added to the last pass in patching. But NGG is somewhat
-    // different in that it must involve extra LLVM optimization passes after preparing pipeline ABI. Thus,
-    // we do target feature setup here.
-#endif
-    CodeGenManager::SetupTargetFeatures(this, &*pipelineModule);
 
     // A separate "whole pipeline" pass manager for code generation.
     std::unique_ptr<PassManager> codeGenPassMgr(PassManager::Create());
     codeGenPassMgr->SetPassIndex(&passIndex);
 
     // Code generation.
-    Context* pContext = reinterpret_cast<Context*>(&GetContext());
-    CodeGenManager::AddTargetPasses(pContext, *codeGenPassMgr, pCodeGenTimer, outStream);
+    GetBuilderContext()->AddTargetPasses(*codeGenPassMgr, pCodeGenTimer, outStream);
 
     // Run the target backend codegen passes.
     codeGenPassMgr->run(*pipelineModule);
@@ -815,7 +816,7 @@ ArrayRef<MDString*> PipelineState::GetResourceTypeNames()
 bool PipelineState::IsTessOffChip()
 {
     // For GFX9+, always enable tessellation off-chip mode
-    return EnableTessOffChip || (GetBuilderContext()->GetGfxIpVersion().major >= 9);
+    return EnableTessOffChip || (GetBuilderContext()->GetTargetInfo().GetGfxIpVersion().major >= 9);
 }
 
 // =====================================================================================================================
@@ -833,11 +834,10 @@ uint32_t PipelineState::GetShaderWaveSize(
 
     LLPC_ASSERT(stage <= ShaderStageCompute);
 
-    Context* pContext = static_cast<Context*>(&GetContext());
-    uint32_t waveSize = pContext->GetGpuProperty()->waveSize;
+    uint32_t waveSize = GetTargetInfo().GetGpuProperty().waveSize;
 
 #if LLPC_BUILD_GFX10
-    if (pContext->GetGfxIpVersion().major >= 10)
+    if (GetTargetInfo().GetGfxIpVersion().major >= 10)
     {
         // NOTE: GPU property wave size is used in shader, unless:
         //  1) A stage-specific default is preferred.

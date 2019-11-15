@@ -41,13 +41,11 @@ namespace Llpc
 // =====================================================================================================================
 ComputeContext::ComputeContext(
     GfxIpVersion                    gfxIp,            // Graphics Ip version info
-    const GpuProperty*              pGpuProp,         // [in] GPU Property
-    const WorkaroundFlags*          pGpuWorkarounds,  // [in] GPU workarounds
     const ComputePipelineBuildInfo* pPipelineInfo,    // [in] Compute pipeline build info
     MetroHash::Hash*                pPipelineHash,    // [in] Pipeline hash code
     MetroHash::Hash*                pCacheHash)       // [in] Cache hash code
     :
-    PipelineContext(gfxIp, pGpuProp, pGpuWorkarounds, pPipelineHash, pCacheHash),
+    PipelineContext(gfxIp, pPipelineHash, pCacheHash),
     m_pPipelineInfo(pPipelineInfo)
 {
     InitShaderResourceUsage(ShaderStageCompute, GetShaderResourceUsage(ShaderStageCompute));

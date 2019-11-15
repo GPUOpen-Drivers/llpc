@@ -38,6 +38,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 #include "llpcShaderMerger.h"
 
 #define DEBUG_TYPE "llpc-patch-prepare-pipeline-abi"
@@ -134,7 +135,7 @@ bool PatchPreparePipelineAbi::runOnModule(
     m_hasTes = m_pPipelineState->HasShaderStage(ShaderStageTessEval);
     m_hasGs = m_pPipelineState->HasShaderStage(ShaderStageGeometry);
 
-    m_gfxIp = m_pContext->GetGfxIpVersion();
+    m_gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
 
     // If we've only to set the calling conventions, do that now.
     if (m_onlySetCallingConvs)

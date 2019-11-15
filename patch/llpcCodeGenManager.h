@@ -80,14 +80,7 @@ struct ElfDataEntry
 class CodeGenManager
 {
 public:
-    static Result CreateTargetMachine(Context* pContext);
-
     static void SetupTargetFeatures(PipelineState* pPipelineState, llvm::Module* pModule);
-
-    static void AddTargetPasses(Context*                    pContext,
-                                PassManager&                passMgr,
-                                llvm::Timer*                pCodeGenTimer,
-                                llvm::raw_pwrite_stream&    outStream);
 
     static Result Run(llvm::Module*               pModule,
                       llvm::legacy::PassManager&  passMgr);
@@ -95,11 +88,6 @@ public:
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(CodeGenManager);
     LLPC_DISALLOW_COPY_AND_ASSIGN(CodeGenManager);
-
-    static void DiagnosticHandler(const llvm::DiagnosticInfo& diagInfo, void* pContext);
-
-    static void FatalErrorHandler(void* userData, const std::string& reason, bool gen_crash_diag);
-
 };
 
 } // Llpc

@@ -36,7 +36,9 @@
 
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
+#include "llpcTargetInfo.h"
 #include "llpcVertexFetch.h"
 
 using namespace llvm;
@@ -1604,7 +1606,7 @@ uint32_t VertexFetch::MapVertexFormat(
     uint32_t format = 0;
 
 #if LLPC_BUILD_GFX10
-    GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+    GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     if (gfxIp.major >= 10)
     {
         uint32_t index = (dfmt * 8) + nfmt;
@@ -1962,7 +1964,7 @@ bool VertexFetch::NeedPatchA2S(
     case VK_FORMAT_A2B10G10R10_SNORM_PACK32:
     case VK_FORMAT_A2B10G10R10_SSCALED_PACK32:
     case VK_FORMAT_A2B10G10R10_SINT_PACK32:
-        needPatch = (m_pContext->GetGfxIpVersion().major < 9);
+        needPatch = (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major < 9);
         break;
     default:
         break;

@@ -47,6 +47,7 @@
 #include "llpcPassDeadFuncRemove.h"
 #include "llpcPassManager.h"
 #include "llpcShaderMerger.h"
+#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-ngg-prim-shader"
 
@@ -61,7 +62,7 @@ NggPrimShader::NggPrimShader(
     :
     m_pPipelineState(pPipelineState),
     m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
-    m_gfxIp(pPipelineState->GetBuilderContext()->GetGfxIpVersion()),
+    m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
     m_pNggControl(m_pPipelineState->GetNggControl()),
     m_pLdsManager(nullptr),
     m_pBuilder(new IRBuilder<>(*m_pContext))
@@ -170,7 +171,7 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
                 {
                     pTesIntfData->userDataUsage.spillTable = userDataCount;
                     ++userDataCount;
-                    LLPC_ASSERT(userDataCount <= m_pContext->GetGpuProperty()->maxUserDataCount);
+                    LLPC_ASSERT(userDataCount <= m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount);
                 }
             }
         }
@@ -880,7 +881,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
         // Thread count when the entire sub-group is fully culled
         const uint32_t fullyCulledThreadCount =
-            m_pContext->GetGpuWorkarounds()->gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
+            m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups ? 1 : 0;
 
         // Define basic blocks
         auto pEntryBlock = CreateBlock(pEntryPoint, ".entry");

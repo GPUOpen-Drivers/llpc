@@ -37,6 +37,8 @@ namespace Llpc
 {
 
 class Context;
+class PipelineState;
+struct WorkaroundFlags;
 
 // Enumerates the source selection of each color channel in a color attachment format.
 enum class ChannelSwizzle : uint8_t
@@ -98,7 +100,7 @@ struct ColorFormatInfo
 class FragColorExport
 {
 public:
-    FragColorExport(llvm::Module* pModule);
+    FragColorExport(PipelineState* pPipelineState, llvm::Module* pModule);
 
     llvm::Value* Run(llvm::Value* pOutput, uint32_t location, llvm::Instruction* pInsertPos);
 
@@ -136,6 +138,7 @@ private:
 
     // -----------------------------------------------------------------------------------------------------------------
 
+    PipelineState*  m_pPipelineState;   // Pipeline state
     llvm::Module*   m_pModule;          // LLVM module
     Context*        m_pContext;         // LLPC context
 
