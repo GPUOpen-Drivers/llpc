@@ -311,7 +311,7 @@ private:
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *LLVMModule, SPIRVModule *TheSPIRVModule,
-    const SPIRVSpecConstMap &TheSpecConstMap, Builder *pBuilder, const void* pModuleUsage)
+    const SPIRVSpecConstMap &TheSpecConstMap, Builder *pBuilder, const ShaderModuleUsage* pModuleUsage)
     :M(LLVMModule), m_pBuilder(pBuilder), BM(TheSPIRVModule), IsKernel(true),
     EnableXfb(false), EntryTarget(nullptr),
     SpecConstMap(TheSpecConstMap), DbgTran(BM, M),
@@ -10525,7 +10525,7 @@ SPIRVToLLVM::transLinkageType(const SPIRVValue *V) {
 
 } // namespace SPIRV
 
-bool llvm::readSpirv(Builder *Builder, const void *shaderInfo, std::istream &IS,
+bool llvm::readSpirv(Builder *Builder, const ShaderModuleUsage *shaderInfo, std::istream &IS,
                      spv::ExecutionModel EntryExecModel, const char *EntryName,
                      const SPIRVSpecConstMap &SpecConstMap, Module *M,
                      std::string &ErrMsg) {

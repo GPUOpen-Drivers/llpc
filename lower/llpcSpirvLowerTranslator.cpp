@@ -112,7 +112,7 @@ void SpirvLowerTranslator::TranslateSpirvToLlvm(
     Context* pContext = static_cast<Context*>(&pModule->getContext());
 
     if (readSpirv(pContext->GetBuilder(),
-                  pShaderInfo->pModuleData,
+                  &(pModuleData->usage),
                   spirvStream,
                   ConvertToExecModel(entryStage),
                   pShaderInfo->pEntryTarget,
