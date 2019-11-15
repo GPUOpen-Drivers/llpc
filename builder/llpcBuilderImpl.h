@@ -31,13 +31,12 @@
 #pragma once
 
 #include "llpcBuilder.h"
+#include "llpcPipelineState.h"
 
 namespace Llpc
 {
 
 using namespace llvm;
-
-class PipelineState;
 
 // =====================================================================================================================
 // Builder implementation base class

@@ -36,6 +36,7 @@
 #include "llpcCodeGenManager.h"
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 namespace llvm
 {
@@ -432,8 +433,8 @@ Result ConfigBuilder::BuildVsRegConfig(
     if (shaderStage == ShaderStageCopyShader)
     {
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, Llpc::CopyShaderUserSgprCount);
-        SetNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pContext->GetGpuProperty()->maxSgprsAvailable);
-        SetNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pContext->GetGpuProperty()->maxVgprsAvailable);
+        SetNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxSgprsAvailable);
+        SetNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxVgprsAvailable);
 
         SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
             (pResUsage->inOutUsage.gs.outLocCount[0] > 0) && enableXfb);
@@ -755,14 +756,14 @@ Result ConfigBuilder::BuildEsRegConfig(
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, TRAP_PRESENT, shaderOptions.trapPresent);
     if (m_pPipelineState->IsGsOnChip())
     {
-        LLPC_ASSERT(calcFactor.gsOnChipLdsSize <= m_pContext->GetGpuProperty()->gsOnChipMaxLdsSize);
+        LLPC_ASSERT(calcFactor.gsOnChipLdsSize <= m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipMaxLdsSize);
         LLPC_ASSERT((calcFactor.gsOnChipLdsSize %
-                     (1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift)) == 0);
+                     (1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)) == 0);
         SET_REG_FIELD(&pConfig->m_esRegs,
                       SPI_SHADER_PGM_RSRC2_ES,
                       LDS_SIZE__CI__VI,
                       (calcFactor.gsOnChipLdsSize >>
-                       m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift));
+                       m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift));
         SetEsGsLdsSize(calcFactor.esGsLdsSize * 4);
     }
 
@@ -849,7 +850,7 @@ Result ConfigBuilder::BuildLsRegConfig(
         ldsSizeInDwords = calcFactor.inPatchSize * calcFactor.patchCountPerThreadGroup;
     }
 
-    auto pGpuWorkarounds = m_pContext->GetGpuWorkarounds();
+    auto pGpuWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
 
     // Override the LDS size based on hardware workarounds.
     if (pGpuWorkarounds->gfx6.shaderSpiBarrierMgmt != 0)
@@ -868,7 +869,7 @@ Result ConfigBuilder::BuildLsRegConfig(
         const uint32_t outputVertices = m_pPipelineState->GetShaderModes()->GetTessellationMode().outputVertices;
 
         const uint32_t threadGroupSize = calcFactor.patchCountPerThreadGroup * outputVertices;
-        const uint32_t waveSize = m_pContext->GetGpuProperty()->waveSize;
+        const uint32_t waveSize = m_pPipelineState->GetTargetInfo().GetGpuProperty().waveSize;
         const uint32_t wavesPerThreadGroup = (threadGroupSize + waveSize - 1) / waveSize;
 
         if (wavesPerThreadGroup > 1)
@@ -882,7 +883,7 @@ Result ConfigBuilder::BuildLsRegConfig(
 
     // NOTE: On GFX6, granularity for the LDS_SIZE field is 64. The range is 0~128 which allocates 0 to 8K DWORDs.
     // On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K DWORDs.
-    const uint32_t ldsSizeDwordGranularityShift = m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift;
+    const uint32_t ldsSizeDwordGranularityShift = m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift;
     const uint32_t ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
     ldsSize = Pow2Align(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
 
@@ -928,7 +929,7 @@ Result ConfigBuilder::BuildGsRegConfig(
                                (geometryMode.inputPrimitive == InputPrimitives::TrianglesAdjacency);
 
     // Maximum number of GS primitives per ES thread is capped by the hardware's GS-prim FIFO.
-    auto pGpuProp = m_pContext->GetGpuProperty();
+    auto pGpuProp = &m_pPipelineState->GetTargetInfo().GetGpuProperty();
     uint32_t maxGsPerEs = (pGpuProp->gsPrimBufferDepth + pGpuProp->waveSize);
 
     // This limit is halved if the primitive topology is adjacency-typed
@@ -1449,7 +1450,7 @@ Result ConfigBuilder::BuildUserDataConfig(
     uint32_t spillThreshold = UINT32_MAX;
     if (shaderStage != ShaderStageCopyShader)
     {
-        uint32_t maxUserDataCount = m_pContext->GetGpuProperty()->maxUserDataCount;
+        uint32_t maxUserDataCount = m_pPipelineState->GetTargetInfo().GetGpuProperty().maxUserDataCount;
         for (uint32_t i = 0; i < maxUserDataCount; ++i)
         {
             if (pIntfData->userDataMap[i] != InterfaceData::UserDataUnmapped)

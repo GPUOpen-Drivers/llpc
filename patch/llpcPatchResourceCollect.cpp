@@ -46,6 +46,7 @@
 #endif
 #include "llpcPatchResourceCollect.h"
 #include "llpcPipelineShaders.h"
+#include "llpcTargetInfo.h"
 #include <algorithm>
 #include <functional>
 
@@ -148,7 +149,7 @@ bool PatchResourceCollect::runOnModule(
 void PatchResourceCollect::SetNggControl()
 {
     // For GFX10+, initialize NGG control settings
-    if (m_pContext->GetGfxIpVersion().major < 10)
+    if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major < 10)
     {
         return;
     }
@@ -200,7 +201,7 @@ void PatchResourceCollect::SetNggControl()
         enableNgg = false;
     }
 
-    if (m_pContext->GetGpuWorkarounds()->gfx10.waNggDisabled)
+    if (m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx10.waNggDisabled)
     {
         enableNgg = false;
     }
@@ -508,9 +509,9 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         break;
     }
 
-    if (m_pContext->GetGfxIpVersion().major <= 8)
+    if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major <= 8)
     {
-        uint32_t gsPrimsPerSubgroup = m_pContext->GetGpuProperty()->gsOnChipDefaultPrimsPerSubgroup;
+        uint32_t gsPrimsPerSubgroup = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
 
         const uint32_t esGsRingItemSize = 4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount);
         const uint32_t gsInstanceCount  = geometryMode.invocations;
@@ -551,12 +552,12 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
         // Total LDS use per subgroup aligned to the register granularity
         uint32_t gsOnChipLdsSize = Pow2Align((esGsLdsSize + gsVsLdsSize),
-                                             static_cast<uint32_t>((1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift)));
+                                             static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
 
         // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
         // reasonable default. The final amount must be 128-DWORD aligned.
 
-        uint32_t maxLdsSize = m_pContext->GetGpuProperty()->gsOnChipDefaultLdsSizePerSubgroup;
+        uint32_t maxLdsSize = m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
 
         // TODO: For BONAIRE A0, GODAVARI and KALINDI, set maxLdsSize to 1024 due to SPI barrier management bug
 
@@ -601,7 +602,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         constexpr uint32_t GsOffChipDefaultThreshold = 32;
 
         bool disableGsOnChip = DisableGsOnChip;
-        if (hasTs || (m_pContext->GetGfxIpVersion().major == 6))
+        if (hasTs || (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 6))
         {
             // GS on-chip is not supportd with tessellation, and is not supportd on GFX6
             disableGsOnChip = true;
@@ -774,7 +775,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             const uint32_t ldsSizeDwords =
                 Pow2Align(expectedEsLdsSize + expectedGsLdsSize,
-                          static_cast<uint32_t>(1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift));
+                          static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift));
 
             // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
             LLPC_ASSERT(ldsSizeDwords <= 16384);
@@ -797,10 +798,10 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
         else
 #endif
         {
-            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift);
+            uint32_t ldsSizeDwordGranularity = static_cast<uint32_t>(1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift);
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
-            uint32_t gsPrimsPerSubgroup = std::min(m_pContext->GetGpuProperty()->gsOnChipDefaultPrimsPerSubgroup,
+            uint32_t gsPrimsPerSubgroup = std::min(m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
                                                    m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
@@ -962,11 +963,11 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
                                                                          gsVsRingItemSize;
 
 #if LLPC_BUILD_GFX10
-            if ((m_pContext->GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
+            if ((m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major == 10) && hasTs && (gsOnChip == false))
             {
                 uint32_t esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
                 uint32_t onChipGsLdsMagicSize = Pow2Align((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
-                            static_cast<uint32_t>((1 << m_pContext->GetGpuProperty()->ldsSizeDwordGranularityShift)));
+                            static_cast<uint32_t>((1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)));
 
                 // If the new size is greater than the size we previously set
                 // then we need to either increase the size or decrease the verts
@@ -1033,7 +1034,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
     }
     LLPC_OUTS("\n");
 
-    if (gsOnChip || (m_pContext->GetGfxIpVersion().major >= 9))
+    if (gsOnChip || (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 9))
     {
 #if LLPC_BUILD_GFX10
         if (m_pPipelineState->GetNggControl()->enableNgg)

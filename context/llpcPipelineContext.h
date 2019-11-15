@@ -683,8 +683,6 @@ class PipelineContext
 {
 public:
     PipelineContext(GfxIpVersion           gfxIp,
-                    const GpuProperty*     pGpuProp,
-                    const WorkaroundFlags* pGpuWorkarounds,
                     MetroHash::Hash*       pPipelineHash,
                     MetroHash::Hash*       pCacheHash);
     virtual ~PipelineContext();
@@ -716,15 +714,11 @@ public:
     // Gets the count of vertices per primitive
     virtual uint32_t GetVerticesPerPrimitive() const = 0;
 
-    static const char* GetGpuNameString(GfxIpVersion gfxIp);
+    static void GetGpuNameString(GfxIpVersion gfxIp, std::string& gpuName);
     static const char* GetGpuNameAbbreviation(GfxIpVersion gfxIp);
 
     // Gets graphics IP version info
     GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
-
-    const GpuProperty* GetGpuProperty() const { return m_pGpuProperty; }
-
-    const WorkaroundFlags* GetGpuWorkarounds() const { return m_pGpuWorkarounds; }
 
     // Gets pipeline hash code
     uint64_t GetPiplineHashCode() const { return MetroHash::Compact64(&m_pipelineHash); }
@@ -760,8 +754,6 @@ protected:
     GfxIpVersion           m_gfxIp;         // Graphics IP version info
     MetroHash::Hash        m_pipelineHash;  // Pipeline hash code
     MetroHash::Hash        m_cacheHash;     // Cache hash code
-    const GpuProperty*     m_pGpuProperty;  // GPU Property
-    const WorkaroundFlags* m_pGpuWorkarounds;  // GPU workarounds
 
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);

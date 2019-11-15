@@ -42,6 +42,7 @@
 #include "llpcGraphicsContext.h"
 #include "llpcPatchInOutImportExport.h"
 #include "llpcPipelineShaders.h"
+#include "llpcTargetInfo.h"
 #include "llpcVertexFetch.h"
 
 using namespace llvm;
@@ -109,8 +110,8 @@ bool PatchInOutImportExport::runOnModule(
 
     Patch::Init(&module);
 
-    m_gfxIp = m_pContext->GetGfxIpVersion();
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    m_gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     m_pipelineSysValues.Initialize(m_pPipelineState);
 
     const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
@@ -122,7 +123,7 @@ bool PatchInOutImportExport::runOnModule(
     // NOTE: ES -> GS ring is always on-chip on GFX9.
     if (m_hasTs || (m_hasGs && (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))))
     {
-        m_pLds = Patch::GetLdsVariable(m_pModule);
+        m_pLds = Patch::GetLdsVariable(m_pPipelineState, m_pModule);
     }
 
     // Process each shader in turn, in reverse order (because for example VS uses inOutUsage.tcs.calcFactor
@@ -184,7 +185,7 @@ void PatchInOutImportExport::ProcessShader()
     else if (m_shaderStage == ShaderStageFragment)
     {
         // Create fragment color export manager
-        m_pFragColorExport = new FragColorExport(m_pModule);
+        m_pFragColorExport = new FragColorExport(m_pPipelineState, m_pModule);
     }
 
     // Initialize the output value for gl_PrimitiveID
@@ -6320,7 +6321,8 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     // Compute the required LDS size per patch, always include the space for VS vertex out
     uint32_t ldsSizePerPatch = inPatchSize;
-    uint32_t patchCountLimitedByLds = (m_pContext->GetGpuProperty()->ldsSizePerThreadGroup / ldsSizePerPatch);
+    uint32_t patchCountLimitedByLds = (m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizePerThreadGroup /
+                                       ldsSizePerPatch);
 
     uint32_t patchCountPerThreadGroup = std::min(patchCountLimitedByThread, patchCountLimitedByLds);
 
@@ -6334,7 +6336,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     {
         auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
         auto tessOffChipPatchCountPerThreadGroup =
-            m_pContext->GetGpuProperty()->tessOffChipLdsBufferSize / outPatchLdsBufferSize;
+            m_pPipelineState->GetTargetInfo().GetGpuProperty().tessOffChipLdsBufferSize / outPatchLdsBufferSize;
         patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
     }
 
@@ -6343,11 +6345,12 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
 
     // There is one TF Buffer per shader engine. We can do the below calculation on a per-SE basis.  It is also safe to
     // assume that one thread-group could at most utilize all of the TF Buffer.
-    const uint32_t tfBufferSizeInBytes = sizeof(uint32_t) * m_pContext->GetGpuProperty()->tessFactorBufferSizePerSe;
+    const uint32_t tfBufferSizeInBytes = sizeof(uint32_t) *
+                                         m_pPipelineState->GetTargetInfo().GetGpuProperty().tessFactorBufferSizePerSe;
     uint32_t       tfBufferPatchCountLimit = tfBufferSizeInBytes / (tessFactorStride * sizeof(uint32_t));
 
 #if LLPC_BUILD_GFX10
-    const auto pWorkarounds = m_pContext->GetGpuWorkarounds();
+    const auto pWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
     if (pWorkarounds->gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow)
     {
         tfBufferPatchCountLimit /= 2;
@@ -6365,9 +6368,9 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     }
 
     // Adjust the patches-per-thread-group based on hardware workarounds.
-    if (m_pContext->GetGpuWorkarounds()->gfx6.miscLoadBalancePerWatt != 0)
+    if (m_pPipelineState->GetTargetInfo().GetGpuWorkarounds().gfx6.miscLoadBalancePerWatt != 0)
     {
-        const uint32_t waveSize = m_pContext->GetGpuProperty()->waveSize;
+        const uint32_t waveSize = m_pPipelineState->GetTargetInfo().GetGpuProperty().waveSize;
         // Load balance per watt is a mechanism which monitors HW utilization (num waves active, instructions issued
         // per cycle, etc.) to determine if the HW can handle the workload with fewer CUs enabled.  The SPI_LB_CU_MASK
         // register directs the SPI to stop launching waves to a CU so it will be clock-gated.  There is a bug in the

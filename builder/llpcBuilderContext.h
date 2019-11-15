@@ -33,11 +33,15 @@
 #include "llpc.h"
 #include "llpcDebug.h"
 
+#include "llvm/ADT/StringRef.h"
+
 namespace llvm
 {
 
 class LLVMContext;
+class raw_pwrite_stream;
 class TargetMachine;
+class Timer;
 
 namespace legacy
 {
@@ -54,7 +58,9 @@ namespace Llpc
 using namespace llvm;
 
 class Builder;
+class PassManager;
 class Pipeline;
+class TargetInfo;
 
 // =====================================================================================================================
 // BuilderContext class, used to create Pipeline and Builder objects. State shared between multiple compiles
@@ -68,18 +74,21 @@ public:
     // possible, this should be called in a thread-safe way.
     static void Initialize();
 
-    // Create the BuilderContext. Returns nullptr on failure.
+    // Create the BuilderContext. Returns nullptr on failure to recognize the AMDGPU target whose name is specified
     static BuilderContext* Create(
-        LLVMContext&  context);             // [in] LLVM context to use on all compiles
+        LLVMContext&  context,               // [in] LLVM context to use on all compiles
+        StringRef     gpuName);              // LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
+
+    ~BuilderContext();
 
     // Get LLVM context
     LLVMContext& GetContext() const { return m_context; }
 
     // Get the target machine.
-    TargetMachine* GetTargetMachine();
+    TargetMachine* GetTargetMachine() const { return m_pTargetMachine; }
 
-    // Get the GfxIpVersion
-    GfxIpVersion GetGfxIpVersion() const;
+    // Get targetinfo
+    const TargetInfo& GetTargetInfo() const { return *m_pTargetInfo; }
 
     // Create a Pipeline object for a pipeline compile
     Pipeline* CreatePipeline();
@@ -95,6 +104,9 @@ public:
     void PreparePassManager(
         legacy::PassManager*  pPassMgr);  // [in/out] Pass manager
 
+    // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
+    void AddTargetPasses(Llpc::PassManager& passMgr, Timer* pCodeGenTimer, raw_pwrite_stream& outStream);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderContext)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderContext)
@@ -102,7 +114,9 @@ private:
     BuilderContext(LLVMContext& context);
 
     // -----------------------------------------------------------------------------------------------------------------
-    LLVMContext&  m_context;              // LLVM context
+    LLVMContext&                    m_context;                  // LLVM context
+    TargetMachine*                  m_pTargetMachine = nullptr; // Target machine
+    TargetInfo*                     m_pTargetInfo = nullptr;    // Target info
 };
 
 } // Llpc

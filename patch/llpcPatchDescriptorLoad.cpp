@@ -36,6 +36,7 @@
 
 #include "llpcContext.h"
 #include "llpcPatchDescriptorLoad.h"
+#include "llpcTargetInfo.h"
 
 #include "SPIRVInternal.h"
 
@@ -652,7 +653,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
                                         pInsertPoint);
 
     // DWORD3
-    const GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
+    const GfxIpVersion gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
     if (gfxIp.major < 10)
     {
         SqBufRsrcWord3 sqBufRsrcWord3 = {};

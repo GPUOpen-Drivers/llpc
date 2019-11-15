@@ -50,6 +50,7 @@
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcMetroHash.h"
+#include "llpcPipelineContext.h"
 #include "llpcShaderCache.h"
 #include "llpcShaderCacheManager.h"
 
@@ -60,8 +61,7 @@ namespace Llpc
 
 // =====================================================================================================================
 Context::Context(
-    GfxIpVersion gfxIp,                     // Graphics IP version info
-    const WorkaroundFlags* pGpuWorkarounds) // GPU workarounds
+    GfxIpVersion gfxIp)                     // Graphics IP version info
     :
     LLVMContext(),
     m_gfxIp(gfxIp),
@@ -120,7 +120,9 @@ BuilderContext* Context::GetBuilderContext()
     if (!m_builderContext)
     {
         // First time: Create the BuilderContext.
-        m_builderContext.reset(BuilderContext::Create(*this));
+        std::string gpuName;
+        PipelineContext::GetGpuNameString(m_gfxIp, gpuName);
+        m_builderContext.reset(BuilderContext::Create(*this, gpuName));
     }
     return &*m_builderContext;
 }
@@ -160,8 +162,9 @@ std::unique_ptr<Module> Context::LoadLibary(
 void Context::SetModuleTargetMachine(
     Module* pModule)  // [in/out] Module to modify
 {
-    pModule->setTargetTriple(GetTargetMachine()->getTargetTriple().getTriple());
-    pModule->setDataLayout(GetTargetMachine()->createDataLayout());
+    TargetMachine* pTargetMachine = GetBuilderContext()->GetTargetMachine();
+    pModule->setTargetTriple(pTargetMachine->getTargetTriple().getTriple());
+    pModule->setDataLayout(pTargetMachine->createDataLayout());
 }
 
 } // Llpc

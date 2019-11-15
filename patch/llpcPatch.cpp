@@ -57,6 +57,8 @@
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
 #include "llpcPatchCheckShaderCache.h"
+#include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 #include "SPIRVInternal.h"
 
 #define DEBUG_TYPE "llpc-patch"
@@ -95,8 +97,6 @@ void Patch::AddPasses(
     Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
-    Context* pContext = static_cast<Context*>(&pPipelineState->GetContext());
-
     // Start timer for patching passes.
     if (pPatchTimer != nullptr)
     {
@@ -185,7 +185,7 @@ void Patch::AddPasses(
     passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
 #if LLPC_BUILD_GFX10
-    if (pPipelineState->IsGraphics() && (pContext->GetGfxIpVersion().major >= 10) &&
+    if (pPipelineState->IsGraphics() && (pPipelineState->GetTargetInfo().GetGfxIpVersion().major >= 10) &&
         ((pPipelineState->GetOptions().nggFlags & NggFlagDisable) == 0))
     {
         // Stop timer for patching passes and restart timer for optimization passes.
@@ -364,7 +364,8 @@ void Patch::Init(
 // =====================================================================================================================
 // Get or create global variable for LDS.
 GlobalVariable* Patch::GetLdsVariable(
-    Module* pModule)  // [in/out] Module to get or create LDS in
+    PipelineState*  pPipelineState, // [in] Pipeline state
+    Module*         pModule)        // [in/out] Module to get or create LDS in
 {
     auto pContext = static_cast<Context*>(&pModule->getContext());
 
@@ -377,7 +378,7 @@ GlobalVariable* Patch::GetLdsVariable(
     }
     // Now we can create LDS.
     // Construct LDS type: [ldsSize * i32], address space 3
-    auto ldsSize = pContext->GetGpuProperty()->ldsSizePerCu;
+    auto ldsSize = pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizePerCu;
     auto pLdsTy = ArrayType::get(pContext->Int32Ty(), ldsSize / sizeof(uint32_t));
 
     auto pLds = new GlobalVariable(*pModule,

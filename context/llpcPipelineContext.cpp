@@ -96,16 +96,12 @@ namespace Llpc
 // =====================================================================================================================
 PipelineContext::PipelineContext(
     GfxIpVersion           gfxIp,           // Graphics IP version info
-    const GpuProperty*     pGpuProp,        // [in] GPU property
-    const WorkaroundFlags* pGpuWorkarounds, // [in] GPU workarounds
     MetroHash::Hash*       pPipelineHash,   // [in] Pipeline hash code
     MetroHash::Hash*       pCacheHash)      // [in] Cache hash code
     :
     m_gfxIp(gfxIp),
     m_pipelineHash(*pPipelineHash),
-    m_cacheHash(*pCacheHash),
-    m_pGpuProperty(pGpuProp),
-    m_pGpuWorkarounds(pGpuWorkarounds)
+    m_cacheHash(*pCacheHash)
 {
 
 }
@@ -117,61 +113,26 @@ PipelineContext::~PipelineContext()
 
 // =====================================================================================================================
 // Gets the name string of GPU target according to graphics IP version info.
-const char* PipelineContext::GetGpuNameString(
-    GfxIpVersion gfxIp)   // Graphics IP version info
+void PipelineContext::GetGpuNameString(
+    GfxIpVersion  gfxIp,    // Graphics IP version info
+    std::string&  gpuName)  // [out] LLVM GPU name
 {
-    struct GpuNameStringMap
+    // A GfxIpVersion from PAL is three decimal numbers for major, minor and stepping. This function
+    // converts that to an LLVM target name, whith is "gfx" followed by the three decimal numbers with
+    // no separators, e.g. "gfx1010" for 10.1.0. A high stepping number 0xFFFA..0xFFFF denotes an
+    // experimental target, and that is represented by the final hexadecimal digit, e.g. "gfx101A"
+    // for 10.1.0xFFFA.
+    gpuName.clear();
+    raw_string_ostream gpuNameStream(gpuName);
+    gpuNameStream << "gfx" << gfxIp.major << gfxIp.minor;
+    if (gfxIp.stepping >= 0xFFFA)
     {
-        GfxIpVersion gfxIp;
-        const char*  pNameString;
-    };
-
-    static const GpuNameStringMap GpuNameMap[] =
-    {   // Graphics IP  Target Name   Compatible Target Name
-        { { 6, 0, 0 }, "tahiti"   },  // [6.0.0] gfx600, tahiti
-        { { 6, 0, 1 }, "pitcairn" },  // [6.0.1] gfx601, pitcairn, verde, oland, hainan
-        { { 7, 0, 0 }, "kaveri"  },   // [7.0.0] gfx700, kaveri
-        { { 7, 0, 1 }, "hawaii"   },  // [7.0.1] gfx701, hawaii
-        { { 7, 0, 2 }, "gfx702"   },  // [7.0.2] gfx702
-        { { 7, 0, 3 }, "kabini"   },  // [7.0.3] gfx703, kabini, mullins
-        { { 7, 0, 4 }, "bonaire"  },  // [7.0.4] gfx704, bonaire
-        { { 8, 0, 0 }, "iceland"  },  // [8.0.0] gfx800, iceland
-        { { 8, 0, 1 }, "carrizo"  },  // [8.0.1] gfx801, carrizo
-        { { 8, 0, 2 }, "tonga"    },  // [8.0.2] gfx802, tonga
-        { { 8, 0, 3 }, "fiji"     },  // [8.0.3] gfx803, fiji, polaris10, polaris11
-        { { 8, 0, 4 }, "gfx804"   },  // [8.0.4] gfx804
-        { { 8, 1, 0 }, "stoney"   },  // [8.1.0] gfx810, stoney
-        { { 9, 0, 0 }, "gfx900"   },  // [9.0.0] gfx900
-        { { 9, 0, 1 }, "gfx901"   },  // [9.0.1] gfx901
-        { { 9, 0, 2 }, "gfx902"   },  // [9.0.2] gfx902
-        { { 9, 0, 3 }, "gfx903"   },  // [9.0.3] gfx903
-        { { 9, 0, 4 }, "gfx904"   },  // [9.0.4] gfx904, vega12
-        { { 9, 0, 6 }, "gfx906"   },  // [9.0.6] gfx906, vega20
-        { { 9, 0, 9 }, "gfx909"   },  // [9.0.9] gfx909, raven2
-#if LLPC_BUILD_GFX10
-        { { 10, 1, 0xFFFF }, "gfx101F" },
-        { { 10, 1, 0xFFFE }, "gfx101E" },
-        { { 10, 1, 0 }, "gfx1010" },  // [10.1.0] gfx1010
-        { { 10, 1, 0xFFFD}, "gfx101D" },
-        { { 10, 1, 2 }, "gfx1012" },  // [10.1.2] gfx1012, navi14
-#endif
-    };
-
-    const GpuNameStringMap* pNameMap = nullptr;
-    for (auto& nameMap : GpuNameMap)
-    {
-        if ((nameMap.gfxIp.major    == gfxIp.major) &&
-            (nameMap.gfxIp.minor    == gfxIp.minor) &&
-            (nameMap.gfxIp.stepping == gfxIp.stepping))
-        {
-            pNameMap = &nameMap;
-            break;
-        }
+        gpuNameStream << char(gfxIp.stepping - 0xFFFA + 'A');
     }
-
-    LLPC_ASSERT(pNameMap != nullptr);
-
-    return (pNameMap != nullptr) ? pNameMap->pNameString : "";
+    else
+    {
+        gpuNameStream << gfxIp.stepping;
+    }
 }
 
 // =====================================================================================================================

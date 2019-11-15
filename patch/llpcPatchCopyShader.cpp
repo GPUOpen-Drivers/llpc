@@ -43,6 +43,7 @@
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 using namespace Llpc;
 using namespace llvm;
@@ -181,7 +182,7 @@ bool PatchCopyShader::runOnModule(
     auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageCopyShader);
 
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
-    if (m_pContext->GetGfxIpVersion().major <= 8)
+    if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major <= 8)
     {
         pIntfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
         pIntfData->userDataUsage.gs.copyShaderEsGsLdsSize = 3;
@@ -195,7 +196,7 @@ bool PatchCopyShader::runOnModule(
 
     if (m_pPipelineState->IsGsOnChip())
     {
-        m_pLds = Patch::GetLdsVariable(&module);
+        m_pLds = Patch::GetLdsVariable(m_pPipelineState, &module);
     }
     else
     {

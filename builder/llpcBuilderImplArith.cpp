@@ -31,6 +31,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 #define DEBUG_TYPE "llpc-builder-impl-arith"
 
@@ -226,7 +227,7 @@ Value* BuilderImplArith::CreateSMod(
 {
 #if LLPC_BUILD_GFX10
     if (pDivisor->getType()->getScalarType()->isIntegerTy(32) &&
-        (getContext().GetGpuWorkarounds()->gfx10.disableI32ModToI16Mod))
+        (GetPipelineState()->GetTargetInfo().GetGpuWorkarounds().gfx10.disableI32ModToI16Mod))
     {
 
         // NOTE: On some hardware, when the divisor is a literal value and less than 0xFFFF, i32 mod will be
@@ -282,7 +283,7 @@ Value* BuilderImplArith::CreateFma(
     Value*        pC,         // [in] The value to add to the product of A and B
     const Twine&  instName)   // [in] Name to give instruction(s)
 {
-    if (getContext().GetGfxIpVersion().major <= 8)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major <= 8)
     {
         // Pre-GFX9 version: Use fmuladd.
         return CreateIntrinsic(Intrinsic::fmuladd, pA->getType(), { pA, pB, pC }, nullptr, instName);
@@ -949,7 +950,7 @@ Value* BuilderImplArith::CreateFClamp(
     // But we can only do this if we do not need NaN preservation.
     Value* pResult = nullptr;
     if (getFastMathFlags().noNaNs() && (pX->getType()->getScalarType()->isFloatTy() ||
-        ((getContext().GetGfxIpVersion().major >= 9) && pX->getType()->getScalarType()->isHalfTy())))
+        ((GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 9) && pX->getType()->getScalarType()->isHalfTy())))
     {
         pResult = Scalarize(pX,
                             pMinVal,
@@ -974,7 +975,7 @@ Value* BuilderImplArith::CreateFClamp(
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
-    if (getContext().GetGfxIpVersion().major < 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major < 9)
     {
         pResult = Canonicalize(pResult);
     }
@@ -998,7 +999,7 @@ Value* BuilderImplArith::CreateFMin(
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
-    if (getContext().GetGfxIpVersion().major < 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major < 9)
     {
         pResult = Canonicalize(pResult);
     }
@@ -1022,7 +1023,7 @@ Value* BuilderImplArith::CreateFMax(
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
-    if (getContext().GetGfxIpVersion().major < 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major < 9)
     {
         pResult = Canonicalize(pResult);
     }
@@ -1049,7 +1050,7 @@ Value* BuilderImplArith::CreateFMin3(
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
-    if (getContext().GetGfxIpVersion().major < 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major < 9)
     {
         pResult = Canonicalize(pResult);
     }
@@ -1076,7 +1077,7 @@ Value* BuilderImplArith::CreateFMax3(
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
-    if (getContext().GetGfxIpVersion().major < 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major < 9)
     {
         pResult = Canonicalize(pResult);
     }
@@ -1099,7 +1100,7 @@ Value* BuilderImplArith::CreateFMid3(
     // But we can only do this if we do not need NaN preservation.
     Value* pResult = nullptr;
     if (getFastMathFlags().noNaNs() && (pValue1->getType()->getScalarType()->isFloatTy() ||
-        ((getContext().GetGfxIpVersion().major >= 9) && pValue1->getType()->getScalarType()->isHalfTy())))
+        ((GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major >= 9) && pValue1->getType()->getScalarType()->isHalfTy())))
     {
         pResult = Scalarize(pValue1,
                             pValue2,
@@ -1127,7 +1128,7 @@ Value* BuilderImplArith::CreateFMid3(
 
     // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
     // canonicalize the result here.
-    if (getContext().GetGfxIpVersion().major < 9)
+    if (GetPipelineState()->GetTargetInfo().GetGfxIpVersion().major < 9)
     {
         pResult = Canonicalize(pResult);
     }

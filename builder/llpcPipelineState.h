@@ -56,6 +56,8 @@ namespace Llpc
 
 using namespace llvm;
 
+class TargetInfo;
+
 ModulePass* CreatePipelineStateClearer();
 
 // =====================================================================================================================
@@ -138,6 +140,9 @@ public:
 
     // Get the embedded ShaderModes object
     ShaderModes* GetShaderModes() { return &m_shaderModes; }
+
+    // Accessor for TargetInfo
+    const TargetInfo& GetTargetInfo() const;
 
     // Clear the pipeline state IR metadata.
     void Clear(Module* pModule);

@@ -65,6 +65,7 @@
 #include "llpcPipelineDumper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerResourceCollect.h"
+#include "llpcTargetInfo.h"
 #include "llpcTimerProfiler.h"
 #include "llpcVertexFetch.h"
 #include <mutex>
@@ -143,12 +144,6 @@ opt<bool> EnableShaderModuleOpt("enable-shader-module-opt",
 
 // -disable-licm: annotate loops with metadata to disable the LLVM LICM pass
 opt<bool> DisableLicm("disable-licm", desc("Disable LLVM LICM pass"), init(false));
-
-#if LLPC_BUILD_GFX10
-// -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
-// final wave size base on it. Used in pre-silicon verification.
-opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardware native wave size"), init(0));
-#endif
 
 // -trim-debug-info: Trim debug information in SPIR-V binary
 opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
@@ -373,9 +368,6 @@ Compiler::Compiler(
 
     m_shaderCache = ShaderCacheManager::GetShaderCacheManager()->GetShaderCacheObject(&createInfo, &auxCreateInfo);
 
-    InitGpuProperty();
-    InitGpuWorkaround();
-
     ++m_instanceCount;
     ++m_outRedirectCount;
 }
@@ -581,7 +573,6 @@ Result Compiler::BuildShaderModule(
 
                 pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
                 pContext->SetBuilder(pContext->GetBuilderContext()->CreateBuilder(nullptr, true));
-                CodeGenManager::CreateTargetMachine(pContext);
 
                 for (uint32_t i = 0; i < entryNames.size(); ++i)
                 {
@@ -861,9 +852,6 @@ Result Compiler::BuildPipelineInternal(
     std::unique_ptr<Pipeline> pipeline(pBuilderContext->CreatePipeline());
     pContext->GetPipelineContext()->SetPipelineState(&*pipeline);
     pContext->SetBuilder(pBuilderContext->CreateBuilder(&*pipeline, UseBuilderRecorder));
-
-    // Create the AMDGPU TargetMachine.
-    result = CodeGenManager::CreateTargetMachine(pContext);
 
     std::unique_ptr<Module> pipelineModule;
 
@@ -1308,12 +1296,15 @@ uint32_t Compiler::ConvertColorBufferFormatToExportFormat(
     const bool                  enableAlphaToCoverage   // whether enalbe AlphaToCoverage
     ) const
 {
+    Context* pContext = AcquireContext();
+    const TargetInfo& targetInfo = pContext->GetBuilderContext()->GetTargetInfo();
     ExportFormat exportFormat = FragColorExport::ConvertColorBufferFormatToExportFormat(
             pTarget,
-            m_gfxIp,
-            &m_gpuWorkarounds,
+            targetInfo.GetGfxIpVersion(),
+            &targetInfo.GetGpuWorkarounds(),
             pTarget->channelWriteMask,
             enableAlphaToCoverage);
+    ReleaseContext(pContext);
 
     return static_cast<uint32_t>(exportFormat);
 }
@@ -1413,8 +1404,6 @@ Result Compiler::BuildGraphicsPipeline(
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
         GraphicsContext graphicsContext(m_gfxIp,
-                                        &m_gpuProperty,
-                                        &m_gpuWorkarounds,
                                         pPipelineInfo,
                                         &pipelineHash,
                                         &cacheHash);
@@ -1549,8 +1538,6 @@ Result Compiler::BuildComputePipeline(
         uint32_t                      forceLoopUnrollCount = cl::ForceLoopUnrollCount;
 
         ComputeContext computeContext(m_gfxIp,
-                                      &m_gpuProperty,
-                                      &m_gpuWorkarounds,
                                       pPipelineInfo,
                                       &pipelineHash,
                                       &cacheHash);
@@ -1754,257 +1741,6 @@ Result Compiler::CreateShaderCache(
 #endif
 
 // =====================================================================================================================
-// Initialize GPU property.
-void Compiler::InitGpuProperty()
-{
-    // Initial settings (could be adjusted later according to graphics IP version info)
-    memset(&m_gpuProperty, 0, sizeof(m_gpuProperty));
-    m_gpuProperty.waveSize = 64;
-
-#if LLPC_BUILD_GFX10
-    if (m_gfxIp.major == 10)
-    {
-        // Compiler is free to choose wave mode if forced wave size is not specified.
-        if (cl::NativeWaveSize != 0)
-        {
-            LLPC_ASSERT((cl::NativeWaveSize == 32) || (cl::NativeWaveSize == 64));
-            m_gpuProperty.waveSize = cl::NativeWaveSize;
-        }
-        else
-        {
-            m_gpuProperty.waveSize = 32;
-        }
-    }
-    else if (m_gfxIp.major > 10)
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
-#endif
-
-    m_gpuProperty.ldsSizePerCu = (m_gfxIp.major > 6) ? 65536 : 32768;
-    m_gpuProperty.ldsSizePerThreadGroup = 32 * 1024;
-    m_gpuProperty.numShaderEngines = 4;
-    m_gpuProperty.maxSgprsAvailable = 104;
-    m_gpuProperty.maxVgprsAvailable = 256;
-
-    //TODO: Setup gsPrimBufferDepth from hardware config option, will be done in another change.
-    m_gpuProperty.gsPrimBufferDepth = 0x100;
-
-    m_gpuProperty.maxUserDataCount = (m_gfxIp.major >= 9) ? 32 : 16;
-
-    m_gpuProperty.gsOnChipMaxLdsSize = 16384;
-
-    m_gpuProperty.tessOffChipLdsBufferSize = 32768;
-
-    // TODO: Accept gsOnChipDefaultPrimsPerSubgroup from panel option
-    m_gpuProperty.gsOnChipDefaultPrimsPerSubgroup   = 64;
-
-    m_gpuProperty.tessFactorBufferSizePerSe = 4096;
-
-    if (m_gfxIp.major <= 6)
-    {
-        m_gpuProperty.ldsSizeDwordGranularityShift = 6;
-    }
-    else
-    {
-        m_gpuProperty.ldsSizeDwordGranularityShift = 7;
-    }
-
-    if (m_gfxIp.major <= 8)
-    {
-        // TODO: Accept gsOnChipDefaultLdsSizePerSubgroup from panel option
-        m_gpuProperty.gsOnChipDefaultLdsSizePerSubgroup = 8192;
-    }
-
-    if (m_gfxIp.major == 6)
-    {
-        m_gpuProperty.numShaderEngines = (m_gfxIp.stepping == 0) ? 2 : 1;
-    }
-    else if (m_gfxIp.major == 7)
-    {
-        if (m_gfxIp.stepping == 0)
-        {
-            m_gpuProperty.numShaderEngines = 2;
-        }
-        else if (m_gfxIp.stepping == 1)
-        {
-            m_gpuProperty.numShaderEngines = 4;
-        }
-        else
-        {
-            m_gpuProperty.numShaderEngines = 1;
-        }
-    }
-    else if (m_gfxIp.major == 8)
-    {
-        // TODO: polaris11 and polaris12 is 2, but we can't identify them by GFX IP now.
-        m_gpuProperty.numShaderEngines = ((m_gfxIp.minor == 1) || (m_gfxIp.stepping <= 1)) ? 1 : 4;
-    }
-    else if (m_gfxIp.major == 9)
-    {
-        m_gpuProperty.tessFactorBufferSizePerSe = 8192;
-        if (m_gfxIp.stepping == 0)
-        {
-            m_gpuProperty.numShaderEngines = 4;
-        }
-    }
-#if LLPC_BUILD_GFX10
-    else if (m_gfxIp.major == 10)
-    {
-        m_gpuProperty.numShaderEngines = 2;
-        m_gpuProperty.supportShaderPowerProfiling = true;
-        m_gpuProperty.tessFactorBufferSizePerSe = 8192;
-
-        if (m_gfxIp.minor != 0)
-        {
-            m_gpuProperty.supportSpiPrefPriority = true; // For GFX10.1+
-        }
-
-        if ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF))
-        {
-            m_gpuProperty.tessFactorBufferSizePerSe = 0x80;
-        }
-    }
-#endif
-    else
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
-}
-
-// =====================================================================================================================
-// Initialize GPU workarounds.
-void Compiler::InitGpuWorkaround()
-{
-    memset(&m_gpuWorkarounds, 0, sizeof(m_gpuWorkarounds));
-    if (m_gfxIp.major == 6)
-    {
-        // Hardware workarounds for GFX6 based GPU's:
-        m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
-        m_gpuWorkarounds.gfx6.miscLoadBalancePerWatt = 1;
-        m_gpuWorkarounds.gfx6.shader8b16bLocalWriteCorruption = 1;
-
-        m_gpuWorkarounds.gfx6.shaderReadlaneSmrd = 1;
-
-        m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
-
-        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
-
-        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
-
-        // NOTE: We only need workaround it in Tahiti, Pitcairn, Capeverde, to simplify the design, we set this
-        // flag for all gfxIp.major == 6
-        m_gpuWorkarounds.gfx6.shaderZExport = 1;
-
-    }
-    else if (m_gfxIp.major == 7)
-    {
-        // Hardware workarounds for GFX7 based GPU's:
-        m_gpuWorkarounds.gfx6.shaderVcczScalarReadBranchFailure = 1;
-        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
-
-        if (m_gfxIp.stepping == 0)
-        {
-            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
-
-            // NOTE: Buffer store + index mode are not used in vulkan, so we can skip this workaround in safe.
-            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
-        }
-        if ((m_gfxIp.stepping == 3) || (m_gfxIp.stepping == 4))
-        {
-            m_gpuWorkarounds.gfx6.cbNoLt16BitIntClamp = 1;
-            m_gpuWorkarounds.gfx6.shaderCoalesceStore = 1;
-            m_gpuWorkarounds.gfx6.shaderSpiBarrierMgmt = 1;
-            m_gpuWorkarounds.gfx6.shaderSpiCsRegAllocFragmentation = 1;
-        }
-    }
-    else if (m_gfxIp.major == 8)
-    {
-        // Hardware workarounds for GFX8.x based GPU's:
-        m_gpuWorkarounds.gfx6.shaderMinMaxFlushDenorm = 1;
-
-        m_gpuWorkarounds.gfx6.shaderSmemBufferAddrClamp = 1;
-
-        m_gpuWorkarounds.gfx6.shaderEstimateRegisterUsage = 1;
-
-        if (m_gfxIp.minor == 0 && m_gfxIp.stepping == 2)
-        {
-            m_gpuWorkarounds.gfx6.miscSpiSgprsNum = 1;
-        }
-    }
-    else if (m_gfxIp.major == 9)
-    {
-        // Hardware workarounds for GFX9 based GPU's:
-
-        // TODO: Clean up code for all 1d texture patch
-        m_gpuWorkarounds.gfx9.treat1dImagesAs2d = 1;
-
-        m_gpuWorkarounds.gfx9.shaderImageGatherInstFix = 1;
-
-        m_gpuWorkarounds.gfx9.fixCacheLineStraddling = 1;
-
-        if (m_gfxIp.stepping == 0 || m_gfxIp.stepping == 2)
-        {
-            m_gpuWorkarounds.gfx9.fixLsVgprInput = 1;
-        }
-    }
-#if LLPC_BUILD_GFX10
-    else if (m_gfxIp.major == 10)
-    {
-        // Hardware workarounds for GFX10 based GPU's:
-        m_gpuWorkarounds.gfx10.disableI32ModToI16Mod = 1;
-
-        if ((m_gfxIp.minor == 1) && (m_gfxIp.stepping == 0xFFFF))
-        {
-            m_gpuWorkarounds.gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow = 1;
-        }
-
-        if (m_gfxIp.minor == 1)
-        {
-            switch (m_gfxIp.stepping)
-            {
-            case 0:
-            case 0xFFFE:
-            case 0xFFFF:
-                m_gpuWorkarounds.gfx10.waShaderInstPrefetch0 = 1;
-                m_gpuWorkarounds.gfx10.waDidtThrottleVmem = 1;
-                m_gpuWorkarounds.gfx10.waLdsVmemNotWaitingVmVsrc = 1;
-                m_gpuWorkarounds.gfx10.waNsaAndClauseCanHang = 1;
-                m_gpuWorkarounds.gfx10.waNsaCannotFollowWritelane = 1;
-                m_gpuWorkarounds.gfx10.waTessIncorrectRelativeIndex = 1;
-                m_gpuWorkarounds.gfx10.waSmemFollowedByVopc = 1;
-
-                if (m_gfxIp.stepping == 0xFFFF)
-                {
-                    m_gpuWorkarounds.gfx10.waShaderInstPrefetch123   = 1;
-                    m_gpuWorkarounds.gfx10.nggTessDegeneratePrims    = 1;
-                    m_gpuWorkarounds.gfx10.waThrottleInMultiDwordNsa = 1;
-                    m_gpuWorkarounds.gfx10.waNggCullingNoEmptySubgroups = 1;
-                }
-                break;
-            case 2:
-                m_gpuWorkarounds.gfx10.waShaderInstPrefetch0      = 1;
-                m_gpuWorkarounds.gfx10.waDidtThrottleVmem         = 1;
-                m_gpuWorkarounds.gfx10.waLdsVmemNotWaitingVmVsrc  = 1;
-                m_gpuWorkarounds.gfx10.waNsaCannotFollowWritelane = 1;
-                m_gpuWorkarounds.gfx10.waNsaAndClauseCanHang      = 1;
-                m_gpuWorkarounds.gfx10.waThrottleInMultiDwordNsa  = 1;
-                m_gpuWorkarounds.gfx10.waSmemFollowedByVopc       = 1;
-                m_gpuWorkarounds.gfx10.waNggCullingNoEmptySubgroups = 1;
-                m_gpuWorkarounds.gfx10.waShaderInstPrefetchFwd64  = 1;
-                m_gpuWorkarounds.gfx10.waWarFpAtomicDenormHazard  = 1;
-                m_gpuWorkarounds.gfx10.waNggDisabled              = 1;
-                break;
-            default:
-                LLPC_NEVER_CALLED();
-                break;
-            }
-        }
-    }
-#endif
-
-}
-// =====================================================================================================================
 // Acquires a free context from context pool.
 Context* Compiler::AcquireContext() const
 {
@@ -2031,7 +1767,7 @@ Context* Compiler::AcquireContext() const
     if (pFreeContext == nullptr)
     {
         // Create a new one if we fail to find an available one
-        pFreeContext = new Context(m_gfxIp, &m_gpuWorkarounds);
+        pFreeContext = new Context(m_gfxIp);
         pFreeContext->SetInUse(true);
         m_pContextPool->push_back(pFreeContext);
     }

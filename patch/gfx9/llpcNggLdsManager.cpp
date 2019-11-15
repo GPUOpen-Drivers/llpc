@@ -42,6 +42,7 @@
 #include "llpcNggLdsManager.h"
 #include "llpcPatch.h"
 #include "llpcPipelineState.h"
+#include "llpcTargetInfo.h"
 
 using namespace llvm;
 
@@ -133,7 +134,7 @@ NggLdsManager::NggLdsManager(
     :
     m_pPipelineState(pPipelineState),
     m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
-    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pContext->GetGpuProperty()->waveSize),
+    m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pPipelineState->GetTargetInfo().GetGpuProperty().waveSize),
     m_pBuilder(pBuilder)
 {
     LLPC_ASSERT(pBuilder != nullptr);
@@ -149,7 +150,7 @@ NggLdsManager::NggLdsManager(
     //
     // Create global variable modeling LDS
     //
-    m_pLds = Patch::GetLdsVariable(pModule);
+    m_pLds = Patch::GetLdsVariable(m_pPipelineState, pModule);
 
     memset(&m_ldsRegionStart, InvalidValue, sizeof(m_ldsRegionStart)); // Initialized to invalid value (0xFFFFFFFF)
 
