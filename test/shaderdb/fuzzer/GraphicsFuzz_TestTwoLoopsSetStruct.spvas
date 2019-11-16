@@ -1,0 +1,97 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -verify-ir -spvgen-dir=%spvgendir% -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+;
+; Based on https://github.com/GPUOpen-Drivers/llpc/issues/216.
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 7
+; Bound: 75
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %4 "main" %58
+               OpExecutionMode %4 OriginUpperLeft
+               OpSource ESSL 310
+               OpName %4 "main"
+               OpName %18 "buf0"
+               OpMemberName %18 0 "injectionSwitch"
+               OpName %20 ""
+               OpName %31 "StructType"
+               OpMemberName %31 0 "col"
+               OpMemberName %31 1 "bbbb"
+               OpName %58 "_GLF_color"
+               OpMemberDecorate %18 0 Offset 0
+               OpDecorate %18 Block
+               OpDecorate %20 DescriptorSet 0
+               OpDecorate %20 Binding 0
+               OpDecorate %41 RelaxedPrecision
+               OpDecorate %55 RelaxedPrecision
+               OpDecorate %58 Location 0
+               OpDecorate %70 RelaxedPrecision
+               OpDecorate %71 RelaxedPrecision
+          %2 = OpTypeVoid
+          %3 = OpTypeFunction %2
+          %6 = OpTypeInt 32 1
+          %9 = OpConstant %6 0
+         %16 = OpTypeFloat 32
+         %17 = OpTypeVector %16 2
+         %18 = OpTypeStruct %17
+         %19 = OpTypePointer Uniform %18
+         %20 = OpVariable %19 Uniform
+         %21 = OpTypeInt 32 0
+         %22 = OpConstant %21 1
+         %23 = OpTypePointer Uniform %16
+         %27 = OpTypeBool
+         %29 = OpTypeVector %16 3
+         %30 = OpTypeVector %27 4
+         %31 = OpTypeStruct %29 %30
+         %34 = OpConstant %16 1
+         %35 = OpConstant %16 0
+         %36 = OpConstantComposite %29 %34 %35 %35
+         %40 = OpConstant %6 1
+         %56 = OpTypeVector %16 4
+         %57 = OpTypePointer Output %56
+         %58 = OpVariable %57 Output
+         %74 = OpUndef %31
+          %4 = OpFunction %2 None %3
+          %5 = OpLabel
+               OpBranch %10
+         %10 = OpLabel
+         %73 = OpPhi %31 %74 %5 %66 %11
+         %70 = OpPhi %6 %9 %5 %41 %11
+         %24 = OpAccessChain %23 %20 %9 %22
+         %25 = OpLoad %16 %24
+         %26 = OpConvertFToS %6 %25
+         %28 = OpSLessThan %27 %70 %26
+               OpLoopMerge %12 %11 None
+               OpBranchConditional %28 %11 %12
+         %11 = OpLabel
+         %66 = OpCompositeInsert %31 %36 %73 0
+         %41 = OpIAdd %6 %70 %40
+               OpBranch %10
+         %12 = OpLabel
+               OpBranch %43
+         %43 = OpLabel
+         %72 = OpPhi %31 %73 %12 %68 %44
+         %71 = OpPhi %6 %9 %12 %55 %44
+         %52 = OpSLessThan %27 %71 %26
+               OpLoopMerge %45 %44 None
+               OpBranchConditional %52 %44 %45
+         %44 = OpLabel
+         %68 = OpCompositeInsert %31 %36 %72 0
+         %55 = OpIAdd %6 %71 %40
+               OpBranch %43
+         %45 = OpLabel
+         %60 = OpCompositeExtract %29 %72 0
+         %61 = OpCompositeExtract %16 %60 0
+         %62 = OpCompositeExtract %16 %60 1
+         %63 = OpCompositeExtract %16 %60 2
+         %64 = OpCompositeConstruct %56 %61 %62 %63 %34
+               OpStore %58 %64
+               OpReturn
+               OpFunctionEnd
