@@ -1,0 +1,40 @@
+name: Build AMDVLK for LLPC
+
+on:
+  schedule:
+    - cron:  "0 */4 * * *"
+
+jobs:
+  build-and-push-amdvlk:
+    name: Build AMDVLK branch ${{ matrix.branch }}, base image ${{ matrix.base-image }}, config ${{ matrix.config }}
+    runs-on: ${{ matrix.host-os }}
+    strategy:
+      matrix:
+        host-os:      ["ubuntu-latest"]
+        base-image:   ["gcr.io/stadia-open-source/amdvlk:nightly"]
+        branch:       [dev]
+        config:       [Release]
+        generator:    [Ninja]
+    steps:
+      - name: Checkout LLPC
+        run: |
+          git clone https://github.com/${GITHUB_REPOSITORY}.git .
+          git checkout ${GITHUB_SHA}
+      - name: Setup Google Cloud CLI
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '270.0.0'
+          service_account_email: ${{ secrets.GCR_USER }}
+          service_account_key: ${{ secrets.GCR_KEY }}
+      - name: Setup Docker to use the GCR
+        run: |
+          gcloud auth configure-docker
+      - name: Build and Test AMDVLK with Docker
+        run: docker build . --file docker/amdvlk.Dockerfile
+                            --build-arg BRANCH="${{ matrix.branch }}"
+                            --build-arg CONFIG="${{ matrix.config }}"
+                            --build-arg GENERATOR="${{ matrix.generator }}"
+                            --tag ${{ matrix.base-image }}
+      - name: Push the new image
+        run: |
+          docker push ${{ matrix.base-image }}
