@@ -125,17 +125,6 @@ static void dumpLLVM(Module *M, const std::string &FName) {
   }
 }
 
-static MDNode*
-getMDNodeStringIntVec(LLVMContext *Context, const std::string& Str,
-                      const std::vector<SPIRVWord>& IntVals) {
-  std::vector<Metadata*> ValueVec;
-  ValueVec.push_back(MDString::get(*Context, Str));
-  for (auto &I:IntVals)
-    ValueVec.push_back(ConstantAsMetadata::get(
-        ConstantInt::get(Type::getInt32Ty(*Context), I)));
-  return MDNode::get(*Context, ValueVec);
-}
-
 static void
 mangleGlslBuiltin(const std::string &UniqName,
   ArrayRef<Type*> ArgTypes, std::string &MangledName) {
@@ -7059,18 +7048,11 @@ bool SPIRVToLLVM::transMetadata() {
     if (EntryPoint != nullptr && BF != EntryTarget)
       continue; // Ignore those untargeted entry-points
 
-    Function *F = static_cast<Function *>(getTranslatedValue(BF));
-    assert(F && "Invalid translated function");
-
     if (EntryPoint == nullptr)
       continue;
     SPIRVExecutionModelKind ExecModel = EntryPoint->getExecModel();
 
     if ((ExecModel >= ExecutionModelVertex) && (ExecModel <= ExecutionModelGLCompute)) {
-      NamedMDNode *EntryMDs =
-          M->getOrInsertNamedMetadata(gSPIRVMD::EntryPoints);
-      std::vector<llvm::Metadata *> EntryMD;
-      EntryMD.push_back(ValueAsMetadata::get(F));
 
       // Generate metadata for execution modes
       ShaderExecModeMetadata ExecModeMD = {};
@@ -7278,21 +7260,6 @@ bool SPIRVToLLVM::transMetadata() {
         getBuilder()->SetComputeShaderMode(computeMode);
       } else
         llvm_unreachable("Invalid execution model");
-
-      static_assert(sizeof(ExecModeMD) == 4 * sizeof(uint32_t),
-          "Unexpected size");
-      std::vector<uint32_t> MDVec;
-      MDVec.push_back(ExecModeMD.U32All[0]);
-      MDVec.push_back(ExecModeMD.U32All[1]);
-      MDVec.push_back(ExecModeMD.U32All[2]);
-      MDVec.push_back(ExecModeMD.U32All[3]);
-
-      EntryMD.push_back(getMDNodeStringIntVec(Context,
-          gSPIRVMD::ExecutionMode + std::string(".") + getName(ExecModel),
-          MDVec));
-
-      MDNode *MDNode = MDNode::get(*Context, EntryMD);
-      EntryMDs->addOperand(MDNode);
 
       // Skip the following processing for GLSL
       continue;
