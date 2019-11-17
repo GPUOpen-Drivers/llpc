@@ -318,7 +318,6 @@ const static char ExtDivider[] = "__";
 namespace kSPIRVMD {
 const static char Capability[] = "spirv.Capability";
 const static char EntryPoint[] = "spirv.EntryPoint";
-const static char ExecutionMode[] = "spirv.ExecutionMode";
 const static char Extension[] = "spirv.Extension";
 const static char Generator[] = "spirv.Generator";
 const static char Source[] = "spirv.Source";
@@ -342,9 +341,7 @@ namespace gSPIRVMD {
   const static char Block[]             = "spirv.Block";
   const static char PushConst[]         = "spirv.PushConst";
   const static char Resource[]          = "spirv.Resource";
-  const static char EntryPoints[]       = "spirv.EntryPoints";
   const static char ExecutionModel[]    = "spirv.ExecutionModel";
-  const static char ExecutionMode[]     = "spirv.ExecutionMode";
   const static char ImageCall[]         = "spirv.ImageCall";
   const static char ImageMemory[]       = "spirv.ImageMemory";
   const static char BufferLoad[]        = "spirv.BufferLoad";
