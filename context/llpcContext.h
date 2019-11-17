@@ -84,22 +84,15 @@ public:
     BuilderContext* GetBuilderContext();
 
     // Sets the target machine.
-    void SetTargetMachine(llvm::TargetMachine* pTargetMachine, const PipelineOptions* pPipelineOptions)
+    void SetTargetMachine(llvm::TargetMachine* pTargetMachine)
     {
         m_pTargetMachine.reset(pTargetMachine);
-        m_TargetMachineOptions = *pPipelineOptions;
     }
 
     // Gets the target machine.
     llvm::TargetMachine* GetTargetMachine()
     {
         return m_pTargetMachine.get();
-    }
-
-    // Gets pipeline debuging/tunning options
-    const PipelineOptions* GetTargetMachinePipelineOptions() const
-    {
-        return &m_TargetMachineOptions;
     }
 
     // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
@@ -275,7 +268,6 @@ private:
     std::unique_ptr<BuilderContext> m_builderContext;  // Builder context
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
-    PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine
     bool                          m_scalarBlockLayout = false;  // scalarBlockLayout option from last pipeline compile
     bool                          m_robustBufferAccess = false; // robustBufferAccess option from last pipeline compile
 

@@ -487,12 +487,6 @@ Result Compiler::BuildShaderModule(
     ShaderEntryState cacheEntryState = ShaderEntryState::New;
     CacheEntryHandle hEntry = nullptr;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 32
-    const PipelineOptions* pPipelineOptions = &pShaderInfo->options.pipelineOptions;
-#else
-    PipelineOptions dummyPipelineOptions = {};
-    const PipelineOptions* pPipelineOptions = &dummyPipelineOptions;
-#endif
     // Calculate the hash code of input data
     MetroHash::Hash hash = {};
     MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->shaderBin.pCode),
@@ -590,7 +584,7 @@ Result Compiler::BuildShaderModule(
 
                 pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
                 pContext->SetBuilder(pContext->GetBuilderContext()->CreateBuilder(nullptr, true));
-                CodeGenManager::CreateTargetMachine(pContext, pPipelineOptions);
+                CodeGenManager::CreateTargetMachine(pContext);
 
                 for (uint32_t i = 0; i < entryNames.size(); ++i)
                 {
@@ -872,7 +866,7 @@ Result Compiler::BuildPipelineInternal(
     pContext->SetBuilder(pBuilderContext->CreateBuilder(&*pipeline, UseBuilderRecorder));
 
     // Create the AMDGPU TargetMachine.
-    result = CodeGenManager::CreateTargetMachine(pContext, pContext->GetPipelineContext()->GetPipelineOptions());
+    result = CodeGenManager::CreateTargetMachine(pContext);
 
     std::unique_ptr<Module> pipelineModule;
 

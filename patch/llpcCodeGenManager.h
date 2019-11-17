@@ -80,7 +80,7 @@ struct ElfDataEntry
 class CodeGenManager
 {
 public:
-    static Result CreateTargetMachine(Context* pContext, const PipelineOptions* pPipelineOptions);
+    static Result CreateTargetMachine(Context* pContext);
 
     static void SetupTargetFeatures(PipelineState* pPipelineState, llvm::Module* pModule);
 
