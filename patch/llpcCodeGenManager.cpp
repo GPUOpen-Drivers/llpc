@@ -84,20 +84,9 @@ namespace Llpc
 // Creates the TargetMachine if not already created, and stores it in the context. It then persists as long as
 // the context.
 Result CodeGenManager::CreateTargetMachine(
-    Context*               pContext,          // [in/out] Pipeline context
-    const PipelineOptions* pPipelineOptions)  // [in] Pipeline options
+    Context*               pContext)          // [in/out] Pipeline context
 {
-    if ((pContext->GetTargetMachine() != nullptr) &&
-        (pPipelineOptions->includeDisassembly == pContext->GetTargetMachinePipelineOptions()->includeDisassembly) &&
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 30
-        (pPipelineOptions->autoLayoutDesc == pContext->GetTargetMachinePipelineOptions()->autoLayoutDesc) &&
-#endif
-        (pPipelineOptions->scalarBlockLayout == pContext->GetTargetMachinePipelineOptions()->scalarBlockLayout) &&
-        (pPipelineOptions->includeIr == pContext->GetTargetMachinePipelineOptions()->includeIr)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-        && (pPipelineOptions->robustBufferAccess == pContext->GetTargetMachinePipelineOptions()->robustBufferAccess)
-#endif
-        )
+    if (pContext->GetTargetMachine() != nullptr)
     {
         return Result::Success;
     }
@@ -129,7 +118,7 @@ Result CodeGenManager::CreateTargetMachine(
                                                            relocModel);
         if (pTargetMachine != nullptr)
         {
-            pContext->SetTargetMachine(pTargetMachine, pPipelineOptions);
+            pContext->SetTargetMachine(pTargetMachine);
             result = Result::Success;
         }
     }
