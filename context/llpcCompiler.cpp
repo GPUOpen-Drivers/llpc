@@ -855,6 +855,13 @@ Result Compiler::BuildPipelineInternal(
 
     pContext->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>());
 
+    // Set a couple of pipeline options for front-end use.
+    // TODO: The front-end should not be using pipeline options.
+    pContext->SetScalarBlockLayout(pContext->GetPipelineContext()->GetPipelineOptions()->scalarBlockLayout);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
+    pContext->SetRobustBufferAccess(pContext->GetPipelineContext()->GetPipelineOptions()->robustBufferAccess);
+#endif
+
     // Merge user data for shader stages into one.
     pContext->GetPipelineContext()->DoUserDataNodeMerge();
 

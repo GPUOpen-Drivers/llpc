@@ -1989,7 +1989,7 @@ Value* SPIRVToLLVM::addLoadInstRecursively(
             Type* const pCastType = pVectorType->getPointerTo(pLoadPointer->getType()->getPointerAddressSpace());
             pLoadPointer = getBuilder()->CreateBitCast(pLoadPointer, pCastType);
 
-            const bool scalarBlockLayout = getBuilder()->getContext().GetTargetMachinePipelineOptions()->scalarBlockLayout;
+            const bool scalarBlockLayout = getBuilder()->getContext().GetScalarBlockLayout();
 
             if (scalarBlockLayout == false)
             {
@@ -2151,7 +2151,7 @@ void SPIRVToLLVM::addStoreInstRecursively(
             Type* const pCastType = pStoreType->getPointerTo(pStorePointer->getType()->getPointerAddressSpace());
             pStorePointer = getBuilder()->CreateBitCast(pStorePointer, pCastType);
 
-            const bool scalarBlockLayout = getBuilder()->getContext().GetTargetMachinePipelineOptions()->scalarBlockLayout;
+            const bool scalarBlockLayout = getBuilder()->getContext().GetScalarBlockLayout();
 
             if (scalarBlockLayout == false)
             {
