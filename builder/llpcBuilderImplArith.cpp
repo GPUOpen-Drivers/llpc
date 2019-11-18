@@ -82,10 +82,10 @@ Value* BuilderImplArith::CreateCubeFaceIndex(
 // Create scalar or vector FP truncate operation with the given rounding mode.
 // Currently the rounding mode is only implemented for float/double -> half conversion.
 Value* BuilderImplArith::CreateFpTruncWithRounding(
-    Value*                                pValue,             // [in] Input value
-    Type*                                 pDestTy,            // [in] Type to convert to
-    ConstrainedFPIntrinsic::RoundingMode  roundingMode,       // Rounding mode
-    const Twine&                          instName)           // [in] Name to give instruction(s)
+    Value*            pValue,             // [in] Input value
+    Type*             pDestTy,            // [in] Type to convert to
+    fp::RoundingMode  roundingMode,       // Rounding mode
+    const Twine&      instName)           // [in] Name to give instruction(s)
 {
     if (pValue->getType()->getScalarType()->isDoubleTy())
     {
@@ -101,7 +101,7 @@ Value* BuilderImplArith::CreateFpTruncWithRounding(
 
     // RTZ: Use cvt_pkrtz instruction.
     // TODO: We also use this for RTP and RTN for now.
-    if (roundingMode != ConstrainedFPIntrinsic::rmToNearest)
+    if (roundingMode != fp::rmToNearest)
     {
         Value* pResult = ScalarizeInPairs(pValue,
                                           [this](Value* pInVec2)

@@ -804,10 +804,10 @@ Value* BuilderRecorder::CreateRefract(
 // Create scalar or vector FP truncate operation with the given rounding mode.
 // Currently only implemented for float/double -> half conversion.
 Value* BuilderRecorder::CreateFpTruncWithRounding(
-    Value*                                pValue,             // [in] Input value
-    Type*                                 pDestTy,            // [in] Type to convert to
-    ConstrainedFPIntrinsic::RoundingMode  roundingMode,       // Rounding mode
-    const Twine&                          instName)           // [in] Name to give instruction(s)
+    Value*            pValue,             // [in] Input value
+    Type*             pDestTy,            // [in] Type to convert to
+    fp::RoundingMode  roundingMode,       // Rounding mode
+    const Twine&      instName)           // [in] Name to give instruction(s)
 {
     return Record(Opcode::FpTruncWithRounding, pDestTy, { pValue, getInt32(roundingMode) }, instName);
 }

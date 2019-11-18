@@ -6016,21 +6016,21 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         DestTy->getScalarType()->getPrimitiveSizeInBits())
       return mapValue(BV, getBuilder()->CreateFPExt(Val, DestTy));
 
-    ConstrainedFPIntrinsic::RoundingMode RM = ConstrainedFPIntrinsic::rmDynamic;
+    fp::RoundingMode RM = fp::rmDynamic;
     SPIRVFPRoundingModeKind Rounding;
     if (BC->hasFPRoundingMode(&Rounding)) {
       switch (Rounding) {
       case FPRoundingModeRTE:
-        RM = ConstrainedFPIntrinsic::rmToNearest;
+        RM = fp::rmToNearest;
         break;
       case FPRoundingModeRTZ:
-        RM = ConstrainedFPIntrinsic::rmTowardZero;
+        RM = fp::rmTowardZero;
         break;
       case FPRoundingModeRTP:
-        RM = ConstrainedFPIntrinsic::rmUpward;
+        RM = fp::rmUpward;
         break;
       case FPRoundingModeRTN:
-        RM = ConstrainedFPIntrinsic::rmDownward;
+        RM = fp::rmDownward;
         break;
       default:
         llvm_unreachable("");
