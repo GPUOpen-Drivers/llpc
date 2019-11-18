@@ -1181,11 +1181,19 @@ Value* VertexFetch::Run(
         LLPC_ASSERT(pBinding->inputRate == VK_VERTEX_INPUT_RATE_INSTANCE);
         if (pDivisor != nullptr)
         {
-            pVbIndex = BinaryOperator::CreateUDiv(m_pInstanceId,
-                                                  ConstantInt::get(m_pContext->Int32Ty(), pDivisor->divisor),
-                                                  "",
-                                                  pInsertPos);
-            pVbIndex = BinaryOperator::CreateAdd(pVbIndex, m_pBaseInstance, "", pInsertPos);
+            if (pDivisor->divisor == 0)
+            {
+                // All instances get the same VB record index
+                pVbIndex = m_pBaseInstance;
+            }
+            else
+            {
+                pVbIndex = BinaryOperator::CreateUDiv(m_pInstanceId,
+                                                      ConstantInt::get(m_pContext->Int32Ty(), pDivisor->divisor),
+                                                      "",
+                                                      pInsertPos);
+                pVbIndex = BinaryOperator::CreateAdd(pVbIndex, m_pBaseInstance, "", pInsertPos);
+            }
         }
         else
         {
