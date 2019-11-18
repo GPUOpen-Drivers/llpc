@@ -54,8 +54,6 @@ namespace llvm
 namespace cl
 {
 
-extern opt<bool> EnablePipelineDump;
-
 // -enable-si-scheduler: enable target option si-scheduler
 static opt<bool> EnableSiScheduler("enable-si-scheduler",
                                    desc("Enable target option si-scheduler"),
@@ -137,13 +135,10 @@ void CodeGenManager::SetupTargetFeatures(
     Module*             pModule)        // [in, out] LLVM module
 {
     Context* pContext = static_cast<Context*>(&pModule->getContext());
-    auto pPipelineOptions = pContext->GetPipelineContext()->GetPipelineOptions();
 
     std::string globalFeatures = "";
 
-    if (cl::EnablePipelineDump ||
-        EnableOuts() ||
-        pPipelineOptions->includeDisassembly)
+    if (pPipelineState->GetOptions().includeDisassembly)
     {
         globalFeatures += ",+DumpCode";
     }

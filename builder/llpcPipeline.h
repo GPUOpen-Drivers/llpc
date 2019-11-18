@@ -50,6 +50,22 @@ using namespace llvm;
 class BuilderContext;
 
 // =====================================================================================================================
+// Structs for setting pipeline state
+
+// Middle-end per-pipeline options to pass to SetOptions.
+// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct Options
+{
+    uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
+    uint32_t includeDisassembly;      // If set, the disassembly for all compiled shaders will be included in
+                                      // the pipeline ELF.
+    uint32_t reconfigWorkgroupLayout; // If set, allows automatic workgroup reconfigure to take place on compute shaders.
+    uint32_t includeIr;               // If set, the IR for all compiled shaders will be included in the pipeline ELF.
+};
+
+// =====================================================================================================================
 // Structs for setting shader modes, e.g. Builder::SetCommonShaderMode
 
 // FP rounding mode. These happen to have values one more than the corresponding register field in current
@@ -202,6 +218,9 @@ public:
 
     // Set the shader stage mask
     virtual void SetShaderStageMask(uint32_t mask) = 0;
+
+    // Set per-pipeline options
+    virtual void SetOptions(const Options& options) = 0;
 
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.

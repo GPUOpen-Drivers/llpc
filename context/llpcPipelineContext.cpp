@@ -40,7 +40,24 @@
 #include "llpcPipelineContext.h"
 #include "llpcPipeline.h"
 
+namespace llvm
+{
+
+namespace cl
+{
+
+extern opt<bool> EnablePipelineDump;
+
+} // cl
+
+} // llvm
+
 using namespace llvm;
+
+// -include-llvm-ir: include LLVM IR as a separate section in the ELF binary
+static cl::opt<bool> IncludeLlvmIr("include-llvm-ir",
+                                   cl::desc("Include LLVM IR as a separate section in the ELF binary"),
+                                   cl::init(false));
 
 namespace Llpc
 {
@@ -287,6 +304,19 @@ void PipelineContext::SetPipelineState(
     // Give the shader stage mask to the middle-end.
     uint32_t stageMask = GetShaderStageMask();
     pPipeline->SetShaderStageMask(stageMask);
+
+    // Give the pipeline options to the middle-end.
+    Options options = {};
+    options.hash[0] = GetPiplineHashCode();
+    options.hash[1] = GetCacheHashCode();
+
+    options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || GetPipelineOptions()->includeDisassembly);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+    options.reconfigWorkgroupLayout = GetPipelineOptions()->reconfigWorkgroupLayout;
+#endif
+    options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
+
+    pPipeline->SetOptions(options);
 
     // Give the user data nodes and descriptor range values to the Builder.
     // The user data nodes have been merged so they are the same in each shader stage. Get them from

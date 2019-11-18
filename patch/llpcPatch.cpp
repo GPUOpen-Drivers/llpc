@@ -72,11 +72,6 @@ namespace cl
 // -disable-patch-opt: disable optimization for LLVM patching
 opt<bool> DisablePatchOpt("disable-patch-opt", desc("Disable optimization for LLVM patching"));
 
-// -include-llvm-ir: include LLVM IR as a separate section in the ELF binary
-opt<bool> IncludeLlvmIr("include-llvm-ir",
-                        desc("Include LLVM IR as a separate section in the ELF binary"),
-                        init(false));
-
 // -use-llvm-opt: Use LLVM's standard optimization set instead of the curated optimization set
 opt<bool> UseLlvmOpt("use-llvm-opt",
                      desc("Use LLVM's standard optimization set instead of the curated optimization set"),
@@ -92,7 +87,7 @@ namespace Llpc
 // =====================================================================================================================
 // Add whole-pipeline patch passes to pass manager
 void Patch::AddPasses(
-    Context*              pContext,      // [in] LLPC context
+    PipelineState*        pPipelineState, // [in] Pipeline state
     legacy::PassManager&  passMgr,       // [in/out] Pass manager to add passes to
     ModulePass*           pReplayerPass, // [in] BuilderReplayer pass, or nullptr if not needed
     llvm::Timer*          pPatchTimer,   // [in] Timer to time patch passes with, nullptr if not timing
@@ -100,6 +95,8 @@ void Patch::AddPasses(
     Pipeline::CheckShaderCacheFunc  checkShaderCacheFunc)
                                          // Callback function to check shader cache
 {
+    Context* pContext = static_cast<Context*>(&pPipelineState->GetContext());
+
     // Start timer for patching passes.
     if (pPatchTimer != nullptr)
     {
@@ -170,7 +167,7 @@ void Patch::AddPasses(
 
     if (cl::DisablePatchOpt == false)
     {
-        AddOptimizationPasses(pContext, passMgr);
+        AddOptimizationPasses(passMgr);
     }
 
     // Stop timer for optimization passes and restart timer for patching passes.
@@ -188,7 +185,7 @@ void Patch::AddPasses(
     passMgr.add(CreatePatchPreparePipelineAbi(/* onlySetCallingConvs = */ false));
 
 #if LLPC_BUILD_GFX10
-    if (pContext->IsGraphics() && (pContext->GetGfxIpVersion().major >= 10) &&
+    if (pPipelineState->IsGraphics() && (pContext->GetGfxIpVersion().major >= 10) &&
         static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo())->nggState.enableNgg)
     {
         // Stop timer for patching passes and restart timer for optimization passes.
@@ -225,7 +222,7 @@ void Patch::AddPasses(
     passMgr.add(CreatePatchSetupTargetFeatures());
 
     // Include LLVM IR as a separate section in the ELF binary
-    if (cl::IncludeLlvmIr || pContext->GetPipelineContext()->GetPipelineOptions()->includeIr)
+    if (pPipelineState->GetOptions().includeIr)
     {
         passMgr.add(CreatePatchLlvmIrInclusion());
     }
@@ -248,7 +245,6 @@ void Patch::AddPasses(
 // =====================================================================================================================
 // Add optimization passes to pass manager
 void Patch::AddOptimizationPasses(
-    Context*              pContext, // [in] LLPC context
     legacy::PassManager&  passMgr)  // [in/out] Pass manager to add passes to
 {
     // Set up standard optimization passes.

@@ -56,6 +56,7 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip",
                                        cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
+static const char OptionsMetadataName[] = "llpc.options";
 static const char UserDataMetadataName[] = "llpc.user.data.nodes";
 
 // =====================================================================================================================
@@ -214,8 +215,7 @@ void PipelineState::Generate(
     }
 
     // Patching.
-    Context* pContext = reinterpret_cast<Context*>(&GetContext());
-    Patch::AddPasses(pContext,
+    Patch::AddPasses(this,
                      *patchPassMgr,
                      pReplayerPass,
                      pPatchTimer,
@@ -240,6 +240,7 @@ void PipelineState::Generate(
     codeGenPassMgr->SetPassIndex(&passIndex);
 
     // Code generation.
+    Context* pContext = reinterpret_cast<Context*>(&GetContext());
     CodeGenManager::AddTargetPasses(pContext, *codeGenPassMgr, pCodeGenTimer, outStream);
 
     // Run the target backend codegen passes.
@@ -252,6 +253,7 @@ void PipelineState::Clear(
     Module* pModule)    // [in/out] IR module
 {
     GetShaderModes()->Clear();
+    m_options = {};
     m_userDataNodes = {};
     Record(pModule);
 }
@@ -262,6 +264,7 @@ void PipelineState::Record(
     Module* pModule)    // [in/out] Module to record the IR metadata in
 {
     GetShaderModes()->Record(pModule);
+    RecordOptions(pModule);
     RecordUserDataNodes(pModule);
 }
 
@@ -272,6 +275,7 @@ void PipelineState::ReadState(
 {
     GetShaderModes()->ReadModesFromPipeline(pModule);
     ReadShaderStageMask(pModule);
+    ReadOptions(pModule);
     ReadUserDataNodes(pModule);
 }
 
@@ -394,6 +398,24 @@ bool PipelineState::IsGraphics() const
              (1U << ShaderStageTessEval) |
              (1U << ShaderStageGeometry) |
              (1U << ShaderStageFragment))) != 0;
+}
+
+// =====================================================================================================================
+// Record options into IR metadata.
+// TODO: The options could be recorded in a more human-readable form, with a string for the option name for each
+// option.
+void PipelineState::RecordOptions(
+    Module* pModule)    // [in/out] Module to record metadata into
+{
+    SetNamedMetadataToArrayOfInt32(pModule, m_options, OptionsMetadataName);
+}
+
+// =====================================================================================================================
+// Read options from IR metadata
+void PipelineState::ReadOptions(
+    Module* pModule)    // [in] Module to read metadata from
+{
+    ReadNamedMetadataArrayOfInt32(pModule, OptionsMetadataName, m_options);
 }
 
 // =====================================================================================================================
