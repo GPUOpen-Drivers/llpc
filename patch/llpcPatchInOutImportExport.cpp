@@ -6861,7 +6861,7 @@ WorkgroupLayout PatchInOutImportExport::CalculateWorkgroupLayout()
             // pipeline option was enabled.
             if (resUsage.useImages)
             {
-                reconfig = m_pContext->GetPipelineContext()->GetPipelineOptions()->reconfigWorkgroupLayout;
+                reconfig = m_pPipelineState->GetOptions().reconfigWorkgroupLayout;
             }
             break;
         case WorkgroupLayout::Linear:

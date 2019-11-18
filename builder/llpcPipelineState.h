@@ -117,6 +117,9 @@ public:
     // Set shader stage mask
     void SetShaderStageMask(uint32_t mask) override final { m_stageMask = mask; }
 
+    // Set per-pipeline options
+    void SetOptions(const Options& options) override final { m_options = options; }
+
     // Link the individual shader modules into a single pipeline module
     Module* Link(ArrayRef<Module*> modules) override final;
 
@@ -148,6 +151,9 @@ public:
 
     // Set up the pipeline state from the pipeline module.
     void ReadState(Module* pModule);
+
+    // Get pipeline options
+    const Options& GetOptions() const { return m_options; }
 
     // Get user data nodes
     ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
@@ -273,6 +279,10 @@ private:
     // Read shaderStageMask from IR
     void ReadShaderStageMask(Module* pModule);
 
+    // Options handling
+    void RecordOptions(Module* pModule);
+    void ReadOptions(Module* pModule);
+
     // User data nodes handling
     void SetUserDataNodesTable(ArrayRef<ResourceMappingNode>        nodes,
                                const ImmutableNodesMap&             immutableNodesMap,
@@ -288,6 +298,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
     bool                            m_noReplayer = false;               // True if no BuilderReplayer needed
     uint32_t                        m_stageMask = 0;                    // Mask of active shader stages
+    Options                         m_options = {};                     // Per-pipeline options
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};

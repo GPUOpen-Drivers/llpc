@@ -341,11 +341,11 @@ void ConfigBuilderBase::SetSpillThreshold()
 // Set PIPELINE_HASH (called once for the whole pipeline)
 void ConfigBuilderBase::SetPipelineHash()
 {
-    auto hash64 = m_pContext->GetPiplineHashCode();
+    const auto& options = m_pPipelineState->GetOptions();
 
     auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-    pipelineHashNode[0] = m_document->getNode(hash64);
-    pipelineHashNode[1] = m_document->getNode(0U);
+    pipelineHashNode[0] = m_document->getNode(options.hash[0]);
+    pipelineHashNode[1] = m_document->getNode(options.hash[1]);
 }
 
 // =====================================================================================================================
@@ -399,11 +399,6 @@ void ConfigBuilderBase::WritePalMetadata()
     SetPipelineHash();
 
     // Generating MsgPack metadata.
-    // Set the pipeline hashes.
-    auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-    pipelineHashNode[0] = m_document->getNode(m_pContext->GetPiplineHashCode());
-    pipelineHashNode[1] = m_document->getNode(m_pContext->GetCacheHashCode());
-
     // Add the register values to the MsgPack document.
     msgpack::MapDocNode registers = m_pipelineNode[".registers"].getMap(true);
     for (const auto& entry : m_config)

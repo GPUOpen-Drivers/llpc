@@ -127,7 +127,7 @@ public:
     }
     virtual ~Patch() {}
 
-    static void AddPasses(Context*                        pContext,
+    static void AddPasses(PipelineState*                  pPipelineState,
                           llvm::legacy::PassManager&      passMgr,
                           llvm::ModulePass*               pReplayerPass,
                           llvm::Timer*                    pPatchTimer,
@@ -147,7 +147,7 @@ protected:
     llvm::Function* m_pEntryPoint;  // Entry-point
 
 private:
-    static void AddOptimizationPasses(Context* pContext, llvm::legacy::PassManager& passMgr);
+    static void AddOptimizationPasses(llvm::legacy::PassManager& passMgr);
 
     LLPC_DISALLOW_DEFAULT_CTOR(Patch);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Patch);
