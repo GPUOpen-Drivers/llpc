@@ -371,11 +371,7 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
     ArrayRef<GetElementPtrInst*> getElemPtrs,    // [in] A group of "getelementptr" with constant indices
     Value*                       pDynIndex)      // [in] Dynamic index
 {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 23
-    const bool robustBufferAccess = m_pContext->GetTargetMachinePipelineOptions()->robustBufferAccess;
-#else
-    const bool robustBufferAccess = false;
-#endif
+    const bool robustBufferAccess = m_pContext->GetRobustBufferAccess();
     const uint32_t getElemPtrCount = getElemPtrs.size();
     bool isType64 = (pDynIndex->getType()->getPrimitiveSizeInBits() == 64);
     Value* pFirstStoreDest = getElemPtrs[0];

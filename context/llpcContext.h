@@ -102,6 +102,27 @@ public:
         return &m_TargetMachineOptions;
     }
 
+    // Set value of scalarBlockLayout option. This gets called with the value from PipelineOptions when
+    // starting a pipeline compile.
+    void SetScalarBlockLayout(bool scalarBlockLayout) { m_scalarBlockLayout = scalarBlockLayout; }
+
+    // Get value of scalarBlockLayout for front-end use. If there have been any pipeline compiles in this context,
+    // then it returns the value from the most recent one. If there have not been any pipeline compiles in this
+    // context yet, then it returns false.
+    // TODO: This is not correct behavior. The front-end should not be using pipeline options. Possibly
+    // scalarBlockLayout is a whole-device option that should be passed into LLPC in a different way.
+    bool GetScalarBlockLayout() const { return m_scalarBlockLayout; }
+
+    // Set value of robustBufferAccess option. This gets called with the value from PipelineOptions when
+    // starting a pipeline compile.
+    void SetRobustBufferAccess(bool robustBufferAccess) { m_robustBufferAccess = robustBufferAccess; }
+
+    // Get value of robustBufferAccess for front-end use. If there have been any pipeline compiles in this context,
+    // then it returns the value from the most recent one. If there have not been any pipeline compiles in this
+    // context yet, then it returns false.
+    // TODO: This is not correct behavior. The front-end should not be using pipeline options.
+    bool GetRobustBufferAccess() const { return m_robustBufferAccess; }
+
     // Gets pre-constructed LLVM types
     llvm::Type* BoolTy() const { return m_tys.pBoolTy; }
     llvm::Type* Int8Ty() const { return m_tys.pInt8Ty; }
@@ -255,6 +276,8 @@ private:
 
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     PipelineOptions               m_TargetMachineOptions;  // Pipeline options when create target machine
+    bool                          m_scalarBlockLayout = false;  // scalarBlockLayout option from last pipeline compile
+    bool                          m_robustBufferAccess = false; // robustBufferAccess option from last pipeline compile
 
     llvm::MDNode*       m_pEmptyMetaNode;   // Empty metadata node
 
