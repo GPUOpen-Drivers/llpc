@@ -6016,21 +6016,28 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         DestTy->getScalarType()->getPrimitiveSizeInBits())
       return mapValue(BV, getBuilder()->CreateFPExt(Val, DestTy));
 
-    fp::RoundingMode RM = fp::rmDynamic;
+    // TODO: use hardcoded values during namespace flux for llvm
+    //fp::RoundingMode RM = fp::rmDynamic;
+    unsigned RM = 0; // fp::rmDynamic
     SPIRVFPRoundingModeKind Rounding;
     if (BC->hasFPRoundingMode(&Rounding)) {
       switch (Rounding) {
       case FPRoundingModeRTE:
-        RM = fp::rmToNearest;
+        // TODO: use hardcoded values during namespace flux for llvm
+        //RM = fp::rmToNearest;
+        RM = 1;
         break;
       case FPRoundingModeRTZ:
-        RM = fp::rmTowardZero;
+        //RM = fp::rmTowardZero;
+        RM = 4;
         break;
       case FPRoundingModeRTP:
-        RM = fp::rmUpward;
+        //RM = fp::rmUpward;
+        RM = 3;
         break;
       case FPRoundingModeRTN:
-        RM = fp::rmDownward;
+        //RM = fp::rmDownward;
+        RM = 2;
         break;
       default:
         llvm_unreachable("");

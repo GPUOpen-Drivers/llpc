@@ -806,7 +806,7 @@ Value* BuilderRecorder::CreateRefract(
 Value* BuilderRecorder::CreateFpTruncWithRounding(
     Value*            pValue,             // [in] Input value
     Type*             pDestTy,            // [in] Type to convert to
-    fp::RoundingMode  roundingMode,       // Rounding mode
+    unsigned          roundingMode,       // Rounding mode
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     return Record(Opcode::FpTruncWithRounding, pDestTy, { pValue, getInt32(roundingMode) }, instName);
