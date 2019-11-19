@@ -26,7 +26,7 @@
 project(LLPC C CXX)
 
 ### Create LLPC Library ################################################################################################
-add_library(llpc STATIC "")
+ add_library(llpc STATIC "")
 
 if(ICD_BUILD_LLPC)
     add_dependencies(llpc LLVMCore)
