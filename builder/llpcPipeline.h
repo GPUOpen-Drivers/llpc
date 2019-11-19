@@ -52,17 +52,48 @@ class BuilderContext;
 // =====================================================================================================================
 // Structs for setting pipeline state
 
+// Bit values of NGG flags. This is done as bit values rather than bitfields so the flags word appears
+// in a platform-independent way in IR metdata.
+enum NggFlag : uint32_t
+{
+    NggFlagDisable = 0x0001,                      // Disable NGG
+    NggFlagEnableGsUse = 0x0002,                  // Enable NGG when pipeline has GS
+    NggFlagForceNonPassthrough = 0x0004,          // Force NGG to run in non-passthrough mode
+    NggFlagDontAlwaysUsePrimShaderTable = 0x0008, // Don't always use primitive shader table to fetch culling-control
+                                                  //   registers
+    NggFlagCompactSubgroup = 0x0010,              // Compaction is based on the whole sub-group rather than on vertices
+    NggFlagEnableFastLaunch = 0x0020,             // Enable the hardware to launch subgroups of work at a faster rate
+    NggFlagEnableVertexReuse = 0x0040,            // Enable optimization to cull duplicate vertices
+    NggFlagEnableBackfaceCulling = 0x0080,        // Enable culling of primitives that don't meet facing criteria
+    NggFlagEnableFrustumCulling = 0x0100,         // Enable discarding of primitives outside of view frustum
+    NggFlagEnableBoxFilterCulling = 0x0200,       // Enable simpler frustum culler that is less accurate
+    NggFlagEnableSphereCulling = 0x0400,          // Enable frustum culling based on a sphere
+    NggFlagEnableSmallPrimFilter = 0x0800,        // Enable trivial sub-sample primitive culling
+    NggFlagEnableCullDistanceCulling = 0x1000,    // Enable culling when "cull distance" exports are present
+};
+
 // Middle-end per-pipeline options to pass to SetOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // All fields are uint32_t, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct Options
 {
-    uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
-    uint32_t includeDisassembly;      // If set, the disassembly for all compiled shaders will be included in
-                                      // the pipeline ELF.
-    uint32_t reconfigWorkgroupLayout; // If set, allows automatic workgroup reconfigure to take place on compute shaders.
-    uint32_t includeIr;               // If set, the IR for all compiled shaders will be included in the pipeline ELF.
+    uint64_t              hash[2];                 // Pipeline hash to set in ELF PAL metadata
+    uint32_t              includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
+                                                   //   in the pipeline ELF.
+    uint32_t              reconfigWorkgroupLayout; // If set, allows automatic workgroup reconfigure to take place on
+                                                   //   compute shaders.
+    uint32_t              includeIr;               // If set, the IR for all compiled shaders will be included in the
+                                                   //   pipeline ELF.
+    uint32_t              nggFlags;                // Flags to control NGG (NggFlag* values ored together)
+    uint32_t              nggBackfaceExponent;     // Value from 1 to UINT32_MAX that will cause the backface culling
+                                                   // algorithm to ignore area calculations that are less than
+                                                   // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
+                                                   //  Only valid if the NGG backface culler is enabled.
+                                                   //  A value of 0 will disable the threshold.
+    NggSubgroupSizingType nggSubgroupSizing;       // NGG subgroup sizing type
+    uint32_t              nggVertsPerSubgroup;     // How to determine NGG verts per subgroup
+    uint32_t              nggPrimsPerSubgroup;     // How to determine NGG prims per subgroup
 };
 
 // =====================================================================================================================
@@ -219,8 +250,9 @@ public:
     // Set the shader stage mask
     virtual void SetShaderStageMask(uint32_t mask) = 0;
 
-    // Set per-pipeline options
+    // Set and get per-pipeline options
     virtual void SetOptions(const Options& options) = 0;
+    virtual const Options& GetOptions() = 0;
 
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.

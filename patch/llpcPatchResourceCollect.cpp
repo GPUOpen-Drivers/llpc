@@ -184,17 +184,17 @@ void PatchResourceCollect::SetNggControl()
         }
     }
 
-    const auto& nggState = static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo())->nggState;
+    const auto& options = m_pPipelineState->GetOptions();
     NggControl& nggControl = *m_pPipelineState->GetNggControl();
 
-    bool enableNgg = nggState.enableNgg;
+    bool enableNgg = (options.nggFlags & NggFlagDisable) == 0;
     if (enableXfb)
     {
         // TODO: If transform feedback is enabled, disable NGG.
         enableNgg = false;
     }
 
-    if (hasGs && (nggState.enableGsUse == false))
+    if (hasGs && ((options.nggFlags & NggFlagEnableGsUse) == 0))
     {
         // NOTE: NGG used on GS is disabled by default
         enableNgg = false;
@@ -206,27 +206,29 @@ void PatchResourceCollect::SetNggControl()
     }
 
     nggControl.enableNgg                  = enableNgg;
-    nggControl.enableGsUse                = nggState.enableGsUse;
-    nggControl.alwaysUsePrimShaderTable   = nggState.alwaysUsePrimShaderTable;
-    nggControl.compactMode                = nggState.compactMode;
+    nggControl.enableGsUse                = (options.nggFlags & NggFlagEnableGsUse);
+    nggControl.alwaysUsePrimShaderTable   = (options.nggFlags & NggFlagDontAlwaysUsePrimShaderTable) == 0;
+    nggControl.compactMode                = (options.nggFlags & NggFlagCompactSubgroup) ?
+                                             NggCompactSubgroup : NggCompactVertices;
 
-    nggControl.enableFastLaunch           = nggState.enableFastLaunch;
-    nggControl.enableVertexReuse          = nggState.enableVertexReuse;
-    nggControl.enableBackfaceCulling      = nggState.enableBackfaceCulling;
-    nggControl.enableFrustumCulling       = nggState.enableFrustumCulling;
-    nggControl.enableBoxFilterCulling     = nggState.enableBoxFilterCulling;
-    nggControl.enableSphereCulling        = nggState.enableSphereCulling;
-    nggControl.enableSmallPrimFilter      = nggState.enableSmallPrimFilter;
-    nggControl.enableCullDistanceCulling  = (nggState.enableCullDistanceCulling && useCullDistance);
+    nggControl.enableFastLaunch           = (options.nggFlags & NggFlagEnableFastLaunch);
+    nggControl.enableVertexReuse          = (options.nggFlags & NggFlagEnableVertexReuse);
+    nggControl.enableBackfaceCulling      = (options.nggFlags & NggFlagEnableBackfaceCulling);
+    nggControl.enableFrustumCulling       = (options.nggFlags & NggFlagEnableFrustumCulling);
+    nggControl.enableBoxFilterCulling     = (options.nggFlags & NggFlagEnableBoxFilterCulling);
+    nggControl.enableSphereCulling        = (options.nggFlags & NggFlagEnableSphereCulling);
+    nggControl.enableSmallPrimFilter      = (options.nggFlags & NggFlagEnableSmallPrimFilter);
+    nggControl.enableCullDistanceCulling  = ((options.nggFlags & NggFlagEnableCullDistanceCulling) &&
+                                            useCullDistance);
 
-    nggControl.backfaceExponent           = nggState.backfaceExponent;
-    nggControl.subgroupSizing             = nggState.subgroupSizing;
-    nggControl.primsPerSubgroup           = std::min(nggState.primsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
-    nggControl.vertsPerSubgroup           = std::min(nggState.vertsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+    nggControl.backfaceExponent           = options.nggBackfaceExponent;
+    nggControl.subgroupSizing             = options.nggSubgroupSizing;
+    nggControl.primsPerSubgroup           = std::min(options.nggPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+    nggControl.vertsPerSubgroup           = std::min(options.nggVertsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
 
-    if (nggState.enableNgg)
+    if (nggControl.enableNgg)
     {
-        if (nggState.forceNonPassthrough)
+        if (options.nggFlags & NggFlagForceNonPassthrough)
         {
             nggControl.passthroughMode = false;
         }

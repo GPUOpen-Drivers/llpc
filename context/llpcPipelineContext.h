@@ -775,6 +775,12 @@ private:
     LLPC_DISALLOW_DEFAULT_CTOR(PipelineContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(PipelineContext);
 
+    // Give the pipeline options to the middle-end.
+    void SetOptionsInPipeline(Pipeline* pPipeline) const;
+
+    // Give the user data nodes and descriptor range values to the middle-end.
+    void SetUserDataInPipeline(Pipeline* pPipeline) const;
+
     // -----------------------------------------------------------------------------------------------------------------
 
     ShaderFpMode           m_shaderFpModes[ShaderStageCountInternal] = {};

@@ -299,13 +299,24 @@ ShaderHash PipelineContext::GetShaderHashCode(
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end
 void PipelineContext::SetPipelineState(
-    Pipeline*    pPipeline) const   // [in/out] Pipeline object
+    Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
 {
     // Give the shader stage mask to the middle-end.
     uint32_t stageMask = GetShaderStageMask();
     pPipeline->SetShaderStageMask(stageMask);
 
     // Give the pipeline options to the middle-end.
+    SetOptionsInPipeline(pPipeline);
+
+    // Give the user data nodes to the middle-end.
+    SetUserDataInPipeline(pPipeline);
+}
+
+// =====================================================================================================================
+// Give the pipeline options to the middle-end.
+void PipelineContext::SetOptionsInPipeline(
+    Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
+{
     Options options = {};
     options.hash[0] = GetPiplineHashCode();
     options.hash[1] = GetCacheHashCode();
@@ -316,12 +327,51 @@ void PipelineContext::SetPipelineState(
 #endif
     options.includeIr = (IncludeLlvmIr || GetPipelineOptions()->includeIr);
 
-    pPipeline->SetOptions(options);
+#if LLPC_BUILD_GFX10
+    if (IsGraphics() && (GetGfxIpVersion().major >= 10))
+    {
+        // Only set NGG options for a GFX10+ graphics pipeline.
+        auto pPipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo*>(GetPipelineBuildInfo());
+        const auto& nggState = pPipelineInfo->nggState;
+        if (nggState.enableNgg == false)
+        {
+            options.nggFlags |= NggFlagDisable;
+        }
+        else
+        {
+            options.nggFlags =
+                  (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
+                  (nggState.forceNonPassthrough ? NggFlagForceNonPassthrough : 0) |
+                  (nggState.alwaysUsePrimShaderTable ? 0 : NggFlagDontAlwaysUsePrimShaderTable) |
+                  (nggState.compactMode == NggCompactSubgroup ? NggFlagCompactSubgroup : 0) |
+                  (nggState.enableFastLaunch ? NggFlagEnableFastLaunch : 0) |
+                  (nggState.enableVertexReuse ? NggFlagEnableVertexReuse : 0) |
+                  (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
+                  (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
+                  (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |
+                  (nggState.enableSphereCulling ? NggFlagEnableSphereCulling : 0) |
+                  (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
+                  (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
+            options.nggBackfaceExponent = nggState.backfaceExponent;
+            options.nggSubgroupSizing = nggState.subgroupSizing;
+            options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
+            options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
+        }
+    }
+#endif
 
-    // Give the user data nodes and descriptor range values to the Builder.
-    // The user data nodes have been merged so they are the same in each shader stage. Get them from
-    // the first active stage.
+    pPipeline->SetOptions(options);
+}
+
+// =====================================================================================================================
+// Give the user data nodes and descriptor range values to the middle-end.
+// The user data nodes have been merged so they are the same in each shader stage. Get them from
+// the first active stage.
+void PipelineContext::SetUserDataInPipeline(
+    Pipeline*    pPipeline) const   // [in/out] Middle-end pipeline object
+{
     const PipelineShaderInfo* pShaderInfo = nullptr;
+    uint32_t stageMask = GetShaderStageMask();
     {
         pShaderInfo = GetPipelineShaderInfo(ShaderStage(countTrailingZeros(stageMask)));
     }

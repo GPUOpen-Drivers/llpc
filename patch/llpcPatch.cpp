@@ -186,7 +186,7 @@ void Patch::AddPasses(
 
 #if LLPC_BUILD_GFX10
     if (pPipelineState->IsGraphics() && (pContext->GetGfxIpVersion().major >= 10) &&
-        static_cast<const GraphicsPipelineBuildInfo*>(pContext->GetPipelineBuildInfo())->nggState.enableNgg)
+        ((pPipelineState->GetOptions().nggFlags & NggFlagDisable) == 0))
     {
         // Stop timer for patching passes and restart timer for optimization passes.
         if (pPatchTimer != nullptr)
