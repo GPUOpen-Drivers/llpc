@@ -84,7 +84,7 @@ Value* BuilderImplArith::CreateCubeFaceIndex(
 Value* BuilderImplArith::CreateFpTruncWithRounding(
     Value*            pValue,             // [in] Input value
     Type*             pDestTy,            // [in] Type to convert to
-    fp::RoundingMode  roundingMode,       // Rounding mode
+    unsigned          roundingMode,       // Rounding mode
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
     if (pValue->getType()->getScalarType()->isDoubleTy())
@@ -101,7 +101,10 @@ Value* BuilderImplArith::CreateFpTruncWithRounding(
 
     // RTZ: Use cvt_pkrtz instruction.
     // TODO: We also use this for RTP and RTN for now.
-    if (roundingMode != fp::rmToNearest)
+    // TODO: Using a hard-coded value for rmToNearest due to flux in LLVM over
+    // the namespace for this value - this will be removed once it has settled
+    //if (roundingMode != fp::rmToNearest)
+    if (roundingMode != 1 /* rmToNearest */ )
     {
         Value* pResult = ScalarizeInPairs(pValue,
                                           [this](Value* pInVec2)

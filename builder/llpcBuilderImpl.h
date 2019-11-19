@@ -113,7 +113,7 @@ public:
     // Create scalar or vector FP truncate operation with rounding mode.
     Value* CreateFpTruncWithRounding(Value*                                pValue,
                                      Type*                                 pDestTy,
-                                     fp::RoundingMode                      roundingMode,
+                                     unsigned                              roundingMode,
                                      const Twine&                          instName = "") override final;
 
     // Create quantize operation.

@@ -288,7 +288,7 @@ public:
     virtual Value* CreateFpTruncWithRounding(
         Value*                                pValue,             // [in] Input value
         Type*                                 pDestTy,            // [in] Type to convert to
-        fp::RoundingMode  roundingMode,                           // Rounding mode
+        unsigned                              roundingMode,       // Rounding mode
         const Twine&                          instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
