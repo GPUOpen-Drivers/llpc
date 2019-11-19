@@ -37,7 +37,6 @@
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcGraphicsContext.h"
-
 #include "llpcInternal.h"
 
 using namespace llvm;

@@ -91,8 +91,8 @@ struct ResourceNode
 // Represents NGG (implicit primitive shader) control settings (valid for GFX10+)
 struct NggControl : NggState
 {
-    bool                            passthroughMode; // Whether NGG passthrough mode is enabled
-    Util::Abi::PrimShaderCbLayout   primShaderTable; // Primitive shader table (only some registers are used)
+    bool                            passthroughMode;      // Whether NGG passthrough mode is enabled
+    Util::Abi::PrimShaderCbLayout   primShaderTable;      // Primitive shader table (only some registers are used)
 };
 #endif
 
@@ -117,8 +117,9 @@ public:
     // Set shader stage mask
     void SetShaderStageMask(uint32_t mask) override final { m_stageMask = mask; }
 
-    // Set per-pipeline options
+    // Set and get per-pipeline options
     void SetOptions(const Options& options) override final { m_options = options; }
+    const Options& GetOptions() override final { return m_options; }
 
     // Link the individual shader modules into a single pipeline module
     Module* Link(ArrayRef<Module*> modules) override final;
@@ -151,9 +152,6 @@ public:
 
     // Set up the pipeline state from the pipeline module.
     void ReadState(Module* pModule);
-
-    // Get pipeline options
-    const Options& GetOptions() const { return m_options; }
 
     // Get user data nodes
     ArrayRef<ResourceNode> GetUserDataNodes() const { return m_userDataNodes; }
