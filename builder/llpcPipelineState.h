@@ -121,6 +121,9 @@ public:
     void SetOptions(const Options& options) override final { m_options = options; }
     const Options& GetOptions() override final { return m_options; }
 
+    // Set per-shader options
+    void SetShaderOptions(ShaderStage stage, const ShaderOptions& options) override final;
+
     // Link the individual shader modules into a single pipeline module
     Module* Link(ArrayRef<Module*> modules) override final;
 
@@ -149,6 +152,9 @@ public:
     ShaderStage GetLastVertexProcessingStage() const;
     ShaderStage GetPrevShaderStage(ShaderStage shaderStage) const;
     ShaderStage GetNextShaderStage(ShaderStage shaderStage) const;
+
+    // Get per-shader options
+    const ShaderOptions& GetShaderOptions(ShaderStage stage);
 
     // Set up the pipeline state from the pipeline module.
     void ReadState(Module* pModule);
@@ -297,6 +303,7 @@ private:
     bool                            m_noReplayer = false;               // True if no BuilderReplayer needed
     uint32_t                        m_stageMask = 0;                    // Mask of active shader stages
     Options                         m_options = {};                     // Per-pipeline options
+    std::vector<ShaderOptions>      m_shaderOptions;                    // Per-shader options
     std::unique_ptr<ResourceNode[]> m_allocUserDataNodes;               // Allocated buffer for user data
     ArrayRef<ResourceNode>          m_userDataNodes;                    // Top-level user data node table
     MDString*                       m_resourceNodeTypeNames[uint32_t(ResourceMappingNodeType::Count)] = {};
