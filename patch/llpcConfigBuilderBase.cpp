@@ -128,21 +128,16 @@ msgpack::MapDocNode ConfigBuilderBase::GetHwShaderNode(
 }
 
 // =====================================================================================================================
-// Set an API shader's hash in metadata
-void ConfigBuilderBase::SetShaderHash(
-    ShaderStage   apiStage, // API shader stage
-    ShaderHash    hash)     // Its hash
+// Set an API shader's hash in metadata. Returns a 32-bit value derived from the hash that is used as
+// a shader checksum for performance profiling where applicable.
+uint32_t ConfigBuilderBase::SetShaderHash(
+    ShaderStage   apiStage) // API shader stage
 {
+    const ShaderOptions& shaderOptions = m_pPipelineState->GetShaderOptions(apiStage);
     auto hashNode = GetApiShaderNode(uint32_t(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-    // 128-bit hash
-    hashNode[0] = hashNode.getDocument()->getNode(hash.lower);
-    hashNode[1] = hashNode.getDocument()->getNode(hash.upper);
-#else
-    // 64-bit hash
-    hashNode[0] = hashNode.getDocument()->getNode(hash);
-    hashNode[1] = hashNode.getDocument()->getNode(0U);
-#endif
+    hashNode[0] = hashNode.getDocument()->getNode(shaderOptions.hash[0]);
+    hashNode[1] = hashNode.getDocument()->getNode(shaderOptions.hash[1]);
+    return shaderOptions.hash[0] >> 32 ^ shaderOptions.hash[0] ^ shaderOptions.hash[1] >> 32 ^ shaderOptions.hash[1];
 }
 
 // =====================================================================================================================

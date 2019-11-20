@@ -401,21 +401,64 @@ bool PipelineState::IsGraphics() const
 }
 
 // =====================================================================================================================
-// Record options into IR metadata.
+// Set per-shader options
+void PipelineState::SetShaderOptions(
+    ShaderStage           stage,    // Shader stage
+    const ShaderOptions&  options)  // [in] Shader options
+{
+    if (m_shaderOptions.size() <= stage)
+    {
+        m_shaderOptions.resize(stage + 1);
+    }
+    m_shaderOptions[stage] = options;
+}
+
+// =====================================================================================================================
+// Get per-shader options
+const ShaderOptions& PipelineState::GetShaderOptions(
+    ShaderStage           stage)    // Shader stage
+{
+    if (m_shaderOptions.size() <= stage)
+    {
+        m_shaderOptions.resize(stage + 1);
+    }
+    return m_shaderOptions[stage];
+}
+
+// =====================================================================================================================
+// Record pipeline and shader options into IR metadata.
 // TODO: The options could be recorded in a more human-readable form, with a string for the option name for each
 // option.
 void PipelineState::RecordOptions(
     Module* pModule)    // [in/out] Module to record metadata into
 {
     SetNamedMetadataToArrayOfInt32(pModule, m_options, OptionsMetadataName);
+    for (uint32_t stage = 0; stage != m_shaderOptions.size(); ++stage)
+    {
+        std::string metadataName = (Twine(OptionsMetadataName) + "." +
+                                    GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true)).str();
+        SetNamedMetadataToArrayOfInt32(pModule, m_shaderOptions[stage], metadataName);
+    }
 }
 
 // =====================================================================================================================
-// Read options from IR metadata
+// Read pipeline and shader options from IR metadata
 void PipelineState::ReadOptions(
     Module* pModule)    // [in] Module to read metadata from
 {
     ReadNamedMetadataArrayOfInt32(pModule, OptionsMetadataName, m_options);
+    for (uint32_t stage = 0; stage != ShaderStageCompute + 1; ++stage)
+    {
+        std::string metadataName = (Twine(OptionsMetadataName) + "." +
+                                    GetShaderStageAbbreviation(static_cast<ShaderStage>(stage), true)).str();
+        auto pNamedMetaNode = pModule->getNamedMetadata(metadataName);
+        if ((pNamedMetaNode == nullptr) || (pNamedMetaNode->getNumOperands() == 0))
+        {
+            continue;
+        }
+        m_shaderOptions.resize(stage + 1);
+        ReadArrayOfInt32MetaNode(pNamedMetaNode->getOperand(0), m_shaderOptions[stage]);
+    }
 }
 
 // =====================================================================================================================

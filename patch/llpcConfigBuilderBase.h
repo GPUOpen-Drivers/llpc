@@ -51,7 +51,7 @@ public:
 protected:
     void AddApiHwShaderMapping(ShaderStage apiStage, uint32_t hwStages);
 
-    void SetShaderHash(ShaderStage apiStage, ShaderHash hash);
+    uint32_t SetShaderHash(ShaderStage apiStage);
     void SetNumAvailSgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetNumAvailVgprs(Util::Abi::HardwareStage hwStage, uint32_t value);
     void SetUsesViewportArrayIndex(bool useViewportIndex);

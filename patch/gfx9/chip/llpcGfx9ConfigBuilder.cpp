@@ -178,14 +178,12 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
 #endif
 #endif
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
         SET_REG(pConfig, VGT_GS_ONCHIP_CNTL, 0);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_CHKSUM_VS, CHECKSUM, checksum);
         }
 #endif
@@ -195,13 +193,11 @@ Result ConfigBuilder::BuildPipelineVsFsRegConfig()      // [out] Size of registe
     {
         result = BuildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
 #endif
@@ -271,23 +267,12 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
                                                              hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                              pConfig);
 
-        ShaderHash vsHash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, vsHash);
-
-        ShaderHash tcsHash = m_pContext->GetShaderHashCode(ShaderStageTessControl);
-        SetShaderHash(ShaderStageTessControl, tcsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
+        checksum = checksum ^ SetShaderHash(ShaderStageTessControl);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = vsHash.upper ^ tcsHash.upper;
-            hash.lower = vsHash.lower ^ tcsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(vsHash ^ tcsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
         }
 #endif
@@ -331,13 +316,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
 #endif
 #endif
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageTessEval);
-        SetShaderHash(ShaderStageTessEval, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageTessEval);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_CHKSUM_VS, CHECKSUM, checksum);
         }
 #endif
@@ -347,13 +330,11 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     {
         result = BuildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
 #endif
@@ -420,23 +401,12 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
                                                              hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                              pConfig);
 
-        ShaderHash vsHash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, vsHash);
-
-        ShaderHash gsHash = m_pContext->GetShaderHashCode(ShaderStageGeometry);
-        SetShaderHash(ShaderStageGeometry, gsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
+        checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = vsHash.upper ^ gsHash.upper;
-            hash.lower = vsHash.lower ^ gsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(vsHash ^ gsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
 #endif
@@ -463,13 +433,11 @@ Result ConfigBuilder::BuildPipelineVsGsFsRegConfig()      // [out] Size of regis
     {
         result = BuildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
 #endif
@@ -549,23 +517,12 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
                                                                hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                pConfig);
 
-        ShaderHash vsHash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, vsHash);
-
-        ShaderHash tcsHash = m_pContext->GetShaderHashCode(ShaderStageTessControl);
-        SetShaderHash(ShaderStageTessControl, tcsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
+        checksum = checksum ^ SetShaderHash(ShaderStageTessControl);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = vsHash.upper ^ tcsHash.upper;
-            hash.lower = vsHash.lower ^ tcsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(vsHash ^ tcsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
         }
 #endif
@@ -601,23 +558,12 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
                                                                hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                pConfig);
 
-        ShaderHash tesHash = m_pContext->GetShaderHashCode(ShaderStageTessEval);
-        SetShaderHash(ShaderStageTessEval, tesHash);
-
-        ShaderHash gsHash = m_pContext->GetShaderHashCode(ShaderStageGeometry);
-        SetShaderHash(ShaderStageGeometry, gsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageTessEval);
+        checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = tesHash.upper ^ gsHash.upper;
-            hash.lower = tesHash.lower ^ gsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(tesHash ^ gsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
 #endif
@@ -646,13 +592,11 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     {
         result = BuildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
 #if LLPC_BUILD_GFX10
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
 #endif
@@ -760,12 +704,10 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
 #endif
 #endif
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
     }
@@ -774,12 +716,10 @@ Result ConfigBuilder::BuildPipelineNggVsFsRegConfig()
     {
         result = BuildPsRegConfig<PipelineNggVsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
     }
@@ -841,22 +781,11 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
                                                                 hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                 pConfig);
 
-        ShaderHash vsHash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, vsHash);
-
-        ShaderHash tcsHash = m_pContext->GetShaderHashCode(ShaderStageTessControl);
-        SetShaderHash(ShaderStageTessControl, tcsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
+        checksum = checksum ^ SetShaderHash(ShaderStageTessControl);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = vsHash.upper ^ tcsHash.upper;
-            hash.lower = vsHash.lower ^ tcsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(vsHash ^ tcsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
         }
 
@@ -900,12 +829,10 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
 #endif
 #endif
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageTessEval);
-        SetShaderHash(ShaderStageTessEval, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageTessEval);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
     }
@@ -914,12 +841,10 @@ Result ConfigBuilder::BuildPipelineNggVsTsFsRegConfig()
     {
         result = BuildPsRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
     }
@@ -979,22 +904,11 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
                                                                       hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                       pConfig);
 
-        ShaderHash vsHash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, vsHash);
-
-        ShaderHash gsHash = m_pContext->GetShaderHashCode(ShaderStageGeometry);
-        SetShaderHash(ShaderStageGeometry, gsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
+        checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = vsHash.upper ^ gsHash.upper;
-            hash.lower = vsHash.lower ^ gsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(vsHash ^ gsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
 
@@ -1021,12 +935,10 @@ Result ConfigBuilder::BuildPipelineNggVsGsFsRegConfig()
     {
         result = BuildPsRegConfig<PipelineNggVsGsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
     }
@@ -1084,22 +996,11 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
                                                                   hasTcs ? ShaderStageTessControl : ShaderStageInvalid,
                                                                   pConfig);
 
-        ShaderHash vsHash = m_pContext->GetShaderHashCode(ShaderStageVertex);
-        SetShaderHash(ShaderStageVertex, vsHash);
-
-        ShaderHash tcsHash = m_pContext->GetShaderHashCode(ShaderStageTessControl);
-        SetShaderHash(ShaderStageTessControl, tcsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageVertex);
+        checksum = checksum ^ SetShaderHash(ShaderStageTessControl);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = vsHash.upper ^ tcsHash.upper;
-            hash.lower = vsHash.lower ^ tcsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(vsHash ^ tcsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
         }
 
@@ -1130,22 +1031,11 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
                                                                    hasGs ? ShaderStageGeometry : ShaderStageInvalid,
                                                                    pConfig);
 
-        ShaderHash tesHash = m_pContext->GetShaderHashCode(ShaderStageTessEval);
-        SetShaderHash(ShaderStageTessEval, tesHash);
-
-        ShaderHash gsHash = m_pContext->GetShaderHashCode(ShaderStageGeometry);
-        SetShaderHash(ShaderStageGeometry, gsHash);
+        uint32_t checksum = SetShaderHash(ShaderStageTessEval);
+        checksum = checksum ^ SetShaderHash(ShaderStageGeometry);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-            ShaderHash hash = {};
-            hash.upper = tesHash.upper ^ gsHash.upper;
-            hash.lower = tesHash.lower ^ gsHash.lower;
-            uint32_t checksum = MetroHash::Compact32(hash);
-#else
-            uint32_t checksum = MetroHash::Compact32(tesHash ^ gsHash);
-#endif
             SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
         }
 
@@ -1173,12 +1063,10 @@ Result ConfigBuilder::BuildPipelineNggVsTsGsFsRegConfig()
     {
         result = BuildPsRegConfig<PipelineNggVsTsGsFsRegConfig>(ShaderStageFragment, &config);
 
-        ShaderHash hash = m_pContext->GetShaderHashCode(ShaderStageFragment);
-        SetShaderHash(ShaderStageFragment, hash);
+        uint32_t checksum = SetShaderHash(ShaderStageFragment);
 
         if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
         {
-            uint32_t checksum = MetroHash::Compact32(hash);
             SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
         }
     }
@@ -1214,12 +1102,6 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
 
     LLPC_ASSERT(m_pPipelineState->GetShaderStageMask() == ShaderStageToMask(ShaderStageCompute));
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
-    ShaderHash hash = {};
-#else
-    ShaderHash hash = 0;
-#endif
-
     CsRegConfig config(gfxIp);
 
     AddApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
@@ -1228,13 +1110,11 @@ Result ConfigBuilder::BuildPipelineCsRegConfig()
 
     result = BuildCsRegConfig(ShaderStageCompute, &config);
 
-    hash = m_pContext->GetShaderHashCode(ShaderStageCompute);
-    SetShaderHash(ShaderStageCompute, hash);
+    uint32_t checksum = SetShaderHash(ShaderStageCompute);
 
 #if LLPC_BUILD_GFX10
     if (m_pContext->GetGpuProperty()->supportShaderPowerProfiling)
     {
-        uint32_t checksum = MetroHash::Compact32(hash);
         SET_REG_FIELD(&config, COMPUTE_SHADER_CHKSUM, CHECKSUM, checksum);
     }
 #endif
@@ -1290,10 +1170,10 @@ Result ConfigBuilder::BuildVsRegConfig(
     }
     else
     {
-        const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, pShaderInfo->options.debugMode);
+        const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, shaderOptions.debugMode);
 
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, shaderOptions.trapPresent);
         SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
         const bool userSgprMsb = (pIntfData->userDataCount > 31);
 #if LLPC_BUILD_GFX10
@@ -1626,8 +1506,8 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     const auto& pTcsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessControl);
     uint32_t userDataCount = std::max(pVsIntfData->userDataCount, pTcsIntfData->userDataCount);
 
-    const auto pTcsShaderInfo = m_pContext->GetPipelineShaderInfo(ShaderStageTessControl);
-    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, pTcsShaderInfo->options.debugMode);
+    const auto& tcsShaderOptions = m_pPipelineState->GetShaderOptions(ShaderStageTessControl);
+    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, tcsShaderOptions.debugMode);
 
     const bool userSgprMsb = (userDataCount > 31);
 #if LLPC_BUILD_GFX10
@@ -1645,7 +1525,7 @@ Result ConfigBuilder::BuildLsHsRegConfig(
     {
         SET_REG_GFX9_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR_MSB, userSgprMsb);
     }
-    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, pTcsShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, tcsShaderOptions.trapPresent);
     SET_REG_FIELD(&pConfig->m_lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, userDataCount);
 
     // NOTE: On GFX7+, granularity for the LDS_SIZE field is 128. The range is 0~128 which allocates 0 to 16K
@@ -1792,8 +1672,8 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     uint32_t userDataCount = std::max((hasTs ? pTesIntfData->userDataCount : pVsIntfData->userDataCount),
                                       pGsIntfData->userDataCount);
 
-    const auto pGsShaderInfo = m_pContext->GetPipelineShaderInfo(ShaderStageGeometry);
-    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, pGsShaderInfo->options.debugMode);
+    const auto& gsShaderOptions = m_pPipelineState->GetShaderOptions(ShaderStageGeometry);
+    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, gsShaderOptions.debugMode);
 
     const bool userSgprMsb = (userDataCount > 31);
 #if LLPC_BUILD_GFX10
@@ -1812,7 +1692,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
         SET_REG_GFX9_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
     }
 
-    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, pGsShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, gsShaderOptions.trapPresent);
     SET_REG_FIELD(&pConfig->m_esGsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
 
     uint32_t esVgprCompCnt = 0;
@@ -2097,18 +1977,18 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     uint32_t userDataCount = std::max((hasTs ? pTesIntfData->userDataCount : pVsIntfData->userDataCount),
                                       pGsIntfData->userDataCount);
 
-    const auto pGsShaderInfo = m_pContext->GetPipelineShaderInfo(ShaderStageGeometry);
+    const auto& gsShaderOptions = m_pPipelineState->GetShaderOptions(ShaderStageGeometry);
     bool wgpMode = m_pContext->GetShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     if (hasGs)
     {
         wgpMode = (wgpMode || m_pContext->GetShaderWgpMode(ShaderStageGeometry));
     }
 
-    SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, pGsShaderInfo->options.debugMode);
+    SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, gsShaderOptions.debugMode);
     SET_REG_GFX10_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, MEM_ORDERED, true);
     SET_REG_GFX10_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, WGP_MODE, wgpMode);
 
-    SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, pGsShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, gsShaderOptions.trapPresent);
     SET_REG_FIELD(&pConfig->m_primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, userDataCount);
 
     const bool userSgprMsb = (userDataCount > 31);
@@ -2562,7 +2442,7 @@ Result ConfigBuilder::BuildPsRegConfig(
         static_cast<const GraphicsPipelineBuildInfo*>(m_pContext->GetPipelineBuildInfo());
 
     const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
-    const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
+    const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
     const auto& fragmentMode = m_pPipelineState->GetShaderModes()->GetFragmentShaderMode();
@@ -2570,9 +2450,9 @@ Result ConfigBuilder::BuildPsRegConfig(
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, pShaderInfo->options.debugMode);
+    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, shaderOptions.debugMode);
 
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, shaderOptions.trapPresent);
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
 
     const bool userSgprMsb = (pIntfData->userDataCount > 31);
@@ -2583,14 +2463,14 @@ Result ConfigBuilder::BuildPsRegConfig(
     {
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
 
-        if (pShaderInfo->options.waveBreakSize == Llpc::WaveBreakSize::DrawTime)
+        if (shaderOptions.waveBreakSize == Llpc::WaveBreakSize::DrawTime)
         {
             SetCalcWaveBreakSizeAtDrawTime(true);
         }
         else
         {
             SET_REG_GFX10_FIELD(&pConfig->m_psRegs, PA_SC_SHADER_CONTROL, WAVE_BREAK_REGION_SIZE,
-                                static_cast<uint32_t>(pShaderInfo->options.waveBreakSize));
+                                static_cast<uint32_t>(shaderOptions.waveBreakSize));
         }
 
         SET_REG_GFX10_FIELD(&pConfig->m_psRegs, PA_STEREO_CNTL, STEREO_MODE, STATE_STEREO_X);
@@ -2640,7 +2520,7 @@ Result ConfigBuilder::BuildPsRegConfig(
         zOrder = LATE_Z;
         execOnHeirFail = true;
     }
-    else if (pShaderInfo->options.allowReZ)
+    else if (shaderOptions.allowReZ)
     {
         zOrder = EARLY_Z_THEN_RE_Z;
     }
@@ -2684,6 +2564,7 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
     uint32_t spiShaderColFormat = 0;
+    const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
     uint32_t cbShaderMask = (pShaderInfo->pModuleData == nullptr) ? 0 : pResUsage->inOutUsage.fs.cbShaderMask;
     const auto& expFmts = pResUsage->inOutUsage.fs.expFmts;
     for (uint32_t i = 0; i < MaxColorTargets; ++i)
@@ -2842,7 +2723,7 @@ Result ConfigBuilder::BuildCsRegConfig(
     LLPC_ASSERT(shaderStage == ShaderStageCompute);
 
     const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
-    const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
+    const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
     const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
     const auto& computeMode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
@@ -2866,7 +2747,7 @@ Result ConfigBuilder::BuildCsRegConfig(
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC1, DX10_CLAMP, true);  // Follow PAL setting
-    SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC1, DEBUG_MODE, pShaderInfo->options.debugMode);
+    SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC1, DEBUG_MODE, shaderOptions.debugMode);
 
 #if LLPC_BUILD_GFX10
     GfxIpVersion gfxIp = m_pContext->GetGfxIpVersion();
@@ -2893,7 +2774,7 @@ Result ConfigBuilder::BuildCsRegConfig(
 #endif
 
     // Set registers based on shader interface data
-    SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TRAP_PRESENT, pShaderInfo->options.trapPresent);
+    SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TRAP_PRESENT, shaderOptions.trapPresent);
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, USER_SGPR, pIntfData->userDataCount);
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TGID_X_EN, true);
     SET_REG_FIELD(pConfig, COMPUTE_PGM_RSRC2, TGID_Y_EN, true);

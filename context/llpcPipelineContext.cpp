@@ -59,6 +59,32 @@ static cl::opt<bool> IncludeLlvmIr("include-llvm-ir",
                                    cl::desc("Include LLVM IR as a separate section in the ELF binary"),
                                    cl::init(false));
 
+// -vgpr-limit: maximum VGPR limit for this shader
+static cl::opt<uint32_t> VgprLimit("vgpr-limit", cl::desc("Maximum VGPR limit for this shader"), cl::init(0));
+
+// -sgpr-limit: maximum SGPR limit for this shader
+static cl::opt<uint32_t> SgprLimit("sgpr-limit", cl::desc("Maximum SGPR limit for this shader"), cl::init(0));
+
+// -waves-per-eu: the maximum number of waves per EU for this shader
+static cl::opt<uint32_t> WavesPerEu("waves-per-eu",
+                                    cl::desc("Maximum number of waves per EU for this shader"),
+                                    cl::init(0));
+
+// -enable-load-scalarizer: Enable the optimization for load scalarizer.
+static cl::opt<bool> EnableScalarLoad("enable-load-scalarizer",
+                                      cl::desc("Enable the optimization for load scalarizer."),
+                                      cl::init(false));
+
+// -scalar-threshold: Set the vector size threshold for load scalarizer.
+static cl::opt<unsigned> ScalarThreshold("scalar-threshold",
+                                         cl::desc("The threshold for load scalarizer"),
+                                         cl::init(0xFFFFFFFF));
+
+// -enable-si-scheduler: enable target option si-scheduler
+static cl::opt<bool> EnableSiScheduler("enable-si-scheduler",
+                                       cl::desc("Enable target option si-scheduler"),
+                                       cl::init(false));
+
 namespace Llpc
 {
 
@@ -361,6 +387,77 @@ void PipelineContext::SetOptionsInPipeline(
 #endif
 
     pPipeline->SetOptions(options);
+
+    // Give the shader options (including the hash) to the middle-end.
+    uint32_t stageMask = GetShaderStageMask();
+    for (uint32_t stage = 0; stage <= ShaderStageCompute; ++stage)
+    {
+        if (stageMask & ShaderStageToMask(static_cast<ShaderStage>(stage)))
+        {
+            ShaderOptions shaderOptions = {};
+
+            ShaderHash hash = GetShaderHashCode(static_cast<ShaderStage>(stage));
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 36
+            // 128-bit hash
+            shaderOptions.hash[0] = hash.lower;
+            shaderOptions.hash[1] = hash.upper;
+#else
+            // 64-bit hash
+            shaderOptions.hash[0] = hash;
+#endif
+
+            const PipelineShaderInfo* pShaderInfo = GetPipelineShaderInfo(static_cast<ShaderStage>(stage));
+            shaderOptions.trapPresent = pShaderInfo->options.trapPresent;
+            shaderOptions.debugMode = pShaderInfo->options.debugMode;
+            shaderOptions.allowReZ = pShaderInfo->options.allowReZ;
+
+            if ((pShaderInfo->options.vgprLimit != 0) && (pShaderInfo->options.vgprLimit != UINT_MAX))
+            {
+                shaderOptions.vgprLimit = pShaderInfo->options.vgprLimit;
+            }
+            else
+            {
+                shaderOptions.vgprLimit = VgprLimit;
+            }
+
+            if ((pShaderInfo->options.sgprLimit != 0) && (pShaderInfo->options.sgprLimit != UINT_MAX))
+            {
+                shaderOptions.sgprLimit = pShaderInfo->options.sgprLimit;
+            }
+            else
+            {
+                shaderOptions.sgprLimit = SgprLimit;
+            }
+
+            if (pShaderInfo->options.maxThreadGroupsPerComputeUnit != 0)
+            {
+                shaderOptions.maxThreadGroupsPerComputeUnit = pShaderInfo->options.maxThreadGroupsPerComputeUnit;
+            }
+            else
+            {
+                shaderOptions.maxThreadGroupsPerComputeUnit = WavesPerEu;
+            }
+
+#if LLPC_BUILD_GFX10
+            shaderOptions.waveBreakSize = pShaderInfo->options.waveBreakSize;
+#endif
+
+            bool loadScalarizerEnabled = EnableScalarLoad;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
+            loadScalarizerEnabled |= pShaderInfo->options.enableLoadScalarizer;
+#endif
+            shaderOptions.loadScalarizerThreshold = loadScalarizerEnabled ? ScalarThreshold : 0;
+
+            shaderOptions.useSiScheduler = EnableSiScheduler;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
+            shaderOptions.useSiScheduler |= pShaderInfo->options.useSiScheduler;
+#endif
+
+            shaderOptions.unrollThreshold = pShaderInfo->options.unrollThreshold;
+
+            pPipeline->SetShaderOptions(static_cast<ShaderStage>(stage), shaderOptions);
+        }
+    }
 }
 
 // =====================================================================================================================

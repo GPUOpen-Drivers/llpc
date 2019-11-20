@@ -50,18 +50,6 @@ namespace llvm
 namespace cl
 {
 
-// -vgpr-limit: maximum VGPR limit for this shader
-static opt<uint32_t> VgprLimit("vgpr-limit", desc("Maximum VGPR limit for this shader"), init(0));
-
-// -sgpr-limit: maximum SGPR limit for this shader
-static opt<uint32_t> SgprLimit("sgpr-limit", desc("Maximum SGPR limit for this shader"), init(0));
-
-// -waves-per-eu: the range of waves per EU for this shader
-static opt<std::string> WavesPerEu("waves-per-eu",
-                                   desc("The range of waves per EU for this shader"),
-                                   value_desc("minVal,maxVal"),
-                                   init(""));
-
 // -inreg-esgs-lds-size: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent with PAL's
 // GS on-chip behavior. In the future, if PAL allows hardcoded ES-GS LDS size, this option could be deprecated.
 opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size",
@@ -185,21 +173,11 @@ void PatchEntryPointMutate::ProcessShader()
     }
 
     // Set VGPR, SGPR, and wave limits
-    uint32_t vgprLimit = 0;
-    uint32_t sgprLimit = 0;
-    std::string wavesPerEu;
-
-    auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(m_shaderStage)->options);
+    auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
     auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
 
-    if ((pShaderOptions->vgprLimit != 0) && (pShaderOptions->vgprLimit != UINT32_MAX))
-    {
-        vgprLimit = pShaderOptions->vgprLimit;
-    }
-    else if (cl::VgprLimit != 0)
-    {
-        vgprLimit = cl::VgprLimit;
-    }
+    uint32_t vgprLimit = pShaderOptions->vgprLimit;
+    uint32_t sgprLimit = pShaderOptions->sgprLimit;
 
     if (vgprLimit != 0)
     {
@@ -208,15 +186,6 @@ void PatchEntryPointMutate::ProcessShader()
     }
     pResUsage->numVgprsAvailable = std::min(pResUsage->numVgprsAvailable,
                                            m_pContext->GetGpuProperty()->maxVgprsAvailable);
-
-    if ((pShaderOptions->sgprLimit != 0) && (pShaderOptions->sgprLimit != UINT32_MAX))
-    {
-        sgprLimit = pShaderOptions->sgprLimit;
-    }
-    else if (cl::SgprLimit != 0)
-    {
-        sgprLimit = cl::SgprLimit;
-    }
 
     if (sgprLimit != 0)
     {
@@ -228,15 +197,7 @@ void PatchEntryPointMutate::ProcessShader()
 
     if (pShaderOptions->maxThreadGroupsPerComputeUnit != 0)
     {
-        wavesPerEu = std::string("0,") + std::to_string(pShaderOptions->maxThreadGroupsPerComputeUnit);
-    }
-    else if (cl::WavesPerEu.empty() == false)
-    {
-        wavesPerEu = cl::WavesPerEu;
-    }
-
-    if (wavesPerEu.empty() == false)
-    {
+        std::string wavesPerEu = std::string("0,") + std::to_string(pShaderOptions->maxThreadGroupsPerComputeUnit);
         builder.addAttribute("amdgpu-waves-per-eu", wavesPerEu);
     }
 

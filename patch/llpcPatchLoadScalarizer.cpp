@@ -37,26 +37,10 @@
 
 #include "llpcPatchLoadScalarizer.h"
 #include "llpcPipelineShaders.h"
+#include "llpcPipelineState.h"
 
 using namespace Llpc;
 using namespace llvm;
-
-namespace llvm
-{
-
-namespace cl
-{
-// -enable-load-scalarizer: Enable the optimization for load scalarizer.
-static opt<bool> EnableScalarLoad("enable-load-scalarizer",
-                                   desc("Enable the optimization for load scalarizer."),
-                                   init(false));
-
-static opt<unsigned> ScalarThreshold("scalar-threshold",
-                                     desc("The threshold for load scalarizer"),
-                                     init(0xFFFFFFFF));
-} // cl
-
-} // llvm
 
 namespace Llpc
 {
@@ -87,6 +71,7 @@ void PatchLoadScalarizer::getAnalysisUsage(
     AnalysisUsage& analysisUsage    // [out] The analysis usage.
     ) const
 {
+    analysisUsage.addRequired<PipelineStateWrapper>();
     analysisUsage.addRequired<PipelineShaders>();
     analysisUsage.addPreserved<PipelineShaders>();
 }
@@ -98,45 +83,22 @@ bool PatchLoadScalarizer::runOnFunction(
 {
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
-    bool enableLoadScalarizerPerShader = false;
-    m_scalarThreshold = cl::ScalarThreshold;
-
+    auto pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(function.getParent());
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     auto shaderStage = pPipelineShaders->GetShaderStage(&function);
 
-    // If the function is not a valid shader stage, bail.
-    if (shaderStage == ShaderStageInvalid)
+    // If the function is not a valid shader stage, or the optimization is disabled, bail.
+    m_scalarThreshold = 0;
+    if (shaderStage != ShaderStageInvalid)
+    {
+        m_scalarThreshold = pPipelineState->GetShaderOptions(shaderStage).loadScalarizerThreshold;
+    }
+    if (m_scalarThreshold == 0)
     {
         return false;
     }
 
-    m_pContext = static_cast<Context*>(&function.getContext());
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 33
-    if (m_pContext->GetPipelineContext() != nullptr)
-    {
-        auto pShaderOptions = &(m_pContext->GetPipelineShaderInfo(shaderStage)->options);
-        if (pShaderOptions->enableLoadScalarizer)
-        {
-            enableLoadScalarizerPerShader = true;
-            if (pShaderOptions->scalarThreshold != 0)
-            {
-                m_scalarThreshold = pShaderOptions->scalarThreshold;
-            }
-            else
-            {
-                m_scalarThreshold = 0xFFFFFFFF;
-            }
-        }
-    }
-#endif
-
-    if ((cl::EnableScalarLoad == false) && (enableLoadScalarizerPerShader == false))
-    {
-        return false;
-    }
-
-    m_pBuilder.reset(new IRBuilder<>(*m_pContext));
+    m_pBuilder.reset(new IRBuilder<>(function.getContext()));
 
     visit(function);
 

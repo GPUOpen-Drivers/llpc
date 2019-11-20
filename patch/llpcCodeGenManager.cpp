@@ -54,11 +54,6 @@ namespace llvm
 namespace cl
 {
 
-// -enable-si-scheduler: enable target option si-scheduler
-static opt<bool> EnableSiScheduler("enable-si-scheduler",
-                                   desc("Enable target option si-scheduler"),
-                                   init(false));
-
 // -disable-fp32-denormals: disable target option fp32-denormals
 static opt<bool> DisableFp32Denormals("disable-fp32-denormals",
                                       desc("Disable target option fp32-denormals"),
@@ -158,14 +153,7 @@ void CodeGenManager::SetupTargetFeatures(
              ShaderStage shaderStage = GetShaderStageFromCallingConv(pPipelineState->GetShaderStageMask(),
                                                                      pFunc->getCallingConv());
 
-            bool useSiScheduler = cl::EnableSiScheduler;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 28
-            if (shaderStage != ShaderStageCopyShader)
-            {
-                auto pShaderOptions = pContext->GetPipelineShaderInfo(shaderStage)->options;
-                useSiScheduler |= pShaderOptions.useSiScheduler;
-            }
-#endif
+            bool useSiScheduler = pPipelineState->GetShaderOptions(shaderStage).useSiScheduler;
             if (useSiScheduler)
             {
                 // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular

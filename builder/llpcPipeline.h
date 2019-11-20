@@ -96,6 +96,52 @@ struct Options
     uint32_t              nggPrimsPerSubgroup;     // How to determine NGG prims per subgroup
 };
 
+// Middle-end per-shader options to pass to SetShaderOptions.
+// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// All fields are uint32_t, even those that could be bool, because the way the state is written to and read
+// from IR metadata relies on that.
+struct ShaderOptions
+{
+    uint64_t      hash[2];        // Shader hash to set in ELF PAL metadata
+    uint32_t      trapPresent;    // Indicates a trap handler will be present when this pipeline is executed,
+                                  //  and any trap conditions encountered in this shader should call the trap
+                                  //  handler. This could include an arithmetic exception, an explicit trap
+                                  //  request from the host, or a trap after every instruction when in debug
+                                  //  mode.
+    uint32_t      debugMode;      // When set, this shader should cause the trap handler to be executed after
+                                  //  every instruction.  Only valid if trapPresent is set.
+    uint32_t      allowReZ;       // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
+                                  //  to potentially kill PS waves before launch, and also issues a late-Z test
+                                  //  in case the PS kills pixels.  Only valid for pixel shaders.
+
+    // Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
+    // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
+    uint32_t  vgprLimit;
+
+    // Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
+    // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
+    uint32_t  sgprLimit;
+
+    /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
+    /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
+    /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
+    uint32_t  maxThreadGroupsPerComputeUnit;
+
+#if LLPC_BUILD_GFX10
+    WaveBreakSize waveBreakSize;  // Size of region to force the end of a wavefront (GFX10+).
+                                  // Only valid for fragment shaders.
+#endif
+
+    // Vector szie threshold for load scalarizer. 0 means do not scalarize loads at all.
+    uint32_t  loadScalarizerThreshold;
+
+    // Use the LLVM backend's SI scheduler instead of the default scheduler.
+    bool      useSiScheduler;
+
+    /// Default unroll threshold for LLVM.
+    uint32_t  unrollThreshold;
+};
+
 // =====================================================================================================================
 // Structs for setting shader modes, e.g. Builder::SetCommonShaderMode
 
@@ -253,6 +299,9 @@ public:
     // Set and get per-pipeline options
     virtual void SetOptions(const Options& options) = 0;
     virtual const Options& GetOptions() = 0;
+
+    // Set per-shader options
+    virtual void SetShaderOptions(ShaderStage stage, const ShaderOptions& options) = 0;
 
     // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
     // supplied to the shader as a hierarchical table (max two levels) of descriptors.
