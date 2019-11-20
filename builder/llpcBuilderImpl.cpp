@@ -105,7 +105,7 @@ bool BuilderImplBase::SupportBPermute() const
     auto gfxIp = getContext().GetGfxIpVersion().major;
     auto supportBPermute = (gfxIp == 8) || (gfxIp == 9);
 #if LLPC_BUILD_GFX10
-    auto waveSize = getContext().GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
+    auto waveSize = GetPipelineState()->GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
     supportBPermute = supportBPermute || ((gfxIp == 10) && (waveSize == 32));
 #endif
     return supportBPermute;

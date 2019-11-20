@@ -819,6 +819,76 @@ bool PipelineState::IsTessOffChip()
 }
 
 // =====================================================================================================================
+// Gets wave size for the specified shader stage
+//
+// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
+uint32_t PipelineState::GetShaderWaveSize(
+    ShaderStage stage)  // Shader stage
+{
+    if (stage == ShaderStageCopyShader)
+    {
+       // Treat copy shader as part of geometry shader
+       stage = ShaderStageGeometry;
+    }
+
+    LLPC_ASSERT(stage <= ShaderStageCompute);
+
+    Context* pContext = static_cast<Context*>(&GetContext());
+    uint32_t waveSize = pContext->GetGpuProperty()->waveSize;
+
+#if LLPC_BUILD_GFX10
+    if (pContext->GetGfxIpVersion().major >= 10)
+    {
+        // NOTE: GPU property wave size is used in shader, unless:
+        //  1) A stage-specific default is preferred.
+        //  2) If specified by tuning option, use the specified wave size.
+        //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
+
+        if (stage == ShaderStageFragment)
+        {
+            // Per programming guide, it's recommended to use wave64 for fragment shader.
+            waveSize = 64;
+        }
+        else if (HasShaderStage(ShaderStageGeometry))
+        {
+            // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
+            waveSize = 64;
+        }
+
+        uint32_t waveSizeOption = GetShaderOptions(stage).waveSize;
+        if (waveSizeOption != 0)
+        {
+            waveSize = waveSizeOption;
+        }
+
+        if ((stage == ShaderStageGeometry) && (HasShaderStage(ShaderStageGeometry) == false))
+        {
+            // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
+            // In such cases, we check the property of VS or TES.
+            if (HasShaderStage(ShaderStageTessEval))
+            {
+                return GetShaderWaveSize(ShaderStageTessEval);
+            }
+            return GetShaderWaveSize(ShaderStageVertex);
+        }
+
+        // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
+        if (GetShaderModes()->GetAnyUseSubgroupSize())
+        {
+            uint32_t subgroupSize = GetShaderOptions(stage).subgroupSize;
+            if (subgroupSize != 0)
+            {
+                waveSize = subgroupSize;
+            }
+        }
+
+        LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
+    }
+#endif
+    return waveSize;
+}
+
+// =====================================================================================================================
 // Get (create if necessary) the PipelineState from this wrapper pass.
 PipelineState* PipelineStateWrapper::GetPipelineState(
     Module* pModule)  // [in] IR module

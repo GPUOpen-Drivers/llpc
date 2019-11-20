@@ -42,20 +42,6 @@
 using namespace llvm;
 using namespace SPIRV;
 
-namespace llvm
-{
-
-namespace cl
-{
-
-#if LLPC_BUILD_GFX10
-extern opt<int> SubgroupSize;
-#endif
-
-} // cl
-
-} // llvm
-
 namespace Llpc
 {
 
@@ -384,49 +370,6 @@ ArrayRef<ResourceMappingNode> GraphicsContext::MergeUserDataNodeTable(
     return mergedNodes;
 }
 
-#if LLPC_BUILD_GFX10
-// =====================================================================================================================
-// Gets WGP mode enablement for the specified shader stage
-bool GraphicsContext::GetShaderWgpMode(
-    ShaderStage shaderStage // Shader stage
-    ) const
-{
-    if (shaderStage == ShaderStageCopyShader)
-    {
-        // Treat copy shader as part of geometry shader
-        shaderStage = ShaderStageGeometry;
-    }
-
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
-
-    bool wgpMode = false;
-
-    switch (shaderStage)
-    {
-    case ShaderStageVertex:
-        wgpMode = m_pPipelineInfo->vs.options.wgpMode;
-        break;
-    case ShaderStageTessControl:
-        wgpMode = m_pPipelineInfo->tcs.options.wgpMode;
-        break;
-    case ShaderStageTessEval:
-        wgpMode = m_pPipelineInfo->tes.options.wgpMode;
-        break;
-    case ShaderStageGeometry:
-        wgpMode = m_pPipelineInfo->gs.options.wgpMode;
-        break;
-    case ShaderStageFragment:
-        wgpMode = m_pPipelineInfo->fs.options.wgpMode;
-        break;
-    default:
-        LLPC_NEVER_CALLED();
-        break;
-    }
-
-    return wgpMode;
-}
-#endif
-
 // =====================================================================================================================
 // Gets the count of vertices per primitive
 uint32_t GraphicsContext::GetVerticesPerPrimitive() const
@@ -474,120 +417,6 @@ uint32_t GraphicsContext::GetVerticesPerPrimitive() const
     }
 
     return vertsPerPrim;
-}
-
-// =====================================================================================================================
-// Gets wave size for the specified shader stage
-//
-// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
-uint32_t GraphicsContext::GetShaderWaveSize(
-    ShaderStage stage)  // Shader stage
-{
-    if (stage == ShaderStageCopyShader)
-    {
-       // Treat copy shader as part of geometry shader
-       stage = ShaderStageGeometry;
-    }
-
-    LLPC_ASSERT(stage < ShaderStageGfxCount);
-
-    uint32_t waveSize = m_pGpuProperty->waveSize;
-
-#if LLPC_BUILD_GFX10
-    if (m_gfxIp.major == 10)
-    {
-        // NOTE: GPU property wave size is used in shader, unless:
-        //  1) A stage-specific default is preferred.
-        //  2) If specified by tuning option, use the specified wave size.
-        //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
-
-        if (stage == ShaderStageFragment)
-        {
-            // Per programming guide, it's recommended to use wave64 for fragment shader.
-            waveSize = 64;
-        }
-        else if ((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0)
-        {
-            // NOTE: Hardware path for GS wave32 is not tested, use wave64 instead
-            waveSize = 64;
-        }
-
-        switch (stage)
-        {
-        case ShaderStageVertex:
-            if (m_pPipelineInfo->vs.options.waveSize != 0)
-            {
-                waveSize = m_pPipelineInfo->vs.options.waveSize;
-            }
-            break;
-        case ShaderStageTessControl:
-            if (m_pPipelineInfo->tcs.options.waveSize != 0)
-            {
-                waveSize = m_pPipelineInfo->tcs.options.waveSize;
-            }
-            break;
-        case ShaderStageTessEval:
-            if (m_pPipelineInfo->tes.options.waveSize != 0)
-            {
-                waveSize = m_pPipelineInfo->tes.options.waveSize;
-            }
-            break;
-        case ShaderStageGeometry:
-            // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
-            // In such cases, we check the property of VS or TES.
-            if ((m_stageMask & ShaderStageToMask(ShaderStageGeometry)) != 0)
-            {
-                if (m_pPipelineInfo->gs.options.waveSize != 0)
-                {
-                    waveSize = m_pPipelineInfo->gs.options.waveSize;
-                }
-            }
-            else if ((m_stageMask & ShaderStageToMask(ShaderStageTessEval)) != 0)
-            {
-                waveSize = GetShaderWaveSize(ShaderStageTessEval);
-            }
-            else
-            {
-                waveSize = GetShaderWaveSize(ShaderStageVertex);
-            }
-            break;
-        case ShaderStageFragment:
-            if (m_pPipelineInfo->fs.options.waveSize != 0)
-            {
-                waveSize = m_pPipelineInfo->fs.options.waveSize;
-            }
-            break;
-        default:
-            LLPC_NEVER_CALLED();
-            break;
-        }
-
-        // Check is subgroup size used in shader. If it's used, use the specified subgroup size as wave size.
-        for (uint32_t i = ShaderStageVertex; i < ShaderStageGfxCount; ++i)
-        {
-            const PipelineShaderInfo* pShaderInfo = GetPipelineShaderInfo(static_cast<ShaderStage>(i));
-            const ShaderModuleData* pModuleData =
-                reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
-
-            if ((pModuleData != nullptr) && pModuleData->usage.useSubgroupSize
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 31
-             && (pShaderInfo->options.allowVaryWaveSize == false)
-#endif
-               )
-            {
-                waveSize = cl::SubgroupSize;
-                break;
-            }
-        }
-
-        LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
-    }
-    else if (m_gfxIp.major > 10)
-    {
-        LLPC_NOT_IMPLEMENTED();
-    }
-#endif
-    return waveSize;
 }
 
 } // Llpc

@@ -6901,7 +6901,7 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
   if (auto EM = EntryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
       FpControlFlags.RoundingModeRTZ = EM->getLiterals()[0] >> 3;
 
-  // Set common shader mode (FP mode) for middle-end.
+  // Set common shader mode (FP mode and useSubgroupSize) for middle-end.
   CommonShaderMode shaderMode = {};
   if (FpControlFlags.RoundingModeRTE & SPIRVTW_16Bit)
     shaderMode.fp16RoundMode = FpRoundMode::Even;
@@ -6927,6 +6927,22 @@ bool SPIRVToLLVM::translate(ExecutionModel EntryExecModel,
     shaderMode.fp64DenormMode = FpDenormMode::FlushNone;
   else if (FpControlFlags.DenormFlushToZero & SPIRVTW_64Bit)
     shaderMode.fp64DenormMode = FpDenormMode::FlushInOut;
+
+  auto &Extensions = BM->getExtension();
+  if (Extensions.find("SPV_AMD_shader_ballot") != Extensions.end() ||
+      BM->hasCapability(CapabilityGroupNonUniform) ||
+      BM->hasCapability(CapabilityGroupNonUniformVote) ||
+      BM->hasCapability(CapabilityGroupNonUniformArithmetic) ||
+      BM->hasCapability(CapabilityGroupNonUniformBallot) ||
+      BM->hasCapability(CapabilityGroupNonUniformShuffle) ||
+      BM->hasCapability(CapabilityGroupNonUniformShuffleRelative) ||
+      BM->hasCapability(CapabilityGroupNonUniformClustered) ||
+      BM->hasCapability(CapabilityGroupNonUniformQuad) ||
+      BM->hasCapability(CapabilitySubgroupBallotKHR) ||
+      BM->hasCapability(CapabilitySubgroupVoteKHR) ||
+      BM->hasCapability(CapabilityGroups))
+    shaderMode.useSubgroupSize = true;
+
   getBuilder()->SetCommonShaderMode(shaderMode);
 
   EnableXfb = BM->getCapability().find(

@@ -82,15 +82,6 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
                 capabilities.insert(capability);
                 break;
             }
-        case OpExtension:
-            {
-                if ((strncmp(reinterpret_cast<const char*>(&pCodePos[1]), "SPV_AMD_shader_ballot",
-                    strlen("SPV_AMD_shader_ballot")) == 0) && (pShaderModuleUsage->useSubgroupSize == false))
-                {
-                    pShaderModuleUsage->useSubgroupSize = true;
-                }
-                break;
-            }
         case OpDPdx:
         case OpDPdy:
         case OpDPdxCoarse:
@@ -156,22 +147,6 @@ Result ShaderModuleHelper::CollectInfoFromSpirvBinary(
     if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
     {
         pShaderModuleUsage->enableVarPtr = true;
-    }
-
-    if ((pShaderModuleUsage->useSubgroupSize == false) &&
-        ((capabilities.find(CapabilityGroupNonUniform) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformVote) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformArithmetic) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformBallot) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformShuffle) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformShuffleRelative) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformClustered) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroupNonUniformQuad) != capabilities.end()) ||
-        (capabilities.find(CapabilitySubgroupBallotKHR) != capabilities.end()) ||
-        (capabilities.find(CapabilitySubgroupVoteKHR) != capabilities.end()) ||
-        (capabilities.find(CapabilityGroups) != capabilities.end())))
-    {
-        pShaderModuleUsage->useSubgroupSize = true;
     }
 
     return result;

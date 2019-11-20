@@ -2369,7 +2369,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
     case BuiltInViewIndex:
         return GetFunctionArgument(m_pEntryPoint, entryArgIdxs.viewIndex);
     case BuiltInSubgroupSize:
-        return ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+        return ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
     case BuiltInSubgroupLocalInvocationId:
         return GetSubgroupLocalInvocationId(pInsertPos);
     case BuiltInDeviceIndex:
@@ -2469,7 +2469,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2633,7 +2633,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2727,7 +2727,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3025,7 +3025,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3212,7 +3212,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pContext->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3235,7 +3235,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
                                            mode.workgroupSizeZ;
 
             // gl_NumSubgroups = (workgroupSize + gl_SubGroupSize - 1) / gl_SubgroupSize
-            const uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+            const uint32_t subgroupSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
             const uint32_t numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
 
             pInput = ConstantInt::get(m_pContext->Int32Ty(), numSubgroups);
@@ -3310,7 +3310,7 @@ Value* PatchInOutImportExport::GetSubgroupId(
     IRBuilder<> builder(*m_pContext);
     builder.SetInsertPoint(pInsertPos);
     Value* pLocalInvocationIndex = PatchCsBuiltInInputImport(pInputTy, BuiltInLocalInvocationIndex, pInsertPos);
-    uint32_t subgroupSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    uint32_t subgroupSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
     return builder.CreateLShr(pLocalInvocationIndex, builder.getInt32(Log2_32(subgroupSize)));
 }
 
@@ -4548,7 +4548,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
         {
             outofRangeValue /= xfbStride;
         }
-        outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
+        outofRangeValue -= (m_pPipelineState->GetShaderWaveSize(m_shaderStage) - 1);
         Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
         pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
         BranchInst::Create(pStoreBlock, pEntryBlock);
@@ -6307,7 +6307,7 @@ uint32_t PatchInOutImportExport::CalcPatchCountPerThreadGroup(
     uint32_t tessFactorStride   // Stride of tessellation factors (DWORDs)
     ) const
 {
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
 
     // NOTE: The limit of thread count for tessellation control shader is 4 wavefronts per thread group.
     const uint32_t maxThreadCountPerThreadGroup = (4 * waveSize);
@@ -6826,7 +6826,7 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
                                                  &*pInsertPos);
 
 #if LLPC_BUILD_GFX10
-    uint32_t waveSize = m_pContext->GetShaderWaveSize(m_shaderStage);
+    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
     if (waveSize == 64)
 #endif
     {

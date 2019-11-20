@@ -31,6 +31,7 @@
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcInternal.h"
+#include "llpcPipelineState.h"
 
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
@@ -52,7 +53,7 @@ Value* BuilderImplSubgroup::CreateGetSubgroupSize(
 // Get the shader subgroup size for the current insertion block.
 uint32_t BuilderImplSubgroup::GetShaderSubgroupSize()
 {
-    return getContext().GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
+    return GetPipelineState()->GetShaderWaveSize(GetShaderStageFromFunction(GetInsertBlock()->getParent()));
 }
 
 // =====================================================================================================================

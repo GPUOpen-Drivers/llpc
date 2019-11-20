@@ -74,6 +74,20 @@ const CommonShaderMode& ShaderModes::GetCommonShaderMode(
 }
 
 // =====================================================================================================================
+// Check if any shader stage has useSubgroupSize set
+bool ShaderModes::GetAnyUseSubgroupSize()
+{
+    for (const auto& commonShaderMode : m_commonShaderModes)
+    {
+        if (commonShaderMode.useSubgroupSize)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// =====================================================================================================================
 // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
 // to allow the client to call this twice, once for TCS and once for TES.
 void ShaderModes::SetTessellationMode(

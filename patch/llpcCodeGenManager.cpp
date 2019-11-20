@@ -200,7 +200,7 @@ void CodeGenManager::SetupTargetFeatures(
             if (gfxIp.major >= 10)
             {
                 // Setup wavefront size per shader stage
-                uint32_t waveSize = pContext->GetShaderWaveSize(shaderStage);
+                uint32_t waveSize = pPipelineState->GetShaderWaveSize(shaderStage);
 
                 targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
 

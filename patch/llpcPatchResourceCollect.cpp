@@ -801,7 +801,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 
             // gsPrimsPerSubgroup shouldn't be bigger than wave size.
             uint32_t gsPrimsPerSubgroup = std::min(m_pContext->GetGpuProperty()->gsOnChipDefaultPrimsPerSubgroup,
-                                                   m_pContext->GetShaderWaveSize(ShaderStageGeometry));
+                                                   m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry));
 
             // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
             const uint32_t esGsRingItemSize = (4 * std::max(1u, pGsResUsage->inOutUsage.inputMapLocCount)) | 1;

@@ -128,6 +128,9 @@ struct ShaderOptions
     uint32_t  maxThreadGroupsPerComputeUnit;
 
 #if LLPC_BUILD_GFX10
+    uint32_t      waveSize;       // Control the number of threads per wavefront (GFX10+)
+    uint32_t      subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
+    uint32_t      wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
     WaveBreakSize waveBreakSize;  // Size of region to force the end of a wavefront (GFX10+).
                                   // Only valid for fragment shaders.
 #endif
@@ -179,6 +182,7 @@ struct CommonShaderMode
     FpDenormMode  fp32DenormMode;
     FpRoundMode   fp64RoundMode;
     FpDenormMode  fp64DenormMode;
+    uint32_t      useSubgroupSize;  // True if shader relies on SubgroupSize
 };
 
 // Tessellation vertex spacing

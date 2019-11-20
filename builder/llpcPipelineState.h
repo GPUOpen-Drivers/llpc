@@ -178,6 +178,9 @@ public:
     // ring is on-chip.
     bool IsGsOnChip() const { return m_gsOnChip; }
 
+    // Gets wave size for the specified shader stage
+    uint32_t GetShaderWaveSize(ShaderStage stage);
+
 #if LLPC_BUILD_GFX10
     // Get NGG control settings
     NggControl* GetNggControl() { return &m_nggControl; }

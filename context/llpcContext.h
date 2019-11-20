@@ -216,24 +216,10 @@ public:
         m_pPipelineContext->DoUserDataNodeMerge();
     }
 
-#if LLPC_BUILD_GFX10
-    // Gets WGP mode enablement for the specified shader stage
-    bool GetShaderWgpMode(ShaderStage shaderStage) const
-    {
-        return m_pPipelineContext->GetShaderWgpMode(shaderStage);
-    }
-#endif
-
     // Gets the count of vertices per primitive
     uint32_t GetVerticesPerPrimitive()
     {
         return m_pPipelineContext->GetVerticesPerPrimitive();
-    }
-
-    // Gets wave size for the specified shader stage
-    uint32_t GetShaderWaveSize(ShaderStage stage)
-    {
-        return m_pPipelineContext->GetShaderWaveSize(stage);
     }
 
     uint64_t GetPiplineHashCode() const

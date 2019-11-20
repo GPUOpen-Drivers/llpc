@@ -148,9 +148,6 @@ opt<bool> DisableLicm("disable-licm", desc("Disable LLVM LICM pass"), init(false
 // -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
 // final wave size base on it. Used in pre-silicon verification.
 opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardware native wave size"), init(0));
-
-// -subgroup-size: sub-group size exposed via Vulkan API.
-opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), init(64));
 #endif
 
 // -trim-debug-info: Trim debug information in SPIR-V binary
