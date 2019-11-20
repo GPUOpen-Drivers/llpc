@@ -348,7 +348,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
     const bool hasTs = (m_hasTcs || m_hasTes);
 
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
 
     const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
@@ -1874,7 +1874,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
 {
     LLPC_ASSERT(m_hasGs);
 
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
 
     const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
@@ -2448,7 +2448,7 @@ void NggPrimShader::InitWaveThreadInfo(
     Value* pMergedGroupInfo,    // [in] Merged group info
     Value* pMergedWaveInfo)     // [in] Merged wave info
 {
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
 
     m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_pBuilder->getInt64(-1));
@@ -3564,7 +3564,7 @@ Function* NggPrimShader::MutateGsToVariant(
     }
 
     // Initialize thread ID in wave
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
 
     auto pThreadIdInWave = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo,
@@ -6308,7 +6308,7 @@ Value* NggPrimShader::DoSubgroupBallot(
 {
     LLPC_ASSERT(pValue->getType()->isIntegerTy(1)); // Should be i1
 
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
 
     pValue = m_pBuilder->CreateSelect(pValue, m_pBuilder->getInt32(1), m_pBuilder->getInt32(0));
@@ -6345,7 +6345,7 @@ Value* NggPrimShader::DoSubgroupInclusiveAdd(
 {
     LLPC_ASSERT(pValue->getType()->isIntegerTy(32)); // Should be i32
 
-    const uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    const uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     LLPC_ASSERT((waveSize == 32) || (waveSize == 64));
 
     auto pInlineAsmTy = FunctionType::get(m_pBuilder->getInt32Ty(), m_pBuilder->getInt32Ty(), false);

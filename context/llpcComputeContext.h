@@ -67,20 +67,8 @@ public:
     // Does user data node merging for all shader stages
     virtual void DoUserDataNodeMerge() { }
 
-#if LLPC_BUILD_GFX10
-    // Gets WGP mode enablement for the specified shader stage
-    virtual bool GetShaderWgpMode(ShaderStage shaderStage) const
-    {
-        LLPC_ASSERT(shaderStage == ShaderStageCompute);
-        return m_pPipelineInfo->cs.options.wgpMode;
-    }
-#endif
-
     // Gets the count of vertices per primitive
     virtual uint32_t GetVerticesPerPrimitive() const { LLPC_NEVER_CALLED(); return 0; }
-
-    // Gets wave size for the specified shader stage
-    virtual uint32_t GetShaderWaveSize(ShaderStage stage);
 
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }

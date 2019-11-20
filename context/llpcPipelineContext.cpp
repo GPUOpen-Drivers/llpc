@@ -85,6 +85,11 @@ static cl::opt<bool> EnableSiScheduler("enable-si-scheduler",
                                        cl::desc("Enable target option si-scheduler"),
                                        cl::init(false));
 
+#if LLPC_BUILD_GFX10
+// -subgroup-size: sub-group size exposed via Vulkan API.
+static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
+#endif
+
 namespace Llpc
 {
 
@@ -439,6 +444,14 @@ void PipelineContext::SetOptionsInPipeline(
             }
 
 #if LLPC_BUILD_GFX10
+            shaderOptions.waveSize = pShaderInfo->options.waveSize;
+            shaderOptions.wgpMode = pShaderInfo->options.wgpMode;
+            if (pShaderInfo->options.allowVaryWaveSize == false)
+            {
+                // allowVaryWaveSize is disabled, so use -subgroup-size (default 64) to override the wave
+                // size for a shader that uses gl_SubgroupSize.
+                shaderOptions.subgroupSize = SubgroupSize;
+            }
             shaderOptions.waveBreakSize = pShaderInfo->options.waveBreakSize;
 #endif
 

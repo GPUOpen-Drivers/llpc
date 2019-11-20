@@ -48,6 +48,9 @@ public:
     // Get the common shader modes for the given shader stage
     const CommonShaderMode& GetCommonShaderMode(ShaderStage stage);
 
+    // Check if any shader stage has useSubgroupSize set
+    bool GetAnyUseSubgroupSize();
+
     // Set the tessellation mode. This in fact merges the supplied values with any previously supplied values,
     // to allow the client to call this twice, once for TCS and once for TES.
     void SetTessellationMode(const TessellationMode& inMode);

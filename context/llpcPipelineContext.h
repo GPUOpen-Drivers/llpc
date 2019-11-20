@@ -713,16 +713,8 @@ public:
     // Does user data node merge for merged shader
     virtual void DoUserDataNodeMerge() = 0;
 
-#if LLPC_BUILD_GFX10
-    // Gets WGP mode enablement for the specified shader stage
-    virtual bool GetShaderWgpMode(ShaderStage shaderStage) const = 0;
-#endif
-
     // Gets the count of vertices per primitive
     virtual uint32_t GetVerticesPerPrimitive() const = 0;
-
-    // Gets wave size for the specified shader stage
-    virtual uint32_t GetShaderWaveSize(ShaderStage stage) = 0;
 
     static const char* GetGpuNameString(GfxIpVersion gfxIp);
     static const char* GetGpuNameAbbreviation(GfxIpVersion gfxIp);

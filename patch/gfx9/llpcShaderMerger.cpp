@@ -263,7 +263,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
 #if LLPC_BUILD_GFX10
-    uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageTessControl);
+    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
     if (waveSize == 64)
 #endif
     {
@@ -730,7 +730,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
 
 #if LLPC_BUILD_GFX10
-    uint32_t waveSize = m_pContext->GetShaderWaveSize(ShaderStageGeometry);
+    uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
     if (waveSize == 64)
 #endif
     {

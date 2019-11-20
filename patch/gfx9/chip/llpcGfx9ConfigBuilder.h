@@ -104,6 +104,10 @@ private:
                                uint32_t    startUserData);
 
     void SetupVgtTfParam(LsHsRegConfig* pConfig);
+
+#if LLPC_BUILD_GFX10
+    bool GetShaderWgpMode(ShaderStage shaderStage) const;
+#endif
 };
 
 } // Gfx9
