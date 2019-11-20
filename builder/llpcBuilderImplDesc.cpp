@@ -58,7 +58,7 @@ Value* BuilderImplDesc::CreateLoadBufferDesc(
     pDescIndex = ScalarizeIfUniform(pDescIndex, isNonUniform);
 
     // Mark the shader as reading and writing (if applicable) a resource.
-    auto pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     pResUsage->resourceRead = true;
     pResUsage->resourceWrite |= isWritten;
 
@@ -120,7 +120,7 @@ Value* BuilderImplDesc::CreateLoadDescFromPtr(
     const Twine&  instName)           // [in] Name to give instruction(s)
 {
     // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-    getContext().GetShaderResourceUsage(m_shaderStage)->useImages = true;
+    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->useImages = true;
 
     std::string name = LlpcName::DescriptorLoadFromPtr;
 
@@ -280,7 +280,7 @@ Value* BuilderImplDesc::CreateLoadPushConstantsPtr(
 {
     // Remember the size of push constants.
     uint32_t pushConstSize = GetInsertPoint()->getModule()->getDataLayout().getTypeStoreSize(pPushConstantsTy);
-    ResourceUsage* pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    ResourceUsage* pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     LLPC_ASSERT((pResUsage->pushConstSizeInBytes == 0) || (pResUsage->pushConstSizeInBytes == pushConstSize));
     pResUsage->pushConstSizeInBytes = pushConstSize;
 

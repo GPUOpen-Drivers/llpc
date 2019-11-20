@@ -69,7 +69,7 @@ void ShaderSystemValues::Initialize(
         m_pPipelineState = pPipelineState;
 
         LLPC_ASSERT(m_shaderStage != ShaderStageInvalid);
-        LLPC_ASSERT(m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
+        LLPC_ASSERT(m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
     }
 }
 
@@ -126,7 +126,7 @@ Value* ShaderSystemValues::GetPrimitiveId()
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
     if (m_pPrimitiveId == nullptr)
     {
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
         m_pPrimitiveId = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tcs.patchId, "patchId");
     }
     return m_pPrimitiveId;
@@ -140,7 +140,7 @@ Value* ShaderSystemValues::GetInvocationId()
     if (m_pInvocationId == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
 
         // invocationId = relPatchId[12:8]
         Value* args[] =
@@ -166,7 +166,7 @@ Value* ShaderSystemValues::GetRelativeId()
     if (m_pRelativeId == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
         auto pRelPatchId = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
 
         // relativeId = relPatchId[7:0]
@@ -199,7 +199,7 @@ Value* ShaderSystemValues::GetTessCoord()
     if (m_pTessCoord == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
 
         Value* pTessCoordX = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
         Value* pTessCoordY = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tes.tessCoordY, "tessCoordY");
@@ -242,7 +242,7 @@ Value* ShaderSystemValues::GetEsGsOffsets()
     if (m_pEsGsOffsets == nullptr)
     {
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
 
         m_pEsGsOffsets = UndefValue::get(m_pContext->Int32x6Ty());
         for (uint32_t i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i)
@@ -276,7 +276,7 @@ Value* ShaderSystemValues::GetGsVsRingBufDesc(
 
         if (m_shaderStage == ShaderStageGeometry)
         {
-            const auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+            const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
             // Geometry shader, using GS-VS ring for output.
             Value* pDesc = LoadDescFromDriverTable(SI_DRV_TABLE_GS_RING_OUT0_OFFS + streamId, builder);
@@ -489,7 +489,7 @@ Value* ShaderSystemValues::GetNumWorkgroups()
     if (m_pNumWorkgroups == nullptr)
     {
         Instruction* pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
 
         auto pNumWorkgroupPtr = GetFunctionArgument(m_pEntryPoint,
                                                     pIntfData->entryArgIdxs.cs.numWorkgroupsPtr,
@@ -507,7 +507,7 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
 {
     if (m_pSpilledPushConstTablePtr == nullptr)
     {
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
         LLPC_ASSERT(pIntfData->pushConst.resNodeIdx != InvalidValue);
         LLPC_ASSERT(pIntfData->entryArgIdxs.spillTable != InvalidValue);
 
@@ -540,7 +540,7 @@ Value* ShaderSystemValues::GetVertexBufTablePtr()
         if (pVbTableNode != nullptr)
         {
             // Get the 64-bit extended node value.
-            auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+            auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
             auto pVbTablePtrLow = GetFunctionArgument(m_pEntryPoint,
                                                       pIntfData->entryArgIdxs.vs.vbTablePtr,
                                                       "vbTablePtr");
@@ -596,7 +596,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
 
     if (m_pStreamOutTablePtr == nullptr)
     {
-        auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
         uint32_t entryArgIdx = 0;
 
         if (m_shaderStage != ShaderStageCopyShader)
@@ -723,7 +723,7 @@ Value* ShaderSystemValues::GetResourceNodeValue(
     uint32_t        resNodeIdx)     // Resource node index
 {
     auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
-    auto pIntfData   = m_pContext->GetShaderInterfaceData(m_shaderStage);
+    auto pIntfData   = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
     auto pNode = &m_pPipelineState->GetUserDataNodes()[resNodeIdx];
     Value* pResNodeValue = nullptr;
 
@@ -784,7 +784,7 @@ Instruction* ShaderSystemValues::GetSpillTablePtr()
 {
     if (m_pSpillTablePtr == nullptr)
     {
-        auto pIntfData   = m_pContext->GetShaderInterfaceData(m_shaderStage);
+        auto pIntfData   = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
         auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
         auto pSpillTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), InterfaceData::MaxSpillTableSize),
                                                  ADDR_SPACE_CONST);

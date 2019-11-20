@@ -316,7 +316,7 @@ void BuilderImplInOut::MarkGenericInputOutputUsage(
                                   //      else nullptr.
                                   //      (This is just used to tell whether an input/output is per-vertex.)
 {
-    auto pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
 
     // Mark the input or output locations as in use.
     std::map<uint32_t, uint32_t>* pInOutLocMap = nullptr;
@@ -381,7 +381,7 @@ void BuilderImplInOut::MarkInterpolationInfo(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
 
-    auto pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     switch (interpInfo.GetInterpMode())
     {
     case InOutInfo::InterpModeCustom:
@@ -469,7 +469,7 @@ void BuilderImplInOut::MarkFsOutputType(
         LLPC_NEVER_CALLED();
     }
 
-    auto pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     pResUsage->inOutUsage.fs.outputTypes[location] = basicTy;
 }
 
@@ -483,7 +483,7 @@ Value* BuilderImplInOut::ModifyAuxInterpValue(
     {
         // Add intrinsic to calculate I/J for interpolation function
         std::string evalInstName;
-        auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
+        auto pResUsage = GetPipelineState()->GetShaderResourceUsage(ShaderStageFragment);
 
         if (inputInfo.GetInterpLoc() == InOutInfo::InterpLocCentroid)
         {
@@ -621,7 +621,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
     }
 
     // Mark the usage of the XFB buffer.
-    auto pResUsage = getContext().GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage);
     uint32_t streamId = outputInfo.HasStreamId() ? outputInfo.GetStreamId() : 0;
     LLPC_ASSERT(xfbBuffer < MaxTransformFeedbackBuffers);
     LLPC_ASSERT(streamId < MaxGsStreams);
@@ -643,7 +643,7 @@ Instruction* BuilderImplInOut::CreateWriteXfbOutput(
         xfbOutInfo.is16bit = (pValueToWrite->getType()->getScalarSizeInBits() == 16);
         xfbOutInfo.xfbExtraOffset = 0;
 
-        auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageGeometry);
+        auto pResUsage = GetPipelineState()->GetShaderResourceUsage(ShaderStageGeometry);
         pResUsage->inOutUsage.gs.xfbOutsInfo[outLocInfo.u32All] = xfbOutInfo.u32All;
         if (pValueToWrite->getType()->getPrimitiveSizeInBits() > 128)
         {
@@ -977,7 +977,7 @@ void BuilderImplInOut::MarkBuiltInInputUsage(
     uint32_t    arraySize)    // Number of array elements for ClipDistance and CullDistance. (Multiple calls to
                               //    this function for this built-in might have different array sizes; we take the max)
 {
-    auto& pUsage = getContext().GetShaderResourceUsage(m_shaderStage)->builtInUsage;
+    auto& pUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
     LLPC_ASSERT(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
     switch (m_shaderStage)
     {
@@ -1172,7 +1172,7 @@ void BuilderImplInOut::MarkBuiltInOutputUsage(
                               //    function for this built-in might have different array sizes; we take the max)
     uint32_t    streamId)     // GS stream ID, or InvalidValue if not known
 {
-    auto& pUsage = getContext().GetShaderResourceUsage(m_shaderStage)->builtInUsage;
+    auto& pUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
     LLPC_ASSERT(((builtIn != BuiltInClipDistance) && (builtIn != BuiltInCullDistance)) || (arraySize != 0));
     switch (m_shaderStage)
     {
@@ -1253,7 +1253,7 @@ void BuilderImplInOut::MarkBuiltInOutputUsage(
             // Collect raster stream ID for the export of built-ins
             if (streamId != InvalidValue)
             {
-                getContext().GetShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
+                GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
             }
             break;
         }

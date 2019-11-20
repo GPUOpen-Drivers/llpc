@@ -49,26 +49,6 @@ ComputeContext::ComputeContext(
     PipelineContext(gfxIp, pPipelineHash, pCacheHash),
     m_pPipelineInfo(pPipelineInfo)
 {
-    InitShaderResourceUsage(ShaderStageCompute, GetShaderResourceUsage(ShaderStageCompute));
-    InitShaderInterfaceData(GetShaderInterfaceData(ShaderStageCompute));
-}
-
-// =====================================================================================================================
-// Gets resource usage of the specified shader stage.
-ResourceUsage* ComputeContext::GetShaderResourceUsage(
-    ShaderStage shaderStage) // Shader stage
-{
-    LLPC_ASSERT(shaderStage == ShaderStageCompute);
-    return &m_resUsage;
-}
-
-// =====================================================================================================================
-// Gets interface data of the specified shader stage.
-InterfaceData* ComputeContext::GetShaderInterfaceData(
-    ShaderStage shaderStage)  // Shader stage
-{
-    LLPC_ASSERT(shaderStage == ShaderStageCompute);
-    return &m_intfData;
 }
 
 // =====================================================================================================================

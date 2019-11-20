@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpcPipeline.h"
+#include "llpcResourceUsage.h"
 #include "llpcShaderModes.h"
 #include "palPipelineAbi.h"
 #include "llvm/ADT/SmallVector.h"
@@ -224,6 +225,12 @@ public:
     NggControl* GetNggControl() { return &m_nggControl; }
 #endif
 
+    // Gets resource usage of the specified shader stage
+    ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
+
+    // Gets interface data of the specified shader stage
+    InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
+
     // -----------------------------------------------------------------------------------------------------------------
     // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
 
@@ -356,6 +363,10 @@ private:
     void RecordGraphicsState(Module* pModule);
     void ReadGraphicsState(Module* pModule);
 
+    // Initialization of ResourceUsage and InterfaceData.
+    static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
+    static void InitShaderInterfaceData(InterfaceData* pIntfData);
+
     // -----------------------------------------------------------------------------------------------------------------
     bool                            m_noReplayer = false;               // True if no BuilderReplayer needed
     uint32_t                        m_stageMask = 0;                    // Mask of active shader stages
@@ -380,6 +391,8 @@ private:
     InputAssemblyState              m_inputAssemblyState = {};          // Input-assembly state
     ViewportState                   m_viewportState = {};               // Viewport state
     RasterizerState                 m_rasterizerState = {};             // Rasterizer state
+    std::unique_ptr<ResourceUsage>  m_resourceUsage[ShaderStageCompute + 1] = {};  // Per-shader ResourceUsage
+    std::unique_ptr<InterfaceData>  m_interfaceData[ShaderStageCompute + 1] = {};  // Per-shader InterfaceData
 };
 
 // =====================================================================================================================

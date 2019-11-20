@@ -179,7 +179,7 @@ bool PatchCopyShader::runOnModule(
     auto pEntryBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, pEndBlock);
     builder.SetInsertPoint(pEntryBlock);
 
-    auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageCopyShader);
+    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageCopyShader);
 
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
     if (m_pPipelineState->GetTargetInfo().GetGfxIpVersion().major <= 8)
@@ -203,7 +203,7 @@ bool PatchCopyShader::runOnModule(
         m_pGsVsRingBufDesc = LoadGsVsRingBufferDescriptor(builder);
     }
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
 
     uint32_t outputStreamCount = 0;
     uint32_t outputStreamId = InvalidValue;
@@ -301,7 +301,7 @@ bool PatchCopyShader::runOnModule(
 void PatchCopyShader::CollectGsGenericOutputInfo(
     Function* pGsEntryPoint)  // [in] Geometry shader entrypoint
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
 
     for (auto& func : *pGsEntryPoint->getParent())
     {
@@ -353,7 +353,7 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
 
                 LLPC_ASSERT(compIdx < 4);
                 auto& genericOutByteSizes =
-                    m_pContext->GetShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.gs.genericOutByteSizes;
+                    m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader)->inOutUsage.gs.genericOutByteSizes;
                 genericOutByteSizes[streamId][location].resize(4);
                 genericOutByteSizes[streamId][location][compIdx] = byteSize;
             }
@@ -367,7 +367,7 @@ void PatchCopyShader::ExportOutput(
     uint32_t        streamId,     // Export output of this stream
     IRBuilder<>&    builder)      // [in] IRBuilder to use for instruction constructing
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
     auto& builtInUsage = pResUsage->builtInUsage.gs;
     const auto& genericOutByteSizes = pResUsage->inOutUsage.gs.genericOutByteSizes;
 
@@ -468,7 +468,7 @@ Value* PatchCopyShader::CalcGsVsRingOffsetForInput(
     auto pEntryPoint = builder.GetInsertBlock()->getParent();
     Value* pVertexOffset = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxVertexOffset);
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
 
     Value* pRingOffset = nullptr;
     if (m_pPipelineState->IsGsOnChip())
@@ -622,7 +622,7 @@ void PatchCopyShader::ExportGenericOutput(
     uint32_t     streamId,      // ID of output vertex stream
     IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
     if (pResUsage->inOutUsage.enableXfb)
     {
         auto& outLocMap = pResUsage->inOutUsage.outputLocMap;
@@ -704,7 +704,7 @@ void PatchCopyShader::ExportBuiltInOutput(
     uint32_t     streamId,      // ID of output vertex stream
     IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader);
 
     if (pResUsage->inOutUsage.enableXfb)
     {

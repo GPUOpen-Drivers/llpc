@@ -1116,6 +1116,135 @@ uint32_t PipelineState::GetShaderWaveSize(
 }
 
 // =====================================================================================================================
+// Gets resource usage of the specified shader stage
+ResourceUsage* PipelineState::GetShaderResourceUsage(
+    ShaderStage shaderStage)  // Shader stage
+{
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        shaderStage = ShaderStageGeometry;
+    }
+
+    auto& resUsage = MutableArrayRef<std::unique_ptr<ResourceUsage>>(m_resourceUsage)[shaderStage];
+    if (!resUsage)
+    {
+        resUsage.reset(new ResourceUsage);
+        InitShaderResourceUsage(shaderStage, &*resUsage);
+    }
+    return &*resUsage;
+}
+
+// =====================================================================================================================
+// Gets interface data of the specified shader stage
+InterfaceData* PipelineState::GetShaderInterfaceData(
+    ShaderStage shaderStage)  // Shader stage
+{
+    if (shaderStage == ShaderStageCopyShader)
+    {
+        shaderStage = ShaderStageGeometry;
+    }
+
+    auto& intfData = MutableArrayRef<std::unique_ptr<InterfaceData>>(m_interfaceData)[shaderStage];
+    if (!intfData)
+    {
+        intfData.reset(new InterfaceData);
+        InitShaderInterfaceData(&*intfData);
+    }
+    return &*intfData;
+}
+
+// =====================================================================================================================
+// Initializes resource usage of the specified shader stage.
+void PipelineState::InitShaderResourceUsage(
+    ShaderStage    shaderStage,      // Shader stage
+    ResourceUsage* pResUsage)        // [out] Resource usage
+{
+    memset(&pResUsage->builtInUsage, 0, sizeof(pResUsage->builtInUsage));
+
+    pResUsage->pushConstSizeInBytes = 0;
+    pResUsage->resourceWrite = false;
+    pResUsage->resourceRead = false;
+    pResUsage->perShaderTable = false;
+
+    pResUsage->numSgprsAvailable = UINT32_MAX;
+    pResUsage->numVgprsAvailable = UINT32_MAX;
+
+    pResUsage->inOutUsage.inputMapLocCount = 0;
+    pResUsage->inOutUsage.outputMapLocCount = 0;
+    memset(pResUsage->inOutUsage.gs.outLocCount, 0, sizeof(pResUsage->inOutUsage.gs.outLocCount));
+    pResUsage->inOutUsage.perPatchInputMapLocCount = 0;
+    pResUsage->inOutUsage.perPatchOutputMapLocCount = 0;
+
+    pResUsage->inOutUsage.expCount = 0;
+
+    memset(pResUsage->inOutUsage.xfbStrides, 0, sizeof(pResUsage->inOutUsage.xfbStrides));
+    pResUsage->inOutUsage.enableXfb = false;
+
+    memset(pResUsage->inOutUsage.streamXfbBuffers, 0, sizeof(pResUsage->inOutUsage.streamXfbBuffers));
+
+    if (shaderStage == ShaderStageVertex)
+    {
+        // NOTE: For vertex shader, PAL expects base vertex and base instance in user data,
+        // even if they are not used in shader.
+        pResUsage->builtInUsage.vs.baseVertex = true;
+        pResUsage->builtInUsage.vs.baseInstance = true;
+    }
+    else if (shaderStage == ShaderStageTessControl)
+    {
+        auto& calcFactor = pResUsage->inOutUsage.tcs.calcFactor;
+
+        calcFactor.inVertexStride           = InvalidValue;
+        calcFactor.outVertexStride          = InvalidValue;
+        calcFactor.patchCountPerThreadGroup = InvalidValue;
+        calcFactor.offChip.outPatchStart    = InvalidValue;
+        calcFactor.offChip.patchConstStart  = InvalidValue;
+        calcFactor.onChip.outPatchStart     = InvalidValue;
+        calcFactor.onChip.patchConstStart   = InvalidValue;
+        calcFactor.outPatchSize             = InvalidValue;
+        calcFactor.patchConstSize           = InvalidValue;
+    }
+    else if (shaderStage == ShaderStageGeometry)
+    {
+        pResUsage->inOutUsage.gs.rasterStream        = 0;
+
+        auto& calcFactor = pResUsage->inOutUsage.gs.calcFactor;
+        memset(&calcFactor, 0, sizeof(calcFactor));
+    }
+    else if (shaderStage == ShaderStageFragment)
+    {
+        for (uint32_t i = 0; i < MaxColorTargets; ++i)
+        {
+            pResUsage->inOutUsage.fs.expFmts[i] = EXP_FORMAT_ZERO;
+            pResUsage->inOutUsage.fs.outputTypes[i] = BasicType::Unknown;
+        }
+
+        pResUsage->inOutUsage.fs.cbShaderMask = 0;
+        pResUsage->inOutUsage.fs.dummyExport = true;
+        pResUsage->inOutUsage.fs.isNullFs = false;
+    }
+}
+
+// =====================================================================================================================
+// Initializes interface data of the specified shader stage.
+void PipelineState::InitShaderInterfaceData(
+    InterfaceData* pIntfData)  // [out] Interface data
+{
+    pIntfData->userDataCount = 0;
+    memset(pIntfData->userDataMap, InterfaceData::UserDataUnmapped, sizeof(pIntfData->userDataMap));
+
+    memset(&pIntfData->pushConst, 0, sizeof(pIntfData->pushConst));
+    pIntfData->pushConst.resNodeIdx = InvalidValue;
+
+    memset(&pIntfData->spillTable, 0, sizeof(pIntfData->spillTable));
+    pIntfData->spillTable.offsetInDwords = InvalidValue;
+
+    memset(&pIntfData->userDataUsage, 0, sizeof(pIntfData->userDataUsage));
+
+    memset(&pIntfData->entryArgIdxs, 0, sizeof(pIntfData->entryArgIdxs));
+    pIntfData->entryArgIdxs.spillTable = InvalidValue;
+}
+
+// =====================================================================================================================
 // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
 // type. Only the number of elements of the type is significant.
 // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.

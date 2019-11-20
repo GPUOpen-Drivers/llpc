@@ -111,7 +111,7 @@ bool PatchCheckShaderCache::runOnModule(
             continue;
         }
 
-        auto pResUsage = m_pContext->GetShaderResourceUsage(stage);
+        auto pResUsage = pPipelineState->GetShaderResourceUsage(stage);
         raw_string_ostream stream(inOutUsageStreams[stage]);
 
         // Update input/output usage

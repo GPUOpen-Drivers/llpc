@@ -135,16 +135,6 @@ public:
     std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
 
     // Wrappers of interfaces of pipeline context
-    ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage)
-    {
-        return m_pPipelineContext->GetShaderResourceUsage(shaderStage);
-    }
-
-    InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage)
-    {
-        return m_pPipelineContext->GetShaderInterfaceData(shaderStage);
-    }
-
     bool IsGraphics() const
     {
         return m_pPipelineContext->IsGraphics();

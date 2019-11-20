@@ -99,7 +99,7 @@ Instruction* BuilderImplMisc::CreateKill(
     // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
     // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
     // section of code containing the kill.
-    auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(ShaderStageFragment);
     pResUsage->builtInUsage.fs.discard = true;
 
     return CreateIntrinsic(Intrinsic::amdgcn_kill, {}, getFalse(), nullptr, instName);
@@ -111,7 +111,7 @@ Instruction* BuilderImplMisc::CreateDemoteToHelperInvocation(
     const Twine& instName) // [in] Name to give instruction(s)
 {
     // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
-    auto pResUsage = getContext().GetShaderResourceUsage(ShaderStageFragment);
+    auto pResUsage = GetPipelineState()->GetShaderResourceUsage(ShaderStageFragment);
     pResUsage->builtInUsage.fs.discard = true;
 
     return CreateIntrinsic(Intrinsic::amdgcn_wqm_demote, {}, getFalse(), nullptr, instName);

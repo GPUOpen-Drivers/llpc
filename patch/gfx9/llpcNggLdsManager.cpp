@@ -161,7 +161,7 @@ NggLdsManager::NggLdsManager(
     LLPC_OUTS("===============================================================================\n");
     LLPC_OUTS("// LLPC NGG LDS region info (in bytes)\n\n");
 
-    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     if (hasGs)
     {
@@ -305,7 +305,6 @@ NggLdsManager::NggLdsManager(
 uint32_t NggLdsManager::CalcEsExtraLdsSize(
     PipelineState* pPipelineState)  // [in] Pipeline state
 {
-    Context* pContext = static_cast<Context*>(&pPipelineState->GetContext());
     const auto pNggControl = pPipelineState->GetNggControl();
     if (pNggControl->enableNgg == false)
     {
@@ -332,7 +331,7 @@ uint32_t NggLdsManager::CalcEsExtraLdsSize(
         bool distributePrimId = false;
         if (hasTs == false)
         {
-            const auto& builtInUsage = pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+            const auto& builtInUsage = pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
             distributePrimId = builtInUsage.primitiveId;
         }
 

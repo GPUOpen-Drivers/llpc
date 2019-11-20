@@ -106,20 +106,20 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
     uint32_t userDataCount = 0;
     if (m_hasVs)
     {
-        const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+        const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
         userDataCount = std::max(pIntfData->userDataCount, userDataCount);
     }
 
     if (m_hasTcs)
     {
-        const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessControl);
+        const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
         userDataCount = std::max(pIntfData->userDataCount, userDataCount);
     }
 
     if (m_hasTcs && m_hasVs)
     {
-        auto pVsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
-        auto pTcsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessControl);
+        auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
+        auto pTcsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
 
         if ((pVsIntfData->spillTable.sizeInDwords == 0) &&
             (pTcsIntfData->spillTable.sizeInDwords > 0))
@@ -324,7 +324,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Call LS main function
         args.clear();
 
-        auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
         const uint32_t userDataCount = pIntfData->userDataCount;
 
         uint32_t userDataIdx = 0;
@@ -422,7 +422,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         // Call HS main function
         args.clear();
 
-        auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessControl);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl);
         const uint32_t userDataCount = pIntfData->userDataCount;
 
         uint32_t userDataIdx = 0;
@@ -468,7 +468,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
                     {
                         if (m_hasVs)
                         {
-                            auto pVsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+                            auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
                             LLPC_ASSERT(pVsIntfData->userDataUsage.spillTable > 0);
                             actualUserDataIdx = pVsIntfData->userDataUsage.spillTable;
                         }
@@ -538,7 +538,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     {
         if (m_hasTes)
         {
-            const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessEval);
+            const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
             userDataCount = std::max(pIntfData->userDataCount, userDataCount);
         }
     }
@@ -546,19 +546,19 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     {
         if (m_hasVs)
         {
-            const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+            const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
             userDataCount = std::max(pIntfData->userDataCount, userDataCount);
         }
     }
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
     userDataCount = std::max(pIntfData->userDataCount, userDataCount);
 
     if (hasTs)
     {
         if (m_hasTes)
         {
-            const auto pTesIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessEval);
+            const auto pTesIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
             LLPC_ASSERT(pTesIntfData->userDataUsage.tes.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
             if ((pIntfData->spillTable.sizeInDwords > 0) &&
                 (pTesIntfData->spillTable.sizeInDwords == 0))
@@ -573,7 +573,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     {
         if (m_hasVs)
         {
-            const auto pVsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+            const auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
             LLPC_ASSERT(pVsIntfData->userDataUsage.vs.viewIndex == pIntfData->userDataUsage.gs.viewIndex);
             if ((pIntfData->spillTable.sizeInDwords > 0) &&
                 (pVsIntfData->spillTable.sizeInDwords == 0))
@@ -693,7 +693,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     std::vector<Value*> args;
     std::vector<Attribute::AttrKind> attribs;
 
-    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     auto pArg = pEntryPoint->arg_begin();
 
@@ -819,7 +819,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         // Call ES main function
         args.clear();
 
-        auto pIntfData = m_pContext->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
         const uint32_t userDataCount = pIntfData->userDataCount;
         spillTableIdx = pIntfData->userDataUsage.spillTable;
 
@@ -1003,7 +1003,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
         // Call GS main function
         args.clear();
 
-        auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
+        auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
         const uint32_t userDataCount = pIntfData->userDataCount;
 
         uint32_t userDataIdx = 0;
