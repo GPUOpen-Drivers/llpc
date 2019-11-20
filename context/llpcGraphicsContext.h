@@ -48,8 +48,6 @@ public:
                     MetroHash::Hash*                 pCacheHash);
     virtual ~GraphicsContext();
 
-    virtual ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
-    virtual InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
     virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const;
 
     // Checks whether the pipeline is graphics or compute
@@ -83,9 +81,6 @@ private:
 
     uint32_t m_stageMask; // Mask of active shader stages bound to this graphics pipeline
     uint32_t m_activeStageCount;    // Count of active shader stages
-
-    ResourceUsage   m_resUsages[ShaderStageGfxCount];   // Resource usages of all graphics shader stages
-    InterfaceData   m_intfData[ShaderStageGfxCount];    // Interface data of all graphics shader stages
 
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode
 

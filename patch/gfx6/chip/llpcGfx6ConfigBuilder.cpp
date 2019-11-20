@@ -204,8 +204,8 @@ Result ConfigBuilder::BuildPipelineVsTsFsRegConfig()
     // Set up IA_MULTI_VGT_PARAM
     regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
-    const auto& tcsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
-    const auto& tesBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+    const auto& tcsBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
+    const auto& tesBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
 
     if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId)
     {
@@ -362,9 +362,9 @@ Result ConfigBuilder::BuildPipelineVsTsGsFsRegConfig()
     // Set up IA_MULTI_VGT_PARAM
     regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
 
-    const auto& tcsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
-    const auto& tesBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
-    const auto& gsBuiltInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+    const auto& tcsBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
+    const auto& tesBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+    const auto& gsBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
 
     // With tessellation, SWITCH_ON_EOI and PARTIAL_ES_WAVE_ON must be set if primitive ID is used by either the TCS, TES, or GS.
     if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
@@ -419,9 +419,9 @@ Result ConfigBuilder::BuildVsRegConfig(
                 (shaderStage == ShaderStageTessEval) ||
                 (shaderStage == ShaderStageCopyShader));
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
 
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
@@ -573,7 +573,7 @@ Result ConfigBuilder::BuildVsRegConfig(
         clipDistanceCount = builtInUsage.gs.clipDistance;
         cullDistanceCount = builtInUsage.gs.cullDistance;
 
-        const auto pGsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
+        const auto pGsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
         if (cl::InRegEsGsLdsSize && m_pPipelineState->IsGsOnChip())
         {
             AppendConfig(mmSPI_SHADER_USER_DATA_VS_0 + pGsIntfData->userDataUsage.gs.copyShaderEsGsLdsSize,
@@ -688,8 +688,8 @@ Result ConfigBuilder::BuildHsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageTessControl);
 
-    const auto& pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto& pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& calcFactor = pResUsage->inOutUsage.tcs.calcFactor;
     const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
 
@@ -741,13 +741,13 @@ Result ConfigBuilder::BuildEsRegConfig(
 
     LLPC_ASSERT((shaderStage == ShaderStageVertex) || (shaderStage == ShaderStageTessEval));
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
 
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
     LLPC_ASSERT((m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageGeometry)) != 0);
-    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
     SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, FLOAT_MODE, floatMode);
@@ -823,8 +823,8 @@ Result ConfigBuilder::BuildLsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageVertex);
 
-    const auto& pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto& pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.vs;
 
@@ -843,7 +843,7 @@ Result ConfigBuilder::BuildLsRegConfig(
 
     SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, USER_SGPR, pIntfData->userDataCount);
 
-    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
     uint32_t ldsSizeInDwords = calcFactor.onChip.patchConstStart +
                                calcFactor.patchConstSize * calcFactor.patchCountPerThreadGroup;
@@ -911,9 +911,9 @@ Result ConfigBuilder::BuildGsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageGeometry);
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
 
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.gs;
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
     const auto& inOutUsage   = pResUsage->inOutUsage;
@@ -1075,9 +1075,9 @@ Result ConfigBuilder::BuildPsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageFragment);
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.fs;
     const auto& fragmentMode = m_pPipelineState->GetShaderModes()->GetFragmentShaderMode();
 
@@ -1163,8 +1163,8 @@ Result ConfigBuilder::BuildPsRegConfig(
     SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
     uint32_t spiShaderColFormat = 0;
-    const auto pShaderInfo = m_pContext->GetPipelineShaderInfo(shaderStage);
-    uint32_t cbShaderMask = (pShaderInfo->pModuleData == nullptr) ? 0 : pResUsage->inOutUsage.fs.cbShaderMask;
+    uint32_t cbShaderMask = pResUsage->inOutUsage.fs.cbShaderMask;
+    cbShaderMask = pResUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
     const auto& expFmts = pResUsage->inOutUsage.fs.expFmts;
     for (uint32_t i = 0; i < MaxColorTargets; ++i)
     {
@@ -1276,9 +1276,9 @@ Result ConfigBuilder::BuildCsRegConfig(
 
     LLPC_ASSERT(shaderStage == ShaderStageCompute);
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage.cs;
     const auto& computeMode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
     uint32_t workgroupSizes[3];
@@ -1349,8 +1349,8 @@ Result ConfigBuilder::BuildUserDataConfig(
 
     bool enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
-    const auto pIntfData = m_pContext->GetShaderInterfaceData(shaderStage);
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(shaderStage);
+    const auto pIntfData = m_pPipelineState->GetShaderInterfaceData(shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(shaderStage);
     const auto& builtInUsage = pResUsage->builtInUsage;
 
     // Stage-specific processing

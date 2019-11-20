@@ -902,7 +902,7 @@ Value* BuilderImplImage::CreateImageLoad(
     Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
-    getContext().GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
+    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceRead = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
@@ -1087,7 +1087,7 @@ Value* BuilderImplImage::CreateImageStore(
     Value*            pMipLevel,          // [in] Mipmap level if doing load_mip, otherwise nullptr
     const Twine&      instName)           // [in] Name to give instruction(s)
 {
-    getContext().GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pImageDesc = PatchCubeDescriptor(pImageDesc, dim);
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
@@ -1710,7 +1710,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
     Value*                  pComparatorValue,   // [in] Value to compare against: i32; ignored if not compare-swap
     const Twine&            instName)           // [in] Name to give instruction(s)
 {
-    getContext().GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+    GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->resourceWrite = true;
     LLPC_ASSERT(pCoord->getType()->getScalarType()->isIntegerTy(32));
     pCoord = HandleFragCoordViewIndex(pCoord, flags, dim);
 
@@ -2409,7 +2409,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         // Get FragCoord, convert to signed i32, and add its x,y to the coordinate.
         // For now, this just generates a call to llpc.input.import.builtin. A future commit will
         // change it to use a Builder call to read the built-in.
-        getContext().GetShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
+        GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
 
         const static uint32_t BuiltInFragCoord = 15;
         std::string callName = LlpcName::InputImportBuiltIn;
@@ -2439,7 +2439,7 @@ Value* BuilderImplImage::HandleFragCoordViewIndex(
         // Get ViewIndex and use it as the z coordinate.
         // For now, this just generates a call to llpc.input.import.builtin. A future commit will
         // change it to use a Builder call to read the built-in.
-        auto& builtInUsage = getContext().GetShaderResourceUsage(m_shaderStage)->builtInUsage;
+        auto& builtInUsage = GetPipelineState()->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
         switch (m_shaderStage)
         {
         case ShaderStageVertex:

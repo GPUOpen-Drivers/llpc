@@ -190,8 +190,8 @@ void PatchInOutImportExport::ProcessShader()
     }
 
     // Initialize the output value for gl_PrimitiveID
-    const auto& builtInUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
-    const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+    const auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->builtInUsage;
+    const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
     if (m_shaderStage == ShaderStageVertex)
     {
         if (builtInUsage.vs.primitiveId)
@@ -212,7 +212,7 @@ void PatchInOutImportExport::ProcessShader()
     bool useThreadId = (m_hasGs && (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9)));
 
     // Thread ID will also be used for stream-out buffer export
-    const bool enableXfb = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
+    const bool enableXfb = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
     useThreadId = useThreadId || enableXfb;
 
     if (useThreadId)
@@ -228,7 +228,7 @@ void PatchInOutImportExport::ProcessShader()
         const uint32_t stageMask = m_pPipelineState->GetShaderStageMask();
         const bool hasTcs = ((stageMask & ShaderStageToMask(ShaderStageTessControl)) != 0);
 
-        auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+        auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
         if ((calcFactor.inVertexStride              == InvalidValue) &&
             (calcFactor.outVertexStride             == InvalidValue) &&
             (calcFactor.patchCountPerThreadGroup    == InvalidValue) &&
@@ -249,8 +249,8 @@ void PatchInOutImportExport::ProcessShader()
             // outPatchTotalSize = outVertexCount * outVertexStride * patchCountPerThreadGroup
             // patchConstTotalSize = patchConstCount * 4 * patchCountPerThreadGroup
 
-            const auto& tcsInOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage;
-            const auto& tesInOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->inOutUsage;
+            const auto& tcsInOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage;
+            const auto& tesInOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval)->inOutUsage;
 
             const uint32_t inLocCount = std::max(tcsInOutUsage.inputMapLocCount, 1u);
             const uint32_t outLocCount =
@@ -365,7 +365,7 @@ void PatchInOutImportExport::visitCallInst(
         return;
     }
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
     auto mangledName = pCallee->getName();
 
@@ -961,10 +961,10 @@ void PatchInOutImportExport::visitCallInst(
             {
                 LLPC_ASSERT(m_shaderStage == ShaderStageGeometry); // Must be geometry shader
 
-                auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+                auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
                 auto pViewIndex = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.viewIndex);
 
-                auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+                auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
                 auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
                 LLPC_ASSERT(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
@@ -1011,7 +1011,7 @@ void PatchInOutImportExport::visitReturnInst(
     }
 
     const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
-    const bool enableXfb = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
+    const bool enableXfb = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage.enableXfb;
 
     // Whether this shader stage has to use "exp" instructions to export outputs
     const bool useExpInst = (((m_shaderStage == ShaderStageVertex) || (m_shaderStage == ShaderStageTessEval) ||
@@ -1034,14 +1034,14 @@ void PatchInOutImportExport::visitReturnInst(
         uint32_t clipDistanceCount = 0;
         uint32_t cullDistanceCount = 0;
 
-        auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+        auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
         const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
         if (m_shaderStage == ShaderStageVertex)
         {
-            auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
-            auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
+            auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+            auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
 
             usePosition       = builtInUsage.position;
             usePointSize      = builtInUsage.pointSize;
@@ -1059,8 +1059,8 @@ void PatchInOutImportExport::visitReturnInst(
         }
         else if (m_shaderStage == ShaderStageTessEval)
         {
-            auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
-            auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
+            auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+            auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
 
             usePosition       = builtInUsage.position;
             usePointSize      = builtInUsage.pointSize;
@@ -1079,7 +1079,7 @@ void PatchInOutImportExport::visitReturnInst(
         else
         {
             LLPC_ASSERT(m_shaderStage == ShaderStageCopyShader);
-            auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader)->builtInUsage.gs;
+            auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCopyShader)->builtInUsage.gs;
 
             usePosition       = builtInUsage.position;
             usePointSize      = builtInUsage.pointSize;
@@ -1202,7 +1202,7 @@ void PatchInOutImportExport::visitReturnInst(
             if (nextStage == ShaderStageFragment)
             {
                 const auto& nextBuiltInUsage =
-                    m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+                    m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
                 hasClipCullExport = ((nextBuiltInUsage.clipDistance > 0) || (nextBuiltInUsage.cullDistance > 0));
 
@@ -1318,14 +1318,14 @@ void PatchInOutImportExport::visitReturnInst(
             if (nextStage == ShaderStageFragment)
             {
                 hasPrimitiveIdExport =
-                    m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.primitiveId;
+                    m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.primitiveId;
             }
             else if (nextStage == ShaderStageInvalid)
             {
                 if (m_shaderStage == ShaderStageCopyShader)
                 {
                     hasPrimitiveIdExport =
-                        m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.primitiveId;
+                        m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.primitiveId;
                 }
             }
 
@@ -1417,7 +1417,7 @@ void PatchInOutImportExport::visitReturnInst(
                 if (nextStage == ShaderStageFragment)
                 {
                     const auto& nextBuiltInUsage =
-                        m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+                        m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
                     hasViewportIndexExport = nextBuiltInUsage.viewportIndex;
                 }
@@ -1462,7 +1462,7 @@ void PatchInOutImportExport::visitReturnInst(
                 if (nextStage == ShaderStageFragment)
                 {
                     const auto& nextBuiltInUsage =
-                        m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+                        m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
                     hasLayerExport = nextBuiltInUsage.layer|| nextBuiltInUsage.viewIndex;
                 }
@@ -1543,7 +1543,7 @@ void PatchInOutImportExport::visitReturnInst(
             new FenceInst(*m_pContext, AtomicOrdering::Release, SyncScope::System, pInsertPos);
         }
 #endif
-        auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+        auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
         auto pWaveId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.waveId);
         Value* args[] = {
             ConstantInt::get(m_pContext->Int32Ty(), GS_DONE),
@@ -1556,7 +1556,7 @@ void PatchInOutImportExport::visitReturnInst(
     {
         if ((m_pFragDepth != nullptr) || (m_pFragStencilRef != nullptr) || (m_pSampleMask != nullptr))
         {
-            auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+            auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
             Value* pFragDepth = pUndef;
             Value* pFragStencilRef = pUndef;
             Value* pSampleMask = pUndef;
@@ -1610,7 +1610,7 @@ void PatchInOutImportExport::visitReturnInst(
                 LLPC_ASSERT(compCount <= 4);
 
                 // Set CB shader mask
-                auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+                auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
                 const uint32_t channelMask = ((1 << compCount) - 1);
                 const uint32_t origLoc = pResUsage->inOutUsage.fs.outputOrigLocs[location];
                 if (origLoc == InvalidValue)
@@ -1651,7 +1651,7 @@ void PatchInOutImportExport::visitReturnInst(
         }
 
         // NOTE: If outputs are present in fragment shader, we have to export a dummy one
-        auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+        auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
 
 #if LLPC_BUILD_GFX10
         // NOTE: GFX10 can allow no dummy export when the fragment shader does not have discard operation
@@ -1812,7 +1812,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 {
     Value* pInput = UndefValue::get(pInputTy);
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
     auto& interpInfo = pResUsage->inOutUsage.fs.interpInfo;
 
     const uint32_t locCount = (pInputTy->getPrimitiveSizeInBits() / 8 > SizeOfVec4) ? 2 : 1;
@@ -1841,7 +1841,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
         };
     }
 
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
     auto  pPrimMask    = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
     Value* pI  = nullptr;
     Value* pJ  = nullptr;
@@ -2252,7 +2252,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
     // Field "genericOutByteSizes" now gets set when generating the copy shader. Just assert that we agree on the
     // byteSize.
     auto& genericOutByteSizes =
-        m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
+        m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.genericOutByteSizes;
     LLPC_ASSERT(genericOutByteSizes[streamId][location][compIdx] == byteSize);
     LLPC_UNUSED(genericOutByteSizes);
 
@@ -2349,7 +2349,7 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
     uint32_t     builtInId,     // ID of the built-in variable
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
 
     switch (builtInId)
     {
@@ -2388,7 +2388,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
 {
     Value* pInput = UndefValue::get(pInputTy);
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl);
     auto& inoutUsage = pResUsage->inOutUsage;
     auto& builtInInLocMap = inoutUsage.builtInInputLocMap;
 
@@ -2496,9 +2496,9 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
 {
     Value* pInput = UndefValue::get(pInputTy);
 
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval);
     auto& inOutUsage = pResUsage->inOutUsage;
     auto& builtInInLocMap = inOutUsage.builtInInputLocMap;
     auto& perPatchBuiltInInLocMap = inOutUsage.perPatchBuiltInInputLocMap;
@@ -2658,9 +2658,9 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
 {
     Value* pInput = nullptr;
 
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
-    auto& inOutUsage   = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+    auto& inOutUsage   = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
 
     uint32_t loc = inOutUsage.builtInInputLocMap[builtInId];
     LLPC_ASSERT(loc != InvalidValue);
@@ -2757,9 +2757,9 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
 {
     Value* pInput = UndefValue::get(pInputTy);
 
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-    auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->inOutUsage;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
+    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->inOutUsage;
 
     Attribute::AttrKind attribs[] = {
         Attribute::ReadNone
@@ -3173,7 +3173,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
 {
     Value* pInput = nullptr;
 
-    auto  pIntfData    = m_pContext->GetShaderInterfaceData(ShaderStageCompute);
+    auto  pIntfData    = m_pPipelineState->GetShaderInterfaceData(ShaderStageCompute);
     auto& entryArgIdxs = pIntfData->entryArgIdxs.cs;
 
     switch (builtInId)
@@ -3312,7 +3312,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
 {
     Value* pOutput = UndefValue::get(pOutputTy);
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl);
     auto& builtInUsage = pResUsage->builtInUsage.tcs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
     auto& perPatchBuiltInOutLocMap = pResUsage->inOutUsage.perPatchBuiltInOutputLocMap;
@@ -3448,7 +3448,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
 {
     auto pOutputTy = pOutput->getType();
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
     auto& builtInUsage = pResUsage->builtInUsage.vs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
@@ -3701,7 +3701,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
 {
     auto pOutputTy = pOutput->getType();
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl);
     auto& builtInUsage = pResUsage->builtInUsage.tcs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
     auto& perPatchBuiltInOutLocMap = pResUsage->inOutUsage.perPatchBuiltInOutputLocMap;
@@ -3932,7 +3932,7 @@ void PatchInOutImportExport::PatchTesBuiltInOutputExport(
 {
     auto pOutputTy = pOutput->getType();
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval);
     auto& builtInUsage = pResUsage->builtInUsage.tes;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
@@ -4120,7 +4120,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
     uint32_t     streamId,      // ID of output vertex stream
     Instruction* pInsertPos)    // [in] Where to insert the patch instruction
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& builtInUsage = pResUsage->builtInUsage.gs;
     auto& builtInOutLocMap = pResUsage->inOutUsage.builtInOutputLocMap;
 
@@ -4353,7 +4353,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
 
     Value* pStreamOutBufDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetStreamOutBufDesc(xfbBuffer);
 
-    const auto& xfbStrides = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
+    const auto& xfbStrides = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage.xfbStrides;
     uint32_t xfbStride = xfbStrides[xfbBuffer];
 
     auto pOutputTy = pOutput->getType();
@@ -4871,7 +4871,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         }
     }
 
-    const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+    const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
 
     uint32_t streamOffsets[MaxTransformFeedbackBuffers] = {};
     uint32_t writeIndex = 0;
@@ -4896,7 +4896,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         writeIndex = CopyShaderUserSgprIdxWriteIndex;
         streamInfo = CopyShaderUserSgprIdxStreamInfo;
 
-        auto& inoutUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+        auto& inoutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
         uint32_t streamOffset = CopyShaderUserSgprIdxStreamOffset;
 
         for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
@@ -5004,7 +5004,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         }
 
         // Call buffer store intrinsic or LDS store
-        const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+        const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
         Value* pEsGsOffset = nullptr;
         if (m_shaderStage == ShaderStageVertex)
         {
@@ -5206,7 +5206,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
     }
 
     // Call buffer store intrinsic
-    const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+    const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
     Value* pGsVsOffset = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.gs.gsVsOffset);
 
     auto pEmitCounterPtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetEmitCounterPtr()[streamId];
@@ -5287,7 +5287,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
         LLPC_ASSERT(m_pPipelineState->HasShaderStage(ShaderStageGeometry));
-        const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+        const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
         pEsGsOffset = BinaryOperator::CreateLShr(pEsGsOffset,
                                                  ConstantInt::get(m_pContext->Int32Ty(), 2),
@@ -5372,7 +5372,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
     Value*          pGsVsOffset, // [in] ES-GS ring offset in bytes
     Instruction*    pInsertPos)  // [in] Where to insert the instruction
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     Value* pRingOffset = nullptr;
 
@@ -5472,8 +5472,8 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     if (m_pPipelineState->IsTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
     {
         const auto& offChipLdsBase = (m_shaderStage == ShaderStageTessEval) ?
-            m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes.offChipLdsBase :
-            m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs.offChipLdsBase;
+            m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes.offChipLdsBase :
+            m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs.offChipLdsBase;
 
         auto pOffChipLdsDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetOffChipLdsDesc();
 
@@ -5634,7 +5634,7 @@ void PatchInOutImportExport::WriteValueToLds(
 
     if (m_pPipelineState->IsTessOffChip() && (m_shaderStage == ShaderStageTessControl))     // Write to off-chip LDS buffer
     {
-        auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
+        auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs;
 
         auto pOffChipLdsBase = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.offChipLdsBase);
         // Convert DWORD off-chip LDS offset to byte offset
@@ -5812,10 +5812,10 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         return;
     }
 
-    const auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
+    const auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
 
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
     auto pTfBufferBase = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.tfBufferBase);
 
     auto pTessFactorStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.tessFactorStride);
@@ -6027,10 +6027,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForVsOutput(
                                               "",
                                               pInsertPos);
 
-    const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
+    const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
     auto pRelVertexId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.relVertexId);
 
-    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
     auto pVertexStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.inVertexStride);
 
     // dwordOffset = relVertexId * vertexStride + attribOffset
@@ -6052,7 +6052,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
 
-    const auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
+    const auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
 
     // attribOffset = (location + locOffset) * 4 + compIdx
@@ -6113,7 +6113,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageTessControl);
 
-    const auto& inOutUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
+    const auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
     const auto& calcFactor = inOutUsage.calcFactor;
 
     auto outPatchStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
@@ -6201,7 +6201,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageTessEval);
 
-    const auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+    const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
     auto outPatchStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.outPatchStart :
         calcFactor.onChip.outPatchStart;
@@ -6209,7 +6209,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     auto patchConstStart = m_pPipelineState->IsTessOffChip() ? calcFactor.offChip.patchConstStart :
         calcFactor.onChip.patchConstStart;
 
-    const auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes;
+    const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes;
 
     auto pRelPatchId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.relPatchId);
 
@@ -6393,7 +6393,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
     auto pOutputTy = pOutput->getType();
 
-    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     const uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() : 1;
     const uint32_t bitWidth  = pOutputTy->getScalarSizeInBits();
@@ -6571,7 +6571,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
     LLPC_ASSERT(useExpInst);
     LLPC_UNUSED(useExpInst);
 
-    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     const auto pUndef = UndefValue::get(m_pContext->FloatTy());
 
@@ -6649,7 +6649,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             if (nextStage == ShaderStageFragment)
             {
                 const auto& nextBuiltInUsage =
-                    m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+                    m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
                 hasLayerExport = nextBuiltInUsage.layer || nextBuiltInUsage.viewIndex;
             }
@@ -6717,7 +6717,7 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
             if (nextStage == ShaderStageFragment)
             {
                 const auto& nextBuiltInUsage =
-                    m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+                    m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
 
                 hasViewportIndexExport = nextBuiltInUsage.viewportIndex;
             }
@@ -6769,9 +6769,9 @@ Value* PatchInOutImportExport::AdjustCentroidIJ(
     Value*       pCenterIJ,     // [in] Center I/J provided by hardware natively
     Instruction* pInsertPos)    // [in] Where to insert this call
 {
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
     auto pPrimMask = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
     Value* pIJ = nullptr;
 
     if (builtInUsage.centroid && builtInUsage.center)
@@ -6833,7 +6833,7 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
 // to apply optimizations.
 WorkgroupLayout PatchInOutImportExport::CalculateWorkgroupLayout()
 {
-    auto& resUsage = *m_pContext->GetShaderResourceUsage(ShaderStageCompute);
+    auto& resUsage = *m_pPipelineState->GetShaderResourceUsage(ShaderStageCompute);
     if (m_shaderStage == ShaderStageCompute)
     {
         bool reconfig = false;
@@ -6890,7 +6890,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     Value*       pLocalInvocationId, // [in] The original workgroup ID.
     Instruction* pInsertPos)         // [in] Where to insert instructions.
 {
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
+    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageCompute)->builtInUsage.cs;
     auto workgroupLayout = static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout);
     auto& mode = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
 
@@ -7216,7 +7216,7 @@ Value* PatchInOutImportExport::GetInLocalInvocationId(
     LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
 
     auto& builtInUsage = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
     Value* pLocaInvocatioId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.localInvocationId);
 
     WorkgroupLayout workgroupLayout = CalculateWorkgroupLayout();

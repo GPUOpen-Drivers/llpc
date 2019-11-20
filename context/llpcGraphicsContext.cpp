@@ -82,48 +82,11 @@ GraphicsContext::GraphicsContext(
             }
         }
     }
-
-    for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
-    {
-        ShaderStage shaderStage = static_cast<ShaderStage>(stage);
-        InitShaderResourceUsage(shaderStage, GetShaderResourceUsage(shaderStage));
-        InitShaderInterfaceData(GetShaderInterfaceData(shaderStage));
-    }
 }
 
 // =====================================================================================================================
 GraphicsContext::~GraphicsContext()
 {
-}
-
-// =====================================================================================================================
-// Gets resource usage of the specified shader stage.
-ResourceUsage* GraphicsContext::GetShaderResourceUsage(
-    ShaderStage shaderStage) // Shader stage
-{
-    if (shaderStage == ShaderStageCopyShader)
-    {
-        // Treat copy shader as part of geometry shader
-        shaderStage = ShaderStageGeometry;
-    }
-
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
-    return &m_resUsages[shaderStage];
-}
-
-// =====================================================================================================================
-// Gets interface data of the specified shader stage.
-InterfaceData* GraphicsContext::GetShaderInterfaceData(
-    ShaderStage shaderStage)  // Shader stage
-{
-    if (shaderStage == ShaderStageCopyShader)
-    {
-        // Treat copy shader as part of geometry shader
-        shaderStage = ShaderStageGeometry;
-    }
-
-    LLPC_ASSERT(shaderStage < ShaderStageGfxCount);
-    return &m_intfData[shaderStage];
 }
 
 // =====================================================================================================================

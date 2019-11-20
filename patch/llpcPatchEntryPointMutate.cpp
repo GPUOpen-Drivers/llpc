@@ -145,7 +145,7 @@ void PatchEntryPointMutate::ProcessShader()
     AttrBuilder builder;
     if (m_shaderStage == ShaderStageFragment)
     {
-        auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+        auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
         SpiPsInputAddr spiPsInputAddr = {};
 
         spiPsInputAddr.bits.PERSP_SAMPLE_ENA     = ((builtInUsage.smooth && builtInUsage.sample) ||
@@ -175,7 +175,7 @@ void PatchEntryPointMutate::ProcessShader()
 
     // Set VGPR, SGPR, and wave limits
     auto pShaderOptions = &m_pPipelineState->GetShaderOptions(m_shaderStage);
-    auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
     uint32_t vgprLimit = pShaderOptions->vgprLimit;
     uint32_t sgprLimit = pShaderOptions->sgprLimit;
@@ -241,7 +241,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
 {
     bool active = false;
 
-    const ResourceUsage* pResUsage1 = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    const ResourceUsage* pResUsage1 = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
     const ResourceUsage* pResUsage2 = nullptr;
 
     const auto gfxIp = m_pPipelineState->GetTargetInfo().GetGfxIpVersion();
@@ -280,7 +280,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
 
             if (shaderStage2 != ShaderStageInvalid)
             {
-                pResUsage2 = m_pContext->GetShaderResourceUsage(shaderStage2);
+                pResUsage2 = m_pPipelineState->GetShaderResourceUsage(shaderStage2);
             }
         }
     }
@@ -343,8 +343,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     std::vector<Type*> argTys;
 
     auto userDataNodes = m_pPipelineState->GetUserDataNodes();
-    auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
-    auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
     // Global internal table
     *pInRegMask |= 1ull << argTys.size();
@@ -472,7 +472,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 (m_shaderStage == ShaderStageTessControl) &&
                 (m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
             {
-                pCurrResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+                pCurrResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
             }
 
             if (pCurrResUsage->builtInUsage.vs.baseVertex || pCurrResUsage->builtInUsage.vs.baseInstance)
@@ -747,8 +747,8 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 (m_shaderStage == ShaderStageTessControl) &&
                 (m_pPipelineState->GetShaderStageMask() & ShaderStageToMask(ShaderStageVertex)))
             {
-                pCurrIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
-                pCurrResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+                pCurrIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
+                pCurrResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
             }
 
             // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9

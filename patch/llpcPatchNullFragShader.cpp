@@ -167,7 +167,7 @@ bool PatchNullFragShader::runOnModule(
     pEntryPoint->addMetadata(LlpcName::ShaderStageMetadata, *pExecModelMetaNode);
 
     // Initialize shader info.
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+    auto pResUsage = pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
     pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | ShaderStageToMask(ShaderStageFragment));
 
     // Add usage info for dummy input
@@ -179,6 +179,7 @@ bool PatchNullFragShader::runOnModule(
     // Add usage info for dummy output
     pResUsage->inOutUsage.fs.cbShaderMask = 0;
     pResUsage->inOutUsage.fs.dummyExport = true;
+    pResUsage->inOutUsage.fs.isNullFs = true;
     pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 
     return true;

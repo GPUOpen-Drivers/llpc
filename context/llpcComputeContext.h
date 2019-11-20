@@ -46,8 +46,6 @@ public:
                    MetroHash::Hash*                pCacheHash);
     virtual ~ComputeContext() {}
 
-    virtual ResourceUsage* GetShaderResourceUsage(ShaderStage shaderStage);
-    virtual InterfaceData* GetShaderInterfaceData(ShaderStage shaderStage);
     virtual const PipelineShaderInfo* GetPipelineShaderInfo(ShaderStage shaderStage) const;
 
     // Checks whether the pipeline is graphics or compute
@@ -73,9 +71,6 @@ private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(ComputeContext);
 
     const ComputePipelineBuildInfo*     m_pPipelineInfo; // Info to build a compute pipeline
-
-    ResourceUsage   m_resUsage;   // Resource usage of compute shader
-    InterfaceData   m_intfData;   // Interface data of compute shader
 };
 
 } // Llpc

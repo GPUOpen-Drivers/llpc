@@ -150,9 +150,9 @@ FunctionType* NggPrimShader::GeneratePrimShaderEntryPointType(
     // User data (SGPRs)
     uint32_t userDataCount = 0;
 
-    const auto pGsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
-    const auto pTesIntfData = m_pContext->GetShaderInterfaceData(ShaderStageTessEval);
-    const auto pVsIntfData = m_pContext->GetShaderInterfaceData(ShaderStageVertex);
+    const auto pGsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
+    const auto pTesIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessEval);
+    const auto pVsIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex);
 
     bool hasTs = (m_hasTcs || m_hasTes);
     if (m_hasGs)
@@ -378,7 +378,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
     Value* pVertexId = (pArg + 5);
     Value* pInstanceId = (pArg + 8);
 
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
 
     // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
     // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
@@ -1881,7 +1881,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
 
     const uint32_t waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     const uint32_t rasterStream = pResUsage->inOutUsage.gs.rasterStream;
     LLPC_ASSERT(rasterStream < MaxGsStreams);
 
@@ -3029,7 +3029,7 @@ void NggPrimShader::RunEsOrEsVariant(
     Value* pEsGsOffset = nullptr;
     if (m_hasGs)
     {
-        auto& calcFactor = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+        auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
         pEsGsOffset = m_pBuilder->CreateMul(m_nggFactor.pWaveIdInSubgroup,
                                             m_pBuilder->getInt32(64 * 4 * calcFactor.esGsRingItemSize));
     }
@@ -3057,7 +3057,7 @@ void NggPrimShader::RunEsOrEsVariant(
         // NOTE: For vertex compaction, system values are from LDS compaction data region rather than from VGPRs.
         LLPC_ASSERT(m_pNggControl->compactMode == NggCompactVertices);
 
-        const auto pResUsage = m_pContext->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+        const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
 
         if (hasTs)
         {
@@ -3129,7 +3129,7 @@ void NggPrimShader::RunEsOrEsVariant(
     std::vector<Value*> args;
 
     auto pIntfData =
-        m_pContext->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+        m_pPipelineState->GetShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     const uint32_t userDataCount = pIntfData->userDataCount;
 
     uint32_t userDataIdx = 0;
@@ -3517,7 +3517,7 @@ Value* NggPrimShader::RunGsVariant(
 
     std::vector<Value*> args;
 
-    auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageGeometry);
+    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry);
     const uint32_t userDataCount = pIntfData->userDataCount;
 
     uint32_t userDataIdx = 0;
@@ -3696,7 +3696,7 @@ Function* NggPrimShader::MutateGsToVariant(
     }
 
     // Initialzie thread ID in subgroup
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
     auto pWaveId = GetFunctionArgument(pGsEntryVariant, entryArgIdxs.waveId);
 
     auto pThreadIdInSubgroup = m_pBuilder->CreateMul(pWaveId, m_pBuilder->getInt32(waveSize));
@@ -3784,7 +3784,7 @@ Function* NggPrimShader::MutateGsToVariant(
     m_pBuilder->SetInsertPoint(pRetBlock);
 
     // NOTE: Only return output primitive/vertex count info for rasterization stream.
-    auto rasterStream = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+    auto rasterStream = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
     auto pOutPrimCount = m_pBuilder->CreateLoad(outPrimCounterPtrs[rasterStream]);
     auto pOutVertCount = m_pBuilder->CreateLoad(outVertCounterPtrs[rasterStream]);
 
@@ -3914,7 +3914,7 @@ void NggPrimShader::ExportGsOutput(
     llvm::Value* pThreadIdInWave,   // [in] Thread ID in wave
     Value*       pOutVertCounter)   // [in] GS output vertex counter for this stream
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     if (pResUsage->inOutUsage.gs.rasterStream != streamId)
     {
         // NOTE: Only export those outputs that belong to the rasterization stream.
@@ -3973,7 +3973,7 @@ Value* NggPrimShader::ImportGsOutput(
     uint32_t     streamId,              // ID of output vertex stream
     Value*       pVertexOffset)         // [in] Start offset of vertex item in GS-VS ring (in BYTES)
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     if (pResUsage->inOutUsage.gs.rasterStream != streamId)
     {
         // NOTE: Only import those outputs that belong to the rasterization stream.
@@ -4133,7 +4133,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
     auto savedInsertPoint = m_pBuilder->saveIP();
 
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
-    const auto& pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    const auto& pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
     uint32_t outVertsPerPrim = 0;
@@ -4355,7 +4355,7 @@ Function* NggPrimShader::CreateGsCutHandler(
     auto savedInsertPoint = m_pBuilder->saveIP();
 
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
-    const auto& pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    const auto& pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     // Get GS output vertices per output primitive
     uint32_t outVertsPerPrim = 0;
@@ -4470,7 +4470,7 @@ void NggPrimShader::ReviseOutputPrimitiveData(
     Value* pVertexIdAdjust)  // [in] Adjustment of vertex indices corresponding to the GS output primitive
 {
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
 

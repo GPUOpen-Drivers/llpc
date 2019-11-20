@@ -172,7 +172,7 @@ void PatchPushConstOp::visitCallInst(
     LLPC_ASSERT(pCallee->getName().startswith(LlpcName::DescriptorLoadSpillTable));
     LLPC_UNUSED(pCallee);
 
-    auto pIntfData = m_pContext->GetShaderInterfaceData(m_shaderStage);
+    auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
     uint32_t pushConstNodeIdx = pIntfData->pushConst.resNodeIdx;
     LLPC_ASSERT(pushConstNodeIdx != InvalidValue);
     auto pPushConstNode = &m_pPipelineState->GetUserDataNodes()[pushConstNodeIdx];

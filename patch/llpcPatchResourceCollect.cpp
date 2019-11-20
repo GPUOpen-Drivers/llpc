@@ -164,21 +164,21 @@ void PatchResourceCollect::SetNggControl()
     bool enableXfb = false;
     if (hasGs)
     {
-        const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+        const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
         enableXfb = pResUsage->inOutUsage.enableXfb;
     }
     else
     {
         if (hasTs)
         {
-            const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageTessEval);
+            const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval);
             const auto& builtInUsage = pResUsage->builtInUsage.tes;
             useCullDistance = (builtInUsage.cullDistance > 0);
             enableXfb = pResUsage->inOutUsage.enableXfb;
         }
         else
         {
-            const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex);
+            const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex);
             const auto& builtInUsage = pResUsage->builtInUsage.vs;
             useCullDistance = (builtInUsage.cullDistance > 0);
             enableXfb = pResUsage->inOutUsage.enableXfb;
@@ -458,7 +458,7 @@ bool PatchResourceCollect::CheckGsOnChipValidity()
 #endif
 
     const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
-    auto pGsResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pGsResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
 
     uint32_t inVertsPerPrim = 0;
     bool useAdjacency = false;
@@ -1152,7 +1152,7 @@ void PatchResourceCollect::ProcessShader()
     m_hasPushConstOp = false;
     m_hasDynIndexedInput = false;
     m_hasDynIndexedOutput = false;
-    m_pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    m_pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
     // Invoke handling of "call" instruction
     visit(m_pEntryPoint);
@@ -1229,15 +1229,16 @@ bool PatchResourceCollect::IsVertexReuseDisabled()
     bool useViewportIndex = false;
     if (hasGs)
     {
-        useViewportIndex = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.viewportIndex;
+        useViewportIndex = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs.viewportIndex;
     }
     else if (hasTs)
     {
-        useViewportIndex = m_pContext->GetShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.viewportIndex;
+        useViewportIndex = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessEval)->
+                              builtInUsage.tes.viewportIndex;
     }
     else if (hasVs)
     {
-        useViewportIndex = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
+        useViewportIndex = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
     }
 
     disableVertexReuse |= useViewportIndex;
@@ -2018,7 +2019,7 @@ void PatchResourceCollect::ClearInactiveOutput()
 void PatchResourceCollect::MatchGenericInOut()
 {
     LLPC_ASSERT(m_pPipelineState->IsGraphics());
-    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     auto& inLocMap  = inOutUsage.inputLocMap;
     auto& outLocMap = inOutUsage.outputLocMap;
@@ -2034,7 +2035,7 @@ void PatchResourceCollect::MatchGenericInOut()
         // Do normal input/output matching
         if (nextStage != ShaderStageInvalid)
         {
-            const auto pNextResUsage = m_pContext->GetShaderResourceUsage(nextStage);
+            const auto pNextResUsage = m_pPipelineState->GetShaderResourceUsage(nextStage);
             const auto& nextInLocMap = pNextResUsage->inOutUsage.inputLocMap;
 
             uint32_t availInMapLoc = pNextResUsage->inOutUsage.inputMapLocCount;
@@ -2081,7 +2082,7 @@ void PatchResourceCollect::MatchGenericInOut()
         {
             if (nextStage != ShaderStageInvalid)
             {
-                const auto pNextResUsage = m_pContext->GetShaderResourceUsage(nextStage);
+                const auto pNextResUsage = m_pPipelineState->GetShaderResourceUsage(nextStage);
                 const auto& nextPerPatchInLocMap = pNextResUsage->inOutUsage.perPatchInputLocMap;
 
                 uint32_t availPerPatchInMapLoc = pNextResUsage->inOutUsage.perPatchInputMapLocCount;
@@ -2266,14 +2267,14 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
 {
     LLPC_ASSERT(m_pPipelineState->IsGraphics());
 
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(m_shaderStage);
+    const auto pResUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage);
 
     auto& builtInUsage = pResUsage->builtInUsage;
     auto& inOutUsage = pResUsage->inOutUsage;
 
     const auto nextStage = m_pPipelineState->GetNextShaderStage(m_shaderStage);
     auto pNextResUsage =
-        (nextStage != ShaderStageInvalid) ? m_pContext->GetShaderResourceUsage(nextStage) : nullptr;
+        (nextStage != ShaderStageInvalid) ? m_pPipelineState->GetShaderResourceUsage(nextStage) : nullptr;
 
     LLPC_ASSERT(inOutUsage.builtInInputLocMap.empty()); // Should be empty
     LLPC_ASSERT(inOutUsage.builtInOutputLocMap.empty());
@@ -2788,7 +2789,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
             {
-                const auto& prevBuiltInUsage = m_pContext->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
+                const auto& prevBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
                 clipDistanceCount = std::max(clipDistanceCount, prevBuiltInUsage.clipDistance);
             }
 
@@ -2806,7 +2807,7 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
             const auto prevStage = m_pPipelineState->GetPrevShaderStage(m_shaderStage);
             if (prevStage == ShaderStageTessControl)
             {
-                const auto& prevBuiltInUsage = m_pContext->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
+                const auto& prevBuiltInUsage = m_pPipelineState->GetShaderResourceUsage(prevStage)->builtInUsage.tcs;
                 cullDistanceCount = std::max(cullDistanceCount, prevBuiltInUsage.clipDistance);
             }
 
@@ -3325,7 +3326,7 @@ void PatchResourceCollect::MapGsGenericOutput(
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
     uint32_t streamId = outLocInfo.streamId;
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& inOutUsage = pResUsage->inOutUsage.gs;
 
     pResUsage->inOutUsage.outputLocMap[outLocInfo.u32All] = inOutUsage.outLocCount[streamId]++;
@@ -3351,7 +3352,7 @@ void PatchResourceCollect::MapGsBuiltInOutput(
     uint32_t elemCount)         // Element count of this built-in
 {
     LLPC_ASSERT(m_shaderStage == ShaderStageGeometry);
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry);
     auto& inOutUsage = pResUsage->inOutUsage.gs;
     uint32_t streamId = inOutUsage.rasterStream;
 
@@ -3399,8 +3400,8 @@ void PatchResourceCollect::PackInOutLocation()
         ReassembleOutputExportCalls();
 
         // For computing the shader hash
-        m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
-            m_pContext->GetShaderResourceUsage(ShaderStageFragment)->inOutUsage.inOutLocMap;
+        m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
+            m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment)->inOutUsage.inOutLocMap;
     }
     else
     {
@@ -3420,7 +3421,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
 
     LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
 
-    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
     auto& inputLocMap = inOutUsage.inputLocMap;
     inputLocMap.clear();
 
@@ -3519,7 +3520,7 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
         return;
     }
 
-    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
     // Collect the components of a vector exported from each packed location
     // Assume each location exports a vector with four components

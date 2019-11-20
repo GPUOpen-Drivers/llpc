@@ -262,8 +262,8 @@ VertexFetch::VertexFetch(
 {
     LLPC_ASSERT(GetShaderStageFromFunction(pEntryPoint) == ShaderStageVertex); // Must be vertex shader
 
-    auto& entryArgIdxs = m_pContext->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-    auto& builtInUsage = m_pContext->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+    auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
+    auto& builtInUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
     auto pInsertPos = pEntryPoint->begin()->getFirstInsertionPt();
 
     // VertexIndex = BaseVertex + VertexID

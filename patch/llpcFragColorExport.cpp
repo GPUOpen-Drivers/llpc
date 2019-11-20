@@ -64,7 +64,7 @@ Value* FragColorExport::Run(
     uint32_t     location,      // Location of fragment color output
     Instruction* pInsertPos)    // [in] Where to insert fragment color export instructions
 {
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+    auto pResUsage = m_pPipelineState->GetShaderResourceUsage(ShaderStageFragment);
 
     Type* pOutputTy = pOutput->getType();
     const uint32_t origLoc = pResUsage->inOutUsage.fs.outputOrigLocs[location];
