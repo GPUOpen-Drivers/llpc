@@ -13,7 +13,7 @@ layout(location = 0) out vec4 output0;
 void main()
 {
     dvec4 dv4temp = dv4;
-    dv4temp.x = d;
+    dv4temp.x += d;
     d = dv4temp.y;
     output0 = vec4(dv4temp);
     dv4temp = dm2x4[0];
