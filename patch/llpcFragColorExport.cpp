@@ -34,7 +34,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
-#include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcFragColorExport.h"
 #include "llpcIntrinsDefs.h"
@@ -53,7 +52,7 @@ FragColorExport::FragColorExport(
     :
     m_pPipelineState(pPipelineState),
     m_pModule(pModule),
-    m_pContext(static_cast<Context*>(&pModule->getContext()))
+    m_pContext(&pModule->getContext())
 {
 }
 

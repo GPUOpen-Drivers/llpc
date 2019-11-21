@@ -30,8 +30,18 @@
  */
 #pragma once
 
-#include "llpcContext.h"
+#include "llpc.h"
+#include "palPipelineAbi.h"
+#include "g_palPipelineAbiMetadata.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
+
+namespace llvm
+{
+
+class LLVMContext;
+class Module;
+
+} // llvm
 
 namespace Llpc
 {
@@ -89,7 +99,7 @@ protected:
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Module*                   m_pModule;            // LLVM module being processed
-    Context*                        m_pContext;           // LLPC context
+    llvm::LLVMContext*              m_pContext;           // LLVM context
     PipelineState*                  m_pPipelineState;     // Pipeline state
     GfxIpVersion                    m_gfxIp;              // Graphics IP version info
 

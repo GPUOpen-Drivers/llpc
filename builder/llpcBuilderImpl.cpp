@@ -31,7 +31,6 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
 
@@ -53,13 +52,6 @@ BuilderImpl::BuilderImpl(
 {
     m_pPipelineState = reinterpret_cast<PipelineState*>(pPipeline);
     m_pPipelineState->SetNoReplayer();
-}
-
-// =====================================================================================================================
-// Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-Context& BuilderImplBase::getContext() const
-{
-    return *static_cast<Llpc::Context*>(&Builder::getContext());
 }
 
 // =====================================================================================================================

@@ -41,7 +41,6 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llpcContext.h"
 #include "llpcGfx9Chip.h"
 #include "llpcNggLdsManager.h"
 #include "llpcNggPrimShader.h"
@@ -62,7 +61,7 @@ NggPrimShader::NggPrimShader(
     PipelineState*  pPipelineState) // [in] Pipeline state
     :
     m_pPipelineState(pPipelineState),
-    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_pContext(&pPipelineState->GetContext()),
     m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
     m_pNggControl(m_pPipelineState->GetNggControl()),
     m_pLdsManager(nullptr),

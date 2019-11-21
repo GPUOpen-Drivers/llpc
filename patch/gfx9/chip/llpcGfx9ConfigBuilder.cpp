@@ -31,12 +31,12 @@
 #define DEBUG_TYPE "llpc-gfx9-config-builder"
 
 #include "SPIRVInternal.h"
-#include "llpcContext.h"
 #include "llpcCodeGenManager.h"
 #include "llpcElfReader.h"
 #include "llpcGfx9ConfigBuilder.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace llvm
 {

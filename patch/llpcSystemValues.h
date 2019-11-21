@@ -146,7 +146,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Function*     m_pEntryPoint = nullptr;        // Shader entrypoint
-    Context*            m_pContext;                     // LLPC context
+    llvm::LLVMContext*  m_pContext;                     // LLVM context
     PipelineState*      m_pPipelineState;               // Pipeline state
     ShaderStage         m_shaderStage;                  // Shader stage
 

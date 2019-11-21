@@ -36,7 +36,6 @@
 
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
-#include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchPushConstOp.h"
 #include "llpcPipelineShaders.h"

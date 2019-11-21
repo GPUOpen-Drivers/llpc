@@ -35,10 +35,10 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcContext.h"
 #include "llpcPatchPeepholeOpt.h"
 
 using namespace Llpc;
@@ -930,7 +930,7 @@ void PatchPeepholeOpt::visitCallInst(
                 auto pCond = pBranch->getCondition();
                 auto pTrueBlock = dyn_cast<BasicBlock>(pBranch->getSuccessor(0));
                 auto pNewKill = dyn_cast<CallInst>(callInst.clone());
-                Context* pContext = static_cast<Context*>(&callInst.getContext());
+                llvm::LLVMContext* pContext = &callInst.getContext();
 
                 if (pTrueBlock == pBlock)
                 {

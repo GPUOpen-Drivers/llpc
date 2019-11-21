@@ -61,7 +61,6 @@ namespace Gfx6
     struct PipelineCsRegConfig;
 }
 
-class Context;
 class PassManager;
 class PipelineState;
 

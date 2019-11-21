@@ -36,7 +36,6 @@
 namespace Llpc
 {
 
-class Context;
 struct ElfDataEntry;
 struct ResourceUsage;
 

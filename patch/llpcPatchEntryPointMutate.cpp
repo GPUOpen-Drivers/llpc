@@ -30,11 +30,11 @@
  */
 #define DEBUG_TYPE "llpc-patch-entry-point-mutate"
 
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llpcContext.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcIntrinsDefs.h"
@@ -334,7 +334,7 @@ bool PatchEntryPointMutate::IsResourceNodeActive(
 }
 
 // =====================================================================================================================
-// Generates the type for the new entry-point based on already-collected info in LLPC context.
+// Generates the type for the new entry-point based on already-collected info in LLVM context.
 FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     uint64_t* pInRegMask  // [out] "Inreg" bit mask for the arguments
     ) const

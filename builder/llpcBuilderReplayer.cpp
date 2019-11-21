@@ -28,8 +28,8 @@
  * @brief LLPC source file: BuilderReplayer pass
  ***********************************************************************************************************************
  */
+#include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
 

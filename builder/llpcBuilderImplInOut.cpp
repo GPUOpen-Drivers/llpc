@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
 

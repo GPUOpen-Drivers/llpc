@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"

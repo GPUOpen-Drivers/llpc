@@ -37,7 +37,6 @@
 namespace Llpc
 {
 
-class Context;
 class PipelineState;
 struct WorkaroundFlags;
 
@@ -81,7 +80,7 @@ private:
 
     PipelineState*  m_pPipelineState;   // Pipeline state
     llvm::Module*   m_pModule;          // LLVM module
-    Context*        m_pContext;         // LLPC context
+    llvm::LLVMContext*        m_pContext;         // LLVM context
 };
 
 } // Llpc

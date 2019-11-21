@@ -33,7 +33,6 @@
 #include "llvm/Pass.h"
 
 #include "llpc.h"
-#include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcPipeline.h"
 
@@ -108,7 +107,6 @@ llvm::ModulePass* CreatePatchPushConstOp();
 llvm::ModulePass* CreatePatchResourceCollect();
 llvm::ModulePass* CreatePatchSetupTargetFeatures();
 
-class Context;
 class PipelineState;
 
 // =====================================================================================================================
@@ -142,7 +140,7 @@ protected:
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Module*   m_pModule;      // LLVM module to be run on
-    Context*        m_pContext;     // Associated LLPC context of the LLVM module that passes run on
+    llvm::LLVMContext*        m_pContext;     // Associated LLVM context of the LLVM module that passes run on
     ShaderStage     m_shaderStage;  // Shader stage
     llvm::Function* m_pEntryPoint;  // Entry-point
 

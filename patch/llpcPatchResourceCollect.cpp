@@ -37,7 +37,6 @@
 
 #include "SPIRVInternal.h"
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcGfx6Chip.h"
 #include "llpcGfx9Chip.h"
 #include "llpcIntrinsDefs.h"

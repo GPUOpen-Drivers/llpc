@@ -156,7 +156,10 @@ Module* PipelineState::Link(
         // disappearing when modules are deleted.
         bool result = true;
         pPipelineModule = new Module("llpcPipeline", GetContext());
-        static_cast<Llpc::Context*>(&GetContext())->SetModuleTargetMachine(pPipelineModule);
+        TargetMachine* pTargetMachine = GetBuilderContext()->GetTargetMachine();
+        pPipelineModule->setTargetTriple(pTargetMachine->getTargetTriple().getTriple());
+        pPipelineModule->setDataLayout(pTargetMachine->createDataLayout());
+
         Linker linker(*pPipelineModule);
 
         for (uint32_t shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex)

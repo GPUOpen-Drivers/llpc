@@ -38,9 +38,7 @@
 #include <unordered_set>
 #include "llpcBuilderBuiltIns.h"
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcFragColorExport.h"
-#include "llpcGraphicsContext.h"
 #include "llpcPatchInOutImportExport.h"
 #include "llpcPipelineShaders.h"
 #include "llpcTargetInfo.h"

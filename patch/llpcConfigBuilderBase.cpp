@@ -52,7 +52,7 @@ ConfigBuilderBase::ConfigBuilderBase(
     m_userDataLimit(0),
     m_spillThreshold(UINT32_MAX)
 {
-    m_pContext = static_cast<Context*>(&pModule->getContext());
+    m_pContext = &pModule->getContext();
 
     m_hasVs = m_pPipelineState->HasShaderStage(ShaderStageVertex);
     m_hasTcs = m_pPipelineState->HasShaderStage(ShaderStageTessControl);

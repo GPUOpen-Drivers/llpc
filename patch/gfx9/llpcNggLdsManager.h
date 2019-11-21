@@ -40,7 +40,6 @@
 namespace Llpc
 {
 
-class Context;
 class PipelineState;
 
 // Enumerates the types of LDS regions used in NGG.
@@ -122,7 +121,7 @@ private:
     static const char*    LdsRegionNames[LdsRegionCount];  // Name strings for all LDS region types
 
     PipelineState*  m_pPipelineState; // Pipeline state
-    Context*        m_pContext;     // LLPC context
+    llvm::LLVMContext*        m_pContext;     // LLVM context
 
     llvm::GlobalValue*  m_pLds;     // Global variable to model NGG LDS
 

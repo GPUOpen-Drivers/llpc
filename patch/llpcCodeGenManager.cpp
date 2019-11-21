@@ -33,11 +33,11 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 
 #include "llpcCodeGenManager.h"
-#include "llpcContext.h"
 #include "llpcElfReader.h"
 #include "llpcFile.h"
 #include "llpcInternal.h"

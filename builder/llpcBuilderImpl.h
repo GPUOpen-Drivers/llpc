@@ -45,9 +45,6 @@ class BuilderImplBase : public Builder
 public:
     BuilderImplBase(BuilderContext* pBuilderContext) : Builder(pBuilderContext) {}
 
-    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-    Llpc::Context& getContext() const;
-
     // Create scalar from dot product of vector
     Value* CreateDotProduct(Value* const pVector1,
                             Value* const pVector2,

@@ -101,7 +101,7 @@ private:
     llvm::LegacyDivergenceAnalysis*                 m_pDivergenceAnalysis; // The divergence analysis.
     llvm::SmallVector<llvm::Instruction*, 16>       m_postVisitInsts;      // The post process instruction set.
     std::unique_ptr<llvm::IRBuilder<>>              m_pBuilder;            // The IRBuilder.
-    Context*                                        m_pContext;            // The LLPC Context.
+    llvm::LLVMContext*                              m_pContext;            // The LLVM context.
     PipelineState*                                  m_pPipelineState;      // The pipeline state
 
     static constexpr uint32_t MinMemOpLoopBytes = 256;
