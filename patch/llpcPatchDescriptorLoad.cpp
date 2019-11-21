@@ -274,25 +274,25 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     // TODO: The address space ID 2 is a magic number. We have to replace it with defined LLPC address space ID.
     if (mangledName == LlpcName::DescriptorGetResourcePtr)
     {
-        pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorResource;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorGetSamplerPtr)
     {
-        pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorSampler;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorGetFmaskPtr)
     {
-        pDescPtrTy = m_pContext->Int32x8Ty()->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 8)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorFmask;
         nodeType2 = nodeType1;
     }
     else if (mangledName == LlpcName::DescriptorLoadBuffer)
     {
-        pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorBuffer;
         nodeType2 = ResourceMappingNodeType::PushConst;
     }
@@ -303,7 +303,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
     }
     else if (mangledName == LlpcName::DescriptorGetTexelBufferPtr)
     {
-        pDescPtrTy = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
+        pDescPtrTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
         nodeType1 = ResourceMappingNodeType::DescriptorTexelBuffer;
         nodeType2 = nodeType1;
     }
@@ -384,23 +384,23 @@ Value* PatchDescriptorLoad::LoadDescriptor(
             pDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetDynamicDesc(dynDescIdx);
             if (pDesc != nullptr)
             {
-                auto pDescTy = VectorType::get(m_pContext->Int32Ty(), descSizeInDword);
+                auto pDescTy = VectorType::get(Type::getInt32Ty(*m_pContext), descSizeInDword);
                 if (pDesc->getType() != pDescTy)
                 {
                     // Array dynamic descriptor
                     Value* pDynDesc = UndefValue::get(pDescTy);
-                    auto pDescStride = ConstantInt::get(m_pContext->Int32Ty(), descSizeInDword);
+                    auto pDescStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), descSizeInDword);
                     auto pIndex = BinaryOperator::CreateMul(pArrayOffset, pDescStride, "", pInsertPoint);
                     for (uint32_t i = 0; i < descSizeInDword; ++i)
                     {
                         auto pDescElem = ExtractElementInst::Create(pDesc, pIndex, "", pInsertPoint);
                         pDynDesc = InsertElementInst::Create(pDynDesc,
                                                              pDescElem,
-                                                             ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                              "",
                                                              pInsertPoint);
                         pIndex = BinaryOperator::CreateAdd(pIndex,
-                                                           ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                            "",
                                                            pInsertPoint);
                     }
@@ -425,19 +425,22 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 m_pipelineSysValues.Get(m_pEntryPoint)->GetDescTablePtr(descSet);
 
             Value* pDescTableAddr = new PtrToIntInst(pDescTablePtr,
-                                                     m_pContext->Int64Ty(),
+                                                     Type::getInt64Ty(*m_pContext),
                                                      "",
                                                      pInsertPoint);
 
-            pDescTableAddr = new BitCastInst(pDescTableAddr, m_pContext->Int32x2Ty(), "", pInsertPoint);
+            pDescTableAddr = new BitCastInst(pDescTableAddr,
+                                             VectorType::get(Type::getInt32Ty(*m_pContext), 2),
+                                             "",
+                                             pInsertPoint);
 
             // Extract descriptor table address
             Value* pDescElem0 = ExtractElementInst::Create(pDescTableAddr,
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 "",
                 pInsertPoint);
 
-            auto pDescOffset = ConstantInt::get(m_pContext->Int32Ty(), descOffset);
+            auto pDescOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), descOffset);
 
             pDescElem0 = BinaryOperator::CreateAdd(pDescElem0, pDescOffset, "", pInsertPoint);
 
@@ -446,7 +449,7 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 // Load the address of inline constant buffer
                 pDesc = InsertElementInst::Create(pDescTableAddr,
                     pDescElem0,
-                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                     "",
                     pInsertPoint);
             }
@@ -469,59 +472,59 @@ Value* PatchDescriptorLoad::LoadDescriptor(
                 LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
 
                 Value* pDescElem1 = ExtractElementInst::Create(pDescTableAddr,
-                    ConstantInt::get(m_pContext->Int32Ty(), 1),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                     "",
                     pInsertPoint);
 
-                auto pBufDescTy = m_pContext->Int32x4Ty();
+                auto pBufDescTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
                 pDesc = UndefValue::get(pBufDescTy);
 
                 // DWORD0
                 pDesc = InsertElementInst::Create(pDesc,
                     pDescElem0,
-                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                     "",
                     pInsertPoint);
 
                 // DWORD1
                 pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
-                    ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord1.u32All),
                     "",
                     pInsertPoint);
                 pDesc = InsertElementInst::Create(pDesc,
                     pDescElem1,
-                    ConstantInt::get(m_pContext->Int32Ty(), 1),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                     "",
                     pInsertPoint);
 
                 // DWORD2
                 pDesc = InsertElementInst::Create(pDesc,
-                    ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
-                    ConstantInt::get(m_pContext->Int32Ty(), 2),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord2.u32All),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                     "",
                     pInsertPoint);
 
                 // DWORD3
                 pDesc = InsertElementInst::Create(pDesc,
-                    ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                    ConstantInt::get(m_pContext->Int32Ty(), 3),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                     "",
                     pInsertPoint);
             }
         }
         else
         {
-            auto pDescOffset = ConstantInt::get(m_pContext->Int32Ty(), descOffset);
-            auto pDescSize   = ConstantInt::get(m_pContext->Int32Ty(), descSize, 0);
+            auto pDescOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), descOffset);
+            auto pDescSize   = ConstantInt::get(Type::getInt32Ty(*m_pContext), descSize, 0);
 
             Value* pOffset = BinaryOperator::CreateMul(pArrayOffset, pDescSize, "", pInsertPoint);
             pOffset = BinaryOperator::CreateAdd(pOffset, pDescOffset, "", pInsertPoint);
 
-            pOffset = CastInst::CreateZExtOrBitCast(pOffset, m_pContext->Int64Ty(), "", pInsertPoint);
+            pOffset = CastInst::CreateZExtOrBitCast(pOffset, Type::getInt64Ty(*m_pContext), "", pInsertPoint);
 
             // Get descriptor address
             Value* idxs[] = {
-                ConstantInt::get(m_pContext->Int64Ty(), 0, false),
+                ConstantInt::get(Type::getInt64Ty(*m_pContext), 0, false),
                 pOffset
             };
 
@@ -607,23 +610,23 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
 {
     // Extract compact buffer descriptor
     Value* pDescElem0 = ExtractElementInst::Create(pDesc,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                     "",
                                                     pInsertPoint);
 
     Value* pDescElem1 = ExtractElementInst::Create(pDesc,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                     "",
                                                     pInsertPoint);
 
     // Build normal buffer descriptor
-    auto pBufDescTy = m_pContext->Int32x4Ty();
+    auto pBufDescTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
     Value* pBufDesc = UndefValue::get(pBufDescTy);
 
     // DWORD0
     pBufDesc = InsertElementInst::Create(pBufDesc,
                                         pDescElem0,
-                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                         "",
                                         pInsertPoint);
 
@@ -632,13 +635,13 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
     sqBufRsrcWord1.bits.BASE_ADDRESS_HI = UINT16_MAX;
 
     pDescElem1 = BinaryOperator::CreateAnd(pDescElem1,
-                                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord1.u32All),
+                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord1.u32All),
                                             "",
                                             pInsertPoint);
 
     pBufDesc = InsertElementInst::Create(pBufDesc,
                                         pDescElem1,
-                                        ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                         "",
                                         pInsertPoint);
 
@@ -647,8 +650,8 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
     sqBufRsrcWord2.bits.NUM_RECORDS = UINT32_MAX;
 
     pBufDesc = InsertElementInst::Create(pBufDesc,
-                                        ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord2.u32All),
-                                        ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord2.u32All),
+                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                         "",
                                         pInsertPoint);
 
@@ -666,8 +669,8 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
         LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x24FAC);
 
         pBufDesc = InsertElementInst::Create(pBufDesc,
-                                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                                            ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
+                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                                             "",
                                             pInsertPoint);
     }
@@ -685,8 +688,8 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
         LLPC_ASSERT(sqBufRsrcWord3.u32All == 0x21014FAC);
 
         pBufDesc = InsertElementInst::Create(pBufDesc,
-                                            ConstantInt::get(m_pContext->Int32Ty(), sqBufRsrcWord3.u32All),
-                                            ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), sqBufRsrcWord3.u32All),
+                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                                             "",
                                             pInsertPoint);
     }

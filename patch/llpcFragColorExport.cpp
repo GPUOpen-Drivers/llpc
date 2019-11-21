@@ -106,7 +106,7 @@ Value* FragColorExport::Run(
         for (uint32_t i = 0; i < compCount; ++i)
         {
             comps[i] = ExtractElementInst::Create(pOutput,
-                                                  ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                  ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                   "",
                                                   pInsertPos);
         }
@@ -115,9 +115,9 @@ Value* FragColorExport::Run(
     bool comprExp = false;
     bool needPack = false;
 
-    const auto pUndefFloat     = UndefValue::get(m_pContext->FloatTy());
-    const auto pUndefFloat16   = UndefValue::get(m_pContext->Float16Ty());
-    const auto pUndefFloat16x2 = UndefValue::get(m_pContext->Float16x2Ty());
+    const auto pUndefFloat     = UndefValue::get(Type::getFloatTy(*m_pContext));
+    const auto pUndefFloat16   = UndefValue::get(Type::getHalfTy(*m_pContext));
+    const auto pUndefFloat16x2 = UndefValue::get(VectorType::get(Type::getHalfTy(*m_pContext), 2));
 
     switch (expFmt)
     {
@@ -202,16 +202,16 @@ Value* FragColorExport::Run(
                     if (signedness)
                     {
                         // %comp = sext i8 %comp to i16
-                        comps[i] = new SExtInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
+                        comps[i] = new SExtInst(comps[i], Type::getInt16Ty(*m_pContext), "", pInsertPos);
                     }
                     else
                     {
                         // %comp = zext i8 %comp to i16
-                        comps[i] = new ZExtInst(comps[i], m_pContext->Int16Ty(), "", pInsertPos);
+                        comps[i] = new ZExtInst(comps[i], Type::getInt16Ty(*m_pContext), "", pInsertPos);
                     }
 
                     // %comp = bitcast i16 %comp to half
-                    comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
+                    comps[i] = new BitCastInst(comps[i], Type::getHalfTy(*m_pContext), "", pInsertPos);
                 }
 
                 for (uint32_t i = compCount; i < 4; ++i)
@@ -229,7 +229,7 @@ Value* FragColorExport::Run(
                     for (uint32_t i = 0; i < compCount; ++i)
                     {
                         // %comp = bitcast i16 %comp to half
-                        comps[i] = new BitCastInst(comps[i], m_pContext->Float16Ty(), "", pInsertPos);
+                        comps[i] = new BitCastInst(comps[i], Type::getHalfTy(*m_pContext), "", pInsertPos);
                     }
                 }
 
@@ -246,7 +246,7 @@ Value* FragColorExport::Run(
                     for (uint32_t i = 0; i < compCount; ++i)
                     {
                         // %comp = bitcast i32 %comp to float
-                        comps[i] = new BitCastInst(comps[i], m_pContext->FloatTy(), "", pInsertPos);
+                        comps[i] = new BitCastInst(comps[i], Type::getFloatTy(*m_pContext), "", pInsertPos);
                     }
                 }
 
@@ -261,7 +261,7 @@ Value* FragColorExport::Run(
 
                 // Do packing
                 comps[0] = EmitCall("llvm.amdgcn.cvt.pkrtz",
-                                    m_pContext->Float16x2Ty(),
+                                    VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                     { comps[0], comps[1] },
                                     attribs,
                                     pInsertPos);
@@ -269,7 +269,7 @@ Value* FragColorExport::Run(
                 if (compCount > 2)
                 {
                     comps[1] = EmitCall("llvm.amdgcn.cvt.pkrtz",
-                                        m_pContext->Float16x2Ty(),
+                                        VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                         { comps[2], comps[3] },
                                         attribs,
                                         pInsertPos);
@@ -298,7 +298,7 @@ Value* FragColorExport::Run(
             // Make even number of components;
             if ((compCount % 2) != 0)
             {
-                comps[compCount] = ConstantFP::get(m_pContext->FloatTy(), 0.0);
+                comps[compCount] = ConstantFP::get(Type::getFloatTy(*m_pContext), 0.0);
                 compCount++;
             }
 
@@ -308,20 +308,20 @@ Value* FragColorExport::Run(
             for (uint32_t i = 0; i < compCount; i += 2)
             {
                 Value* pComps = EmitCall(funcName,
-                                         m_pContext->Int16x2Ty(),
+                                         VectorType::get(Type::getInt16Ty(*m_pContext), 2),
                                          { comps[i], comps[i + 1] },
                                          NoAttrib,
                                          pInsertPos);
 
-                pComps = new BitCastInst(pComps, m_pContext->Float16x2Ty(), "", pInsertPos);
+                pComps = new BitCastInst(pComps, VectorType::get(Type::getHalfTy(*m_pContext), 2), "", pInsertPos);
 
                 comps[i] = ExtractElementInst::Create(pComps,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                         "",
                                                         pInsertPos);
 
                 comps[i + 1] = ExtractElementInst::Create(pComps,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                             "",
                                                             pInsertPos);
 
@@ -350,7 +350,7 @@ Value* FragColorExport::Run(
             // Make even number of components;
             if ((compCount % 2) != 0)
             {
-                comps[compCount] = ConstantInt::get(m_pContext->Int32Ty(), 0),
+                comps[compCount] = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 compCount++;
             }
 
@@ -360,20 +360,20 @@ Value* FragColorExport::Run(
             for (uint32_t i = 0; i < compCount; i += 2)
             {
                 Value* pComps = EmitCall(funcName,
-                                         m_pContext->Int16x2Ty(),
+                                         VectorType::get(Type::getInt16Ty(*m_pContext), 2),
                                          { comps[i], comps[i + 1] },
                                          NoAttrib,
                                          pInsertPos);
 
-                pComps = new BitCastInst(pComps, m_pContext->Float16x2Ty(), "", pInsertPos);
+                pComps = new BitCastInst(pComps, VectorType::get(Type::getHalfTy(*m_pContext), 2), "", pInsertPos);
 
                 comps[i] = ExtractElementInst::Create(pComps,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                         "",
                                                         pInsertPos);
 
                 comps[i + 1] = ExtractElementInst::Create(pComps,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                             "",
                                                             pInsertPos);
             }
@@ -408,14 +408,14 @@ Value* FragColorExport::Run(
             // %comp[0] = insertelement <2 x half> undef, half %comp[0], i32 0
             comps[0] = InsertElementInst::Create(pUndefFloat16x2,
                                                  comps[0],
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                  "",
                                                  pInsertPos);
 
             // %comp[0] = insertelement <2 x half> %comp[0], half %comp[1], i32 1
             comps[0] = InsertElementInst::Create(comps[0],
                                                  comps[1],
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                  "",
                                                  pInsertPos);
 
@@ -424,14 +424,14 @@ Value* FragColorExport::Run(
                 // %comp[1] = insertelement <2 x half> undef, half %comp[2], i32 0
                 comps[1] = InsertElementInst::Create(pUndefFloat16x2,
                                                      comps[2],
-                                                     ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                     ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                      "",
                                                      pInsertPos);
 
                 // %comp[1] = insertelement <2 x half> %comp[1], half %comp[3], i32 1
                 comps[1] = InsertElementInst::Create(comps[1],
                                                      comps[3],
-                                                     ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                     ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                      "",
                                                      pInsertPos);
             }
@@ -442,31 +442,31 @@ Value* FragColorExport::Run(
         }
 
         Value* args[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0 + location), // tgt
-            ConstantInt::get(m_pContext->Int32Ty(), (compCount > 2) ? 0xF : 0x3), // en
-            comps[0],                                                             // src0
-            comps[1],                                                             // src1
-            ConstantInt::get(m_pContext->BoolTy(), false),                        // done
-            ConstantInt::get(m_pContext->BoolTy(), true)                          // vm
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_MRT_0 + location), // tgt
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), (compCount > 2) ? 0xF : 0x3), // en
+            comps[0],                                                                     // src0
+            comps[1],                                                                     // src1
+            ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                        // done
+            ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                          // vm
         };
 
-        pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        pExport = EmitCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
     }
     else
     {
         // 32-bit export
         Value* args[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0 + location), // tgt
-            ConstantInt::get(m_pContext->Int32Ty(), (1 << compCount) - 1),        // en
-            comps[0],                                                             // src0
-            comps[1],                                                             // src1
-            comps[2],                                                             // src2
-            comps[3],                                                             // src3
-            ConstantInt::get(m_pContext->BoolTy(), false),                        // done
-            ConstantInt::get(m_pContext->BoolTy(), true)                          // vm
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_MRT_0 + location), // tgt
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), (1 << compCount) - 1),        // en
+            comps[0],                                                                     // src0
+            comps[1],                                                                     // src1
+            comps[2],                                                                     // src2
+            comps[3],                                                                     // src3
+            ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                        // done
+            ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                          // vm
         };
 
-        pExport = EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        pExport = EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
     }
 
     return pExport;
@@ -761,39 +761,39 @@ Value* FragColorExport::ConvertToFloat(
         if (signedness)
         {
             // %value = sext i8 %value to i32
-            pValue = new SExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new SExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
         else
         {
             // %value = zext i8 %value to i32
-            pValue = new ZExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new ZExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
 
         // %value = bitcast i32 %value to float
-        pValue = new BitCastInst(pValue, m_pContext->FloatTy(), "", pInsertPos);
+        pValue = new BitCastInst(pValue, Type::getFloatTy(*m_pContext), "", pInsertPos);
     }
     else if (bitWidth == 16)
     {
         if (pValueTy->isFloatingPointTy())
         {
             // %value = fpext half %value to float
-            pValue = new FPExtInst(pValue, m_pContext->FloatTy(), "", pInsertPos);
+            pValue = new FPExtInst(pValue, Type::getFloatTy(*m_pContext), "", pInsertPos);
         }
         else
         {
             if (signedness)
             {
                 // %value = sext i16 %value to i32
-                pValue = new SExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+                pValue = new SExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
             else
             {
                 // %value = zext i16 %value to i32
-                pValue = new ZExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+                pValue = new ZExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
 
             // %value = bitcast i32 %value to float
-            pValue = new BitCastInst(pValue, m_pContext->FloatTy(), "", pInsertPos);
+            pValue = new BitCastInst(pValue, Type::getFloatTy(*m_pContext), "", pInsertPos);
         }
     }
     else
@@ -802,7 +802,7 @@ Value* FragColorExport::ConvertToFloat(
         if (pValueTy->isIntegerTy())
         {
             // %value = bitcast i32 %value to float
-            pValue = new BitCastInst(pValue, m_pContext->FloatTy(), "", pInsertPos);
+            pValue = new BitCastInst(pValue, Type::getFloatTy(*m_pContext), "", pInsertPos);
         }
     }
 
@@ -829,12 +829,12 @@ Value* FragColorExport::ConvertToInt(
         if (signedness)
         {
             // %value = sext i8 %value to i32
-            pValue = new SExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new SExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
         else
         {
             // %value = zext i8 %value to i32
-            pValue = new ZExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new ZExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
     }
     else if (bitWidth == 16)
@@ -842,18 +842,18 @@ Value* FragColorExport::ConvertToInt(
         if (pValueTy->isFloatingPointTy())
         {
             // %value = bicast half %value to i16
-            pValue = new BitCastInst(pValue, m_pContext->Int16Ty(), "", pInsertPos);
+            pValue = new BitCastInst(pValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
         }
 
         if (signedness)
         {
             // %value = sext i16 %value to i32
-            pValue = new SExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new SExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
         else
         {
             // %value = zext i16 %value to i32
-            pValue = new ZExtInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new ZExtInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
     }
     else
@@ -862,7 +862,7 @@ Value* FragColorExport::ConvertToInt(
         if (pValueTy->isFloatingPointTy())
         {
             // %value = bitcast float %value to i32
-            pValue = new BitCastInst(pValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pValue = new BitCastInst(pValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
     }
 

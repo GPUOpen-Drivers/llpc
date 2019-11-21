@@ -136,7 +136,7 @@ void SpirvLowerMemoryOp::visitExtractElementInst(
             auto pCastPtr = new BitCastInst(pLoadPtr, pCastPtrTy, "", &extractElementInst);
             Value* idxs[] =
             {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 extractElementInst.getOperand(1)
             };
             auto pElementPtr = GetElementPtrInst::Create(nullptr, pCastPtr, idxs, "", &extractElementInst);
@@ -167,8 +167,8 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
         for (uint32_t i = 0; i < dynIndexBound; ++i)
         {
             auto pGetElemPtr = cast<GetElementPtrInst>(getElemPtrInst.clone());
-            auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
-                                          ConstantInt::get(m_pContext->Int32Ty(), i);
+            auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
+                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
             pGetElemPtr->setOperand(operandIndex, pConstIndex);
             getElemPtrs.push_back(pGetElemPtr);
             pGetElemPtr->insertBefore(&getElemPtrInst);
@@ -333,8 +333,8 @@ void SpirvLowerMemoryOp::ExpandLoadInst(
 
     for (uint32_t i = 1, getElemPtrCount = getElemPtrs.size(); i < getElemPtrCount; ++i)
     {
-        auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
-                                      ConstantInt::get(m_pContext->Int32Ty(), i);
+        auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
+                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
 
         auto pSecondLoadValue = new LoadInst(getElemPtrs[i], "", false, pLoadInst);
         auto pCond = new ICmpInst(pLoadInst, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
@@ -416,8 +416,8 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
         Instruction* pCheckStoreInsertPos = &pCheckStoreBlock->getInstList().back();
         Instruction* pStoreInsertPos      = &pStoreBlock->getInstList().front();
 
-        auto pGetElemPtrCount = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), getElemPtrCount) :
-                                           ConstantInt::get(m_pContext->Int32Ty(), getElemPtrCount);
+        auto pGetElemPtrCount = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), getElemPtrCount) :
+                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), getElemPtrCount);
 
         auto pDoStore = new ICmpInst(pCheckStoreInsertPos, ICmpInst::ICMP_ULT, pDynIndex, pGetElemPtrCount);
         BranchInst::Create(pStoreBlock, pEndStoreBlock, pDoStore, pCheckStoreInsertPos);
@@ -425,8 +425,8 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
         for (uint32_t i = 1; i < getElemPtrCount; ++i)
         {
             auto pSecondStoreDest = getElemPtrs[i];
-            auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
-                                          ConstantInt::get(m_pContext->Int32Ty(), i);
+            auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
+                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
             auto pCond = new ICmpInst(pStoreInsertPos, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
             pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInsertPos);
         }
@@ -465,8 +465,8 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
         for (uint32_t i = 1; i < getElemPtrCount; ++i)
         {
             auto pSecondStoreDest = getElemPtrs[i];
-            auto pConstIndex = isType64 ? ConstantInt::get(m_pContext->Int64Ty(), i) :
-                                          ConstantInt::get(m_pContext->Int32Ty(), i);
+            auto pConstIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), i) :
+                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
             auto pCond = new ICmpInst(pStoreInst, ICmpInst::ICMP_EQ, pDynIndex, pConstIndex);
             pFirstStoreDest = SelectInst::Create(pCond, pSecondStoreDest, pFirstStoreDest, "", pStoreInst);
         }

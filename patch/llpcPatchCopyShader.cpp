@@ -143,7 +143,7 @@ bool PatchCopyShader::runOnModule(
     //    i32
     IRBuilder<> builder(*m_pContext);
 
-    auto pInt32Ty = builder.getInt32Ty();
+    auto pInt32Ty = Type::getInt32Ty(*m_pContext);
     Type* argTys[] = {  pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty,
                         pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty, pInt32Ty };
     bool argInReg[] = { true,   true,   true,   true,   true,   true,

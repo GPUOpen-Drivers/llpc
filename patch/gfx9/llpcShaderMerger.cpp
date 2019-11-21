@@ -98,7 +98,7 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
     // First 8 system values (SGPRs)
     for (uint32_t i = 0; i < LsHsSpecialSysValueCount; ++i)
     {
-        argTys.push_back(m_pContext->Int32Ty());
+        argTys.push_back(Type::getInt32Ty(*m_pContext));
         *pInRegMask |= (1ull << i);
     }
 
@@ -131,18 +131,18 @@ FunctionType* ShaderMerger::GenerateLsHsEntryPointType(
     }
 
     LLPC_ASSERT(userDataCount > 0);
-    argTys.push_back(VectorType::get(m_pContext->Int32Ty(), userDataCount));
+    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), userDataCount));
     *pInRegMask |= (1ull << LsHsSpecialSysValueCount);
 
     // Other system values (VGPRs)
-    argTys.push_back(m_pContext->Int32Ty()); // Patch ID
-    argTys.push_back(m_pContext->Int32Ty()); // Relative patch ID (control point ID included)
-    argTys.push_back(m_pContext->Int32Ty()); // Vertex ID
-    argTys.push_back(m_pContext->Int32Ty()); // Relative vertex ID (auto index)
-    argTys.push_back(m_pContext->Int32Ty()); // Step rate
-    argTys.push_back(m_pContext->Int32Ty()); // Instance ID
+    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Patch ID
+    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative patch ID (control point ID included)
+    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Vertex ID
+    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative vertex ID (auto index)
+    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Step rate
+    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Instance ID
 
-    return FunctionType::get(m_pContext->VoidTy(), argTys, false);
+    return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
 }
 
 // =====================================================================================================================
@@ -247,21 +247,21 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
 
     // Construct ".entry" block
     args.clear();
-    args.push_back(ConstantInt::get(m_pContext->Int64Ty(), -1));
+    args.push_back(ConstantInt::get(Type::getInt64Ty(*m_pContext), -1));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    EmitCall("llvm.amdgcn.init.exec", m_pContext->VoidTy(), args, attribs, pEntryBlock);
+    EmitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_pContext), args, attribs, pEntryBlock);
 
     args.clear();
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
 #if LLPC_BUILD_GFX10
     uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageTessControl);
@@ -269,21 +269,21 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
 #endif
     {
         args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
         args.push_back(pThreadId);
 
-        pThreadId = EmitCall("llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        pThreadId = EmitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
     }
 
     args.clear();
     args.push_back(pMergeWaveInfo);
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
 
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
 
-    auto pLsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pLsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
     Value* pPatchId     = pArg;
     Value* pRelPatchId  = (pArg + 1);
@@ -294,10 +294,10 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
 
     args.clear();
     args.push_back(pMergeWaveInfo);
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
 
-    auto pHsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pHsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
     // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
     // VGPRs rather than expected v2~v4.
     auto pGpuWorkarounds = &m_pPipelineState->GetTargetInfo().GetGpuWorkarounds();
@@ -306,7 +306,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
         auto pNullHs = new ICmpInst(*pEntryBlock,
                                     ICmpInst::ICMP_EQ,
                                     pHsVertCount,
-                                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                     "");
 
         pVertexId    = SelectInst::Create(pNullHs, pArg,       (pArg + 2), "", pEntryBlock);
@@ -352,7 +352,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
                 std::vector<Constant*> shuffleMask;
                 for (uint32_t i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
@@ -366,7 +366,8 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
                 LLPC_ASSERT(pLsArgTy->isIntegerTy());
 
                 auto pLsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(m_pContext->Int32Ty(), userDataIdx),
+                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                               userDataIdx),
                                                               "",
                                                               pBeginLsBlock);
                 args.push_back(pLsUserData);
@@ -411,7 +412,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
     args.clear();
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
-    EmitCall("llvm.amdgcn.s.barrier", m_pContext->VoidTy(), args, attribs, pEndLsBlock);
+    EmitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_pContext), args, attribs, pEndLsBlock);
 
     auto pHsEnable = new ICmpInst(*pEndLsBlock, ICmpInst::ICMP_ULT, pThreadId, pHsVertCount, "");
     BranchInst::Create(pBeginHsBlock, pEndHsBlock, pHsEnable, pEndLsBlock);
@@ -449,7 +450,7 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
                 std::vector<Constant*> shuffleMask;
                 for (uint32_t i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
@@ -475,7 +476,8 @@ Function* ShaderMerger::GenerateLsHsEntryPoint(
                     }
                 }
                 auto pHsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(m_pContext->Int32Ty(), actualUserDataIdx),
+                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                               actualUserDataIdx),
                                                               "",
                                                               pBeginHsBlock);
                 args.push_back(pHsUserData);
@@ -527,7 +529,7 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     // First 8 system values (SGPRs)
     for (uint32_t i = 0; i < EsGsSpecialSysValueCount; ++i)
     {
-        argTys.push_back(m_pContext->Int32Ty());
+        argTys.push_back(Type::getInt32Ty(*m_pContext));
         *pInRegMask |= (1ull << i);
     }
 
@@ -586,32 +588,32 @@ FunctionType* ShaderMerger::GenerateEsGsEntryPointType(
     }
 
     LLPC_ASSERT(userDataCount > 0);
-    argTys.push_back(VectorType::get(m_pContext->Int32Ty(), userDataCount));
+    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), userDataCount));
     *pInRegMask |= (1ull << EsGsSpecialSysValueCount);
 
     // Other system values (VGPRs)
-    argTys.push_back(m_pContext->Int32Ty());        // ES to GS offsets (vertex 0 and 1)
-    argTys.push_back(m_pContext->Int32Ty());        // ES to GS offsets (vertex 2 and 3)
-    argTys.push_back(m_pContext->Int32Ty());        // Primitive ID (GS)
-    argTys.push_back(m_pContext->Int32Ty());        // Invocation ID
-    argTys.push_back(m_pContext->Int32Ty());        // ES to GS offsets (vertex 4 and 5)
+    argTys.push_back(Type::getInt32Ty(*m_pContext));        // ES to GS offsets (vertex 0 and 1)
+    argTys.push_back(Type::getInt32Ty(*m_pContext));        // ES to GS offsets (vertex 2 and 3)
+    argTys.push_back(Type::getInt32Ty(*m_pContext));        // Primitive ID (GS)
+    argTys.push_back(Type::getInt32Ty(*m_pContext));        // Invocation ID
+    argTys.push_back(Type::getInt32Ty(*m_pContext));        // ES to GS offsets (vertex 4 and 5)
 
     if (hasTs)
     {
-        argTys.push_back(m_pContext->FloatTy());    // X of TessCoord (U)
-        argTys.push_back(m_pContext->FloatTy());    // Y of TessCoord (V)
-        argTys.push_back(m_pContext->Int32Ty());    // Relative patch ID
-        argTys.push_back(m_pContext->Int32Ty());    // Patch ID
+        argTys.push_back(Type::getFloatTy(*m_pContext));    // X of TessCoord (U)
+        argTys.push_back(Type::getFloatTy(*m_pContext));    // Y of TessCoord (V)
+        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Relative patch ID
+        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Patch ID
     }
     else
     {
-        argTys.push_back(m_pContext->Int32Ty());    // Vertex ID
-        argTys.push_back(m_pContext->Int32Ty());    // Relative vertex ID (auto index)
-        argTys.push_back(m_pContext->Int32Ty());    // Primitive ID (VS)
-        argTys.push_back(m_pContext->Int32Ty());    // Instance ID
+        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Vertex ID
+        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Relative vertex ID (auto index)
+        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Primitive ID (VS)
+        argTys.push_back(Type::getInt32Ty(*m_pContext));    // Instance ID
     }
 
-    return FunctionType::get(m_pContext->VoidTy(), argTys, false);
+    return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
 }
 
 // =====================================================================================================================
@@ -714,21 +716,21 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 
     // Construct ".entry" block
     args.clear();
-    args.push_back(ConstantInt::get(m_pContext->Int64Ty(), -1));
+    args.push_back(ConstantInt::get(Type::getInt64Ty(*m_pContext), -1));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    EmitCall("llvm.amdgcn.init.exec", m_pContext->VoidTy(), args, attribs, pEntryBlock);
+    EmitCall("llvm.amdgcn.init.exec", Type::getVoidTy(*m_pContext), args, attribs, pEntryBlock);
 
     args.clear();
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
 
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
 
-    auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pThreadId = EmitCall("llvm.amdgcn.mbcnt.lo", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
 #if LLPC_BUILD_GFX10
     uint32_t waveSize = m_pPipelineState->GetShaderWaveSize(ShaderStageGeometry);
@@ -736,47 +738,47 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 #endif
     {
         args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), -1));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), -1));
         args.push_back(pThreadId);
 
-        pThreadId = EmitCall("llvm.amdgcn.mbcnt.hi", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        pThreadId = EmitCall("llvm.amdgcn.mbcnt.hi", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
     }
 
     args.clear();
     args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
 
     attribs.clear();
     attribs.push_back(Attribute::ReadNone);
 
-    auto pEsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pEsVertCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
 
-    auto pGsPrimCount = EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
-
-    args.clear();
-    args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 8));
-
-    auto pGsWaveId = EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+    auto pGsPrimCount = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
     args.clear();
     args.push_back(pMergedWaveInfo);
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 24));
-    args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 4));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 8));
+
+    auto pGsWaveId = EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
+
+    args.clear();
+    args.push_back(pMergedWaveInfo);
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 24));
+    args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 4));
 
     auto pWaveInSubgroup =
-        EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pEntryBlock);
+        EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pEntryBlock);
 
     auto pEsGsOffset =
         BinaryOperator::CreateMul(pWaveInSubgroup,
-                                  ConstantInt::get(m_pContext->Int32Ty(), 64 * 4 * calcFactor.esGsRingItemSize),
+                                  ConstantInt::get(Type::getInt32Ty(*m_pContext), 64 * 4 * calcFactor.esGsRingItemSize),
                                   "",
                                   pEntryBlock);
 
@@ -785,7 +787,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 
     Value* pEsGsOffsets01 = pArg;
 
-    Value* pEsGsOffsets23 = UndefValue::get(m_pContext->Int32Ty());
+    Value* pEsGsOffsets23 = UndefValue::get(Type::getInt32Ty(*m_pContext));
     if (calcFactor.inputVertices > 2)
     {
         // NOTE: ES to GS offset (vertex 2 and 3) is valid once the primitive type has more than 2 vertices.
@@ -795,7 +797,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     Value* pGsPrimitiveId = (pArg + 2);
     Value* pInvocationId  = (pArg + 3);
 
-    Value* pEsGsOffsets45 = UndefValue::get(m_pContext->Int32Ty());
+    Value* pEsGsOffsets45 = UndefValue::get(Type::getInt32Ty(*m_pContext));
     if (calcFactor.inputVertices > 4)
     {
         // NOTE: ES to GS offset (vertex 4 and 5) is valid once the primitive type has more than 4 vertices.
@@ -848,7 +850,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                 std::vector<Constant*> shuffleMask;
                 for (uint32_t i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
@@ -862,7 +864,8 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                 LLPC_ASSERT(pEsArgTy->isIntegerTy());
 
                 auto pEsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(m_pContext->Int32Ty(), userDataIdx),
+                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                               userDataIdx),
                                                               "",
                                                               pBeginEsBlock);
                 args.push_back(pEsUserData);
@@ -942,7 +945,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
     args.clear();
     attribs.clear();
     attribs.push_back(Attribute::NoRecurse);
-    EmitCall("llvm.amdgcn.s.barrier", m_pContext->VoidTy(), args, attribs, pEndEsBlock);
+    EmitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_pContext), args, attribs, pEndEsBlock);
 
     auto pGsEnable = new ICmpInst(*pEndEsBlock, ICmpInst::ICMP_ULT, pThreadId, pGsPrimCount, "");
     BranchInst::Create(pBeginGsBlock, pEndGsBlock, pGsEnable, pEndEsBlock);
@@ -954,51 +957,51 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
 
         args.clear();
         args.push_back(pEsGsOffsets01);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
 
         auto pEsGsOffset0 =
-            EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets01);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
 
         auto pEsGsOffset1 =
-            EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets23);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
 
         auto pEsGsOffset2 =
-            EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets23);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
 
         auto pEsGsOffset3 =
-            EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets45);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
 
         auto pEsGsOffset4 =
-            EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
 
         args.clear();
         args.push_back(pEsGsOffsets45);
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 16));
 
         auto pEsGsOffset5 =
-            EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, attribs, pBeginGsBlock);
+            EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, attribs, pBeginGsBlock);
 
         // Call GS main function
         args.clear();
@@ -1030,7 +1033,7 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                 std::vector<Constant*> shuffleMask;
                 for (uint32_t i = 0; i < userDataSize; ++i)
                 {
-                    shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), userDataIdx + i));
+                    shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), userDataIdx + i));
                 }
 
                 userDataIdx += userDataSize;
@@ -1054,7 +1057,8 @@ Function* ShaderMerger::GenerateEsGsEntryPoint(
                     }
                 }
                 auto pGsUserData = ExtractElementInst::Create(pUserData,
-                                                              ConstantInt::get(m_pContext->Int32Ty(), actualUserDataIdx),
+                                                              ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                               actualUserDataIdx),
                                                               "",
                                                               pBeginGsBlock);
                 args.push_back(pGsUserData);

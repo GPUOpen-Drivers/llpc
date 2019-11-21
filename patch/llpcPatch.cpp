@@ -379,7 +379,7 @@ GlobalVariable* Patch::GetLdsVariable(
     // Now we can create LDS.
     // Construct LDS type: [ldsSize * i32], address space 3
     auto ldsSize = pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizePerCu;
-    auto pLdsTy = ArrayType::get(pContext->Int32Ty(), ldsSize / sizeof(uint32_t));
+    auto pLdsTy = ArrayType::get(Type::getInt32Ty(*pContext), ldsSize / sizeof(uint32_t));
 
     auto pLds = new GlobalVariable(*pModule,
                                    pLdsTy,

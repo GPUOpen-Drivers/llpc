@@ -464,7 +464,7 @@ Value* NggLdsManager::ReadValueFromLds(
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
     auto pLds = ConstantExpr::getBitCast(m_pLds,
-                    PointerType::get(m_pContext->Int8Ty(), m_pLds->getType()->getPointerAddressSpace()));
+                    PointerType::get(Type::getInt8Ty(*m_pContext), m_pLds->getType()->getPointerAddressSpace()));
 
     for (uint32_t i = 0; i < compCount; ++i)
     {
@@ -475,7 +475,9 @@ Value* NggLdsManager::ReadValueFromLds(
             {
                 // NOTE: For single 128-bit LDS load, the friendly data type for backend compiler is <4 x i32>.
                 pLoadPtr =
-                    m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(m_pContext->Int32x4Ty(), ADDR_SPACE_LOCAL));
+                    m_pBuilder->CreateBitCast(pLoadPtr, PointerType::get(VectorType::get(Type::getInt32Ty(*m_pContext),
+                                                                                         4),
+                                                                         ADDR_SPACE_LOCAL));
             }
             else
             {
@@ -574,7 +576,7 @@ void NggLdsManager::WriteValueToLds(
 
     // NOTE: LDS variable is defined as a pointer to i32 array. We cast it to a pointer to i8 array first.
     auto pLds = ConstantExpr::getBitCast(m_pLds,
-                  PointerType::get(m_pContext->Int8Ty(), m_pLds->getType()->getPointerAddressSpace()));
+                  PointerType::get(Type::getInt8Ty(*m_pContext), m_pLds->getType()->getPointerAddressSpace()));
 
     for (uint32_t i = 0; i < compCount; ++i)
     {
@@ -585,7 +587,9 @@ void NggLdsManager::WriteValueToLds(
             {
                 // NOTE: For single 128-bit LDS store, the friendly data type for backend compiler is <4 x i32>.
                 pStorePtr =
-                    m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(m_pContext->Int32x4Ty(), ADDR_SPACE_LOCAL));
+                    m_pBuilder->CreateBitCast(pStorePtr, PointerType::get(VectorType::get(Type::getInt32Ty(*m_pContext),
+                                                                                          4),
+                                                                          ADDR_SPACE_LOCAL));
             }
             else
             {
@@ -606,7 +610,7 @@ void NggLdsManager::WriteValueToLds(
         if (useDs128 && (bitWidth == 128))
         {
             // Convert i128 to <4 x i32>
-            pStoreValue = m_pBuilder->CreateBitCast(pStoreValue, m_pContext->Int32x4Ty());
+            pStoreValue = m_pBuilder->CreateBitCast(pStoreValue, VectorType::get(Type::getInt32Ty(*m_pContext), 4));
         }
 
         // NOTE: Use "volatile" for store to prevent optimization.

@@ -134,7 +134,7 @@ bool PatchNullFragShader::runOnModule(
     // }
 
     // Create type of new function: void()
-    auto pEntryPointTy = FunctionType::get(m_pContext->VoidTy(), ArrayRef<Type*>(), false);
+    auto pEntryPointTy = FunctionType::get(Type::getVoidTy(*m_pContext), ArrayRef<Type*>(), false);
 
     // Create function for the null fragment shader entrypoint.
     auto pEntryPoint = Function::Create(pEntryPointTy,
@@ -147,10 +147,10 @@ bool PatchNullFragShader::runOnModule(
     auto pInsertPos = ReturnInst::Create(*m_pContext, pBlock);
 
     // Add its code. First the import.
-    auto pZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
-    auto pOne = ConstantInt::get(m_pContext->Int32Ty(), 1);
+    auto pZero = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
+    auto pOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), 1);
     Value* importArgs[] = { pZero, pZero, pZero, pOne };
-    auto pInputTy = m_pContext->FloatTy();
+    auto pInputTy = Type::getFloatTy(*m_pContext);
     std::string importName = LlpcName::InputImportGeneric;
     AddTypeMangling(pInputTy, importArgs, importName);
     auto pInput = EmitCall(importName, pInputTy, importArgs, NoAttrib, pInsertPos);
@@ -158,11 +158,11 @@ bool PatchNullFragShader::runOnModule(
     // Then the export.
     Value* exportArgs[] = { pZero, pZero, pInput };
     std::string exportName = LlpcName::OutputExportGeneric;
-    AddTypeMangling(m_pContext->VoidTy(), exportArgs, exportName);
-    EmitCall(exportName, m_pContext->VoidTy(), exportArgs, NoAttrib, pInsertPos);
+    AddTypeMangling(Type::getVoidTy(*m_pContext), exportArgs, exportName);
+    EmitCall(exportName, Type::getVoidTy(*m_pContext), exportArgs, NoAttrib, pInsertPos);
 
     // Add execution model metadata to the function.
-    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), ShaderStageFragment));
+    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext), ShaderStageFragment));
     auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
     pEntryPoint->addMetadata(LlpcName::ShaderStageMetadata, *pExecModelMetaNode);
 

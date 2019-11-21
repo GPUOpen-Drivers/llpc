@@ -283,8 +283,8 @@ VertexFetch::VertexFetch(
     }
 
     // Initialize default fetch values
-    auto pZero = ConstantInt::get(m_pContext->Int32Ty(), 0);
-    auto pOne = ConstantInt::get(m_pContext->Int32Ty(), 1);
+    auto pZero = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
+    auto pOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), 1);
 
     // Int8 (0, 0, 0, 1)
     m_fetchDefaults.pInt8 = ConstantVector::get({ pZero, pZero, pZero, pOne });
@@ -300,7 +300,7 @@ VertexFetch::VertexFetch(
 
     // Float16 (0, 0, 0, 1.0)
     const uint16_t float16One = 0x3C00;
-    auto pFloat16One = ConstantInt::get(m_pContext->Int32Ty(), float16One);
+    auto pFloat16One = ConstantInt::get(Type::getInt32Ty(*m_pContext), float16One);
     m_fetchDefaults.pFloat16 = ConstantVector::get({ pZero, pZero, pZero, pFloat16One });
 
     // Float (0.0, 0.0, 0.0, 1.0)
@@ -309,7 +309,7 @@ VertexFetch::VertexFetch(
         float    f;
         uint32_t u32;
     } floatOne = { 1.0f };
-    auto pFloatOne = ConstantInt::get(m_pContext->Int32Ty(), floatOne.u32);
+    auto pFloatOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), floatOne.u32);
     m_fetchDefaults.pFloat = ConstantVector::get({ pZero, pZero, pZero, pFloatOne });
 
     // Double (0.0, 0.0, 0.0, 1.0)
@@ -318,8 +318,8 @@ VertexFetch::VertexFetch(
         double   d;
         uint32_t u32[2];
     } doubleOne = { 1.0 };
-    auto pDoubleOne0 = ConstantInt::get(m_pContext->Int32Ty(), doubleOne.u32[0]);
-    auto pDoubleOne1 = ConstantInt::get(m_pContext->Int32Ty(), doubleOne.u32[1]);
+    auto pDoubleOne0 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[0]);
+    auto pDoubleOne1 = ConstantInt::get(Type::getInt32Ty(*m_pContext), doubleOne.u32[1]);
     m_fetchDefaults.pDouble = ConstantVector::get({ pZero, pZero,
                                                     pZero, pZero,
                                                     pZero, pZero,
@@ -366,7 +366,8 @@ Value* VertexFetch::Run(
         {
             // There is a divisor.
             pVbIndex = BinaryOperator::CreateUDiv(m_pInstanceId,
-                                                  ConstantInt::get(m_pContext->Int32Ty(), pDescription->inputRate),
+                                                  ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                   pDescription->inputRate),
                                                   "",
                                                   pInsertPos);
             pVbIndex = BinaryOperator::CreateAdd(pVbIndex, m_pBaseInstance, "", pInsertPos);
@@ -417,7 +418,7 @@ Value* VertexFetch::Run(
 
             // Extract alpha channel: %a = extractelement %vf0, 3
             Value* pAlpha = ExtractElementInst::Create(vertexFetch[0],
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                                                        "",
                                                        pInsertPos);
 
@@ -428,13 +429,13 @@ Value* VertexFetch::Run(
 
                 // %a = shl %a, 30
                 pAlpha = BinaryOperator::CreateShl(pAlpha,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 30),
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
                                                    "",
                                                    pInsertPos);
 
                 // %a = ashr %a, 30
                 pAlpha = BinaryOperator::CreateAShr(pAlpha,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 30),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
                                                     "",
                                                     pInsertPos);
             }
@@ -445,11 +446,11 @@ Value* VertexFetch::Run(
                 // -1.0, -1.0 } respectively.
 
                 // %a = bitcast %a to f32
-                pAlpha = new BitCastInst(pAlpha, m_pContext->FloatTy(), "", pInsertPos);
+                pAlpha = new BitCastInst(pAlpha, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
                 // %a = mul %a, 3.0f
                 pAlpha = BinaryOperator::CreateFMul(pAlpha,
-                                                   ConstantFP::get(m_pContext->FloatTy(), 3.0f),
+                                                   ConstantFP::get(Type::getFloatTy(*m_pContext), 3.0f),
                                                    "",
                                                    pInsertPos);
 
@@ -457,18 +458,18 @@ Value* VertexFetch::Run(
                 auto pCond = new FCmpInst(pInsertPos,
                                           FCmpInst::FCMP_UGT,
                                           pAlpha,
-                                          ConstantFP::get(m_pContext->FloatTy(), 1.5f),
+                                          ConstantFP::get(Type::getFloatTy(*m_pContext), 1.5f),
                                           "");
 
                 // %a = select %cond, -1.0f, pAlpha
                 pAlpha = SelectInst::Create(pCond,
-                                            ConstantFP::get(m_pContext->FloatTy(), -1.0f),
+                                            ConstantFP::get(Type::getFloatTy(*m_pContext), -1.0f),
                                             pAlpha,
                                             "",
                                             pInsertPos);
 
                 // %a = bitcast %a to i32
-                pAlpha = new BitCastInst(pAlpha, m_pContext->Int32Ty(), "", pInsertPos);
+                pAlpha = new BitCastInst(pAlpha, Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
             else if (formatInfo.nfmt == BufNumFormatSscaled)
             {
@@ -478,28 +479,28 @@ Value* VertexFetch::Run(
                 // "ashr" 30, and finally "sitofp".
 
                // %a = bitcast %a to float
-                pAlpha = new BitCastInst(pAlpha, m_pContext->FloatTy(), "", pInsertPos);
+                pAlpha = new BitCastInst(pAlpha, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
                 // %a = fptosi %a to i32
-                pAlpha = new FPToSIInst(pAlpha, m_pContext->Int32Ty(), "", pInsertPos);
+                pAlpha = new FPToSIInst(pAlpha, Type::getInt32Ty(*m_pContext), "", pInsertPos);
 
                 // %a = shl %a, 30
                 pAlpha = BinaryOperator::CreateShl(pAlpha,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), 30),
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
                                                    "",
                                                    pInsertPos);
 
                 // %a = ashr a, 30
                 pAlpha = BinaryOperator::CreateAShr(pAlpha,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 30),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 30),
                                                     "",
                                                     pInsertPos);
 
                 // %a = sitofp %a to float
-                pAlpha = new SIToFPInst(pAlpha, m_pContext->FloatTy(), "", pInsertPos);
+                pAlpha = new SIToFPInst(pAlpha, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
                 // %a = bitcast %a to i32
-                pAlpha = new BitCastInst(pAlpha, m_pContext->Int32Ty(), "", pInsertPos);
+                pAlpha = new BitCastInst(pAlpha, Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
             else
             {
@@ -509,7 +510,7 @@ Value* VertexFetch::Run(
             // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
             vertexFetch[0] = InsertElementInst::Create(vertexFetch[0],
                                                        pAlpha,
-                                                       ConstantInt::get(m_pContext->Int32Ty(), 3),
+                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                                                        "",
                                                        pInsertPos);
         }
@@ -559,10 +560,10 @@ Value* VertexFetch::Run(
 
             // %vf1 = shufflevector %vf1, %vf1, <0, 1, undef, undef>
             Constant* shuffleMask[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
-                ConstantInt::get(m_pContext->Int32Ty(), 1),
-                UndefValue::get(m_pContext->Int32Ty()),
-                UndefValue::get(m_pContext->Int32Ty())
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                UndefValue::get(Type::getInt32Ty(*m_pContext)),
+                UndefValue::get(Type::getInt32Ty(*m_pContext))
             };
             vertexFetch[1] = new ShuffleVectorInst(vertexFetch[1],
                                                    vertexFetch[1],
@@ -575,7 +576,7 @@ Value* VertexFetch::Run(
         shuffleMask.clear();
         for (uint32_t i = 0; i < 4 + compCount; ++i)
         {
-            shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), i));
+            shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), i));
         }
         pVertexFetch = new ShuffleVectorInst(vertexFetch[0],
                                              vertexFetch[1],
@@ -643,7 +644,7 @@ Value* VertexFetch::Run(
     for (uint32_t i = 0; i < defaultValues.size(); ++i)
     {
         defaultValues[i] = ExtractElementInst::Create(pDefaults,
-                                                      ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                       "",
                                                       pInsertPos);
     }
@@ -662,7 +663,7 @@ Value* VertexFetch::Run(
         for (uint32_t i = 0; i < fetchCompCount; ++i)
         {
             fetchValues[i] = ExtractElementInst::Create(pVertexFetch,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                         "",
                                                         pInsertPos);
         }
@@ -691,7 +692,7 @@ Value* VertexFetch::Run(
         else
         {
             LLPC_NEVER_CALLED();
-            vertexValues[i] = UndefValue::get(m_pContext->Int32Ty());
+            vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_pContext));
         }
     }
 
@@ -701,14 +702,14 @@ Value* VertexFetch::Run(
     }
     else
     {
-        Type* pVertexTy = VectorType::get(m_pContext->Int32Ty(), vertexCompCount);
+        Type* pVertexTy = VectorType::get(Type::getInt32Ty(*m_pContext), vertexCompCount);
         pVertex = UndefValue::get(pVertexTy);
 
         for (uint32_t i = 0; i < vertexCompCount; ++i)
         {
             pVertex = InsertElementInst::Create(pVertex,
                                                 vertexValues[i],
-                                                ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                 "",
                                                 pInsertPos);
         }
@@ -721,20 +722,20 @@ Value* VertexFetch::Run(
         LLPC_ASSERT(pInputTy->isIntOrIntVectorTy()); // Must be integer type
 
         Type* pVertexTy = pVertex->getType();
-        pVertexTy = pVertexTy->isVectorTy() ?
-                        VectorType::get(m_pContext->Int8Ty(), pVertexTy->getVectorNumElements()) :
-                        m_pContext->Int8Ty();
-        pVertex = new TruncInst(pVertex, pVertexTy, "", pInsertPos);
+        Type* pTruncTy = Type::getInt8Ty(*m_pContext);
+        pTruncTy = pVertexTy->isVectorTy() ? cast<Type>(VectorType::get(pTruncTy, pVertexTy->getVectorNumElements())) :
+                                             pTruncTy;
+        pVertex = new TruncInst(pVertex, pTruncTy, "", pInsertPos);
     }
     else if (is16bitFetch)
     {
         // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
         // convert them to <n x i16> and the 16 high bits is truncated.
         Type* pVertexTy = pVertex->getType();
-        pVertexTy = pVertexTy->isVectorTy() ?
-                        VectorType::get(m_pContext->Int16Ty(), pVertexTy->getVectorNumElements()) :
-                        m_pContext->Int16Ty();
-        pVertex = new TruncInst(pVertex, pVertexTy, "", pInsertPos);
+        Type* pTruncTy = Type::getInt16Ty(*m_pContext);
+        pTruncTy = pVertexTy->isVectorTy() ? cast<Type>(VectorType::get(pTruncTy, pVertexTy->getVectorNumElements())) :
+                                             pTruncTy;
+        pVertex = new TruncInst(pVertex, pTruncTy, "", pInsertPos);
     }
 
     return pVertex;
@@ -840,8 +841,8 @@ Value* VertexFetch::LoadVertexBufferDescriptor(
     ) const
 {
     Value* idxs[] = {
-        ConstantInt::get(m_pContext->Int64Ty(), 0, false),
-        ConstantInt::get(m_pContext->Int64Ty(), binding, false)
+        ConstantInt::get(Type::getInt64Ty(*m_pContext), 0, false),
+        ConstantInt::get(Type::getInt64Ty(*m_pContext), binding, false)
     };
 
     auto pVbTablePtr = m_pShaderSysValues->GetVertexBufTablePtr();
@@ -882,7 +883,7 @@ void VertexFetch::AddVertexFetchInst(
         if ((stride != 0) && (offset > stride))
         {
             pVbIndex = BinaryOperator::CreateAdd(pVbIndex,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), offset / stride),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), offset / stride),
                                                  "",
                                                  pInsertPos);
             offset = offset % stride;
@@ -890,12 +891,12 @@ void VertexFetch::AddVertexFetchInst(
 
         // Do vertex fetch
         Value* args[] = {
-            pVbDesc,                                                                // rsrc
-            pVbIndex,                                                               // vindex
-            ConstantInt::get(m_pContext->Int32Ty(), offset),                        // offset
-            ConstantInt::get(m_pContext->Int32Ty(), 0),                             // soffset
-            ConstantInt::get(m_pContext->Int32Ty(), MapVertexFormat(dfmt, nfmt)),   // dfmt, nfmt
-            ConstantInt::get(m_pContext->Int32Ty(), 0)                              // glc, slc
+            pVbDesc,                                                                        // rsrc
+            pVbIndex,                                                                       // vindex
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), offset),                        // offset
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),                             // soffset
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), MapVertexFormat(dfmt, nfmt)),   // dfmt, nfmt
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0)                              // glc, slc
         };
 
         StringRef suffix = "";
@@ -907,16 +908,16 @@ void VertexFetch::AddVertexFetchInst(
             {
             case 1:
                 suffix = ".f16";
-                pFetchTy = m_pContext->Float16Ty();
+                pFetchTy = Type::getHalfTy(*m_pContext);
                 break;
             case 2:
                 suffix = ".v2f16";
-                pFetchTy = m_pContext->Float16x2Ty();
+                pFetchTy = VectorType::get(Type::getHalfTy(*m_pContext), 2);
                 break;
             case 3:
             case 4:
                 suffix = ".v4f16";
-                pFetchTy = m_pContext->Float16x4Ty();
+                pFetchTy = VectorType::get(Type::getHalfTy(*m_pContext), 4);
                 break;
             default:
                 LLPC_NEVER_CALLED();
@@ -929,16 +930,16 @@ void VertexFetch::AddVertexFetchInst(
             {
             case 1:
                 suffix = ".i32";
-                pFetchTy = m_pContext->Int32Ty();
+                pFetchTy = Type::getInt32Ty(*m_pContext);
                 break;
             case 2:
                 suffix = ".v2i32";
-                pFetchTy = m_pContext->Int32x2Ty();
+                pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
                 break;
             case 3:
             case 4:
                 suffix = ".v4i32";
-                pFetchTy = m_pContext->Int32x4Ty();
+                pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
                 break;
             default:
                 LLPC_NEVER_CALLED();
@@ -956,17 +957,17 @@ void VertexFetch::AddVertexFetchInst(
         {
             // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
             // int32 eventually.
+            Type* pBitCastTy = Type::getInt16Ty(*m_pContext);
+            pBitCastTy = (numChannels == 1) ? pBitCastTy : VectorType::get(pBitCastTy, numChannels);
             pFetch = new BitCastInst(pFetch,
-                                        (numChannels == 1) ?
-                                            m_pContext->Int16Ty() :
-                                            VectorType::get(m_pContext->Int16Ty(), numChannels),
+                                        pBitCastTy,
                                         "",
                                         pInsertPos);
 
+            Type* pZExtTy = Type::getInt32Ty(*m_pContext);
+            pZExtTy = (numChannels == 1) ? pZExtTy : VectorType::get(pZExtTy, numChannels);
             pFetch = new ZExtInst(pFetch,
-                                    (numChannels == 1) ?
-                                        m_pContext->Int32Ty() :
-                                        VectorType::get(m_pContext->Int32Ty(), numChannels),
+                                    pZExtTy,
                                     "",
                                     pInsertPos);
         }
@@ -976,9 +977,9 @@ void VertexFetch::AddVertexFetchInst(
             // NOTE: If valid number of channels is 3, the actual fetch type should be revised from <4 x i32>
             // to <3 x i32>.
             Constant* shuffleMask[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
-                ConstantInt::get(m_pContext->Int32Ty(), 1),
-                ConstantInt::get(m_pContext->Int32Ty(), 2)
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 2)
             };
             *ppFetch = new ShuffleVectorInst(pFetch, pFetch, ConstantVector::get(shuffleMask), "", pInsertPos);
         }
@@ -1007,7 +1008,7 @@ void VertexFetch::AddVertexFetchInst(
             {
                 compVbIndices[i] = BinaryOperator::CreateAdd(
                                        pVbIndex,
-                                       ConstantInt::get(m_pContext->Int32Ty(), compOffset / stride),
+                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), compOffset / stride),
                                        "",
                                        pInsertPos);
                 compOffsets[i] = compOffset % stride;
@@ -1019,38 +1020,38 @@ void VertexFetch::AddVertexFetchInst(
             }
         }
 
-        Type* pFetchTy = VectorType::get(m_pContext->Int32Ty(), numChannels);
+        Type* pFetchTy = VectorType::get(Type::getInt32Ty(*m_pContext), numChannels);
         Value* pFetch = UndefValue::get(pFetchTy);
 
         // Do vertex per-component fetches
         for (uint32_t i = 0; i < pFormatInfo->compCount; ++i)
         {
             Value* args[] = {
-                pVbDesc,                                                        // rsrc
-                compVbIndices[i],                                               // vindex
-                ConstantInt::get(m_pContext->Int32Ty(), compOffsets[i]),        // offset
-                ConstantInt::get(m_pContext->Int32Ty(), 0),                     // soffset
-                ConstantInt::get(m_pContext->Int32Ty(),
-                                 MapVertexFormat(pFormatInfo->compDfmt, nfmt)), // dfmt, nfmt
-                ConstantInt::get(m_pContext->Int32Ty(), 0)                      // glc, slc
+                pVbDesc,                                                          // rsrc
+                compVbIndices[i],                                                 // vindex
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), compOffsets[i]),  // offset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),               // soffset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                 MapVertexFormat(pFormatInfo->compDfmt, nfmt)),   // dfmt, nfmt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0)                // glc, slc
             };
 
             Value* pCompFetch = nullptr;
             if (is16bitFetch)
             {
                 pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.f16",
-                                      m_pContext->Float16Ty(),
+                                      Type::getHalfTy(*m_pContext),
                                       args,
                                       NoAttrib,
                                       pInsertPos);
 
-                pCompFetch = new BitCastInst(pCompFetch, m_pContext->Int16Ty(), "", pInsertPos);
-                pCompFetch = new ZExtInst(pCompFetch, m_pContext->Int32Ty(), "", pInsertPos);
+                pCompFetch = new BitCastInst(pCompFetch, Type::getInt16Ty(*m_pContext), "", pInsertPos);
+                pCompFetch = new ZExtInst(pCompFetch, Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
             else
             {
                 pCompFetch = EmitCall("llvm.amdgcn.struct.tbuffer.load.i32",
-                                      m_pContext->Int32Ty(),
+                                      Type::getInt32Ty(*m_pContext),
                                       args,
                                       NoAttrib,
                                       pInsertPos);
@@ -1058,7 +1059,7 @@ void VertexFetch::AddVertexFetchInst(
 
             pFetch = InsertElementInst::Create(pFetch,
                                                pCompFetch,
-                                               ConstantInt::get(m_pContext->Int32Ty(), i),
+                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                "",
                                                pInsertPos);
         }
@@ -1080,10 +1081,10 @@ bool VertexFetch::NeedPostShuffle(
     {
     case BufDataFormat8_8_8_8_Bgra:
     case BufDataFormat2_10_10_10_Bgra:
-        shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 2));
-        shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 1));
-        shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0));
-        shuffleMask.push_back(ConstantInt::get(m_pContext->Int32Ty(), 3));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 2));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 1));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0));
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 3));
         needShuffle = true;
         break;
     default:
