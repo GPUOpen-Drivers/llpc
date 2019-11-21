@@ -30,7 +30,6 @@
  */
 #include "llpcBuilderContext.h"
 #include "llpcBuilderRecorder.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPipelineState.h"

@@ -34,9 +34,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/Support/Debug.h"
 
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"

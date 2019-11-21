@@ -32,8 +32,9 @@
 
 #include "llvm/IR/Constants.h"
 
-#include "llpcContext.h"
 #include "llpcPatchLlvmIrInclusion.h"
+#include "palPipelineAbi.h"
+#include "g_palPipelineAbiMetadata.h"
 
 using namespace llvm;
 using namespace Llpc;

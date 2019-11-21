@@ -32,11 +32,11 @@
 
 #include "SPIRVInternal.h"
 #include "llpcAbiMetadata.h"
-#include "llpcContext.h"
 #include "llpcCodeGenManager.h"
 #include "llpcGfx6ConfigBuilder.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace llvm
 {

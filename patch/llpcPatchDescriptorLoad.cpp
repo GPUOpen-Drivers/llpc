@@ -31,10 +31,10 @@
 #define DEBUG_TYPE "llpc-patch-descriptor-load"
 
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcContext.h"
 #include "llpcPatchDescriptorLoad.h"
 #include "llpcTargetInfo.h"
 

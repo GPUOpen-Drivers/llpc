@@ -40,7 +40,6 @@
 namespace Llpc
 {
 
-class Context;
 struct NggControl;
 class NggLdsManager;
 class PipelineState;
@@ -219,7 +218,7 @@ private:
     static const uint32_t NullPrim = (1u << 31); // Null primitive data (invalid)
 
     PipelineState*  m_pPipelineState; // Pipeline state
-    Context*        m_pContext;       // LLPC context
+    llvm::LLVMContext*        m_pContext;       // LLVM context
     GfxIpVersion    m_gfxIp;          // Graphics IP version info
 
     const NggControl* m_pNggControl;  // NGG control settings

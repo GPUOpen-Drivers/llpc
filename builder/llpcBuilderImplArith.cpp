@@ -31,7 +31,6 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
 

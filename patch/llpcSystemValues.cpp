@@ -33,7 +33,6 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "SPIRVInternal.h"
-#include "llpcContext.h"
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 #include "llpcTargetInfo.h"
@@ -65,7 +64,7 @@ void ShaderSystemValues::Initialize(
     {
         m_pEntryPoint = pEntryPoint;
         m_shaderStage = GetShaderStageFromFunction(pEntryPoint);
-        m_pContext = static_cast<Context*>(&pEntryPoint->getParent()->getContext());
+        m_pContext = &pEntryPoint->getParent()->getContext();
         m_pPipelineState = pPipelineState;
 
         LLPC_ASSERT(m_shaderStage != ShaderStageInvalid);

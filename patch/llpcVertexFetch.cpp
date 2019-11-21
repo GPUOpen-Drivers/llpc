@@ -34,7 +34,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
-#include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
@@ -256,7 +255,7 @@ VertexFetch::VertexFetch(
     PipelineState*      pPipelineState)   // [in] Pipeline state
     :
     m_pModule(pEntryPoint->getParent()),
-    m_pContext(static_cast<Context*>(&m_pModule->getContext())),
+    m_pContext(&m_pModule->getContext()),
     m_pShaderSysValues(pShaderSysValues),
     m_pPipelineState(pPipelineState)
 {

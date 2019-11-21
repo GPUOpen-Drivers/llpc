@@ -37,7 +37,6 @@
 namespace Llpc
 {
 
-class Context;
 class PipelineState;
 class ShaderSystemValues;
 
@@ -110,7 +109,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     llvm::Module*       m_pModule;          // LLVM module
-    Context*            m_pContext;         // LLPC context
+    llvm::LLVMContext*  m_pContext;         // LLVM context
     ShaderSystemValues* m_pShaderSysValues; // ShaderSystemValues object for getting vertex buffer pointer from
     PipelineState*      m_pPipelineState;   // Pipeline state
 

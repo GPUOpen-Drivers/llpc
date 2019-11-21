@@ -30,8 +30,8 @@
  */
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
+#include "llpcBuilderContext.h"
 #include "llpcBuilderImpl.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPipelineState.h"
 #include "llpcShaderModes.h"
@@ -255,13 +255,6 @@ Type* Builder::GetTransposedMatrixTy(
     const uint32_t rowCount = pColumnVectorType->getVectorNumElements();
 
     return ArrayType::get(VectorType::get(pColumnVectorType->getVectorElementType(), columnCount), rowCount);
-}
-
-// =====================================================================================================================
-// Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-Context& Builder::getContext() const
-{
-    return *static_cast<Llpc::Context*>(&IRBuilder<>::getContext());
 }
 
 // =====================================================================================================================

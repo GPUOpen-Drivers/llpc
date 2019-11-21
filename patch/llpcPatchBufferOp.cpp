@@ -42,7 +42,6 @@
 
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
-#include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchBufferOp.h"
 #include "llpcPipelineShaders.h"
@@ -95,7 +94,7 @@ bool PatchBufferOp::runOnFunction(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
 
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(function.getParent());
-    m_pContext = static_cast<Context*>(&function.getContext());
+    m_pContext = &function.getContext();
     m_pBuilder.reset(new IRBuilder<>(*m_pContext));
 
     // Invoke visitation of the target instructions.

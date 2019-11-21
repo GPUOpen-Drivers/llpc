@@ -42,7 +42,6 @@
 namespace Llpc
 {
 
-class Context;
 class PipelineState;
 
 // Enumerates special system values for the LS-HS merged shader (the assigned numeric values are identical to SGPR
@@ -109,7 +108,7 @@ private:
     // -----------------------------------------------------------------------------------------------------------------
 
     PipelineState*    m_pPipelineState;     // Pipeline state
-    Context*          m_pContext;           // LLPC context
+    llvm::LLVMContext*m_pContext;           // LLVM context
     GfxIpVersion      m_gfxIp;              // Graphics IP version info
     PipelineShaders*  m_pPipelineShaders;   // API shaders in the pipeline
 

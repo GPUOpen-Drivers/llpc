@@ -34,7 +34,6 @@
 #include "llvm/IR/Module.h"
 
 #include "llpcCodeGenManager.h"
-#include "llpcContext.h"
 #if LLPC_BUILD_GFX10
 #include "llpcNggPrimShader.h"
 #endif
@@ -56,7 +55,7 @@ ShaderMerger::ShaderMerger(
     PipelineShaders*  pPipelineShaders) // [in] API shaders in the pipeline
     :
     m_pPipelineState(pPipelineState),
-    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_pContext(&pPipelineState->GetContext()),
     m_gfxIp(pPipelineState->GetTargetInfo().GetGfxIpVersion()),
     m_pPipelineShaders(pPipelineShaders)
 #if LLPC_BUILD_GFX10

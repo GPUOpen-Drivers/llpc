@@ -34,10 +34,9 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llpcContext.h"
-#include "llpcGraphicsContext.h"
 #include "llpcGfx9Chip.h"
 #include "llpcNggLdsManager.h"
 #include "llpcPatch.h"
@@ -133,7 +132,7 @@ NggLdsManager::NggLdsManager(
     IRBuilder<>*        pBuilder)       // [in] LLVM IR builder
     :
     m_pPipelineState(pPipelineState),
-    m_pContext(static_cast<Context*>(&pPipelineState->GetContext())),
+    m_pContext(&pPipelineState->GetContext()),
     m_waveCountInSubgroup(Gfx9::NggMaxThreadsPerSubgroup / m_pPipelineState->GetTargetInfo().GetGpuProperty().waveSize),
     m_pBuilder(pBuilder)
 {

@@ -52,7 +52,6 @@
 #include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Utils.h"
 #include "llpcBuilder.h"
-#include "llpcContext.h"
 #include "llpcInternal.h"
 #include "llpcPassManager.h"
 #include "llpcPatch.h"
@@ -356,7 +355,7 @@ void Patch::Init(
     Module* pModule) // [in] LLVM module
 {
     m_pModule  = pModule;
-    m_pContext = static_cast<Context*>(&m_pModule->getContext());
+    m_pContext = &m_pModule->getContext();
     m_shaderStage = ShaderStageInvalid;
     m_pEntryPoint = nullptr;
 }
@@ -367,7 +366,7 @@ GlobalVariable* Patch::GetLdsVariable(
     PipelineState*  pPipelineState, // [in] Pipeline state
     Module*         pModule)        // [in/out] Module to get or create LDS in
 {
-    auto pContext = static_cast<Context*>(&pModule->getContext());
+    auto pContext = &pModule->getContext();
 
     // See if this module already has LDS.
     auto pOldLds = pModule->getNamedValue("lds");

@@ -45,7 +45,6 @@ using namespace llvm;
 class BuilderContext;
 struct CommonShaderMode;
 struct ComputeShaderMode;
-class Context;
 struct FragmentShaderMode;
 struct GeometryShaderMode;
 class Pipeline;
@@ -157,9 +156,6 @@ public:
     // Get the type pElementTy, turned into a vector of the same vector width as pMaybeVecTy if the latter
     // is a vector type.
     static Type* GetConditionallyVectorizedTy(Type* pElementTy, Type* pMaybeVecTy);
-
-    // Get the LLPC context. This overrides the IRBuilder method that gets the LLVM context.
-    Llpc::Context& getContext() const;
 
     // Get the BuilderContext
     BuilderContext* GetBuilderContext() const { return m_pBuilderContext; }

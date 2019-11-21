@@ -33,10 +33,10 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 
-#include "llpcContext.h"
 #include "llpcDebug.h"
-#include "llpcGraphicsContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcInternal.h"
 #include "llpcPatch.h"
