@@ -104,29 +104,6 @@ public:
     // TODO: This is not correct behavior. The front-end should not be using pipeline options.
     bool GetRobustBufferAccess() const { return m_robustBufferAccess; }
 
-    // Gets pre-constructed LLVM types
-    llvm::Type* BoolTy() const { return m_tys.pBoolTy; }
-    llvm::Type* Int8Ty() const { return m_tys.pInt8Ty; }
-    llvm::Type* Int16Ty() const { return m_tys.pInt16Ty; }
-    llvm::Type* Int32Ty() const { return m_tys.pInt32Ty; }
-    llvm::Type* Int64Ty()  const { return m_tys.pInt64Ty; }
-    llvm::Type* Float16Ty() const { return m_tys.pFloat16Ty; }
-    llvm::Type* FloatTy() const { return m_tys.pFloatTy; }
-    llvm::Type* DoubleTy() const { return m_tys.pDoubleTy; }
-    llvm::Type* VoidTy() const { return m_tys.pVoidTy; }
-
-    llvm::Type* Int16x2Ty() const { return m_tys.pInt16x2Ty; }
-    llvm::Type* Int32x2Ty() const { return m_tys.pInt32x2Ty; }
-    llvm::Type* Int32x3Ty() const { return m_tys.pInt32x3Ty; }
-    llvm::Type* Int32x4Ty() const { return m_tys.pInt32x4Ty; }
-    llvm::Type* Int32x6Ty() const { return m_tys.pInt32x6Ty; }
-    llvm::Type* Int32x8Ty() const { return m_tys.pInt32x8Ty; }
-    llvm::Type* Float16x2Ty() const { return m_tys.pFloat16x2Ty; }
-    llvm::Type* Float16x4Ty() const { return m_tys.pFloat16x4Ty; }
-    llvm::Type* Floatx2Ty() const { return m_tys.pFloatx2Ty; }
-    llvm::Type* Floatx3Ty() const { return m_tys.pFloatx3Ty; }
-    llvm::Type* Floatx4Ty() const { return m_tys.pFloatx4Ty; }
-
     std::unique_ptr<llvm::Module> LoadLibary(const BinaryData* pLib);
 
     // Wrappers of interfaces of pipeline context
@@ -203,32 +180,6 @@ private:
     std::unique_ptr<llvm::TargetMachine> m_pTargetMachine; // Target machine
     bool                          m_scalarBlockLayout = false;  // scalarBlockLayout option from last pipeline compile
     bool                          m_robustBufferAccess = false; // robustBufferAccess option from last pipeline compile
-
-    // Pre-constructed LLVM types
-    struct
-    {
-        llvm::Type* pBoolTy;      // Bool
-        llvm::Type* pInt8Ty;      // Int8
-        llvm::Type* pInt16Ty;     // Int16
-        llvm::Type* pInt32Ty;     // Int32
-        llvm::Type* pInt64Ty;     // Int64
-        llvm::Type* pFloat16Ty;   // Float16
-        llvm::Type* pFloatTy;     // Float
-        llvm::Type* pDoubleTy;    // Double
-        llvm::Type* pVoidTy;      // Void
-
-        llvm::Type* pInt16x2Ty;   // Int16 x 2
-        llvm::Type* pInt32x2Ty;   // Int32 x 2
-        llvm::Type* pInt32x3Ty;   // Int32 x 3
-        llvm::Type* pInt32x4Ty;   // Int32 x 4
-        llvm::Type* pInt32x6Ty;   // Int32 x 6
-        llvm::Type* pInt32x8Ty;   // Int32 x 8
-        llvm::Type* pFloat16x2Ty; // Float16 x 2
-        llvm::Type* pFloat16x4Ty; // Float16 x 4
-        llvm::Type* pFloatx2Ty;   // Float x 2
-        llvm::Type* pFloatx3Ty;   // Float x 3
-        llvm::Type* pFloatx4Ty;   // Float x 4
-    } m_tys;
 };
 
 } // Llpc

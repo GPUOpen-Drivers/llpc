@@ -230,7 +230,7 @@ void SpirvLowerAlgebraTransform::visitBinaryOperator(
             // TODO: FREM for float16 type is not well handled by backend compiler. We lower it here:
             // frem(x, y) = x - y * trunc(x/y)
 
-            auto pOne = ConstantFP::get(m_pContext->Float16Ty(), 1.0);
+            auto pOne = ConstantFP::get(Type::getHalfTy(*m_pContext), 1.0);
             if (pDestTy->isVectorTy())
             {
                 pOne = ConstantVector::getSplat(pDestTy->getVectorNumElements(), pOne);
@@ -425,8 +425,8 @@ void SpirvLowerAlgebraTransform::visitFPTruncInst(
             // NOTE: doubel -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
             // it with two phases to disable such lowering if we need RTZ rounding.
             auto pFloatTy =
-                pSrcTy->isVectorTy() ? VectorType::get(m_pContext->FloatTy(), pSrcTy->getVectorNumElements()) :
-                                       m_pContext->FloatTy();
+                pSrcTy->isVectorTy() ? VectorType::get(Type::getFloatTy(*m_pContext), pSrcTy->getVectorNumElements()) :
+                                       Type::getFloatTy(*m_pContext);
             auto pFloatValue = new FPTruncInst(pSrc, pFloatTy, "", &fptruncInst);
             auto pDest = new FPTruncInst(pFloatValue, pDestTy, "", &fptruncInst);
 

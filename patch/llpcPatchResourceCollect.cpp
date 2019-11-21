@@ -3478,7 +3478,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
         }
 
         // Previous stage converts non-float type to float type when outputs
-        Type* pReturnTy = m_pContext->FloatTy();
+        Type* pReturnTy = builder.getFloatTy();
         AddTypeMangling(pReturnTy, args, callName);
         Value* pOutValue = EmitCall(callName,
                                     pReturnTy,
@@ -3494,7 +3494,7 @@ void PatchResourceCollect::ReviseInputImportCalls()
         if (pOrigReturnTy->isIntegerTy())
         {
             // float -> i32
-            pOutValue = builder.CreateBitCast(pOutValue, m_pContext->Int32Ty());
+            pOutValue = builder.CreateBitCast(pOutValue, builder.getInt32Ty());
             if (pOrigReturnTy->getScalarSizeInBits() < 32)
             {
                 // i32 -> i16 or i8
@@ -3570,7 +3570,7 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
 
         // Construct the output vector
         Value* pOutValue = (compCount == 1) ? components[0] :
-                           UndefValue::get(VectorType::get(m_pContext->FloatTy(), compCount));
+                           UndefValue::get(VectorType::get(builder.getFloatTy(), compCount));
         for (auto compIdx = 0; compIdx < compCount; ++compIdx)
         {
             // Type conversion from non-float to float
@@ -3581,15 +3581,15 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
                 // i8/i16 -> i32
                 if (pCompTy->getScalarSizeInBits() < 32)
                 {
-                    pComp = builder.CreateZExt(pComp, m_pContext->Int32Ty());
+                    pComp = builder.CreateZExt(pComp, builder.getInt32Ty());
                 }
                 // i32 -> float
-                pComp = builder.CreateBitCast(pComp, m_pContext->FloatTy());
+                pComp = builder.CreateBitCast(pComp, builder.getFloatTy());
             }
             else if (pCompTy->isHalfTy())
             {
                 // f16 -> float
-                pComp = builder.CreateFPExt(pComp, m_pContext->FloatTy());
+                pComp = builder.CreateFPExt(pComp, builder.getFloatTy());
             }
 
             if (compCount > 1)
@@ -3607,9 +3607,9 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
         args[2] = pOutValue;
 
         std::string callName(LlpcName::OutputExportGeneric);
-        AddTypeMangling(m_pContext->VoidTy(), args, callName);
+        AddTypeMangling(builder.getVoidTy(), args, callName);
 
-        EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, builder);
+        EmitCall(callName, builder.getVoidTy(), args, NoAttrib, builder);
 
         outputLocMap[consectiveLocation] = InvalidValue;
         ++consectiveLocation;

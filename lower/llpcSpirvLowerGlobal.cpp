@@ -493,7 +493,7 @@ void SpirvLowerGlobal::visitLoadInst(
             const uint32_t elemCount = pInOutTy->getArrayNumElements();
             for (uint32_t i = 0; i < elemCount; ++i)
             {
-                Value* pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                Value* pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                 auto pElemValue = AddCallInstForInOutImport(pElemTy,
                                                             addrSpace,
                                                             pElemMeta,
@@ -681,7 +681,7 @@ void SpirvLowerGlobal::visitStoreInst(
             for (uint32_t i = 0; i < elemCount; ++i)
             {
                 auto pElemValue = ExtractValueInst::Create(pStoreValue, { i }, "", &storeInst);
-                Value* pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                Value* pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                 AddCallInstForOutputExport(pElemValue,
                                            pElemMeta,
                                            nullptr,
@@ -1205,7 +1205,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
                 {
                     // Handle array elements recursively
-                    pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), elemIdx);
+                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), elemIdx);
                     auto pElem = AddCallInstForInOutImport(pElemTy,
                                                            addrSpace,
                                                            pElemMeta,
@@ -1256,7 +1256,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 // vertex indexing is handled by "load"/"store" instruction lowering.
                 for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
                 {
-                    pVertexIdx = ConstantInt::get(m_pContext->Int32Ty(), elemIdx);
+                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), elemIdx);
                     auto pElem = AddCallInstForInOutImport(pElemTy,
                                                            addrSpace,
                                                            pElemMeta,
@@ -1275,7 +1275,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 // NOTE: If the relative location offset is not specified, initialize it to 0.
                 if (pLocOffset == nullptr)
                 {
-                    pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
                 for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
@@ -1283,8 +1283,10 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     // Handle array elements recursively
 
                     // elemLocOffset = locOffset + stride * elemIdx
-                    Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(m_pContext->Int32Ty(), stride),
-                                                                      ConstantInt::get(m_pContext->Int32Ty(), elemIdx),
+                    Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                                       stride),
+                                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                                       elemIdx),
                                                                       "",
                                                                       pInsertPos);
                     pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
@@ -1541,7 +1543,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             // NOTE: If the relative location offset is not specified, initialize it to 0.
             if (pLocOffset == nullptr)
             {
-                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
             }
 
             auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
@@ -1558,13 +1560,13 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 if (pLocOffsetConst != nullptr)
                 {
                     uint32_t locOffset = pLocOffsetConst->getZExtValue();
-                    pElemLocOffset = ConstantInt::get(m_pContext->Int32Ty(), locOffset + stride * elemIdx);
+                    pElemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), locOffset + stride * elemIdx);
                 }
                 else
                 {
                     // elemLocOffset = locOffset + stride * elemIdx
-                    pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(m_pContext->Int32Ty(), stride),
-                                                               ConstantInt::get(m_pContext->Int32Ty(), elemIdx),
+                    pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext), stride),
+                                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), elemIdx),
                                                                "",
                                                                pInsertPos);
                     pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
@@ -1783,13 +1785,14 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                 // NOTE: If the relative location offset is not specified, initialize it to 0.
                 if (pLocOffset == nullptr)
                 {
-                    pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
                 uint32_t stride = cast<ConstantInt>(pInOutMeta->getOperand(0))->getZExtValue();
                 auto pElemIdx = indexOperands[operandIdx + 1];
-                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(m_pContext->Int32Ty(), stride),
+                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                                   stride),
                                                                   pElemIdx,
                                                                   "",
                                                                   pInsertPos);
@@ -1926,13 +1929,14 @@ void SpirvLowerGlobal::StoreOutputMember(
                 // NOTE: If the relative location offset is not specified, initialize it.
                 if (pLocOffset == nullptr)
                 {
-                    pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
                 uint32_t stride = cast<ConstantInt>(pOutputMeta->getOperand(0))->getZExtValue();
                 auto pElemIdx = indexOperands[operandIdx + 1];
-                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(m_pContext->Int32Ty(), stride),
+                Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                                   stride),
                                                                   pElemIdx,
                                                                   "",
                                                                   pInsertPos);
@@ -2467,7 +2471,9 @@ void SpirvLowerGlobal::InterpolateInputElement(
             {
                 uint32_t index = flattenElemIdx / elemStrides[arraySizeIdx];
                 flattenElemIdx = flattenElemIdx - index * elemStrides[arraySizeIdx];
-                newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(m_pContext->Int32Ty(), index, true);
+                newIndexOperands[indexOperandIdxs[arraySizeIdx]] = ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                                    index,
+                                                                                    true);
             }
 
             auto pLoadValue = LoadInOutMember(pInputTy,

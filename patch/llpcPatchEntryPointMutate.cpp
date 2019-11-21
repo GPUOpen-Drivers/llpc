@@ -348,14 +348,14 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
     // Global internal table
     *pInRegMask |= 1ull << argTys.size();
-    argTys.push_back(m_pContext->Int32Ty());
+    argTys.push_back(Type::getInt32Ty(*m_pContext));
     ++userDataIdx;
 
     // TODO: We need add per shader table per real usage after switch to PAL new interface.
     //if (pResUsage->perShaderTable)
     {
         *pInRegMask |= 1ull << argTys.size();
-        argTys.push_back(m_pContext->Int32Ty());
+        argTys.push_back(Type::getInt32Ty(*m_pContext));
         ++userDataIdx;
     }
 
@@ -621,7 +621,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     }
                 }
                 *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(m_pContext->Int32Ty());
+                argTys.push_back(Type::getInt32Ty(*m_pContext));
                 ++userDataIdx;
                 break;
             }
@@ -660,7 +660,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                    (userDataIdx < (availUserDataCount + InterfaceData::CsStartUserData)))
             {
                 *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(m_pContext->Int32Ty());
+                argTys.push_back(Type::getInt32Ty(*m_pContext));
                 ++userDataIdx;
                 ++actualAvailUserDataCount;
             }
@@ -677,7 +677,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
             case ResourceMappingNodeType::DescriptorTableVaPtr:
                 {
-                    argTys.push_back(m_pContext->Int32Ty());
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));
 
                     LLPC_ASSERT(pNode->sizeInDwords == 1);
 
@@ -694,7 +694,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             case ResourceMappingNodeType::PushConst:
             case ResourceMappingNodeType::DescriptorBufferCompact:
                 {
-                    argTys.push_back(VectorType::get(m_pContext->Int32Ty(), pNode->sizeInDwords));
+                    argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), pNode->sizeInDwords));
                     for (uint32_t j = 0; j < pNode->sizeInDwords; ++j)
                     {
                         pIntfData->userDataMap[userDataIdx + j] = pNode->offsetInDwords + j;
@@ -724,7 +724,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         while (userDataIdx <= (InterfaceData::MaxCsUserDataCount + InterfaceData::CsStartUserData))
         {
             *pInRegMask |= 1ull << argTys.size();
-            argTys.push_back(m_pContext->Int32Ty());
+            argTys.push_back(Type::getInt32Ty(*m_pContext));
             ++userDataIdx;
         }
         pIntfData->userDataUsage.spillTable = userDataIdx - 1;
@@ -757,7 +757,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.viewIndex = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // View Index
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // View Index
                 pCurrIntfData->userDataUsage.vs.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
@@ -765,7 +765,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             if (reserveEsGsLdsSize)
             {
                 *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(m_pContext->Int32Ty());
+                argTys.push_back(Type::getInt32Ty(*m_pContext));
                 pCurrIntfData->userDataUsage.vs.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
@@ -779,7 +779,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                     pCurrIntfData->userDataUsage.vs.vbTablePtr = userDataIdx;
                     pCurrIntfData->entryArgIdxs.vs.vbTablePtr = argTys.size();
                     *pInRegMask |= 1ull << argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty());
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));
                     ++userDataIdx;
                     break;
                 }
@@ -789,13 +789,13 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.baseVertex = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // Base vertex
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Base vertex
                 pCurrIntfData->userDataUsage.vs.baseVertex = userDataIdx;
                 ++userDataIdx;
 
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.baseInstance = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // Base instance
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Base instance
                 pCurrIntfData->userDataUsage.vs.baseInstance = userDataIdx;
                 ++userDataIdx;
             }
@@ -804,7 +804,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.drawIndex = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // Draw index
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Draw index
                 pCurrIntfData->userDataUsage.vs.drawIndex = userDataIdx;
                 ++userDataIdx;
             }
@@ -819,7 +819,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tes.viewIndex = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // View Index
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // View Index
                 pIntfData->userDataUsage.tes.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
@@ -828,7 +828,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             if (reserveEsGsLdsSize)
             {
                 *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(m_pContext->Int32Ty());
+                argTys.push_back(Type::getInt32Ty(*m_pContext));
                 pIntfData->userDataUsage.tes.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
@@ -843,7 +843,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.gs.viewIndex = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // View Index
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // View Index
                 pIntfData->userDataUsage.gs.viewIndex = userDataIdx;
                 ++userDataIdx;
             }
@@ -851,7 +851,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             if (reserveEsGsLdsSize)
             {
                 *pInRegMask |= 1ull << argTys.size();
-                argTys.push_back(m_pContext->Int32Ty());
+                argTys.push_back(Type::getInt32Ty(*m_pContext));
                 pIntfData->userDataUsage.gs.esGsLdsSize = userDataIdx;
                 ++userDataIdx;
             }
@@ -866,11 +866,12 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 if ((userDataIdx % 2) != 0)
                 {
                     *pInRegMask |= 1ull << argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty());
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));
                     userDataIdx += 1;
                 }
 
-                auto pNumWorkgroupsPtrTy = PointerType::get(m_pContext->Int32x3Ty(), ADDR_SPACE_CONST);
+                auto pNumWorkgroupsPtrTy = PointerType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 3),
+                                                            ADDR_SPACE_CONST);
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.cs.numWorkgroupsPtr = argTys.size();
                 argTys.push_back(pNumWorkgroupsPtrTy); // NumWorkgroupsPtr
@@ -895,7 +896,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
     {
         *pInRegMask |= 1ull << argTys.size();
         pIntfData->entryArgIdxs.spillTable = argTys.size();
-        argTys.push_back(m_pContext->Int32Ty());
+        argTys.push_back(Type::getInt32Ty(*m_pContext));
 
         pIntfData->userDataUsage.spillTable = userDataIdx++;
         pIntfData->spillTable.sizeInDwords = requiredUserDataCount;
@@ -915,7 +916,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.vs.esGsOffset = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset
             }
             else if ((m_hasGs == false) && (m_hasTs == false))  // VS acts as hardware VS
             {
@@ -923,11 +924,11 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.vs.streamOutData.streamInfo = argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out info (ID, vertex count, enablement)
+                    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out info (ID, vertex count, enablement)
 
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.vs.streamOutData.writeIndex = argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out write Index
+                    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out write Index
 
                     for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
                     {
@@ -935,7 +936,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                         {
                             *pInRegMask |= 1ull << argTys.size();
                             entryArgIdxs.vs.streamOutData.streamOffsets[i] = argTys.size();
-                            argTys.push_back(m_pContext->Int32Ty()); // Stream-out offset
+                            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out offset
                         }
                     }
                 }
@@ -943,16 +944,16 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
 
             // NOTE: The order of these arguments is determined by hardware.
             entryArgIdxs.vs.vertexId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Vertex ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Vertex ID
 
             entryArgIdxs.vs.relVertexId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Relative vertex ID (auto index)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative vertex ID (auto index)
 
             entryArgIdxs.vs.primitiveId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Primitive ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Primitive ID
 
             entryArgIdxs.vs.instanceId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Instance ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Instance ID
 
             break;
         }
@@ -962,18 +963,18 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             {
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tcs.offChipLdsBase = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // Off-chip LDS buffer base
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // Off-chip LDS buffer base
             }
 
             *pInRegMask |= 1ull << argTys.size();
             entryArgIdxs.tcs.tfBufferBase = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // TF buffer base
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // TF buffer base
 
             entryArgIdxs.tcs.patchId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Patch ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Patch ID
 
             entryArgIdxs.tcs.relPatchId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Relative patch ID (control point ID included)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative patch ID (control point ID included)
 
             break;
         }
@@ -985,14 +986,14 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.offChipLdsBase = argTys.size(); // Off-chip LDS buffer base
-                    argTys.push_back(m_pContext->Int32Ty());
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));
 
                     *pInRegMask |= 1ull << argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty());  // If is_offchip enabled
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));  // If is_offchip enabled
                 }
                 *pInRegMask |= 1ull << argTys.size();
                 entryArgIdxs.tes.esGsOffset = argTys.size();
-                argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset
+                argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset
             }
             else  // TES acts as hardware VS
             {
@@ -1000,14 +1001,14 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.streamOutData.streamInfo = argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty());
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));
                 }
 
                 if (enableXfb)
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.streamOutData.writeIndex = argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out write Index
+                    argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out write Index
 
                     for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
                     {
@@ -1015,7 +1016,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                         {
                             *pInRegMask |= 1ull << argTys.size();
                             entryArgIdxs.tes.streamOutData.streamOffsets[i] = argTys.size();
-                            argTys.push_back(m_pContext->Int32Ty()); // Stream-out offset
+                            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Stream-out offset
                         }
                     }
                 }
@@ -1024,21 +1025,21 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 {
                     *pInRegMask |= 1ull << argTys.size();
                     entryArgIdxs.tes.offChipLdsBase = argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty());
+                    argTys.push_back(Type::getInt32Ty(*m_pContext));
                 }
             }
 
             entryArgIdxs.tes.tessCoordX = argTys.size();
-            argTys.push_back(m_pContext->FloatTy()); // X of TessCoord (U)
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // X of TessCoord (U)
 
             entryArgIdxs.tes.tessCoordY = argTys.size();
-            argTys.push_back(m_pContext->FloatTy()); // Y of TessCoord (V)
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // Y of TessCoord (V)
 
             entryArgIdxs.tes.relPatchId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Relative patch ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Relative patch ID
 
             entryArgIdxs.tes.patchId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Patch ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Patch ID
 
             break;
         }
@@ -1046,89 +1047,89 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         {
             *pInRegMask |= 1ull << argTys.size();
             entryArgIdxs.gs.gsVsOffset = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // GS to VS offset
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // GS to VS offset
 
             *pInRegMask |= 1ull << argTys.size();
             entryArgIdxs.gs.waveId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // GS wave ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // GS wave ID
 
             // TODO: We should make the arguments according to real usage.
             entryArgIdxs.gs.esGsOffsets[0] = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset (vertex 0)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 0)
 
             entryArgIdxs.gs.esGsOffsets[1] = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset (vertex 1)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 1)
 
             entryArgIdxs.gs.primitiveId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Primitive ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Primitive ID
 
             entryArgIdxs.gs.esGsOffsets[2] = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset (vertex 2)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 2)
 
             entryArgIdxs.gs.esGsOffsets[3] = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset (vertex 3)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 3)
 
             entryArgIdxs.gs.esGsOffsets[4] = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset (vertex 4)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 4)
 
             entryArgIdxs.gs.esGsOffsets[5] = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // ES to GS offset (vertex 5)
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // ES to GS offset (vertex 5)
 
             entryArgIdxs.gs.invocationId = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Invocation ID
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Invocation ID
             break;
         }
     case ShaderStageFragment:
         {
             *pInRegMask |= 1ull << argTys.size();
             entryArgIdxs.fs.primMask = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Primitive mask
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Primitive mask
 
             entryArgIdxs.fs.perspInterp.sample = argTys.size();
-            argTys.push_back(m_pContext->Floatx2Ty()); // Perspective sample
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Perspective sample
 
             entryArgIdxs.fs.perspInterp.center = argTys.size();
-            argTys.push_back(m_pContext->Floatx2Ty()); // Perspective center
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Perspective center
 
             entryArgIdxs.fs.perspInterp.centroid = argTys.size();
-            argTys.push_back(m_pContext->Floatx2Ty()); // Perspective centroid
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Perspective centroid
 
             entryArgIdxs.fs.perspInterp.pullMode = argTys.size();
-            argTys.push_back(m_pContext->Floatx3Ty()); // Perspective pull-mode
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 3)); // Perspective pull-mode
 
             entryArgIdxs.fs.linearInterp.sample = argTys.size();
-            argTys.push_back(m_pContext->Floatx2Ty()); // Linear sample
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Linear sample
 
             entryArgIdxs.fs.linearInterp.center = argTys.size();
-            argTys.push_back(m_pContext->Floatx2Ty()); // Linear center
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Linear center
 
             entryArgIdxs.fs.linearInterp.centroid = argTys.size();
-            argTys.push_back(m_pContext->Floatx2Ty()); // Linear centroid
+            argTys.push_back(VectorType::get(Type::getFloatTy(*m_pContext), 2)); // Linear centroid
 
-            argTys.push_back(m_pContext->FloatTy()); // Line stipple
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // Line stipple
 
             entryArgIdxs.fs.fragCoord.x = argTys.size();
-            argTys.push_back(m_pContext->FloatTy()); // X of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // X of FragCoord
 
             entryArgIdxs.fs.fragCoord.y = argTys.size();
-            argTys.push_back(m_pContext->FloatTy()); // Y of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // Y of FragCoord
 
             entryArgIdxs.fs.fragCoord.z = argTys.size();
-            argTys.push_back(m_pContext->FloatTy()); // Z of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // Z of FragCoord
 
             entryArgIdxs.fs.fragCoord.w = argTys.size();
-            argTys.push_back(m_pContext->FloatTy()); // W of FragCoord
+            argTys.push_back(Type::getFloatTy(*m_pContext)); // W of FragCoord
 
             entryArgIdxs.fs.frontFacing = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Front facing
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Front facing
 
             entryArgIdxs.fs.ancillary = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Ancillary
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Ancillary
 
             entryArgIdxs.fs.sampleCoverage = argTys.size();
-            argTys.push_back(m_pContext->Int32Ty()); // Sample coverage
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Sample coverage
 
-            argTys.push_back(m_pContext->Int32Ty()); // Fixed X/Y
+            argTys.push_back(Type::getInt32Ty(*m_pContext)); // Fixed X/Y
 
             break;
         }
@@ -1137,14 +1138,14 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
             // Add system values in SGPR
             *pInRegMask |= 1ull << argTys.size();
             entryArgIdxs.cs.workgroupId = argTys.size();
-            argTys.push_back(m_pContext->Int32x3Ty()); // WorkgroupId
+            argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), 3)); // WorkgroupId
 
             *pInRegMask |= 1ull << argTys.size();
-            argTys.push_back(m_pContext->Int32Ty());  // Multiple dispatch info, include TG_SIZE and etc.
+            argTys.push_back(Type::getInt32Ty(*m_pContext));  // Multiple dispatch info, include TG_SIZE and etc.
 
             // Add system value in VGPR
             entryArgIdxs.cs.localInvocationId = argTys.size();
-            argTys.push_back(m_pContext->Int32x3Ty()); // LocalInvociationId
+            argTys.push_back(VectorType::get(Type::getInt32Ty(*m_pContext), 3)); // LocalInvociationId
             break;
         }
     default:
@@ -1154,7 +1155,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
         }
     }
 
-    return FunctionType::get(m_pContext->VoidTy(), argTys, false);
+    return FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
 }
 
 } // Llpc

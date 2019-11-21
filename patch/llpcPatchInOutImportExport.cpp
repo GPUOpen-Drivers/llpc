@@ -204,7 +204,7 @@ void PatchInOutImportExport::ProcessShader()
         if (builtInUsage.tes.primitiveId)
         {
             // TODO: Support tessellation shader.
-            m_pPrimitiveId = UndefValue::get(m_pContext->Int32Ty());
+            m_pPrimitiveId = UndefValue::get(Type::getInt32Ty(*m_pContext));
         }
     }
 
@@ -515,7 +515,7 @@ void PatchInOutImportExport::visitCallInst(
                     {
                         auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
                         value += locOffset;
-                        pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                        pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                     }
                 }
 
@@ -681,7 +681,7 @@ void PatchInOutImportExport::visitCallInst(
             {
                 auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
                 value += locOffset;
-                pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
             }
 
             // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
@@ -839,7 +839,7 @@ void PatchInOutImportExport::visitCallInst(
                 {
                     auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
                     value += locOffset;
-                    pLocOffset = ConstantInt::get(m_pContext->Int32Ty(), 0);
+                    pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
                 // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
@@ -990,7 +990,7 @@ void PatchInOutImportExport::visitCallInst(
                 auto pEmitCounterPtr = m_pipelineSysValues.Get(m_pEntryPoint)->GetEmitCounterPtr()[emitStream];
                 Value* pEmitCounter = new LoadInst(pEmitCounterPtr, "", &callInst);
                 pEmitCounter = BinaryOperator::CreateAdd(pEmitCounter,
-                                                         ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                          "",
                                                          &callInst);
                 new StoreInst(pEmitCounter, pEmitCounterPtr, &callInst);
@@ -1018,9 +1018,9 @@ void PatchInOutImportExport::visitReturnInst(
                               ((m_shaderStage == ShaderStageCopyShader) && (enableXfb == false))) &&
                              ((nextStage == ShaderStageInvalid) || (nextStage == ShaderStageFragment)));
 
-    auto pZero  = ConstantFP::get(m_pContext->FloatTy(), 0.0);
-    auto pOne   = ConstantFP::get(m_pContext->FloatTy(), 1.0);
-    auto pUndef = UndefValue::get(m_pContext->FloatTy());
+    auto pZero  = ConstantFP::get(Type::getFloatTy(*m_pContext), 0.0);
+    auto pOne   = ConstantFP::get(Type::getFloatTy(*m_pContext), 1.0);
+    auto pUndef = UndefValue::get(Type::getFloatTy(*m_pContext));
 
     auto pInsertPos = &retInst;
 
@@ -1096,17 +1096,17 @@ void PatchInOutImportExport::visitReturnInst(
         if (usePosition == false)
         {
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_POS_0),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0xF),               // en
-                pZero,                                                      // src0
-                pZero,                                                      // src1
-                pZero,                                                      // src2
-                pOne,                                                       // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), false)               // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_POS_0),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),               // en
+                pZero,                                                              // src0
+                pZero,                                                              // src1
+                pZero,                                                              // src2
+                pOne,                                                               // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)               // vm
             };
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         }
 
         // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
@@ -1164,35 +1164,35 @@ void PatchInOutImportExport::visitReturnInst(
             // should start from pos2.
             uint32_t pos = (usePointSize || useLayer || useViewportIndex) ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), pos),   // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0xF),   // en
-                clipCullDistance[0],                            // src0
-                clipCullDistance[1],                            // src1
-                clipCullDistance[2],                            // src2
-                clipCullDistance[3],                            // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),  // done
-                ConstantInt::get(m_pContext->BoolTy(), false)   // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), pos),   // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),   // en
+                clipCullDistance[0],                                    // src0
+                clipCullDistance[1],                                    // src1
+                clipCullDistance[2],                                    // src2
+                clipCullDistance[3],                                    // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),  // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)   // vm
             };
 
             // "Done" flag is valid for exporting position 0 ~ 3
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
 
             if (clipCullDistance.size() > 4)
             {
                 // Do the second exporting
                 Value* args[] = {
-                    ConstantInt::get(m_pContext->Int32Ty(), pos + 1), // tgt
-                    ConstantInt::get(m_pContext->Int32Ty(), 0xF),     // en
-                    clipCullDistance[4],                              // src0
-                    clipCullDistance[5],                              // src1
-                    clipCullDistance[6],                              // src2
-                    clipCullDistance[7],                              // src3
-                    ConstantInt::get(m_pContext->BoolTy(), false),    // done
-                    ConstantInt::get(m_pContext->BoolTy(), false)     // vm
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), pos + 1), // tgt
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),     // en
+                    clipCullDistance[4],                                      // src0
+                    clipCullDistance[5],                                      // src1
+                    clipCullDistance[6],                                      // src2
+                    clipCullDistance[7],                                      // src3
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),    // done
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false)     // vm
                 };
                 m_pLastExport =
-                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
             }
 
             // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
@@ -1280,32 +1280,32 @@ void PatchInOutImportExport::visitReturnInst(
                 }
 
                 Value* args[] = {
-                    ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc),  // tgt
-                    ConstantInt::get(m_pContext->Int32Ty(), 0xF),                       // en
-                    clipCullDistance[0],                                                // src0
-                    clipCullDistance[1],                                                // src1
-                    clipCullDistance[2],                                                // src2
-                    clipCullDistance[3],                                                // src3
-                    ConstantInt::get(m_pContext->BoolTy(), false),                      // done
-                    ConstantInt::get(m_pContext->BoolTy(), false)                       // vm
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc),  // tgt
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),                       // en
+                    clipCullDistance[0],                                                        // src0
+                    clipCullDistance[1],                                                        // src1
+                    clipCullDistance[2],                                                        // src2
+                    clipCullDistance[3],                                                        // src3
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                      // done
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                       // vm
                 };
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
 
                 if (clipCullDistance.size() > 4)
                 {
                     // Do the second exporting
                     Value* args[] = {
-                        ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc + 1),  // tgt
-                        ConstantInt::get(m_pContext->Int32Ty(), 0xF),                           // en
-                        clipCullDistance[4],                                                    // src0
-                        clipCullDistance[5],                                                    // src1
-                        clipCullDistance[6],                                                    // src2
-                        clipCullDistance[7],                                                    // src3
-                        ConstantInt::get(m_pContext->BoolTy(), false),                          // done
-                        ConstantInt::get(m_pContext->BoolTy(), false)                           // vm
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc + 1),  // tgt
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),                           // en
+                        clipCullDistance[4],                                                            // src0
+                        clipCullDistance[5],                                                            // src1
+                        clipCullDistance[6],                                                            // src2
+                        clipCullDistance[7],                                                            // src3
+                        ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                          // done
+                        ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                           // vm
                     };
-                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                     ++inOutUsage.expCount;
                 }
             }
@@ -1346,19 +1346,19 @@ void PatchInOutImportExport::visitReturnInst(
                 }
 
                 LLPC_ASSERT(m_pPrimitiveId != nullptr);
-                Value* pPrimitiveId = new BitCastInst(m_pPrimitiveId, m_pContext->FloatTy(), "", pInsertPos);
+                Value* pPrimitiveId = new BitCastInst(m_pPrimitiveId, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
                 Value* args[] = {
-                    ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc),  // tgt
-                    ConstantInt::get(m_pContext->Int32Ty(), 0x1),                       // en
-                    pPrimitiveId,                                                       // src0
-                    pUndef,                                                             // src1
-                    pUndef,                                                             // src2
-                    pUndef,                                                             // src3
-                    ConstantInt::get(m_pContext->BoolTy(), false),                      // done
-                    ConstantInt::get(m_pContext->BoolTy(), false)                       // vm
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc),  // tgt
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0x1),                       // en
+                    pPrimitiveId,                                                               // src0
+                    pUndef,                                                                     // src1
+                    pUndef,                                                                     // src2
+                    pUndef,                                                                     // src3
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                      // done
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                       // vm
                 };
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
         }
@@ -1372,13 +1372,13 @@ void PatchInOutImportExport::visitReturnInst(
         // Export gl_Layer and gl_ViewportIndex before entry-point returns
         if ((m_gfxIp.major >= 9) && (useLayer || useViewportIndex))
         {
-            Value* pViewportIndexAndLayer = ConstantInt::get(m_pContext->Int32Ty(), 0);
+            Value* pViewportIndexAndLayer = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
 
             if (useViewportIndex)
             {
                 LLPC_ASSERT(m_pViewportIndex != nullptr);
                 pViewportIndexAndLayer = BinaryOperator::CreateShl(m_pViewportIndex,
-                                                                   ConstantInt::get(m_pContext->Int32Ty(), 16),
+                                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 16),
                                                                    "",
                                                                    pInsertPos);
 
@@ -1393,22 +1393,25 @@ void PatchInOutImportExport::visitReturnInst(
                                                                   pInsertPos);
             }
 
-            pViewportIndexAndLayer = new BitCastInst(pViewportIndexAndLayer, m_pContext->FloatTy(), "", pInsertPos);
+            pViewportIndexAndLayer = new BitCastInst(pViewportIndexAndLayer,
+                                                     Type::getFloatTy(*m_pContext),
+                                                     "",
+                                                     pInsertPos);
 
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_POS_1),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0x4),               // en
-                pUndef,                                                     // src0
-                pUndef,                                                     // src1
-                pViewportIndexAndLayer,                                     // src2
-                pUndef,                                                     // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), false)               // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_POS_1),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0x4),               // en
+                pUndef,                                                             // src0
+                pUndef,                                                             // src1
+                pViewportIndexAndLayer,                                             // src2
+                pUndef,                                                             // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)               // vm
             };
 
             // "Done" flag is valid for exporting position 0 ~ 3
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
 
             // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
             if (useViewportIndex)
@@ -1438,19 +1441,22 @@ void PatchInOutImportExport::visitReturnInst(
                         loc = inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
                     }
 
-                    Value* pViewportIndex = new BitCastInst(m_pViewportIndex, m_pContext->FloatTy(), "", pInsertPos);
+                    Value* pViewportIndex = new BitCastInst(m_pViewportIndex,
+                                                            Type::getFloatTy(*m_pContext),
+                                                            "",
+                                                            pInsertPos);
 
                     Value* args[] = {
-                        ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc),  // tgt
-                        ConstantInt::get(m_pContext->Int32Ty(), 0xF),                       // en
-                        pViewportIndex,                                                     // src0
-                        pUndef,                                                             // src1
-                        pUndef,                                                             // src2
-                        pUndef,                                                             // src3
-                        ConstantInt::get(m_pContext->BoolTy(), false),                      // done
-                        ConstantInt::get(m_pContext->BoolTy(), false)                       // vm
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc),  // tgt
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),                       // en
+                        pViewportIndex,                                                             // src0
+                        pUndef,                                                                     // src1
+                        pUndef,                                                                     // src2
+                        pUndef,                                                                     // src3
+                        ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                      // done
+                        ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                       // vm
                     };
-                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                     ++inOutUsage.expCount;
                 }
             }
@@ -1491,19 +1497,19 @@ void PatchInOutImportExport::visitReturnInst(
                             inOutUsage.builtInOutputLocMap[BuiltInLayer];
                     }
 
-                    Value* pLayer = new BitCastInst(m_pLayer, m_pContext->FloatTy(), "", pInsertPos);
+                    Value* pLayer = new BitCastInst(m_pLayer, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
                     Value* args[] = {
-                        ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc),  // tgt
-                        ConstantInt::get(m_pContext->Int32Ty(), 0xF),                       // en
-                        pLayer,                                                             // src0
-                        pUndef,                                                             // src1
-                        pUndef,                                                             // src2
-                        pUndef,                                                             // src3
-                        ConstantInt::get(m_pContext->BoolTy(), false),                      // done
-                        ConstantInt::get(m_pContext->BoolTy(), false)                       // vm
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc),  // tgt
+                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),                       // en
+                        pLayer,                                                                     // src0
+                        pUndef,                                                                     // src1
+                        pUndef,                                                                     // src2
+                        pUndef,                                                                     // src3
+                        ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                      // done
+                        ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                       // vm
                     };
-                    EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                    EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                     ++inOutUsage.expCount;
                 }
             }
@@ -1519,16 +1525,16 @@ void PatchInOutImportExport::visitReturnInst(
             if (inOutUsage.expCount == 0)
             {
                 Value* args[] = {
-                    ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0),  // tgt
-                    ConstantInt::get(m_pContext->Int32Ty(), 0),                   // en
-                    pUndef,                                                       // src0
-                    pUndef,                                                       // src1
-                    pUndef,                                                       // src2
-                    pUndef,                                                       // src3
-                    ConstantInt::get(m_pContext->BoolTy(), false),                // done
-                    ConstantInt::get(m_pContext->BoolTy(), false)                 // vm
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0),  // tgt
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),                   // en
+                    pUndef,                                                               // src0
+                    pUndef,                                                               // src1
+                    pUndef,                                                               // src2
+                    pUndef,                                                               // src3
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                // done
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                 // vm
                 };
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
         }
@@ -1546,11 +1552,11 @@ void PatchInOutImportExport::visitReturnInst(
         auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
         auto pWaveId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.waveId);
         Value* args[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), GS_DONE),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), GS_DONE),
             pWaveId
         };
 
-        EmitCall("llvm.amdgcn.s.sendmsg", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.s.sendmsg", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
     }
     else if (m_shaderStage == ShaderStageFragment)
     {
@@ -1586,17 +1592,17 @@ void PatchInOutImportExport::visitReturnInst(
             }
 
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_Z),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), channelMask),   // en
-                pFragDepth,                                             // src0
-                pFragStencilRef,                                        // src1
-                pSampleMask,                                            // src2
-                pUndef,                                                 // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),          // done
-                ConstantInt::get(m_pContext->BoolTy(), true)            // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_Z),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), channelMask),   // en
+                pFragDepth,                                                     // src0
+                pFragStencilRef,                                                // src1
+                pSampleMask,                                                    // src2
+                pUndef,                                                         // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),          // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), true)            // vm
             };
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         }
 
         // Export fragment colors
@@ -1635,7 +1641,7 @@ void PatchInOutImportExport::visitReturnInst(
                         LLPC_ASSERT(expFragColor[i]->getType() == pCompTy);
                         pOutput = InsertElementInst::Create(pOutput,
                                                             expFragColor[i],
-                                                            ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                             "",
                                                             pInsertPos);
                     }
@@ -1663,17 +1669,17 @@ void PatchInOutImportExport::visitReturnInst(
         if ((m_pLastExport == nullptr) && pResUsage->inOutUsage.fs.dummyExport)
         {
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_MRT_0),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0x1),               // en
-                pZero,                                                      // src0
-                pUndef,                                                     // src1
-                pUndef,                                                     // src2
-                pUndef,                                                     // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), true)                // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_MRT_0),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0x1),               // en
+                pZero,                                                              // src0
+                pUndef,                                                             // src1
+                pUndef,                                                             // src2
+                pUndef,                                                             // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), true)                // vm
             };
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         }
     }
 
@@ -1683,12 +1689,12 @@ void PatchInOutImportExport::visitReturnInst(
         auto exportName = m_pLastExport->getCalledFunction()->getName();
         if (exportName == "llvm.amdgcn.exp.f32")
         {
-            m_pLastExport->setOperand(6, ConstantInt::get(m_pContext->BoolTy(), true));
+            m_pLastExport->setOperand(6, ConstantInt::get(Type::getInt1Ty(*m_pContext), true));
         }
         else
         {
             LLPC_ASSERT(exportName == "llvm.amdgcn.exp.compr.v2f16");
-            m_pLastExport->setOperand(4, ConstantInt::get(m_pContext->BoolTy(), true));
+            m_pLastExport->setOperand(4, ConstantInt::get(Type::getInt1Ty(*m_pContext), true));
         }
     }
 }
@@ -1775,7 +1781,7 @@ Value* PatchInOutImportExport::PatchGsGenericInputImport(
         compIdx *= 2; // For 64-bit data type, the component indexing must multiply by 2
 
         // Cast 64-bit data type to float vector
-        pInputTy = VectorType::get(m_pContext->FloatTy(), compCount * 2);
+        pInputTy = VectorType::get(Type::getFloatTy(*m_pContext), compCount * 2);
     }
     else
     {
@@ -1890,8 +1896,8 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 }
             }
         }
-        pI = ExtractElementInst::Create(pIJ, ConstantInt::get(m_pContext->Int32Ty(), 0), "", pInsertPos);
-        pJ = ExtractElementInst::Create(pIJ, ConstantInt::get(m_pContext->Int32Ty(), 1), "", pInsertPos);
+        pI = ExtractElementInst::Create(pIJ, ConstantInt::get(Type::getInt32Ty(*m_pContext), 0), "", pInsertPos);
+        pJ = ExtractElementInst::Create(pIJ, ConstantInt::get(Type::getInt32Ty(*m_pContext), 1), "", pInsertPos);
     }
 
     Attribute::AttrKind attribs[] = {
@@ -1910,17 +1916,19 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
     if (bitWidth == 8)
     {
         LLPC_ASSERT(pInputTy->isIntOrIntVectorTy());
-        pInterpTy =
-            (numChannels > 1) ? VectorType::get(m_pContext->Int8Ty(), numChannels) : m_pContext->Int8Ty();
+        pInterpTy = Type::getInt8Ty(*m_pContext);
     }
     else if (bitWidth == 16)
     {
-        pInterpTy =
-            (numChannels > 1) ? VectorType::get(m_pContext->Float16Ty(), numChannels) : m_pContext->Float16Ty();
+        pInterpTy = Type::getHalfTy(*m_pContext);
     }
     else
     {
-        pInterpTy = (numChannels > 1) ? VectorType::get(m_pContext->FloatTy(), numChannels) : m_pContext->FloatTy();
+        pInterpTy = Type::getFloatTy(*m_pContext);
+    }
+    if (numChannels > 1)
+    {
+        pInterpTy = VectorType::get(pInterpTy, numChannels);
     }
     Value* pInterp = UndefValue::get(pInterpTy);
 
@@ -1930,7 +1938,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
         startChannel = cast<ConstantInt>(pCompIdx)->getZExtValue();
     }
 
-    Value* pLoc = ConstantInt::get(m_pContext->Int32Ty(), location);
+    Value* pLoc = ConstantInt::get(Type::getInt32Ty(*m_pContext), location);
     if (pLocOffset != nullptr)
     {
         pLoc = BinaryOperator::CreateAdd(pLoc, pLocOffset, "", pInsertPos);
@@ -1949,28 +1957,28 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             if (bitWidth == 16)
             {
                 Value* args1[] = {
-                    pI,                                             // i
-                    ConstantInt::get(m_pContext->Int32Ty(), i),     // attr_chan
-                    pLoc,                                           // attr
-                    ConstantInt::get(m_pContext->BoolTy(), false),  // high
-                    pPrimMask                                       // m0
+                    pI,                                                     // i
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), i),     // attr_chan
+                    pLoc,                                                   // attr
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),  // high
+                    pPrimMask                                               // m0
                 };
                 pCompValue = EmitCall("llvm.amdgcn.interp.p1.f16",
-                                      m_pContext->FloatTy(),
+                                      Type::getFloatTy(*m_pContext),
                                       args1,
                                       attribs,
                                       pInsertPos);
 
                 Value* args2[] = {
-                    pCompValue,                                     // p1
-                    pJ,                                             // j
-                    ConstantInt::get(m_pContext->Int32Ty(), i),     // attr_chan
-                    pLoc,                                           // attr
-                    ConstantInt::get(m_pContext->BoolTy(), false),  // high
-                    pPrimMask                                       // m0
+                    pCompValue,                                             // p1
+                    pJ,                                                     // j
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), i),     // attr_chan
+                    pLoc,                                                   // attr
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),  // high
+                    pPrimMask                                               // m0
                 };
                 pCompValue = EmitCall("llvm.amdgcn.interp.p2.f16",
-                                      m_pContext->Float16Ty(),
+                                      Type::getHalfTy(*m_pContext),
                                       args2,
                                       attribs,
                                       pInsertPos);
@@ -1978,26 +1986,26 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             else
             {
                 Value* args1[] = {
-                    pI,                                             // i
-                    ConstantInt::get(m_pContext->Int32Ty(), i),     // attr_chan
-                    pLoc,                                           // attr
-                    pPrimMask                                       // m0
+                    pI,                                                   // i
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), i),   // attr_chan
+                    pLoc,                                                 // attr
+                    pPrimMask                                             // m0
                 };
                 pCompValue = EmitCall("llvm.amdgcn.interp.p1",
-                                      m_pContext->FloatTy(),
+                                      Type::getFloatTy(*m_pContext),
                                       args1,
                                       attribs,
                                       pInsertPos);
 
                 Value* args2[] = {
-                    pCompValue,                                     // p1
-                    pJ,                                             // j
-                    ConstantInt::get(m_pContext->Int32Ty(), i),     // attr_chan
-                    pLoc,                                           // attr
-                    pPrimMask                                       // m0
+                    pCompValue,                                         // p1
+                    pJ,                                                 // j
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), i), // attr_chan
+                    pLoc,                                               // attr
+                    pPrimMask                                           // m0
                 };
                 pCompValue = EmitCall("llvm.amdgcn.interp.p2",
-                                      m_pContext->FloatTy(),
+                                      Type::getFloatTy(*m_pContext),
                                       args2,
                                       attribs,
                                       pInsertPos);
@@ -2034,29 +2042,29 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             }
 
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), interpParam),           // param
-                ConstantInt::get(m_pContext->Int32Ty(), i % 4),                 // attr_chan
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), interpParam),           // param
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), i % 4),                 // attr_chan
                 (pLocOffset != nullptr) ?
                     pLoc :
-                    ConstantInt::get(m_pContext->Int32Ty(), location + i / 4),  // attr
-                pPrimMask                                                       // m0
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), location + i / 4),  // attr
+                pPrimMask                                                               // m0
             };
             pCompValue = EmitCall("llvm.amdgcn.interp.mov",
-                                  m_pContext->FloatTy(),
+                                  Type::getFloatTy(*m_pContext),
                                   args,
                                   attribs,
                                   pInsertPos);
 
             if (bitWidth == 8)
             {
-                pCompValue = new BitCastInst(pCompValue, m_pContext->Int32Ty(), "", pInsertPos);
-                pCompValue = new TruncInst(pCompValue, m_pContext->Int8Ty(), "", pInsertPos);
+                pCompValue = new BitCastInst(pCompValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                pCompValue = new TruncInst(pCompValue, Type::getInt8Ty(*m_pContext), "", pInsertPos);
             }
             else if (bitWidth == 16)
             {
-                pCompValue = new BitCastInst(pCompValue, m_pContext->Int32Ty(), "", pInsertPos);
-                pCompValue = new TruncInst(pCompValue, m_pContext->Int16Ty(), "", pInsertPos);
-                pCompValue = new BitCastInst(pCompValue, m_pContext->Float16Ty(), "", pInsertPos);
+                pCompValue = new BitCastInst(pCompValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                pCompValue = new TruncInst(pCompValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
+                pCompValue = new BitCastInst(pCompValue, Type::getHalfTy(*m_pContext), "", pInsertPos);
             }
         }
 
@@ -2068,7 +2076,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
         {
             pInterp = InsertElementInst::Create(pInterp,
                                                 pCompValue,
-                                                ConstantInt::get(m_pContext->Int32Ty(), i - startChannel),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext), i - startChannel),
                                                 "",
                                                 pInsertPos);
         }
@@ -2133,7 +2141,7 @@ void PatchInOutImportExport::PatchVsGenericOutputExport(
 
                 uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() * 2 : 2;
 
-                pOutputTy = VectorType::get(m_pContext->FloatTy(), compCount);
+                pOutputTy = VectorType::get(Type::getFloatTy(*m_pContext), compCount);
                 pOutput = new BitCastInst(pOutput, pOutputTy, "", pInsertPos);
             }
             else
@@ -2187,7 +2195,7 @@ void PatchInOutImportExport::PatchTesGenericOutputExport(
             compIdx *= 2;
 
             uint32_t compCount = pOutputTy->isVectorTy() ? pOutputTy->getVectorNumElements() * 2 : 2;
-            pOutputTy = VectorType::get(m_pContext->FloatTy(), compCount);
+            pOutputTy = VectorType::get(Type::getFloatTy(*m_pContext), compCount);
 
             pOutput = new BitCastInst(pOutput, pOutputTy, "", pInsertPos);
         }
@@ -2224,11 +2232,11 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
 
         if (pOutputTy->isVectorTy())
         {
-            pOutputTy = VectorType::get(m_pContext->FloatTy(), pOutputTy->getVectorNumElements() * 2);
+            pOutputTy = VectorType::get(Type::getFloatTy(*m_pContext), pOutputTy->getVectorNumElements() * 2);
         }
         else
         {
-            pOutputTy = m_pContext->Floatx2Ty();
+            pOutputTy = VectorType::get(Type::getFloatTy(*m_pContext), 2);
         }
 
         pOutput = new BitCastInst(pOutput, pOutputTy, "", pInsertPos);
@@ -2262,13 +2270,13 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
         Value* args[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), location),
-            ConstantInt::get(m_pContext->Int32Ty(), compIdx),
-            ConstantInt::get(m_pContext->Int32Ty(), streamId),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), location),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), compIdx),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), streamId),
             pOutput
         };
         std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
     }
     else
 #endif
@@ -2282,7 +2290,7 @@ void PatchInOutImportExport::PatchGsGenericOutputExport(
             for (uint32_t i = 0; i < compCount; ++i)
             {
                 auto pComp = ExtractElementInst::Create(pOutput,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                         "",
                                                         pInsertPos);
                 StoreValueToGsVsRingBuffer(
@@ -2320,7 +2328,7 @@ void PatchInOutImportExport::PatchFsGenericOutputExport(
         else
         {
             pOutputComp = ExtractElementInst::Create(pOutput,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                     ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                      "",
                                                      pInsertPos);
         }
@@ -2366,11 +2374,11 @@ Value* PatchInOutImportExport::PatchVsBuiltInInputImport(
     case BuiltInViewIndex:
         return GetFunctionArgument(m_pEntryPoint, entryArgIdxs.viewIndex);
     case BuiltInSubgroupSize:
-        return ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
+        return ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
     case BuiltInSubgroupLocalInvocationId:
         return GetSubgroupLocalInvocationId(pInsertPos);
     case BuiltInDeviceIndex:
-        return ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
+        return ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
     default:
         LLPC_NEVER_CALLED();
         return UndefValue::get(pInputTy);
@@ -2429,7 +2437,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
                 auto pElemTy = pInputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pInputTy->getArrayNumElements(); ++i)
                 {
-                    auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                    auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                     auto pLdsOffset =
                         CalcLdsOffsetForTcsInput(pElemTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                     auto pElem = ReadValueFromLds(false, pElemTy, pLdsOffset, pInsertPos);
@@ -2446,7 +2454,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInPatchVertices:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(),
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                       m_pPipelineState->GetInputAssemblyState().patchControlPoints);
             break;
         }
@@ -2462,7 +2470,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2472,7 +2480,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
             break;
         }
     default:
@@ -2540,7 +2548,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
                 auto pElemTy = pInputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pInputTy->getArrayNumElements(); ++i)
                 {
-                    auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                    auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                     auto pLdsOffset =
                         CalcLdsOffsetForTesInput(pElemTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                     auto pElem = ReadValueFromLds(false, pElemTy, pLdsOffset, pInsertPos);
@@ -2564,7 +2572,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
                 patchVertices = m_pPipelineState->GetShaderModes()->GetTessellationMode().outputVertices;
             }
 
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), patchVertices);
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchVertices);
 
             break;
         }
@@ -2603,7 +2611,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
                 auto pElemTy = pInputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pInputTy->getArrayNumElements(); ++i)
                 {
-                    auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                    auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                     auto pLdsOffset =
                         CalcLdsOffsetForTesInput(pElemTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                     auto pElem = ReadValueFromLds(false, pElemTy, pLdsOffset, pInsertPos);
@@ -2625,7 +2633,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2635,7 +2643,7 @@ Value* PatchInOutImportExport::PatchTesBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
             break;
         }
     default:
@@ -2718,7 +2726,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -2728,7 +2736,7 @@ Value* PatchInOutImportExport::PatchGsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
             break;
         }
     // Handle internal-use built-ins
@@ -2777,17 +2785,17 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             // gl_SampleID = Ancillary[11:8]
             Value* args[] = {
                 pAncillary,
-                ConstantInt::get(m_pContext->Int32Ty(), 8),
-                ConstantInt::get(m_pContext->Int32Ty(), 4)
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 8),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 4)
             };
             auto pSampleId =
-                EmitCall("llvm.amdgcn.ubfe.i32", m_pContext->Int32Ty(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.ubfe.i32", Type::getInt32Ty(*m_pContext), args, NoAttrib, pInsertPos);
 
             auto pSampleMaskIn = pSampleCoverage;
             if (m_pPipelineState->GetRasterizerState().perSampleShading)
             {
                 // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
-                pSampleMaskIn = BinaryOperator::CreateShl(ConstantInt::get(m_pContext->Int32Ty(), 1),
+                pSampleMaskIn = BinaryOperator::CreateShl(ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                           pSampleId,
                                                           "",
                                                           pInsertPos);
@@ -2811,13 +2819,13 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             };
 
             fragCoord[3] =
-                EmitCall("llvm.amdgcn.rcp.f32", m_pContext->FloatTy(), { fragCoord[3] }, attribs, pInsertPos);
+                EmitCall("llvm.amdgcn.rcp.f32", Type::getFloatTy(*m_pContext), { fragCoord[3] }, attribs, pInsertPos);
 
             for (uint32_t i = 0; i < 4; ++i)
             {
                 pInput = InsertElementInst::Create(pInput,
                                                    fragCoord[i],
-                                                   ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                    "",
                                                    pInsertPos);
             }
@@ -2830,7 +2838,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             pInput = new ICmpInst(pInsertPos,
                                   ICmpInst::ICMP_NE,
                                   pFrontFacing,
-                                  ConstantInt::get(m_pContext->Int32Ty(),
+                                  ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                   0));
             pInput = CastInst::CreateIntegerCast(pInput, pInputTy, false, "", pInsertPos);
             break;
@@ -2862,7 +2870,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInHelperInvocation:
         {
-            pInput = EmitCall("llvm.amdgcn.ps.live", m_pContext->BoolTy(), {}, Attribute::ReadNone, pInsertPos);
+            pInput = EmitCall("llvm.amdgcn.ps.live", Type::getInt1Ty(*m_pContext), {}, Attribute::ReadNone, pInsertPos);
             pInput = BinaryOperator::CreateNot(pInput, "", pInsertPos);
             pInput = CastInst::CreateIntegerCast(pInput, pInputTy, false, "", pInsertPos);
             break;
@@ -2962,9 +2970,15 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             auto pPrimMask = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
             auto pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center);
 
-            pIJ = new BitCastInst(pIJ, m_pContext->Floatx2Ty(), "", pInsertPos);
-            auto pI = ExtractElementInst::Create(pIJ, ConstantInt::get(m_pContext->Int32Ty(), 0), "", pInsertPos);
-            auto pJ = ExtractElementInst::Create(pIJ, ConstantInt::get(m_pContext->Int32Ty(), 1), "", pInsertPos);
+            pIJ = new BitCastInst(pIJ, VectorType::get(Type::getFloatTy(*m_pContext), 2), "", pInsertPos);
+            auto pI = ExtractElementInst::Create(pIJ,
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                                                 "",
+                                                 pInsertPos);
+            auto pJ = ExtractElementInst::Create(pIJ,
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                                                 "",
+                                                 pInsertPos);
 
             const uint32_t elemCount = pInputTy->getArrayNumElements();
             LLPC_ASSERT(elemCount <= MaxClipCullDistanceCount);
@@ -2972,26 +2986,26 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             for (uint32_t i = 0; i < elemCount; ++i)
             {
                 Value* args1[] = {
-                    pI,                                                                     // i
-                    ConstantInt::get(m_pContext->Int32Ty(), (startChannel + i) % 4),        // attr_chan
-                    ConstantInt::get(m_pContext->Int32Ty(), loc + (startChannel + i) / 4),  // attr
-                    pPrimMask                                                               // m0
+                    pI,                                                                             // i
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), (startChannel + i) % 4),        // attr_chan
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), loc + (startChannel + i) / 4),  // attr
+                    pPrimMask                                                                       // m0
                 };
                 auto pCompValue = EmitCall("llvm.amdgcn.interp.p1",
-                                           m_pContext->FloatTy(),
+                                           Type::getFloatTy(*m_pContext),
                                            args1,
                                            attribs,
                                            pInsertPos);
 
                 Value* args2[] = {
-                    pCompValue,                                                             // p1
-                    pJ,                                                                     // j
-                    ConstantInt::get(m_pContext->Int32Ty(), (startChannel + i) % 4),        // attr_chan
-                    ConstantInt::get(m_pContext->Int32Ty(), loc + (startChannel + i) / 4),  // attr
-                    pPrimMask                                                               // m0
+                    pCompValue,                                                                     // p1
+                    pJ,                                                                             // j
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), (startChannel + i) % 4),        // attr_chan
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), loc + (startChannel + i) / 4),  // attr
+                    pPrimMask                                                                       // m0
                 };
                 pCompValue = EmitCall("llvm.amdgcn.interp.p2",
-                                      m_pContext->FloatTy(),
+                                      Type::getFloatTy(*m_pContext),
                                       args2,
                                       attribs,
                                       pInsertPos);
@@ -3007,8 +3021,8 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             // gl_SampleID = Ancillary[11:8]
             Value* args[] = {
                 pAncillary,
-                ConstantInt::get(m_pContext->Int32Ty(), 8),
-                ConstantInt::get(m_pContext->Int32Ty(), 4)
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 8),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 4)
             };
             pInput = EmitCall("llvm.amdgcn.ubfe.i32", pInputTy, args, NoAttrib, pInsertPos);
 
@@ -3016,7 +3030,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3026,18 +3040,19 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
             break;
         }
     // Handle internal-use built-ins for sample position emulation
     case BuiltInNumSamples:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetRasterizerState().numSamples);
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetRasterizerState().numSamples);
             break;
         }
     case BuiltInSamplePatternIdx:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetRasterizerState().samplePatternIdx);
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                      m_pPipelineState->GetRasterizerState().samplePatternIdx);
             break;
         }
     // Handle internal-use built-ins for interpolation functions and AMD extension (AMD_shader_explicit_vertex_parameter)
@@ -3200,7 +3215,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInSubgroupSize:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetShaderWaveSize(m_shaderStage));
             break;
         }
     case BuiltInSubgroupLocalInvocationId:
@@ -3210,7 +3225,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
         }
     case BuiltInDeviceIndex:
         {
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), m_pPipelineState->GetDeviceIndex());
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), m_pPipelineState->GetDeviceIndex());
             break;
         }
     case BuiltInNumSubgroups:
@@ -3225,7 +3240,7 @@ Value* PatchInOutImportExport::PatchCsBuiltInInputImport(
             const uint32_t subgroupSize = m_pPipelineState->GetShaderWaveSize(m_shaderStage);
             const uint32_t numSubgroups = (workgroupSize + subgroupSize - 1) / subgroupSize;
 
-            pInput = ConstantInt::get(m_pContext->Int32Ty(), numSubgroups);
+            pInput = ConstantInt::get(Type::getInt32Ty(*m_pContext), numSubgroups);
             break;
         }
     case BuiltInGlobalInvocationId:
@@ -3372,7 +3387,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
                 auto pElemTy = pOutputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                 {
-                    auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                    auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                     auto pLdsOffset =
                         CalcLdsOffsetForTcsOutput(pElemTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                     auto pElem = ReadValueFromLds(true, pElemTy, pLdsOffset, pInsertPos);
@@ -3414,7 +3429,7 @@ Value* PatchInOutImportExport::PatchTcsBuiltInOutputImport(
                 auto pElemTy = pOutputTy->getArrayElementType();
                 for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                 {
-                    auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                    auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                     auto pLdsOffset =
                         CalcLdsOffsetForTcsOutput(pElemTy, loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                     auto pElem = ReadValueFromLds(true, pElemTy, pLdsOffset, pInsertPos);
@@ -3550,7 +3565,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
                     WriteValueToLds(pElem, pLdsOffset, pInsertPos);
 
                     pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
-                                                           ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                            "",
                                                            pInsertPos);
                 }
@@ -3606,7 +3621,7 @@ void PatchInOutImportExport::PatchVsBuiltInOutputExport(
                     WriteValueToLds(pElem, pLdsOffset, pInsertPos);
 
                     pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
-                                                           ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                            "",
                                                            pInsertPos);
                 }
@@ -3759,7 +3774,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                 for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                 {
                     auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                    auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                    auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                     auto pLdsOffset =
                         CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                     WriteValueToLds(pElem, pLdsOffset, pInsertPos);
@@ -3834,7 +3849,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                     for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                     {
                         auto pElem = ExtractValueInst::Create(pOutput, { i }, "",  pInsertPos);
-                        auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                        auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                         auto pLdsOffset =
                             CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                         WriteValueToLds(pElem, pLdsOffset,  pInsertPos);
@@ -3900,7 +3915,7 @@ void PatchInOutImportExport::PatchTcsBuiltInOutputExport(
                     for (uint32_t i = 0; i < pOutputTy->getArrayNumElements(); ++i)
                     {
                         auto pElem = ExtractValueInst::Create(pOutput, { i }, "", pInsertPos);
-                        auto pElemIdx = ConstantInt::get(m_pContext->Int32Ty(), i);
+                        auto pElemIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), i);
                         auto pLdsOffset =
                             CalcLdsOffsetForTcsOutput(pElem->getType(), loc, nullptr, pElemIdx, pVertexIdx, pInsertPos);
                         WriteValueToLds(pElem, pLdsOffset, pInsertPos);
@@ -4133,13 +4148,13 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
         // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
         // real instructions when when NGG primitive shader is generated.
         Value* args[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), loc),
-            ConstantInt::get(m_pContext->Int32Ty(), 0),
-            ConstantInt::get(m_pContext->Int32Ty(), streamId),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), loc),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), streamId),
             pOutput
         };
         std::string callName = LlpcName::NggGsOutputExport + GetTypeName(pOutput->getType());
-        EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
     }
     else
 #endif
@@ -4153,7 +4168,7 @@ void PatchInOutImportExport::PatchGsBuiltInOutputExport(
                 for (uint32_t i = 0; i < 4; ++i)
                 {
                     auto pComp = ExtractElementInst::Create(pOutput,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                             "",
                                                             pInsertPos);
                     StoreValueToGsVsRingBuffer(pComp, loc, i, streamId, pInsertPos);
@@ -4241,12 +4256,12 @@ void PatchInOutImportExport::PatchFsBuiltInOutputExport(
 
             // NOTE: Only gl_SampleMask[0] is valid for us.
             m_pSampleMask = ExtractValueInst::Create(pOutput, { 0 }, "", pInsertPos);
-            m_pSampleMask = new BitCastInst(m_pSampleMask, m_pContext->FloatTy(), "", pInsertPos);
+            m_pSampleMask = new BitCastInst(m_pSampleMask, Type::getFloatTy(*m_pContext), "", pInsertPos);
             break;
         }
     case BuiltInFragStencilRef:
         {
-            m_pFragStencilRef = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
+            m_pFragStencilRef = new BitCastInst(pOutput, Type::getFloatTy(*m_pContext), "", pInsertPos);
             break;
         }
     default:
@@ -4367,7 +4382,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
         // Cast 64-bit output to 32-bit
         compCount *= 2;
         bitWidth = 32;
-        pOutputTy = VectorType::get(m_pContext->FloatTy(), compCount);
+        pOutputTy = VectorType::get(Type::getFloatTy(*m_pContext), compCount);
         pOutput = new BitCastInst(pOutput, pOutputTy, "", pInsertPos);
     }
     LLPC_ASSERT((bitWidth == 16) || (bitWidth == 32));
@@ -4378,20 +4393,20 @@ void PatchInOutImportExport::PatchXfbOutputExport(
         LLPC_ASSERT(bitWidth == 32);
 
         Constant* shuffleMask0123[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), 0),
-            ConstantInt::get(m_pContext->Int32Ty(), 1),
-            ConstantInt::get(m_pContext->Int32Ty(), 2),
-            ConstantInt::get(m_pContext->Int32Ty(), 3)
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 3)
         };
         Value* pCompX4 = new ShuffleVectorInst(pOutput, pOutput, ConstantVector::get(shuffleMask0123), "", pInsertPos);
 
         StoreValueToStreamOutBuffer(pCompX4, xfbBuffer, xfbOffset, xfbStride, pStreamOutBufDesc, pInsertPos);
 
         Constant* shuffleMask4567[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), 4),
-            ConstantInt::get(m_pContext->Int32Ty(), 5),
-            ConstantInt::get(m_pContext->Int32Ty(), 6),
-            ConstantInt::get(m_pContext->Int32Ty(), 7)
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 5),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 6),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 7)
         };
         pCompX4 = new ShuffleVectorInst(pOutput, pOutput, ConstantVector::get(shuffleMask4567), "", pInsertPos);
 
@@ -4405,18 +4420,18 @@ void PatchInOutImportExport::PatchXfbOutputExport(
 
         // NOTE: This case is generated by copy shader, which casts 64-bit outputs to float.
         Constant* shuffleMask0123[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), 0),
-            ConstantInt::get(m_pContext->Int32Ty(), 1),
-            ConstantInt::get(m_pContext->Int32Ty(), 2),
-            ConstantInt::get(m_pContext->Int32Ty(), 3)
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 3)
         };
         Value* pCompX4 = new ShuffleVectorInst(pOutput, pOutput, ConstantVector::get(shuffleMask0123), "", pInsertPos);
 
         StoreValueToStreamOutBuffer(pCompX4, xfbBuffer, xfbOffset, xfbStride, pStreamOutBufDesc, pInsertPos);
 
         Constant* shuffleMask45[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), 4),
-            ConstantInt::get(m_pContext->Int32Ty(), 5)
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 5)
         };
         Value* pCompX2 = new ShuffleVectorInst(pOutput, pOutput, ConstantVector::get(shuffleMask45), "", pInsertPos);
 
@@ -4428,15 +4443,15 @@ void PatchInOutImportExport::PatchXfbOutputExport(
         // 16vec3 -> 16vec2 + 16scalar
         // vec3 -> vec2 + scalar
         Constant* shuffleMask01[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), 0),
-            ConstantInt::get(m_pContext->Int32Ty(), 1)
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 1)
         };
         Value* pCompX2 = new ShuffleVectorInst(pOutput, pOutput, ConstantVector::get(shuffleMask01), "", pInsertPos);
 
         StoreValueToStreamOutBuffer(pCompX2, xfbBuffer, xfbOffset, xfbStride, pStreamOutBufDesc, pInsertPos);
 
         Value* pComp = ExtractElementInst::Create(pOutput,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                     "",
                                                     pInsertPos);
 
@@ -4451,7 +4466,7 @@ void PatchInOutImportExport::PatchXfbOutputExport(
         {
             // NOTE: We translate vec1 to scalar. SPIR-V translated from DX has such usage.
             pOutput = ExtractElementInst::Create(pOutput,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                     "",
                                                     pInsertPos);
         }
@@ -4488,15 +4503,15 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
     // }
 
     Type* argTys[] = {
-        pStoreValue->getType(),   // %storeValue
-        m_pContext->Int32x4Ty(),  // %streamOutBufDesc
-        m_pContext->Int32Ty(),    // %writeIndex
-        m_pContext->Int32Ty(),    // %threadId
-        m_pContext->Int32Ty(),    // %vertexCount
-        m_pContext->Int32Ty(),    // %xfbOffset
-        m_pContext->Int32Ty()     // %streamOffset
+        pStoreValue->getType(),                             // %storeValue
+        VectorType::get(Type::getInt32Ty(*m_pContext), 4),  // %streamOutBufDesc
+        Type::getInt32Ty(*m_pContext),                      // %writeIndex
+        Type::getInt32Ty(*m_pContext),                      // %threadId
+        Type::getInt32Ty(*m_pContext),                      // %vertexCount
+        Type::getInt32Ty(*m_pContext),                      // %xfbOffset
+        Type::getInt32Ty(*m_pContext)                       // %streamOffset
     };
-    auto pFuncTy = FunctionType::get(m_pContext->VoidTy(), argTys, false);
+    auto pFuncTy = FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, funcName, m_pModule);
 
     pFunc->setCallingConv(CallingConv::C);
@@ -4533,7 +4548,7 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
             outofRangeValue /= xfbStride;
         }
         outofRangeValue -= (m_pPipelineState->GetShaderWaveSize(m_shaderStage) - 1);
-        Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
+        Value* pOutofRangeValue = ConstantInt::get(Type::getInt32Ty(*m_pContext), outofRangeValue);
         pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
         BranchInst::Create(pStoreBlock, pEntryBlock);
     }
@@ -4613,15 +4628,15 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
     coherent.bits.glc = true;
     coherent.bits.slc = true;
     Value* args[] = {
-        pStoredValue,                                             // value
-        pStreamOutBufDesc,                                        // desc
-        pWriteIndex,                                              // vindex
-        pXfbOffset,                                               // offset
-        pStreamOffset,                                            // soffset
-        ConstantInt::get(m_pContext->Int32Ty(), format),          // format
-        ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)  // glc, slc
+        pStoredValue,                                                     // value
+        pStreamOutBufDesc,                                                // desc
+        pWriteIndex,                                                      // vindex
+        pXfbOffset,                                                       // offset
+        pStreamOffset,                                                    // soffset
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), format),          // format
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)  // glc, slc
     };
-    EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, pStoreBlock);
+    EmitCall(callName, Type::getVoidTy(*m_pContext), args, NoAttrib, pStoreBlock);
     BranchInst::Create(pEndBlock, pStoreBlock);
 }
 
@@ -4670,10 +4685,10 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
 
     Type* storeTys[4] =
     {
-        m_pContext->Int32Ty(),
-        m_pContext->Int32x2Ty(),
-        m_pContext->Int32x3Ty(),
-        m_pContext->Int32x4Ty(),
+        Type::getInt32Ty(*m_pContext),
+        VectorType::get(Type::getInt32Ty(*m_pContext), 2),
+        VectorType::get(Type::getInt32Ty(*m_pContext), 3),
+        VectorType::get(Type::getInt32Ty(*m_pContext), 4),
     };
 
     std::string funcName = "llvm.amdgcn.raw.tbuffer.store.";
@@ -4692,14 +4707,14 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
             Value* pStoreValue = nullptr;
             if (compCount > 1)
             {
-                auto pStoreTy = VectorType::get(m_pContext->Int32Ty(), compCount);
+                auto pStoreTy = VectorType::get(Type::getInt32Ty(*m_pContext), compCount);
                 pStoreValue = UndefValue::get(pStoreTy);
 
                 for (uint32_t i = 0; i < compCount; ++i)
                 {
                     pStoreValue = InsertElementInst::Create(pStoreValue,
                                                             storeValues[startIdx + i],
-                                                            ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                            ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                             "",
                                                             pInsertPos);
                 }
@@ -4710,18 +4725,19 @@ uint32_t PatchInOutImportExport::CombineBufferStore(
             }
 
             auto pWriteOffset = BinaryOperator::CreateAdd(pStoreOffset,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), valueOffset * 4),
-                                                            "",
-                                                            pInsertPos);
+                                                          ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                           valueOffset * 4),
+                                                          "",
+                                                          pInsertPos);
             Value* args[] = {
-                pStoreValue,                                                      // vdata
-                pBufDesc,                                                         // rsrc
-                pWriteOffset,                                                     // voffset
-                pBufBase,                                                         // soffset
-                ConstantInt::get(m_pContext->Int32Ty(), formats[compCount - 1]),  // format
-                ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)          // glc
+                pStoreValue,                                                              // vdata
+                pBufDesc,                                                                 // rsrc
+                pWriteOffset,                                                             // voffset
+                pBufBase,                                                                 // soffset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), formats[compCount - 1]),  // format
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)          // glc
             };
-            EmitCall(funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall(funcName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
 
             break;
         }
@@ -4773,10 +4789,10 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
 
     Type* loadTyps[4] =
     {
-        m_pContext->Int32Ty(),
-        m_pContext->Int32x2Ty(),
-        m_pContext->Int32x3Ty(),
-        m_pContext->Int32x4Ty(),
+        Type::getInt32Ty(*m_pContext),
+        VectorType::get(Type::getInt32Ty(*m_pContext), 2),
+        VectorType::get(Type::getInt32Ty(*m_pContext), 3),
+        VectorType::get(Type::getInt32Ty(*m_pContext), 4),
     };
 
     std::string funcName = "llvm.amdgcn.raw.tbuffer.load.";
@@ -4796,15 +4812,16 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
 
             Value* pLoadValue = nullptr;
             auto pWriteOffset = BinaryOperator::CreateAdd(pLoadOffset,
-                                                            ConstantInt::get(m_pContext->Int32Ty(), startIdx * 4),
-                                                            "",
-                                                            pInsertPos);
+                                                          ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                           startIdx * 4),
+                                                          "",
+                                                          pInsertPos);
             Value* args[] = {
-                pBufDesc,                                                         // rsrc
-                pWriteOffset,                                                     // voffset
-                pBufBase,                                                         // soffset
-                ConstantInt::get(m_pContext->Int32Ty(), formats[compCount - 1]),  // format
-                ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)          // glc
+                pBufDesc,                                                                 // rsrc
+                pWriteOffset,                                                             // voffset
+                pBufBase,                                                                 // soffset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), formats[compCount - 1]),  // format
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)          // glc
             };
             pLoadValue = EmitCall(funcName, loadTyps[compCount - 1], args, NoAttrib, pInsertPos);
             LLPC_ASSERT(pLoadValue != nullptr);
@@ -4812,10 +4829,11 @@ uint32_t PatchInOutImportExport::CombineBufferLoad(
             {
                 for (uint32_t i = 0; i < compCount; i++)
                 {
-                    loadValues[startIdx + i] = ExtractElementInst::Create(pLoadValue,
-                                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
-                                                                        "",
-                                                                        pInsertPos);
+                    loadValues[startIdx + i] = ExtractElementInst::Create(
+                                                      pLoadValue,
+                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
+                                                      "",
+                                                      pInsertPos);
                 }
             }
             else
@@ -4850,25 +4868,12 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
 
     if (pStoreTy->isIntOrIntVectorTy())
     {
-        if (compCount == 4)
+        Type* pBitCastTy = (bitWidth == 32) ? Type::getFloatTy(*m_pContext) : Type::getHalfTy(*m_pContext);
+        if (compCount > 1)
         {
-            pStoreValue =
-                (bitWidth == 32) ? new BitCastInst(pStoreValue, m_pContext->Floatx4Ty(), "", pInsertPos) :
-                                   new BitCastInst(pStoreValue, m_pContext->Float16x4Ty(), "", pInsertPos);
+            pBitCastTy = VectorType::get(pBitCastTy, compCount);
         }
-        else if (compCount == 2)
-        {
-            pStoreValue =
-                (bitWidth == 32) ? new BitCastInst(pStoreValue, m_pContext->Floatx2Ty(), "", pInsertPos) :
-                                   new BitCastInst(pStoreValue, m_pContext->Float16x2Ty(), "", pInsertPos);
-        }
-        else
-        {
-            LLPC_ASSERT(compCount == 1);
-            pStoreValue =
-                (bitWidth == 32) ? new BitCastInst(pStoreValue, m_pContext->FloatTy(), "", pInsertPos) :
-                                   new BitCastInst(pStoreValue, m_pContext->Float16Ty(), "", pInsertPos);
-        }
+        pStoreValue = new BitCastInst(pStoreValue, pBitCastTy, "", pInsertPos);
     }
 
     const auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs;
@@ -4914,7 +4919,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     auto pStreamOffset = GetFunctionArgument(m_pEntryPoint, streamOffsets[xfbBuffer]);
 
     pStreamOffset = BinaryOperator::CreateMul(pStreamOffset,
-                                              ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                              ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                               "",
                                               pInsertPos);
 
@@ -4923,11 +4928,11 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     // vertexCount = streamInfo[22:16]
     Value* ubfeArgs[] = {
         pStreamInfo,
-        ConstantInt::get(m_pContext->Int32Ty(), 16),
-        ConstantInt::get(m_pContext->Int32Ty(), 7)
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), 16),
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), 7)
     };
     Value* pVertexCount = EmitCall("llvm.amdgcn.ubfe.i32",
-                                   m_pContext->Int32Ty(),
+                                   Type::getInt32Ty(*m_pContext),
                                    ubfeArgs,
                                    NoAttrib,
                                    &*pInsertPos);
@@ -4949,10 +4954,10 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
         pWriteIndex,
         m_pThreadId,
         pVertexCount,
-        ConstantInt::get(m_pContext->Int32Ty(), xfbOffset),
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), xfbOffset),
         pStreamOffset
     };
-    EmitCall(funcName, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+    EmitCall(funcName, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
 }
 
 // =====================================================================================================================
@@ -4976,7 +4981,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         for (uint32_t i = 0; i < compCount; ++i)
         {
             auto pStoreComp = ExtractElementInst::Create(pStoreValue,
-                                                         ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                          "",
                                                          pInsertPos);
 
@@ -4989,17 +4994,17 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         {
             if (pStoreTy->isFloatingPointTy())
             {
-                pStoreValue = new BitCastInst(pStoreValue, m_pContext->Int16Ty(), "", pInsertPos);
+                pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
             }
 
-            pStoreValue = new ZExtInst(pStoreValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pStoreValue = new ZExtInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
         else
         {
             LLPC_ASSERT(bitWidth == 32);
             if (pStoreTy->isFloatingPointTy())
             {
-                pStoreValue = new BitCastInst(pStoreValue, m_pContext->Int32Ty(), "", pInsertPos);
+                pStoreValue = new BitCastInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
         }
 
@@ -5021,7 +5026,7 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
         if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9+
         {
             Value* idxs[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 pRingOffset
             };
             Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
@@ -5042,14 +5047,14 @@ void PatchInOutImportExport::StoreValueToEsGsRing(
             coherent.bits.slc = true;
             coherent.bits.swz = true;
             Value* args[] = {
-                pStoreValue,                                                    // vdata
-                pEsGsRingBufDesc,                                               // rsrc
-                pRingOffset,                                                    // voffset
-                pEsGsOffset,                                                    // soffset
-                ConstantInt::get(m_pContext->Int32Ty(), combineFormat.u32All),
-                ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)        // glc, slc, swz
+                pStoreValue,                                                            // vdata
+                pEsGsRingBufDesc,                                                       // rsrc
+                pRingOffset,                                                            // voffset
+                pEsGsOffset,                                                            // soffset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), combineFormat.u32All),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)        // glc, slc, swz
             };
-            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         }
     }
 }
@@ -5086,7 +5091,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
 
             pLoadValue = InsertElementInst::Create(pLoadValue,
                                                    pLoadComp,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                    "",
                                                    pInsertPos);
         }
@@ -5097,7 +5102,7 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
         if (m_pPipelineState->IsGsOnChip() || (m_gfxIp.major >= 9))   // ES -> GS ring is always on-chip on GFX9
         {
             Value* idxs[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 pRingOffset
             };
             Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
@@ -5107,11 +5112,11 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
 
             if (bitWidth == 8)
             {
-                pLoadValue = new TruncInst(pLoadValue, m_pContext->Int8Ty(), "", pInsertPos);
+                pLoadValue = new TruncInst(pLoadValue, Type::getInt8Ty(*m_pContext), "", pInsertPos);
             }
             else if (bitWidth == 16)
             {
-                pLoadValue = new TruncInst(pLoadValue, m_pContext->Int16Ty(), "", pInsertPos);
+                pLoadValue = new TruncInst(pLoadValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
             }
 
             if (pLoadTy->isFloatingPointTy())
@@ -5126,13 +5131,13 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
             coherent.bits.glc = true;
             coherent.bits.slc = true;
             Value* args[] = {
-                pEsGsRingBufDesc,                                         // rsrc
-                pRingOffset,                                              // offset
-                ConstantInt::get(m_pContext->Int32Ty(), 0),               // soffset
-                ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)  // glc slc
+                pEsGsRingBufDesc,                                                 // rsrc
+                pRingOffset,                                                      // offset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),               // soffset
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)  // glc slc
             };
             pLoadValue = EmitCall("llvm.amdgcn.raw.buffer.load.f32",
-                                  m_pContext->FloatTy(),
+                                  Type::getFloatTy(*m_pContext),
                                   args,
                                   NoAttrib,
                                   pInsertPos);
@@ -5141,13 +5146,13 @@ Value* PatchInOutImportExport::LoadValueFromEsGsRing(
             {
                 LLPC_ASSERT(pLoadTy->isIntegerTy());
 
-                pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
-                pLoadValue = new TruncInst(pLoadValue, m_pContext->Int8Ty(), "", pInsertPos);
+                pLoadValue = new BitCastInst(pLoadValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                pLoadValue = new TruncInst(pLoadValue, Type::getInt8Ty(*m_pContext), "", pInsertPos);
             }
             else if (bitWidth == 16)
             {
-                pLoadValue = new BitCastInst(pLoadValue, m_pContext->Int32Ty(), "", pInsertPos);
-                pLoadValue = new TruncInst(pLoadValue, m_pContext->Int16Ty(), "", pInsertPos);
+                pLoadValue = new BitCastInst(pLoadValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
+                pLoadValue = new TruncInst(pLoadValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
 
                 if (pLoadTy->isFloatingPointTy())
                 {
@@ -5190,18 +5195,18 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         // based on number of DWORDs.
         if (pStoreTy->isFloatingPointTy())
         {
-            pStoreValue = new BitCastInst(pStoreValue, m_pContext->Int16Ty(), "", pInsertPos);
+            pStoreValue = new BitCastInst(pStoreValue, Type::getInt16Ty(*m_pContext), "", pInsertPos);
 
         }
 
-        pStoreValue = new ZExtInst(pStoreValue, m_pContext->Int32Ty(), "", pInsertPos);
+        pStoreValue = new ZExtInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
     }
     else
     {
         LLPC_ASSERT(bitWidth == 32);
         if (pStoreTy->isFloatingPointTy())
         {
-            pStoreValue = new BitCastInst(pStoreValue, m_pContext->Int32Ty(), "", pInsertPos);
+            pStoreValue = new BitCastInst(pStoreValue, Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
     }
 
@@ -5217,7 +5222,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
     if (m_pPipelineState->IsGsOnChip())
     {
         Value* idxs[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), 0),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
             pRingOffset
         };
         Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
@@ -5243,10 +5248,10 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
                 m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId), // rsrc
                 pRingOffset,                                                          // voffset
                 pGsVsOffset,                                                          // soffset
-                ConstantInt::get(m_pContext->Int32Ty(), combineFormat.u32All),
-                ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)              // glc, slc, swz
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), combineFormat.u32All),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)      // glc, slc, swz
             };
-            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         }
 #if LLPC_BUILD_GFX10
         else if (m_gfxIp.major == 10)
@@ -5260,10 +5265,10 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
                 m_pipelineSysValues.Get(m_pEntryPoint)->GetGsVsRingBufDesc(streamId), // rsrc
                 pRingOffset,                                                          // voffset
                 pGsVsOffset,                                                          // soffset
-                ConstantInt::get(m_pContext->Int32Ty(), BUF_FORMAT_32_UINT),          // format
-                ConstantInt::get(m_pContext->Int32Ty(), coherent.u32All)              // glc, slc, swz
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), BUF_FORMAT_32_UINT),  // format
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), coherent.u32All)      // glc, slc, swz
             };
-            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+            EmitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         }
 #endif
         else
@@ -5287,29 +5292,32 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForOutput(
         // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
         LLPC_ASSERT(m_pPipelineState->HasShaderStage(ShaderStageGeometry));
-        const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+        const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->
+                                                                    inOutUsage.gs.calcFactor;
 
         pEsGsOffset = BinaryOperator::CreateLShr(pEsGsOffset,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                  "",
                                                  pInsertPos);
 
         pRingOffset = BinaryOperator::CreateMul(m_pThreadId,
-                                                ConstantInt::get(m_pContext->Int32Ty(), calcFactor.esGsRingItemSize),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                 calcFactor.esGsRingItemSize),
                                                 "",
                                                 pInsertPos);
 
         pRingOffset = BinaryOperator::CreateAdd(pRingOffset, pEsGsOffset, "", pInsertPos);
 
         pRingOffset = BinaryOperator::CreateAdd(pRingOffset,
-                                                ConstantInt::get(m_pContext->Int32Ty(), (location * 4 + compIdx)),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                 (location * 4 + compIdx)),
                                                 "",
                                                 pInsertPos);
     }
     else
     {
         // ringOffset = (location * 4 + compIdx) * 4
-        pRingOffset = ConstantInt::get(m_pContext->Int32Ty(), (location * 4 + compIdx) * 4);
+        pRingOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), (location * 4 + compIdx) * 4);
     }
     return pRingOffset;
 }
@@ -5335,7 +5343,7 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForInput(
         // ringOffset = vertexOffset[N] + (location * 4 + compIdx);
         pRingOffset =
             BinaryOperator::CreateAdd(pVertexOffset,
-                                      ConstantInt::get(m_pContext->Int32Ty(), (location * 4 + compIdx)),
+                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), (location * 4 + compIdx)),
                                       "",
                                       pInsertPos);
     }
@@ -5348,13 +5356,13 @@ Value* PatchInOutImportExport::CalcEsGsRingOffsetForInput(
 
         // ringOffset = vertexOffset[N] * 4 + (location * 4 + compIdx) * 64 * 4;
         pRingOffset = BinaryOperator::CreateMul(pVertexOffset,
-                                                ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                 "",
                                                 pInsertPos);
 
         pRingOffset =
             BinaryOperator::CreateAdd(pRingOffset,
-                                      ConstantInt::get(m_pContext->Int32Ty(), (location * 4 + compIdx) * 64 * 4),
+                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), (location * 4 + compIdx) * 64 * 4),
                                       "",
                                       pInsertPos);
     }
@@ -5392,17 +5400,18 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
         //              threadId * gsVsRingItemSize +
         //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase (in DWORDS)
 
-        auto pEsGsLdsSize = ConstantInt::get(m_pContext->Int32Ty(), pResUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
+        auto pEsGsLdsSize = ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                             pResUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
 
         pGsVsOffset = BinaryOperator::CreateExact(Instruction::LShr,
                                                   pGsVsOffset,
-                                                  ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                  ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                   "",
                                                   pInsertPos);
 
         auto pRingItemOffset =
             BinaryOperator::CreateMul(m_pThreadId,
-                                      ConstantInt::get(m_pContext->Int32Ty(),
+                                      ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                        pResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize),
                                       "",
                                       pInsertPos);
@@ -5410,7 +5419,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
         // VertexSize is stream output vertexSize x 4 (in DWORDS)
         uint32_t vertexSize = pResUsage->inOutUsage.gs.outLocCount[streamId] * 4;
         auto pVertexItemOffset = BinaryOperator::CreateMul(pVertexIdx,
-                                                           ConstantInt::get(m_pContext->Int32Ty(), vertexSize),
+                                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), vertexSize),
                                                            "",
                                                            pInsertPos);
 
@@ -5422,7 +5431,7 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
 
         uint32_t attribOffset = (location * 4) + compIdx + streamBases[streamId];
         pRingOffset = BinaryOperator::CreateAdd(pRingOffset,
-                                                ConstantInt::get(m_pContext->Int32Ty(), attribOffset),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext), attribOffset),
                                                 "",
                                                 pInsertPos);
     }
@@ -5432,14 +5441,14 @@ Value* PatchInOutImportExport::CalcGsVsRingOffsetForOutput(
 
         uint32_t outputVertices = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode().outputVertices;
 
-        pRingOffset = BinaryOperator::CreateAdd(ConstantInt::get(m_pContext->Int32Ty(),
+        pRingOffset = BinaryOperator::CreateAdd(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                  (location * 4 + compIdx) * outputVertices),
                                                 pVertexIdx,
                                                 "",
                                                 pInsertPos);
 
         pRingOffset = BinaryOperator::CreateMul(pRingOffset,
-                                                ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                                ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                 "",
                                                 pInsertPos);
     }
@@ -5481,7 +5490,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
 
         // Convert DWORD off-chip LDS offset to byte offset
         pLdsOffset = BinaryOperator::CreateMul(pLdsOffset,
-                                               ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                "",
                                                pInsertPos);
 
@@ -5517,11 +5526,11 @@ Value* PatchInOutImportExport::ReadValueFromLds(
             {
                 if (bitWidth == 8)
                 {
-                    loadValues[j] = new TruncInst(loadValues[j], m_pContext->Int8Ty(), "", pInsertPos);
+                    loadValues[j] = new TruncInst(loadValues[j], Type::getInt8Ty(*m_pContext), "", pInsertPos);
                 }
                 else if (bitWidth == 16)
                 {
-                    loadValues[j] = new TruncInst(loadValues[j], m_pContext->Int16Ty(), "", pInsertPos);
+                    loadValues[j] = new TruncInst(loadValues[j], Type::getInt16Ty(*m_pContext), "", pInsertPos);
                 }
             }
         }
@@ -5531,7 +5540,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         for (uint32_t i = 0; i < numChannels; ++i)
         {
             Value* idxs[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 pLdsOffset
             };
             Value* pLoadPtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
@@ -5541,15 +5550,17 @@ Value* PatchInOutImportExport::ReadValueFromLds(
 
             if (bitWidth == 8)
             {
-                loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int8Ty(), "", pInsertPos);
+                loadValues[i] = new TruncInst(loadValues[i], Type::getInt8Ty(*m_pContext), "", pInsertPos);
             }
             else if (bitWidth == 16)
             {
-                loadValues[i] = new TruncInst(loadValues[i], m_pContext->Int16Ty(), "", pInsertPos);
+                loadValues[i] = new TruncInst(loadValues[i], Type::getInt16Ty(*m_pContext), "", pInsertPos);
             }
 
-            pLdsOffset =
-                BinaryOperator::CreateAdd(pLdsOffset, ConstantInt::get(m_pContext->Int32Ty(), 1), "", pInsertPos);
+            pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                                                   "",
+                                                   pInsertPos);
         }
     }
 
@@ -5558,8 +5569,8 @@ Value* PatchInOutImportExport::ReadValueFromLds(
     if (numChannels > 1)
     {
         auto pIntTy = ((bitWidth == 32) || (bitWidth == 64)) ?
-                          m_pContext->Int32Ty() :
-                          ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
+                          Type::getInt32Ty(*m_pContext) :
+                          ((bitWidth == 16) ? Type::getInt16Ty(*m_pContext) : Type::getInt8Ty(*m_pContext));
         auto pCastTy = VectorType::get(pIntTy, numChannels);
         pCastValue = UndefValue::get(pCastTy);
 
@@ -5567,7 +5578,7 @@ Value* PatchInOutImportExport::ReadValueFromLds(
         {
             pCastValue = InsertElementInst::Create(pCastValue,
                                                    loadValues[i],
-                                                   ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                    "",
                                                    pInsertPos);
         }
@@ -5599,10 +5610,10 @@ void PatchInOutImportExport::WriteValueToLds(
     const uint32_t numChannels = compCout * ((bitWidth == 64) ? 2 : 1);
 
     // Cast write value to <n x i32> vector
-    auto pIntTy = ((bitWidth == 32) || (bitWidth == 64)) ?
-                      m_pContext->Int32Ty() :
-                      ((bitWidth == 16) ? m_pContext->Int16Ty() : m_pContext->Int8Ty());
-    Type* pCastTy = (numChannels > 1) ? VectorType::get(pIntTy, numChannels) : pIntTy;
+    Type* pIntTy = ((bitWidth == 32) || (bitWidth == 64)) ?
+                      Type::getInt32Ty(*m_pContext) :
+                      ((bitWidth == 16) ? Type::getInt16Ty(*m_pContext) : Type::getInt8Ty(*m_pContext));
+    Type* pCastTy = (numChannels > 1) ? cast<Type>(VectorType::get(pIntTy, numChannels)) : pIntTy;
     Value* pCastValue = new BitCastInst(pWriteValue, pCastTy, "", pInsertPos);
 
     // Extract store values (DWORDs) from <n x i8>, <n x i16> or <n x i32> vector
@@ -5612,13 +5623,13 @@ void PatchInOutImportExport::WriteValueToLds(
         for (uint32_t i = 0; i < numChannels; ++i)
         {
             storeValues[i] = ExtractElementInst::Create(pCastValue,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                         "",
                                                         pInsertPos);
 
             if ((bitWidth == 8) || (bitWidth == 16))
             {
-                storeValues[i] = new ZExtInst(storeValues[i], m_pContext->Int32Ty(), "", pInsertPos);
+                storeValues[i] = new ZExtInst(storeValues[i], Type::getInt32Ty(*m_pContext), "", pInsertPos);
             }
         }
     }
@@ -5628,7 +5639,7 @@ void PatchInOutImportExport::WriteValueToLds(
 
         if ((bitWidth == 8) || (bitWidth == 16))
         {
-            storeValues[0] = new ZExtInst(storeValues[0], m_pContext->Int32Ty(), "", pInsertPos);
+            storeValues[0] = new ZExtInst(storeValues[0], Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
     }
 
@@ -5639,7 +5650,7 @@ void PatchInOutImportExport::WriteValueToLds(
         auto pOffChipLdsBase = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.offChipLdsBase);
         // Convert DWORD off-chip LDS offset to byte offset
         pLdsOffset = BinaryOperator::CreateMul(pLdsOffset,
-                                               ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                "",
                                                pInsertPos);
 
@@ -5665,14 +5676,17 @@ void PatchInOutImportExport::WriteValueToLds(
         for (uint32_t i = 0; i < numChannels; ++i)
         {
             Value* idxs[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), 0),
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                 pLdsOffset
             };
             Value* pStorePtr = GetElementPtrInst::Create(nullptr, m_pLds, idxs, "", pInsertPos);
             auto pStoreInst = new StoreInst(storeValues[i], pStorePtr, false, pInsertPos);
             pStoreInst->setAlignment(MaybeAlign(m_pLds->getAlignment()));
 
-            pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, ConstantInt::get(m_pContext->Int32Ty(), 1), "", pInsertPos);
+            pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                                                   "",
+                                                   pInsertPos);
         }
     }
 }
@@ -5725,7 +5739,7 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
         break;
     }
 
-    Value* pTessFactorOffset = ConstantInt::get(m_pContext->Int32Ty(), tessFactorStart);
+    Value* pTessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), tessFactorStart);
     if (pElemIdx != nullptr)
     {
         if (isa<ConstantInt>(pElemIdx))
@@ -5742,12 +5756,12 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
                     elemIdx = 1 - elemIdx;
                 }
 
-                pTessFactorOffset = ConstantInt::get(m_pContext->Int32Ty(), tessFactorStart + elemIdx);
+                pTessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), tessFactorStart + elemIdx);
             }
             else
             {
                 // Out of range, drop it
-                pTessFactorOffset = ConstantInt::get(m_pContext->Int32Ty(), InvalidValue);
+                pTessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), InvalidValue);
             }
         }
         else
@@ -5763,10 +5777,10 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
                 auto pCond = new ICmpInst(pInsertPos,
                                           ICmpInst::ICMP_ULE,
                                           pElemIdx,
-                                          ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                           "");
 
-                auto pSwapElemIdx = BinaryOperator::CreateSub(ConstantInt::get(m_pContext->Int32Ty(), 1),
+                auto pSwapElemIdx = BinaryOperator::CreateSub(ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                               pElemIdx,
                                                               "",
                                                               pInsertPos);
@@ -5783,12 +5797,12 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
             auto pCond = new ICmpInst(pInsertPos,
                                       ICmpInst::ICMP_ULT,
                                       pElemIdx,
-                                      ConstantInt::get(m_pContext->Int32Ty(), tessFactorCount),
+                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), tessFactorCount),
                                       "");
 
             pTessFactorOffset = SelectInst::Create(pCond,
                                                    pTessFactorOffset,
-                                                   ConstantInt::get(m_pContext->Int32Ty(), InvalidValue),
+                                                   ConstantInt::get(Type::getInt32Ty(*m_pContext), InvalidValue),
                                                    "",
                                                    pInsertPos);
         }
@@ -5818,7 +5832,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
     auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
     auto pTfBufferBase = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.tfBufferBase);
 
-    auto pTessFactorStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.tessFactorStride);
+    auto pTessFactorStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.tessFactorStride);
 
     if (isa<ConstantInt>(pTessFactorOffset))
     {
@@ -5832,7 +5846,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         auto pRelativeId = m_pipelineSysValues.Get(m_pEntryPoint)->GetRelativeId();
         Value* pTfBufferOffset = BinaryOperator::CreateMul(pRelativeId, pTessFactorStride, "", pInsertPos);
         pTfBufferOffset = BinaryOperator::CreateMul(pTfBufferOffset,
-                                                    ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                     "",
                                                     pInsertPos);
 
@@ -5840,7 +5854,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
         std::vector<Value*> tfValues(tessFactors.size());
         for (uint32_t i = 0; i < tessFactors.size(); i++)
         {
-            tfValues[i] = new BitCastInst(tessFactors[i], m_pContext->Int32Ty(), "", pInsertPos);
+            tfValues[i] = new BitCastInst(tessFactors[i], Type::getInt32Ty(*m_pContext), "", pInsertPos);
         }
 
         CoherentFlag coherent = {};
@@ -5880,7 +5894,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             {
                 // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
                 pTfBufferBase = BinaryOperator::CreateAdd(pTfBufferBase,
-                                                          ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                           "",
                                                           pInsertPos);
             }
@@ -5895,7 +5909,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             pTessFactorOffset,                                              // tfOffset
             tessFactors[0]                                                  // tfValue
         };
-        EmitCall(LlpcName::TfBufferStore, m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall(LlpcName::TfBufferStore, Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
     }
 }
 
@@ -5924,14 +5938,14 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     //     ret void
     // }
     Type* argTys[] = {
-        m_pContext->Int32x4Ty(),  // TF buffer descriptor
-        m_pContext->Int32Ty(),    // TF buffer base
-        m_pContext->Int32Ty(),    // Relative patch ID
-        m_pContext->Int32Ty(),    // TF stride
-        m_pContext->Int32Ty(),    // TF offset
-        m_pContext->FloatTy()     // TF value
+        VectorType::get(Type::getInt32Ty(*m_pContext), 4),  // TF buffer descriptor
+        Type::getInt32Ty(*m_pContext),                      // TF buffer base
+        Type::getInt32Ty(*m_pContext),                      // Relative patch ID
+        Type::getInt32Ty(*m_pContext),                      // TF stride
+        Type::getInt32Ty(*m_pContext),                      // TF offset
+        Type::getFloatTy(*m_pContext)                       // TF value
     };
-    auto pFuncTy = FunctionType::get(m_pContext->VoidTy(), argTys, false);
+    auto pFuncTy = FunctionType::get(Type::getVoidTy(*m_pContext), argTys, false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::TfBufferStore, m_pModule);
 
     pFunc->setCallingConv(CallingConv::C);
@@ -5966,12 +5980,12 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     BasicBlock* pTfStoreBlock = BasicBlock::Create(*m_pContext, ".tfstore", pFunc, pEndBlock);
 
     Value *pTfByteOffset = BinaryOperator::CreateMul(pTfOffset,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                                     ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                      "",
                                                      pTfStoreBlock);
 
     Value* pTfByteStride = BinaryOperator::CreateMul(pTfStride,
-                                                     ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                                     ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                                      "",
                                                      pTfStoreBlock);
     Value* pTfBufferOffset = BinaryOperator::CreateMul(pRelPatchId, pTfByteStride, "", pTfStoreBlock);
@@ -5982,20 +5996,20 @@ void PatchInOutImportExport::CreateTessBufferStoreFunction()
     auto pBranch = BranchInst::Create(pEndBlock, pTfStoreBlock);
 
     Value* args[] = {
-        pTfValue,                                   // vdata
-        pTfBufferDesc,                              // rsrc
-        pTfBufferOffset,                            // offset
-        ConstantInt::get(m_pContext->Int32Ty(), 0), // soffset
-        ConstantInt::get(m_pContext->Int32Ty(), 1)  // cachepolicy: glc = 1
+        pTfValue,                                           // vdata
+        pTfBufferDesc,                                      // rsrc
+        pTfBufferOffset,                                    // offset
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0), // soffset
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), 1)  // cachepolicy: glc = 1
     };
-    EmitCall("llvm.amdgcn.raw.buffer.store.f32", m_pContext->VoidTy(), args, NoAttrib, pBranch);
+    EmitCall("llvm.amdgcn.raw.buffer.store.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pBranch);
 
     // Create entry block
     BasicBlock* pEntryBlock = BasicBlock::Create(*m_pContext, "", pFunc, pTfStoreBlock);
     Value* pCond = new ICmpInst(*pEntryBlock,
                                 ICmpInst::ICMP_NE,
                                 pTfOffset,
-                                ConstantInt::get(m_pContext->Int32Ty(), InvalidValue),
+                                ConstantInt::get(Type::getInt32Ty(*m_pContext), InvalidValue),
                                 "");
     BranchInst::Create(pTfStoreBlock, pEndBlock, pCond, pEntryBlock);
 }
@@ -6011,7 +6025,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForVsOutput(
     LLPC_ASSERT(m_shaderStage == ShaderStageVertex);
 
     // attribOffset = location * 4 + compIdx
-    Value* pAttribOffset = ConstantInt::get(m_pContext->Int32Ty(), location * 4);
+    Value* pAttribOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), location * 4);
 
     const uint32_t bitWidth = pOutputTy->getScalarSizeInBits();
     LLPC_ASSERT((bitWidth == 8) || (bitWidth == 16) || (bitWidth == 32) || (bitWidth == 64));
@@ -6023,7 +6037,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForVsOutput(
     }
 
     pAttribOffset = BinaryOperator::CreateAdd(pAttribOffset,
-                                              ConstantInt::get(m_pContext->Int32Ty(), compIdx),
+                                              ConstantInt::get(Type::getInt32Ty(*m_pContext), compIdx),
                                               "",
                                               pInsertPos);
 
@@ -6031,7 +6045,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForVsOutput(
     auto pRelVertexId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.relVertexId);
 
     const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
-    auto pVertexStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.inVertexStride);
+    auto pVertexStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.inVertexStride);
 
     // dwordOffset = relVertexId * vertexStride + attribOffset
     auto pLdsOffset = BinaryOperator::CreateMul(pRelVertexId, pVertexStride, "", pInsertPos);
@@ -6056,7 +6070,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
     const auto& calcFactor = inOutUsage.calcFactor;
 
     // attribOffset = (location + locOffset) * 4 + compIdx
-    Value* pAttribOffset = ConstantInt::get(m_pContext->Int32Ty(), location);
+    Value* pAttribOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), location);
 
     if (pLocOffset != nullptr)
     {
@@ -6064,7 +6078,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
     }
 
     pAttribOffset = BinaryOperator::CreateMul(pAttribOffset,
-                                              ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                              ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                               "",
                                               pInsertPos);
 
@@ -6077,7 +6091,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
         {
             // For 64-bit data type, the component indexing must multiply by 2
             pCompIdx = BinaryOperator::CreateMul(pCompIdx,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                  "",
                                                  pInsertPos);
         }
@@ -6087,13 +6101,13 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
 
     // dwordOffset = (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
     auto inVertexCount = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
-    auto pInVertexCount = ConstantInt::get(m_pContext->Int32Ty(), inVertexCount);
+    auto pInVertexCount = ConstantInt::get(Type::getInt32Ty(*m_pContext), inVertexCount);
     auto pRelativeId = m_pipelineSysValues.Get(m_pEntryPoint)->GetRelativeId();
 
     Value* pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pInVertexCount, "", pInsertPos);
     pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pVertexIdx, "", pInsertPos);
 
-    auto pInVertexStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.inVertexStride);
+    auto pInVertexStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.inVertexStride);
     pLdsOffset = BinaryOperator::CreateMul(pLdsOffset, pInVertexStride, "", pInsertPos);
 
     pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pAttribOffset, "", pInsertPos);
@@ -6123,7 +6137,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
         calcFactor.onChip.patchConstStart;
 
     // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
-    Value* pAttibOffset = ConstantInt::get(m_pContext->Int32Ty(), location);
+    Value* pAttibOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), location);
 
     if (pLocOffset != nullptr)
     {
@@ -6131,7 +6145,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     }
 
     pAttibOffset = BinaryOperator::CreateMul(pAttibOffset,
-                                             ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                              "",
                                              pInsertPos);
 
@@ -6144,7 +6158,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
         {
             // For 64-bit data type, the component indexing must multiply by 2
             pCompIdx = BinaryOperator::CreateMul(pCompIdx,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                  "",
                                                  pInsertPos);
         }
@@ -6159,10 +6173,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     if (perPatch)
     {
         // dwordOffset = patchConstStart + relativeId * patchConstSize + attribOffset
-        auto pPatchConstSize = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.patchConstSize);
+        auto pPatchConstSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.patchConstSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pPatchConstSize, "", pInsertPos);
 
-        auto pPatchConstStart = ConstantInt::get(m_pContext->Int32Ty(), patchConstStart);
+        auto pPatchConstStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchConstStart);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchConstStart, "", pInsertPos);
 
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pAttibOffset, "", pInsertPos);
@@ -6171,13 +6185,13 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
     {
         // dwordOffset = outPatchStart + (relativeId * outVertexCount + vertexId) * outVertexStride + attribOffset
         //             = outPatchStart + relativeId * outPatchSize + vertexId  * outVertexStride + attribOffset
-        auto pOutPatchSize = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.outPatchSize);
+        auto pOutPatchSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.outPatchSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pOutPatchSize, "", pInsertPos);
 
-        auto pOutPatchStart = ConstantInt::get(m_pContext->Int32Ty(), outPatchStart);
+        auto pOutPatchStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), outPatchStart);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pOutPatchStart, "", pInsertPos);
 
-        auto pOutVertexStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.outVertexStride);
+        auto pOutVertexStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.outVertexStride);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
                                                BinaryOperator::CreateMul(pVertexIdx, pOutVertexStride, "", pInsertPos),
                                                "",
@@ -6214,7 +6228,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     auto pRelPatchId = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.relPatchId);
 
     // attribOffset = (location + locOffset) * 4 + compIdx
-    Value* pAttibOffset = ConstantInt::get(m_pContext->Int32Ty(), location);
+    Value* pAttibOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), location);
 
     if (pLocOffset != nullptr)
     {
@@ -6222,7 +6236,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     }
 
     pAttibOffset = BinaryOperator::CreateMul(pAttibOffset,
-                                             ConstantInt::get(m_pContext->Int32Ty(), 4),
+                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), 4),
                                              "",
                                              pInsertPos);
 
@@ -6235,7 +6249,7 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
         {
             // For 64-bit data type, the component indexing must multiply by 2
             pCompIdx = BinaryOperator::CreateMul(pCompIdx,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                  "",
                                                  pInsertPos);
         }
@@ -6249,10 +6263,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     if (perPatch)
     {
         // dwordOffset = patchConstStart + relPatchId * patchConstSize + attribOffset
-        auto pPatchConstSize = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.patchConstSize);
+        auto pPatchConstSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.patchConstSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelPatchId, pPatchConstSize, "", pInsertPos);
 
-        auto pPatchConstStart = ConstantInt::get(m_pContext->Int32Ty(), patchConstStart);
+        auto pPatchConstStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchConstStart);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchConstStart, "", pInsertPos);
 
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pAttibOffset, "", pInsertPos);
@@ -6261,13 +6275,13 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
     {
         // dwordOffset = patchStart + (relPatchId * vertexCount + vertexId) * vertexStride + attribOffset
         //             = patchStart + relPatchId * patchSize + vertexId  * vertexStride + attribOffset
-        auto pPatchSize = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.outPatchSize);
+        auto pPatchSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.outPatchSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelPatchId, pPatchSize, "", pInsertPos);
 
-        auto pPatchStart = ConstantInt::get(m_pContext->Int32Ty(), outPatchStart);
+        auto pPatchStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), outPatchStart);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchStart, "", pInsertPos);
 
-        auto pVertexStride = ConstantInt::get(m_pContext->Int32Ty(), calcFactor.outVertexStride);
+        auto pVertexStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.outVertexStride);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
                                                BinaryOperator::CreateMul(pVertexIdx, pVertexStride, "", pInsertPos),
                                                "",
@@ -6403,7 +6417,8 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
     Value* pExport = nullptr;
     const uint32_t numChannels = (bitWidth == 64) ? compCount * 2 : compCount;
     uint32_t startChannel = (bitWidth == 64) ? compIdx * 2 : compIdx;
-    Type* pExportTy = (numChannels > 1) ? VectorType::get(m_pContext->FloatTy(), numChannels) : m_pContext->FloatTy();
+    Type* pExportTy = (numChannels > 1) ? VectorType::get(Type::getFloatTy(*m_pContext), numChannels) :
+                                          Type::getFloatTy(*m_pContext);
 
     if (pOutputTy != pExportTy)
     {
@@ -6411,9 +6426,10 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         {
             // NOTE: For 16-bit output export, we have to cast the 8-bit value to 32-bit floating-point value.
             LLPC_ASSERT(pOutputTy->isIntOrIntVectorTy());
+            Type* pZExtTy = Type::getInt32Ty(*m_pContext);
+            pZExtTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pZExtTy, compCount)) : pZExtTy;
             pExport = new ZExtInst(pOutput,
-                                   pOutputTy->isVectorTy() ?
-                                       VectorType::get(m_pContext->Int32Ty(), compCount) : m_pContext->Int32Ty(),
+                                   pZExtTy,
                                    "",
                                    pInsertPos);
             pExport = new BitCastInst(pExport, pExportTy, "", pInsertPos);
@@ -6423,9 +6439,10 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
             // NOTE: For 16-bit output export, we have to cast the 16-bit value to 32-bit floating-point value.
             if (pOutputTy->isFPOrFPVectorTy())
             {
+                Type* pBitCastTy = Type::getInt16Ty(*m_pContext);
+                pBitCastTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pBitCastTy, compCount)) : pBitCastTy;
                 pExport = new BitCastInst(pOutput,
-                                          pOutputTy->isVectorTy() ?
-                                              VectorType::get(m_pContext->Int16Ty(), compCount) : m_pContext->Int16Ty(),
+                                          pBitCastTy,
                                           "",
                                           pInsertPos);
             }
@@ -6435,9 +6452,10 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
                 pExport = pOutput;
             }
 
+            Type* pZExtTy = Type::getInt32Ty(*m_pContext);
+            pZExtTy = pOutputTy->isVectorTy() ? cast<Type>(VectorType::get(pZExtTy, compCount)) : pZExtTy;
             pExport = new ZExtInst(pExport,
-                                   pOutputTy->isVectorTy() ?
-                                       VectorType::get(m_pContext->Int32Ty(), compCount) : m_pContext->Int32Ty(),
+                                   pZExtTy,
                                    "",
                                    pInsertPos);
             pExport = new BitCastInst(pExport, pExportTy, "", pInsertPos);
@@ -6465,7 +6483,7 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         for (uint32_t i = 0; i < numChannels; ++i)
         {
             exportValues[i] = ExtractElementInst::Create(pExport,
-                                                         ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                          "",
                                                          pInsertPos);
         }
@@ -6479,14 +6497,14 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         const uint32_t channelMask = ((1 << (startChannel + numChannels)) - 1) - ((1 << startChannel) - 1);
 
         args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + location)); // tgt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), channelMask));                   // en
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + location)); // tgt
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), channelMask));                   // en
 
         // src0 ~ src3
         for (uint32_t i = 0; i < startChannel; ++i)
         {
             // Inactive components (dummy)
-            args.push_back(UndefValue::get(m_pContext->FloatTy()));
+            args.push_back(UndefValue::get(Type::getFloatTy(*m_pContext)));
         }
 
         for (uint32_t i = startChannel; i < startChannel + numChannels; ++i)
@@ -6497,13 +6515,13 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         for (uint32_t i = startChannel + numChannels; i < 4; ++i)
         {
             // Inactive components (dummy)
-            args.push_back(UndefValue::get(m_pContext->FloatTy()));
+            args.push_back(UndefValue::get(Type::getFloatTy(*m_pContext)));
         }
 
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // vm
+        args.push_back(ConstantInt::get(Type::getInt1Ty(*m_pContext), false));  // done
+        args.push_back(ConstantInt::get(Type::getInt1Ty(*m_pContext), false));  // vm
 
-        EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         ++inOutUsage.expCount;
     }
     else
@@ -6514,8 +6532,8 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
 
         // Do the first exporting
         args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + location)); // tgt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), 0xF));                           // en
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + location)); // tgt
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF));                           // en
 
         // src0 ~ src3
         for (uint32_t i = 0; i < 4; ++i)
@@ -6523,18 +6541,18 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
             args.push_back(exportValues[i]);
         }
 
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // done
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false));  // vm
+        args.push_back(ConstantInt::get(Type::getInt1Ty(*m_pContext), false));  // done
+        args.push_back(ConstantInt::get(Type::getInt1Ty(*m_pContext), false));  // vm
 
-        EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         ++inOutUsage.expCount;
 
         // Do the second exporting
         const uint32_t channelMask = ((1 << (numChannels - 4)) - 1);
 
         args.clear();
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + location + 1)); // tgt
-        args.push_back(ConstantInt::get(m_pContext->Int32Ty(), channelMask));                       // en
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + location + 1)); // tgt
+        args.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), channelMask));                       // en
 
         // src0 ~ src3
         for (uint32_t i = 4; i < numChannels; ++i)
@@ -6545,13 +6563,13 @@ void PatchInOutImportExport::AddExportInstForGenericOutput(
         for (uint32_t i = numChannels; i < 8; ++i)
         {
             // Inactive components (dummy)
-            args.push_back(UndefValue::get(m_pContext->FloatTy()));
+            args.push_back(UndefValue::get(Type::getFloatTy(*m_pContext)));
         }
 
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // done
-        args.push_back(ConstantInt::get(m_pContext->BoolTy(), false)); // vm
+        args.push_back(ConstantInt::get(Type::getInt1Ty(*m_pContext), false)); // done
+        args.push_back(ConstantInt::get(Type::getInt1Ty(*m_pContext), false)); // vm
 
-        EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+        EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
         ++inOutUsage.expCount;
     }
 }
@@ -6573,28 +6591,28 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
 
     auto& inOutUsage = m_pPipelineState->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
 
-    const auto pUndef = UndefValue::get(m_pContext->FloatTy());
+    const auto pUndef = UndefValue::get(Type::getFloatTy(*m_pContext));
 
     switch (builtInId)
     {
     case BuiltInPosition:
         {
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_POS_0),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0xF),               // en
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_POS_0),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),               // en
                 nullptr,
                 nullptr,
                 nullptr,
                 nullptr,
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), false)               // vm
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)               // vm
             };
 
             // src0 ~ src3
             for (uint32_t i = 0; i < 4; ++i)
             {
                 auto pCompValue = ExtractElementInst::Create(pOutput,
-                                                             ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                              "",
                                                              pInsertPos);
                 args[2 + i] = pCompValue;
@@ -6602,24 +6620,24 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
 
             // "Done" flag is valid for exporting position 0 ~ 3
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
             break;
         }
     case BuiltInPointSize:
         {
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_POS_1),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0x1),               // en
-                pOutput,                                                    // src0
-                pUndef,                                                     // src1
-                pUndef,                                                     // src2
-                pUndef,                                                     // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), false)               // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_POS_1),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0x1),               // en
+                pOutput,                                                            // src0
+                pUndef,                                                             // src1
+                pUndef,                                                             // src2
+                pUndef,                                                             // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)               // vm
             };
             // "Done" flag is valid for exporting position 0 ~ 3
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
             break;
         }
     case BuiltInLayer:
@@ -6628,21 +6646,21 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
 
             const auto enableMultiView = m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
-            Value* pLayer = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
+            Value* pLayer = new BitCastInst(pOutput, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_POS_1),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0x4),               // en
-                pUndef,                                                     // src0
-                pUndef,                                                     // src1
-                pLayer,                                                     // src2
-                pUndef,                                                     // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), false)               // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_POS_1),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0x4),               // en
+                pUndef,                                                             // src0
+                pUndef,                                                             // src1
+                pLayer,                                                             // src2
+                pUndef,                                                             // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)               // vm
             };
             // "Done" flag is valid for exporting position 0 ~ 3
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
 
             // NOTE: We have to export gl_Layer via generic outputs as well.
             bool hasLayerExport = true;
@@ -6678,16 +6696,16 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 }
 
                 Value* args[] = {
-                    ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc),  // tgt
-                    ConstantInt::get(m_pContext->Int32Ty(), 0xF),                       // en
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc),  // tgt
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),                       // en
                     pLayer,                                                             // src0
                     pUndef,                                                             // src1
                     pUndef,                                                             // src2
                     pUndef,                                                             // src3
-                    ConstantInt::get(m_pContext->BoolTy(), false),                      // done
-                    ConstantInt::get(m_pContext->BoolTy(), false)                       // vm
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                      // done
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                       // vm
                 };
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
 
@@ -6696,21 +6714,21 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
     case BuiltInViewportIndex:
         {
             LLPC_ASSERT(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
-            Value* pViewportIndex = new BitCastInst(pOutput, m_pContext->FloatTy(), "", pInsertPos);
+            Value* pViewportIndex = new BitCastInst(pOutput, Type::getFloatTy(*m_pContext), "", pInsertPos);
 
             Value* args[] = {
-                ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_POS_1),  // tgt
-                ConstantInt::get(m_pContext->Int32Ty(), 0x8),               // en
-                pUndef,                                                     // src0
-                pUndef,                                                     // src1
-                pUndef,                                                     // src2
-                pViewportIndex,                                             // src3
-                ConstantInt::get(m_pContext->BoolTy(), false),              // done
-                ConstantInt::get(m_pContext->BoolTy(), false)               // vm
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_POS_1),  // tgt
+                ConstantInt::get(Type::getInt32Ty(*m_pContext), 0x8),               // en
+                pUndef,                                                             // src0
+                pUndef,                                                             // src1
+                pUndef,                                                             // src2
+                pViewportIndex,                                                     // src3
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false),              // done
+                ConstantInt::get(Type::getInt1Ty(*m_pContext), false)               // vm
             };
             // "Done" flag is valid for exporting position 0 ~ 3
             m_pLastExport =
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
 
             // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
             bool hasViewportIndexExport = true;
@@ -6739,16 +6757,16 @@ void PatchInOutImportExport::AddExportInstForBuiltInOutput(
                 }
 
                 Value* args[] = {
-                    ConstantInt::get(m_pContext->Int32Ty(), EXP_TARGET_PARAM_0 + loc),  // tgt
-                    ConstantInt::get(m_pContext->Int32Ty(), 0xF),                       // en
-                    pViewportIndex,                                                     // src0
-                    pUndef,                                                             // src1
-                    pUndef,                                                             // src2
-                    pUndef,                                                             // src3
-                    ConstantInt::get(m_pContext->BoolTy(), false),                      // done
-                    ConstantInt::get(m_pContext->BoolTy(), false)                       // vm
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), EXP_TARGET_PARAM_0 + loc),  // tgt
+                    ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xF),                       // en
+                    pViewportIndex,                                                             // src0
+                    pUndef,                                                                     // src1
+                    pUndef,                                                                     // src2
+                    pUndef,                                                                     // src3
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false),                      // done
+                    ConstantInt::get(Type::getInt1Ty(*m_pContext), false)                       // vm
                 };
-                EmitCall("llvm.amdgcn.exp.f32", m_pContext->VoidTy(), args, NoAttrib, pInsertPos);
+                EmitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_pContext), args, NoAttrib, pInsertPos);
                 ++inOutUsage.expCount;
             }
 
@@ -6782,7 +6800,7 @@ Value* PatchInOutImportExport::AdjustCentroidIJ(
         auto pCond = new ICmpInst(pInsertPos,
                                  ICmpInst::ICMP_SLT,
                                  pPrimMask,
-                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                  "");
         pIJ = SelectInst::Create(pCond, pCenterIJ, pCentroidIJ, "", pInsertPos);
     }
@@ -6800,11 +6818,11 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
     Instruction* pInsertPos)  // [in] Where to insert this call
 {
     Value* args[] = {
-        ConstantInt::get(m_pContext->Int32Ty(), -1),
-        ConstantInt::get(m_pContext->Int32Ty(), 0)
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), -1),
+        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0)
     };
     Value* pSubgroupLocalInvocationId = EmitCall("llvm.amdgcn.mbcnt.lo",
-                                                 m_pContext->Int32Ty(),
+                                                 Type::getInt32Ty(*m_pContext),
                                                  args,
                                                  NoAttrib,
                                                  &*pInsertPos);
@@ -6815,11 +6833,11 @@ Value* PatchInOutImportExport::GetSubgroupLocalInvocationId(
 #endif
     {
         Value* args[] = {
-            ConstantInt::get(m_pContext->Int32Ty(), -1),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), -1),
             pSubgroupLocalInvocationId
         };
         pSubgroupLocalInvocationId = EmitCall("llvm.amdgcn.mbcnt.hi",
-                                              m_pContext->Int32Ty(),
+                                              Type::getInt32Ty(*m_pContext),
                                               args,
                                               NoAttrib,
                                               &*pInsertPos);
@@ -6909,8 +6927,8 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     //   xy.x += gl_WorkGroupID.x << 5; // v_lshl_add_u32
     //   xy.y += gl_WorkGroupID.y << 4; // v_lshl_add_u32
 
-    Type* const pInt16Ty = m_pContext->Int16Ty();
-    Type* const pInt32Ty = m_pContext->Int32Ty();
+    Type* const pInt16Ty = Type::getInt16Ty(*m_pContext);
+    Type* const pInt32Ty = Type::getInt32Ty(*m_pContext);
 
     Value* pRemappedId = pLocalInvocationId;
 
@@ -7201,9 +7219,9 @@ Value* PatchInOutImportExport::GetWorkgroupSize()
     LLPC_ASSERT(m_shaderStage == ShaderStageCompute);
 
     auto& builtInUsage = m_pPipelineState->GetShaderModes()->GetComputeShaderMode();
-    auto pWorkgroupSizeX = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeX);
-    auto pWorkgroupSizeY = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeY);
-    auto pWorkgroupSizeZ = ConstantInt::get(m_pContext->Int32Ty(), builtInUsage.workgroupSizeZ);
+    auto pWorkgroupSizeX = ConstantInt::get(Type::getInt32Ty(*m_pContext), builtInUsage.workgroupSizeX);
+    auto pWorkgroupSizeY = ConstantInt::get(Type::getInt32Ty(*m_pContext), builtInUsage.workgroupSizeY);
+    auto pWorkgroupSizeZ = ConstantInt::get(Type::getInt32Ty(*m_pContext), builtInUsage.workgroupSizeZ);
 
     return ConstantVector::get({ pWorkgroupSizeX, pWorkgroupSizeY, pWorkgroupSizeZ });
 }
@@ -7238,8 +7256,8 @@ Value* PatchInOutImportExport::GetInLocalInvocationId(
         {
             // XY
             pLocaInvocatioId = InsertElementInst::Create(pLocaInvocatioId,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                         "",
                                                         pInsertPos);
         }
@@ -7247,14 +7265,14 @@ Value* PatchInOutImportExport::GetInLocalInvocationId(
         {
             // X
             pLocaInvocatioId = InsertElementInst::Create(pLocaInvocatioId,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                         "",
                                                         pInsertPos);
 
             pLocaInvocatioId = InsertElementInst::Create(pLocaInvocatioId,
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 0),
-                                                        ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                         "",
                                                         pInsertPos);
         }

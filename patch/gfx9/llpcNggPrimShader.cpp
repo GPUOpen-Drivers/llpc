@@ -1251,10 +1251,10 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
         {
             m_pBuilder->SetInsertPoint(pEndWritePosDataBlock);
 
-            auto pUndef = UndefValue::get(m_pContext->Floatx4Ty());
+            auto pUndef = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 4));
             for (auto& expData : expDataSet)
             {
-                PHINode* pExpValue = m_pBuilder->CreatePHI(m_pContext->Floatx4Ty(), 2);
+                PHINode* pExpValue = m_pBuilder->CreatePHI(VectorType::get(Type::getFloatTy(*m_pContext), 4), 2);
                 pExpValue->addIncoming(expData.pExpValue, pWritePosDataBlock);
                 pExpValue->addIncoming(pUndef, pEndZeroDrawFlagBlock);
 
@@ -1460,7 +1460,7 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 m_pBuilder->SetInsertPoint(pWriteCompactDataBlock);
 
                 Value* pDrawMask = DoSubgroupBallot(pDrawFlag);
-                pDrawMask = m_pBuilder->CreateBitCast(pDrawMask, m_pContext->Int32x2Ty());
+                pDrawMask = m_pBuilder->CreateBitCast(pDrawMask, VectorType::get(Type::getInt32Ty(*m_pContext), 2));
 
                 auto pDrawMaskLow = m_pBuilder->CreateExtractElement(pDrawMask, static_cast<uint64_t>(0));
 
@@ -1758,7 +1758,10 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                             m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(SizeOfVec4));
                         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
-                        auto pExpValue = m_pLdsManager->ReadValueFromLds(m_pContext->Floatx4Ty(), pLdsOffset, true);
+                        auto pExpValue = m_pLdsManager->ReadValueFromLds(VectorType::get(Type::getFloatTy(*m_pContext),
+                                                                                         4),
+                                                                         pLdsOffset,
+                                                                         true);
                         expData.pExpValue = pExpValue;
 
                         break;
@@ -1798,10 +1801,10 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
 
             if (vertexCompact)
             {
-                auto pUndef = UndefValue::get(m_pContext->Floatx4Ty());
+                auto pUndef = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 4));
                 for (auto& expData : expDataSet)
                 {
-                    PHINode* pExpValue = m_pBuilder->CreatePHI(m_pContext->Floatx4Ty(), 2);
+                    PHINode* pExpValue = m_pBuilder->CreatePHI(VectorType::get(Type::getFloatTy(*m_pContext), 4), 2);
 
                     pExpValue->addIncoming(expData.pExpValue, pExpVertPosBlock);
                     pExpValue->addIncoming(pUndef, pEndExpPrimBlock);
@@ -2686,7 +2689,7 @@ Value* NggPrimShader::DoCulling(
         Value* pLdsOffset = m_pBuilder->CreateMul(vertexId[i], m_pBuilder->getInt32(SizeOfVec4));
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStart);
 
-        vertex[i] = m_pLdsManager->ReadValueFromLds(m_pContext->Floatx4Ty(), pLdsOffset, true);
+        vertex[i] = m_pLdsManager->ReadValueFromLds(VectorType::get(Type::getFloatTy(*m_pContext), 4), pLdsOffset, true);
     }
 
     // Handle backface culling
@@ -3304,7 +3307,7 @@ Function* NggPrimShader::MutateEsToVariant(
     }
 
     // Clone new entry-point
-    auto pExpDataTy = ArrayType::get(m_pContext->Floatx4Ty(), expCount);
+    auto pExpDataTy = ArrayType::get(VectorType::get(Type::getFloatTy(*m_pContext), 4), expCount);
     Value* pExpData = UndefValue::get(pExpDataTy);
 
     auto pEsEntryVariantTy = FunctionType::get(pExpDataTy, pEsEntryPoint->getFunctionType()->params(), false);
@@ -3382,7 +3385,7 @@ Function* NggPrimShader::MutateEsToVariant(
                         expValue[3] = m_pBuilder->CreateBitCast(expValue[3], m_pBuilder->getFloatTy());
                     }
 
-                    Value* pExpValue = UndefValue::get(m_pContext->Floatx4Ty());
+                    Value* pExpValue = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 4));
                     for (uint32_t i = 0; i < 4; ++i)
                     {
                         pExpValue = m_pBuilder->CreateInsertElement(pExpValue, expValue[i], i);
@@ -4948,14 +4951,14 @@ Function* NggPrimShader::CreateBackfaceCuller(
 {
     auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
                                      {
-                                         m_pBuilder->getInt1Ty(),   // %cullFlag
-                                         m_pContext->Floatx4Ty(),   // %vertex0
-                                         m_pContext->Floatx4Ty(),   // %vertex1
-                                         m_pContext->Floatx4Ty(),   // %vertex2
-                                         m_pBuilder->getInt32Ty(),  // %backfaceExponent
-                                         m_pBuilder->getInt32Ty(),  // %paSuScModeCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClVportXscale
-                                         m_pBuilder->getInt32Ty()   // %paClVportYscale
+                                         m_pBuilder->getInt1Ty(),                           // %cullFlag
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex0
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex1
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex2
+                                         m_pBuilder->getInt32Ty(),                          // %backfaceExponent
+                                         m_pBuilder->getInt32Ty(),                          // %paSuScModeCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClVportXscale
+                                         m_pBuilder->getInt32Ty()                           // %paClVportYscale
                                      },
                                      false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingBackface, pModule);
@@ -5219,13 +5222,13 @@ Function* NggPrimShader::CreateFrustumCuller(
 {
     auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
                                      {
-                                         m_pBuilder->getInt1Ty(),   // %cullFlag
-                                         m_pContext->Floatx4Ty(),   // %vertex0
-                                         m_pContext->Floatx4Ty(),   // %vertex1
-                                         m_pContext->Floatx4Ty(),   // %vertex2
-                                         m_pBuilder->getInt32Ty(),  // %paClClipCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClGbHorzDiscAdj
-                                         m_pBuilder->getInt32Ty()   // %paClGbVertDiscAdj
+                                         m_pBuilder->getInt1Ty(),                           // %cullFlag
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex0
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex1
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex2
+                                         m_pBuilder->getInt32Ty(),                          // %paClClipCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClGbHorzDiscAdj
+                                         m_pBuilder->getInt32Ty()                           // %paClGbVertDiscAdj
                                      },
                                      false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingFrustum, pModule);
@@ -5483,14 +5486,14 @@ Function* NggPrimShader::CreateBoxFilterCuller(
 {
     auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
                                      {
-                                         m_pBuilder->getInt1Ty(),   // %cullFlag
-                                         m_pContext->Floatx4Ty(),   // %vertex0
-                                         m_pContext->Floatx4Ty(),   // %vertex1
-                                         m_pContext->Floatx4Ty(),   // %vertex2
-                                         m_pBuilder->getInt32Ty(),  // %paClVteCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClClipCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClGbHorzDiscAdj
-                                         m_pBuilder->getInt32Ty()   // %paClGbVertDiscAdj
+                                         m_pBuilder->getInt1Ty(),                           // %cullFlag
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex0
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex1
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex2
+                                         m_pBuilder->getInt32Ty(),                          // %paClVteCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClClipCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClGbHorzDiscAdj
+                                         m_pBuilder->getInt32Ty()                           // %paClGbVertDiscAdj
                                      },
                                      false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingBoxFilter, pModule);
@@ -5730,14 +5733,14 @@ Function* NggPrimShader::CreateSphereCuller(
 {
     auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
                                      {
-                                         m_pBuilder->getInt1Ty(),   // %cullFlag
-                                         m_pContext->Floatx4Ty(),   // %vertex0
-                                         m_pContext->Floatx4Ty(),   // %vertex1
-                                         m_pContext->Floatx4Ty(),   // %vertex2
-                                         m_pBuilder->getInt32Ty(),  // %paClVteCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClClipCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClGbHorzDiscAdj
-                                         m_pBuilder->getInt32Ty()   // %paClGbVertDiscAdj
+                                         m_pBuilder->getInt1Ty(),                           // %cullFlag
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex0
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex1
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex2
+                                         m_pBuilder->getInt32Ty(),                          // %paClVteCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClClipCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClGbHorzDiscAdj
+                                         m_pBuilder->getInt32Ty()                           // %paClGbVertDiscAdj
                                      },
                                      false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingSphere, pModule);
@@ -5927,10 +5930,10 @@ Function* NggPrimShader::CreateSphereCuller(
         Value* pZ2Z1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_cvt_pkrtz, {}, { pZ2, pZ1 });
 
         pZ0Z0 = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
-                                            m_pContext->Float16x2Ty(),
+                                            VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                             { pZNearPlusTwo, pZ0Z0, pNegOneMinusZNear });
         pZ2Z1 = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
-                                            m_pContext->Float16x2Ty(),
+                                            VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                             { pZNearPlusTwo, pZ2Z1, pNegOneMinusZNear });
 
         //
@@ -6015,19 +6018,20 @@ Function* NggPrimShader::CreateSphereCuller(
         //
 
         // <s, t>
-        auto pST =
-            m_pBuilder->CreateInsertElement(UndefValue::get(m_pContext->Float16x2Ty()), pS, static_cast<uint64_t>(0));
+        auto pST = m_pBuilder->CreateInsertElement(UndefValue::get(VectorType::get(Type::getHalfTy(*m_pContext), 2)),
+                                                   pS,
+                                                   static_cast<uint64_t>(0));
         pST = m_pBuilder->CreateInsertElement(pST, pT, 1);
 
         // <s', t'> = <0.5 - 0.5(t - s), 0.5 + 0.5(t - s)>
         auto pTMinusS = m_pBuilder->CreateFSub(pT, pS);
-        auto pST1 = m_pBuilder->CreateInsertElement(UndefValue::get(m_pContext->Float16x2Ty()),
+        auto pST1 = m_pBuilder->CreateInsertElement(UndefValue::get(VectorType::get(Type::getHalfTy(*m_pContext), 2)),
                                                     pTMinusS,
                                                     static_cast<uint64_t>(0));
         pST1 = m_pBuilder->CreateInsertElement(pST1, pTMinusS, 1);
 
         pST1 = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
-                                           m_pContext->Float16x2Ty(),
+                                           VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                            {
                                                ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), -0.5),
                                                                      ConstantFP::get(m_pBuilder->getHalfTy(), 0.5) }),
@@ -6038,14 +6042,14 @@ Function* NggPrimShader::CreateSphereCuller(
 
         // <s", t"> = clamp(<s, t>)
         auto pST2 = m_pBuilder->CreateIntrinsic(Intrinsic::maxnum,
-                                                m_pContext->Float16x2Ty(),
+                                                VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                                 {
                                                    pST,
                                                    ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), 0.0),
                                                                          ConstantFP::get(m_pBuilder->getHalfTy(), 0.0) })
                                                });
         pST2 = m_pBuilder->CreateIntrinsic(Intrinsic::minnum,
-                                           m_pContext->Float16x2Ty(),
+                                           VectorType::get(Type::getHalfTy(*m_pContext), 2),
                                            {
                                                pST2,
                                                ConstantVector::get({ ConstantFP::get(m_pBuilder->getHalfTy(), 1.0),
@@ -6070,10 +6074,14 @@ Function* NggPrimShader::CreateSphereCuller(
         auto pTT = m_pBuilder->CreateInsertElement(pST, pT, static_cast<uint64_t>(0));
 
         // s * <x10, y10> + <x0", y0">
-        auto pXY = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pContext->Float16x2Ty(), { pSS, pX10Y10, pX0Y0 });
+        auto pXY = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
+                                               VectorType::get(Type::getHalfTy(*m_pContext), 2),
+                                               { pSS, pX10Y10, pX0Y0 });
 
         // <x, y> = t * <x20, y20> + (s * <x10, y10> + <x0", y0">)
-        pXY = m_pBuilder->CreateIntrinsic(Intrinsic::fma, m_pContext->Float16x2Ty(), { pTT, pX20Y20, pXY });
+        pXY = m_pBuilder->CreateIntrinsic(Intrinsic::fma,
+                                          VectorType::get(Type::getHalfTy(*m_pContext), 2),
+                                          { pTT, pX20Y20, pXY });
 
         // s * z10 + z0"
         pZ0 = m_pBuilder->CreateExtractElement(pZ0Z0, static_cast<uint64_t>(0));
@@ -6127,13 +6135,13 @@ Function* NggPrimShader::CreateSmallPrimFilterCuller(
 {
     auto pFuncTy = FunctionType::get(m_pBuilder->getInt1Ty(),
                                      {
-                                         m_pBuilder->getInt1Ty(),   // %cullFlag
-                                         m_pContext->Floatx4Ty(),   // %vertex0
-                                         m_pContext->Floatx4Ty(),   // %vertex1
-                                         m_pContext->Floatx4Ty(),   // %vertex2
-                                         m_pBuilder->getInt32Ty(),  // %paClVteCntl
-                                         m_pBuilder->getInt32Ty(),  // %paClVportXscale
-                                         m_pBuilder->getInt32Ty()   // %paClVportYscale
+                                         m_pBuilder->getInt1Ty(),                           // %cullFlag
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex0
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex1
+                                         VectorType::get(Type::getFloatTy(*m_pContext), 4), // %vertex2
+                                         m_pBuilder->getInt32Ty(),                          // %paClVteCntl
+                                         m_pBuilder->getInt32Ty(),                          // %paClVportXscale
+                                         m_pBuilder->getInt32Ty()                           // %paClVportYscale
                                      },
                                      false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggCullingSmallPrimFilter, pModule);
@@ -6538,9 +6546,10 @@ Function* NggPrimShader::CreateFetchCullingRegister(
     {
         m_pBuilder->SetInsertPoint(pEntryBlock);
 
-        Value* pPrimShaderTableAddr = m_pBuilder->CreateInsertElement(UndefValue::get(m_pContext->Int32x2Ty()),
-                                                                      pPrimShaderTableAddrLow,
-                                                                      static_cast<uint64_t>(0));
+        Value* pPrimShaderTableAddr = m_pBuilder->CreateInsertElement(
+                                                    UndefValue::get(VectorType::get(Type::getInt32Ty(*m_pContext), 2)),
+                                                    pPrimShaderTableAddrLow,
+                                                    static_cast<uint64_t>(0));
 
         pPrimShaderTableAddr = m_pBuilder->CreateInsertElement(pPrimShaderTableAddr, pPrimShaderTableAddrHigh, 1);
 

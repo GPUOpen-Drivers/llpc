@@ -146,11 +146,11 @@ Value* ShaderSystemValues::GetInvocationId()
         Value* args[] =
         {
             GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tcs.relPatchId, "relPatchId"),
-            ConstantInt::get(m_pContext->Int32Ty(), 8),
-            ConstantInt::get(m_pContext->Int32Ty(), 5)
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 8),
+            ConstantInt::get(Type::getInt32Ty(*m_pContext), 5)
         };
         m_pInvocationId = EmitCall("llvm.amdgcn.ubfe.i32",
-                                   m_pContext->Int32Ty(),
+                                   Type::getInt32Ty(*m_pContext),
                                    args,
                                    Attribute::ReadNone,
                                    pInsertPos);
@@ -171,7 +171,7 @@ Value* ShaderSystemValues::GetRelativeId()
 
         // relativeId = relPatchId[7:0]
         m_pRelativeId = BinaryOperator::CreateAnd(pRelPatchId,
-                                                  ConstantInt::get(m_pContext->Int32Ty(), 0xFF),
+                                                  ConstantInt::get(Type::getInt32Ty(*m_pContext), 0xFF),
                                                   "",
                                                   pInsertPos);
     }
@@ -205,29 +205,29 @@ Value* ShaderSystemValues::GetTessCoord()
         Value* pTessCoordY = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.tes.tessCoordY, "tessCoordY");
         Value* pTessCoordZ = BinaryOperator::CreateFAdd(pTessCoordX, pTessCoordY, "", pInsertPos);
 
-        pTessCoordZ = BinaryOperator::CreateFSub(ConstantFP::get(m_pContext->FloatTy(), 1.0f),
+        pTessCoordZ = BinaryOperator::CreateFSub(ConstantFP::get(Type::getFloatTy(*m_pContext), 1.0f),
                                                  pTessCoordZ,
                                                  "",
                                                  pInsertPos);
 
         auto primitiveMode = m_pPipelineState->GetShaderModes()->GetTessellationMode().primitiveMode;
         pTessCoordZ = (primitiveMode == PrimitiveMode::Triangles) ?
-                          pTessCoordZ : ConstantFP::get(m_pContext->FloatTy(), 0.0f);
+                          pTessCoordZ : ConstantFP::get(Type::getFloatTy(*m_pContext), 0.0f);
 
-        m_pTessCoord = UndefValue::get(m_pContext->Floatx3Ty());
+        m_pTessCoord = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 3));
         m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
                                                  pTessCoordX,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                  "",
                                                  pInsertPos);
         m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
                                                  pTessCoordY,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 1),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                  "",
                                                  pInsertPos);
         m_pTessCoord = InsertElementInst::Create(m_pTessCoord,
                                                  pTessCoordZ,
-                                                 ConstantInt::get(m_pContext->Int32Ty(), 2),
+                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 2),
                                                  "",
                                                  pInsertPos);
     }
@@ -244,7 +244,7 @@ Value* ShaderSystemValues::GetEsGsOffsets()
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
         auto pIntfData = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
 
-        m_pEsGsOffsets = UndefValue::get(m_pContext->Int32x6Ty());
+        m_pEsGsOffsets = UndefValue::get(VectorType::get(Type::getInt32Ty(*m_pContext), 6));
         for (uint32_t i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i)
         {
             auto pEsGsOffset = GetFunctionArgument(m_pEntryPoint,
@@ -252,7 +252,7 @@ Value* ShaderSystemValues::GetEsGsOffsets()
                                                    Twine("esGsOffset") + Twine(i));
             m_pEsGsOffsets = InsertElementInst::Create(m_pEsGsOffsets,
                                                        pEsGsOffset,
-                                                       ConstantInt::get(m_pContext->Int32Ty(), i),
+                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), i),
                                                        "",
                                                        pInsertPos);
         }
@@ -348,11 +348,11 @@ ArrayRef<Value*> ShaderSystemValues::GetEmitCounterPtr()
         auto pInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
         for (int i = 0; i < MaxGsStreams; ++i)
         {
-            auto pEmitCounterPtr = new AllocaInst(m_pContext->Int32Ty(),
+            auto pEmitCounterPtr = new AllocaInst(Type::getInt32Ty(*m_pContext),
                                                   dataLayout.getAllocaAddrSpace(),
                                                   "",
                                                   pInsertPos);
-            new StoreInst(ConstantInt::get(m_pContext->Int32Ty(), 0),
+            new StoreInst(ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                           pEmitCounterPtr,
                           pInsertPos);
             m_emitCounterPtrs.push_back(pEmitCounterPtr);
@@ -377,7 +377,8 @@ Value* ShaderSystemValues::GetDescTablePtr(
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
-            auto pDescTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), UINT32_MAX), ADDR_SPACE_CONST);
+            auto pDescTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX),
+                                                    ADDR_SPACE_CONST);
             m_descTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
                                                                     pDescTablePtrTy,
                                                                     InvalidValue);
@@ -402,7 +403,8 @@ Value* ShaderSystemValues::GetShadowDescTablePtr(
         if (resNodeIdx != InvalidValue)
         {
             // Get the 64-bit extended node value.
-            auto pDescTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), UINT32_MAX), ADDR_SPACE_CONST);
+            auto pDescTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX),
+                                                    ADDR_SPACE_CONST);
             m_shadowDescTablePtrs[descSet] = GetExtendedResourceNodeValue(resNodeIdx,
                                                                           pDescTablePtrTy,
                                                                           cl::ShadowDescTablePtrHigh);
@@ -458,7 +460,7 @@ Value* ShaderSystemValues::GetInternalGlobalTablePtr()
 {
     if (m_pInternalGlobalTablePtr == nullptr)
     {
-        auto pPtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), UINT32_MAX), ADDR_SPACE_CONST);
+        auto pPtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX), ADDR_SPACE_CONST);
         // Global table is always the first function argument
         m_pInternalGlobalTablePtr = MakePointer(GetFunctionArgument(m_pEntryPoint, 0, "globalTable"),
                                                 pPtrTy,
@@ -473,7 +475,7 @@ Value* ShaderSystemValues::GetInternalPerShaderTablePtr()
 {
     if (m_pInternalPerShaderTablePtr == nullptr)
     {
-        auto pPtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), UINT32_MAX), ADDR_SPACE_CONST);
+        auto pPtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), UINT32_MAX), ADDR_SPACE_CONST);
         // Per shader table is always the second function argument
         m_pInternalPerShaderTablePtr = MakePointer(GetFunctionArgument(m_pEntryPoint, 1, "perShaderTable"),
                                                    pPtrTy,
@@ -517,12 +519,12 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
         uint32_t pushConstOffset = pPushConstNode->offsetInDwords * sizeof(uint32_t);
 
         auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
-        auto pPushConstOffset = ConstantInt::get(m_pContext->Int32Ty(), pushConstOffset);
+        auto pPushConstOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), pushConstOffset);
         auto pSpilledPushConstTablePtrLow = BinaryOperator::CreateAdd(pSpillTablePtrLow,
                                                                       pPushConstOffset,
                                                                       "",
                                                                       pInsertPos);
-        auto pTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), InterfaceData::MaxSpillTableSize),
+        auto pTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), InterfaceData::MaxSpillTableSize),
                                                  ADDR_SPACE_CONST);
         m_pSpilledPushConstTablePtr = MakePointer(pSpilledPushConstTablePtrLow, pTy, InvalidValue);
     }
@@ -545,7 +547,8 @@ Value* ShaderSystemValues::GetVertexBufTablePtr()
                                                       pIntfData->entryArgIdxs.vs.vbTablePtr,
                                                       "vbTablePtr");
             static const uint32_t MaxVertexBufferSize = 0x10000000;
-            auto pVbTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int32x4Ty(), MaxVertexBufferSize),
+            auto pVbTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+                                                                 MaxVertexBufferSize),
                                                   ADDR_SPACE_CONST);
             m_pVbTablePtr = MakePointer(pVbTablePtrLow, pVbTablePtrTy, InvalidValue);
         }
@@ -570,8 +573,8 @@ Value* ShaderSystemValues::GetStreamOutBufDesc(
 
         Value* idxs[] =
         {
-            ConstantInt::get(m_pContext->Int64Ty(), 0),
-            ConstantInt::get(m_pContext->Int64Ty(), xfbBuffer)
+            ConstantInt::get(Type::getInt64Ty(*m_pContext), 0),
+            ConstantInt::get(Type::getInt64Ty(*m_pContext), xfbBuffer)
         };
 
         auto pStreamOutBufDescPtr = GetElementPtrInst::Create(nullptr, pStreamOutTablePtr, idxs, "", pInsertPos);
@@ -631,7 +634,7 @@ Instruction* ShaderSystemValues::GetStreamOutTablePtr()
 
         // Get the 64-bit extended node value.
         auto pStreamOutTablePtrLow = GetFunctionArgument(m_pEntryPoint, entryArgIdx, "streamOutTable");
-        auto pStreamOutTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int32x4Ty(),
+        auto pStreamOutTablePtrTy = PointerType::get(ArrayType::get(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
             MaxTransformFeedbackBuffers), ADDR_SPACE_CONST);
         m_pStreamOutTablePtr = MakePointer(pStreamOutTablePtrLow, pStreamOutTablePtrTy, InvalidValue);
     }
@@ -672,11 +675,11 @@ Instruction* ShaderSystemValues::MakePointer(
             // reuse this PC if its pLowValue is an arg rather than an instruction.
             auto pPcInsertPos = &*m_pEntryPoint->front().getFirstInsertionPt();
             Value* pPc = EmitCall("llvm.amdgcn.s.getpc",
-                                  m_pContext->Int64Ty(),
+                                  Type::getInt64Ty(*m_pContext),
                                   ArrayRef<Value*>(),
                                   NoAttrib,
                                   pPcInsertPos);
-            m_pPc = new BitCastInst(pPc, m_pContext->Int32x2Ty(), "", pInsertPos);
+            m_pPc = new BitCastInst(pPc, VectorType::get(Type::getInt32Ty(*m_pContext), 2), "", pInsertPos);
         }
         else
         {
@@ -696,12 +699,12 @@ Instruction* ShaderSystemValues::MakePointer(
     }
     pExtendedPtrValue = InsertElementInst::Create(pExtendedPtrValue,
                                           pLowValue,
-                                          ConstantInt::get(m_pContext->Int32Ty(), 0),
+                                          ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                           "",
                                           pInsertPos);
     pExtendedPtrValue = CastInst::Create(Instruction::BitCast,
                                          pExtendedPtrValue,
-                                         m_pContext->Int64Ty(),
+                                         Type::getInt64Ty(*m_pContext),
                                          "",
                                          pInsertPos);
     return CastInst::Create(Instruction::IntToPtr, pExtendedPtrValue, pPtrTy, "", pInsertPos);
@@ -746,8 +749,8 @@ Value* ShaderSystemValues::GetResourceNodeValue(
 
         Value* idxs[] =
         {
-          ConstantInt::get(m_pContext->Int32Ty(), 0),
-          ConstantInt::get(m_pContext->Int32Ty(), byteOffset)
+          ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+          ConstantInt::get(Type::getInt32Ty(*m_pContext), byteOffset)
         };
         auto pSpillTablePtr = GetSpillTablePtr();
         pInsertPos = pSpillTablePtr->getNextNode();
@@ -762,11 +765,12 @@ Value* ShaderSystemValues::GetResourceNodeValue(
              (pNode->type == ResourceMappingNodeType::DescriptorBuffer) ||
              (pNode->type == ResourceMappingNodeType::DescriptorBufferCompact))
         {
-            pResNodePtrTy = VectorType::get(m_pContext->Int32Ty(), pNode->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
+            pResNodePtrTy = VectorType::get(Type::getInt32Ty(*m_pContext),
+                                            pNode->sizeInDwords)->getPointerTo(ADDR_SPACE_CONST);
         }
         else
         {
-            pResNodePtrTy = m_pContext->Int32Ty()->getPointerTo(ADDR_SPACE_CONST);
+            pResNodePtrTy = Type::getInt32Ty(*m_pContext)->getPointerTo(ADDR_SPACE_CONST);
         }
 
         auto pResNodePtr = BitCastInst::CreatePointerCast(pElemPtr, pResNodePtrTy, "", pInsertPos);
@@ -786,7 +790,8 @@ Instruction* ShaderSystemValues::GetSpillTablePtr()
     {
         auto pIntfData   = m_pPipelineState->GetShaderInterfaceData(m_shaderStage);
         auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
-        auto pSpillTablePtrTy = PointerType::get(ArrayType::get(m_pContext->Int8Ty(), InterfaceData::MaxSpillTableSize),
+        auto pSpillTablePtrTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext),
+                                                                InterfaceData::MaxSpillTableSize),
                                                  ADDR_SPACE_CONST);
         m_pSpillTablePtr = MakePointer(pSpillTablePtrLow, pSpillTablePtrTy, InvalidValue);
     }
@@ -806,7 +811,7 @@ Instruction* ShaderSystemValues::LoadDescFromDriverTable(
         builder.getInt32(0),
     };
     return EmitCall(LlpcName::DescriptorLoadBuffer,
-                    m_pContext->Int32x4Ty(),
+                    VectorType::get(Type::getInt32Ty(*m_pContext), 4),
                     args,
                     NoAttrib,
                     builder);

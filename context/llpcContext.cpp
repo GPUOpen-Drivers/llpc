@@ -67,29 +67,6 @@ Context::Context(
     m_gfxIp(gfxIp),
     m_glslEmuLib(this)
 {
-    // Initialize pre-constructed LLVM derived types
-    m_tys.pBoolTy     = Type::getInt1Ty(*this);
-    m_tys.pInt8Ty     = Type::getInt8Ty(*this);
-    m_tys.pInt16Ty    = Type::getInt16Ty(*this);
-    m_tys.pInt32Ty    = Type::getInt32Ty(*this);
-    m_tys.pInt64Ty    = Type::getInt64Ty(*this);
-    m_tys.pFloat16Ty  = Type::getHalfTy(*this);
-    m_tys.pFloatTy    = Type::getFloatTy(*this);
-    m_tys.pDoubleTy   = Type::getDoubleTy(*this);
-    m_tys.pVoidTy     = Type::getVoidTy(*this);
-
-    m_tys.pInt16x2Ty    = VectorType::get(m_tys.pInt16Ty, 2);
-    m_tys.pInt32x2Ty    = VectorType::get(m_tys.pInt32Ty, 2);
-    m_tys.pInt32x3Ty    = VectorType::get(m_tys.pInt32Ty, 3);
-    m_tys.pInt32x4Ty    = VectorType::get(m_tys.pInt32Ty, 4);
-    m_tys.pInt32x6Ty    = VectorType::get(m_tys.pInt32Ty, 6);
-    m_tys.pInt32x8Ty    = VectorType::get(m_tys.pInt32Ty, 8);
-    m_tys.pFloat16x2Ty  = VectorType::get(m_tys.pFloat16Ty, 2);
-    m_tys.pFloat16x4Ty  = VectorType::get(m_tys.pFloat16Ty, 4);
-    m_tys.pFloatx2Ty    = VectorType::get(m_tys.pFloatTy, 2);
-    m_tys.pFloatx3Ty    = VectorType::get(m_tys.pFloatTy, 3);
-    m_tys.pFloatx4Ty    = VectorType::get(m_tys.pFloatTy, 4);
-
     Reset();
 }
 

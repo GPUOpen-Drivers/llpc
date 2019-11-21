@@ -654,7 +654,7 @@ void PatchBufferOp::visitLoadInst(
         LLPC_ASSERT(loadInst.isVolatile() == false);
         LLPC_ASSERT(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
 
-        Type* const pCastType = m_pContext->Int32x4Ty()->getPointerTo(ADDR_SPACE_CONST);
+        Type* const pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(ADDR_SPACE_CONST);
 
         Value* const pPointer = GetPointerOperandAsInst(loadInst.getPointerOperand());
 
@@ -845,7 +845,8 @@ void PatchBufferOp::visitPHINode(
     // If the buffer descriptor was null, it means the PHI is changing the buffer descriptor, and we need a new PHI.
     if (pBufferDesc == nullptr)
     {
-        PHINode* const pNewPhiNode = m_pBuilder->CreatePHI(m_pContext->Int32x4Ty(), incomings.size());
+        PHINode* const pNewPhiNode = m_pBuilder->CreatePHI(VectorType::get(Type::getInt32Ty(*m_pContext), 4),
+                                                           incomings.size());
         CopyMetadata(pNewPhiNode, &phiNode);
 
         bool isInvariant = true;
@@ -1112,8 +1113,8 @@ void PatchBufferOp::PostVisitMemCpyInst(
 
         if (stride == 16)
         {
-            pCastDestType = m_pContext->Int32x4Ty()->getPointerTo(destAddrSpace);
-            pCastSrcType = m_pContext->Int32x4Ty()->getPointerTo(srcAddrSpace);
+            pCastDestType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(destAddrSpace);
+            pCastSrcType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(srcAddrSpace);
         }
         else
         {
@@ -1263,7 +1264,7 @@ void PatchBufferOp::PostVisitMemSetInst(
 
         if (stride == 16)
         {
-            pCastDestType = m_pContext->Int32x4Ty()->getPointerTo(destAddrSpace);
+            pCastDestType = VectorType::get(Type::getInt32Ty(*m_pContext), 4)->getPointerTo(destAddrSpace);
         }
         else
         {
@@ -1614,20 +1615,20 @@ Value* PatchBufferOp::ReplaceLoad(
 
             if (remainingBytes >= 16)
             {
-                pIntLoadType = m_pContext->Int32x4Ty();
-                pFloatLoadType = m_pContext->Floatx4Ty();
+                pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
+                pFloatLoadType = VectorType::get(Type::getFloatTy(*m_pContext), 4);
                 remainingBytes -= 16;
             }
             else if (remainingBytes >= 8)
             {
-                pIntLoadType = m_pContext->Int32x2Ty();
-                pFloatLoadType = m_pContext->Floatx2Ty();
+                pIntLoadType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
+                pFloatLoadType = VectorType::get(Type::getFloatTy(*m_pContext), 2);
                 remainingBytes -= 8;
             }
             else if (remainingBytes >= 4)
             {
-                pIntLoadType = m_pContext->Int32Ty();
-                pFloatLoadType = m_pContext->FloatTy();
+                pIntLoadType = Type::getInt32Ty(*m_pContext);
+                pFloatLoadType = Type::getFloatTy(*m_pContext);
                 remainingBytes -= 4;
             }
             else
@@ -1950,17 +1951,17 @@ void PatchBufferOp::ReplaceStore(
 
                 if (remainingBytes >= 16)
                 {
-                    pCastType = m_pContext->Int32x4Ty();
+                    pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 4);
                     remainingBytes -= 16;
                 }
                 else if (remainingBytes >= 8)
                 {
-                    pCastType = m_pContext->Int32x2Ty();
+                    pCastType = VectorType::get(Type::getInt32Ty(*m_pContext), 2);
                     remainingBytes -= 8;
                 }
                 else if (remainingBytes >= 4)
                 {
-                    pCastType = m_pContext->Int32Ty();
+                    pCastType = Type::getInt32Ty(*m_pContext);
                     remainingBytes -= 4;
                 }
                 else
@@ -2050,7 +2051,7 @@ void PatchBufferOp::ReplaceStore(
                 pPartStore = m_pBuilder->CreateShuffleVector(pPartStore, pUndef, { 0, 1, 2, 2 });
                 CopyMetadata(pPartStore, pStoreInst);
 
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, m_pContext->FloatTy());
+                pPartStore = m_pBuilder->CreateBitCast(pPartStore, Type::getFloatTy(*m_pContext));
                 CopyMetadata(pPartStore, pStoreInst);
 
                 Value* const pNewStore = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_store_short,
@@ -2071,7 +2072,7 @@ void PatchBufferOp::ReplaceStore(
                 pPartStore = m_pBuilder->CreateInsertElement(pUndef, pPartStore, static_cast<uint64_t>(0));
                 CopyMetadata(pPartStore, pStoreInst);
 
-                pPartStore = m_pBuilder->CreateBitCast(pPartStore, m_pContext->FloatTy());
+                pPartStore = m_pBuilder->CreateBitCast(pPartStore, Type::getFloatTy(*m_pContext));
                 CopyMetadata(pPartStore, pStoreInst);
 
                 Value* const pNewStore = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_buffer_store_byte,

@@ -939,13 +939,13 @@ void PatchPeepholeOpt::visitCallInst(
                     auto pNotCond = BinaryOperator::CreateNot(pCond, "", pTerminator);
                     pNewKill->setArgOperand(0, pNotCond);
                     // Make the kill block unreachable
-                    pBranch->setCondition(ConstantInt::get(pContext->BoolTy(), false));
+                    pBranch->setCondition(ConstantInt::get(Type::getInt1Ty(*pContext), false));
                 }
                 else
                 {
                     pNewKill->setArgOperand(0, pCond);
                     // make the kill block unreachable
-                    pBranch->setCondition(ConstantInt::get(pContext->BoolTy(), true));
+                    pBranch->setCondition(ConstantInt::get(Type::getInt1Ty(*pContext), true));
                 }
                 pNewKill->insertBefore(pTerminator);
             }

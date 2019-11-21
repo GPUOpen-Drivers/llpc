@@ -75,7 +75,7 @@ bool PatchLlvmIrInclusion::runOnModule(
     llvmIr << *m_pModule;
     llvmIr.flush();
 
-    auto pGlobalTy = ArrayType::get(m_pContext->Int8Ty(), moduleStr.size());
+    auto pGlobalTy = ArrayType::get(Type::getInt8Ty(*m_pContext), moduleStr.size());
     auto pInitializer = ConstantDataArray::getString(m_pModule->getContext(), moduleStr, false);
     auto pGlobal = new GlobalVariable(*m_pModule,
                                       pGlobalTy,

@@ -419,12 +419,12 @@ Value* ToInt32Value(
     if (bitWidth > 32)
     {
         // Truncated to i32 type
-        pValue = CastInst::CreateTruncOrBitCast(pValue, pContext->Int32Ty(), "", pInsertPos);
+        pValue = CastInst::CreateTruncOrBitCast(pValue, Type::getInt32Ty(*pContext), "", pInsertPos);
     }
     else if (bitWidth < 32)
     {
         // Extended to i32 type
-        pValue = CastInst::CreateZExtOrBitCast(pValue, pContext->Int32Ty(), "", pInsertPos);
+        pValue = CastInst::CreateZExtOrBitCast(pValue, Type::getInt32Ty(*pContext), "", pInsertPos);
     }
 
     return pValue;
