@@ -30,9 +30,9 @@
  */
 #define DEBUG_TYPE "llpc-patch-copy-shader"
 
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
@@ -71,25 +71,25 @@ public:
 private:
     LLPC_DISALLOW_COPY_AND_ASSIGN(PatchCopyShader);
 
-    void ExportOutput(uint32_t streamId, Instruction* pInsertPos);
+    void ExportOutput(uint32_t streamId, IRBuilder<>& builder);
     void CollectGsGenericOutputInfo(Function* pGsEntryPoint);
 
-    Value* CalcGsVsRingOffsetForInput(uint32_t location, uint32_t compIdx, uint32_t streamId, Instruction* pInsertPos);
+    Value* CalcGsVsRingOffsetForInput(uint32_t location, uint32_t compIdx, uint32_t streamId, IRBuilder<>& builder);
 
-    Value* LoadValueFromGsVsRing(uint32_t location, uint32_t compIdx, uint32_t streamId, Instruction* pInsertPos);
+    Value* LoadValueFromGsVsRing(uint32_t location, uint32_t compIdx, uint32_t streamId, IRBuilder<>& builder);
 
-    Value* LoadGsVsRingBufferDescriptor(Function* pEntryPoint, Instruction* pInsertPos);
+    Value* LoadGsVsRingBufferDescriptor(IRBuilder<>& builder);
 
-    void ExportGenericOutput(Value* pOutputValue, uint32_t location, uint32_t streamId, Instruction* pInsertPos);
-    void ExportBuiltInOutput(Value* pOutputValue, spv::BuiltIn builtInId, uint32_t streamId, Instruction* pInsertPos);
+    void ExportGenericOutput(Value* pOutputValue, uint32_t location, uint32_t streamId, IRBuilder<>& builder);
+    void ExportBuiltInOutput(Value* pOutputValue, spv::BuiltIn builtInId, uint32_t streamId, IRBuilder<>& builder);
 
     // -----------------------------------------------------------------------------------------------------------------
 
     // Low part of global internal table pointer
     static const uint32_t EntryArgIdxInternalTablePtrLow = 0;
 
-    GlobalVariable*       m_pLds;                 // Global variable representing LDS
-    Value*                m_pGsVsRingBufDesc;   // Descriptor for GS-VS ring
+    GlobalVariable*       m_pLds = nullptr;             // Global variable representing LDS
+    Value*                m_pGsVsRingBufDesc = nullptr; // Descriptor for GS-VS ring
 };
 
 char PatchCopyShader::ID = 0;
@@ -172,14 +172,11 @@ bool PatchCopyShader::runOnModule(
     // Create entry basic block
     auto pEntryBlock = BasicBlock::Create(*m_pContext, "", pEntryPoint, pEndBlock);
     builder.SetInsertPoint(pEntryBlock);
-    builder.CreateBr(pEndBlock);
 
     auto pIntfData = m_pContext->GetShaderInterfaceData(ShaderStageCopyShader);
 
-    const auto gfxIp = m_pContext->GetGfxIpVersion();
-
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
-    if (gfxIp.major <= 8)
+    if (m_pContext->GetGfxIpVersion().major <= 8)
     {
         pIntfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
         pIntfData->userDataUsage.gs.copyShaderEsGsLdsSize = 3;
@@ -191,15 +188,16 @@ bool PatchCopyShader::runOnModule(
         pIntfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
     }
 
-    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
-
-    // Load GS-VS ring buffer descriptor
-    m_pGsVsRingBufDesc = LoadGsVsRingBufferDescriptor(pEntryPoint, pEntryBlock->getTerminator());
-
     if (m_pContext->IsGsOnChip())
     {
         m_pLds = Patch::GetLdsVariable(&module);
     }
+    else
+    {
+        m_pGsVsRingBufDesc = LoadGsVsRingBufferDescriptor(builder);
+    }
+
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
 
     uint32_t outputStreamCount = 0;
     uint32_t outputStreamId = InvalidValue;
@@ -217,11 +215,6 @@ bool PatchCopyShader::runOnModule(
 
     if ((outputStreamCount > 1) && pResUsage->inOutUsage.enableXfb)
     {
-        // Remove entry block terminator
-        auto pTerminator = pEntryBlock->getTerminator();
-        pTerminator->removeFromParent();
-        pTerminator->dropAllReferences();
-
         // StreamId = streamInfo[25:24]
         auto pStreamInfo = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxStreamInfo);
 
@@ -270,18 +263,19 @@ bool PatchCopyShader::runOnModule(
                 std::string blockName = ".stream" + std::to_string(streamId);
                 BasicBlock* pStreamBlock = BasicBlock::Create(*m_pContext, blockName, pEntryPoint, pEndBlock);
                 builder.SetInsertPoint(pStreamBlock);
-                builder.CreateBr(pEndBlock);
 
                 pSwitch->addCase(builder.getInt32(streamId), pStreamBlock);
 
-                ExportOutput(streamId, pStreamBlock->getTerminator());
+                ExportOutput(streamId, builder);
+                builder.CreateBr(pEndBlock);
             }
         }
     }
     else
     {
         outputStreamId = (outputStreamCount == 0) ? 0 : outputStreamId;
-        ExportOutput(outputStreamId, pEntryBlock->getTerminator());
+        ExportOutput(outputStreamId, builder);
+        builder.CreateBr(pEndBlock);
     }
 
     // Add SPIR-V execution model metadata to the function.
@@ -361,11 +355,8 @@ void PatchCopyShader::CollectGsGenericOutputInfo(
 // Exports outputs of geometry shader, inserting buffer-load/output-export calls.
 void PatchCopyShader::ExportOutput(
     uint32_t        streamId,     // Export output of this stream
-    Instruction*    pInsertPos)   // [in] Where to insert the instruction
+    IRBuilder<>&    builder)      // [in] IRBuilder to use for instruction constructing
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPos);
-
     Value* pOutputValue = nullptr;
 
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
@@ -410,11 +401,11 @@ void PatchCopyShader::ExportOutput(
         {
             for (uint32_t i = 0; i < dwordSize; ++i)
             {
-                auto pLoadValue = LoadValueFromGsVsRing(loc + i / 4, i % 4, streamId, pInsertPos);
+                auto pLoadValue = LoadValueFromGsVsRing(loc + i / 4, i % 4, streamId, builder);
                 pOutputValue = builder.CreateInsertElement(pOutputValue, pLoadValue, i);
             }
         }
-        ExportGenericOutput(pOutputValue, loc, streamId, pInsertPos);
+        ExportGenericOutput(pOutputValue, loc, streamId, builder);
     }
 
 #if LLPC_BUILD_GFX10
@@ -485,9 +476,9 @@ void PatchCopyShader::ExportOutput(
                                         builder.getInt32(streamId)
                                     },
                                     NoAttrib,
-                                    pInsertPos);
+                                    builder);
 
-            ExportBuiltInOutput(pOutputValue, builtInId, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, builtInId, streamId, builder);
         }
     }
     else
@@ -505,10 +496,10 @@ void PatchCopyShader::ExportOutput(
             pOutputValue = UndefValue::get(VectorType::get(builder.getFloatTy(), 4));
             for (uint32_t i = 0; i < 4; ++i)
             {
-                auto pLoadValue = LoadValueFromGsVsRing(loc, i, streamId, pInsertPos);
+                auto pLoadValue = LoadValueFromGsVsRing(loc, i, streamId, builder);
                 pOutputValue = builder.CreateInsertElement(pOutputValue, pLoadValue, i);
             }
-            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, builder);
         }
         else if (pResUsage->inOutUsage.enableXfb)
         {
@@ -519,7 +510,7 @@ void PatchCopyShader::ExportOutput(
             std::vector<Constant*> outputValues = { pZero, pZero, pZero, pOne };
             pOutputValue = ConstantVector::get(outputValues);
 
-            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInPosition, streamId, builder);
         }
 
         if (builtInUsage.pointSize)
@@ -528,9 +519,9 @@ void PatchCopyShader::ExportOutput(
                 pResUsage->inOutUsage.builtInOutputLocMap.end());
 
             uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPointSize];
-            pOutputValue = LoadValueFromGsVsRing(loc, 0, streamId, pInsertPos);
+            pOutputValue = LoadValueFromGsVsRing(loc, 0, streamId, builder);
 
-            ExportBuiltInOutput(pOutputValue, BuiltInPointSize, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInPointSize, streamId, builder);
         }
 
         if (builtInUsage.clipDistance > 0)
@@ -543,11 +534,11 @@ void PatchCopyShader::ExportOutput(
 
             for (uint32_t i = 0; i < builtInUsage.clipDistance; ++i)
             {
-                auto pLoadValue = LoadValueFromGsVsRing(loc + i / 4, i % 4, streamId, pInsertPos);
+                auto pLoadValue = LoadValueFromGsVsRing(loc + i / 4, i % 4, streamId, builder);
                 pOutputValue = builder.CreateInsertValue(pOutputValue, pLoadValue, i);
             }
 
-            ExportBuiltInOutput(pOutputValue, BuiltInClipDistance, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInClipDistance, streamId, builder);
         }
 
         if (builtInUsage.cullDistance > 0)
@@ -560,11 +551,11 @@ void PatchCopyShader::ExportOutput(
 
             for (uint32_t i = 0; i < builtInUsage.cullDistance; ++i)
             {
-                auto pLoadValue = LoadValueFromGsVsRing(loc + i / 4, i % 4, streamId, pInsertPos);
+                auto pLoadValue = LoadValueFromGsVsRing(loc + i / 4, i % 4, streamId, builder);
                 pOutputValue = builder.CreateInsertValue(pOutputValue, pLoadValue, i);
             }
 
-            ExportBuiltInOutput(pOutputValue, BuiltInCullDistance, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInCullDistance, streamId, builder);
         }
 
         if (builtInUsage.primitiveId)
@@ -574,10 +565,10 @@ void PatchCopyShader::ExportOutput(
 
             uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInPrimitiveId];
 
-            pOutputValue = LoadValueFromGsVsRing(loc, 0, streamId, pInsertPos);
+            pOutputValue = LoadValueFromGsVsRing(loc, 0, streamId, builder);
             pOutputValue = builder.CreateBitCast(pOutputValue, builder.getInt32Ty());
 
-            ExportBuiltInOutput(pOutputValue, BuiltInPrimitiveId, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInPrimitiveId, streamId, builder);
         }
 
         const auto enableMultiView = (reinterpret_cast<const GraphicsPipelineBuildInfo*>(
@@ -591,10 +582,10 @@ void PatchCopyShader::ExportOutput(
 
             uint32_t loc = builtInOutLocMap[builtInId];
 
-            pOutputValue = LoadValueFromGsVsRing(loc, 0, streamId, pInsertPos);
+            pOutputValue = LoadValueFromGsVsRing(loc, 0, streamId, builder);
             pOutputValue = builder.CreateBitCast(pOutputValue, builder.getInt32Ty());
 
-            ExportBuiltInOutput(pOutputValue, BuiltInLayer, streamId, pInsertPos);
+            ExportBuiltInOutput(pOutputValue, BuiltInLayer, streamId, builder);
         }
 
         if (builtInUsage.viewportIndex)
@@ -603,10 +594,10 @@ void PatchCopyShader::ExportOutput(
                 pResUsage->inOutUsage.builtInOutputLocMap.end());
 
             uint32_t loc = pResUsage->inOutUsage.builtInOutputLocMap[BuiltInViewportIndex];
-            auto pLoadValue = LoadValueFromGsVsRing(loc, 0, streamId, pInsertPos);
+            auto pLoadValue = LoadValueFromGsVsRing(loc, 0, streamId, builder);
             pLoadValue = builder.CreateBitCast(pLoadValue, builder.getInt32Ty());
 
-            ExportBuiltInOutput(pLoadValue, BuiltInViewportIndex, streamId, pInsertPos);
+            ExportBuiltInOutput(pLoadValue, BuiltInViewportIndex, streamId, builder);
         }
     }
 }
@@ -617,11 +608,8 @@ Value* PatchCopyShader::CalcGsVsRingOffsetForInput(
     uint32_t        location,    // Output location
     uint32_t        compIdx,     // Output component
     uint32_t        streamId,    // Output stream ID
-    Instruction*    pInsertPos)  // [in] Where to insert the instruction
+    IRBuilder<>&    builder)     // [in] IRBuilder to use for instruction constructing
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPos);
-
     auto pEntryPoint = builder.GetInsertBlock()->getParent();
     Value* pVertexOffset = GetFunctionArgument(pEntryPoint, CopyShaderUserSgprIdxVertexOffset);
 
@@ -653,15 +641,14 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     uint32_t        location,   // Output location
     uint32_t        compIdx,    // Output component
     uint32_t        streamId,   // Output stream ID
-    Instruction*    pInsertPos) // [in] Where to insert the load instruction
+    IRBuilder<>&    builder)    // [in] IRBuilder to use for instruction constructing
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPos);
-
-    Value* pRingOffset = CalcGsVsRingOffsetForInput(location, compIdx, streamId, pInsertPos);
+    Value* pRingOffset = CalcGsVsRingOffsetForInput(location, compIdx, streamId, builder);
 
     if (m_pContext->IsGsOnChip())
     {
+        LLPC_ASSERT(m_pLds != nullptr);
+
         Value* pLoadPtr = builder.CreateGEP(m_pLds, { builder.getInt32(0), pRingOffset });
         auto pLoadValue = builder.CreateLoad(pLoadPtr);
         pLoadValue->setAlignment(MaybeAlign(m_pLds->getAlignment()));
@@ -670,6 +657,8 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
     }
     else
     {
+        LLPC_ASSERT(m_pGsVsRingBufDesc != nullptr);
+
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
         coherent.bits.slc = true;
@@ -688,12 +677,9 @@ Value* PatchCopyShader::LoadValueFromGsVsRing(
 // =====================================================================================================================
 // Load GS-VS ring buffer descriptor.
 Value* PatchCopyShader::LoadGsVsRingBufferDescriptor(
-    Function*    pEntryPoint,   // [in] Entry-point of copy shader
-    Instruction* pInsertPos)    // [in] Where to insert instructions
+    IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPos);
-
+    Function* pEntryPoint = builder.GetInsertBlock()->getParent();
     Value* pInternalTablePtrLow = GetFunctionArgument(pEntryPoint, EntryArgIdxInternalTablePtrLow);
 
     Value* pPc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
@@ -725,11 +711,8 @@ void PatchCopyShader::ExportGenericOutput(
     Value*       pOutputValue,  // [in] Value exported to output
     uint32_t     location,      // Location of the output
     uint32_t     streamId,      // ID of output vertex stream
-    Instruction* pInsertPos)    // [in] Where to insert the instructions
+    IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPos);
-
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
     if (pResUsage->inOutUsage.enableXfb)
     {
@@ -810,11 +793,8 @@ void PatchCopyShader::ExportBuiltInOutput(
     Value*       pOutputValue,  // [in] Value exported to output
     BuiltIn      builtInId,     // ID of the built-in variable
     uint32_t     streamId,      // ID of output vertex stream
-    Instruction* pInsertPos)    // [in] Where to insert the instructions
+    IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
 {
-    IRBuilder<> builder(*m_pContext);
-    builder.SetInsertPoint(pInsertPos);
-
     auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageCopyShader);
 
     if (pResUsage->inOutUsage.enableXfb)
