@@ -1081,6 +1081,7 @@ public:
         Section(m_addrTable, MemberCount, SectionTypeUnset, "colorBuffer")
     {
         memset(&m_state, 0, sizeof(m_state));
+        m_state.channelWriteMask = 0xF;
     }
 
     static void InitialAddrTable()
