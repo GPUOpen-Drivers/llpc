@@ -468,7 +468,7 @@ Type* Builder::GetBuiltInTy(
     case BuiltIn ## name: \
         typeCode = TypeCode:: type; \
         break;
-#include "llpcBuilderBuiltIns.h"
+#include "llpcBuilderBuiltInDefs.h"
 #undef BUILTIN
     default:
         LLPC_NEVER_CALLED();

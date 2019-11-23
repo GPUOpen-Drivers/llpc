@@ -53,55 +53,55 @@ namespace Llpc
 
 // The code here relies on the SPIR-V built-in kind being the same as the Builder built-in kind.
 
-static_assert(Builder::BuiltInBaryCoordNoPersp          == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordNoPerspAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaryCoordNoPerspCentroid  == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordNoPerspCentroidAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaryCoordNoPerspSample    == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordNoPerspSampleAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaryCoordPullModel        == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordPullModelAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaryCoordSmooth           == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordSmoothAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaryCoordSmoothCentroid   == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordSmoothCentroidAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaryCoordSmoothSample     == static_cast<Builder::BuiltInKind>(spv::BuiltInBaryCoordSmoothSampleAMD), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaseInstance              == static_cast<Builder::BuiltInKind>(spv::BuiltInBaseInstance), "Built-in kind mismatch");
-static_assert(Builder::BuiltInBaseVertex                == static_cast<Builder::BuiltInKind>(spv::BuiltInBaseVertex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInClipDistance              == static_cast<Builder::BuiltInKind>(spv::BuiltInClipDistance), "Built-in kind mismatch");
-static_assert(Builder::BuiltInCullDistance              == static_cast<Builder::BuiltInKind>(spv::BuiltInCullDistance), "Built-in kind mismatch");
-static_assert(Builder::BuiltInDeviceIndex               == static_cast<Builder::BuiltInKind>(spv::BuiltInDeviceIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInDrawIndex                 == static_cast<Builder::BuiltInKind>(spv::BuiltInDrawIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInFragCoord                 == static_cast<Builder::BuiltInKind>(spv::BuiltInFragCoord), "Built-in kind mismatch");
-static_assert(Builder::BuiltInFragDepth                 == static_cast<Builder::BuiltInKind>(spv::BuiltInFragDepth), "Built-in kind mismatch");
-static_assert(Builder::BuiltInFragStencilRef            == static_cast<Builder::BuiltInKind>(spv::BuiltInFragStencilRefEXT), "Built-in kind mismatch");
-static_assert(Builder::BuiltInFrontFacing               == static_cast<Builder::BuiltInKind>(spv::BuiltInFrontFacing), "Built-in kind mismatch");
-static_assert(Builder::BuiltInGlobalInvocationId        == static_cast<Builder::BuiltInKind>(spv::BuiltInGlobalInvocationId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInHelperInvocation          == static_cast<Builder::BuiltInKind>(spv::BuiltInHelperInvocation), "Built-in kind mismatch");
-static_assert(Builder::BuiltInInstanceIndex             == static_cast<Builder::BuiltInKind>(spv::BuiltInInstanceIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInInvocationId              == static_cast<Builder::BuiltInKind>(spv::BuiltInInvocationId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInLayer                     == static_cast<Builder::BuiltInKind>(spv::BuiltInLayer), "Built-in kind mismatch");
-static_assert(Builder::BuiltInLocalInvocationId         == static_cast<Builder::BuiltInKind>(spv::BuiltInLocalInvocationId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInLocalInvocationIndex      == static_cast<Builder::BuiltInKind>(spv::BuiltInLocalInvocationIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInNumSubgroups              == static_cast<Builder::BuiltInKind>(spv::BuiltInNumSubgroups), "Built-in kind mismatch");
-static_assert(Builder::BuiltInNumWorkgroups             == static_cast<Builder::BuiltInKind>(spv::BuiltInNumWorkgroups), "Built-in kind mismatch");
-static_assert(Builder::BuiltInPatchVertices             == static_cast<Builder::BuiltInKind>(spv::BuiltInPatchVertices), "Built-in kind mismatch");
-static_assert(Builder::BuiltInPointCoord                == static_cast<Builder::BuiltInKind>(spv::BuiltInPointCoord), "Built-in kind mismatch");
-static_assert(Builder::BuiltInPointSize                 == static_cast<Builder::BuiltInKind>(spv::BuiltInPointSize), "Built-in kind mismatch");
-static_assert(Builder::BuiltInPosition                  == static_cast<Builder::BuiltInKind>(spv::BuiltInPosition), "Built-in kind mismatch");
-static_assert(Builder::BuiltInPrimitiveId               == static_cast<Builder::BuiltInKind>(spv::BuiltInPrimitiveId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSampleId                  == static_cast<Builder::BuiltInKind>(spv::BuiltInSampleId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSampleMask                == static_cast<Builder::BuiltInKind>(spv::BuiltInSampleMask), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSamplePosition            == static_cast<Builder::BuiltInKind>(spv::BuiltInSamplePosition), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupEqMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupEqMask), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupGeMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupGeMask), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupGtMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupGtMask), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupId                == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupLeMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupLeMask), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupLocalInvocationId == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupLocalInvocationId), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupLtMask            == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupLtMask), "Built-in kind mismatch");
-static_assert(Builder::BuiltInSubgroupSize              == static_cast<Builder::BuiltInKind>(spv::BuiltInSubgroupSize), "Built-in kind mismatch");
-static_assert(Builder::BuiltInTessCoord                 == static_cast<Builder::BuiltInKind>(spv::BuiltInTessCoord), "Built-in kind mismatch");
-static_assert(Builder::BuiltInTessLevelInner            == static_cast<Builder::BuiltInKind>(spv::BuiltInTessLevelInner), "Built-in kind mismatch");
-static_assert(Builder::BuiltInTessLevelOuter            == static_cast<Builder::BuiltInKind>(spv::BuiltInTessLevelOuter), "Built-in kind mismatch");
-static_assert(Builder::BuiltInVertexIndex               == static_cast<Builder::BuiltInKind>(spv::BuiltInVertexIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInViewIndex                 == static_cast<Builder::BuiltInKind>(spv::BuiltInViewIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInViewportIndex             == static_cast<Builder::BuiltInKind>(spv::BuiltInViewportIndex), "Built-in kind mismatch");
-static_assert(Builder::BuiltInWorkgroupId               == static_cast<Builder::BuiltInKind>(spv::BuiltInWorkgroupId), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordNoPersp          == static_cast<BuiltInKind>(spv::BuiltInBaryCoordNoPerspAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordNoPerspCentroid  == static_cast<BuiltInKind>(spv::BuiltInBaryCoordNoPerspCentroidAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordNoPerspSample    == static_cast<BuiltInKind>(spv::BuiltInBaryCoordNoPerspSampleAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordPullModel        == static_cast<BuiltInKind>(spv::BuiltInBaryCoordPullModelAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordSmooth           == static_cast<BuiltInKind>(spv::BuiltInBaryCoordSmoothAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordSmoothCentroid   == static_cast<BuiltInKind>(spv::BuiltInBaryCoordSmoothCentroidAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaryCoordSmoothSample     == static_cast<BuiltInKind>(spv::BuiltInBaryCoordSmoothSampleAMD), "Built-in kind mismatch");
+static_assert(BuiltInBaseInstance              == static_cast<BuiltInKind>(spv::BuiltInBaseInstance), "Built-in kind mismatch");
+static_assert(BuiltInBaseVertex                == static_cast<BuiltInKind>(spv::BuiltInBaseVertex), "Built-in kind mismatch");
+static_assert(BuiltInClipDistance              == static_cast<BuiltInKind>(spv::BuiltInClipDistance), "Built-in kind mismatch");
+static_assert(BuiltInCullDistance              == static_cast<BuiltInKind>(spv::BuiltInCullDistance), "Built-in kind mismatch");
+static_assert(BuiltInDeviceIndex               == static_cast<BuiltInKind>(spv::BuiltInDeviceIndex), "Built-in kind mismatch");
+static_assert(BuiltInDrawIndex                 == static_cast<BuiltInKind>(spv::BuiltInDrawIndex), "Built-in kind mismatch");
+static_assert(BuiltInFragCoord                 == static_cast<BuiltInKind>(spv::BuiltInFragCoord), "Built-in kind mismatch");
+static_assert(BuiltInFragDepth                 == static_cast<BuiltInKind>(spv::BuiltInFragDepth), "Built-in kind mismatch");
+static_assert(BuiltInFragStencilRef            == static_cast<BuiltInKind>(spv::BuiltInFragStencilRefEXT), "Built-in kind mismatch");
+static_assert(BuiltInFrontFacing               == static_cast<BuiltInKind>(spv::BuiltInFrontFacing), "Built-in kind mismatch");
+static_assert(BuiltInGlobalInvocationId        == static_cast<BuiltInKind>(spv::BuiltInGlobalInvocationId), "Built-in kind mismatch");
+static_assert(BuiltInHelperInvocation          == static_cast<BuiltInKind>(spv::BuiltInHelperInvocation), "Built-in kind mismatch");
+static_assert(BuiltInInstanceIndex             == static_cast<BuiltInKind>(spv::BuiltInInstanceIndex), "Built-in kind mismatch");
+static_assert(BuiltInInvocationId              == static_cast<BuiltInKind>(spv::BuiltInInvocationId), "Built-in kind mismatch");
+static_assert(BuiltInLayer                     == static_cast<BuiltInKind>(spv::BuiltInLayer), "Built-in kind mismatch");
+static_assert(BuiltInLocalInvocationId         == static_cast<BuiltInKind>(spv::BuiltInLocalInvocationId), "Built-in kind mismatch");
+static_assert(BuiltInLocalInvocationIndex      == static_cast<BuiltInKind>(spv::BuiltInLocalInvocationIndex), "Built-in kind mismatch");
+static_assert(BuiltInNumSubgroups              == static_cast<BuiltInKind>(spv::BuiltInNumSubgroups), "Built-in kind mismatch");
+static_assert(BuiltInNumWorkgroups             == static_cast<BuiltInKind>(spv::BuiltInNumWorkgroups), "Built-in kind mismatch");
+static_assert(BuiltInPatchVertices             == static_cast<BuiltInKind>(spv::BuiltInPatchVertices), "Built-in kind mismatch");
+static_assert(BuiltInPointCoord                == static_cast<BuiltInKind>(spv::BuiltInPointCoord), "Built-in kind mismatch");
+static_assert(BuiltInPointSize                 == static_cast<BuiltInKind>(spv::BuiltInPointSize), "Built-in kind mismatch");
+static_assert(BuiltInPosition                  == static_cast<BuiltInKind>(spv::BuiltInPosition), "Built-in kind mismatch");
+static_assert(BuiltInPrimitiveId               == static_cast<BuiltInKind>(spv::BuiltInPrimitiveId), "Built-in kind mismatch");
+static_assert(BuiltInSampleId                  == static_cast<BuiltInKind>(spv::BuiltInSampleId), "Built-in kind mismatch");
+static_assert(BuiltInSampleMask                == static_cast<BuiltInKind>(spv::BuiltInSampleMask), "Built-in kind mismatch");
+static_assert(BuiltInSamplePosition            == static_cast<BuiltInKind>(spv::BuiltInSamplePosition), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupEqMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupEqMask), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupGeMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupGeMask), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupGtMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupGtMask), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupId                == static_cast<BuiltInKind>(spv::BuiltInSubgroupId), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupLeMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupLeMask), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupLocalInvocationId == static_cast<BuiltInKind>(spv::BuiltInSubgroupLocalInvocationId), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupLtMask            == static_cast<BuiltInKind>(spv::BuiltInSubgroupLtMask), "Built-in kind mismatch");
+static_assert(BuiltInSubgroupSize              == static_cast<BuiltInKind>(spv::BuiltInSubgroupSize), "Built-in kind mismatch");
+static_assert(BuiltInTessCoord                 == static_cast<BuiltInKind>(spv::BuiltInTessCoord), "Built-in kind mismatch");
+static_assert(BuiltInTessLevelInner            == static_cast<BuiltInKind>(spv::BuiltInTessLevelInner), "Built-in kind mismatch");
+static_assert(BuiltInTessLevelOuter            == static_cast<BuiltInKind>(spv::BuiltInTessLevelOuter), "Built-in kind mismatch");
+static_assert(BuiltInVertexIndex               == static_cast<BuiltInKind>(spv::BuiltInVertexIndex), "Built-in kind mismatch");
+static_assert(BuiltInViewIndex                 == static_cast<BuiltInKind>(spv::BuiltInViewIndex), "Built-in kind mismatch");
+static_assert(BuiltInViewportIndex             == static_cast<BuiltInKind>(spv::BuiltInViewportIndex), "Built-in kind mismatch");
+static_assert(BuiltInWorkgroupId               == static_cast<BuiltInKind>(spv::BuiltInWorkgroupId), "Built-in kind mismatch");
 
 // =====================================================================================================================
 // Initializes static members.
@@ -1225,7 +1225,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 if (addrSpace == SPIRAS_Input)
                 {
                     pInOutValue =  m_pBuilder->CreateReadBuiltInInput(
-                                      static_cast<Builder::BuiltInKind>(inOutMeta.Value),
+                                      static_cast<BuiltInKind>(inOutMeta.Value),
                                       inOutInfo,
                                       pVertexIdx,
                                       nullptr);
@@ -1233,7 +1233,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 else
                 {
                     pInOutValue =  m_pBuilder->CreateReadBuiltInOutput(
-                                      static_cast<Builder::BuiltInKind>(inOutMeta.Value),
+                                      static_cast<BuiltInKind>(inOutMeta.Value),
                                       inOutInfo,
                                       pVertexIdx,
                                       nullptr);
@@ -1337,7 +1337,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         m_pBuilder->SetInsertPoint(pInsertPos);
         if (inOutMeta.IsBuiltIn)
         {
-            auto builtIn = static_cast<Builder::BuiltInKind>(inOutMeta.Value);
+            auto builtIn = static_cast<BuiltInKind>(inOutMeta.Value);
             pElemIdx = (pElemIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pElemIdx;
             pVertexIdx = (pVertexIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pVertexIdx;
 
@@ -1352,11 +1352,11 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                 pInOutValue = m_pBuilder->CreateReadBuiltInOutput(builtIn, inOutInfo, pVertexIdx, pElemIdx);
             }
 
-            if (((builtIn == Builder::BuiltInSubgroupEqMask)     ||
-                 (builtIn == Builder::BuiltInSubgroupGeMask)     ||
-                 (builtIn == Builder::BuiltInSubgroupGtMask)     ||
-                 (builtIn == Builder::BuiltInSubgroupLeMask)     ||
-                 (builtIn == Builder::BuiltInSubgroupLtMask)) &&
+            if (((builtIn == BuiltInSubgroupEqMask)     ||
+                 (builtIn == BuiltInSubgroupGeMask)     ||
+                 (builtIn == BuiltInSubgroupGtMask)     ||
+                 (builtIn == BuiltInSubgroupLeMask)     ||
+                 (builtIn == BuiltInSubgroupLtMask)) &&
                 pInOutTy->isIntegerTy(64))
             {
                 // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
@@ -1478,7 +1478,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             // NOTE: For geometry shader, we add stream ID for outputs.
             LLPC_ASSERT((m_shaderStage != ShaderStageGeometry) || (emitStreamId == outputMeta.StreamId));
 
-            auto builtInId = static_cast<Builder::BuiltInKind>(outputMeta.Value);
+            auto builtInId = static_cast<BuiltInKind>(outputMeta.Value);
             Builder::InOutInfo outputInfo;
             if (emitStreamId != InvalidValue)
             {
@@ -1632,7 +1632,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
         if (outputMeta.IsBuiltIn)
         {
-            auto builtInId = static_cast<Builder::BuiltInKind>(outputMeta.Value);
+            auto builtInId = static_cast<BuiltInKind>(outputMeta.Value);
             outputInfo.SetArraySize(maxLocOffset);
             if (outputMeta.IsXfb)
             {

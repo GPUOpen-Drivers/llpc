@@ -557,6 +557,9 @@ public:
                                           Value*        pVertexIndex,
                                           Value*        pIndex) override final;
 
+    // Get name of built-in
+    static StringRef GetBuiltInName(BuiltInKind builtIn);
+
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImplInOut)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImplInOut)
@@ -601,9 +604,6 @@ private:
 
     // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
     Type* GetBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
-
-    // Get name of built-in
-    StringRef GetBuiltInName(BuiltInKind builtIn);
 
     // Mark usage of a built-in input
     void MarkBuiltInInputUsage(BuiltInKind builtIn, uint32_t arraySize);
@@ -969,5 +969,20 @@ private:
     LLPC_DISALLOW_DEFAULT_CTOR(BuilderImpl)
     LLPC_DISALLOW_COPY_AND_ASSIGN(BuilderImpl)
 };
+
+// Built-ins for fragment input interpolation (I/J)
+static const BuiltInKind BuiltInInterpPerspSample     = static_cast<BuiltInKind>(0x10000000);
+static const BuiltInKind BuiltInInterpPerspCenter     = static_cast<BuiltInKind>(0x10000001);
+static const BuiltInKind BuiltInInterpPerspCentroid   = static_cast<BuiltInKind>(0x10000002);
+static const BuiltInKind BuiltInInterpPullMode        = static_cast<BuiltInKind>(0x10000003);
+static const BuiltInKind BuiltInInterpLinearSample    = static_cast<BuiltInKind>(0x10000004);
+static const BuiltInKind BuiltInInterpLinearCenter    = static_cast<BuiltInKind>(0x10000005);
+static const BuiltInKind BuiltInInterpLinearCentroid  = static_cast<BuiltInKind>(0x10000006);
+
+// Built-ins for sample position emulation
+static const BuiltInKind BuiltInSamplePosOffset       = static_cast<BuiltInKind>(0x10000007);
+static const BuiltInKind BuiltInNumSamples            = static_cast<BuiltInKind>(0x10000008);
+static const BuiltInKind BuiltInSamplePatternIdx      = static_cast<BuiltInKind>(0x10000009);
+static const BuiltInKind BuiltInWaveId                = static_cast<BuiltInKind>(0x1000000A);
 
 } // Llpc

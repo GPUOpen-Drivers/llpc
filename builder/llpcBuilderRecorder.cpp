@@ -1483,7 +1483,7 @@ Instruction* BuilderRecorder::CreateWriteXfbOutput(
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in input value.
-// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 Value* BuilderRecorder::CreateReadBuiltInInput(
     BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
@@ -1518,7 +1518,7 @@ Value* BuilderRecorder::CreateReadBuiltInInput(
 
 // =====================================================================================================================
 // Create a read of (part of) a built-in output value.
-// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+// The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
 // or the element type if pIndex is not nullptr.
 Value* BuilderRecorder::CreateReadBuiltInOutput(
     BuiltInKind   builtIn,            // Built-in kind, one of the BuiltIn* constants
