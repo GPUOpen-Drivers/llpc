@@ -32,7 +32,6 @@
 
 #include "llvm/IR/InstVisitor.h"
 
-#include "SPIRVInternal.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatch.h"
 #include "llpcPipelineShaders.h"

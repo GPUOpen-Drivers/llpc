@@ -34,7 +34,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchPushConstOp.h"

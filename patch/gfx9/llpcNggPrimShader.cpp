@@ -28,7 +28,6 @@
  * @brief LLPC source file: contains implementation of class Llpc::NggPrimShader.
  ***********************************************************************************************************************
  */
-#include "SPIRVInternal.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"

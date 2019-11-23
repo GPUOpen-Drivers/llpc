@@ -58,7 +58,6 @@
 #include "llpcPatchCheckShaderCache.h"
 #include "llpcPipelineState.h"
 #include "llpcTargetInfo.h"
-#include "SPIRVInternal.h"
 
 #define DEBUG_TYPE "llpc-patch"
 

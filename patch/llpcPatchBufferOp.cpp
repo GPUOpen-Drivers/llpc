@@ -40,7 +40,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
-#include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchBufferOp.h"

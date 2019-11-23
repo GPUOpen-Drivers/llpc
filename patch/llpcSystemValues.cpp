@@ -32,7 +32,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "SPIRVInternal.h"
 #include "llpcPipelineState.h"
 #include "llpcSystemValues.h"
 #include "llpcTargetInfo.h"
