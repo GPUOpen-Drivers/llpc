@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-gfx6-config-builder"
 
-#include "SPIRVInternal.h"
 #include "llpcAbiMetadata.h"
 #include "llpcCodeGenManager.h"
 #include "llpcGfx6ConfigBuilder.h"

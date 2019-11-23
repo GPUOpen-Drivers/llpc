@@ -30,7 +30,6 @@
  */
 #define DEBUG_TYPE "llpc-gfx9-config-builder"
 
-#include "SPIRVInternal.h"
 #include "llpcCodeGenManager.h"
 #include "llpcElfReader.h"
 #include "llpcGfx9ConfigBuilder.h"

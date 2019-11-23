@@ -38,8 +38,6 @@
 #include "llpcPatchDescriptorLoad.h"
 #include "llpcTargetInfo.h"
 
-#include "SPIRVInternal.h"
-
 using namespace llvm;
 using namespace Llpc;
 
