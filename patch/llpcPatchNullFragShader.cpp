@@ -34,7 +34,6 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 
-#include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcGraphicsContext.h"
@@ -162,15 +161,25 @@ bool PatchNullFragShader::runOnModule(
     AddTypeMangling(m_pContext->VoidTy(), exportArgs, exportName);
     EmitCall(exportName, m_pContext->VoidTy(), exportArgs, NoAttrib, pInsertPos);
 
-    // Add SPIR-V execution model metadata to the function.
-    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), ExecutionModelFragment));
+    // Add execution model metadata to the function.
+    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(m_pContext->Int32Ty(), ShaderStageFragment));
     auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
-    pEntryPoint->addMetadata(gSPIRVMD::ExecutionModel, *pExecModelMetaNode);
+    pEntryPoint->addMetadata(LlpcName::ShaderStageMetadata, *pExecModelMetaNode);
 
     // Initialize shader info.
-    GraphicsContext* pGraphicsContext = static_cast<GraphicsContext*>(m_pContext->GetPipelineContext());
-    pGraphicsContext->InitShaderInfoForNullFs();
-    pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | (1U << ShaderStageFragment));
+    auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageFragment);
+    pPipelineState->SetShaderStageMask(pPipelineState->GetShaderStageMask() | ShaderStageToMask(ShaderStageFragment));
+
+    // Add usage info for dummy input
+    FsInterpInfo interpInfo = { 0, false, false, false };
+    pResUsage->builtInUsage.fs.smooth = true;
+    pResUsage->inOutUsage.inputLocMap[0] = InvalidValue;
+    pResUsage->inOutUsage.fs.interpInfo.push_back(interpInfo);
+
+    // Add usage info for dummy output
+    pResUsage->inOutUsage.fs.cbShaderMask = 0;
+    pResUsage->inOutUsage.fs.dummyExport = true;
+    pResUsage->inOutUsage.outputLocMap[0] = InvalidValue;
 
     return true;
 }
