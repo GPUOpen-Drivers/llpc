@@ -7250,7 +7250,7 @@ bool SPIRVToLLVM::transMetadata() {
           if ((BV->getOpCode() == OpSpecConstant ||
                 BV->getOpCode() == OpSpecConstantComposite) &&
               BV->hasDecorate(DecorationBuiltIn, 0, &BuiltIn)) {
-            if (BuiltIn == BuiltInWorkgroupSize) {
+            if (BuiltIn == spv::BuiltInWorkgroupSize) {
               // NOTE: Overwrite values of local sizes specified in execution
               // mode if the constant corresponding to gl_WorkGroupSize
               // exists. Take its value since gl_WorkGroupSize could be a

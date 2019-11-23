@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcIntrinsDefs.h"
 #include "llpcPatchResourceCollect.h"
@@ -758,43 +759,43 @@ void PatchResourceCollect::ClearInactiveInput()
         }
 
         if (builtInUsage.fs.baryCoordNoPersp &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPersp) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordNoPersp = false;
         }
 
         if (builtInUsage.fs.baryCoordNoPerspCentroid &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspCentroidAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspCentroid) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordNoPerspCentroid = false;
         }
 
         if (builtInUsage.fs.baryCoordNoPerspSample &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspSampleAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordNoPerspSample) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordNoPerspSample = false;
         }
 
         if (builtInUsage.fs.baryCoordSmooth &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmooth) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordSmooth = false;
         }
 
         if (builtInUsage.fs.baryCoordSmoothCentroid &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothCentroidAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothCentroid) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordSmoothCentroid = false;
         }
 
         if (builtInUsage.fs.baryCoordSmoothSample &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothSampleAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordSmoothSample) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordNoPerspSample = false;
         }
 
         if (builtInUsage.fs.baryCoordPullModel &&
-            (m_activeInputBuiltIns.find(BuiltInBaryCoordPullModelAMD) == m_activeInputBuiltIns.end()))
+            (m_activeInputBuiltIns.find(BuiltInBaryCoordPullModel) == m_activeInputBuiltIns.end()))
         {
             builtInUsage.fs.baryCoordPullModel = false;
         }
@@ -854,31 +855,31 @@ void PatchResourceCollect::ClearInactiveInput()
     }
 
     if (builtInUsage.common.subgroupEqMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupEqMaskKHR) == m_activeInputBuiltIns.end()))
+        (m_activeInputBuiltIns.find(BuiltInSubgroupEqMask) == m_activeInputBuiltIns.end()))
     {
         builtInUsage.common.subgroupEqMask = false;
     }
 
     if (builtInUsage.common.subgroupGeMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupGeMaskKHR) == m_activeInputBuiltIns.end()))
+        (m_activeInputBuiltIns.find(BuiltInSubgroupGeMask) == m_activeInputBuiltIns.end()))
     {
         builtInUsage.common.subgroupGeMask = false;
     }
 
     if (builtInUsage.common.subgroupGtMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupGtMaskKHR) == m_activeInputBuiltIns.end()))
+        (m_activeInputBuiltIns.find(BuiltInSubgroupGtMask) == m_activeInputBuiltIns.end()))
     {
         builtInUsage.common.subgroupGtMask = false;
     }
 
     if (builtInUsage.common.subgroupLeMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupLeMaskKHR) == m_activeInputBuiltIns.end()))
+        (m_activeInputBuiltIns.find(BuiltInSubgroupLeMask) == m_activeInputBuiltIns.end()))
     {
         builtInUsage.common.subgroupLeMask = false;
     }
 
     if (builtInUsage.common.subgroupLtMask &&
-        (m_activeInputBuiltIns.find(BuiltInSubgroupLtMaskKHR) == m_activeInputBuiltIns.end()))
+        (m_activeInputBuiltIns.find(BuiltInSubgroupLtMask) == m_activeInputBuiltIns.end()))
     {
         builtInUsage.common.subgroupLtMask = false;
     }
@@ -2173,10 +2174,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     {
         for (const auto& builtInMap : inOutUsage.builtInInputLocMap)
         {
-            const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
+            const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const uint32_t loc = builtInMap.second;
             LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Input:  builtin = "
-                          << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                          << BuilderImplInOut::GetBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
         }
         LLPC_OUTS("\n");
@@ -2186,21 +2187,21 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     {
         for (const auto& builtInMap : inOutUsage.builtInOutputLocMap)
         {
-            const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
+            const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const uint32_t loc = builtInMap.second;
 
             if (m_shaderStage == ShaderStageGeometry)
             {
                 LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
                     << ") Output: stream = " << inOutUsage.gs.rasterStream << " , "
-                    << "builtin = " << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                    << "builtin = " << BuilderImplInOut::GetBuiltInName(builtInId)
                     << "  =>  Mapped = " << loc << "\n");
             }
             else
             {
                 LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true)
                     << ") Output: builtin = "
-                    << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                    << BuilderImplInOut::GetBuiltInName(builtInId)
                     << "  =>  Mapped = " << loc << "\n");
             }
         }
@@ -2211,10 +2212,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     {
         for (const auto& builtInMap : inOutUsage.perPatchBuiltInInputLocMap)
         {
-            const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
+            const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const uint32_t loc = builtInMap.second;
             LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Input (per-patch):  builtin = "
-                          << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                          << BuilderImplInOut::GetBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
         }
         LLPC_OUTS("\n");
@@ -2224,10 +2225,10 @@ void PatchResourceCollect::MapBuiltInToGenericInOut()
     {
         for (const auto& builtInMap : inOutUsage.perPatchBuiltInOutputLocMap)
         {
-            const BuiltIn builtInId = static_cast<BuiltIn>(builtInMap.first);
+            const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
             const uint32_t loc = builtInMap.second;
             LLPC_OUTS("(" << GetShaderStageAbbreviation(m_shaderStage, true) << ") Output (per-patch): builtin = "
-                          << getNameMap(builtInId).map(builtInId).substr(strlen("BuiltIn"))
+                          << BuilderImplInOut::GetBuiltInName(builtInId)
                           << "  =>  Mapped = " << loc << "\n");
         }
         LLPC_OUTS("\n");

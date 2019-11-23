@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpc.h"
+#include "llpcBuilderBuiltIns.h"
 #include "llpcDebug.h"
 
 #include "llvm/IR/IRBuilder.h"
@@ -945,14 +946,6 @@ public:
         } data;
     };
 
-    // Define built-in kind enum.
-    enum BuiltInKind
-    {
-#define BUILTIN(name, number, out, in, type) BuiltIn ## name = number,
-#include "llpcBuilderBuiltIns.h"
-#undef BUILTIN
-    };
-
     // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
     // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
     // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of
@@ -1034,7 +1027,7 @@ public:
         InOutInfo     inOutInfo);         // Extra input/output info (shader-defined array length)
 
     // Create a read of (part of) a built-in input value.
-    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
     // or the element type if pIndex is not nullptr. For ClipDistance or CullDistance when pIndex is nullptr,
     // the array size is determined by inputInfo.GetArraySize().
     virtual Value* CreateReadBuiltInInput(
@@ -1045,7 +1038,7 @@ public:
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a read of (part of) a built-in output value.
-    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // The type of the returned value is the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
     // or the element type if pIndex is not nullptr.
     // This operation is only supported for TCS; other shader stages do not have per-vertex outputs, and
     // the frontend is expected to do its own cacheing of a written output if the shader wants to read it back again.
@@ -1057,7 +1050,7 @@ public:
         const Twine&  instName = "") = 0; // [in] Name to give instruction(s)
 
     // Create a write of (part of) a built-in output value.
-    // The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltIns.h),
+    // The type of the value to write must be the fixed type of the specified built-in (see llpcBuilderBuiltInDefs.h),
     // or the element type if pIndex is not nullptr.
     virtual Instruction* CreateWriteBuiltInOutput(
         Value*        pValueToWrite,      // [in] Value to write

@@ -40,7 +40,6 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
-#include "spirvExt.h"
 #include "llpcCodeGenManager.h"
 #include "llpcContext.h"
 #include "llpcElfReader.h"

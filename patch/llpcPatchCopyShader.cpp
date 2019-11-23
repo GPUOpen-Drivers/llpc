@@ -35,6 +35,7 @@
 #include "llvm/IR/IRBuilder.h"
 
 #include "SPIRVInternal.h"
+#include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcIntrinsDefs.h"
@@ -81,7 +82,7 @@ private:
     Value* LoadGsVsRingBufferDescriptor(IRBuilder<>& builder);
 
     void ExportGenericOutput(Value* pOutputValue, uint32_t location, uint32_t streamId, IRBuilder<>& builder);
-    void ExportBuiltInOutput(Value* pOutputValue, spv::BuiltIn builtInId, uint32_t streamId, IRBuilder<>& builder);
+    void ExportBuiltInOutput(Value* pOutputValue, BuiltInKind builtInId, uint32_t streamId, IRBuilder<>& builder);
 
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -381,7 +382,7 @@ void PatchCopyShader::ExportOutput(
     }
 
     // Export built-in outputs
-    std::vector<std::pair<BuiltIn, Type*>> builtInPairs;
+    std::vector<std::pair<BuiltInKind, Type*>> builtInPairs;
 
     if (builtInUsage.position)
     {
@@ -691,7 +692,7 @@ void PatchCopyShader::ExportGenericOutput(
 // Exports built-in outputs of geometry shader, inserting output-export calls.
 void PatchCopyShader::ExportBuiltInOutput(
     Value*       pOutputValue,  // [in] Value exported to output
-    BuiltIn      builtInId,     // ID of the built-in variable
+    BuiltInKind  builtInId,     // ID of the built-in variable
     uint32_t     streamId,      // ID of output vertex stream
     IRBuilder<>& builder)       // [in] IRBuilder to use for instruction constructing
 {
@@ -726,11 +727,11 @@ void PatchCopyShader::ExportBuiltInOutput(
 
     if (pResUsage->inOutUsage.gs.rasterStream == streamId)
     {
-        std::string builtInName = getNameMap(builtInId).map(builtInId);
-        LLPC_ASSERT(builtInName.find("BuiltIn") == 0);
-        std::string instName(LlpcName::OutputExportBuiltIn);
-        instName += builtInName.substr(strlen("BuiltIn"));
-        EmitCall(instName, builder.getVoidTy(), { builder.getInt32(builtInId), pOutputValue }, NoAttrib, builder);
+        std::string callName = LlpcName::OutputExportBuiltIn;
+        callName += BuilderImplInOut::GetBuiltInName(builtInId);
+        Value* args[] = { builder.getInt32(builtInId), pOutputValue };
+        AddTypeMangling(nullptr, args, callName);
+        EmitCall(callName, builder.getVoidTy(), args, NoAttrib, builder);
     }
 }
 
