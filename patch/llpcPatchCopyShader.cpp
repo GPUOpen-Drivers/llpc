@@ -35,7 +35,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
-#include "SPIRVInternal.h"
 #include "llpcBuilderImpl.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
@@ -285,10 +284,11 @@ bool PatchCopyShader::runOnModule(
         builder.CreateBr(pEndBlock);
     }
 
-    // Add SPIR-V execution model metadata to the function.
-    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(builder.getInt32Ty(), ExecutionModelCopyShader));
+    // Add execution model metadata to the function.
+    auto pExecModelMeta = ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                  ShaderStageCopyShader));
     auto pExecModelMetaNode = MDNode::get(*m_pContext, pExecModelMeta);
-    pEntryPoint->addMetadata(gSPIRVMD::ExecutionModel, *pExecModelMetaNode);
+    pEntryPoint->addMetadata(LlpcName::ShaderStageMetadata, *pExecModelMetaNode);
 
     // Tell pipeline state there is a copy shader.
     m_pPipelineState->SetShaderStageMask(m_pPipelineState->GetShaderStageMask() | (1U << ShaderStageCopyShader));

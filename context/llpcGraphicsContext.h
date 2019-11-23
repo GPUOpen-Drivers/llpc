@@ -69,8 +69,6 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
-    void InitShaderInfoForNullFs();
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(GraphicsContext);
     LLPC_DISALLOW_COPY_AND_ASSIGN(GraphicsContext);
