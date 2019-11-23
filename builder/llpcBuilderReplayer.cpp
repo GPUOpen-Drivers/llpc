@@ -691,7 +691,7 @@ Value* BuilderReplayer::ProcessCall(
     // Replayer implementations of BuilderImplInOut methods
     case BuilderRecorder::Opcode::ReadGenericInput:
         {
-            Builder::InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
+            InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
             return m_pBuilder->CreateReadGenericInput(
                                                pCall->getType(),                                // Result type
                                                cast<ConstantInt>(args[0])->getZExtValue(),      // Location
@@ -704,7 +704,7 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::ReadGenericOutput:
         {
-            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[4])->getZExtValue());
+            InOutInfo outputInfo(cast<ConstantInt>(args[4])->getZExtValue());
             return m_pBuilder->CreateReadGenericOutput(
                                                 pCall->getType(),                               // Result type
                                                 cast<ConstantInt>(args[0])->getZExtValue(),     // Location
@@ -717,7 +717,7 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::WriteGenericOutput:
         {
-            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[5])->getZExtValue());
+            InOutInfo outputInfo(cast<ConstantInt>(args[5])->getZExtValue());
             return m_pBuilder->CreateWriteGenericOutput(
                                                  args[0],                                         // Value to write
                                                  cast<ConstantInt>(args[1])->getZExtValue(),      // Location
@@ -730,7 +730,7 @@ Value* BuilderReplayer::ProcessCall(
 
     case BuilderRecorder::Opcode::WriteXfbOutput:
         {
-            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[6])->getZExtValue());
+            InOutInfo outputInfo(cast<ConstantInt>(args[6])->getZExtValue());
             return m_pBuilder->CreateWriteXfbOutput(args[0],                                    // Value to write
                                                     cast<ConstantInt>(args[1])->getZExtValue(), // IsBuiltIn
                                                     cast<ConstantInt>(args[2])->getZExtValue(), // Location/builtIn
@@ -743,7 +743,7 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::ReadBuiltInInput:
         {
             auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
-            Builder::InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
+            InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
             return m_pBuilder->CreateReadBuiltInInput(builtIn,                                         // BuiltIn
                                                       inputInfo,                                       // Input info
                                                       isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
@@ -753,7 +753,7 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::ReadBuiltInOutput:
         {
             auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
-            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[1])->getZExtValue());
+            InOutInfo outputInfo(cast<ConstantInt>(args[1])->getZExtValue());
             return m_pBuilder->CreateReadBuiltInOutput(builtIn,                                         // BuiltIn
                                                        outputInfo,                                      // Output info
                                                        isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
@@ -763,7 +763,7 @@ Value* BuilderReplayer::ProcessCall(
     case BuilderRecorder::Opcode::WriteBuiltInOutput:
         {
             auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[1])->getZExtValue());
-            Builder::InOutInfo outputInfo(cast<ConstantInt>(args[2])->getZExtValue());
+            InOutInfo outputInfo(cast<ConstantInt>(args[2])->getZExtValue());
             return m_pBuilder->CreateWriteBuiltInOutput(
                                                   args[0],                                          // Val to write
                                                   builtIn,                                          // BuiltIn

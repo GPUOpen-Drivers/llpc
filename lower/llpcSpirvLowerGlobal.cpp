@@ -1219,7 +1219,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             else
             {
                 // Array built-in without vertex indexing (ClipDistance/CullDistance).
-                Builder::InOutInfo inOutInfo;
+                InOutInfo inOutInfo;
                 inOutInfo.SetArraySize(pInOutTy->getArrayNumElements());
                 m_pBuilder->SetInsertPoint(pInsertPos);
                 if (addrSpace == SPIRAS_Input)
@@ -1341,7 +1341,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             pElemIdx = (pElemIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pElemIdx;
             pVertexIdx = (pVertexIdx == m_pBuilder->getInt32(InvalidValue)) ? nullptr : pVertexIdx;
 
-            Builder::InOutInfo inOutInfo;
+            InOutInfo inOutInfo;
             inOutInfo.SetArraySize(maxLocOffset);
             if (addrSpace == SPIRAS_Input)
             {
@@ -1383,7 +1383,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
                                                m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
 
-            Builder::InOutInfo inOutInfo;
+            InOutInfo inOutInfo;
             if (pLocOffset == nullptr)
             {
                 pLocOffset = m_pBuilder->getInt32(0);
@@ -1479,7 +1479,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
             LLPC_ASSERT((m_shaderStage != ShaderStageGeometry) || (emitStreamId == outputMeta.StreamId));
 
             auto builtInId = static_cast<BuiltInKind>(outputMeta.Value);
-            Builder::InOutInfo outputInfo;
+            InOutInfo outputInfo;
             if (emitStreamId != InvalidValue)
             {
                 outputInfo.SetStreamId(emitStreamId);
@@ -1623,7 +1623,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
 
         LLPC_ASSERT(outputMeta.IsLoc || outputMeta.IsBuiltIn);
 
-        Builder::InOutInfo outputInfo;
+        InOutInfo outputInfo;
         if (emitStreamId != InvalidValue)
         {
             outputInfo.SetStreamId(emitStreamId);

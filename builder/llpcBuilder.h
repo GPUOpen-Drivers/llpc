@@ -56,6 +56,79 @@ class Context;
 class PipelineState;
 
 // =====================================================================================================================
+// Class that represents extra information on an input or output.
+// For an FS input, if HasInterpAux(), then CreateReadInput's pVertexIndex is actually an auxiliary value
+// for interpolation:
+//  - InterpLocCenter: auxiliary value is v2f32 offset from center of pixel
+//  - InterpLocSample: auxiliary value is i32 sample ID
+//  - InterpLocExplicit: auxiliary value is i32 vertex number
+class InOutInfo
+{
+public:
+    // Interpolation mode
+    enum
+    {
+        InterpModeSmooth   = 0,   // Smooth (perspective)
+        InterpModeFlat     = 1,   // Flat
+        InterpModeNoPersp  = 2,   // Linear (no perspective)
+        InterpModeCustom   = 3,   // Custom
+    };
+    enum
+    {
+        InterpLocUnknown   = 0,   // Unknown
+        InterpLocCenter    = 1,   // Center
+        InterpLocCentroid  = 2,   // Centroid
+        InterpLocSample    = 3,   // Sample
+        InterpLocExplicit  = 4,   // Mode must be InterpModeCustom
+    };
+
+    InOutInfo() { data.u32All = 0; }
+    InOutInfo(uint32_t data) { this->data.u32All = data; }
+    InOutInfo(const InOutInfo& inOutInfo) { data.u32All = inOutInfo.GetData(); }
+
+    uint32_t GetData() const { return data.u32All; }
+
+    uint32_t GetInterpMode() const { return data.bits.interpMode; }
+    void SetInterpMode(uint32_t mode) { data.bits.interpMode = mode; }
+
+    uint32_t GetInterpLoc() const { return data.bits.interpLoc; }
+    void SetInterpLoc(uint32_t loc) { data.bits.interpLoc = loc; }
+
+    bool HasInterpAux() const { return data.bits.hasInterpAux; }
+    void SetHasInterpAux(bool hasInterpAux = true) { data.bits.hasInterpAux = hasInterpAux; }
+
+    bool HasStreamId() const { return data.bits.hasStreamId; }
+    uint32_t GetStreamId() const { return data.bits.streamId; }
+    void SetStreamId(uint32_t streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
+
+    bool IsSigned() const { return data.bits.isSigned; }
+    void SetIsSigned(bool isSigned = true) { data.bits.isSigned = isSigned; }
+
+    uint32_t GetArraySize() const { return data.bits.arraySize; }
+    void SetArraySize(uint32_t arraySize) { data.bits.arraySize = arraySize; }
+
+private:
+    union
+    {
+        struct
+        {
+            unsigned interpMode   : 4;  // FS input: interpolation mode
+            unsigned interpLoc    : 3;  // FS input: interpolation location
+            unsigned hasInterpAux : 1;  // FS input: there is an interpolation auxiliary value
+            unsigned streamId     : 2;  // GS output: vertex stream ID (0 if none)
+            unsigned hasStreamId  : 1;  // GS output: true if it has a stream ID
+            unsigned isSigned     : 1;  // FS output: is signed integer. Determines whether i16-component output
+                                        //    is zero- or sign-extended
+            unsigned arraySize    : 4;  // Built-in array input: shader-defined array size. Must be set for
+                                        //    a read or write of ClipDistance or CullDistance that is of the
+                                        //    whole array or of an element with a variable index.
+        }
+        bits;
+        uint32_t  u32All;
+    } data;
+};
+
+// =====================================================================================================================
 // Initialize the pass that gets created by a Builder
 inline static void InitializeBuilderPasses(
     PassRegistry& passRegistry)   // Pass registry
@@ -873,78 +946,6 @@ public:
 
     // -----------------------------------------------------------------------------------------------------------------
     // Shader input/output methods
-
-    // Class that represents extra information on an input or output.
-    // For an FS input, if HasInterpAux(), then CreateReadInput's pVertexIndex is actually an auxiliary value
-    // for interpolation:
-    //  - InterpLocCenter: auxiliary value is v2f32 offset from center of pixel
-    //  - InterpLocSample: auxiliary value is i32 sample ID
-    //  - InterpLocExplicit: auxiliary value is i32 vertex number
-    class InOutInfo
-    {
-    public:
-        // Interpolation mode
-        enum
-        {
-            InterpModeSmooth   = 0,   // Smooth (perspective)
-            InterpModeFlat     = 1,   // Flat
-            InterpModeNoPersp  = 2,   // Linear (no perspective)
-            InterpModeCustom   = 3,   // Custom
-        };
-        enum
-        {
-            InterpLocUnknown   = 0,   // Unknown
-            InterpLocCenter    = 1,   // Center
-            InterpLocCentroid  = 2,   // Centroid
-            InterpLocSample    = 3,   // Sample
-            InterpLocExplicit  = 4,   // Mode must be InterpModeCustom
-        };
-
-        InOutInfo() { data.u32All = 0; }
-        InOutInfo(uint32_t data) { this->data.u32All = data; }
-        InOutInfo(const InOutInfo& inOutInfo) { data.u32All = inOutInfo.GetData(); }
-
-        uint32_t GetData() const { return data.u32All; }
-
-        uint32_t GetInterpMode() const { return data.bits.interpMode; }
-        void SetInterpMode(uint32_t mode) { data.bits.interpMode = mode; }
-
-        uint32_t GetInterpLoc() const { return data.bits.interpLoc; }
-        void SetInterpLoc(uint32_t loc) { data.bits.interpLoc = loc; }
-
-        bool HasInterpAux() const { return data.bits.hasInterpAux; }
-        void SetHasInterpAux(bool hasInterpAux = true) { data.bits.hasInterpAux = hasInterpAux; }
-
-        bool HasStreamId() const { return data.bits.hasStreamId; }
-        uint32_t GetStreamId() const { return data.bits.streamId; }
-        void SetStreamId(uint32_t streamId) { data.bits.hasStreamId = true; data.bits.streamId = streamId; }
-
-        bool IsSigned() const { return data.bits.isSigned; }
-        void SetIsSigned(bool isSigned = true) { data.bits.isSigned = isSigned; }
-
-        uint32_t GetArraySize() const { return data.bits.arraySize; }
-        void SetArraySize(uint32_t arraySize) { data.bits.arraySize = arraySize; }
-
-    private:
-        union
-        {
-            struct
-            {
-                unsigned interpMode   : 4;  // FS input: interpolation mode
-                unsigned interpLoc    : 3;  // FS input: interpolation location
-                unsigned hasInterpAux : 1;  // FS input: there is an interpolation auxiliary value
-                unsigned streamId     : 2;  // GS output: vertex stream ID (0 if none)
-                unsigned hasStreamId  : 1;  // GS output: true if it has a stream ID
-                unsigned isSigned     : 1;  // FS output: is signed integer. Determines whether i16-component output
-                                            //    is zero- or sign-extended
-                unsigned arraySize    : 4;  // Built-in array input: shader-defined array size. Must be set for
-                                            //    a read or write of ClipDistance or CullDistance that is of the
-                                            //    whole array or of an element with a variable index.
-            }
-            bits;
-            uint32_t  u32All;
-        } data;
-    };
 
     // Create a read of (part of) a generic (user) input value, passed from the previous shader stage.
     // The result type is as specified by pResultTy, a scalar or vector type with no more than four elements.
