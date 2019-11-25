@@ -117,7 +117,7 @@ cl::opt<bool> SPIRVWorkaroundBadSPIRV("spirv-workaround-bad-spirv",
 const char *KPlaceholderPrefix = "placeholder.";
 
 // Prefix for row major matrix helpers.
-static const char* const SpirvLaunderRowMajor = "spirv.launder.row_major";
+static const char SpirvLaunderRowMajor[] = "spirv.launder.row_major";
 
 static const SPIRVWord SPV_VERSION_1_0 = 0x00010000;
 

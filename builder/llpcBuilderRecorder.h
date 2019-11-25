@@ -41,10 +41,10 @@ namespace Llpc
 using namespace llvm;
 
 // Prefix of all recorded calls.
-static const char* const BuilderCallPrefix = "llpc.call.";
+static const char BuilderCallPrefix[] = "llpc.call.";
 
 // LLPC call opcode metadata name.
-static const char* const BuilderCallOpcodeMetadataName = "llpc.call.opcode";
+static const char BuilderCallOpcodeMetadataName[] = "llpc.call.opcode";
 
 // =====================================================================================================================
 // A class that caches the metadata kind IDs used by BuilderRecorder and BuilderReplayer.

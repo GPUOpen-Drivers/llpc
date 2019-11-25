@@ -41,7 +41,7 @@ using namespace Llpc;
 using namespace llvm;
 
 // User data nodes metadata name prefix
-static const char* const BuilderUserDataMetadataName = "llpc.user.data.nodes";
+static const char BuilderUserDataMetadataName[] = "llpc.user.data.nodes";
 
 // =====================================================================================================================
 // Set the resource mapping nodes for the pipeline.
