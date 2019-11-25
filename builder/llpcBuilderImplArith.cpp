@@ -318,12 +318,12 @@ Value* BuilderImplArith::CreateASin(
         pX = CreateFPExt(pX, pExtTy);
     }
 
-    // asin coefficient p0 = 0.08656672
-    auto pCoefP0 = GetFpConstant(pX->getType(), APFloat(APFloat::IEEEdouble(), APInt(64, 0x3FB6293CA0000000)));
-    // asin coefficient p1 = -0.03102955
-    auto pCoefP1 = GetFpConstant(pX->getType(), APFloat(APFloat::IEEEdouble(), APInt(64, 0xBF9FC635E0000000)));
-
-    Value* pResult = ASinACosCommon(pX, pCoefP0, pCoefP1);
+    // atan2(x, y), y = sqrt(1 - x * x)
+    Value* pY = CreateFMul(pX, pX);
+    Value* pOne = ConstantFP::get(pX->getType(), 1.0);
+    pY = CreateFSub(pOne , pY);
+    pY = CreateUnaryIntrinsic(Intrinsic::sqrt, pY);
+    Value* pResult = CreateATan2(pX, pY);
 
     pResult = CreateFPTrunc(pResult, pOrigTy);
     pResult->setName(instName);
