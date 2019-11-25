@@ -105,7 +105,7 @@ private:
                         uint32_t     compIdx,
                         uint32_t     streamId,
                         llvm::Value* pThreadIdInWave,
-                        llvm::Value* pEmitCounter);
+                        llvm::Value* pOutVertCounter);
 
     llvm::Value* ImportGsOutput(llvm::Type*  pOutputTy,
                                 uint32_t     location,
@@ -185,7 +185,7 @@ private:
     llvm::Function* CreateFetchCullingRegister(llvm::Module* pModule);
 
     llvm::Value* DoSubgroupBallot(llvm::Value* pValue);
-    llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue);
+    llvm::Value* DoSubgroupInclusiveAdd(llvm::Value* pValue, llvm::Value** ppWwmResult = nullptr);
     llvm::Value* DoDppUpdate(llvm::Value* pOldValue,
                              llvm::Value* pSrcValue,
                              uint32_t     dppCtrl,

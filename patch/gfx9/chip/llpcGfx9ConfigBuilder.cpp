@@ -2285,7 +2285,31 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
     VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = POINTLIST;
-    if (hasTs)
+    if (hasGs)
+    {
+        // GS present
+        if (gsInOutUsage.outputMapLocCount == 0)
+        {
+            gsOutputPrimitiveType = POINTLIST;
+        }
+        else if (gsBuiltInUsage.outputPrimitive == OutputPoints)
+        {
+            gsOutputPrimitiveType = POINTLIST;
+        }
+        else if (gsBuiltInUsage.outputPrimitive == OutputLineStrip)
+        {
+            gsOutputPrimitiveType = LINESTRIP;
+        }
+        else if (gsBuiltInUsage.outputPrimitive == OutputTriangleStrip)
+        {
+            gsOutputPrimitiveType = TRISTRIP;
+        }
+        else
+        {
+            LLPC_NEVER_CALLED();
+        }
+    }
+    else if (hasTs)
     {
         // With tessellation
         if (tesBuiltInUsage.pointMode)
