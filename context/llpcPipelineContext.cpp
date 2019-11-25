@@ -103,6 +103,8 @@ const char* PipelineContext::GetGpuNameString(
         { { 10, 1, 0xFFFF }, "gfx101F" },
         { { 10, 1, 0xFFFE }, "gfx101E" },
         { { 10, 1, 0 }, "gfx1010" },  // [10.1.0] gfx1010
+        { { 10, 1, 0xFFFD}, "gfx101D" },
+        { { 10, 1, 2 }, "gfx1012" },  // [10.1.2] gfx1012, navi14
 #endif
     };
 

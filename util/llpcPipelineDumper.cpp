@@ -520,7 +520,6 @@ void PipelineDumper::DumpResourceMappingNode(
 // =====================================================================================================================
 // Dumps pipeline shader info to file.
 void PipelineDumper::DumpPipelineShaderInfo(
-    ShaderStage               stage,       // Shader stage
     const PipelineShaderInfo* pShaderInfo, // [in] Shader info of specified shader stage
     std::ostream&             dumpFile)    // [out] dump file
 {
@@ -529,10 +528,9 @@ void PipelineDumper::DumpPipelineShaderInfo(
 
     // Output shader binary file
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
-    if (stage == ShaderStageInvalid)
-    {
-        stage = pShaderInfo->entryStage;
-    }
+    ShaderStage stage = pShaderInfo->entryStage;
+#else
+    ShaderStage stage = ShaderStageInvalid;
 #endif
 
     dumpFile << "[" << GetShaderStageAbbreviation(stage) << "SpvFile]\n";
@@ -767,7 +765,7 @@ void PipelineDumper::DumpComputePipelineInfo(
     DumpVersionInfo(*pDumpFile);
 
     // Output shader info
-    DumpPipelineShaderInfo(ShaderStageCompute, &pPipelineInfo->cs, *pDumpFile);
+    DumpPipelineShaderInfo(&pPipelineInfo->cs, *pDumpFile);
     DumpComputeStateInfo(pPipelineInfo, *pDumpFile);
 
     pDumpFile->flush();
@@ -895,7 +893,7 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
         {
             continue;
         }
-        DumpPipelineShaderInfo(static_cast<ShaderStage>(stage), pShaderInfo, *pDumpFile);
+        DumpPipelineShaderInfo(pShaderInfo, *pDumpFile);
     }
 
     DumpGraphicsStateInfo(pPipelineInfo, *pDumpFile);

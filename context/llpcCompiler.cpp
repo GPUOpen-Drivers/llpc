@@ -640,7 +640,9 @@ Result Compiler::BuildShaderModule(
                     // SPIR-V translation, then dump the result.
                     PipelineShaderInfo shaderInfo = {};
                     shaderInfo.pModuleData = &moduleDataEx.common;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
                     shaderInfo.entryStage = entryNames[i].stage;
+#endif
                     shaderInfo.pEntryTarget = entryNames[i].pName;
                     lowerPassMgr.add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
@@ -858,7 +860,10 @@ Result Compiler::BuildPipelineInternal(
                 {
                     auto pEntryData = &pModuleDataEx->extra.entryDatas[i];
                     auto pShaderEntry = reinterpret_cast<ShaderModuleEntry*>(pEntryData->pShaderEntry);
-                    if ((pEntryData->stage == pShaderInfo->entryStage) &&
+                    if (
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+			(pEntryData->stage == pShaderInfo->entryStage) &&
+#endif
                         (memcmp(pShaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
                     {
                         // LLVM bitcode
@@ -890,7 +895,10 @@ Result Compiler::BuildPipelineInternal(
             }
             else
             {
-                pModule = new Module((Twine("llpc") + GetShaderStageName(pShaderInfo->entryStage)).str() +
+                pModule = new Module((Twine("llpc") +
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+                                     GetShaderStageName(pShaderInfo->entryStage)).str() +
+#endif
                                      std::to_string(GetModuleIdByIndex(shaderIndex)), *pContext);
             }
 
@@ -905,9 +913,14 @@ Result Compiler::BuildPipelineInternal(
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+            ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
+#else
+            ShaderStage entryStage = ShaderStageInvalid;
+#endif
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
-                (stageSkipMask & ShaderStageToMask(pShaderInfo->entryStage)))
+                (stageSkipMask & ShaderStageToMask(entryStage)))
             {
                 continue;
             }
@@ -915,13 +928,13 @@ Result Compiler::BuildPipelineInternal(
             PassManager lowerPassMgr(&passIndex);
 
             // Set the shader stage in the Builder.
-            pContext->GetBuilder()->SetShaderStage(pShaderInfo->entryStage);
+            pContext->GetBuilder()->SetShaderStage(entryStage);
 
             // Start timer for translate.
             timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, true);
 
             // SPIR-V translation, then dump the result.
-            lowerPassMgr.add(CreateSpirvLowerTranslator(pShaderInfo->entryStage, pShaderInfo));
+            lowerPassMgr.add(CreateSpirvLowerTranslator(entryStage, pShaderInfo));
             if (EnableOuts())
             {
                 lowerPassMgr.add(createPrintModulePass(outs(), "\n"
@@ -947,18 +960,23 @@ Result Compiler::BuildPipelineInternal(
         {
             // Per-shader SPIR-V lowering passes.
             const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+            ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
+#else
+            ShaderStage entryStage = ShaderStageInvalid;
+#endif
             if ((pShaderInfo == nullptr) ||
                 (pShaderInfo->pModuleData == nullptr) ||
-                (stageSkipMask & ShaderStageToMask(pShaderInfo->entryStage)))
+                (stageSkipMask & ShaderStageToMask(entryStage)))
             {
                 continue;
             }
 
-            pContext->GetBuilder()->SetShaderStage(pShaderInfo->entryStage);
+            pContext->GetBuilder()->SetShaderStage(entryStage);
             PassManager lowerPassMgr(&passIndex);
 
             SpirvLower::AddPasses(pContext,
-                                  pShaderInfo->entryStage,
+                                  entryStage,
                                   lowerPassMgr,
                                   timerProfiler.GetTimer(TimerLower),
                                   forceLoopUnrollCount);
@@ -1349,7 +1367,7 @@ Result Compiler::BuildGraphicsPipeline(
 
     for (uint32_t i = 0; (i < ShaderStageGfxCount) && (result == Result::Success); ++i)
     {
-        result = ValidatePipelineShaderInfo(static_cast<ShaderStage>(i), shaderInfo[i]);
+        result = ValidatePipelineShaderInfo(shaderInfo[i]);
     }
 
     MetroHash::Hash cacheHash = {};
@@ -1497,7 +1515,7 @@ Result Compiler::BuildComputePipeline(
     const_cast<ComputePipelineBuildInfo*>(pPipelineInfo)->cs.entryStage = ShaderStageCompute;
 #endif
 
-    Result result = ValidatePipelineShaderInfo(ShaderStageCompute, &pPipelineInfo->cs);
+    Result result = ValidatePipelineShaderInfo(&pPipelineInfo->cs);
 
     MetroHash::Hash cacheHash = {};
     MetroHash::Hash pipelineHash = {};
@@ -1659,11 +1677,16 @@ MetroHash::Hash Compiler::GenerateHashForCompileOptions(
 // =====================================================================================================================
 // Checks whether fields in pipeline shader info are valid.
 Result Compiler::ValidatePipelineShaderInfo(
-    ShaderStage               shaderStage,    // Shader stage
     const PipelineShaderInfo* pShaderInfo     // [in] Pipeline shader info
     ) const
 {
     Result result = Result::Success;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
+    ShaderStage shaderStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
+#else
+    ShaderStage shaderStage = ShaderStageInvalid;
+#endif
+
     const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
     if (pModuleData != nullptr)
     {
@@ -1974,6 +1997,19 @@ void Compiler::InitGpuWorkaround()
                     m_gpuWorkarounds.gfx10.waThrottleInMultiDwordNsa = 1;
                     m_gpuWorkarounds.gfx10.waNggCullingNoEmptySubgroups = 1;
                 }
+                break;
+            case 2:
+                m_gpuWorkarounds.gfx10.waShaderInstPrefetch0      = 1;
+                m_gpuWorkarounds.gfx10.waDidtThrottleVmem         = 1;
+                m_gpuWorkarounds.gfx10.waLdsVmemNotWaitingVmVsrc  = 1;
+                m_gpuWorkarounds.gfx10.waNsaCannotFollowWritelane = 1;
+                m_gpuWorkarounds.gfx10.waNsaAndClauseCanHang      = 1;
+                m_gpuWorkarounds.gfx10.waThrottleInMultiDwordNsa  = 1;
+                m_gpuWorkarounds.gfx10.waSmemFollowedByVopc       = 1;
+                m_gpuWorkarounds.gfx10.waNggCullingNoEmptySubgroups = 1;
+                m_gpuWorkarounds.gfx10.waShaderInstPrefetchFwd64  = 1;
+                m_gpuWorkarounds.gfx10.waWarFpAtomicDenormHazard  = 1;
+                m_gpuWorkarounds.gfx10.waNggDisabled              = 1;
                 break;
             default:
                 LLPC_NEVER_CALLED();

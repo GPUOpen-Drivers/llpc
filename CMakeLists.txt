@@ -38,6 +38,7 @@ option(LLPC_BUILD_RAVEN2   "LLPC support for Raven2?"   ON)
 option(LLPC_BUILD_LIT      "LLPC build lit test"        OFF)
 #if VKI_BUILD_GFX10
 option(LLPC_BUILD_GFX10   "LLPC support for GFX10?"   OFF)
+option(LLPC_BUILD_NAVI14   "LLPC support for NAVI14?"   OFF)
 #endif
 # None
 
@@ -182,6 +183,12 @@ if(LLPC_BUILD_GFX10)
       PAL_BUILD_GFX9=1
       PAL_BUILD_GFX10=1
   )
+  if(LLPC_BUILD_NAVI14)
+    target_compile_definitions(llpc PRIVATE
+        LLPC_BUILD_NAVI14=1
+        CHIP_HDR_NAVI14=1
+    )
+  endif()
 endif()
 #endif
 

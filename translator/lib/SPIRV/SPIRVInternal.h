@@ -1193,7 +1193,7 @@ union ShaderInOutMetadata {
     uint64_t XfbStride          : 16; // Transform feedback stride
     // BYTE 8~9
     uint64_t IsBlockArray       : 1;  // Whether we are handling block array
-    uint64_t XfbArrayStride     : 15; // Transform feedback array stride (for
+    uint64_t XfbArrayStride     : 16; // Transform feedback array stride (for
                                       //   block array, it's flatten dimension
                                       //   of an element (1 if element is not
                                       //   sub-array; for non block array, it's
