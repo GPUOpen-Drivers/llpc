@@ -1190,13 +1190,15 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
         INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
 #endif
+        INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollThreshold, MemberTypeInt, false);
+
         VFX_ASSERT(pTableItem - &m_addrTable[0] <= MemberCount);
     }
 
     void GetSubState(SubState& state) { state = m_state; };
 
 private:
-    static const uint32_t  MemberCount = 15;
+    static const uint32_t  MemberCount = 16;
     static StrToMemberAddr m_addrTable[MemberCount];
 
     SubState               m_state;
