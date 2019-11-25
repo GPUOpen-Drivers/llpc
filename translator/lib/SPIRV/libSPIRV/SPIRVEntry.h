@@ -49,6 +49,8 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace SPIRV {
@@ -322,8 +324,18 @@ public:
 protected:
   /// An entry may have multiple FuncParamAttr decorations.
   typedef std::multimap<Decoration, const SPIRVDecorate *> DecorateMapType;
-  typedef std::map<std::pair<SPIRVWord, Decoration>,
-                   const SPIRVMemberDecorate *>
+
+  struct DectorateKeyHash {
+    using DecorationInt = std::underlying_type<Decoration>::type;
+    std::hash<SPIRVWord> wordHash;
+    std::hash<DecorationInt> decorationHash;
+    size_t operator()(const std::pair<SPIRVWord, Decoration>& key) const {
+      return wordHash(key.first) ^
+             decorationHash(static_cast<DecorationInt>(key.second));
+    }
+  };
+  typedef std::unordered_map<std::pair<SPIRVWord, Decoration>,
+                             const SPIRVMemberDecorate *, DectorateKeyHash>
       MemberDecorateMapType;
 
   bool canHaveMemberDecorates() const {

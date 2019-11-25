@@ -480,6 +480,7 @@ private:
   std::map<std::string, uint32_t> MangleNameToIndex;
   RemappedTypeElementsMap RemappedTypeElements;
   DenseMap<Type *, bool> TypesWithPadMap;
+  DenseMap<Type*, uint64_t> TypeToStoreSize;
   DenseMap<std::pair<SPIRVType*, uint32_t>, Type *> OverlappingStructTypeWorkaroundMap;
   DenseMap<std::pair<BasicBlock*, BasicBlock*>, unsigned> BlockPredecessorToCount;
   const ShaderModuleUsage* ModuleUsage;
@@ -526,6 +527,19 @@ private:
 
   bool isTypeWithPadRowMajorMatrix(Type* const T) const {
     return TypesWithPadMap.lookup(T);
+  }
+
+  // Returns a cached type store size. If there is no entry for the given type,
+  // its store size is calculated and added to the cache.
+  uint64_t getTypeStoreSize(Type* const T) {
+    auto it = TypeToStoreSize.find(T);
+    if (it != TypeToStoreSize.end()) {
+      return it->second;
+    }
+
+    const uint64_t calculatedSize = M->getDataLayout().getTypeStoreSize(T);
+    TypeToStoreSize[T] = calculatedSize;
+    return calculatedSize;
   }
 
   // If a value is mapped twice, the existing mapped value is a placeholder,
@@ -712,7 +726,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(
     const bool hasArrayStride = pSpvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
     LLPC_ASSERT(hasArrayStride ^ (arrayStride == 0));
 
-    const uint64_t storeSize = M->getDataLayout().getTypeStoreSize(pElementType);
+    const uint64_t storeSize = getTypeStoreSize(pElementType);
 
     bool paddedArray = false;
 
@@ -849,7 +863,7 @@ template<> Type* SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(
 
         memberTypes.push_back(pColumnType);
 
-        const uint64_t storeSize = M->getDataLayout().getTypeStoreSize(pColumnType);
+        const uint64_t storeSize = getTypeStoreSize(pColumnType);
         LLPC_ASSERT(matrixStride >= storeSize);
 
         const uint32_t padding = static_cast<uint32_t>(matrixStride - storeSize);
@@ -976,7 +990,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(
     LLPC_ASSERT(hasArrayStride ^ (arrayStride == 0));
     LLPC_UNUSED(hasArrayStride);
 
-    const uint64_t storeSize = M->getDataLayout().getTypeStoreSize(pElementType);
+    const uint64_t storeSize = getTypeStoreSize(pElementType);
 
     bool paddedArray = false;
 
@@ -1085,7 +1099,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
                 memberTypes.pop_back();
 
                 // Get the size of the last member.
-                const uint64_t bytes = M->getDataLayout().getTypeStoreSize(pLastMemberType);
+                const uint64_t bytes = getTypeStoreSize(pLastMemberType);
 
                 // Push a pad type into the struct for the member we are having to remap.
                 memberTypes.push_back(getPadType(offset - (lastValidByte - bytes)));
@@ -1131,7 +1145,7 @@ template<> Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(
                                             isParentPointer,
                                             isExplicitlyLaidOut);
 
-        lastValidByte = offset + M->getDataLayout().getTypeStoreSize(pMemberType);
+        lastValidByte = offset + getTypeStoreSize(pMemberType);
 
         memberTypes.push_back(pMemberType);
 
