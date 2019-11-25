@@ -2013,7 +2013,7 @@ Result ConfigBuilder::BuildEsGsRegConfig(
     {
         gsOutputPrimitiveType = POINTLIST;
     }
-    else if (gsBuiltInUsage.outputPrimitive == LINESTRIP)
+    else if (gsBuiltInUsage.outputPrimitive == OutputLineStrip)
     {
         gsOutputPrimitiveType = LINESTRIP;
     }

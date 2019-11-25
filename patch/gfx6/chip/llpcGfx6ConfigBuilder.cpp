@@ -1113,7 +1113,7 @@ Result ConfigBuilder::BuildGsRegConfig(
     {
         gsOutputPrimitiveType = POINTLIST;
     }
-    else if (builtInUsage.outputPrimitive == LINESTRIP)
+    else if (builtInUsage.outputPrimitive == OutputLineStrip)
     {
         gsOutputPrimitiveType = LINESTRIP;
     }
