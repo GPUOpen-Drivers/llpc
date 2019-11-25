@@ -28,6 +28,10 @@ ifeq ($(VKI_BUILD_GFX10), 1)
 endif
 #endif
 
+ifeq ($(VKI_BUILD_NAVI14), 1)
+    LLPC_BUILD_NAVI14 = 1
+endif
+
 # Turn on "warnings as errors" if enabled.
 ifeq ($(ICD_PLATFORM), win)
     ifeq ($(ICD_ANALYSIS_WARNINGS_AS_ERRORS), 1)

@@ -135,15 +135,6 @@ const char* GetShaderStageAbbreviation(
 }
 
 // =====================================================================================================================
-// Translates shader stage to corresponding stage mask.
-uint32_t ShaderStageToMask(
-    ShaderStage stage)  // Shader stage
-{
-    LLPC_ASSERT((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));
-    return (1 << stage);
-}
-
-// =====================================================================================================================
 // Converts the SPIR-V execution model to the shader stage
 ShaderStage ConvertToStageShage(
     uint32_t execModel)  // SPIR-V execution model
@@ -195,6 +186,15 @@ spv::ExecutionModel ConvertToExecModel(
             return static_cast <spv::ExecutionModel>(0);
         }
     }
+}
+
+// =====================================================================================================================
+// Translates shader stage to corresponding stage mask.
+uint32_t ShaderStageToMask(
+    ShaderStage stage)  // Shader stage
+{
+    LLPC_ASSERT((stage < ShaderStageCount) || (stage == ShaderStageCopyShader));
+    return (1 << stage);
 }
 
 // =====================================================================================================================

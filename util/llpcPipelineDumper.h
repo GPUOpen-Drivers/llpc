@@ -146,8 +146,7 @@ private:
                                          const GraphicsPipelineBuildInfo* pPipelineInfo);
 
     static void DumpVersionInfo(std::ostream&                  dumpFile);
-    static void DumpPipelineShaderInfo(ShaderStage               stage,
-                                       const PipelineShaderInfo* pShaderInfo,
+    static void DumpPipelineShaderInfo(const PipelineShaderInfo* pShaderInfo,
                                        std::ostream&             dumpFile);
     static void DumpResourceMappingNode(const ResourceMappingNode* pUserDataNode,
                                         const char*                pPrefix,

@@ -28,6 +28,10 @@ ifeq ($(LLPC_BUILD_GFX10), 1)
 endif
 #endif
 
+ifeq ($(LLPC_BUILD_NAVI14), 1)
+    LCXXDEFS += -DLLPC_BUILD_NAVI14=1 -DCHIP_HDR_NAVI14=1
+endif
+
 ifeq ($(ICD_BUILD_LLPC), 1)
     LCXXINCS += -I$(LLVM_DEPTH)/include
     LCXXINCS += -I$(LLVM_BUILD_DIR)/include

@@ -279,7 +279,7 @@ private:
     LLPC_DISALLOW_DEFAULT_CTOR(Compiler);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Compiler);
 
-    Result ValidatePipelineShaderInfo(ShaderStage shaderStage, const PipelineShaderInfo* pShaderInfo) const;
+    Result ValidatePipelineShaderInfo(const PipelineShaderInfo* pShaderInfo) const;
 
     void InitGpuProperty();
     void InitGpuWorkaround();
