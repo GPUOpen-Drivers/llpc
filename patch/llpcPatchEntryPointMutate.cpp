@@ -240,6 +240,11 @@ void PatchEntryPointMutate::ProcessShader()
         builder.addAttribute("amdgpu-waves-per-eu", wavesPerEu);
     }
 
+    if (pShaderOptions->unrollThreshold != 0)
+    {
+        builder.addAttribute("amdgpu-unroll-threshold", std::to_string(pShaderOptions->unrollThreshold));
+    }
+
     AttributeList::AttrIndex attribIdx = AttributeList::AttrIndex(AttributeList::FunctionIndex);
     pEntryPoint->addAttributes(attribIdx, builder);
 

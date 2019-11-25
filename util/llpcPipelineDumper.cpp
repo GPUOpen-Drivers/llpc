@@ -640,6 +640,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
     dumpFile << "options.disableLicm = " << pShaderInfo->options.disableLicm << "\n";
 #endif
+    dumpFile << "options.unrollThreshold = " << pShaderInfo->options.unrollThreshold << "\n";
 
     dumpFile << "\n";
 }
@@ -1208,6 +1209,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 35
             pHasher->Update(options.disableLicm);
 #endif
+            pHasher->Update(options.unrollThreshold);
         }
     }
 }

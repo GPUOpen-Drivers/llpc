@@ -43,7 +43,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 38
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 //**
 //**********************************************************************************************************************
@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
 //* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
 //* |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
 //* |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
@@ -432,6 +433,8 @@ struct PipelineShaderOptions
     /// Disable the the LLVM backend's LICM pass.
     bool      disableLicm;
 #endif
+    /// Default unroll threshold for LLVM.
+    uint32_t  unrollThreshold;
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
