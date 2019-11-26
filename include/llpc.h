@@ -66,6 +66,17 @@
 //* |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
 //* |     22.0 | Internal revision.                                                                                    |
 //* |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.   |
+//*
+//* IMPORTANT NOTE: All structures defined in this file that are passed as input into LLPC must be zero-initialized
+//* with code such as the following before filling in the structure's fields:
+//*
+//*   SomeLlpcStructure someLlpcStructure = {};
+//*
+//* It is sufficient to perform this initialization on a containing structure.
+//*
+//* LLPC is free to add new fields to such structures without increasing the client interface major version, as long
+//* as setting the newly added fields to a 0 (or false) value is safe, i.e. it preserves the old behavior.
+//*
 //**/
 
 namespace Llpc
