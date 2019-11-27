@@ -197,6 +197,9 @@ void SpirvLower::AddPasses(
         passMgr.add(CreateStartStopTimer(pLowerTimer, true));
     }
 
+    // Lower SPIR-V resource collecting
+    passMgr.add(CreateSpirvLowerResourceCollect(false));
+
     // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
     // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
     passMgr.add(createAlwaysInlinerLegacyPass());

@@ -1011,10 +1011,6 @@ Result Compiler::BuildPipelineInternal(
                             "===============================================================================\n"
                             "// LLPC SPIRV-to-LLVM translation results\n"));
             }
-            {
-                lowerPassMgr.add(CreateSpirvLowerResourceCollect(false));
-            }
-
             // Stop timer for translate.
             timerProfiler.AddTimerStartStopPass(&lowerPassMgr, TimerTranslate, false);
 
