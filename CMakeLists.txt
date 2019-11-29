@@ -320,12 +320,7 @@ if(ICD_BUILD_LLPC)
 
 # llpc/translator
     target_sources(llpc PRIVATE
-        translator/lib/SPIRV/OCLUtil.cpp
-        translator/lib/SPIRV/SPIRVLowerBool.cpp
-        translator/lib/SPIRV/SPIRVLowerConstExpr.cpp
-        translator/lib/SPIRV/SPIRVLowerMemmove.cpp
         translator/lib/SPIRV/SPIRVReader.cpp
-        translator/lib/SPIRV/SPIRVRegularizeLLVM.cpp
         translator/lib/SPIRV/SPIRVUtil.cpp
     )
 

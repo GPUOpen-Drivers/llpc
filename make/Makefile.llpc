@@ -164,12 +164,7 @@ endif
         ManglingUtils.cpp                   \
         ParameterType.cpp                   \
         \
-        OCLUtil.cpp                         \
-        SPIRVLowerBool.cpp                  \
-        SPIRVLowerConstExpr.cpp             \
-        SPIRVLowerMemmove.cpp               \
         SPIRVReader.cpp                     \
-        SPIRVRegularizeLLVM.cpp             \
         SPIRVUtil.cpp
 
     # llpc/util
