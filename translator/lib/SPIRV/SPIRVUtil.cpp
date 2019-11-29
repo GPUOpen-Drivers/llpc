@@ -41,7 +41,6 @@
 #include "FunctionDescriptor.h"
 #include "ManglingUtils.h"
 #include "NameMangleAPI.h"
-#include "OCLUtil.h"
 #include "ParameterType.h"
 #include "SPIRVInternal.h"
 #include "SPIRVMDWalker.h"
@@ -87,110 +86,6 @@ Value *removeCast(Value *V) {
   return V;
 }
 
-void saveLLVMModule(Module *M, const std::string &OutputFile) {
-  std::error_code EC;
-  ToolOutputFile Out(OutputFile.c_str(), EC, sys::fs::F_None);
-  if (EC) {
-    return;
-  }
-
-  WriteBitcodeToFile(*M, Out.os());
-  Out.keep();
-}
-
-std::string mapLLVMTypeToOCLType(const Type *Ty, bool Signed) {
-  if (Ty->isHalfTy())
-    return "half";
-  if (Ty->isFloatTy())
-    return "float";
-  if (Ty->isDoubleTy())
-    return "double";
-  if (auto IntTy = dyn_cast<IntegerType>(Ty)) {
-    std::string SignPrefix;
-    std::string Stem;
-    if (!Signed)
-      SignPrefix = "u";
-    switch (IntTy->getIntegerBitWidth()) {
-    case 8:
-      Stem = "char";
-      break;
-    case 16:
-      Stem = "short";
-      break;
-    case 32:
-      Stem = "int";
-      break;
-    case 64:
-      Stem = "long";
-      break;
-    default:
-      Stem = "invalid_type";
-      break;
-    }
-    return SignPrefix + Stem;
-  }
-  if (auto VecTy = dyn_cast<VectorType>(Ty)) {
-    Type *EleTy = VecTy->getElementType();
-    unsigned Size = VecTy->getVectorNumElements();
-    std::stringstream Ss;
-    Ss << mapLLVMTypeToOCLType(EleTy, Signed) << Size;
-    return Ss.str();
-  }
-  return "invalid_type";
-}
-
-std::string mapSPIRVTypeToOCLType(SPIRVType *Ty, bool Signed) {
-  if (Ty->isTypeFloat()) {
-    auto W = Ty->getBitWidth();
-    switch (W) {
-    case 16:
-      return "half";
-    case 32:
-      return "float";
-    case 64:
-      return "double";
-    default:
-      assert(0 && "Invalid floating pointer type");
-      return std::string("float") + W + "_t";
-    }
-  }
-  if (Ty->isTypeInt()) {
-    std::string SignPrefix;
-    std::string Stem;
-    if (!Signed)
-      SignPrefix = "u";
-    auto W = Ty->getBitWidth();
-    switch (W) {
-    case 8:
-      Stem = "char";
-      break;
-    case 16:
-      Stem = "short";
-      break;
-    case 32:
-      Stem = "int";
-      break;
-    case 64:
-      Stem = "long";
-      break;
-    default:
-      llvm_unreachable("Invalid integer type");
-      Stem = std::string("int") + W + "_t";
-      break;
-    }
-    return SignPrefix + Stem;
-  }
-  if (Ty->isTypeVector()) {
-    auto EleTy = Ty->getVectorComponentType();
-    auto Size = Ty->getVectorComponentCount();
-    std::stringstream Ss;
-    Ss << mapSPIRVTypeToOCLType(EleTy, Signed) << Size;
-    return Ss.str();
-  }
-  llvm_unreachable("Invalid type");
-  return "unknown_type";
-}
-
 PointerType *getOrCreateOpaquePtrType(Module *M, const std::string &Name,
                                       unsigned AddrSpace) {
   auto OpaqueType = M->getTypeByName(Name);
@@ -202,11 +97,6 @@ PointerType *getOrCreateOpaquePtrType(Module *M, const std::string &Name,
 PointerType *getSamplerType(Module *M) {
   return getOrCreateOpaquePtrType(M, getSPIRVTypeName(kSPIRVTypeName::Sampler),
                                   SPIRAS_Constant);
-}
-
-PointerType *getPipeStorageType(Module *M) {
-  return getOrCreateOpaquePtrType(
-      M, getSPIRVTypeName(kSPIRVTypeName::PipeStorage), SPIRAS_Constant);
 }
 
 void getFunctionTypeParameterTypes(llvm::FunctionType *FT,
@@ -233,20 +123,6 @@ bool isPointerToOpaqueStructType(llvm::Type *Ty, const std::string &Name) {
     if (auto ST = dyn_cast<StructType>(PT->getElementType()))
       if (ST->isOpaque() && ST->getName() == Name)
         return true;
-  return false;
-}
-
-bool isOCLImageType(llvm::Type *Ty, StringRef *Name) {
-  if (auto PT = dyn_cast<PointerType>(Ty))
-    if (auto ST = dyn_cast<StructType>(PT->getElementType()))
-      if (ST->isOpaque()) {
-        auto FullName = ST->getName();
-        if (FullName.find(kSPR2TypeName::ImagePrefix) == 0) {
-          if (Name)
-            *Name = FullName.drop_front(strlen(kSPR2TypeName::OCLPrefix));
-          return true;
-        }
-      }
   return false;
 }
 
@@ -361,15 +237,6 @@ StringRef dePrefixSPIRVName(StringRef R, SmallVectorImpl<StringRef> &Postfix) {
   return Name;
 }
 
-std::string getSPIRVFuncName(Op OC, StringRef PostFix) {
-  return prefixSPIRVName(getName(OC) + PostFix.str());
-}
-
-std::string getSPIRVFuncName(Op OC, const Type *PRetTy, bool IsSigned) {
-  return prefixSPIRVName(getName(OC) + kSPIRVPostfix::Divider +
-                         getPostfixForReturnType(PRetTy, false));
-}
-
 std::string getSPIRVExtFuncName(SPIRVExtInstSetKind Set, unsigned ExtOp,
                                 StringRef PostFix) {
   std::string ExtOpName;
@@ -389,105 +256,12 @@ std::string getSPIRVExtFuncName(SPIRVExtInstSetKind Set, unsigned ExtOp,
                          PostFix.str());
 }
 
-SPIRVDecorate *mapPostfixToDecorate(StringRef Postfix, SPIRVEntry *Target) {
-  if (Postfix == kSPIRVPostfix::Sat)
-    return new SPIRVDecorate(spv::DecorationSaturatedConversion, Target);
-
-  if (Postfix.startswith(kSPIRVPostfix::Rt))
-    return new SPIRVDecorate(spv::DecorationFPRoundingMode, Target,
-                             map<SPIRVFPRoundingModeKind>(Postfix.str()));
-
-  return nullptr;
-}
-
-SPIRVValue *addDecorations(SPIRVValue *Target,
-                           const SmallVectorImpl<std::string> &Decs) {
-  for (auto &I : Decs)
-    if (auto Dec = mapPostfixToDecorate(I, Target))
-      Target->addDecorate(Dec);
-  return Target;
-}
-
-std::string getPostfix(Decoration Dec, unsigned Value) {
-  switch (Dec) {
-  default:
-    llvm_unreachable("not implemented");
-    return "unknown";
-  case spv::DecorationSaturatedConversion:
-    return kSPIRVPostfix::Sat;
-  case spv::DecorationFPRoundingMode:
-    return rmap<std::string>(static_cast<SPIRVFPRoundingModeKind>(Value));
-  }
-}
-
-std::string getPostfixForReturnType(CallInst *CI, bool IsSigned) {
-  return getPostfixForReturnType(CI->getType(), IsSigned);
-}
-
-std::string getPostfixForReturnType(const Type *PRetTy, bool IsSigned) {
-  return std::string(kSPIRVPostfix::Return) +
-         mapLLVMTypeToOCLType(PRetTy, IsSigned);
-}
-
-Op getSPIRVFuncOC(const std::string &S, SmallVectorImpl<std::string> *Dec) {
-  Op OC;
-  SmallVector<StringRef, 2> Postfix;
-  std::string Name;
-  if (!oclIsBuiltin(S, &Name))
-    Name = S;
-  StringRef R(Name);
-  R = dePrefixSPIRVName(R, Postfix);
-  if (!getByName(R.str(), OC))
-    return OpNop;
-  if (Dec)
-    for (auto &I : Postfix)
-      Dec->push_back(I.str());
-  return OC;
-}
-
 bool getSPIRVBuiltin(const std::string &OrigName, spv::BuiltIn &B) {
   SmallVector<StringRef, 2> Postfix;
   StringRef R(OrigName);
   R = dePrefixSPIRVName(R, Postfix);
   assert(Postfix.empty() && "Invalid SPIR-V builtin Name");
   return getByName(R.str(), B);
-}
-
-bool oclIsBuiltin(const StringRef &Name, std::string *DemangledName,
-                  bool IsCpp) {
-  if (Name == "printf") {
-    if (DemangledName)
-      *DemangledName = Name;
-    return true;
-  }
-  if (!Name.startswith("_Z"))
-    return false;
-  if (!DemangledName)
-    return true;
-  // OpenCL C++ built-ins are declared in cl namespace.
-  // TODO: consider using 'St' abbriviation for cl namespace mangling.
-  // Similar to ::std:: in C++.
-  if (IsCpp) {
-    if (!Name.startswith("_ZN"))
-      return false;
-    // Skip CV and ref qualifiers.
-    size_t NameSpaceStart = Name.find_first_not_of("rVKRO", 3);
-    // All built-ins are in the ::cl:: namespace.
-    if (Name.substr(NameSpaceStart, 11) != "2cl7__spirv")
-      return false;
-    size_t DemangledNameLenStart = NameSpaceStart + 11;
-    size_t Start = Name.find_first_not_of("0123456789", DemangledNameLenStart);
-    size_t Len = 0;
-    Name.substr(DemangledNameLenStart, Start - DemangledNameLenStart)
-        .getAsInteger(10, Len);
-    *DemangledName = Name.substr(Start, Len);
-  } else {
-    size_t Start = Name.find_first_not_of("0123456789", 2);
-    size_t Len = 0;
-    Name.substr(2, Start - 2).getAsInteger(10, Len);
-    *DemangledName = Name.substr(Start, Len);
-  }
-  return true;
 }
 
 // Check if a mangled type Name is unsigned
@@ -887,34 +661,6 @@ bool isDecoratedSPIRVFunc(const Function *F, std::string *UndecoratedName) {
   return true;
 }
 
-/// Get TypePrimitiveEnum for special OpenCL type except opencl.block.
-SPIR::TypePrimitiveEnum getOCLTypePrimitiveEnum(StringRef TyName) {
-  return StringSwitch<SPIR::TypePrimitiveEnum>(TyName)
-      .Case("opencl.image1d_t", SPIR::PRIMITIVE_IMAGE_1D_T)
-      .Case("opencl.image1d_array_t", SPIR::PRIMITIVE_IMAGE_1D_ARRAY_T)
-      .Case("opencl.image1d_buffer_t", SPIR::PRIMITIVE_IMAGE_1D_BUFFER_T)
-      .Case("opencl.image2d_t", SPIR::PRIMITIVE_IMAGE_2D_T)
-      .Case("opencl.image2d_array_t", SPIR::PRIMITIVE_IMAGE_2D_ARRAY_T)
-      .Case("opencl.image3d_t", SPIR::PRIMITIVE_IMAGE_3D_T)
-      .Case("opencl.image2d_msaa_t", SPIR::PRIMITIVE_IMAGE_2D_MSAA_T)
-      .Case("opencl.image2d_array_msaa_t",
-            SPIR::PRIMITIVE_IMAGE_2D_ARRAY_MSAA_T)
-      .Case("opencl.image2d_msaa_depth_t",
-            SPIR::PRIMITIVE_IMAGE_2D_MSAA_DEPTH_T)
-      .Case("opencl.image2d_array_msaa_depth_t",
-            SPIR::PRIMITIVE_IMAGE_2D_ARRAY_MSAA_DEPTH_T)
-      .Case("opencl.image2d_depth_t", SPIR::PRIMITIVE_IMAGE_2D_DEPTH_T)
-      .Case("opencl.image2d_array_depth_t",
-            SPIR::PRIMITIVE_IMAGE_2D_ARRAY_DEPTH_T)
-      .Case("opencl.event_t", SPIR::PRIMITIVE_EVENT_T)
-      .Case("opencl.pipe_t", SPIR::PRIMITIVE_PIPE_T)
-      .Case("opencl.reserve_id_t", SPIR::PRIMITIVE_RESERVE_ID_T)
-      .Case("opencl.queue_t", SPIR::PRIMITIVE_QUEUE_T)
-      .Case("opencl.clk_event_t", SPIR::PRIMITIVE_CLK_EVENT_T)
-      .Case("opencl.sampler_t", SPIR::PRIMITIVE_SAMPLER_T)
-      .Case("struct.ndrange_t", SPIR::PRIMITIVE_NDRANGE_T)
-      .Default(SPIR::PRIMITIVE_NONE);
-}
 /// Translates LLVM type to descriptor for mangler.
 /// \param Signed indicates integer type should be translated as signed.
 /// \param VoidPtr indicates i8* should be translated as void*.
@@ -1021,38 +767,6 @@ static SPIR::RefParamType transTypeDesc(Type *Ty,
         TyName = Tmp = std::string("struct_") + OS.str();
       }
       LLVM_DEBUG(dbgs() << "  type Name: " << TyName << '\n');
-
-      auto Prim = getOCLTypePrimitiveEnum(TyName);
-      if (StructTy->isOpaque()) {
-        if (TyName == "opencl.block") {
-          auto BlockTy = new SPIR::BlockType;
-          // Handle block with local memory arguments according to OpenCL 2.0
-          // spec.
-          if (Info.IsLocalArgBlock) {
-            SPIR::RefParamType VoidTyRef(
-                new SPIR::PrimitiveType(SPIR::PRIMITIVE_VOID));
-            auto VoidPtrTy = new SPIR::PointerType(VoidTyRef);
-            VoidPtrTy->setAddressSpace(SPIR::ATTR_LOCAL);
-            // "__local void *"
-            BlockTy->setParam(0, SPIR::RefParamType(VoidPtrTy));
-            // "..."
-            BlockTy->setParam(1, SPIR::RefParamType(new SPIR::PrimitiveType(
-                                     SPIR::PRIMITIVE_VAR_ARG)));
-          }
-          EPT = BlockTy;
-        } else if (Prim != SPIR::PRIMITIVE_NONE) {
-          if (Prim == SPIR::PRIMITIVE_PIPE_T) {
-            SPIR::RefParamType OpaqueTyRef(new SPIR::PrimitiveType(Prim));
-            auto OpaquePtrTy = new SPIR::PointerType(OpaqueTyRef);
-            OpaquePtrTy->setAddressSpace(getOCLOpaqueTypeAddrSpace(Prim));
-            EPT = OpaquePtrTy;
-          } else {
-            EPT = new SPIR::PrimitiveType(Prim);
-          }
-        }
-      } else if (Prim == SPIR::PRIMITIVE_NDRANGE_T)
-        // ndrange_t is not opaque type
-        EPT = new SPIR::PrimitiveType(SPIR::PRIMITIVE_NDRANGE_T);
     }
     if (EPT)
       return SPIR::RefParamType(EPT);
@@ -1228,38 +942,6 @@ Type *getLLVMTypeForSPIRVImageSampledTypePostfix(StringRef Postfix,
   llvm_unreachable("Invalid sampled type postfix");
 }
 
-std::string mapOCLTypeNameToSPIRV(StringRef Name, StringRef Acc) {
-  std::string BaseTy;
-  std::string Postfixes;
-  raw_string_ostream OS(Postfixes);
-  if (!Acc.empty())
-    OS << kSPIRVTypeName::PostfixDelim;
-  if (Name.startswith(kSPR2TypeName::Pipe)) {
-    BaseTy = kSPIRVTypeName::Pipe;
-    OS << SPIRSPIRVAccessQualifierMap::map(Acc);
-  } else if (Name.startswith(kSPR2TypeName::ImagePrefix)) {
-    SmallVector<StringRef, 4> SubStrs;
-    const char Delims[] = {kSPR2TypeName::Delimiter, 0};
-    Name.split(SubStrs, Delims);
-    std::string ImageTyName = SubStrs[1].str();
-    if (hasAccessQualifiedName(Name))
-      ImageTyName.erase(ImageTyName.size() - 5, 3);
-    auto Desc = map<SPIRVTypeImageDescriptor>(ImageTyName);
-    LLVM_DEBUG(dbgs() << "[trans image type] " << SubStrs[1] << " => "
-                      << "(" << (unsigned)Desc.Dim << ", " << Desc.Depth << ", "
-                      << Desc.Arrayed << ", " << Desc.MS << ", " << Desc.Sampled
-                      << ", " << Desc.Format << ")\n");
-
-    BaseTy = kSPIRVTypeName::Image;
-    OS << getSPIRVImageTypePostfixes(kSPIRVImageSampledTypeName::Void, Desc,
-                                     SPIRSPIRVAccessQualifierMap::map(Acc));
-  } else {
-    LLVM_DEBUG(dbgs() << "Mapping of " << Name << " is not implemented\n");
-    llvm_unreachable("Not implemented");
-  }
-  return getSPIRVTypeName(BaseTy, OS.str());
-}
-
 bool eraseIfNoUse(Function *F) {
   bool Changed = false;
   if (!F)
@@ -1395,26 +1077,6 @@ StringRef getAccessQualifier(StringRef TyName) {
       .Case("wo", "write_only")
       .Case("rw", "read_write")
       .Default("");
-}
-
-/// Translates OpenCL image type names to SPIR-V.
-Type *getSPIRVImageTypeFromOCL(Module *M, Type *ImageTy) {
-  assert(isOCLImageType(ImageTy) && "Unsupported type");
-  auto ImageTypeName = ImageTy->getPointerElementType()->getStructName();
-  std::string Acc = kAccessQualName::ReadOnly;
-  if (hasAccessQualifiedName(ImageTypeName))
-    Acc = getAccessQualifier(ImageTypeName);
-  return getOrCreateOpaquePtrType(M, mapOCLTypeNameToSPIRV(ImageTypeName, Acc));
-}
-
-// Check if the execution model is OpenCL kernel
-bool
-isOpenCLKernel(Module *M) {
-  for (auto F = M->begin(), E = M->end(); F != E; ++F) {
-    if (F->getCallingConv() == CallingConv::SPIR_KERNEL)
-      return true;
-  }
-  return false;
 }
 
 // Check if an image operation is "readonly"

@@ -778,20 +778,10 @@ inline size_t findFirstPtr(const std::vector<Value *> &Args) {
 void removeFnAttr(LLVMContext *Context, CallInst *Call,
                   Attribute::AttrKind Attr);
 void addFnAttr(LLVMContext *Context, CallInst *Call, Attribute::AttrKind Attr);
-void saveLLVMModule(Module *M, const std::string &OutputFile);
-std::string mapSPIRVTypeToOCLType(SPIRVType *Ty, bool Signed);
-std::string mapLLVMTypeToOCLType(const Type *Ty, bool Signed);
-SPIRVDecorate *mapPostfixToDecorate(StringRef Postfix, SPIRVEntry *Target);
-
-/// Add decorations to a SPIR-V entry.
-/// \param Decs Each string is a postfix without _ at the beginning.
-SPIRVValue *addDecorations(SPIRVValue *Target,
-                           const SmallVectorImpl<std::string> &Decs);
 
 PointerType *getOrCreateOpaquePtrType(Module *M, const std::string &Name,
                                       unsigned AddrSpace = SPIRAS_Global);
 PointerType *getSamplerType(Module *M);
-PointerType *getPipeStorageType(Module *M);
 void getFunctionTypeParameterTypes(llvm::FunctionType *FT,
                                    std::vector<Type *> &ArgTys);
 Function *getOrCreateFunction(Module *M, Type *RetTy, ArrayRef<Type *> ArgTypes,
@@ -827,10 +817,6 @@ Decoration getArgAsDecoration(CallInst *CI, unsigned I);
 bool isPointerToOpaqueStructType(llvm::Type *Ty);
 bool isPointerToOpaqueStructType(llvm::Type *Ty, const std::string &Name);
 
-/// Check if a type is OCL image type.
-/// \return type name without "opencl." prefix.
-bool isOCLImageType(llvm::Type *Ty, StringRef *Name = nullptr);
-
 /// \param BaseTyName is the type name as in spirv.BaseTyName.Postfixes
 /// \param Postfix contains postfixes extracted from the SPIR-V image
 ///   type name as spirv.BaseTyName.Postfixes.
@@ -846,36 +832,14 @@ std::string undecorateSPIRVFunction(const std::string &S);
 /// and get the original name.
 bool isDecoratedSPIRVFunc(const Function *F, std::string *UndecName = nullptr);
 
-/// Get a canonical function name for a SPIR-V op code.
-std::string getSPIRVFuncName(Op OC, StringRef PostFix = "");
-
-std::string getSPIRVFuncName(Op OC, const Type *PRetTy, bool IsSigned = false);
-
 /// Get a canonical function name for a SPIR-V extended instruction
 std::string getSPIRVExtFuncName(SPIRVExtInstSetKind Set, unsigned ExtOp,
                                 StringRef PostFix = "");
-
-/// Get SPIR-V op code given the canonical function name.
-/// Assume \param Name is either IA64 mangled or unmangled, and the unmangled
-/// name takes the __spirv_{OpName}_{Postfixes} format.
-/// \return op code if the unmangled function name is a valid op code name,
-///   otherwise return OpNop.
-/// \param Dec contains decorations decoded from function name if it is
-///   not nullptr.
-Op getSPIRVFuncOC(const std::string &Name,
-                  SmallVectorImpl<std::string> *Dec = nullptr);
 
 /// Get SPIR-V builtin variable enum given the canonical builtin name
 /// Assume \param Name is in format __spirv_BuiltIn{Name}
 /// \return false if \param Name is not a valid builtin name.
 bool getSPIRVBuiltin(const std::string &Name, spv::BuiltIn &Builtin);
-
-/// \param Name LLVM function name
-/// \param DemangledName demanged name of the OpenCL built-in function
-/// \returns true if Name is the name of the OpenCL built-in function,
-/// false for other functions
-bool oclIsBuiltin(const StringRef &Name, std::string *DemangledName = nullptr,
-                  bool IsCpp = false);
 
 /// Check if a function type is void(void).
 bool isVoidFuncTy(FunctionType *FT);
@@ -1032,15 +996,6 @@ ConstantInt *mapUInt(Module *M, ConstantInt *I,
 /// Map a signed integer constant by applying a function.
 ConstantInt *mapSInt(Module *M, ConstantInt *I, std::function<int(int)> F);
 
-/// Get postfix for given decoration.
-/// The returned postfix does not include "_" at the beginning.
-std::string getPostfix(Decoration Dec, unsigned Value = 0);
-
-/// Get postfix _R{ReturnType} for return type
-/// The returned postfix does not includ "_" at the beginning
-std::string getPostfixForReturnType(CallInst *CI, bool IsSigned = false);
-std::string getPostfixForReturnType(const Type *PRetTy, bool IsSigned = false);
-
 Constant *getScalarOrVectorConstantInt(Type *T, uint64_t V,
                                        bool IsSigned = false);
 
@@ -1079,16 +1034,9 @@ std::string getSPIRVImageTypePostfixes(StringRef SampledType,
 /// friendly LLVM IR.
 std::string getSPIRVImageSampledTypeName(SPIRVType *Ty);
 
-/// Translates OpenCL image type names to SPIR-V.
-/// E.g. %opencl.image1d_rw_t -> %spirv.Image._void_0_0_0_0_0_0_2
-Type *getSPIRVImageTypeFromOCL(Module *M, Type *T);
-
 /// Get LLVM type for sampled type of SPIR-V image type by postfix.
 Type *getLLVMTypeForSPIRVImageSampledTypePostfix(StringRef Postfix,
                                                  LLVMContext &Ctx);
-
-/// Map OpenCL opaque type name to SPIR-V type name.
-std::string mapOCLTypeNameToSPIRV(StringRef Name, StringRef Acc = "");
 
 /// Check if access qualifier is encoded in the type name.
 bool hasAccessQualifiedName(StringRef TyName);
@@ -1149,10 +1097,6 @@ PointerType *getInt8PtrTy(PointerType *T);
 
 /// Cast a value to a i8* by inserting a cast instruction.
 Value *castToInt8Ptr(Value *V, Instruction *Pos);
-
-// Check if the execution model is OpenCL kernel
-bool
-isOpenCLKernel(Module *M);
 
 template <> inline void SPIRVMap<std::string, Op, SPIRVOpaqueType>::init() {
   add(kSPIRVTypeName::DeviceEvent, OpTypeDeviceEvent);
