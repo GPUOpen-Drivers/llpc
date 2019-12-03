@@ -4553,7 +4553,11 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
     {
         // Setup out-of-range value. GPU will drop stream-out buffer writing when the thread is invalid.
         uint32_t outofRangeValue = 0xFFFFFFFF;
-        outofRangeValue /= xfbStride;
+        // Divide outofRangeValue by xfbStride only for GFX8.
+        if (m_gfxIp.major == 8)
+        {
+            outofRangeValue /= xfbStride;
+        }
         outofRangeValue -= (m_pContext->GetShaderWaveSize(m_shaderStage) - 1);
         Value* pOutofRangeValue = ConstantInt::get(m_pContext->Int32Ty(), outofRangeValue);
         pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
@@ -5255,7 +5259,7 @@ void PatchInOutImportExport::StoreValueToGsVsRingBuffer(
         {
             CombineFormat combineFormat = {};
             combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
-            combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT; 
+            combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
             CoherentFlag coherent = {};
             coherent.bits.glc = true;
             coherent.bits.slc = true;

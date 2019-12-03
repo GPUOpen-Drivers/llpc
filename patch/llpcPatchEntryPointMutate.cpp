@@ -1045,11 +1045,7 @@ FunctionType* PatchEntryPointMutate::GenerateEntryPointType(
                 if (enableXfb)
                 {
                     *pInRegMask |= 1ull << argTys.size();
-                    entryArgIdxs.vs.streamOutData.streamInfo = argTys.size();
-                    argTys.push_back(m_pContext->Int32Ty()); // Stream-out info (ID, vertex count, enablement)
-
-                    *pInRegMask |= 1ull << argTys.size();
-                    entryArgIdxs.vs.streamOutData.writeIndex = argTys.size();
+                    entryArgIdxs.tes.streamOutData.writeIndex = argTys.size();
                     argTys.push_back(m_pContext->Int32Ty()); // Stream-out write Index
 
                     for (uint32_t i = 0; i < MaxTransformFeedbackBuffers; ++i)
