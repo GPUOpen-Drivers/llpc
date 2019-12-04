@@ -1,8 +1,5 @@
 # LGC (LLPC middle-end) overview
 
-This document outlines the state of LLPC as it will be at the end of the
-"middle-end interface clean-up" series of patches.
-
 LGC ("LLVM-based graphics compiler", or "LLPC generator core") is the middle-end part of
 LLPC. This document gives an overview of the interface that LGC presents to the front-end
 of LLPC, and of the data structures it uses internally.

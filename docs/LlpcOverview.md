@@ -1,8 +1,5 @@
 # LLPC overview
 
-This document outlines the state of LLPC as it will be at the end of the
-"middle-end interface clean-up" series of patches.
-
 ## Compilation process
 
 LLPC builds on LLVM's existing shader compilation infrastructure for AMD GPUs to
