@@ -350,9 +350,12 @@ struct ResourceUsage
     // Usage of generic input/output
     struct
     {
-        // Map from shader specified locations to tightly packed locations
+        // Map from shader specified locations to tightly packed locations.
         std::map<uint32_t, uint32_t> inputLocMap;
         std::map<uint32_t, uint32_t> outputLocMap;
+
+        // The original and new InOutLocations for shader cache
+        std::map<uint32_t, uint32_t> inOutLocMap;
 
         std::map<uint32_t, uint32_t> perPatchInputLocMap;
         std::map<uint32_t, uint32_t> perPatchOutputLocMap;
@@ -748,6 +751,15 @@ public:
 
     // Set pipeline state in Pipeline object for middle-end
     void SetPipelineState(Pipeline* pPipeline) const;
+
+    // Checks whether the requirements of packing input/output is satisfied
+    virtual bool CanPackInOut(ShaderStage shaderStage, bool isOutput) const { return false; }
+
+    // Checks whether pack input/output is enabled
+    virtual bool IsPackInOutEnabled() const { return false; }
+
+    // Enable/disable pack input/output
+    virtual void EnablePackInOut(bool packInOut) {}
 
     static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
 

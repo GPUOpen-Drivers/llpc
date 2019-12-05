@@ -30,6 +30,7 @@
  */
 #define DEBUG_TYPE "llpc-patch-resource-collect"
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -45,6 +46,8 @@
 #endif
 #include "llpcPatchResourceCollect.h"
 #include "llpcPipelineShaders.h"
+#include <algorithm>
+#include <functional>
 
 using namespace llvm;
 using namespace Llpc;
@@ -79,6 +82,8 @@ PatchResourceCollect::PatchResourceCollect()
 {
     initializePipelineShadersPass(*PassRegistry::getPassRegistry());
     initializePatchResourceCollectPass(*PassRegistry::getPassRegistry());
+
+    m_pLocationMapManager.reset(new InOutLocationMapManager);
 }
 
 // =====================================================================================================================
@@ -1391,6 +1396,25 @@ void PatchResourceCollect::visitCallInst(
             }
         }
     }
+
+    if (CanPackInOut())
+    {
+        if ((m_shaderStage == ShaderStageFragment) && (isDeadCall == false))
+        {
+            // Collect LocationSpans according to each FS' input call
+            bool isInput = m_pLocationMapManager->AddSpan(&callInst);
+            if (isInput)
+            {
+                m_inOutCalls.push_back(&callInst);
+                m_deadCalls.insert(&callInst);
+            }
+        }
+        else if ((m_shaderStage == ShaderStageVertex) && mangledName.startswith(LlpcName::OutputExportGeneric))
+        {
+            m_inOutCalls.push_back(&callInst);
+            m_deadCalls.insert(&callInst);
+        }
+    }
 }
 
 // =====================================================================================================================
@@ -1977,6 +2001,12 @@ void PatchResourceCollect::MatchGenericInOut()
             // For other stages, must be empty
             LLPC_ASSERT(perPatchOutLocMap.empty());
         }
+    }
+
+    if (CanPackInOut())
+    {
+        // Do packing input/output
+        PackInOutLocation();
     }
 
     // Do location mapping
@@ -3220,6 +3250,379 @@ void PatchResourceCollect::MapGsBuiltInOutput(
                             inOutUsage.outLocCount[3];
 
     pResUsage->inOutUsage.outputMapLocCount = std::max(pResUsage->inOutUsage.outputMapLocCount, assignedLocCount);
+}
+
+// =====================================================================================================================
+// Determine whether the requirements of packing input/output is satisfied in patch phase
+bool PatchResourceCollect::CanPackInOut() const
+{
+    // Pack input/output requirements:
+    // 1) GraphicsContext::m_packInOut is enabled (e.g., null FS will disable it)
+    // 2) It is XX-FS pipeline
+    bool canPackInOut = m_pContext->IsPackInOutEnabled();
+    if (canPackInOut)
+    {
+        const uint32_t validStageMask = ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment);
+        canPackInOut = (m_pContext->GetShaderStageMask() == validStageMask);
+    }
+    return canPackInOut;
+}
+
+// =====================================================================================================================
+// The process of packing input/output
+void PatchResourceCollect::PackInOutLocation()
+{
+    if (m_shaderStage == ShaderStageFragment)
+    {
+        m_pLocationMapManager->BuildLocationMap();
+
+        ReviseInputImportCalls();
+
+        m_inOutCalls.clear(); // It will hold XX' output calls
+    }
+    else if (m_shaderStage == ShaderStageVertex)
+    {
+        ReassembleOutputExportCalls();
+
+        // For computing the shader hash
+        m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage.inOutLocMap =
+            m_pContext->GetShaderResourceUsage(ShaderStageFragment)->inOutUsage.inOutLocMap;
+    }
+    else
+    {
+        // TODO: Pack input/output in other stages is not supported
+        LLPC_NOT_IMPLEMENTED();
+    }
+}
+
+// =====================================================================================================================
+// Revise the location and element index fields of the fragment shaders input import functions
+void PatchResourceCollect::ReviseInputImportCalls()
+{
+    if (m_inOutCalls.empty())
+    {
+        return;
+    }
+
+    LLPC_ASSERT(m_shaderStage == ShaderStageFragment);
+
+    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+    auto& inputLocMap = inOutUsage.inputLocMap;
+    inputLocMap.clear();
+
+    IRBuilder<> builder(*m_pContext);
+
+    for (auto pCall : m_inOutCalls)
+    {
+        auto argCount = pCall->arg_size();
+        const bool isInterpolant = (argCount == 5);
+        uint32_t compIdx = 1;
+        uint32_t locOffset = 0;
+        if (isInterpolant)
+        {
+            compIdx = 2;
+            locOffset = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        }
+
+        // Construct original InOutLocation from the location and elemIdx operands of the FS' input import call
+        InOutLocation origInLoc = {};
+        origInLoc.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue() + locOffset;
+        origInLoc.locationInfo.component = cast<ConstantInt>(pCall->getOperand(compIdx))->getZExtValue();
+        origInLoc.locationInfo.half = false;
+
+        // Get the packed InOutLocation from locationMap
+        const InOutLocation* pNewInLoc = nullptr;
+        m_pLocationMapManager->FindMap(origInLoc, pNewInLoc);
+        LLPC_ASSERT(m_pLocationMapManager->FindMap(origInLoc, pNewInLoc));
+
+        // TODO: inputLocMap can be removed
+        inputLocMap[pNewInLoc->locationInfo.location] = InvalidValue;
+        inOutUsage.inOutLocMap[origInLoc.AsIndex()] = pNewInLoc->AsIndex();
+
+        // Re-write the input import call by using the new InOutLocation
+        SmallVector<Value*, 5> args;
+        std::string callName;
+        if (isInterpolant == false)
+        {
+            args.push_back(builder.getInt32(pNewInLoc->locationInfo.location));
+            args.push_back(builder.getInt32(pNewInLoc->locationInfo.component));
+            args.push_back(pCall->getOperand(2));
+            args.push_back(pCall->getOperand(3));
+
+            callName = LlpcName::InputImportGeneric;
+        }
+        else
+        {
+            args.push_back(builder.getInt32(pNewInLoc->locationInfo.location));
+            args.push_back(builder.getInt32(0));
+            args.push_back(builder.getInt32(pNewInLoc->locationInfo.component));
+            args.push_back(pCall->getOperand(3));
+            args.push_back(pCall->getOperand(4));
+
+            callName = LlpcName::InputImportInterpolant;
+        }
+
+        // Previous stage converts non-float type to float type when outputs
+        Type* pReturnTy = m_pContext->FloatTy();
+        AddTypeMangling(pReturnTy, args, callName);
+        Value* pOutValue = EmitCall(callName,
+                                    pReturnTy,
+                                    args,
+                                    NoAttrib,
+                                    pCall);
+
+        // Restore float type to original type
+        builder.SetInsertPoint(pCall);
+
+        auto pCallee = pCall->getCalledFunction();
+        Type* pOrigReturnTy = pCallee->getReturnType();
+        if (pOrigReturnTy->isIntegerTy())
+        {
+            // float -> i32
+            pOutValue = builder.CreateBitCast(pOutValue, m_pContext->Int32Ty());
+            if (pOrigReturnTy->getScalarSizeInBits() < 32)
+            {
+                // i32 -> i16 or i8
+                pOutValue = builder.CreateTrunc(pOutValue, pOrigReturnTy);
+            }
+        }
+        else if (pOrigReturnTy->isHalfTy())
+        {
+            // float -> f16
+            pOutValue = builder.CreateFPTrunc(pOutValue, pOrigReturnTy);
+        }
+
+        pCall->replaceAllUsesWith(pOutValue);
+    }
+}
+
+// =====================================================================================================================
+// Re-assemble output export functions based on the locationMap
+void PatchResourceCollect::ReassembleOutputExportCalls()
+{
+    if (m_inOutCalls.empty())
+    {
+        return;
+    }
+
+    auto& inOutUsage = m_pContext->GetShaderResourceUsage(m_shaderStage)->inOutUsage;
+
+    // Collect the components of a vector exported from each packed location
+    // Assume each location exports a vector with four components
+    std::vector<std::array<Value*, 4>> packedComponents(m_inOutCalls.size());
+    for (auto pCall : m_inOutCalls)
+    {
+        InOutLocation origOutLoc = {};
+        origOutLoc.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+        origOutLoc.locationInfo.component = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        origOutLoc.locationInfo.half = false;
+
+        const InOutLocation* pNewInLoc = nullptr;
+        const bool isFound = m_pLocationMapManager->FindMap(origOutLoc, pNewInLoc);
+        if (isFound == false)
+        {
+            continue;
+        }
+
+        auto& components = packedComponents[pNewInLoc->locationInfo.location];
+        components[pNewInLoc->locationInfo.component] = pCall->getOperand(2);
+    }
+
+    // Re-assamble XX' output export calls for each packed location
+    IRBuilder<> builder(*m_pContext);
+    builder.SetInsertPoint(m_inOutCalls.back());
+
+    auto& outputLocMap = inOutUsage.outputLocMap;
+    outputLocMap.clear();
+
+    Value* args[3] = {};
+    uint32_t consectiveLocation = 0;
+    for (auto components : packedComponents)
+    {
+        uint32_t compCount = 0;
+        for (auto pComp : components)
+        {
+            if (pComp != nullptr)
+            {
+                ++compCount;
+            }
+        }
+
+        if (compCount == 0)
+        {
+            break;
+        }
+
+        // Construct the output vector
+        Value* pOutValue = (compCount == 1) ? components[0] :
+                           UndefValue::get(VectorType::get(m_pContext->FloatTy(), compCount));
+        for (auto compIdx = 0; compIdx < compCount; ++compIdx)
+        {
+            // Type conversion from non-float to float
+            Value* pComp = components[compIdx];
+            Type* pCompTy = pComp->getType();
+            if (pCompTy->isIntegerTy())
+            {
+                // i8/i16 -> i32
+                if (pCompTy->getScalarSizeInBits() < 32)
+                {
+                    pComp = builder.CreateZExt(pComp, m_pContext->Int32Ty());
+                }
+                // i32 -> float
+                pComp = builder.CreateBitCast(pComp, m_pContext->FloatTy());
+            }
+            else if (pCompTy->isHalfTy())
+            {
+                // f16 -> float
+                pComp = builder.CreateFPExt(pComp, m_pContext->FloatTy());
+            }
+
+            if (compCount > 1)
+            {
+                pOutValue = builder.CreateInsertElement(pOutValue, pComp, compIdx);
+            }
+            else
+            {
+                pOutValue = pComp;
+            }
+        }
+
+        args[0] = builder.getInt32(consectiveLocation);
+        args[1] = builder.getInt32(0);
+        args[2] = pOutValue;
+
+        std::string callName(LlpcName::OutputExportGeneric);
+        AddTypeMangling(m_pContext->VoidTy(), args, callName);
+
+        EmitCall(callName, m_pContext->VoidTy(), args, NoAttrib, builder);
+
+        outputLocMap[consectiveLocation] = InvalidValue;
+        ++consectiveLocation;
+    }
+}
+
+// =====================================================================================================================
+// Fill the locationSpan container by constructing a LocationSpan from each input import call
+bool InOutLocationMapManager::AddSpan(
+    CallInst*   pCall)  // [in] Call to process
+{
+    auto pCallee = pCall->getCalledFunction();
+    auto mangledName = pCallee->getName();
+    bool isInput = false;
+    if (mangledName.startswith(LlpcName::InputImportGeneric))
+    {
+        LocationSpan span = {};
+
+        span.firstLocation.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue();
+        span.firstLocation.locationInfo.component = cast<ConstantInt>(pCall->getOperand(1))->getZExtValue();
+        span.firstLocation.locationInfo.half = false;
+
+        const uint32_t bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
+
+        span.compatibilityInfo.isFlat = (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InterpModeFlat);
+        span.compatibilityInfo.is16Bit = false;
+        span.compatibilityInfo.isCustom =
+            (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InterpModeCustom);
+
+        LLPC_ASSERT(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
+        m_locationSpans.push_back(span);
+
+        isInput = true;
+    }
+    if (mangledName.startswith(LlpcName::InputImportInterpolant))
+    {
+        auto pLocOffset = pCall->getOperand(1);
+        LLPC_ASSERT(isa<ConstantInt>(pLocOffset));
+
+        LocationSpan span = {};
+
+        span.firstLocation.locationInfo.location = cast<ConstantInt>(pCall->getOperand(0))->getZExtValue() +
+                                        cast<ConstantInt>(pLocOffset)->getZExtValue();
+        span.firstLocation.locationInfo.component = cast<ConstantInt>(pCall->getOperand(2))->getZExtValue();
+        span.firstLocation.locationInfo.half = false;
+
+        const uint32_t bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
+        span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
+
+        span.compatibilityInfo.isFlat =
+            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InterpModeFlat);
+        span.compatibilityInfo.is16Bit = false;
+        span.compatibilityInfo.isCustom =
+            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InterpModeCustom);
+
+        if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end())
+        {
+            m_locationSpans.push_back(span);
+        }
+
+        isInput = true;
+    }
+
+    return isInput;
+}
+
+// =====================================================================================================================
+// Build the map between orignal InOutLocation and packed InOutLocation based on sorted locaiton spans
+void InOutLocationMapManager::BuildLocationMap()
+{
+    // Sort m_locationSpans based on LocationSpan::GetCompatibilityKey() and InOutLocation::AsIndex()
+    std::sort(m_locationSpans.begin(), m_locationSpans.end());
+
+    // Map original InOutLocation to new InOutLocation
+    uint32_t consectiveLocation = 0;
+    uint32_t compIdx = 0;
+    for (auto spanIt = m_locationSpans.begin(); spanIt != m_locationSpans.end(); ++spanIt)
+    {
+        // Increase consectiveLocation when halfComponentCount is up to 8 or the span isn't compatible to previous
+        // Otherwise, increase the compIdx in a packed vector
+        if (spanIt != m_locationSpans.begin())
+        {
+            const auto& prevSpan = *(--spanIt);
+            ++spanIt;
+            if ((isCompatible(prevSpan, *spanIt) == false) || (compIdx == 3))
+            {
+                ++consectiveLocation;
+                compIdx = 0;
+            }
+            else if (spanIt->compatibilityInfo.halfComponentCount > 1)
+            {
+                compIdx += spanIt->compatibilityInfo.halfComponentCount / 2;
+            }
+            else if (spanIt->firstLocation.locationInfo.half)
+            {
+                // 16-bit attribute
+                compIdx += 1;
+            }
+        }
+
+        InOutLocation newLocation = {};
+        newLocation.locationInfo.location = consectiveLocation;
+        newLocation.locationInfo.component = compIdx;
+        newLocation.locationInfo.half = false;
+
+        InOutLocation& origLocation = spanIt->firstLocation;
+        m_locationMap[origLocation] = newLocation;
+    }
+
+    // Exists temporarily for computing m_locationMap
+    m_locationSpans.clear();
+}
+
+// =====================================================================================================================
+// Output a mapped InOutLocation from a given InOutLocation if the mapping exists
+bool InOutLocationMapManager::FindMap(
+    const InOutLocation& originalLocation,  // [in] The original InOutLocation
+    const InOutLocation*& pNewLocation)     // [out] The new InOutLocation
+{
+    auto it = m_locationMap.find(originalLocation);
+    if (it == m_locationMap.end())
+    {
+        return false;
+    }
+
+    pNewLocation = &(it->second);
+    return true;
 }
 
 } // Llpc
