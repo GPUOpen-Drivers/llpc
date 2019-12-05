@@ -116,6 +116,7 @@ bool PatchCheckShaderCache::runOnModule(
         // Update input/output usage
         StreamMapEntries(pResUsage->inOutUsage.inputLocMap, stream);
         StreamMapEntries(pResUsage->inOutUsage.outputLocMap, stream);
+        StreamMapEntries(pResUsage->inOutUsage.inOutLocMap, stream);
         StreamMapEntries(pResUsage->inOutUsage.perPatchInputLocMap, stream);
         StreamMapEntries(pResUsage->inOutUsage.perPatchOutputLocMap, stream);
         StreamMapEntries(pResUsage->inOutUsage.builtInInputLocMap, stream);

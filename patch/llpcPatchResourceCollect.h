@@ -41,6 +41,8 @@ namespace Llpc
 {
 
 struct NggControl;
+struct InOutLocation;
+class InOutLocationMapManager;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching opertions for resource collecting
@@ -86,6 +88,11 @@ private:
     void MapGsGenericOutput(GsOutLocInfo outLocInfo);
     void MapGsBuiltInOutput(uint32_t builtInId, uint32_t elemCount);
 
+    bool CanPackInOut() const;
+    void PackInOutLocation();
+    void ReviseInputImportCalls();
+    void ReassembleOutputExportCalls();
+
     // -----------------------------------------------------------------------------------------------------------------
 
     PipelineState*                  m_pPipelineState;           // Pipeline state
@@ -99,12 +106,89 @@ private:
     std::unordered_set<uint32_t>    m_importedOutputLocs;       // Locations of imported generic outputs
     std::unordered_set<uint32_t>    m_importedOutputBuiltIns;   // IDs of imported built-in outputs
 
+    std::vector<llvm::CallInst*>    m_inOutCalls;               // The import or export calls
+
     bool            m_hasPushConstOp;           // Whether push constant is active
     bool            m_hasDynIndexedInput;       // Whether dynamic indices are used in generic input addressing (valid
                                                 // for tessellation shader, fragment shader with input interpolation)
     bool            m_hasDynIndexedOutput;      // Whether dynamic indices are used in generic output addressing (valid
                                                 // for tessellation control shader)
     ResourceUsage*  m_pResUsage;                // Pointer to shader resource usage
+    std::unique_ptr<InOutLocationMapManager> m_pLocationMapManager; // Pointer to InOutLocationMapManager instance
+};
+
+// Represents the location info of input/output
+union InOutLocationInfo
+{
+    struct
+    {
+        uint16_t location  : 13; // The location
+        uint16_t component : 2;  // The component index
+        uint16_t half      : 1;  // High half in case of 16-bit attriburtes
+    };
+    uint16_t u16All;
+};
+
+// Represents the compatibility info of input/output
+union InOutCompatibilityInfo
+{
+    struct
+    {
+        uint16_t halfComponentCount : 9; // The number of components measured in times of 16-bits.
+                                         // A single 32-bit component will be halfComponentCount=2
+        uint16_t isFlat             : 1; // Flat shading or not
+        uint16_t is16Bit            : 1; // Half float or not
+        uint16_t isCustom           : 1; // Custom interpolation mode or not
+    };
+    uint16_t u16All;
+};
+
+// Represents the wrapper of input/output locatoin info, along with handlers
+struct InOutLocation
+{
+    uint16_t AsIndex() const { return locationInfo.u16All; }
+
+    bool operator<(const InOutLocation& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+
+    InOutLocationInfo locationInfo; // The location info of an input or output
+};
+
+// =====================================================================================================================
+// Represents the manager of input/output locationMap generation
+class InOutLocationMapManager
+{
+public:
+    InOutLocationMapManager() {}
+
+    bool AddSpan(CallInst* pCall);
+    void BuildLocationMap();
+
+    bool FindMap(const InOutLocation& originalLocation, const InOutLocation*& pNewLocation);
+
+    struct LocationSpan
+    {
+        uint16_t GetCompatibilityKey() const { return compatibilityInfo.u16All; }
+
+        uint32_t AsIndex() const { return ((GetCompatibilityKey() << 16) | firstLocation.AsIndex()); }
+
+        bool operator==(const LocationSpan& rhs) const { return (this->AsIndex() == rhs.AsIndex()); }
+
+        bool operator<(const LocationSpan& rhs) const { return (this->AsIndex() < rhs.AsIndex()); }
+
+        InOutLocation firstLocation;
+        InOutCompatibilityInfo compatibilityInfo;
+    };
+
+private:
+    LLPC_DISALLOW_COPY_AND_ASSIGN(InOutLocationMapManager);
+
+    bool isCompatible(const LocationSpan& rSpan, const LocationSpan& lSpan) const
+    {
+        return rSpan.GetCompatibilityKey() == lSpan.GetCompatibilityKey();
+    }
+
+    std::vector<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
+    std::map<InOutLocation, InOutLocation> m_locationMap; // The map between original location and new location
 };
 
 } // Llpc
