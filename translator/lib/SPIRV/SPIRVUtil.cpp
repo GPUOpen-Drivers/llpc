@@ -751,8 +751,7 @@ static SPIR::RefParamType transTypeDesc(Type *Ty,
     } else if (auto StructTy = dyn_cast<StructType>(ET)) {
       LLVM_DEBUG(dbgs() << "ptr to struct: " << *Ty << '\n');
       auto TyName = StructTy->isLiteral() ? StringRef("") : StructTy->getStructName();
-      if (TyName.startswith(kSPR2TypeName::ImagePrefix) ||
-          TyName.startswith(kSPR2TypeName::Pipe)) {
+      if (TyName.startswith(kSPR2TypeName::ImagePrefix)) {
         auto DelimPos = TyName.find_first_of(kSPR2TypeName::Delimiter,
                                              strlen(kSPR2TypeName::OCLPrefix));
         if (DelimPos != StringRef::npos)
@@ -866,14 +865,6 @@ std::string getSPIRVTypeName(StringRef BaseName, StringRef Postfixes) {
   return TN + kSPIRVTypeName::Delimiter + Postfixes.str();
 }
 
-bool isSPIRVConstantName(StringRef TyName) {
-  if (TyName == getSPIRVTypeName(kSPIRVTypeName::ConstantSampler) ||
-      TyName == getSPIRVTypeName(kSPIRVTypeName::ConstantPipeStorage))
-    return true;
-
-  return false;
-}
-
 Type *getSPIRVTypeByChangeBaseTypeName(Module *M, Type *T, StringRef OldName,
                                        StringRef NewName) {
   StringRef Postfixes;
@@ -882,20 +873,6 @@ Type *getSPIRVTypeByChangeBaseTypeName(Module *M, Type *T, StringRef OldName,
   LLVM_DEBUG(dbgs() << " Invalid SPIR-V type " << *T << '\n');
   llvm_unreachable("Invalid SPIRV-V type");
   return nullptr;
-}
-
-std::string getSPIRVImageTypePostfixes(StringRef SampledType,
-                                       SPIRVTypeImageDescriptor Desc,
-                                       SPIRVAccessQualifierKind Acc) {
-  std::string S;
-  raw_string_ostream OS(S);
-  OS << SampledType << kSPIRVTypeName::PostfixDelim
-     << Desc.Dim << kSPIRVTypeName::PostfixDelim
-     << Desc.Arrayed << kSPIRVTypeName::PostfixDelim
-     << Desc.MS << kSPIRVTypeName::PostfixDelim
-     << Desc.Sampled << kSPIRVTypeName::PostfixDelim
-     << Acc;
-  return OS.str();
 }
 
 std::string getSPIRVImageSampledTypeName(SPIRVType *Ty) {
@@ -988,25 +965,6 @@ bool eraseUselessFunctions(Module *M) {
   return Changed;
 }
 
-// The mangling algorithm follows OpenCL pipe built-ins clang 3.8 CodeGen rules.
-static SPIR::MangleError manglePipeBuiltin(const SPIR::FunctionDescriptor &Fd,
-                                           std::string &MangledName) {
-  assert(SPIR::isPipeBuiltin(Fd.Name) &&
-         "Method is expected to be called only for pipe builtins!");
-  if (Fd.isNull()) {
-    MangledName.assign(SPIR::FunctionDescriptor::nullString());
-    return SPIR::MANGLE_NULL_FUNC_DESCRIPTOR;
-  }
-  MangledName.assign("__" + Fd.Name);
-  if (Fd.Name == "write_pipe" || Fd.Name == "read_pipe") {
-    // add "_2" or "_4" postfix reflecting the number of explicit args.
-    MangledName.append("_");
-    // subtruct 2 in order to not count size and alignment of packet.
-    MangledName.append(std::to_string(Fd.Parameters.size() - 2));
-  }
-  return SPIR::MANGLE_SUCCESS;
-}
-
 std::string mangleBuiltin(const std::string &UniqName,
                           ArrayRef<Type *> ArgTypes,
                           BuiltinFuncMangleInfo *BtnInfo) {
@@ -1043,40 +1001,11 @@ std::string mangleBuiltin(const std::string &UniqName,
         SPIR::RefParamType(new SPIR::PrimitiveType(SPIR::PRIMITIVE_VAR_ARG)));
   }
 
-#if defined(SPIRV_SPIR20_MANGLING_REQUIREMENTS)
   SPIR::NameMangler Mangler(SPIR::SPIR20);
   Mangler.mangle(FD, MangledName);
-#else
-  if (SPIR::isPipeBuiltin(BtnInfo->getUnmangledName())) {
-    manglePipeBuiltin(FD, MangledName);
-  } else {
-    SPIR::NameMangler Mangler(SPIR::SPIR20);
-    Mangler.mangle(FD, MangledName);
-  }
-#endif
 
   LLVM_DEBUG(dbgs() << MangledName << '\n');
   return MangledName;
-}
-
-/// Check if access qualifier is encoded in the type Name.
-bool hasAccessQualifiedName(StringRef TyName) {
-  if (TyName.endswith("_ro_t") || TyName.endswith("_wo_t") ||
-      TyName.endswith("_rw_t"))
-    return true;
-  return false;
-}
-
-/// Get access qualifier from the type Name.
-StringRef getAccessQualifier(StringRef TyName) {
-  assert(hasAccessQualifiedName(TyName) &&
-         "Type is not qualified with access.");
-  auto Acc = TyName.substr(TyName.size() - 4, 2);
-  return llvm::StringSwitch<StringRef>(Acc)
-      .Case("ro", "read_only")
-      .Case("wo", "write_only")
-      .Case("rw", "read_write")
-      .Default("");
 }
 
 // Check if an image operation is "readonly"

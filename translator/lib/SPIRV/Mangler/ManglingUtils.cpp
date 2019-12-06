@@ -185,22 +185,4 @@ const char *getSPIRVersionAsString(SPIRversion Version) {
   }
 }
 
-bool isPipeBuiltin(std::string UnmangledName) {
-  return UnmangledName == "write_pipe" || UnmangledName == "read_pipe" ||
-         UnmangledName == "reserve_write_pipe" ||
-         UnmangledName == "reserve_read_pipe" ||
-         UnmangledName == "commit_write_pipe" ||
-         UnmangledName == "commit_read_pipe" ||
-         UnmangledName == "work_group_reserve_write_pipe" ||
-         UnmangledName == "work_group_reserve_read_pipe" ||
-         UnmangledName == "work_group_commit_write_pipe" ||
-         UnmangledName == "work_group_commit_read_pipe" ||
-         UnmangledName == "get_pipe_num_packets" ||
-         UnmangledName == "get_pipe_max_packets" ||
-         UnmangledName == "sub_group_reserve_write_pipe" ||
-         UnmangledName == "sub_group_reserve_read_pipe" ||
-         UnmangledName == "sub_group_commit_write_pipe" ||
-         UnmangledName == "sub_group_commit_read_pipe";
-}
-
 } // namespace SPIR

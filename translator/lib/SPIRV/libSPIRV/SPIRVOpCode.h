@@ -56,9 +56,7 @@ SPIRV_DEF_NAMEMAP(Op, OpCodeNameMap)
 
 inline bool isAtomicOpCode(Op OpCode) {
   static_assert(OpAtomicLoad < OpAtomicXor, "");
-  return ((unsigned)OpCode >= OpAtomicLoad &&
-          (unsigned)OpCode <= OpAtomicXor) ||
-         OpCode == OpAtomicFlagTestAndSet || OpCode == OpAtomicFlagClear;
+  return ((unsigned)OpCode >= OpAtomicLoad && (unsigned)OpCode <= OpAtomicXor);
 }
 inline bool isBinaryOpCode(Op OpCode) {
   return ((unsigned)OpCode >= OpIAdd && (unsigned)OpCode <= OpFMod) ||
@@ -87,29 +85,22 @@ inline bool isBinaryShiftLogicalBitwiseOpCode(Op OpCode) {
 inline bool isCmpOpCode(Op OpCode) {
   return ((unsigned)OpCode >= OpIEqual &&
           (unsigned)OpCode <= OpFUnordGreaterThanEqual) ||
-         (OpCode >= OpLessOrGreater && OpCode <= OpLogicalNotEqual)
+         (OpCode >= OpLogicalEqual && OpCode <= OpLogicalNotEqual)
 #if SPV_VERSION >= 0x10400
          || (OpCode == OpPtrEqual || OpCode == OpPtrNotEqual);
 #endif
 }
 
 inline bool isCvtOpCode(Op OpCode) {
-  return ((unsigned)OpCode >= OpConvertFToU && (unsigned)OpCode <= OpBitcast) ||
-         OpCode == OpSatConvertSToU || OpCode == OpSatConvertUToS;
+  return ((unsigned)OpCode >= OpConvertFToU && (unsigned)OpCode <= OpBitcast);
 }
 
 inline bool isCvtToUnsignedOpCode(Op OpCode) {
-  return OpCode == OpConvertFToU || OpCode == OpUConvert ||
-         OpCode == OpSatConvertSToU;
+  return OpCode == OpConvertFToU || OpCode == OpUConvert;
 }
 
 inline bool isCvtFromUnsignedOpCode(Op OpCode) {
-  return OpCode == OpConvertUToF || OpCode == OpUConvert ||
-         OpCode == OpSatConvertUToS;
-}
-
-inline bool isOpaqueGenericTypeOpCode(Op OpCode) {
-  return (unsigned)OpCode >= OpTypeEvent && (unsigned)OpCode <= OpTypeQueue;
+  return OpCode == OpConvertUToF || OpCode == OpUConvert;
 }
 
 inline bool isGenericNegateOpCode(Op OpCode) {
@@ -123,8 +114,7 @@ inline bool isAccessChainOpCode(Op OpCode) {
 
 inline bool hasExecScope(Op OpCode) {
   unsigned OC = OpCode;
-  return (OpGroupWaitEvents <= OC && OC <= OpGroupSMax) ||
-         (OpGroupReserveReadPipePackets <= OC && OC <= OpGroupCommitWritePipe);
+  return (OpGroupAll <= OC && OC <= OpGroupSMax);
 }
 
 inline bool hasGroupOperation(Op OpCode) {
@@ -148,19 +138,15 @@ inline bool isGroupNonUniformAMDCode(Op OpCode) {
   return (OpGroupIAddNonUniformAMD <= OC && OC <= OpGroupSMaxNonUniformAMD);
 }
 
-inline bool isPipeOpCode(Op OpCode) {
-  unsigned OC = OpCode;
-  return OpReadPipe <= OC && OC <= OpGroupCommitWritePipe;
-}
 inline bool isTypeOpCode(Op OpCode) {
   unsigned OC = OpCode;
-  return (OpTypeVoid <= OC && OC <= OpTypePipe) || OC == OpTypePipeStorage;
+  return (OpTypeVoid <= OC && OC <= OpTypeStruct) ||
+         OC == OpTypePointer || OC == OpTypeFunction;
 }
 
 inline bool isConstantOpCode(Op OpCode) {
   unsigned OC = OpCode;
-  return (OpConstantTrue <= OC && OC <= OpSpecConstantOp) || OC == OpUndef ||
-         OC == OpConstantPipeStorage;
+  return (OpConstantTrue <= OC && OC <= OpSpecConstantOp) || OC == OpUndef;
 }
 
 inline bool isModuleScopeAllowedOpCode(Op OpCode) {

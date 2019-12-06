@@ -133,22 +133,12 @@ public:
     addDecorate(DecorationFPRoundingMode, Kind);
   }
   void eraseFPRoundingMode() { eraseDecorate(DecorationFPRoundingMode); }
-  void setSaturatedConversion(bool Enable) {
-    if (Enable)
-      addDecorate(DecorationSaturatedConversion);
-    else
-      eraseDecorate(DecorationSaturatedConversion);
-  }
   bool hasFPRoundingMode(SPIRVFPRoundingModeKind *Kind = nullptr) {
     SPIRVWord V;
     auto Found = hasDecorate(DecorationFPRoundingMode, 0, &V);
     if (Found && Kind)
       *Kind = static_cast<SPIRVFPRoundingModeKind>(V);
     return Found;
-  }
-  bool isSaturatedConversion() {
-    return hasDecorate(DecorationSaturatedConversion) ||
-           OpCode == OpSatConvertSToU || OpCode == OpSatConvertUToS;
   }
 
   SPIRVBasicBlock *getBasicBlock() const { return BB; }
@@ -292,7 +282,7 @@ public:
   // Get the offset of operands.
   // Some instructions skip literals when returning operands.
   size_t getOperandOffset() const {
-    if (hasExecScope() && !isGroupOpCode(OpCode) && !isPipeOpCode(OpCode))
+    if (hasExecScope() && !isGroupOpCode(OpCode))
       return 1;
     return 0;
   }
@@ -477,7 +467,6 @@ public:
     assert(Initializer.size() == 1);
     return getValue(Initializer[0]);
   }
-  bool isConstant() const { return hasDecorate(DecorationConstant); }
   bool isBuiltin(SPIRVBuiltinVariableKind *BuiltinKind = nullptr) const {
     SPIRVWord Kind;
     bool Found = hasDecorate(DecorationBuiltIn, 0, &Kind);
@@ -490,12 +479,6 @@ public:
   void setBuiltin(SPIRVBuiltinVariableKind Kind) {
     assert(isValid(Kind));
     addDecorate(new SPIRVDecorate(DecorationBuiltIn, this, Kind));
-  }
-  void setIsConstant(bool Is) {
-    if (Is)
-      addDecorate(new SPIRVDecorate(DecorationConstant, this));
-    else
-      eraseDecorate(DecorationConstant);
   }
   std::vector<SPIRVEntry *> getNonLiteralOperands() const override {
     if (SPIRVValue *V = getInitializer())
@@ -1125,9 +1108,6 @@ _SPIRV_OP(UGreaterThanEqual)
 _SPIRV_OP(SGreaterThanEqual)
 _SPIRV_OP(FOrdGreaterThanEqual)
 _SPIRV_OP(FUnordGreaterThanEqual)
-_SPIRV_OP(LessOrGreater)
-_SPIRV_OP(Ordered)
-_SPIRV_OP(Unordered)
 #if SPV_VERSION >= 0x10400
 _SPIRV_OP(PtrEqual)
 _SPIRV_OP(PtrNotEqual)
@@ -1492,12 +1472,8 @@ _SPIRV_OP(ConvertUToF)
 _SPIRV_OP(UConvert)
 _SPIRV_OP(SConvert)
 _SPIRV_OP(FConvert)
-_SPIRV_OP(SatConvertSToU)
-_SPIRV_OP(SatConvertUToS)
 _SPIRV_OP(ConvertPtrToU)
 _SPIRV_OP(ConvertUToPtr)
-_SPIRV_OP(PtrCastToGeneric)
-_SPIRV_OP(GenericCastToPtr)
 _SPIRV_OP(Bitcast)
 _SPIRV_OP(SNegate)
 _SPIRV_OP(FNegate)
@@ -1505,9 +1481,6 @@ _SPIRV_OP(Not)
 _SPIRV_OP(LogicalNot)
 _SPIRV_OP(IsNan)
 _SPIRV_OP(IsInf)
-_SPIRV_OP(IsFinite)
-_SPIRV_OP(IsNormal)
-_SPIRV_OP(SignBitSet)
 _SPIRV_OP(Transpose)
 _SPIRV_OP(Any)
 _SPIRV_OP(All)
@@ -2322,163 +2295,6 @@ protected:
   SPIRVWord MemberIndex;
 };
 
-template <Op OC> class SPIRVLifetime : public SPIRVInstruction {
-public:
-  // Complete constructor
-  SPIRVLifetime(SPIRVId TheObject, SPIRVWord TheSize, SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(3, OC, TheBB), Object(TheObject), Size(TheSize) {
-    validate();
-    assert(TheBB && "Invalid BB");
-  };
-  // Incomplete constructor
-  SPIRVLifetime()
-      : SPIRVInstruction(OC), Object(SPIRVID_INVALID), Size(SPIRVWORD_MAX) {
-    setHasNoId();
-    setHasNoType();
-  }
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityKernel);
-  }
-  SPIRVValue *getObject() { return getValue(Object); };
-  SPIRVWord getSize() { return Size; };
-
-protected:
-  void validate() const override {
-    auto Obj = static_cast<SPIRVVariable *>(getValue(Object));
-    assert(Obj->getStorageClass() == StorageClassFunction &&
-           "Invalid storage class");
-    assert(Obj->getType()->isTypePointer() && "Objects type must be a pointer");
-    if (!Obj->getType()->getPointerElementType()->isTypeVoid() ||
-        !Module->hasCapability(CapabilityAddresses))
-      assert(Size == 0 && "Size must be 0");
-  }
-  _SPIRV_DEF_DECODE2(Object, Size)
-  SPIRVId Object;
-  SPIRVWord Size;
-};
-
-typedef SPIRVLifetime<OpLifetimeStart> SPIRVLifetimeStart;
-typedef SPIRVLifetime<OpLifetimeStop> SPIRVLifetimeStop;
-
-class SPIRVGroupAsyncCopy : public SPIRVInstruction {
-public:
-  static const Op OC = OpGroupAsyncCopy;
-  static const SPIRVWord WC = 9;
-  // Complete constructor
-  SPIRVGroupAsyncCopy(SPIRVValue *TheScope, SPIRVId TheId, SPIRVValue *TheDest,
-                      SPIRVValue *TheSrc, SPIRVValue *TheNumElems,
-                      SPIRVValue *TheStride, SPIRVValue *TheEvent,
-                      SPIRVBasicBlock *TheBB)
-      : SPIRVInstruction(WC, OC, TheEvent->getType(), TheId, TheBB),
-        ExecScope(TheScope->getId()), Destination(TheDest->getId()),
-        Source(TheSrc->getId()), NumElements(TheNumElems->getId()),
-        Stride(TheStride->getId()), Event(TheEvent->getId()) {
-    validate();
-    assert(TheBB && "Invalid BB");
-  }
-  // Incomplete constructor
-  SPIRVGroupAsyncCopy()
-      : SPIRVInstruction(OC), ExecScope(SPIRVID_INVALID),
-        Destination(SPIRVID_INVALID), Source(SPIRVID_INVALID),
-        NumElements(SPIRVID_INVALID), Stride(SPIRVID_INVALID),
-        Event(SPIRVID_INVALID) {}
-  SPIRVValue *getExecScope() const { return getValue(ExecScope); }
-  SPIRVValue *getDestination() const { return getValue(Destination); }
-  SPIRVValue *getSource() const { return getValue(Source); }
-  SPIRVValue *getNumElements() const { return getValue(NumElements); }
-  SPIRVValue *getStride() const { return getValue(Stride); }
-  SPIRVValue *getEvent() const { return getValue(Event); }
-  std::vector<SPIRVValue *> getOperands() override {
-    std::vector<SPIRVId> Operands;
-    Operands.push_back(Destination);
-    Operands.push_back(Source);
-    Operands.push_back(NumElements);
-    Operands.push_back(Stride);
-    Operands.push_back(Event);
-    return getValues(Operands);
-  }
-
-protected:
-  _SPIRV_DEF_DECODE8(Type, Id, ExecScope, Destination, Source, NumElements,
-                     Stride, Event)
-  void validate() const override {
-    assert(OpCode == OC);
-    assert(WordCount == WC);
-    SPIRVInstruction::validate();
-  }
-  SPIRVId ExecScope;
-  SPIRVId Destination;
-  SPIRVId Source;
-  SPIRVId NumElements;
-  SPIRVId Stride;
-  SPIRVId Event;
-};
-
-enum SPIRVOpKind { SPIRVOPK_Id, SPIRVOPK_Literal, SPIRVOPK_Count };
-
-class SPIRVDevEnqInstBase : public SPIRVInstTemplateBase {
-public:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityDeviceEnqueue);
-  }
-};
-
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVDevEnqInstBase, Op##x, __VA_ARGS__> SPIRV##x;
-// CL 2.0 enqueue kernel builtins
-_SPIRV_OP(EnqueueMarker, true, 7)
-_SPIRV_OP(EnqueueKernel, true, 13, true)
-_SPIRV_OP(GetKernelNDrangeSubGroupCount, true, 8)
-_SPIRV_OP(GetKernelNDrangeMaxSubGroupSize, true, 8)
-_SPIRV_OP(GetKernelWorkGroupSize, true, 7)
-_SPIRV_OP(GetKernelPreferredWorkGroupSizeMultiple, true, 7)
-_SPIRV_OP(RetainEvent, false, 2)
-_SPIRV_OP(ReleaseEvent, false, 2)
-_SPIRV_OP(CreateUserEvent, true, 3)
-_SPIRV_OP(IsValidEvent, true, 4)
-_SPIRV_OP(SetUserEventStatus, false, 3)
-_SPIRV_OP(CaptureEventProfilingInfo, false, 4)
-_SPIRV_OP(GetDefaultQueue, true, 3)
-_SPIRV_OP(BuildNDRange, true, 6)
-#undef _SPIRV_OP
-
-class SPIRVPipeInstBase : public SPIRVInstTemplateBase {
-public:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityPipes);
-  }
-};
-
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVPipeInstBase, Op##x, __VA_ARGS__> SPIRV##x;
-// CL 2.0 pipe builtins
-_SPIRV_OP(ReadPipe, true, 7)
-_SPIRV_OP(WritePipe, true, 7)
-_SPIRV_OP(ReservedReadPipe, true, 9)
-_SPIRV_OP(ReservedWritePipe, true, 9)
-_SPIRV_OP(ReserveReadPipePackets, true, 7)
-_SPIRV_OP(ReserveWritePipePackets, true, 7)
-_SPIRV_OP(CommitReadPipe, false, 5)
-_SPIRV_OP(CommitWritePipe, false, 5)
-_SPIRV_OP(IsValidReserveId, true, 4)
-_SPIRV_OP(GetNumPipePackets, true, 6)
-_SPIRV_OP(GetMaxPipePackets, true, 6)
-#undef _SPIRV_OP
-
-class SPIRVPipeStorageInstBase : public SPIRVInstTemplateBase {
-public:
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityPipeStorage, CapabilityPipes);
-  }
-};
-
-#define _SPIRV_OP(x, ...)                                                      \
-  typedef SPIRVInstTemplate<SPIRVPipeStorageInstBase, Op##x, __VA_ARGS__>      \
-      SPIRV##x;
-
-_SPIRV_OP(CreatePipeFromPipeStorage, true, 4)
-#undef _SPIRV_OP
-
 class SPIRVGroupInstBase : public SPIRVInstTemplateBase {
 public:
   SPIRVCapVec getRequiredCapability() const override {
@@ -2489,7 +2305,6 @@ public:
 #define _SPIRV_OP(x, ...)                                                      \
   typedef SPIRVInstTemplate<SPIRVGroupInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Group instructions
-_SPIRV_OP(GroupWaitEvents, false, 4)
 _SPIRV_OP(GroupAll, true, 5)
 _SPIRV_OP(GroupAny, true, 5)
 _SPIRV_OP(GroupBroadcast, true, 6)
@@ -2501,10 +2316,6 @@ _SPIRV_OP(GroupSMin, true, 6, false, 1)
 _SPIRV_OP(GroupFMax, true, 6, false, 1)
 _SPIRV_OP(GroupUMax, true, 6, false, 1)
 _SPIRV_OP(GroupSMax, true, 6, false, 1)
-_SPIRV_OP(GroupReserveReadPipePackets, true, 8)
-_SPIRV_OP(GroupReserveWritePipePackets, true, 8)
-_SPIRV_OP(GroupCommitReadPipe, false, 6)
-_SPIRV_OP(GroupCommitWritePipe, false, 6)
 _SPIRV_OP(GroupNonUniformElect, true, 4)
 _SPIRV_OP(GroupNonUniformAll, true, 5)
 _SPIRV_OP(GroupNonUniformAny, true, 5)
@@ -2558,12 +2369,8 @@ public:
     if (hasType() && getType()->isTypeInt(64)) {
       // In SPIRV 1.2 spec only 2 atomic instructions have no result type:
       // 1. OpAtomicStore - need to check type of the Value operand
-      // 2. OpAtomicFlagClear - doesn't require Int64Atomics capability.
       CapVec.push_back(CapabilityInt64Atomics);
     }
-    // Per the spec OpAtomicCompareExchangeWeak, OpAtomicFlagTestAndSet and
-    // OpAtomicFlagClear instructions require kernel capability. But this
-    // capability should be added by setting OpenCL memory model.
     return CapVec;
   }
 
@@ -2581,13 +2388,10 @@ public:
 #define _SPIRV_OP(x, ...)                                                      \
   typedef SPIRVInstTemplate<SPIRVAtomicInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 // Atomic builtins
-_SPIRV_OP(AtomicFlagTestAndSet, true, 6)
-_SPIRV_OP(AtomicFlagClear, false, 4)
 _SPIRV_OP(AtomicLoad, true, 6)
 _SPIRV_OP(AtomicStore, false, 5)
 _SPIRV_OP(AtomicExchange, true, 7)
 _SPIRV_OP(AtomicCompareExchange, true, 9)
-_SPIRV_OP(AtomicCompareExchangeWeak, true, 9)
 _SPIRV_OP(AtomicIIncrement, true, 6)
 _SPIRV_OP(AtomicIDecrement, true, 6)
 _SPIRV_OP(AtomicIAdd, true, 7)
@@ -2605,7 +2409,7 @@ _SPIRV_OP(MemoryBarrier, false, 3)
 class SPIRVImageInstBase : public SPIRVInstTemplateBase {
 public:
   SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityImageBasic);
+    return getVec(CapabilityShader);
   }
 };
 
@@ -2627,8 +2431,6 @@ _SPIRV_OP(ImageGather, true, 6, true, 3)
 _SPIRV_OP(ImageDrefGather, true, 6, true, 3)
 _SPIRV_OP(ImageRead, true, 5, true, 2)
 _SPIRV_OP(ImageWrite, false, 4, true, 3)
-_SPIRV_OP(ImageQueryFormat, true, 4)
-_SPIRV_OP(ImageQueryOrder, true, 4)
 _SPIRV_OP(ImageQuerySizeLod, true, 5)
 _SPIRV_OP(ImageQuerySize, true, 4)
 _SPIRV_OP(ImageQueryLod, true, 5)
@@ -2670,8 +2472,6 @@ protected:
   typedef SPIRVInstTemplate<SPIRVInstTemplateBase, Op##x, __VA_ARGS__> \
       SPIRV##x;
 // Other instructions
-_SPIRV_OP(GenericPtrMemSemantics, true, 4, false)
-_SPIRV_OP(GenericCastToPtrExplicit, true, 5, false, 1)
 _SPIRV_OP(BitFieldInsert, true, 7, false)
 _SPIRV_OP(BitFieldSExtract, true, 6, false)
 _SPIRV_OP(BitFieldUExtract, true, 6, false)

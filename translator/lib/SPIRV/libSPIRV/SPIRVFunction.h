@@ -54,16 +54,7 @@ public:
   SPIRVFunctionParameter()
       : SPIRVValue(OpFunctionParameter), ParentFunc(nullptr), ArgNo(0) {}
   unsigned getArgNo() const { return ArgNo; }
-  void foreachAttr(std::function<void(SPIRVFuncParamAttrKind)>);
-  void addAttr(SPIRVFuncParamAttrKind Kind) {
-    addDecorate(new SPIRVDecorate(DecorationFuncParamAttr, this, Kind));
-  }
   void setParent(SPIRVFunction *Parent) { ParentFunc = Parent; }
-  bool hasAttr(SPIRVFuncParamAttrKind Kind) const {
-    return getDecorate(DecorationFuncParamAttr).count(Kind);
-  }
-  bool isByVal() const { return hasAttr(FunctionParameterAttributeByVal); }
-  bool isZext() const { return hasAttr(FunctionParameterAttributeZext); }
   SPIRVCapVec getRequiredCapability() const override {
     if (hasLinkageType() && getLinkageType() == LinkageTypeImport)
       return getVec(CapabilityLinkage);
@@ -110,8 +101,6 @@ public:
     for (size_t I = 0, E = getNumArguments(); I != E; ++I)
       Func(getArgument(I));
   }
-
-  void foreachReturnValueAttr(std::function<void(SPIRVFuncParamAttrKind)>);
 
   void setFunctionControlMask(SPIRVWord Mask) { FCtrlMask = Mask; }
 

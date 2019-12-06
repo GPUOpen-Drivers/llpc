@@ -82,12 +82,6 @@ public:
 
   SPIRVWord getRequiredSPIRVVersion() const override {
     switch (Dec) {
-    case DecorationSpecId:
-      if (getModule()->hasCapability(CapabilityKernel))
-        return SPIRV_1_1;
-      else
-        return SPIRV_1_0;
-
     case DecorationMaxByteOffset:
       return SPIRV_1_1;
 

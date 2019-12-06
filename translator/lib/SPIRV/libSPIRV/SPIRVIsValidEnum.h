@@ -75,7 +75,6 @@ inline bool isValid(spv::ExecutionModel V) {
   case ExecutionModelGeometry:
   case ExecutionModelFragment:
   case ExecutionModelGLCompute:
-  case ExecutionModelKernel:
     return true;
   default:
     return false;
@@ -131,7 +130,6 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeDepthLess:
   case ExecutionModeDepthUnchanged:
   case ExecutionModeLocalSize:
-  case ExecutionModeLocalSizeHint:
   case ExecutionModeInputPoints:
   case ExecutionModeInputLines:
   case ExecutionModeInputLinesAdjacency:
@@ -143,10 +141,6 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeOutputPoints:
   case ExecutionModeOutputLineStrip:
   case ExecutionModeOutputTriangleStrip:
-  case ExecutionModeVecTypeHint:
-  case ExecutionModeContractionOff:
-  case ExecutionModeInitializer:
-  case ExecutionModeFinalizer:
   case ExecutionModeSubgroupSize:
   case ExecutionModeSubgroupsPerWorkgroup:
   case ExecutionModePostDepthCoverage:
@@ -202,29 +196,6 @@ inline bool isValid(spv::Dim V) {
   }
 }
 
-inline bool isValid(spv::SamplerAddressingMode V) {
-  switch (V) {
-  case SamplerAddressingModeNone:
-  case SamplerAddressingModeClampToEdge:
-  case SamplerAddressingModeClamp:
-  case SamplerAddressingModeRepeat:
-  case SamplerAddressingModeRepeatMirrored:
-    return true;
-  default:
-    return false;
-  }
-}
-
-inline bool isValid(spv::SamplerFilterMode V) {
-  switch (V) {
-  case SamplerFilterModeNearest:
-  case SamplerFilterModeLinear:
-    return true;
-  default:
-    return false;
-  }
-}
-
 inline bool isValid(spv::ImageFormat V) {
   switch (V) {
   case ImageFormatUnknown:
@@ -273,55 +244,6 @@ inline bool isValid(spv::ImageFormat V) {
   }
 }
 
-inline bool isValid(spv::ImageChannelOrder V) {
-  switch (V) {
-  case ImageChannelOrderR:
-  case ImageChannelOrderA:
-  case ImageChannelOrderRG:
-  case ImageChannelOrderRA:
-  case ImageChannelOrderRGB:
-  case ImageChannelOrderRGBA:
-  case ImageChannelOrderBGRA:
-  case ImageChannelOrderARGB:
-  case ImageChannelOrderIntensity:
-  case ImageChannelOrderLuminance:
-  case ImageChannelOrderRx:
-  case ImageChannelOrderRGx:
-  case ImageChannelOrderRGBx:
-  case ImageChannelOrderDepth:
-  case ImageChannelOrderDepthStencil:
-  case ImageChannelOrderABGR:
-    return true;
-  default:
-    return false;
-  }
-}
-
-inline bool isValid(spv::ImageChannelDataType V) {
-  switch (V) {
-  case ImageChannelDataTypeSnormInt8:
-  case ImageChannelDataTypeSnormInt16:
-  case ImageChannelDataTypeUnormInt8:
-  case ImageChannelDataTypeUnormInt16:
-  case ImageChannelDataTypeUnormShort565:
-  case ImageChannelDataTypeUnormShort555:
-  case ImageChannelDataTypeUnormInt101010:
-  case ImageChannelDataTypeSignedInt8:
-  case ImageChannelDataTypeSignedInt16:
-  case ImageChannelDataTypeSignedInt32:
-  case ImageChannelDataTypeUnsignedInt8:
-  case ImageChannelDataTypeUnsignedInt16:
-  case ImageChannelDataTypeUnsignedInt32:
-  case ImageChannelDataTypeHalfFloat:
-  case ImageChannelDataTypeFloat:
-  case ImageChannelDataTypeUnormInt24:
-  case ImageChannelDataTypeUnormInt101010_2:
-    return true;
-  default:
-    return false;
-  }
-}
-
 inline bool isValid(spv::FPRoundingMode V) {
   switch (V) {
   case FPRoundingModeRTE:
@@ -346,33 +268,6 @@ inline bool isValid(spv::LinkageType V) {
   }
 }
 
-inline bool isValid(spv::AccessQualifier V) {
-  switch (V) {
-  case AccessQualifierReadOnly:
-  case AccessQualifierWriteOnly:
-  case AccessQualifierReadWrite:
-    return true;
-  default:
-    return false;
-  }
-}
-
-inline bool isValid(spv::FunctionParameterAttribute V) {
-  switch (V) {
-  case FunctionParameterAttributeZext:
-  case FunctionParameterAttributeSext:
-  case FunctionParameterAttributeByVal:
-  case FunctionParameterAttributeSret:
-  case FunctionParameterAttributeNoAlias:
-  case FunctionParameterAttributeNoCapture:
-  case FunctionParameterAttributeNoWrite:
-  case FunctionParameterAttributeNoReadWrite:
-    return true;
-  default:
-    return false;
-  }
-}
-
 inline bool isValid(spv::Decoration V) {
   switch (V) {
   case DecorationRelaxedPrecision:
@@ -385,7 +280,6 @@ inline bool isValid(spv::Decoration V) {
   case DecorationMatrixStride:
   case DecorationGLSLShared:
   case DecorationGLSLPacked:
-  case DecorationCPacked:
   case DecorationBuiltIn:
   case DecorationNoPerspective:
   case DecorationFlat:
@@ -396,7 +290,6 @@ inline bool isValid(spv::Decoration V) {
   case DecorationRestrict:
   case DecorationAliased:
   case DecorationVolatile:
-  case DecorationConstant:
   case DecorationCoherent:
   case DecorationNonWritable:
   case DecorationNonReadable:
@@ -404,7 +297,6 @@ inline bool isValid(spv::Decoration V) {
 #if SPV_VERSION >= 0x10400
   case DecorationUniformId:
 #endif
-  case DecorationSaturatedConversion:
   case DecorationStream:
   case DecorationLocation:
   case DecorationComponent:
@@ -414,13 +306,10 @@ inline bool isValid(spv::Decoration V) {
   case DecorationOffset:
   case DecorationXfbBuffer:
   case DecorationXfbStride:
-  case DecorationFuncParamAttr:
   case DecorationFPRoundingMode:
-  case DecorationFPFastMathMode:
   case DecorationLinkageAttributes:
   case DecorationNoContraction:
   case DecorationInputAttachmentIndex:
-  case DecorationAlignment:
   case DecorationMaxByteOffset:
 #if SPV_VERSION >= 0x10400
   case DecorationNoSignedWrap:
@@ -474,15 +363,8 @@ inline bool isValid(spv::BuiltIn V) {
   case BuiltInLocalInvocationId:
   case BuiltInGlobalInvocationId:
   case BuiltInLocalInvocationIndex:
-  case BuiltInWorkDim:
-  case BuiltInGlobalSize:
-  case BuiltInEnqueuedWorkgroupSize:
-  case BuiltInGlobalOffset:
-  case BuiltInGlobalLinearId:
   case BuiltInSubgroupSize:
-  case BuiltInSubgroupMaxSize:
   case BuiltInNumSubgroups:
-  case BuiltInNumEnqueuedSubgroups:
   case BuiltInSubgroupId:
   case BuiltInSubgroupLocalInvocationId:
   case BuiltInVertexIndex:
@@ -539,17 +421,6 @@ inline bool isValid(spv::GroupOperation V) {
   }
 }
 
-inline bool isValid(spv::KernelEnqueueFlags V) {
-  switch (V) {
-  case KernelEnqueueFlagsNoWait:
-  case KernelEnqueueFlagsWaitKernel:
-  case KernelEnqueueFlagsWaitWorkGroup:
-    return true;
-  default:
-    return false;
-  }
-}
-
 inline bool isValid(spv::Capability V) {
   uint32_t Cap = V;
   switch(Cap) {
@@ -559,20 +430,11 @@ inline bool isValid(spv::Capability V) {
   case CapabilityTessellation:
   case CapabilityAddresses:
   case CapabilityLinkage:
-  case CapabilityKernel:
-  case CapabilityVector16:
-  case CapabilityFloat16Buffer:
   case CapabilityFloat16:
   case CapabilityFloat64:
   case CapabilityInt64:
   case CapabilityInt64Atomics:
-  case CapabilityImageBasic:
-  case CapabilityImageReadWrite:
-  case CapabilityImageMipmap:
-  case CapabilityPipes:
   case CapabilityGroups:
-  case CapabilityDeviceEnqueue:
-  case CapabilityLiteralSampler:
   case CapabilityAtomicStorage:
   case CapabilityInt16:
   case CapabilityTessellationPointSize:
@@ -611,7 +473,6 @@ inline bool isValid(spv::Capability V) {
   case CapabilityMultiViewport:
   case CapabilitySubgroupDispatch:
   case CapabilityNamedBarrier:
-  case CapabilityPipeStorage:
   case CapabilityGroupNonUniform:
   case CapabilityGroupNonUniformVote:
   case CapabilityGroupNonUniformArithmetic:
@@ -717,20 +578,13 @@ inline bool isValid(spv::Op V) {
   case OpTypeArray:
   case OpTypeRuntimeArray:
   case OpTypeStruct:
-  case OpTypeOpaque:
   case OpTypePointer:
   case OpTypeFunction:
-  case OpTypeEvent:
-  case OpTypeDeviceEvent:
-  case OpTypeReserveId:
-  case OpTypeQueue:
-  case OpTypePipe:
   case OpTypeForwardPointer:
   case OpConstantTrue:
   case OpConstantFalse:
   case OpConstant:
   case OpConstantComposite:
-  case OpConstantSampler:
   case OpConstantNull:
   case OpSpecConstantTrue:
   case OpSpecConstantFalse:
@@ -751,7 +605,6 @@ inline bool isValid(spv::Op V) {
   case OpInBoundsAccessChain:
   case OpPtrAccessChain:
   case OpArrayLength:
-  case OpGenericPtrMemSemantics:
   case OpInBoundsPtrAccessChain:
   case OpDecorate:
   case OpMemberDecorate:
@@ -781,8 +634,6 @@ inline bool isValid(spv::Op V) {
   case OpImageRead:
   case OpImageWrite:
   case OpImage:
-  case OpImageQueryFormat:
-  case OpImageQueryOrder:
   case OpImageQuerySizeLod:
   case OpImageQuerySize:
   case OpImageQueryLod:
@@ -797,12 +648,7 @@ inline bool isValid(spv::Op V) {
   case OpFConvert:
   case OpQuantizeToF16:
   case OpConvertPtrToU:
-  case OpSatConvertSToU:
-  case OpSatConvertUToS:
   case OpConvertUToPtr:
-  case OpPtrCastToGeneric:
-  case OpGenericCastToPtr:
-  case OpGenericCastToPtrExplicit:
   case OpBitcast:
   case OpSNegate:
   case OpFNegate:
@@ -835,12 +681,6 @@ inline bool isValid(spv::Op V) {
   case OpAll:
   case OpIsNan:
   case OpIsInf:
-  case OpIsFinite:
-  case OpIsNormal:
-  case OpSignBitSet:
-  case OpLessOrGreater:
-  case OpOrdered:
-  case OpUnordered:
   case OpLogicalEqual:
   case OpLogicalNotEqual:
   case OpLogicalOr:
@@ -900,7 +740,6 @@ inline bool isValid(spv::Op V) {
   case OpAtomicStore:
   case OpAtomicExchange:
   case OpAtomicCompareExchange:
-  case OpAtomicCompareExchangeWeak:
   case OpAtomicIIncrement:
   case OpAtomicIDecrement:
   case OpAtomicIAdd:
@@ -923,10 +762,6 @@ inline bool isValid(spv::Op V) {
   case OpReturn:
   case OpReturnValue:
   case OpUnreachable:
-  case OpLifetimeStart:
-  case OpLifetimeStop:
-  case OpGroupAsyncCopy:
-  case OpGroupWaitEvents:
   case OpGroupAll:
   case OpGroupAny:
   case OpGroupBroadcast:
@@ -938,35 +773,6 @@ inline bool isValid(spv::Op V) {
   case OpGroupFMax:
   case OpGroupUMax:
   case OpGroupSMax:
-  case OpReadPipe:
-  case OpWritePipe:
-  case OpReservedReadPipe:
-  case OpReservedWritePipe:
-  case OpReserveReadPipePackets:
-  case OpReserveWritePipePackets:
-  case OpCommitReadPipe:
-  case OpCommitWritePipe:
-  case OpIsValidReserveId:
-  case OpGetNumPipePackets:
-  case OpGetMaxPipePackets:
-  case OpGroupReserveReadPipePackets:
-  case OpGroupReserveWritePipePackets:
-  case OpGroupCommitReadPipe:
-  case OpGroupCommitWritePipe:
-  case OpEnqueueMarker:
-  case OpEnqueueKernel:
-  case OpGetKernelNDrangeSubGroupCount:
-  case OpGetKernelNDrangeMaxSubGroupSize:
-  case OpGetKernelWorkGroupSize:
-  case OpGetKernelPreferredWorkGroupSizeMultiple:
-  case OpRetainEvent:
-  case OpReleaseEvent:
-  case OpCreateUserEvent:
-  case OpIsValidEvent:
-  case OpSetUserEventStatus:
-  case OpCaptureEventProfilingInfo:
-  case OpGetDefaultQueue:
-  case OpBuildNDRange:
   case OpImageSparseSampleImplicitLod:
   case OpImageSparseSampleExplicitLod:
   case OpImageSparseSampleDrefImplicitLod:
@@ -980,18 +786,8 @@ inline bool isValid(spv::Op V) {
   case OpImageSparseDrefGather:
   case OpImageSparseTexelsResident:
   case OpNoLine:
-  case OpAtomicFlagTestAndSet:
-  case OpAtomicFlagClear:
   case OpImageSparseRead:
   case OpSizeOf:
-  case OpTypePipeStorage:
-  case OpConstantPipeStorage:
-  case OpCreatePipeFromPipeStorage:
-  case OpGetKernelLocalSizeForSubgroupCount:
-  case OpGetKernelMaxNumSubgroups:
-  case OpTypeNamedBarrier:
-  case OpNamedBarrierInitialize:
-  case OpMemoryNamedBarrier:
   case OpModuleProcessed:
   case OpExecutionModeId:
   case OpDecorateId:
@@ -1097,17 +893,6 @@ inline bool isValidImageOperandsMask(SPIRVWord Mask) {
   return (Mask & ~ValidMask) == 0;
 }
 
-inline bool isValidFPFastMathModeMask(SPIRVWord Mask) {
-  SPIRVWord ValidMask = 0u;
-  ValidMask |= FPFastMathModeNotNaNMask;
-  ValidMask |= FPFastMathModeNotInfMask;
-  ValidMask |= FPFastMathModeNSZMask;
-  ValidMask |= FPFastMathModeAllowRecipMask;
-  ValidMask |= FPFastMathModeFastMask;
-
-  return (Mask & ~ValidMask) == 0;
-}
-
 inline bool isValidSelectionControlMask(SPIRVWord Mask) {
   SPIRVWord ValidMask = 0u;
   ValidMask |= SelectionControlFlattenMask;
@@ -1175,13 +960,6 @@ inline bool isValidMemoryAccessMask(SPIRVWord Mask) {
   ValidMask |= MemoryAccessMakePointerVisibleMask;
   ValidMask |= MemoryAccessNonPrivatePointerMask;
 #endif
-
-  return (Mask & ~ValidMask) == 0;
-}
-
-inline bool isValidKernelProfilingInfoMask(SPIRVWord Mask) {
-  SPIRVWord ValidMask = 0u;
-  ValidMask |= KernelProfilingInfoCmdExecTimeMask;
 
   return (Mask & ~ValidMask) == 0;
 }

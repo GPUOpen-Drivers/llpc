@@ -43,18 +43,6 @@
 #include "SPIRVValue.h"
 #include "SPIRVEnum.h"
 namespace SPIRV {
-void SPIRVValue::setAlignment(SPIRVWord A) {
-  if (A == 0) {
-    eraseDecorate(DecorationAlignment);
-    return;
-  }
-  addDecorate(new SPIRVDecorate(DecorationAlignment, this, A));
-}
-
-bool SPIRVValue::hasAlignment(SPIRVWord *Result) const {
-  return hasDecorate(DecorationAlignment, 0, Result);
-}
-
 bool SPIRVValue::isVolatile() { return hasDecorate(DecorationVolatile); }
 
 void SPIRVValue::setVolatile(bool IsVolatile) {

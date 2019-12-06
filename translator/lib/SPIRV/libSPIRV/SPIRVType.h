@@ -85,17 +85,11 @@ public:
   bool isTypeRuntimeArray() const;
   bool isTypeBool() const;
   bool isTypeComposite() const;
-  bool isTypeEvent() const;
-  bool isTypeDeviceEvent() const;
-  bool isTypeReserveId() const;
   bool isTypeFloat(unsigned Bits = 0) const;
   bool isTypeImage() const;
   bool isTypeSampledImage() const;
   bool isTypeOCLImage() const;
-  bool isTypePipe()const;
-  bool isTypePipeStorage() const;
   bool isTypeInt(unsigned Bits = 0) const;
-  bool isTypeOpaque() const;
   bool isTypePointer() const;
   bool isTypeForwardPointer() const;
   bool isTypeSampler() const;
@@ -193,13 +187,7 @@ public:
 
   SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
-    if (isTypeFloat(16)) {
-      CV.push_back(CapabilityFloat16Buffer);
-      auto Extensions = getModule()->getExtension();
-      if (std::any_of(Extensions.begin(), Extensions.end(),
-                      [](const std::string &I) { return I == "cl_khr_fp16"; }))
-        CV.push_back(CapabilityFloat16);
-    } else if (isTypeFloat(64))
+    if (isTypeFloat(64))
       CV.push_back(CapabilityFloat64);
     return CV;
   }
@@ -236,8 +224,6 @@ public:
   SPIRVStorageClassKind getStorageClass() const { return ElemStorageClass; }
   SPIRVCapVec getRequiredCapability() const override {
     auto Cap = getVec(CapabilityAddresses);
-    if (getElementType()->isTypeFloat(16))
-      Cap.push_back(CapabilityFloat16Buffer);
     auto C = getCapability(ElemStorageClass);
     Cap.insert(Cap.end(), C.begin(), C.end());
     return Cap;
@@ -294,10 +280,6 @@ public:
   bool isValidIndex(SPIRVWord Index) const { return Index < CompCount; }
   SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec V(getComponentType()->getRequiredCapability());
-    // Even though the capability name is "Vector16", it describes
-    // usage of 8-component or 16-component vectors.
-    if (CompCount >= 8)
-      V.push_back(CapabilityVector16);
     return V;
   }
 
@@ -411,22 +393,6 @@ private:
   SPIRVType *ElemType;                // Element Type
 };
 
-class SPIRVTypeOpaque : public SPIRVType {
-public:
-  // Complete constructor
-  SPIRVTypeOpaque(SPIRVModule *M, SPIRVId TheId, const std::string &TheName)
-      : SPIRVType(M, 2 + getSizeInWords(TheName), OpTypeOpaque, TheId) {
-    Name = TheName;
-    validate();
-  }
-  // Incomplete constructor
-  SPIRVTypeOpaque() : SPIRVType(OpTypeOpaque) {}
-
-protected:
-  _SPIRV_DEF_DECODE2(Id, Name)
-  void validate() const override { SPIRVEntry::validate(); }
-};
-
 struct SPIRVTypeImageDescriptor {
   SPIRVImageDimKind Dim;
   SPIRVWord Depth;
@@ -490,32 +456,15 @@ public:
         Desc(TheDesc) {
     validate();
   }
-  SPIRVTypeImage(SPIRVModule *M, SPIRVId TheId, SPIRVId TheSampledType,
-                 const SPIRVTypeImageDescriptor &TheDesc,
-                 SPIRVAccessQualifierKind TheAcc)
-      : SPIRVType(M, FixedWC + 1, OC, TheId), SampledType(TheSampledType),
-        Desc(TheDesc) {
-    Acc.push_back(TheAcc);
-    validate();
-  }
   SPIRVTypeImage() : SPIRVType(OC), SampledType(SPIRVID_INVALID), Desc() {}
   const SPIRVTypeImageDescriptor &getDescriptor() const { return Desc; }
   bool isOCLImage() const { return Desc.Sampled == 0 && Desc.Format == 0; }
-  bool hasAccessQualifier() const { return !Acc.empty(); }
-  SPIRVAccessQualifierKind getAccessQualifier() const {
-    return hasAccessQualifier() ? Acc[0] : AccessQualifierReadOnly;
-  }
   SPIRVCapVec getRequiredCapability() const override {
     SPIRVCapVec CV;
-    CV.push_back(CapabilityImageBasic);
     if (Desc.Dim == SPIRVImageDimKind::Dim1D)
       CV.push_back(CapabilitySampled1D);
     else if (Desc.Dim == SPIRVImageDimKind::DimBuffer)
       CV.push_back(CapabilitySampledBuffer);
-    if (Acc.size() > 0 && Acc[0] == AccessQualifierReadWrite)
-      CV.push_back(CapabilityImageReadWrite);
-    if (Desc.MS)
-      CV.push_back(CapabilityImageMipmap);
     return CV;
   }
   SPIRVType *getSampledType() const { return get<SPIRVType>(SampledType); }
@@ -525,28 +474,25 @@ public:
   }
 
 protected:
-  _SPIRV_DEF_DECODE9(Id, SampledType, Desc.Dim, Desc.Depth, Desc.Arrayed,
-                     Desc.MS, Desc.Sampled, Desc.Format, Acc)
+  _SPIRV_DEF_DECODE8(Id, SampledType, Desc.Dim, Desc.Depth, Desc.Arrayed,
+                     Desc.MS, Desc.Sampled, Desc.Format)
   // The validation assumes OpenCL image or sampler type.
   void validate() const override {
     assert(OpCode == OC);
-    assert(WordCount == FixedWC + Acc.size());
+    assert(WordCount == FixedWC);
     assert(SampledType != SPIRVID_INVALID && "Invalid sampled type");
     assert(Desc.Dim <= 6);
     assert(Desc.Depth <= 2);
     assert(Desc.Arrayed <= 1);
     assert(Desc.MS <= 1);
-    assert(Acc.size() <= 1);
   }
   void setWordCount(SPIRVWord TheWC) override {
     WordCount = TheWC;
-    Acc.resize(WordCount - FixedWC);
   }
 
 private:
   SPIRVId SampledType;
   SPIRVTypeImageDescriptor Desc;
-  std::vector<SPIRVAccessQualifierKind> Acc;
 };
 
 class SPIRVTypeSampler : public SPIRVType {
@@ -595,24 +541,6 @@ protected:
   }
 };
 
-class SPIRVTypePipeStorage : public SPIRVType {
-public:
-  const static Op OC = OpTypePipeStorage;
-  const static SPIRVWord FixedWC = 2;
-  SPIRVTypePipeStorage(SPIRVModule *M, SPIRVId TheId)
-      : SPIRVType(M, FixedWC, OC, TheId) {
-    validate();
-  }
-  SPIRVTypePipeStorage() : SPIRVType(OC) {}
-
-protected:
-  _SPIRV_DEF_DECODE1(Id)
-  void validate() const override {
-    assert(OpCode == OC);
-    assert(WordCount == FixedWC);
-  }
-};
-
 class SPIRVTypeStruct : public SPIRVType {
 public:
   // Complete constructor
@@ -646,8 +574,6 @@ public:
     MemberTypeIdVec[I] = Ty->getId();
   }
 
-  bool isPacked() const;
-  void setPacked(bool Packed);
   bool isLiteral() const { return Literal; }
   void setLiteral(bool LiteralStruct) { Literal = LiteralStruct; }
 
@@ -711,112 +637,6 @@ protected:
 private:
   SPIRVType *ReturnType;                 // Return Type
   std::vector<SPIRVType *> ParamTypeVec; // Parameter Types
-};
-
-class SPIRVTypeOpaqueGeneric : public SPIRVType {
-public:
-  // Complete constructor
-  SPIRVTypeOpaqueGeneric(Op TheOpCode, SPIRVModule *M, SPIRVId TheId)
-      : SPIRVType(M, 2, TheOpCode, TheId) {
-    validate();
-  }
-
-  // Incomplete constructor
-  SPIRVTypeOpaqueGeneric(Op TheOpCode)
-      : SPIRVType(TheOpCode), Opn(SPIRVID_INVALID) {}
-
-  SPIRVValue *getOperand() { return getValue(Opn); }
-
-protected:
-  _SPIRV_DEF_DECODE1(Id)
-  void validate() const override { SPIRVEntry::validate(); }
-  SPIRVId Opn;
-};
-
-template <Op TheOpCode>
-class SPIRVOpaqueGenericType : public SPIRVTypeOpaqueGeneric {
-public:
-  // Complete constructor
-  SPIRVOpaqueGenericType(SPIRVModule *M, SPIRVId TheId)
-      : SPIRVTypeOpaqueGeneric(TheOpCode, M, TheId) {}
-  // Incomplete constructor
-  SPIRVOpaqueGenericType() : SPIRVTypeOpaqueGeneric(TheOpCode) {}
-};
-
-#define _SPIRV_OP(x) typedef SPIRVOpaqueGenericType<OpType##x> SPIRVType##x;
-_SPIRV_OP(Event)
-_SPIRV_OP(ReserveId)
-#undef _SPIRV_OP
-
-class SPIRVTypeDeviceEvent : public SPIRVType {
-public:
-  // Complete constructor
-  SPIRVTypeDeviceEvent(SPIRVModule *M, SPIRVId TheId)
-      : SPIRVType(M, 2, OpTypeDeviceEvent, TheId) {
-    validate();
-  }
-
-  // Incomplete constructor
-  SPIRVTypeDeviceEvent() : SPIRVType(OpTypeDeviceEvent) {}
-
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityDeviceEnqueue);
-  }
-
-protected:
-  _SPIRV_DEF_DECODE1(Id)
-  void validate() const override { SPIRVEntry::validate(); }
-};
-
-class SPIRVTypeQueue : public SPIRVType {
-public:
-  // Complete constructor
-  SPIRVTypeQueue(SPIRVModule *M, SPIRVId TheId)
-      : SPIRVType(M, 2, OpTypeQueue, TheId) {
-    validate();
-  }
-
-  // Incomplete constructor
-  SPIRVTypeQueue() : SPIRVType(OpTypeQueue) {}
-
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityDeviceEnqueue);
-  }
-
-protected:
-  _SPIRV_DEF_DECODE1(Id)
-};
-
-class SPIRVTypePipe : public SPIRVType {
-public:
-  // Complete constructor
-  SPIRVTypePipe(SPIRVModule *M, SPIRVId TheId,
-                SPIRVAccessQualifierKind AccessQual = AccessQualifierReadOnly)
-      : SPIRVType(M, 3, OpTypePipe, TheId), AccessQualifier(AccessQual) {
-    validate();
-  }
-
-  // Incomplete constructor
-  SPIRVTypePipe()
-      : SPIRVType(OpTypePipe), AccessQualifier(AccessQualifierReadOnly) {}
-
-  SPIRVAccessQualifierKind getAccessQualifier() const {
-    return AccessQualifier;
-  }
-  void setPipeAcessQualifier(SPIRVAccessQualifierKind AccessQual) {
-    AccessQualifier = AccessQual;
-    assert(isValid(AccessQualifier));
-  }
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityPipes);
-  }
-
-protected:
-  _SPIRV_DEF_DECODE2(Id, AccessQualifier)
-  void validate() const override { SPIRVEntry::validate(); }
-
-private:
-  SPIRVAccessQualifierKind AccessQualifier; // Access Qualifier
 };
 
 template <typename T2, typename T1>

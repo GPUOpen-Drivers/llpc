@@ -153,7 +153,7 @@ public:
   void createCompileUnit() {
     if (!Enable)
       return;
-    auto File = SpDbg.getEntryPointFileStr(ExecutionModelKernel, 0);
+    auto File = SpDbg.getEntryPointFileStr(ExecutionModelVertex, 0);
     if (File.empty())
       File = "spirv.dbg.cu"; // File name must be non-empty
     std::string BaseName;
@@ -282,7 +282,6 @@ public:
 
   bool transDecoration(SPIRVValue *, Value *);
   bool transShaderDecoration(SPIRVValue *, Value *);
-  bool transAlign(SPIRVValue *, Value *);
   bool checkContains64BitType(SPIRVType *BT);
   Constant *buildShaderInOutMetadata(SPIRVType *BT, ShaderInOutDecorate &InOutDec, Type *&MetaTy);
   Constant *buildShaderBlockMetadata(SPIRVType* BT, ShaderBlockDecorate &BlockDec, Type *&MDTy);
@@ -536,7 +535,6 @@ private:
   }
 
   Value *getTranslatedValue(SPIRVValue *BV);
-  IntrinsicInst *getLifetimeStartIntrinsic(Instruction *I);
 
   SPIRVErrorLog &getErrorLog() { return BM->getErrorLog(); }
 
@@ -558,8 +556,6 @@ private:
 
   void setName(llvm::Value *V, SPIRVValue *BV);
   void setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI);
-  void insertImageNameAccessQualifier(SPIRV::SPIRVTypeImage *ST,
-                                      std::string &Name);
   template <class Source, class Func> bool foreachFuncCtlMask(Source, Func);
   llvm::GlobalValue::LinkageTypes transLinkageType(const SPIRVValue *V);
 
@@ -575,23 +571,6 @@ Value *SPIRVToLLVM::getTranslatedValue(SPIRVValue *BV) {
   auto Loc = ValueMap.find(BV);
   if (Loc != ValueMap.end())
     return Loc->second;
-  return nullptr;
-}
-
-IntrinsicInst *SPIRVToLLVM::getLifetimeStartIntrinsic(Instruction *I) {
-  auto II = dyn_cast<IntrinsicInst>(I);
-  if (II && II->getIntrinsicID() == Intrinsic::lifetime_start)
-    return II;
-  // Bitcast might be inserted during translation of OpLifetimeStart
-  auto BC = dyn_cast<BitCastInst>(I);
-  if (BC) {
-    for (const auto &U : BC->users()) {
-      II = dyn_cast<IntrinsicInst>(U);
-      if (II && II->getIntrinsicID() == Intrinsic::lifetime_start)
-        return II;
-      ;
-    }
-  }
   return nullptr;
 }
 
@@ -617,14 +596,6 @@ Type *SPIRVToLLVM::transFPType(SPIRVType *T) {
     llvm_unreachable("Invalid type");
     return nullptr;
   }
-}
-
-std::string SPIRVToLLVM::transGLSLImageTypeName(SPIRV::SPIRVTypeImage* ST) {
-  return getSPIRVTypeName(kSPIRVTypeName::SampledImg,
-    getSPIRVImageTypePostfixes(getSPIRVImageSampledTypeName(
-      ST->getSampledType()),
-      ST->getDescriptor(),
-      ST->getAccessQualifier()));
 }
 
 // =====================================================================================================================
@@ -1134,8 +1105,6 @@ Type *SPIRVToLLVM::transType(
     return mapType(T, Type::getIntNTy(*Context, T->getIntegerBitWidth()));
   case OpTypeFloat:
     return mapType(T, transFPType(T));
-  case OpTypeOpaque:
-    return mapType(T, StructType::create(*Context, T->getName()));
   case OpTypeFunction: {
     auto FT = static_cast<SPIRVTypeFunction *>(T);
     auto RT = transType(FT->getReturnType());
@@ -1214,7 +1183,7 @@ SPIRVToLLVM::transValue(const std::vector<SPIRVValue *> &BV, Function *F,
 
 bool SPIRVToLLVM::isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *BI) const {
   auto OC = BI->getOpCode();
-  return isCmpOpCode(OC) && !(OC >= OpLessOrGreater && OC <= OpUnordered);
+  return isCmpOpCode(OC);
 }
 
 void SPIRVToLLVM::setName(llvm::Value *V, SPIRVValue *BV) {
@@ -1296,15 +1265,6 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *LM, BranchInst *BI) {
   BI->setMetadata("llvm.loop", Node);
 }
 
-void SPIRVToLLVM::insertImageNameAccessQualifier(SPIRV::SPIRVTypeImage *ST,
-                                                 std::string &Name) {
-  std::string QName = rmap<std::string>(ST->getAccessQualifier());
-  // transform: read_only -> ro, write_only -> wo, read_write -> rw
-  QName = QName.substr(0, 1) + QName.substr(QName.find("_") + 1, 1) + "_";
-  assert(!Name.empty() && "image name should not be empty");
-  Name.insert(Name.size() - 1, QName);
-}
-
 Value *SPIRVToLLVM::transValue(SPIRVValue *BV, Function *F, BasicBlock *BB,
                                bool CreatePlaceHolder) {
   SPIRVToLLVMValueMap::iterator Loc = ValueMap.find(BV);
@@ -1336,10 +1296,6 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *BV, Function *F,
   bool IsExt =
       Dst->getScalarSizeInBits() > Src->getType()->getScalarSizeInBits();
   switch (BC->getOpCode()) {
-  case OpPtrCastToGeneric:
-  case OpGenericCastToPtr:
-    CO = Instruction::AddrSpaceCast;
-    break;
   case OpSConvert:
     CO = IsExt ? Instruction::SExt : Instruction::Trunc;
     break;
@@ -2727,21 +2683,6 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(
 
     // LLVM cmpxchg returns { <ty>, i1 }, for SPIR-V we only care about the <ty>.
     return getBuilder()->CreateExtractValue(pAtomicCmpXchg, 0);
-}
-
-// =====================================================================================================================
-// Handle OpAtomicCompareExchangeWeak.
-template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchangeWeak>(
-    SPIRVValue* const pSpvValue) // [in] A SPIR-V value.
-{
-    // Image texel atomic operations use the older path for now.
-    if (static_cast<SPIRVInstruction*>(pSpvValue)->getOperands()[0]->getOpCode() == OpImageTexelPointer)
-    {
-        return transSPIRVImageAtomicOpFromInst(static_cast<SPIRVInstruction *>(pSpvValue),
-                                               getBuilder()->GetInsertBlock());
-    }
-
-    return transValueWithOpcode<OpAtomicCompareExchange>(pSpvValue);
 }
 
 // =====================================================================================================================
@@ -5004,31 +4945,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
         BV, ReturnInst::Create(*Context,
                                transValue(RV->getReturnValue(), F, BB), BB));
   }
-  case OpLifetimeStart: {
-    SPIRVLifetimeStart *LTStart = static_cast<SPIRVLifetimeStart *>(BV);
-    IRBuilder<> Builder(BB);
-    SPIRVWord Size = LTStart->getSize();
-    ConstantInt *S = nullptr;
-    if (Size)
-      S = Builder.getInt64(Size);
-    Value *Var = transValue(LTStart->getObject(), F, BB);
-    CallInst *Start = Builder.CreateLifetimeStart(Var, S);
-    return mapValue(BV, Start->getOperand(1));
-  }
-
-  case OpLifetimeStop: {
-    SPIRVLifetimeStop *LTStop = static_cast<SPIRVLifetimeStop *>(BV);
-    IRBuilder<> Builder(BB);
-    SPIRVWord Size = LTStop->getSize();
-    ConstantInt *S = nullptr;
-    if (Size)
-      S = Builder.getInt64(Size);
-    auto Var = transValue(LTStop->getObject(), F, BB);
-    for (const auto &I : Var->users())
-      if (auto II = getLifetimeStartIntrinsic(dyn_cast<Instruction>(I)))
-        return mapValue(BV, Builder.CreateLifetimeEnd(II->getOperand(1), S));
-    return mapValue(BV, Builder.CreateLifetimeEnd(Var, S));
-  }
 
   case OpSelect: {
     SPIRVSelect *BS = static_cast<SPIRVSelect *>(BV);
@@ -5708,7 +5624,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   HANDLE_OPCODE(OpAtomicAnd);
   HANDLE_OPCODE(OpAtomicOr);
   HANDLE_OPCODE(OpAtomicXor);
-  HANDLE_OPCODE(OpAtomicCompareExchangeWeak);
   HANDLE_OPCODE(OpCopyMemory);
   HANDLE_OPCODE(OpLoad);
   HANDLE_OPCODE(OpStore);
@@ -5899,11 +5814,6 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *BF) {
     auto BA = BF->getArgument(I->getArgNo());
     mapValue(BA, &(*I));
     setName(&(*I), BA);
-    BA->foreachAttr([&](SPIRVFuncParamAttrKind Kind) {
-      if (Kind == FunctionParameterAttributeNoWrite)
-        return;
-      F->addAttribute(I->getArgNo() + 1, SPIRSPIRVFuncParamAttrMap::rmap(Kind));
-    });
 
     SPIRVWord MaxOffset = 0;
     if (BA->hasDecorate(DecorationMaxByteOffset, 0, &MaxOffset)) {
@@ -5912,12 +5822,6 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *BF) {
       I->addAttrs(Builder);
     }
   }
-  BF->foreachReturnValueAttr([&](SPIRVFuncParamAttrKind Kind) {
-    if (Kind == FunctionParameterAttributeNoWrite)
-      return;
-    F->addAttribute(AttributeList::ReturnIndex,
-                    SPIRSPIRVFuncParamAttrMap::rmap(Kind));
-  });
 
   // Creating all basic blocks before creating instructions.
   for (size_t I = 0, E = BF->getNumBasicBlock(); I != E; ++I) {
@@ -6456,8 +6360,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
                        ->getZExtIntValue();
   unsigned Semantics = static_cast<SPIRVConstant *>(BIT->getOpValue(OpndIdx++))
                            ->getZExtIntValue();
-  if (BIT->getOpCode() == OpAtomicCompareExchange ||
-      BIT->getOpCode() == OpAtomicCompareExchangeWeak) {
+  if (BIT->getOpCode() == OpAtomicCompareExchange) {
     // Ignore unequal memory semantics
     ++OpndIdx;
   }
@@ -6467,8 +6370,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
       BIT->getOpCode() != OpAtomicIDecrement)
     InputData = transValue(BIT->getOpValue(OpndIdx++), BB->getParent(), BB);
   Value *Comparator = nullptr;
-  if (BIT->getOpCode() == OpAtomicCompareExchange ||
-      BIT->getOpCode() == OpAtomicCompareExchangeWeak)
+  if (BIT->getOpCode() == OpAtomicCompareExchange)
     Comparator = transValue(BIT->getOpValue(OpndIdx++), BB->getParent(), BB);
 
   // Get image type descriptor and load resource descriptor.
@@ -6524,7 +6426,6 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *BI,
   Value *Result = nullptr;
   switch (BI->getOpCode()) {
   case OpAtomicCompareExchange:
-  case OpAtomicCompareExchangeWeak:
     Result = getBuilder()->CreateImageAtomicCompareSwap(
         ImageInfo.Dim, ImageInfo.Flags, Ordering, ImageInfo.ImageDesc, Coord,
         InputData, Comparator);
@@ -7133,8 +7034,6 @@ bool SPIRVToLLVM::transAddressingModel() {
 }
 
 bool SPIRVToLLVM::transDecoration(SPIRVValue *BV, Value *V) {
-  if (!transAlign(BV, V))
-    return false;
   if (!transShaderDecoration(BV, V))
     return false;
   DbgTran.transDbgInfo(BV, V);
@@ -7398,22 +7297,6 @@ bool SPIRVToLLVM::transMetadata() {
       // Skip the following processing for GLSL
       continue;
     }
-  }
-  return true;
-}
-
-bool SPIRVToLLVM::transAlign(SPIRVValue *BV, Value *V) {
-  if (auto AL = dyn_cast<AllocaInst>(V)) {
-    SPIRVWord Align = 0;
-    if (BV->hasAlignment(&Align))
-      AL->setAlignment(MaybeAlign(Align));
-    return true;
-  }
-  if (auto GV = dyn_cast<GlobalVariable>(V)) {
-    SPIRVWord Align = 0;
-    if (BV->hasAlignment(&Align))
-      GV->setAlignment(MaybeAlign(Align));
-    return true;
   }
   return true;
 }

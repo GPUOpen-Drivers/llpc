@@ -62,18 +62,13 @@ class SPIRVTypeBool;
 class SPIRVTypeFloat;
 class SPIRVTypeFunction;
 class SPIRVTypeInt;
-class SPIRVTypeOpaque;
 class SPIRVTypePointer;
 class SPIRVTypeImage;
 class SPIRVTypeSampler;
 class SPIRVTypeSampledImage;
-class SPIRVTypePipeStorage;
 class SPIRVTypeStruct;
 class SPIRVTypeVector;
 class SPIRVTypeVoid;
-class SPIRVTypeDeviceEvent;
-class SPIRVTypeQueue;
-class SPIRVTypePipe;
 class SPIRVValue;
 class SPIRVVariable;
 class SPIRVDecorateGeneric;
@@ -149,7 +144,6 @@ public:
   virtual bool importBuiltinSet(const std::string &, SPIRVId *) = 0;
   virtual bool importBuiltinSetWithId(const std::string &, SPIRVId) = 0;
   virtual void setAddressingModel(SPIRVAddressingModelKind) = 0;
-  virtual void setAlignment(SPIRVValue *, SPIRVWord) = 0;
   virtual void setMemoryModel(SPIRVMemoryModelKind) = 0;
   virtual void setName(SPIRVEntry *, const std::string &) = 0;
   virtual void setSourceLanguage(SourceLanguage, SPIRVWord) = 0;
@@ -212,24 +206,13 @@ public:
   addFunctionType(SPIRVType *, const std::vector<SPIRVType *> &) = 0;
   virtual SPIRVTypeImage *addImageType(SPIRVType *,
                                        const SPIRVTypeImageDescriptor &) = 0;
-  virtual SPIRVTypeImage *addImageType(SPIRVType *,
-                                       const SPIRVTypeImageDescriptor &,
-                                       SPIRVAccessQualifierKind) = 0;
   virtual SPIRVTypeSampler *addSamplerType() = 0;
-  virtual SPIRVTypePipeStorage *addPipeStorageType() = 0;
   virtual SPIRVTypeSampledImage *addSampledImageType(SPIRVTypeImage *T) = 0;
   virtual SPIRVTypeInt *addIntegerType(unsigned) = 0;
-  virtual SPIRVTypeOpaque *addOpaqueType(const std::string &) = 0;
   virtual SPIRVTypePointer *addPointerType(SPIRVStorageClassKind,
                                            SPIRVType *) = 0;
-  virtual SPIRVTypeStruct *openStructType(unsigned, const std::string &) = 0;
-  virtual void closeStructType(SPIRVTypeStruct *, bool) = 0;
   virtual SPIRVTypeVector *addVectorType(SPIRVType *, SPIRVWord) = 0;
   virtual SPIRVTypeVoid *addVoidType() = 0;
-  virtual SPIRVType *addOpaqueGenericType(Op) = 0;
-  virtual SPIRVTypeDeviceEvent *addDeviceEventType() = 0;
-  virtual SPIRVTypeQueue *addQueueType() = 0;
-  virtual SPIRVTypePipe *addPipeType() = 0;
   virtual void createForwardPointers() = 0;
 
   // Constants creation functions
@@ -242,22 +225,11 @@ public:
   virtual SPIRVValue *addIntegerConstant(SPIRVTypeInt *, uint64_t) = 0;
   virtual SPIRVValue *addNullConstant(SPIRVType *) = 0;
   virtual SPIRVValue *addUndef(SPIRVType *TheType) = 0;
-  virtual SPIRVValue *addSamplerConstant(SPIRVType *TheType, SPIRVWord AddrMode,
-                                         SPIRVWord ParametricMode,
-                                         SPIRVWord FilterMode) = 0;
-  virtual SPIRVValue *addPipeStorageConstant(SPIRVType *TheType,
-                                             SPIRVWord PacketSize,
-                                             SPIRVWord PacketAlign,
-                                             SPIRVWord Capacity) = 0;
 
   // Instruction creation functions
   virtual SPIRVInstruction *addPtrAccessChainInst(SPIRVType *, SPIRVValue *,
                                                   std::vector<SPIRVValue *>,
                                                   SPIRVBasicBlock *, bool) = 0;
-  virtual SPIRVInstruction *
-  addAsyncGroupCopy(SPIRVValue *Scope, SPIRVValue *Dest, SPIRVValue *Src,
-                    SPIRVValue *NumElems, SPIRVValue *Stride, SPIRVValue *Event,
-                    SPIRVBasicBlock *BB) = 0;
   virtual SPIRVInstruction *addBinaryInst(Op, SPIRVType *, SPIRVValue *,
                                           SPIRVValue *, SPIRVBasicBlock *) = 0;
   virtual SPIRVInstruction *addBranchConditionalInst(SPIRVValue *, SPIRVLabel *,
@@ -317,9 +289,6 @@ public:
   virtual SPIRVInstruction *addLoadInst(SPIRVValue *,
                                         const std::vector<SPIRVWord> &,
                                         SPIRVBasicBlock *) = 0;
-  virtual SPIRVInstruction *addLifetimeInst(Op OC, SPIRVValue *Object,
-                                            SPIRVWord Size,
-                                            SPIRVBasicBlock *BB) = 0;
   virtual SPIRVInstruction *addMemoryBarrierInst(Scope ScopeKind,
                                                  SPIRVWord MemFlag,
                                                  SPIRVBasicBlock *BB) = 0;

@@ -65,9 +65,6 @@ namespace SPIRV {
 const static unsigned short KTranslatorVer = 14;
 
 #define SPCV_TARGET_LLVM_IMAGE_TYPE_ENCODE_ACCESS_QUAL 0
-// Workaround for SPIR 2 producer bug about kernel function calling convention.
-// This workaround checks metadata to determine if a function is kernel.
-#define SPCV_RELAX_KERNEL_CALLING_CONV 1
 
 #ifndef LLVM_DEBUG
 #define LLVM_DEBUG DEBUG
@@ -95,7 +92,6 @@ template <> inline void SPIRVMap<unsigned, Op>::init() {
   _SPIRV_OP(PtrToInt, ConvertPtrToU)
   _SPIRV_OP(IntToPtr, ConvertUToPtr)
   _SPIRV_OP(BitCast, Bitcast)
-  _SPIRV_OP(AddrSpaceCast, GenericCastToPtr)
   _SPIRV_OP(GetElementPtr, AccessChain)
   /*Binary*/
   _SPIRV_OP(And, BitwiseAnd)
@@ -128,8 +124,6 @@ template <> inline void SPIRVMap<CmpInst::Predicate, Op>::init() {
   _SPIRV_OP(FCMP_OLT, FOrdLessThan)
   _SPIRV_OP(FCMP_OLE, FOrdLessThanEqual)
   _SPIRV_OP(FCMP_ONE, FOrdNotEqual)
-  _SPIRV_OP(FCMP_ORD, Ordered)
-  _SPIRV_OP(FCMP_UNO, Unordered)
   _SPIRV_OP(FCMP_UEQ, FUnordEqual)
   _SPIRV_OP(FCMP_UGT, FUnordGreaterThan)
   _SPIRV_OP(FCMP_UGE, FUnordGreaterThanEqual)
@@ -222,28 +216,6 @@ inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init() {
 }
 typedef SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind> SPIRSPIRVAddrSpaceMap;
 
-// Maps OCL builtin function to SPIRV builtin variable.
-template <>
-inline void SPIRVMap<std::string, SPIRVAccessQualifierKind>::init() {
-  add("read_only", AccessQualifierReadOnly);
-  add("write_only", AccessQualifierWriteOnly);
-  add("read_write", AccessQualifierReadWrite);
-}
-typedef SPIRVMap<std::string, SPIRVAccessQualifierKind>
-    SPIRSPIRVAccessQualifierMap;
-
-template <>
-inline void SPIRVMap<Attribute::AttrKind, SPIRVFuncParamAttrKind>::init() {
-  add(Attribute::ZExt, FunctionParameterAttributeZext);
-  add(Attribute::SExt, FunctionParameterAttributeSext);
-  add(Attribute::ByVal, FunctionParameterAttributeByVal);
-  add(Attribute::StructRet, FunctionParameterAttributeSret);
-  add(Attribute::NoAlias, FunctionParameterAttributeNoAlias);
-  add(Attribute::NoCapture, FunctionParameterAttributeNoCapture);
-}
-typedef SPIRVMap<Attribute::AttrKind, SPIRVFuncParamAttrKind>
-    SPIRSPIRVFuncParamAttrMap;
-
 template <>
 inline void
 SPIRVMap<Attribute::AttrKind, SPIRVFunctionControlMaskKind>::init() {
@@ -264,14 +236,7 @@ SPIRVMap<SPIRVExtInstSetKind, std::string, SPIRVExtSetShortName>::init() {
 typedef SPIRVMap<SPIRVExtInstSetKind, std::string, SPIRVExtSetShortName>
     SPIRVExtSetShortNameMap;
 
-#define SPIR_MD_KERNELS "opencl.kernels"
 #define SPIR_MD_COMPILER_OPTIONS "opencl.compiler.options"
-#define SPIR_MD_KERNEL_ARG_ADDR_SPACE "kernel_arg_addr_space"
-#define SPIR_MD_KERNEL_ARG_ACCESS_QUAL "kernel_arg_access_qual"
-#define SPIR_MD_KERNEL_ARG_TYPE "kernel_arg_type"
-#define SPIR_MD_KERNEL_ARG_BASE_TYPE "kernel_arg_base_type"
-#define SPIR_MD_KERNEL_ARG_TYPE_QUAL "kernel_arg_type_qual"
-#define SPIR_MD_KERNEL_ARG_NAME "kernel_arg_name"
 
 #define OCL_TYPE_NAME_SAMPLER_T "sampler_t"
 #define SPIR_TYPE_NAME_EVENT_T "opencl.event_t"
@@ -297,20 +262,12 @@ const static char Void[] = "void";
 
 namespace kSPIRVTypeName {
 const static char Delimiter = '.';
-const static char DeviceEvent[] = "DeviceEvent";
-const static char Event[] = "Event";
 const static char Image[] = "Image";
-const static char Pipe[] = "Pipe";
 const static char PostfixDelim = '_';
 const static char Prefix[] = "spirv";
 const static char PrefixAndDelim[] = "spirv.";
-const static char Queue[] = "Queue";
-const static char ReserveId[] = "ReserveId";
 const static char SampledImg[] = "SampledImage";
 const static char Sampler[] = "Sampler";
-const static char ConstantSampler[] = "ConstantSampler";
-const static char PipeStorage[] = "PipeStorage";
-const static char ConstantPipeStorage[] = "ConstantPipeStorage";
 const static char VariablePtr[] = "VarPtr";
 } // namespace kSPIRVTypeName
 
@@ -318,9 +275,7 @@ namespace kSPR2TypeName {
 const static char Delimiter = '.';
 const static char OCLPrefix[] = "opencl.";
 const static char ImagePrefix[] = "opencl.image";
-const static char Pipe[] = "opencl.pipe_t";
 const static char Sampler[] = "opencl.sampler_t";
-const static char Event[] = "opencl.event_t";
 } // namespace kSPR2TypeName
 
 namespace kAccessQualName {
@@ -1017,18 +972,10 @@ void dumpUsers(Value *V, StringRef Prompt = "");
 /// Get SPIR-V type name as spirv.BaseTyName.Postfixes.
 std::string getSPIRVTypeName(StringRef BaseTyName, StringRef Postfixes = "");
 
-/// Checks if given type name is either ConstantSampler or ConsantPipeStorage.
-bool isSPIRVConstantName(StringRef TyName);
-
 /// Get SPIR-V type by changing the type name from spirv.OldName.Postfixes
 /// to spirv.NewName.Postfixes.
 Type *getSPIRVTypeByChangeBaseTypeName(Module *M, Type *T, StringRef OldName,
                                        StringRef NewName);
-
-/// Get the postfixes of SPIR-V image type name as in spirv.Image.postfixes.
-std::string getSPIRVImageTypePostfixes(StringRef SampledType,
-                                       SPIRVTypeImageDescriptor Desc,
-                                       SPIRVAccessQualifierKind Acc);
 
 /// Get the sampled type name used in postfix of image type in SPIR-V
 /// friendly LLVM IR.
@@ -1037,12 +984,6 @@ std::string getSPIRVImageSampledTypeName(SPIRVType *Ty);
 /// Get LLVM type for sampled type of SPIR-V image type by postfix.
 Type *getLLVMTypeForSPIRVImageSampledTypePostfix(StringRef Postfix,
                                                  LLVMContext &Ctx);
-
-/// Check if access qualifier is encoded in the type name.
-bool hasAccessQualifiedName(StringRef TyName);
-
-/// Get access qualifier from the type name.
-StringRef getAccessQualifier(StringRef TyName);
 
 bool eraseUselessFunctions(Module *M);
 
@@ -1099,12 +1040,7 @@ PointerType *getInt8PtrTy(PointerType *T);
 Value *castToInt8Ptr(Value *V, Instruction *Pos);
 
 template <> inline void SPIRVMap<std::string, Op, SPIRVOpaqueType>::init() {
-  add(kSPIRVTypeName::DeviceEvent, OpTypeDeviceEvent);
-  add(kSPIRVTypeName::Event, OpTypeEvent);
   add(kSPIRVTypeName::Image, OpTypeImage);
-  add(kSPIRVTypeName::Pipe, OpTypePipe);
-  add(kSPIRVTypeName::Queue, OpTypeQueue);
-  add(kSPIRVTypeName::ReserveId, OpTypeReserveId);
   add(kSPIRVTypeName::Sampler, OpTypeSampler);
   add(kSPIRVTypeName::SampledImg, OpTypeSampledImage);
 }
