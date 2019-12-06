@@ -63,12 +63,11 @@ public:
   SPIRVModuleImpl()
       : SPIRVModule(), NextId(1), SPIRVVersion(SPIRV_1_0),
         GeneratorId(SPIRVGEN_KhronosLLVMSPIRVTranslator), GeneratorVer(0),
-        InstSchema(SPIRVISCH_Default), SrcLang(SourceLanguageOpenCL_C),
+        InstSchema(SPIRVISCH_Default), SrcLang(SourceLanguageGLSL),
         SrcLangVer(102000) {
     AddrModel = sizeof(size_t) == 32 ? AddressingModelPhysical32
                                      : AddressingModelPhysical64;
-    // OpenCL memory model requires Kernel capability
-    setMemoryModel(MemoryModelOpenCL);
+    setMemoryModel(MemoryModelGLSL450);
   }
   ~SPIRVModuleImpl() override;
 
@@ -155,12 +154,7 @@ public:
   void setAddressingModel(SPIRVAddressingModelKind AM) override {
     AddrModel = AM;
   }
-  void setAlignment(SPIRVValue *, SPIRVWord) override;
-  void setMemoryModel(SPIRVMemoryModelKind MM) override {
-    MemoryModel = MM;
-    if (MemoryModel == spv::MemoryModelOpenCL)
-      addCapability(CapabilityKernel);
-  }
+  void setMemoryModel(SPIRVMemoryModelKind MM) override { MemoryModel = MM; }
   void setName(SPIRVEntry *E, const std::string &Name) override;
   void setSourceLanguage(SourceLanguage Lang, SPIRVWord Ver) override {
     SrcLang = Lang;
@@ -218,22 +212,12 @@ public:
   SPIRVTypeFunction *addFunctionType(SPIRVType *,
                                      const std::vector<SPIRVType *> &) override;
   SPIRVTypeInt *addIntegerType(unsigned BitWidth) override;
-  SPIRVTypeOpaque *addOpaqueType(const std::string &) override;
   SPIRVTypePointer *addPointerType(SPIRVStorageClassKind, SPIRVType *) override;
   SPIRVTypeImage *addImageType(SPIRVType *,
                                const SPIRVTypeImageDescriptor &) override;
-  SPIRVTypeImage *addImageType(SPIRVType *, const SPIRVTypeImageDescriptor &,
-                               SPIRVAccessQualifierKind) override;
   SPIRVTypeSampler *addSamplerType() override;
-  SPIRVTypePipeStorage *addPipeStorageType() override;
   SPIRVTypeSampledImage *addSampledImageType(SPIRVTypeImage *T) override;
-  SPIRVTypeStruct *openStructType(unsigned, const std::string &) override;
-  void closeStructType(SPIRVTypeStruct *T, bool) override;
   SPIRVTypeVector *addVectorType(SPIRVType *, SPIRVWord) override;
-  SPIRVType *addOpaqueGenericType(Op) override;
-  SPIRVTypeDeviceEvent *addDeviceEventType() override;
-  SPIRVTypeQueue *addQueueType() override;
-  SPIRVTypePipe *addPipeType() override;
   SPIRVTypeVoid *addVoidType() override;
   void createForwardPointers() override;
 
@@ -251,21 +235,11 @@ public:
   SPIRVValue *addIntegerConstant(SPIRVTypeInt *, uint64_t) override;
   SPIRVValue *addNullConstant(SPIRVType *) override;
   SPIRVValue *addUndef(SPIRVType *TheType) override;
-  SPIRVValue *addSamplerConstant(SPIRVType *TheType, SPIRVWord AddrMode,
-                                 SPIRVWord ParametricMode,
-                                 SPIRVWord FilterMode) override;
-  SPIRVValue *addPipeStorageConstant(SPIRVType *TheType, SPIRVWord PacketSize,
-                                     SPIRVWord PacketAlign,
-                                     SPIRVWord Capacity) override;
 
   // Instruction creation functions
   SPIRVInstruction *addPtrAccessChainInst(SPIRVType *, SPIRVValue *,
                                           std::vector<SPIRVValue *>,
                                           SPIRVBasicBlock *, bool) override;
-  SPIRVInstruction *addAsyncGroupCopy(SPIRVValue *Scope, SPIRVValue *Dest,
-                                      SPIRVValue *Src, SPIRVValue *NumElems,
-                                      SPIRVValue *Stride, SPIRVValue *Event,
-                                      SPIRVBasicBlock *BB) override;
   SPIRVInstruction *addExtInst(SPIRVType *, SPIRVWord, SPIRVWord,
                                const std::vector<SPIRVWord> &,
                                SPIRVBasicBlock *) override;
@@ -316,8 +290,6 @@ public:
                                          const std::vector<SPIRVWord> &Ops,
                                          SPIRVBasicBlock *BB,
                                          SPIRVType *Ty) override;
-  SPIRVInstruction *addLifetimeInst(Op OC, SPIRVValue *Object, SPIRVWord Size,
-                                    SPIRVBasicBlock *BB) override;
   SPIRVInstruction *addMemoryBarrierInst(Scope ScopeKind, SPIRVWord MemFlag,
                                          SPIRVBasicBlock *BB) override;
   SPIRVInstruction *addUnreachableInst(SPIRVBasicBlock *) override;
@@ -500,22 +472,6 @@ void SPIRVModuleImpl::optimizeDecorates() {
   }
 }
 
-SPIRVValue *SPIRVModuleImpl::addSamplerConstant(SPIRVType *TheType,
-                                                SPIRVWord AddrMode,
-                                                SPIRVWord ParametricMode,
-                                                SPIRVWord FilterMode) {
-  return addConstant(new SPIRVConstantSampler(this, TheType, getId(), AddrMode,
-                                              ParametricMode, FilterMode));
-}
-
-SPIRVValue *SPIRVModuleImpl::addPipeStorageConstant(SPIRVType *TheType,
-                                                    SPIRVWord PacketSize,
-                                                    SPIRVWord PacketAlign,
-                                                    SPIRVWord Capacity) {
-  return addConstant(new SPIRVConstantPipeStorage(
-      this, TheType, getId(), PacketSize, PacketAlign, Capacity));
-}
-
 void SPIRVModuleImpl::addCapability(SPIRVCapabilityKind Cap) {
   addCapabilities(SPIRV::getCapability(Cap));
   if (hasCapability(Cap))
@@ -686,10 +642,6 @@ bool SPIRVModuleImpl::importBuiltinSetWithId(const std::string &BuiltinSetName,
   return true;
 }
 
-void SPIRVModuleImpl::setAlignment(SPIRVValue *V, SPIRVWord A) {
-  V->setAlignment(A);
-}
-
 void SPIRVModuleImpl::setName(SPIRVEntry *E, const std::string &Name) {
   E->setName(Name);
   if (!E->hasId())
@@ -761,39 +713,9 @@ SPIRVTypeFunction *SPIRVModuleImpl::addFunctionType(
       new SPIRVTypeFunction(this, getId(), ReturnType, ParameterTypes));
 }
 
-SPIRVTypeOpaque *SPIRVModuleImpl::addOpaqueType(const std::string &Name) {
-  return addType(new SPIRVTypeOpaque(this, getId(), Name));
-}
-
-SPIRVTypeStruct *SPIRVModuleImpl::openStructType(unsigned NumMembers,
-                                                 const std::string &Name) {
-  auto T = new SPIRVTypeStruct(this, getId(), NumMembers, Name);
-  return T;
-}
-
-void SPIRVModuleImpl::closeStructType(SPIRVTypeStruct *T, bool Packed) {
-  addType(T);
-  T->setPacked(Packed);
-}
-
 SPIRVTypeVector *SPIRVModuleImpl::addVectorType(SPIRVType *CompType,
                                                 SPIRVWord CompCount) {
   return addType(new SPIRVTypeVector(this, getId(), CompType, CompCount));
-}
-SPIRVType *SPIRVModuleImpl::addOpaqueGenericType(Op TheOpCode) {
-  return addType(new SPIRVTypeOpaqueGeneric(TheOpCode, this, getId()));
-}
-
-SPIRVTypeDeviceEvent *SPIRVModuleImpl::addDeviceEventType() {
-  return addType(new SPIRVTypeDeviceEvent(this, getId()));
-}
-
-SPIRVTypeQueue *SPIRVModuleImpl::addQueueType() {
-  return addType(new SPIRVTypeQueue(this, getId()));
-}
-
-SPIRVTypePipe *SPIRVModuleImpl::addPipeType() {
-  return addType(new SPIRVTypePipe(this, getId()));
 }
 
 SPIRVTypeImage *
@@ -803,20 +725,8 @@ SPIRVModuleImpl::addImageType(SPIRVType *SampledType,
       this, getId(), SampledType ? SampledType->getId() : 0, Desc));
 }
 
-SPIRVTypeImage *
-SPIRVModuleImpl::addImageType(SPIRVType *SampledType,
-                              const SPIRVTypeImageDescriptor &Desc,
-                              SPIRVAccessQualifierKind Acc) {
-  return addType(new SPIRVTypeImage(
-      this, getId(), SampledType ? SampledType->getId() : 0, Desc, Acc));
-}
-
 SPIRVTypeSampler *SPIRVModuleImpl::addSamplerType() {
   return addType(new SPIRVTypeSampler(this, getId()));
-}
-
-SPIRVTypePipeStorage *SPIRVModuleImpl::addPipeStorageType() {
-  return addType(new SPIRVTypePipeStorage(this, getId()));
 }
 
 SPIRVTypeSampledImage *SPIRVModuleImpl::addSampledImageType(SPIRVTypeImage *T) {
@@ -1143,16 +1053,6 @@ SPIRVInstruction *SPIRVModuleImpl::addControlBarrierInst(SPIRVValue *ExecKind,
                         BB);
 }
 
-SPIRVInstruction *SPIRVModuleImpl::addLifetimeInst(Op OC, SPIRVValue *Object,
-                                                   SPIRVWord Size,
-                                                   SPIRVBasicBlock *BB) {
-  if (OC == OpLifetimeStart)
-    return BB->addInstruction(
-        new SPIRVLifetimeStart(Object->getId(), Size, BB));
-  else
-    return BB->addInstruction(new SPIRVLifetimeStop(Object->getId(), Size, BB));
-}
-
 SPIRVInstruction *SPIRVModuleImpl::addMemoryBarrierInst(Scope ScopeKind,
                                                         SPIRVWord MemFlag,
                                                         SPIRVBasicBlock *BB) {
@@ -1196,14 +1096,6 @@ SPIRVModuleImpl::addPtrAccessChainInst(SPIRVType *Type, SPIRVValue *Base,
           IsInBounds ? OpInBoundsPtrAccessChain : OpPtrAccessChain, Type,
           getId(), getVec(Base->getId(), Base->getIds(Indices)), BB, this),
       BB);
-}
-
-SPIRVInstruction *SPIRVModuleImpl::addAsyncGroupCopy(
-    SPIRVValue *Scope, SPIRVValue *Dest, SPIRVValue *Src, SPIRVValue *NumElems,
-    SPIRVValue *Stride, SPIRVValue *Event, SPIRVBasicBlock *BB) {
-  return addInstruction(new SPIRVGroupAsyncCopy(Scope, getId(), Dest, Src,
-                                                NumElems, Stride, Event, BB),
-                        BB);
 }
 
 SPIRVInstruction *SPIRVModuleImpl::addCompositeConstructInst(
@@ -1261,7 +1153,6 @@ SPIRVInstruction *SPIRVModuleImpl::addVariable(
   add(Variable);
   if (LinkageType != LinkageTypeInternal)
     Variable->setLinkageType(LinkageType);
-  Variable->setIsConstant(IsConstant);
   return Variable;
 }
 

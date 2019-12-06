@@ -144,8 +144,6 @@ bool isSpecConstantOpAllowedOp(Op OC) {
       OpUConvert,
       OpConvertPtrToU,
       OpConvertUToPtr,
-      OpGenericCastToPtr,
-      OpPtrCastToGeneric,
       OpBitcast,
       OpQuantizeToF16,
       OpSNegate,

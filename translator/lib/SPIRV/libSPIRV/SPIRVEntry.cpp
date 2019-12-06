@@ -355,12 +355,10 @@ void SPIRVExecutionMode::decode(std::istream &I) {
   bool MergeEM = false;
   switch (ExecMode) {
   case ExecutionModeLocalSize:
-  case ExecutionModeLocalSizeHint:
     WordLiterals.resize(3);
     break;
   case ExecutionModeInvocations:
   case ExecutionModeOutputVertices:
-  case ExecutionModeVecTypeHint:
     WordLiterals.resize(1);
     break;
   case ExecutionModeDenormPreserve:

@@ -424,7 +424,7 @@ class SPIRVEntryPoint : public SPIRVAnnotation<OpEntryPoint> {
 public:
   SPIRVEntryPoint(SPIRVModule *TheModule, SPIRVExecutionModelKind,
                   SPIRVId TheId, const std::string &TheName);
-  SPIRVEntryPoint() : ExecModel(ExecutionModelKernel) {}
+  SPIRVEntryPoint() : ExecModel(ExecutionModelVertex) {}
   SPIRVExecutionModelKind getExecModel()const { return ExecModel; }
   std::string getName() const { return Name; }
   std::pair<const SPIRVWord *, size_t> getInOuts() const {
@@ -541,7 +541,7 @@ typedef SPIRVEntryOpCodeOnly<OpNoLine> SPIRVNoLine;
 
 class SPIRVExecutionMode : public SPIRVAnnotation<OpExecutionMode> {
 public:
-  // Complete constructor for LocalSize, LocalSizeHint
+  // Complete constructor for LocalSize
   SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode,
                      SPIRVWord X, SPIRVWord Y, SPIRVWord Z)
       : SPIRVAnnotation(TheTarget, 6), ExecMode(TheExecMode) {
@@ -550,18 +550,14 @@ public:
     WordLiterals.push_back(Z);
     updateModuleVersion();
   }
-  // Complete constructor for VecTypeHint, SubgroupSize, SubgroupsPerWorkgroup
+  // Complete constructor for SubgroupSize, SubgroupsPerWorkgroup
   SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode,
                      SPIRVWord Code)
       : SPIRVAnnotation(TheTarget, 4), ExecMode(TheExecMode) {
     WordLiterals.push_back(Code);
     updateModuleVersion();
   }
-  // Complete constructor for ContractionOff
-  SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode)
-      : SPIRVAnnotation(TheTarget, 3), ExecMode(TheExecMode) {
-    updateModuleVersion();
-  }
+
   // Incomplete constructor
   SPIRVExecutionMode() : ExecMode(ExecutionModeInvocations) {}
   SPIRVExecutionModeKind getExecutionMode() const { return ExecMode; }
@@ -572,8 +568,6 @@ public:
 
   SPIRVWord getRequiredSPIRVVersion() const override {
     switch (ExecMode) {
-    case ExecutionModeFinalizer:
-    case ExecutionModeInitializer:
     case ExecutionModeSubgroupSize:
     case ExecutionModeSubgroupsPerWorkgroup:
       return SPIRV_1_1;
@@ -698,7 +692,6 @@ public:
     switch (Kind) {
     case CapabilityNamedBarrier:
     case CapabilitySubgroupDispatch:
-    case CapabilityPipeStorage:
       return SPIRV_1_1;
 
     default:
@@ -735,17 +728,7 @@ bool isa(SPIRVEntry *E) {
 // Each time a new class is implemented, remove the corresponding typedef.
 // This is also an indication of how much work is left.
 #define _SPIRV_OP(x, ...) typedef SPIRVEntryOpCodeOnly<Op##x> SPIRV##x;
-_SPIRV_OP(TypeNamedBarrier)
-_SPIRV_OP(NamedBarrierInitialize)
-_SPIRV_OP(MemoryNamedBarrier)
-_SPIRV_OP(GetKernelMaxNumSubgroups)
-_SPIRV_OP(GetKernelLocalSizeForSubgroupCount)
 _SPIRV_OP(SizeOf)
-_SPIRV_OP(GetKernelLocalSizeForSubgroupCount)
-_SPIRV_OP(GetKernelMaxNumSubgroups)
-_SPIRV_OP(TypeNamedBarrier)
-_SPIRV_OP(NamedBarrierInitialize)
-_SPIRV_OP(MemoryNamedBarrier)
 _SPIRV_OP(ExecutionModeId)
 _SPIRV_OP(DecorateId)
 // NOTE: These 4 OpCodes are reserved by SPIR-V spec, they are invalid unless

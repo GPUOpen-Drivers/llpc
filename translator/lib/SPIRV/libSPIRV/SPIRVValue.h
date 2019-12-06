@@ -96,9 +96,6 @@ public:
   virtual bool isCoherent();
   void setCoherent(bool IsCoherent = true);
 
-  bool hasAlignment(SPIRVWord *Result = 0) const;
-  void setAlignment(SPIRVWord);
-
   void validate() const override {
     SPIRVEntry::validate();
     assert((!hasType() || Type) && "Invalid type");
@@ -243,9 +240,7 @@ protected:
   void validate() const override {
     SPIRVConstantEmpty::validate();
     assert((Type->isTypeScalar() || Type->isTypeComposite() ||
-            Type->isTypeOpaque() || Type->isTypeEvent() ||
-            Type->isTypePointer() ||Type->isTypeReserveId() ||
-            Type->isTypeDeviceEvent()) && "Invalid type");
+            Type->isTypePointer()) && "Invalid type");
   }
 };
 
@@ -294,83 +289,6 @@ protected:
   _SPIRV_DEF_DECODE3(Type, Id, Elements)
 
   std::vector<SPIRVId> Elements;
-};
-
-class SPIRVConstantSampler : public SPIRVValue {
-public:
-  const static Op OC = OpConstantSampler;
-  const static SPIRVWord WC = 6;
-  // Complete constructor
-  SPIRVConstantSampler(SPIRVModule *M, SPIRVType *TheType, SPIRVId TheId,
-                       SPIRVWord TheAddrMode, SPIRVWord TheNormalized,
-                       SPIRVWord TheFilterMode)
-      : SPIRVValue(M, WC, OC, TheType, TheId), AddrMode(TheAddrMode),
-        Normalized(TheNormalized), FilterMode(TheFilterMode) {
-    validate();
-  }
-  // Incomplete constructor
-  SPIRVConstantSampler()
-      : SPIRVValue(OC), AddrMode(SPIRVSAM_Invalid), Normalized(SPIRVWORD_MAX),
-        FilterMode(SPIRVSFM_Invalid) {}
-
-  SPIRVWord getAddrMode() const { return AddrMode; }
-
-  SPIRVWord getFilterMode() const { return FilterMode; }
-
-  SPIRVWord getNormalized() const { return Normalized; }
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityLiteralSampler);
-  }
-
-protected:
-  SPIRVWord AddrMode;
-  SPIRVWord Normalized;
-  SPIRVWord FilterMode;
-  void validate() const override {
-    SPIRVValue::validate();
-    assert(OpCode == OC);
-    assert(WordCount == WC);
-    assert(Type->isTypeSampler());
-  }
-  _SPIRV_DEF_DECODE5(Type, Id, AddrMode, Normalized, FilterMode)
-};
-
-class SPIRVConstantPipeStorage : public SPIRVValue {
-public:
-  const static Op OC = OpConstantPipeStorage;
-  const static SPIRVWord WC = 6;
-  // Complete constructor
-  SPIRVConstantPipeStorage(SPIRVModule *M, SPIRVType *TheType, SPIRVId TheId,
-                           SPIRVWord ThePacketSize, SPIRVWord ThePacketAlign,
-                           SPIRVWord TheCapacity)
-      : SPIRVValue(M, WC, OC, TheType, TheId), PacketSize(ThePacketSize),
-        PacketAlign(ThePacketAlign), Capacity(TheCapacity) {
-    validate();
-  }
-  // Incomplete constructor
-  SPIRVConstantPipeStorage()
-      : SPIRVValue(OC), PacketSize(0), PacketAlign(0), Capacity(0) {}
-
-  SPIRVWord getPacketSize() const { return PacketSize; }
-
-  SPIRVWord getPacketAlign() const { return PacketAlign; }
-
-  SPIRVWord getCapacity() const { return Capacity; }
-  SPIRVCapVec getRequiredCapability() const override {
-    return getVec(CapabilityPipes, CapabilityPipeStorage);
-  }
-
-protected:
-  SPIRVWord PacketSize;
-  SPIRVWord PacketAlign;
-  SPIRVWord Capacity;
-  void validate() const override {
-    SPIRVValue::validate();
-    assert(OpCode == OC);
-    assert(WordCount == WC);
-    assert(Type->isTypePipeStorage());
-  }
-  _SPIRV_DEF_DECODE5(Type, Id, PacketSize, PacketAlign, Capacity)
 };
 
 class SPIRVSpecConstantTrue : public SPIRVConstantBool<OpSpecConstantTrue> {

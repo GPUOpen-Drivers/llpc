@@ -202,14 +202,6 @@ bool SPIRVType::isTypeOCLImage() const {
          static_cast<const SPIRVTypeImage *>(this)->isOCLImage();
 }
 
-bool SPIRVType::isTypePipe() const { return OpCode == OpTypePipe; }
-
-bool SPIRVType::isTypePipeStorage() const {
-  return OpCode == OpTypePipeStorage;
-}
-
-bool SPIRVType::isTypeReserveId() const { return OpCode == OpTypeReserveId; }
-
 bool SPIRVType::isTypeInt(unsigned Bits) const {
   return isType<SPIRVTypeInt>(this, Bits);
 }
@@ -217,14 +209,6 @@ bool SPIRVType::isTypeInt(unsigned Bits) const {
 bool SPIRVType::isTypePointer() const { return OpCode == OpTypePointer; }
 
 bool SPIRVType::isTypeForwardPointer() const { return OpCode == OpTypeForwardPointer; }
-
-bool SPIRVType::isTypeOpaque() const { return OpCode == OpTypeOpaque; }
-
-bool SPIRVType::isTypeEvent() const { return OpCode == OpTypeEvent; }
-
-bool SPIRVType::isTypeDeviceEvent() const {
-  return OpCode == OpTypeDeviceEvent;
-}
 
 bool SPIRVType::isTypeSampler() const { return OpCode == OpTypeSampler; }
 
@@ -266,17 +250,6 @@ bool SPIRVType::isTypeVectorOrScalarInt(unsigned Bits) const {
 
 bool SPIRVType::isTypeVectorOrScalarFloat(unsigned Bits) const {
   return isTypeFloat(Bits) || isTypeVectorFloat(Bits);
-}
-
-bool SPIRVTypeStruct::isPacked() const {
-  return hasDecorate(DecorationCPacked);
-}
-
-void SPIRVTypeStruct::setPacked(bool Packed) {
-  if (Packed)
-    addDecorate(new SPIRVDecorate(DecorationCPacked, this));
-  else
-    eraseDecorate(DecorationCPacked);
 }
 
 SPIRVTypeArray::SPIRVTypeArray(SPIRVModule *M, SPIRVId TheId,

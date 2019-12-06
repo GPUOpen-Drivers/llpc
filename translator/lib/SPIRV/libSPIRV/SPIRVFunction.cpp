@@ -56,16 +56,6 @@ SPIRVFunctionParameter::SPIRVFunctionParameter(SPIRVType *TheType,
   validate();
 }
 
-void SPIRVFunctionParameter::foreachAttr(
-    std::function<void(SPIRVFuncParamAttrKind)> Func) {
-  auto Locs = Decorates.equal_range(DecorationFuncParamAttr);
-  for (auto I = Locs.first, E = Locs.second; I != E; ++I) {
-    auto Attr = static_cast<SPIRVFuncParamAttrKind>(I->second->getLiteral(0));
-    assert(isValid(Attr));
-    Func(Attr);
-  }
-}
-
 SPIRVDecoder SPIRVFunction::getDecoder(std::istream &IS) {
   return SPIRVDecoder(IS, *this);
 }
@@ -135,14 +125,4 @@ void SPIRVFunction::decodeBB(SPIRVDecoder &Decoder) {
       BB->addInstruction(Inst);
   }
   Decoder.setScope(this);
-}
-
-void SPIRVFunction::foreachReturnValueAttr(
-    std::function<void(SPIRVFuncParamAttrKind)> Func) {
-  auto Locs = Decorates.equal_range(DecorationFuncParamAttr);
-  for (auto I = Locs.first, E = Locs.second; I != E; ++I) {
-    auto Attr = static_cast<SPIRVFuncParamAttrKind>(I->second->getLiteral(0));
-    assert(isValid(Attr));
-    Func(Attr);
-  }
 }
