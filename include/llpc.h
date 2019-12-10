@@ -291,9 +291,11 @@ struct ResourceNodeData
 struct ShaderModuleEntryData
 {
     ShaderStage             stage;              ///< Shader stage
+    const char*             pEntryName;         ///< Shader entry name
     void*                   pShaderEntry;       ///< Private shader module entry info
-    uint32_t                resNodeDataCount;  ///< Resource node data count
-    const ResourceNodeData* pResNodeDatas;     ///< Resource node data array
+    uint32_t                resNodeDataCount;   ///< Resource node data count
+    const ResourceNodeData* pResNodeDatas;      ///< Resource node data array
+    uint32_t                pushConstSize;      ///< Push constant size in byte
 };
 
 /// Represents usage info of a shader module

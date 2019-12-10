@@ -66,6 +66,7 @@ SpirvLowerResourceCollect::SpirvLowerResourceCollect(
     :
     SpirvLower(ID),
     m_collectDetailUsage(collectDetailUsage),
+    m_pushConstSize(0),
     m_detailUsageValid(false)
 {
     initializeSpirvLowerResourceCollectPass(*PassRegistry::getPassRegistry());
@@ -193,7 +194,13 @@ bool SpirvLowerResourceCollect::runOnModule(
         {
         case SPIRAS_Constant:
             {
-                if (pGlobal->hasMetadata(gSPIRVMD::PushConst) == false)
+                if (pGlobal->hasMetadata(gSPIRVMD::PushConst))
+                {
+                    // Push constant
+                    MDNode* pMetaNode = pGlobal->getMetadata(gSPIRVMD::PushConst);
+                    m_pushConstSize = mdconst::dyn_extract<ConstantInt>(pMetaNode->getOperand(0))->getZExtValue();
+                }
+                else
                 {
                     // Only collect resource node data when requested
                     if (m_collectDetailUsage == true)
