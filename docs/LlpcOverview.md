@@ -5,6 +5,9 @@ This document outlines the state of LLPC as it will be at the end of the
 
 ## Compilation process
 
+LLPC builds on LLVM's existing shader compilation infrastructure for AMD GPUs to
+generate code objects compatible with PAL's pipeline ABI.
+
 The LLPC compilation process consists of three phases:
 * front-end;
 * middle-end (LGC);
@@ -25,6 +28,8 @@ does not show BuilderReplayer.
   - setting state;
   - linking the individual shader IR modules into a single pipeline IR module.
 * All the SPIR-V and Vulkan specific handling is within the front-end.
+
+The SPIR-V translator is based on the Khronos SPIR-V-to-LLVM translator.
 
 After this, when using LGC's Builder in its BuilderRecorder mode, as LLPC does, the
 pipeline IR module contains calls to `llpc.call.*` functions that record the Builder
