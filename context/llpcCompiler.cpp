@@ -599,6 +599,7 @@ Result Compiler::BuildShaderModule(
 
                     moduleEntryData.pShaderEntry = &moduleEntry;
                     moduleEntryData.stage = entryNames[i].stage;
+                    moduleEntryData.pEntryName = entryNames[i].pName;
                     moduleEntry.entryOffset = moduleBinary.size();
                     MetroHash::Hash entryNamehash = {};
                     MetroHash64::Hash(reinterpret_cast<const uint8_t*>(entryNames[i].pName),
@@ -632,7 +633,8 @@ Result Compiler::BuildShaderModule(
                     shaderInfo.pEntryTarget = entryNames[i].pName;
                     lowerPassMgr->add(CreateSpirvLowerTranslator(static_cast<ShaderStage>(entryNames[i].stage),
                                                                 &shaderInfo));
-                    bool collectDetailUsage = (entryNames[i].stage == ShaderStageFragment) ? true : false;
+                    bool collectDetailUsage = ((entryNames[i].stage == ShaderStageFragment) ||
+                                               (entryNames[i].stage == ShaderStageCompute)) ? true : false;
                     auto pResCollectPass = static_cast<SpirvLowerResourceCollect*>(
                                            CreateSpirvLowerResourceCollect(collectDetailUsage));
                     lowerPassMgr->add(pResCollectPass);
@@ -682,8 +684,9 @@ Result Compiler::BuildShaderModule(
                             entryResourceNodeDatas[i].push_back(data);
                         }
 
-                        auto& fsOutInfos = pResCollectPass->GetFsOutInfos();
-                        for (auto& fsOutInfo : fsOutInfos)
+                        moduleEntryData.pushConstSize = pResCollectPass->GetPushConstSize();
+                        auto& fsOutInfosFromPass = pResCollectPass->GetFsOutInfos();
+                        for (auto& fsOutInfo : fsOutInfosFromPass)
                         {
                             fsOutInfos.push_back(fsOutInfo);
                         }

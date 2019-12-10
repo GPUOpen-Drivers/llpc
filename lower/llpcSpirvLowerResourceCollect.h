@@ -47,10 +47,10 @@ union ResourceNodeDataKey
 {
     struct
     {
-        uint64_t set        :   16;  // Resource set
-        uint64_t binding    :   16;  // Resource binding
-        uint64_t arraySize  :   16;  // Resource array size
         uint64_t reserved   :   16;
+        uint64_t arraySize  :   16;  // Resource array size
+        uint64_t binding    :   16;  // Resource binding
+        uint64_t set        :   16;  // Resource set
     } value;
     uint64_t u64All;
 };
@@ -75,6 +75,7 @@ public:
     {
         return m_resNodeDatas;
     }
+    auto GetPushConstSize() {return m_pushConstSize; }
     auto& GetFsOutInfos() { return m_fsOutInfos; }
     bool DetailUsageValid() { return m_detailUsageValid; }
 
@@ -99,6 +100,7 @@ private:
     bool m_collectDetailUsage;      // If enabled, collect detailed usages of resource node datas and FS output infos
     std::map<ResourceNodeDataKey, ResourceMappingNodeType, ResNodeDataSortingComparer> m_resNodeDatas; // Resource
                                                                                                        // node data
+    uint32_t m_pushConstSize;        // Push constant size in byte
     std::vector<FsOutInfo> m_fsOutInfos;   // FS output info array
     bool m_detailUsageValid; // Indicate whether detailed usages (resource node datas
                              // or fragment shader output infos) are valid
