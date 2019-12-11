@@ -1286,7 +1286,7 @@ void PatchBufferOp::PostVisitMemSetInst(
             Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
                                                             pValue,
                                                             stride,
-                                                            1);
+                                                            Align::None());
             CopyMetadata(pMemSet, &memSetInst);
 
             pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
@@ -1348,7 +1348,7 @@ void PatchBufferOp::PostVisitMemSetInst(
             Value* const pMemSet = m_pBuilder->CreateMemSet(pCastMemoryPointer,
                                                             pValue,
                                                             pMemoryType->getVectorNumElements(),
-                                                            1);
+                                                            Align::None());
             CopyMetadata(pMemSet, &memSetInst);
 
             pNewValue = m_pBuilder->CreateLoad(pMemoryPointer);
