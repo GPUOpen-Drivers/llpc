@@ -98,7 +98,7 @@ struct NggControl : NggState
 
 // =====================================================================================================================
 // The middle-end implementation of PipelineState, a subclass of Pipeline.
-class PipelineState : public Pipeline
+class PipelineState final : public Pipeline
 {
 public:
     PipelineState(BuilderContext* pBuilderContext)
