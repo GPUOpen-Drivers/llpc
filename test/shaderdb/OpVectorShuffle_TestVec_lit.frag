@@ -25,10 +25,8 @@ void main()
 ; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 1
 ; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 3
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = extractelement <3 x float> %{{.*}}, i32 2
-; SHADERTEST: %{{.*}} = insertelement <4 x float> <float undef, float {{.*}}, float {{.*}}, float undef>, float %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = extractelement <3 x float> %{{.*}}, i32 1
-; SHADERTEST: %{{.*}} = insertelement <4 x float> %{{.*}}, float %{{.*}}, i32 3
+; SHADERTEST: [[VEC1:%.*]] = shufflevector <3 x float> %{{.*}}, <3 x float> undef, <4 x i32> <i32 undef, i32 1, i32 2, i32 undef>
+; SHADERTEST: [[VEC2:%.*]] = shufflevector <4 x float> <float undef, float 5.000000e-01, float 5.000000e-01, float undef>, <4 x float> [[VEC1]], <4 x i32> <i32 6, i32 1, i32 2, i32 5>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

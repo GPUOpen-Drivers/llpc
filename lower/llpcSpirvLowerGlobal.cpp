@@ -35,6 +35,7 @@
 #include "llvm/PassSupport.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include <unordered_set>
 #include "SPIRVInternal.h"
@@ -201,6 +202,8 @@ bool SpirvLowerGlobal::runOnModule(
 
     LowerBufferBlock();
     LowerPushConsts();
+
+    CleanupReturnBlock();
 
     return true;
 }
@@ -2523,6 +2526,22 @@ void SpirvLowerGlobal::LowerPushConsts()
     {
         pGlobal->dropAllReferences();
         pGlobal->eraseFromParent();
+    }
+}
+
+// =====================================================================================================================
+// Removes the created return block if it has a single predecessor. This is to avoid
+// scheduling future heavy-weight cleanup passes if we can trivially simplify the CFG here.
+void SpirvLowerGlobal::CleanupReturnBlock()
+{
+    if (m_pRetBlock == nullptr)
+    {
+        return;
+    }
+
+    if (MergeBlockIntoPredecessor(m_pRetBlock))
+    {
+        m_pRetBlock = nullptr;
     }
 }
 

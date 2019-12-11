@@ -74,6 +74,8 @@ private:
     void LowerBufferBlock();
     void LowerPushConsts();
 
+    void CleanupReturnBlock();
+
     llvm::Value* AddCallInstForInOutImport(llvm::Type*        pInOutTy,
                                            uint32_t           addrSpace,
                                            llvm::Constant*    pInOutMeta,
