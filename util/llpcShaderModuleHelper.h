@@ -36,7 +36,6 @@
 namespace Llpc
 {
 
-
 // Represents the special header of SPIR-V token stream (the first DWORD).
 struct SpirvHeader
 {
