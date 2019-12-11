@@ -550,7 +550,7 @@ Result Compiler::BuildShaderModule(
         // Trim debug info
         if (cl::TrimDebugInfo)
         {
-            uint8_t* pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
+	    uint8_t* pTrimmedCode = new uint8_t[moduleDataEx.common.binCode.codeSize];
             ShaderModuleHelper::TrimSpirvDebugInfo(&pShaderInfo->shaderBin, moduleDataEx.common.binCode.codeSize, pTrimmedCode);
             moduleDataEx.common.binCode.pCode = pTrimmedCode;
         }
@@ -917,7 +917,7 @@ Result Compiler::BuildPipelineInternal(
                     auto pShaderEntry = reinterpret_cast<ShaderModuleEntry*>(pEntryData->pShaderEntry);
                     if (
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 21
-			(pEntryData->stage == pShaderInfo->entryStage) &&
+                        (pEntryData->stage == pShaderInfo->entryStage) &&
 #endif
                         (memcmp(pShaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
                     {

@@ -236,7 +236,6 @@ target_include_directories(llpc PRIVATE ${XGL_ICD_PATH}/api/include/khronos)
 
 if(WIN32)
     target_compile_definitions(llpc PRIVATE VK_USE_PLATFORM_WIN32_KHR)
-    target_compile_definitions(llpc PRIVATE VKI_SDK_1_1=1)
 endif()
 
 if(ICD_BUILD_LLPC)
