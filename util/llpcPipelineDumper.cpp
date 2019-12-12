@@ -641,6 +641,7 @@ void PipelineDumper::DumpPipelineShaderInfo(
     dumpFile << "options.disableLicm = " << pShaderInfo->options.disableLicm << "\n";
 #endif
     dumpFile << "options.unrollThreshold = " << pShaderInfo->options.unrollThreshold << "\n";
+    dumpFile << "options.scalarThreshold = " << pShaderInfo->options.scalarThreshold << "\n";
 
     dumpFile << "\n";
 }
@@ -1210,6 +1211,7 @@ void PipelineDumper::UpdateHashForPipelineShaderInfo(
             pHasher->Update(options.disableLicm);
 #endif
             pHasher->Update(options.unrollThreshold);
+            pHasher->Update(options.scalarThreshold);
         }
     }
 }

@@ -51,6 +51,7 @@
 //* %Version History
 //* | %Version | Change Description                                                                                    |
 //* | -------- | ----------------------------------------------------------------------------------------------------- |
+//* |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
 //* |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
 //* |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
 //* |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
@@ -437,6 +438,9 @@ struct PipelineShaderOptions
 #endif
     /// Default unroll threshold for LLVM.
     uint32_t  unrollThreshold;
+
+    /// The threshold for load scalarizer.
+    uint32_t  scalarThreshold;
 };
 
 /// Represents one node in a graph defining how the user data bound in a command buffer at draw/dispatch time maps to
