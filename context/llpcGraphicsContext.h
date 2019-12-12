@@ -63,6 +63,9 @@ public:
     // Gets the mask of active shader stages bound to this pipeline
     virtual uint32_t GetShaderStageMask() const { return m_stageMask; }
 
+    // Get the last vertex processing shader stage in this pipeline, or ShaderStageInvalid if none.
+    virtual ShaderStage GetLastVertexProcessingStage() const;
+
     // Gets the count of active shader stages
     virtual uint32_t GetActiveShaderStageCount() const { return m_activeStageCount; }
 
@@ -85,15 +88,6 @@ public:
     // Gets per pipeline options
     virtual const PipelineOptions* GetPipelineOptions() const { return &m_pPipelineInfo->options; }
 
-    // Checks whether the requirements of packing input/output is satisfied
-    virtual bool CanPackInOut(ShaderStage shaderStage, bool isOutput) const;
-
-    // Checks whether pack input/output is enabled
-    virtual bool IsPackInOutEnabled() const { return m_packInOut; }
-
-    // Enable/disable pack input/output
-    virtual void EnablePackInOut(bool packInOut) { m_packInOut = packInOut; }
-
     void InitShaderInfoForNullFs();
 
 private:
@@ -115,7 +109,6 @@ private:
     InterfaceData   m_intfData[ShaderStageGfxCount];    // Interface data of all graphics shader stages
 
     bool            m_gsOnChip;    // Whether to enable GS on-chip mode
-    bool            m_packInOut;    // Whether to enable/disable pack in/out
 
     llvm::SmallVector<std::unique_ptr<llvm::SmallVectorImpl<ResourceMappingNode>>, 4>
                     m_allocUserDataNodes;               // Allocated merged user data nodes

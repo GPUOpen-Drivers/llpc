@@ -250,21 +250,6 @@ public:
     // Sets triple and data layout in specified module from the context's target machine.
     void SetModuleTargetMachine(llvm::Module* pModule);
 
-    bool CanPackInOut(ShaderStage shaderStage, bool isOutput) const
-    {
-        return m_pPipelineContext->CanPackInOut(shaderStage, isOutput);
-    }
-
-    bool IsPackInOutEnabled() const
-    {
-        return m_pPipelineContext->IsPackInOutEnabled();
-    }
-
-    void EnablePackInOut(bool packInOut)
-    {
-        m_pPipelineContext->EnablePackInOut(packInOut);
-    }
-
 private:
     LLPC_DISALLOW_DEFAULT_CTOR(Context);
     LLPC_DISALLOW_COPY_AND_ASSIGN(Context);

@@ -49,9 +49,6 @@ namespace llvm
 namespace cl
 {
 
-// -pack-in-out: pack input/output
-opt<bool> PackInOut("pack-in-out", desc("Pack input/output"), init(false));
-
 #if LLPC_BUILD_GFX10
 extern opt<int> SubgroupSize;
 #endif
@@ -76,8 +73,7 @@ GraphicsContext::GraphicsContext(
     m_pPipelineInfo(pPipelineInfo),
     m_stageMask(0),
     m_activeStageCount(0),
-    m_gsOnChip(false),
-    m_packInOut(cl::PackInOut)
+    m_gsOnChip(false)
 {
     const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
     {
@@ -184,6 +180,29 @@ const PipelineShaderInfo* GraphicsContext::GetPipelineShaderInfo(
     }
 
     return pShaderInfo;
+}
+
+// =====================================================================================================================
+// Get the last vertex processing shader stage in this pipeline, or ShaderStageInvalid if none.
+ShaderStage GraphicsContext::GetLastVertexProcessingStage() const
+{
+    if (m_stageMask & ShaderStageToMask(ShaderStageCopyShader))
+    {
+        return ShaderStageCopyShader;
+    }
+    if (m_stageMask & ShaderStageToMask(ShaderStageGeometry))
+    {
+        return ShaderStageGeometry;
+    }
+    if (m_stageMask & ShaderStageToMask(ShaderStageTessEval))
+    {
+        return ShaderStageTessEval;
+    }
+    if (m_stageMask & ShaderStageToMask(ShaderStageVertex))
+    {
+        return ShaderStageVertex;
+    }
+    return ShaderStageInvalid;
 }
 
 // =====================================================================================================================
@@ -649,33 +668,6 @@ uint32_t GraphicsContext::GetShaderWaveSize(
     }
 #endif
     return waveSize;
-}
-
-// =====================================================================================================================
-// Determine whether the requirements of packing input/output is satisfied
-bool GraphicsContext::CanPackInOut(
-    ShaderStage shaderStage,    // Current shader stage
-    bool        isOutput        // Whether it is to pack an output
-    ) const
-{
-    // Pack input/output requirements:
-    // 1) Both cl::PackInOut and m_packInOut are enabled.
-    // 2) It is a XX-FS pipeline.
-    // 3) It is XX' output or FS'input.
-    bool canPackInOut = cl::PackInOut && m_packInOut;
-    if (canPackInOut)
-    {
-        const uint32_t validStageMask = ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment);
-        canPackInOut = (GetShaderStageMask() == validStageMask);
-
-        if (canPackInOut)
-        {
-            canPackInOut = (((shaderStage == ShaderStageVertex) && isOutput) ||             // It's XX' output
-                           ((shaderStage == ShaderStageFragment) && (isOutput == false))); // It's FS' input
-        }
-    }
-
-    return canPackInOut;
 }
 
 } // Llpc

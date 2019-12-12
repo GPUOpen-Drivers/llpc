@@ -707,6 +707,9 @@ public:
     // Gets the mask of active shader stages bound to this pipeline
     virtual uint32_t GetShaderStageMask() const = 0;
 
+    // Get the final vertex processing shader stage in this pipeline, or ShaderStageInvalid if none.
+    virtual ShaderStage GetLastVertexProcessingStage() const { return ShaderStageInvalid; }
+
     // Gets the count of active shader stages
     virtual uint32_t GetActiveShaderStageCount() const = 0;
 
@@ -751,15 +754,6 @@ public:
 
     // Set pipeline state in Pipeline object for middle-end
     void SetPipelineState(Pipeline* pPipeline) const;
-
-    // Checks whether the requirements of packing input/output is satisfied
-    virtual bool CanPackInOut(ShaderStage shaderStage, bool isOutput) const { return false; }
-
-    // Checks whether pack input/output is enabled
-    virtual bool IsPackInOutEnabled() const { return false; }
-
-    // Enable/disable pack input/output
-    virtual void EnablePackInOut(bool packInOut) {}
 
     static void InitShaderResourceUsage(ShaderStage shaderStage, ResourceUsage* pResUsage);
 

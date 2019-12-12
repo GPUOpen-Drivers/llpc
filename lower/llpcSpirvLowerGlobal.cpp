@@ -41,7 +41,6 @@
 #include "SPIRVInternal.h"
 #include "llpcBuilder.h"
 #include "llpcContext.h"
-#include "llpcPipelineContext.h"
 #include "llpcSpirvLowerGlobal.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-global"
@@ -1411,112 +1410,13 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     inOutInfo.SetInterpLoc(interpLoc);
                     inOutInfo.SetInterpMode(inOutMeta.InterpMode);
                 }
-
-                // Scalarize FS' output in XX-FS pipeline which is executed once by MapInputToProxy()
-                if (m_pContext->CanPackInOut(m_shaderStage, false))
-                {
-                    const bool is64Bit = (pInOutTy->getScalarSizeInBits() == 64);
-
-                    if (is64Bit == false)
-                    {
-                        if (pInOutTy->isVectorTy() == false)
-                        {
-                            pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
-                                                                             inOutMeta.Value,
-                                                                             pLocOffset,
-                                                                             pElemIdx,
-                                                                             maxLocOffset,
-                                                                             inOutInfo,
-                                                                             pVertexIdx);
-                        }
-                        else
-                        {
-                            // Scalarize 32-bit vector per component
-                            const uint32_t compCount = pInOutTy->getVectorNumElements();
-                            Type* pCompTy = pInOutTy->getScalarType();
-                            for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
-                            {
-                                pElemIdx = m_pBuilder->getInt32(compIdx + elemIdx);
-                                Value* pComp = m_pBuilder->CreateReadGenericInput(pCompTy,
-                                                                                  inOutMeta.Value,
-                                                                                  pLocOffset,
-                                                                                  pElemIdx,
-                                                                                  maxLocOffset,
-                                                                                  inOutInfo,
-                                                                                  pVertexIdx);
-
-                                // Restore the input vector to be reference
-                                pInOutValue = m_pBuilder->CreateInsertElement(pInOutValue,
-                                                                              pComp,
-                                                                              m_pBuilder->getInt32(compIdx));
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Scalarize 64-bit vector into 32-bit elements
-                        Type* pInputTy = pInOutTy;
-                        if (pInOutTy->isVectorTy() == false)
-                        {
-                            pInputTy = VectorType::get(pInOutTy, 1);
-                        }
-
-                        uint32_t locAdjust[] = { 0, 0, 1, 1 };
-                        uint32_t compAdjust[] = { 0, 1, 0, 1 };
-
-                        const uint32_t compCount = pInputTy->getVectorNumElements();
-                        for (uint32_t compIdx = 0; compIdx < compCount; ++compIdx)
-                        {
-                            uint32_t loc = inOutMeta.Value + locAdjust[compIdx];
-                            uint32_t newCompIdx = 2 * compAdjust[compIdx] + elemIdx;
-
-                            // Cast a 64-bit scalar into a 32-bit vector
-                            Type* pScalarTy = pInputTy->getVectorElementType()->isIntegerTy() ?
-                                            m_pContext->Int32Ty() : m_pContext->FloatTy();
-                            Value* pVecValue = UndefValue::get(VectorType::get(pScalarTy, 2));
-
-                            // Scalarize a 32-bit vector
-                            for (uint32_t j = 0; j < 2; ++j)
-                            {
-                                pElemIdx = m_pBuilder->getInt32(newCompIdx + j);
-
-                                Value* pElem = m_pBuilder->CreateReadGenericInput(pScalarTy,
-                                                                                  loc,
-                                                                                  pLocOffset,
-                                                                                  pElemIdx,
-                                                                                  maxLocOffset,
-                                                                                  inOutInfo,
-                                                                                  pVertexIdx);
-
-                                // Restore to a 32-bit vector
-                                pVecValue = m_pBuilder->CreateInsertElement(pVecValue, pElem, m_pBuilder->getInt32(j));
-                            }
-
-                            // Restore to a 64-bit scalar
-                            Value* pComp = m_pBuilder->CreateBitCast(pVecValue, pInputTy->getVectorElementType());
-
-                            // Restore to the value of 64-bit to be reference
-                            if (pInOutTy->isVectorTy())
-                            {
-                                pInOutValue = m_pBuilder->CreateInsertElement(pInOutValue, pComp, m_pBuilder->getInt32(compIdx));
-                            }
-                            else
-                            {
-                                pInOutValue = pComp;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
-                                                                     inOutMeta.Value,
-                                                                     pLocOffset,
-                                                                     pElemIdx,
-                                                                     maxLocOffset,
-                                                                     inOutInfo,
-                                                                     pVertexIdx);
-                }
+                pInOutValue = m_pBuilder->CreateReadGenericInput(pInOutTy,
+                                                                 inOutMeta.Value,
+                                                                 pLocOffset,
+                                                                 pElemIdx,
+                                                                 maxLocOffset,
+                                                                 inOutInfo,
+                                                                 pVertexIdx);
             }
             else
             {
@@ -1816,79 +1716,13 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                       "xfbOffset = " << cast<ConstantInt>(pXfbOffset)->getZExtValue() << "\n");
         }
 
-        // Scalarize XX' output in XX-FS pipeline which is executed once by MapOutputToProxy()
-        if (m_pContext->CanPackInOut(m_shaderStage, true))
-        {
-            // Make %Type into v1%Type for dealing uniformly
-            Value* pOutputVecValue = pOutputValue;
-            if (pOutputTy->isVectorTy() == false)
-            {
-                pOutputVecValue = UndefValue::get(VectorType::get(pOutputTy->getScalarType(), 1));
-                pOutputVecValue = m_pBuilder->CreateInsertElement(pOutputVecValue, pOutputValue, m_pBuilder->getInt32(0));
-            }
-
-            pOutputTy = pOutputVecValue->getType();
-            const auto compCount = pOutputTy->getVectorNumElements();
-            const bool is64Bit = (pOutputTy->getScalarSizeInBits() == 64);
-
-            if (is64Bit == false)
-            {
-                // Scalarize 32-bit vector per component
-                for (auto compIdx = 0; compIdx < compCount; ++compIdx)
-                {
-                    Value* pComp = m_pBuilder->CreateExtractElement(pOutputVecValue, m_pBuilder->getInt32(compIdx));
-                    pElemIdx = m_pBuilder->getInt32(compIdx + elemIdx);
-                    m_pBuilder->CreateWriteGenericOutput(pComp,
-                                                         location,
-                                                         pLocOffset,
-                                                         pElemIdx,
-                                                         maxLocOffset,
-                                                         outputInfo,
-                                                         pVertexIdx);
-                }
-            }
-            else
-            {
-                uint32_t locAdjust[]  = { 0, 0, 1, 1 };
-                uint32_t compAdjust[] = { 0, 1, 0, 1 };
-
-                // Scalarize 64-bit vector into 32-bit elements
-                for (auto compIdx = 0; compIdx < compCount; ++compIdx)
-                {
-                    // Cast 64-bit into a 32-bit vector
-                    Value* pComp = m_pBuilder->CreateExtractElement(pOutputVecValue, m_pBuilder->getInt32(compIdx));
-                    Type* pCastCompTy = pComp->getType()->isIntegerTy() ?
-                                        m_pContext->Int32x2Ty() : m_pContext->Floatx2Ty();
-                    pComp = m_pBuilder->CreateBitCast(pComp, pCastCompTy);
-
-                    // Scalarize a 32-bit vector per component
-                    auto loc = location + locAdjust[compIdx];
-                    const auto newCompIdx = 2 * compAdjust[compIdx] + elemIdx;
-                    for (auto j = 0; j < 2; ++j)
-                    {
-                        Value* pElem = m_pBuilder->CreateExtractElement(pComp, m_pBuilder->getInt32(j));
-                        pElemIdx = m_pBuilder->getInt32(newCompIdx + j);
-                        m_pBuilder->CreateWriteGenericOutput(pElem,
-                                                             loc,
-                                                             pLocOffset,
-                                                             pElemIdx,
-                                                             maxLocOffset,
-                                                             outputInfo,
-                                                             pVertexIdx);
-                    }
-                }
-            }
-        }
-        else
-        {
-            m_pBuilder->CreateWriteGenericOutput(pOutputValue,
-                                                 location,
-                                                 pLocOffset,
-                                                 pElemIdx,
-                                                 maxLocOffset,
-                                                 outputInfo,
-                                                 pVertexIdx);
-        }
+        m_pBuilder->CreateWriteGenericOutput(pOutputValue,
+                                             location,
+                                             pLocOffset,
+                                             pElemIdx,
+                                             maxLocOffset,
+                                             outputInfo,
+                                             pVertexIdx);
     }
 }
 
