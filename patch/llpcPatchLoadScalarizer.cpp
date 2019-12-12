@@ -50,6 +50,10 @@ namespace cl
 static opt<bool> EnableScalarLoad("enable-load-scalarizer",
                                    desc("Enable the optimization for load scalarizer."),
                                    init(false));
+
+static opt<unsigned> ScalarThreshold("scalar-threshold",
+                                     desc("The threshold for load scalarizer"),
+                                     init(0xFFFFFFFF));
 } // cl
 
 } // llvm
@@ -74,6 +78,7 @@ PatchLoadScalarizer::PatchLoadScalarizer()
     FunctionPass(ID)
 {
     initializePatchLoadScalarizerPass(*PassRegistry::getPassRegistry());
+    m_scalarThreshold = 0;
 }
 
 // =====================================================================================================================
@@ -94,6 +99,7 @@ bool PatchLoadScalarizer::runOnFunction(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
     bool enableLoadScalarizerPerShader = false;
+    m_scalarThreshold = cl::ScalarThreshold;
 
     auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     auto shaderStage = pPipelineShaders->GetShaderStage(&function);
@@ -113,6 +119,14 @@ bool PatchLoadScalarizer::runOnFunction(
         if (pShaderOptions->enableLoadScalarizer)
         {
             enableLoadScalarizerPerShader = true;
+            if (pShaderOptions->scalarThreshold != 0)
+            {
+                m_scalarThreshold = pShaderOptions->scalarThreshold;
+            }
+            else
+            {
+                m_scalarThreshold = 0xFFFFFFFF;
+            }
         }
     }
 #endif
@@ -166,6 +180,12 @@ void PatchLoadScalarizer::visitLoadInst(
         //    %loadValue = insertelement <4 x float> %loadValue.i012, float %loadComp.i3, i32 3
 
         uint32_t compCount = pLoadTy->getNumElements();
+
+        if (compCount > m_scalarThreshold)
+        {
+            return;
+        }
+
         Type* pCompTy = pLoadTy->getVectorElementType();
         uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(pCompTy);
 
