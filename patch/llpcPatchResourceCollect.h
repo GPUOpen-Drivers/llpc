@@ -93,8 +93,14 @@ private:
     void ReviseInputImportCalls();
     void ReassembleOutputExportCalls();
 
+    // Input/output scalarizing
+    void ScalarizeForInOutPacking(Module* pModule);
+    void ScalarizeGenericInput(CallInst* pCall);
+    void ScalarizeGenericOutput(CallInst* pCall);
+
     // -----------------------------------------------------------------------------------------------------------------
 
+    PipelineShaders*                m_pPipelineShaders;         // Pipeline shaders
     PipelineState*                  m_pPipelineState;           // Pipeline state
 
     std::unordered_set<llvm::CallInst*> m_deadCalls;            // Dead calls

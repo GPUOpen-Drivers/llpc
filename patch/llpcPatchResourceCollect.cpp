@@ -57,6 +57,9 @@ cl::opt<bool> DisableGsOnChip("disable-gs-onchip",
                               cl::desc("Disable geometry shader on-chip mode"),
                               cl::init(false));
 
+// -pack-in-out: pack input/output
+static cl::opt<bool> PackInOut("pack-in-out", cl::desc("Pack input/output"), cl::init(false));
+
 namespace Llpc
 {
 
@@ -94,13 +97,19 @@ bool PatchResourceCollect::runOnModule(
     LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
     Patch::Init(&module);
+    m_pPipelineShaders = &getAnalysis<PipelineShaders>();
     m_pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
+    // If packing final vertex stage outputs and FS inputs, scalarize those outputs and inputs now.
+    if (CanPackInOut())
+    {
+        ScalarizeForInOutPacking(&module);
+    }
+
     // Process each shader stage, in reverse order.
-    auto pPipelineShaders = &getAnalysis<PipelineShaders>();
     for (int32_t shaderStage = ShaderStageCountInternal - 1; shaderStage >= 0; --shaderStage)
     {
-        m_pEntryPoint = pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
+        m_pEntryPoint = m_pPipelineShaders->GetEntryPoint(static_cast<ShaderStage>(shaderStage));
         if (m_pEntryPoint != nullptr)
         {
             m_shaderStage = static_cast<ShaderStage>(shaderStage);
@@ -3257,15 +3266,11 @@ void PatchResourceCollect::MapGsBuiltInOutput(
 bool PatchResourceCollect::CanPackInOut() const
 {
     // Pack input/output requirements:
-    // 1) GraphicsContext::m_packInOut is enabled (e.g., null FS will disable it)
-    // 2) It is XX-FS pipeline
-    bool canPackInOut = m_pContext->IsPackInOutEnabled();
-    if (canPackInOut)
-    {
-        const uint32_t validStageMask = ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment);
-        canPackInOut = (m_pContext->GetShaderStageMask() == validStageMask);
-    }
-    return canPackInOut;
+    // 1) -pack-in-out option is on
+    // 2) It is a VS-FS pipeline
+    return PackInOut &&
+           (m_pContext->GetShaderStageMask() ==
+            (ShaderStageToMask(ShaderStageVertex) | ShaderStageToMask(ShaderStageFragment)));
 }
 
 // =====================================================================================================================
@@ -3502,6 +3507,250 @@ void PatchResourceCollect::ReassembleOutputExportCalls()
 }
 
 // =====================================================================================================================
+// Scalarize last vertex processing stage outputs and FS inputs ready for packing.
+void PatchResourceCollect::ScalarizeForInOutPacking(
+    Module* pModule)    // [in/out] Module
+{
+    // First gather the input/output calls that need scalarizing.
+    SmallVector<CallInst*, 4> vsOutputCalls;
+    SmallVector<CallInst*, 4> fsInputCalls;
+    for (Function& func : *pModule)
+    {
+        if (func.getName().startswith(LlpcName::InputImportGeneric) ||
+            func.getName().startswith(LlpcName::InputImportInterpolant))
+        {
+            // This is a generic (possibly interpolated) input. Find its uses in FS.
+            for (User* pUser : func.users())
+            {
+                auto pCall = cast<CallInst>(pUser);
+                if (m_pPipelineShaders->GetShaderStage(pCall->getFunction()) != ShaderStageFragment)
+                {
+                    continue;
+                }
+                // We have a use in FS. See if it needs scalarizing.
+                if (isa<VectorType>(pCall->getType()) || (pCall->getType()->getPrimitiveSizeInBits() == 64))
+                {
+                    fsInputCalls.push_back(pCall);
+                }
+            }
+        }
+        else if (func.getName().startswith(LlpcName::OutputExportGeneric))
+        {
+            // This is a generic output. Find its uses in the last vertex processing stage.
+            for (User* pUser : func.users())
+            {
+                auto pCall = cast<CallInst>(pUser);
+                if (m_pPipelineShaders->GetShaderStage(pCall->getFunction()) !=
+                      m_pContext->GetPipelineContext()->GetLastVertexProcessingStage())
+                {
+                    continue;
+                }
+                // We have a use the last vertex processing stage. See if it needs scalarizing. The output value is
+                // always the final argument.
+                Type* pValueTy = pCall->getArgOperand(pCall->getNumArgOperands() - 1)->getType();
+                if (isa<VectorType>(pValueTy) || (pValueTy->getPrimitiveSizeInBits() == 64))
+                {
+                    vsOutputCalls.push_back(pCall);
+                }
+            }
+        }
+    }
+
+    // Scalarize the gathered inputs and outputs.
+    for (CallInst* pCall : fsInputCalls)
+    {
+        ScalarizeGenericInput(pCall);
+    }
+    for (CallInst* pCall : vsOutputCalls)
+    {
+        ScalarizeGenericOutput(pCall);
+    }
+}
+
+// =====================================================================================================================
+// Scalarize a generic input.
+// This is known to be an FS generic or interpolant input that is either a vector or 64 bit.
+void PatchResourceCollect::ScalarizeGenericInput(
+    CallInst* pCall)  // [in] Call that represents importing the generic or interpolant input
+{
+    IRBuilder<> builder(pCall->getContext());
+    builder.SetInsertPoint(pCall);
+
+    // FS:  @llpc.input.import.generic.%Type%(i32 location, i32 elemIdx, i32 interpMode, i32 interpLoc)
+    //      @llpc.input.import.interpolant.%Type%(i32 location, i32 locOffset, i32 elemIdx,
+    //                                            i32 interpMode, <2 x float> | i32 auxInterpValue)
+    SmallVector<Value*, 5> args;
+    for (uint32_t i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
+    {
+        args.push_back(pCall->getArgOperand(i));
+    }
+
+    bool isInterpolant = args.size() != 4;
+    uint32_t elemIdxArgIdx = isInterpolant ? 2 : 1;
+    uint32_t elemIdx = cast<ConstantInt>(args[elemIdxArgIdx])->getZExtValue();
+    Type* pResultTy = pCall->getType();
+
+    if (!isa<VectorType>(pResultTy))
+    {
+        // Handle the case of splitting a 64 bit scalar in two.
+        LLPC_ASSERT(pResultTy->getPrimitiveSizeInBits() == 64);
+        std::string callName = isInterpolant ? LlpcName::InputImportInterpolant : LlpcName::InputImportGeneric;
+        AddTypeMangling(builder.getInt32Ty(), args, callName);
+        Value* pResult = UndefValue::get(VectorType::get(builder.getInt32Ty(), 2));
+        for (uint32_t i = 0; i != 2; ++i)
+        {
+            args[elemIdxArgIdx] = builder.getInt32(elemIdx * 2 + i);
+            pResult = builder.CreateInsertElement(pResult,
+                                                  EmitCall(callName,
+                                                           builder.getInt32Ty(),
+                                                           args,
+                                                           Attribute::ReadOnly,
+                                                           builder),
+                                                  i);
+        }
+        pResult = builder.CreateBitCast(pResult, pCall->getType());
+        pCall->replaceAllUsesWith(pResult);
+        pCall->eraseFromParent();
+        return;
+    }
+
+    // Now we know we're reading a vector.
+    Type* pElementTy = pResultTy->getVectorElementType();
+    uint32_t scalarizeBy = pResultTy->getVectorNumElements();
+
+    // Find trivially unused elements.
+    // This is not quite as good as the previous version of this code that scalarized in the
+    // front-end before running some LLVM optimizations that removed unused inputs. In the future,
+    // we can fix this properly by doing the whole of generic input/output assignment later on in
+    // the middle-end, somewhere in the LLVM middle-end optimization pass flow.
+    static const uint32_t MaxScalarizeBy = 4;
+    LLPC_ASSERT(scalarizeBy <= MaxScalarizeBy);
+    bool elementUsed[MaxScalarizeBy] = {};
+    bool unknownElementsUsed = false;
+    for (User* pUser : pCall->users())
+    {
+        if (auto pExtract = dyn_cast<ExtractElementInst>(pUser))
+        {
+            uint32_t idx = cast<ConstantInt>(pExtract->getIndexOperand())->getZExtValue();
+            LLPC_ASSERT(idx < scalarizeBy);
+            elementUsed[idx] = true;
+            continue;
+        }
+        if (auto pShuffle = dyn_cast<ShuffleVectorInst>(pUser))
+        {
+            SmallVector<int, 4> mask;
+            pShuffle->getShuffleMask(mask);
+            for (int maskElement : mask)
+            {
+                if (maskElement >= 0)
+                {
+                    if (maskElement < scalarizeBy)
+                    {
+                        if (pShuffle->getOperand(0) == pCall)
+                        {
+                            elementUsed[maskElement] = true;
+                        }
+                    }
+                    else
+                    {
+                        LLPC_ASSERT(maskElement < 2 * scalarizeBy);
+                        if (pShuffle->getOperand(1) == pCall)
+                        {
+                            elementUsed[maskElement - scalarizeBy] = true;
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        unknownElementsUsed = true;
+        break;
+    }
+
+    // Load the individual elements and insert into a vector.
+    Value* pResult = UndefValue::get(pResultTy);
+    std::string callName = isInterpolant ? LlpcName::InputImportInterpolant : LlpcName::InputImportGeneric;
+    AddTypeMangling(pElementTy, args, callName);
+    for (uint32_t i = 0; i != scalarizeBy; ++i)
+    {
+        if (!unknownElementsUsed && !elementUsed[i])
+        {
+            continue; // Omit trivially unused element
+        }
+        args[elemIdxArgIdx] = builder.getInt32(elemIdx + i);
+
+        CallInst* pElement = EmitCall(callName, pElementTy, args, Attribute::ReadOnly, builder);
+        pResult = builder.CreateInsertElement(pResult, pElement, i);
+        if (pElementTy->getPrimitiveSizeInBits() == 64)
+        {
+            // If scalarizing with 64 bit elements, further split each element.
+            ScalarizeGenericInput(pElement);
+        }
+    }
+
+    pCall->replaceAllUsesWith(pResult);
+    pCall->eraseFromParent();
+}
+
+// =====================================================================================================================
+// Scalarize a generic output.
+// This is known to be a last vertex processing stage (VS/TES/GS) generic output that is either a vector or 64 bit.
+void PatchResourceCollect::ScalarizeGenericOutput(
+    CallInst* pCall)  // [in] Call that represents exporting the generic output
+{
+    IRBuilder<> builder(pCall->getContext());
+    builder.SetInsertPoint(pCall);
+
+    // VS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // TES: @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, %Type% outputValue)
+    // GS:  @llpc.output.export.generic.%Type%(i32 location, i32 elemIdx, i32 streamId, %Type% outputValue)
+    SmallVector<Value*, 5> args;
+    for (uint32_t i = 0, end = pCall->getNumArgOperands(); i != end; ++i)
+    {
+        args.push_back(pCall->getArgOperand(i));
+    }
+
+    static const uint32_t ElemIdxArgIdx = 1;
+    uint32_t valArgIdx = pCall->getNumArgOperands() - 1;
+    uint32_t elemIdx = cast<ConstantInt>(args[ElemIdxArgIdx])->getZExtValue();
+    Value* pOutputVal = pCall->getArgOperand(valArgIdx);
+    Type* pElementTy = pOutputVal->getType();
+    uint32_t scalarizeBy = 1;
+    if (auto pVectorTy = dyn_cast<VectorType>(pElementTy))
+    {
+        scalarizeBy = pVectorTy->getNumElements();
+        pElementTy = pVectorTy->getElementType();
+    }
+
+    // For a 64-bit element type, split each element in two. (We're assuming no interpolation for 64 bit.)
+    if (pElementTy->getPrimitiveSizeInBits() == 64)
+    {
+        scalarizeBy *= 2;
+        elemIdx *= 2;
+        pElementTy = builder.getInt32Ty();
+    }
+
+    // Bitcast the original value to the vector type if necessary.
+    pOutputVal = builder.CreateBitCast(pOutputVal, VectorType::get(pElementTy, scalarizeBy));
+
+    // Extract and store the individual elements.
+    std::string callName;
+    for (uint32_t i = 0; i != scalarizeBy; ++i)
+    {
+        args[ElemIdxArgIdx] = builder.getInt32(elemIdx + i);
+        args[valArgIdx] = builder.CreateExtractElement(pOutputVal, i);
+        if (i == 0)
+        {
+            callName = LlpcName::OutputExportGeneric;
+            AddTypeMangling(nullptr, args, callName);
+        }
+        EmitCall(callName, builder.getVoidTy(), args, {}, builder);
+    }
+
+    pCall->eraseFromParent();
+}
+
+// =====================================================================================================================
 // Fill the locationSpan container by constructing a LocationSpan from each input import call
 bool InOutLocationMapManager::AddSpan(
     CallInst*   pCall)  // [in] Call to process
@@ -3520,10 +3769,11 @@ bool InOutLocationMapManager::AddSpan(
         const uint32_t bitWidth = pCallee->getReturnType()->getScalarSizeInBits();
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
-        span.compatibilityInfo.isFlat = (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InterpModeFlat);
+        span.compatibilityInfo.isFlat =
+            (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InOutInfo::InterpModeFlat);
         span.compatibilityInfo.is16Bit = false;
         span.compatibilityInfo.isCustom =
-            (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InterpModeCustom);
+            (cast<ConstantInt>(pCall->getOperand(2))->getZExtValue() == InOutInfo::InterpModeCustom);
 
         LLPC_ASSERT(std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end());
         m_locationSpans.push_back(span);
@@ -3546,10 +3796,10 @@ bool InOutLocationMapManager::AddSpan(
         span.compatibilityInfo.halfComponentCount = bitWidth < 64 ? 2 : 4;
 
         span.compatibilityInfo.isFlat =
-            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InterpModeFlat);
+            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InOutInfo::InterpModeFlat);
         span.compatibilityInfo.is16Bit = false;
         span.compatibilityInfo.isCustom =
-            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InterpModeCustom);
+            (cast<ConstantInt>(pCall->getOperand(3))->getZExtValue() == InOutInfo::InterpModeCustom);
 
         if (std::find(m_locationSpans.begin(), m_locationSpans.end(), span) == m_locationSpans.end())
         {
