@@ -2,7 +2,7 @@
 **Status:** revised
 ## 1 Instruction
 Hardware allocates parameters in the parameter cache and attributes in LDS for interpolation in a pixel shader in units of vec4, regardless of how many components are used. Currently, the inputs of fragment shaders are treated as individual vec4s. If the input shader does not fully utilize all components – perhaps after dead-code elimination – then parameter and attribute space is wasted. By packing components tightly, we can reduce the cost of parameter cache, LDS and so on, which can benefit the performance.
-In SCPC, pack in/out and packing half floats are all supported for VS/FS pipeline. This DDN introduces the workflow change of packing in/out in VS/FS pipeline in LLPC.
+This DDN introduces the workflow change of packing in/out in VS/FS pipeline in LLPC.
 ## 2 Background detail
 VS/FS is the most popular pipeline. To reduce risk, we support packing for VS/FS pipeline as the goal of phase 1. Considering component-based interpolation of the input of fragment shader, we adopt the idea of vector scalarization and then re-assembling vectors to achieve the purpose of packing. We use cl::PackInOut as a global switch control.
 In the LLPC middle-end, fragment shader inputs are represented by two kinds of intrinsic:
