@@ -87,7 +87,8 @@ LCXXOPTS +=                                \
 	    -Wno-error=sign-compare            \
 	    -Wno-error=parentheses             \
 	    -Wno-error=delete-non-virtual-dtor \
-	    -Wno-sign-compare
+	    -Wno-sign-compare                  \
+	    -Wno-error=deprecated-declarations
     ifeq ($(USING_CLANG),)
         LCXXOPTS += -Wno-error=maybe-uninitialized \
                     -fno-lto
