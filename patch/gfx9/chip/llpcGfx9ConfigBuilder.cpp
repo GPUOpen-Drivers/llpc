@@ -2163,27 +2163,12 @@ Result ConfigBuilder::BuildPrimShaderRegConfig(
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(geometryMode.outputVertices));
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
 
-    // TODO: Currently only support offchip GS
+    // NGG always enables on-chip GS
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
-    SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_OFF);
+    SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
+    SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_ON);
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
-    SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
-    if (geometryMode.outputVertices <= 128)
-    {
-        SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128);
-    }
-    else if (geometryMode.outputVertices <= 256)
-    {
-        SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256);
-    }
-    else if (geometryMode.outputVertices <= 512)
-    {
-        SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512);
-    }
-    else
-    {
-        SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
-    }
+    SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, false);
 
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, calcFactor.esVertsPerSubgroup);
     SET_REG_FIELD(&pConfig->m_primShaderRegs, VGT_GS_ONCHIP_CNTL, GS_PRIMS_PER_SUBGRP, calcFactor.gsPrimsPerSubgroup);
