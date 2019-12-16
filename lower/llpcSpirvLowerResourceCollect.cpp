@@ -220,7 +220,7 @@ bool SpirvLowerResourceCollect::runOnModule(
         case SPIRAS_Output:
             {
                 // Only collect FS out info when requested.
-                Type* pGlobalTy = pGlobal->getType();
+                Type* pGlobalTy = pGlobal->getType()->getContainedType(0);
                 if (m_collectDetailUsage == false || pGlobalTy->isSingleValueType() == false)
                 {
                     break;
