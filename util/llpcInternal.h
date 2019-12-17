@@ -40,6 +40,9 @@
 #include "llpc.h"
 #include "llpcUtil.h"
 
+// TODO: Remove once LLVM has been updated with new intrinsics enums (D71320)
+#include "../lib/Target/AMDGPU/AMDGPU.h"
+
 namespace llvm { class CallInst; }
 namespace Llpc { class Context; }
 
