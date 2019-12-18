@@ -121,16 +121,21 @@ private:
                         llvm::Value* pThreadIdInSubgroup,
                         llvm::Value* pEmitCounterPtr,
                         llvm::Value* pOutVertCounterPtr,
-                        llvm::Value* pOutPrimCounterPtr);
+                        llvm::Value* pOutPrimCounterPtr,
+                        llvm::Value* pOutstandingVertCounterPtr);
 
     void ProcessGsCut(llvm::Module*  pModule,
                       uint32_t       streamId,
                       llvm::Value*   pThreadIdInSubgroup,
                       llvm::Value*   pEmitCounterPtr,
-                      llvm::Value*   pOutPrimCounterPtr);
+                      llvm::Value*   pOutVertCounterPtr,
+                      llvm::Value*   pOutPrimCounterPtr,
+                      llvm::Value*   pOutstandingVertCounterPtr);
 
     llvm::Function* CreateGsEmitHandler(llvm::Module* pModule, uint32_t streamId);
     llvm::Function* CreateGsCutHandler(llvm::Module* pModule, uint32_t streamId);
+
+    void ReviseOutputPrimitiveData(llvm::Value* pOutPrimId, llvm::Value* pVertexIdAdjust);
 
     llvm::Value* ReadCompactDataFromLds(llvm::Type*       pReadDataTy,
                                         llvm::Value*      pThreadId,
