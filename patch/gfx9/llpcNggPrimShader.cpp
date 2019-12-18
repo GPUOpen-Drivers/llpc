@@ -1954,15 +1954,13 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     //     br i1 %primValid, label %.begings, label %.endgs
     //
     // .beginGs:
-    //     %outPrimVertCountInfo = call { OUT_PRIM_COUNT: i32,
-    //                                    OUT_VERT_COUNT: i32,
-    //                                    INCLUSIVE_OUT_VERT_COUNT: i32,
-    //                                    VERT_COUNT_IN_WAVE: i32 }
+    //     %vertCountInfo = call { OUT_VERT_COUNT: i32,
+    //                             INCLUSIVE_OUT_VERT_COUNT: i32,
+    //                             VERT_COUNT_IN_WAVE: i32 }
     //                           @llpc.ngg.GS.variant(%sgpr..., %userData..., %vgpr...)
-    //     %outPrimCount          = extractvalue { i32, i32, i32 } %outPrimVertCountInfo, 0
-    //     %outVertCount          = extractvalue { i32, i32, i32 } %outPrimVertCountInfo, 1
-    //     %inclusiveOutVertCount = extractvalue { i32, i32, i32 } %outPrimVertCountInfo, 2
-    //     %vertCountInWave       = extractvalue { i32, i32, i32 } %outPrimVertCountInfo, 3
+    //     %outVertCount          = extractvalue { i32, i32, i32 } %vertCountInfo, 0
+    //     %inclusiveOutVertCount = extractvalue { i32, i32, i32 } %vertCountInfo, 1
+    //     %vertCountInWave       = extractvalue { i32, i32, i32 } %vertCountInfo, 2
     //
     //     br label %.endgs
     //
@@ -1998,38 +1996,6 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     //     br label %.endAllocReq
     //
     // .endAllocReq:
-    //     %primValid = icmp ult i32 %threadIdInWave, %primCountInWave
-    //     br i1 %primValid, label %.reviseOutPrimData, label %.reviseOutPrimDataLoop
-    //
-    // .reviseOutPrimData:
-    //     %outVertCountInPrevWaves = ... (read LDS region, GS output vertex count in waves)
-    //     %exclusiveOutVertCount = sub i32 %inclusiveOutVertCount, %outVertCount
-    //     %vertexIdAdjust = %outVertCountInPrevWaves + %exclusiveOutVertCount
-    //
-    //     br label %.reviseOutPrimDataLoop
-    //
-    // .reviseOutPrimDataLoop:
-    //     %outPrimId = phi i32 [ 0, %.reviseOutPrimData ],
-    //                          [ %outPrimId, %.reviseOutPrimDataLoop ]
-    //
-    //     %primData = ... (read LDS region, GS output primitive data)
-    //
-    //     %vertexId0 = ... (primData[8:0])
-    //     %vertexId0 = add i32 %vertexId0, %vertexIdAdjust
-    //     %vertexId1 = ... (primData[18:10])
-    //     %vertexId1 = add i32 %vertexId1, %vertexIdAdjust
-    //     %vertexId2 = ... (primData[28:20])
-    //     %vertexId2 = add i32 %vertexId2, %vertexIdAdjust
-    //     %primData  = ... ((vertexId2 << 20) | (vertexId1 << 10) | vertexId0)
-    //     ; Write LDS region (GS output primitive data)
-    //
-    //     %outPrimId = add i32 %outPrimId, 1
-    //     %reviseContinue = icmp ult %outPrimId, %outPrimCount
-    //     br i1 %reviseContinue, label %.reviseOutPrimDataLoop, label %.endReviseOutPrimData
-    //
-    // .endReviseOutPrimData:
-    //     call void @llvm.amdgcn.s.barrier()
-    //
     //     %primExp = icmp ult i32 %threadIdInSubgroup, %primCountInSubgroup
     //     br i1 %primExp, label %.expPrim, label %.endExpPrim
     //
@@ -2039,29 +2005,29 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     //
     // .endExpPrim:
     //     %primValid = icmp ult i32 %threadIdInWave, %primCountInWave
-    //     br i1 %primValid, label %.writeOutVertOffset, label %.endWriteOutVertOffset
+    //     br i1 %primValid, label %.calcOutVertOffset, label %.endWriteOutVertOffset
     //
-    // .writeOutVertOffset:
-    //     %outVertCountInPrevWaves = ... (read LDS region, GS output vertex count in waves)
+    // .calcOutVertOffset:
+    //     %vertCountInPreWaves = ... (read LDS region, GS output vertex count in waves)
     //     %exclusiveOutVertCount = sub i32 %inclusiveOutVertCount, %outVertCount
-    //     %outVertThreadId = %outVertCountInPrevWaves + %exclusiveOutVertCount
+    //     %outVertThreadId = %vertCountInPreWaves + %exclusiveOutVertCount
     //
-    //     %writeOffset = ... (OutVertOffsetStart + outVertThreadId * 4)
+    //     %writeOffset = ... (OutVertItemOffsetStart + outVertThreadId * 4)
     //     %writeValue = ... (GsVsRingStart + threadIdInSubgroup * gsVsRingItemSize)
     //
-    //     br label %.writeOutVertOffsetLoop
+    //     br label %.writeOutVertOffset
     //
-    // .writeOutVertOffsetLoop:
-    //     %outVertIdInPrim = phi i32 [ 0, %.writeOutVertOffset ],
-    //                                [ %outVertIdInPrim, %.writeOutVertOffsetLoop ]
+    // .writeOutVertOffset:
+    //     %outVertIdInPrim = phi i32 [ 0, %.calcOutVertItemOffset ],
+    //                                [ %outVertIdInPrim, %.writeOutVertItemOffset ]
     //
     //     %ldsOffset = ... (writeOffset + 4 * outVertIdInPrim)
     //     %vertexOffset = ... (writeValue + 4 * vertexSize * outVertIdInPrim)
     //     ; Write LDS region (GS output vertex offset)
     //
     //     %outVertIdInPrim = add i32 %outVertIdInPrim, 1
-    //     %writeEnd = icmp ult %outVertIdInPrim, %outVertCount
-    //     br i1 %writeContinue, label %.writeOutVertOffsetLoop, label %.writeOutVertOffset
+    //     %writeEnd = icmp eq %outVertIdInPrim, %outVertCount
+    //     br i1 %writeEnd, label %.endWriteOutVertOffset, label %.writeOutVertOffset
     //
     // .endWriteOutVertOffset:
     //     call void @llvm.amdgcn.s.barrier()
@@ -2101,15 +2067,11 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     auto pAllocReqBlock = CreateBlock(pEntryPoint, ".allocReq");
     auto pEndAllocReqBlock = CreateBlock(pEntryPoint, ".endAllocReq");
 
-    auto pReviseOutPrimDataBlock = CreateBlock(pEntryPoint, ".reviseOutPrimData");
-    auto pReviseOutPrimDataLoopBlock = CreateBlock(pEntryPoint, ".reviseOutPrimDataLoop");
-    auto pEndReviseOutPrimDataBlock = CreateBlock(pEntryPoint, ".endReviseOutPrimData");
-
     auto pExpPrimBlock = CreateBlock(pEntryPoint, ".expPrim");
     auto pEndExpPrimBlock = CreateBlock(pEntryPoint, ".endExpPrim");
 
+    auto pCalcOutVertOffsetBlock = CreateBlock(pEntryPoint, ".calcOutVertOffset");
     auto pWriteOutVertOffsetBlock = CreateBlock(pEntryPoint, ".writeOutVertOffset");
-    auto pWriteOutVertOffsetLoopBlock = CreateBlock(pEntryPoint, ".writeOutVertOffsetLoop");
     auto pEndWriteOutVertOffsetBlock = CreateBlock(pEntryPoint, ".endWriteOutVertOffset");
 
     auto pExpVertBlock = CreateBlock(pEntryPoint, ".expVert");
@@ -2225,21 +2187,19 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     }
 
     // Construct ".beginGs" block
-    Value* pOutPrimCount = nullptr;
     Value* pOutVertCount = nullptr;
     Value* pInclusiveOutVertCount = nullptr;
     Value* pOutVertCountInWave = nullptr;
     {
         m_pBuilder->SetInsertPoint(pBeginGsBlock);
 
-        Value* pOutPrimVertCountInfo = RunGsVariant(pModule, pEntryPoint->arg_begin(), pBeginGsBlock);
+        Value* pVertCountInfo = RunGsVariant(pModule, pEntryPoint->arg_begin(), pBeginGsBlock);
 
-        // Extract output primitive/vertex count info from the return value
-        LLPC_ASSERT(pOutPrimVertCountInfo->getType()->isStructTy());
-        pOutPrimCount = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 0);
-        pOutVertCount = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 1);
-        pInclusiveOutVertCount = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 2);
-        pOutVertCountInWave = m_pBuilder->CreateExtractValue(pOutPrimVertCountInfo, 3);
+        // Extract vertex count info from the return value
+        LLPC_ASSERT(pVertCountInfo->getType()->isStructTy());
+        pOutVertCount = m_pBuilder->CreateExtractValue(pVertCountInfo, 0);
+        pInclusiveOutVertCount = m_pBuilder->CreateExtractValue(pVertCountInfo, 1);
+        pOutVertCountInWave = m_pBuilder->CreateExtractValue(pVertCountInfo, 2);
 
         m_pBuilder->CreateBr(pEndGsBlock);
     }
@@ -2247,12 +2207,6 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     // Construct ".endGs" block
     {
         m_pBuilder->SetInsertPoint(pEndGsBlock);
-
-        auto pOutPrimCountPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
-        pOutPrimCountPhi->addIncoming(m_pBuilder->getInt32(0), pEndZeroOutVertCountBlock);
-        pOutPrimCountPhi->addIncoming(pOutPrimCount, pBeginGsBlock);
-        pOutPrimCount = pOutPrimCountPhi;
-        pOutPrimCount->setName("outPrimCount");
 
         auto pOutVertCountPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
         pOutVertCountPhi->addIncoming(m_pBuilder->getInt32(0), pEndZeroOutVertCountBlock);
@@ -2357,58 +2311,6 @@ void NggPrimShader::ConstructPrimShaderWithGs(
     {
         m_pBuilder->SetInsertPoint(pEndAllocReqBlock);
 
-        auto pPrimValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
-        m_pBuilder->CreateCondBr(pPrimValid, pReviseOutPrimDataBlock, pEndReviseOutPrimDataBlock);
-    }
-
-    // Construct ".reviseOutPrimData" block
-    Value* pVertexIdAdjust = nullptr;
-    {
-        m_pBuilder->SetInsertPoint(pReviseOutPrimDataBlock);
-
-        uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
-
-        auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
-        pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-        auto pOutVertCountInPreWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-        // vertexIdAdjust = outVertCountInPreWaves + exclusiveOutVertCount
-        auto pExclusiveOutVertCount = m_pBuilder->CreateSub(pInclusiveOutVertCount, pOutVertCount);
-        pVertexIdAdjust = m_pBuilder->CreateAdd(pOutVertCountInPreWaves, pExclusiveOutVertCount);
-
-        m_pBuilder->CreateBr(pReviseOutPrimDataLoopBlock);
-    }
-
-    // Construct ".reviseOutPrimDataLoop" block
-    {
-        m_pBuilder->SetInsertPoint(pReviseOutPrimDataLoopBlock);
-
-        //
-        // The processing is something like this:
-        //   for (outPrimId = 0; outPrimId < outPrimCount; outPrimId++)
-        //   {
-        //       ldsOffset = regionStart + 4 * (threadIdInSubgroup * maxOutPrims + outPrimId)
-        //       Read GS output primitive data from LDS, revise them, and write back to LDS
-        //   }
-        //
-        auto pOutPrimIdPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
-        pOutPrimIdPhi->addIncoming(m_pBuilder->getInt32(0), pReviseOutPrimDataBlock); // outPrimId = 0
-
-        ReviseOutputPrimitiveData(pOutPrimIdPhi, pVertexIdAdjust);
-
-        auto pOutPrimId = m_pBuilder->CreateAdd(pOutPrimIdPhi, m_pBuilder->getInt32(1)); // outPrimId++
-        pOutPrimIdPhi->addIncoming(pOutPrimId, pReviseOutPrimDataLoopBlock);
-
-        auto pReviseContinue = m_pBuilder->CreateICmpULT(pOutPrimId, pOutPrimCount);
-        m_pBuilder->CreateCondBr(pReviseContinue, pReviseOutPrimDataLoopBlock, pEndReviseOutPrimDataBlock);
-    }
-
-    // Construct ".endReviseOutPrimData" block
-    {
-        m_pBuilder->SetInsertPoint(pEndReviseOutPrimDataBlock);
-
-        m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
         auto pPrimExp = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInSubgroup, m_nggFactor.pPrimCountInSubgroup);
         m_pBuilder->CreateCondBr(pPrimExp, pExpPrimBlock, pEndExpPrimBlock);
     }
@@ -2446,24 +2348,24 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         m_pBuilder->SetInsertPoint(pEndExpPrimBlock);
 
         auto pPrimValid = m_pBuilder->CreateICmpULT(m_nggFactor.pThreadIdInWave, m_nggFactor.pPrimCountInWave);
-        m_pBuilder->CreateCondBr(pPrimValid, pWriteOutVertOffsetBlock, pEndWriteOutVertOffsetBlock);
+        m_pBuilder->CreateCondBr(pPrimValid, pCalcOutVertOffsetBlock, pEndWriteOutVertOffsetBlock);
     }
 
-    // Construct ".writeOutVertOffset" block
+    // Construct ".calcOutVertOffset" block
     Value* pWriteOffset = nullptr;
     Value* pWriteValue = nullptr;
     {
-        m_pBuilder->SetInsertPoint(pWriteOutVertOffsetBlock);
+        m_pBuilder->SetInsertPoint(pCalcOutVertOffsetBlock);
 
         uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertCountInWaves);
 
         auto pLdsOffset = m_pBuilder->CreateShl(m_nggFactor.pWaveIdInSubgroup, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-        auto pOutVertCountInPrevWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
+        auto pOutVertCountInPreWaves = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
 
-        // outVertThreadId = outVertCountInPrevWaves + exclusiveOutVertCount
+        // outVertThreadId = vertCountInPrewaves + exclusiveOutVertCount
         auto pExclusiveOutVertCount = m_pBuilder->CreateSub(pInclusiveOutVertCount, pOutVertCount);
-        auto pOutVertThreadId = m_pBuilder->CreateAdd(pOutVertCountInPrevWaves, pExclusiveOutVertCount);
+        auto pOutVertThreadId = m_pBuilder->CreateAdd(pOutVertCountInPreWaves, pExclusiveOutVertCount);
 
         // writeOffset = regionStart (OutVertOffset) + outVertThreadId * 4
         regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutVertOffset);
@@ -2478,12 +2380,12 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionGsVsRing);
         pWriteValue = m_pBuilder->CreateAdd(pVertexItemOffset, m_pBuilder->getInt32(regionStart));
 
-        m_pBuilder->CreateBr(pWriteOutVertOffsetLoopBlock);
+        m_pBuilder->CreateBr(pWriteOutVertOffsetBlock);
     }
 
-    // Construct ".writeOutVertOffsetLoop" block
+    // Construct ".writeOutVertOffset" block
     {
-        m_pBuilder->SetInsertPoint(pWriteOutVertOffsetLoopBlock);
+        m_pBuilder->SetInsertPoint(pWriteOutVertOffsetBlock);
 
         //
         // The processing is something like this:
@@ -2495,7 +2397,7 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         //   }
         //
         auto pOutVertIdInPrimPhi = m_pBuilder->CreatePHI(m_pBuilder->getInt32Ty(), 2);
-        pOutVertIdInPrimPhi->addIncoming(m_pBuilder->getInt32(0), pWriteOutVertOffsetBlock); // outVertIdInPrim = 0
+        pOutVertIdInPrimPhi->addIncoming(m_pBuilder->getInt32(0), pCalcOutVertOffsetBlock); // outVertIdInPrim = 0
 
         auto pLdsOffset = m_pBuilder->CreateShl(pOutVertIdInPrimPhi, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pWriteOffset);
@@ -2506,12 +2408,11 @@ void NggPrimShader::ConstructPrimShaderWithGs(
 
         m_pLdsManager->WriteValueToLds(pVertexoffset, pLdsOffset);
 
-        auto pOutVertIdInPrim =
-            m_pBuilder->CreateAdd(pOutVertIdInPrimPhi, m_pBuilder->getInt32(1)); // outVertIdInPrim++
-        pOutVertIdInPrimPhi->addIncoming(pOutVertIdInPrim, pWriteOutVertOffsetLoopBlock);
+        auto pOutVertIdInPrim = m_pBuilder->CreateAdd(pOutVertIdInPrimPhi, m_pBuilder->getInt32(1)); // outVertIdInPrim++
+        pOutVertIdInPrimPhi->addIncoming(pOutVertIdInPrim, pWriteOutVertOffsetBlock);
 
-        auto pWriteContinue = m_pBuilder->CreateICmpULT(pOutVertIdInPrim, pOutVertCount);
-        m_pBuilder->CreateCondBr(pWriteContinue, pWriteOutVertOffsetLoopBlock, pEndWriteOutVertOffsetBlock);
+        auto pWriteEnd = m_pBuilder->CreateICmpEQ(pOutVertIdInPrim, pOutVertCount);
+        m_pBuilder->CreateCondBr(pWriteEnd, pEndWriteOutVertOffsetBlock, pWriteOutVertOffsetBlock);
     }
 
     // Construct ".endWriteOutVertOffset" block
@@ -2674,7 +2575,7 @@ Value* NggPrimShader::DoCulling(
     auto pVertexId2 = m_pBuilder->CreateLShr(pEsGsOffset2, 2);
 
     Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
-    Value* vertex[3] = {};
+    Value* vertex[3] = { nullptr };
 
     const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
     LLPC_ASSERT(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
@@ -2721,7 +2622,7 @@ Value* NggPrimShader::DoCulling(
     // Handle cull distance culling
     if (m_pNggControl->enableCullDistanceCulling)
     {
-        Value* signMask[3] = {};
+        Value* signMask[3] = { nullptr };
 
         const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionCullDistance);
         auto pRegionStart = m_pBuilder->getInt32(regionStart);
@@ -3588,9 +3489,9 @@ Value* NggPrimShader::RunGsVariant(
 // Mutates the entry-point (".main") of GS to its variant (".variant").
 //
 // NOTE: Initially, the return type of GS entry-point is void. After this mutation, GS messages (GS_EMIT, GS_CUT) are
-// handled by shader itself. Also, output primitive/vertex count info is calculated and is returned. The return type
-// is something like this:
-//   { OUT_PRIM_COUNT: i32, OUT_VERT_COUNT: i32, INCLUSIVE_OUT_VERT_COUNT: i32, OUT_VERT_COUNT_IN_WAVE: i32 }
+// handled by shader itself. Also, vertex count info is calculated and is returned. The return type is something like
+// this:
+//   { OUT_VERT_COUNT: i32, INCLUSIVE_OUT_VERT_COUNT: i32, OUT_VERT_COUNT_IN_WAVE: i32 }
 Function* NggPrimShader::MutateGsToVariant(
     Module* pModule)          // [in] LLVM module
 {
@@ -3602,10 +3503,9 @@ Function* NggPrimShader::MutateGsToVariant(
     // Clone new entry-point
     auto pResultTy = StructType::get(*m_pContext,
                                      {
-                                         m_pBuilder->getInt32Ty(), // outPrimCount
                                          m_pBuilder->getInt32Ty(), // outVertCount
                                          m_pBuilder->getInt32Ty(), // inclusiveOutVertCount
-                                         m_pBuilder->getInt32Ty()  // outVertCountInWave
+                                         m_pBuilder->getInt32Ty()  // vertCountInWave
                                      });
     auto pGsEntryVariantTy = FunctionType::get(pResultTy, pGsEntryPoint->getFunctionType()->params(), false);
     auto pGsEntryVariant = Function::Create(pGsEntryVariantTy, pGsEntryPoint->getLinkage(), "", pModule);
@@ -3644,15 +3544,10 @@ Function* NggPrimShader::MutateGsToVariant(
 
     m_pBuilder->SetInsertPoint(&*pGsEntryVariant->front().getFirstInsertionPt());
 
-    // Initialize GS emit counters, GS output vertex counters, GS output primitive counters,
-    // GS outstanding vertex counters
-    Value* emitCounterPtrs[MaxGsStreams] = {};
-    Value* outVertCounterPtrs[MaxGsStreams] = {};
-    Value* outPrimCounterPtrs[MaxGsStreams] = {};
-    // NOTE: Outstanding vertices are those output vertices that are trying to form a primitive in progress while
-    // still do not belong to any already-completed primitives. If GS_CUT is encountered, they are all dropped as
-    // invalid vertices.
-    Value* outstandingVertCounterPtrs[MaxGsStreams] = {};
+    // Initialize GS emit counters, GS output vertex counters, GS output primitive counters
+    Value* emitCounterPtrs[MaxGsStreams] = { nullptr };
+    Value* outVertCounterPtrs[MaxGsStreams] = { nullptr };
+    Value* outPrimCounterPtrs[MaxGsStreams] = { nullptr };
 
     for (int i = 0; i < MaxGsStreams; ++i)
     {
@@ -3667,10 +3562,6 @@ Function* NggPrimShader::MutateGsToVariant(
         auto pOutPrimCounterPtr = m_pBuilder->CreateAlloca(m_pBuilder->getInt32Ty());
         m_pBuilder->CreateStore(m_pBuilder->getInt32(0), pOutPrimCounterPtr); // outPrimCounter = 0
         outPrimCounterPtrs[i] = pOutPrimCounterPtr;
-
-        auto pOutstandingVertCounterPtr = m_pBuilder->CreateAlloca(m_pBuilder->getInt32Ty());
-        m_pBuilder->CreateStore(m_pBuilder->getInt32(0), pOutstandingVertCounterPtr); // outstandingVertCounter = 0
-        outstandingVertCounterPtrs[i] = pOutstandingVertCounterPtr;
     }
 
     // Initialize thread ID in wave
@@ -3747,8 +3638,7 @@ Function* NggPrimShader::MutateGsToVariant(
                                  pThreadIdInSubgroup,
                                  emitCounterPtrs[streamId],
                                  outVertCounterPtrs[streamId],
-                                 outPrimCounterPtrs[streamId],
-                                 outstandingVertCounterPtrs[streamId]);
+                                 outPrimCounterPtrs[streamId]);
                 }
                 else if ((message == GS_CUT_STREAM0) || (message == GS_CUT_STREAM1) ||
                          (message == GS_CUT_STREAM2) || (message == GS_CUT_STREAM3))
@@ -3760,9 +3650,7 @@ Function* NggPrimShader::MutateGsToVariant(
                                  streamId,
                                  pThreadIdInSubgroup,
                                  emitCounterPtrs[streamId],
-                                 outVertCounterPtrs[streamId],
-                                 outPrimCounterPtrs[streamId],
-                                 outstandingVertCounterPtrs[streamId]);
+                                 outPrimCounterPtrs[streamId]);
                 }
                 else if (message == GS_DONE)
                 {
@@ -3782,9 +3670,8 @@ Function* NggPrimShader::MutateGsToVariant(
     // Add additional processing in return block
     m_pBuilder->SetInsertPoint(pRetBlock);
 
-    // NOTE: Only return output primitive/vertex count info for rasterization stream.
+    // NOTE: Only return vertex count info for rasterization stream.
     auto rasterStream = m_pContext->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
-    auto pOutPrimCount = m_pBuilder->CreateLoad(outPrimCounterPtrs[rasterStream]);
     auto pOutVertCount = m_pBuilder->CreateLoad(outVertCounterPtrs[rasterStream]);
 
     Value* pOutVertCountInWave = nullptr;
@@ -3800,10 +3687,9 @@ Function* NggPrimShader::MutateGsToVariant(
                                                       });
 
     Value* pResult = UndefValue::get(pResultTy);
-    pResult = m_pBuilder->CreateInsertValue(pResult, pOutPrimCount, 0);
-    pResult = m_pBuilder->CreateInsertValue(pResult, pOutVertCount, 1);
-    pResult = m_pBuilder->CreateInsertValue(pResult, pInclusiveOutVertCount, 2);
-    pResult = m_pBuilder->CreateInsertValue(pResult, pOutVertCountInWave, 3);
+    pResult = m_pBuilder->CreateInsertValue(pResult, pOutVertCount, 0);
+    pResult = m_pBuilder->CreateInsertValue(pResult, pInclusiveOutVertCount, 1);
+    pResult = m_pBuilder->CreateInsertValue(pResult, pOutVertCountInWave, 2);
 
     m_pBuilder->CreateRet(pResult); // Insert new "return" instruction
 
@@ -4020,13 +3906,12 @@ Value* NggPrimShader::ImportGsOutput(
 // =====================================================================================================================
 // Processes the message GS_EMIT.
 void NggPrimShader::ProcessGsEmit(
-    Module*  pModule,                       // [in] LLVM module
-    uint32_t streamId,                      // ID of output vertex stream
-    Value*   pThreadIdInSubgroup,           // [in] Thread ID in subgroup
-    Value*   pEmitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
-    Value*   pOutVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
-    Value*   pOutPrimCounterPtr,            // [in,out] Pointer to GS output primitive counter for this stream
-    Value*   pOutstandingVertCounterPtr)    // [in,out] Pointer to GS outstanding vertex counter for this stream
+    Module*  pModule,               // [in] LLVM module
+    uint32_t streamId,              // ID of output vertex stream
+    Value*   pThreadIdInSubgroup,   // [in] Thread ID in subgroup
+    Value*   pEmitCounterPtr,       // [in,out] Pointer to GS emit counter for this stream
+    Value*   pOutVertCounterPtr,    // [in,out] Pointer to GS output vertex counter for this stream
+    Value*   pOutPrimCounterPtr)    // [in,out] Pointer to GS output primitive counter for this stream
 {
     auto pGsEmitHandler = pModule->getFunction(LlpcName::NggGsEmit);
     if (pGsEmitHandler == nullptr)
@@ -4039,21 +3924,18 @@ void NggPrimShader::ProcessGsEmit(
                                pThreadIdInSubgroup,
                                pEmitCounterPtr,
                                pOutVertCounterPtr,
-                               pOutPrimCounterPtr,
-                               pOutstandingVertCounterPtr
+                               pOutPrimCounterPtr
                            });
 }
 
 // =====================================================================================================================
 // Processes the message GS_CUT.
 void NggPrimShader::ProcessGsCut(
-    Module*  pModule,                       // [in] LLVM module
-    uint32_t streamId,                      // ID of output vertex stream
-    Value*   pThreadIdInSubgroup,           // [in] Thread ID in subgroup
-    Value*   pEmitCounterPtr,               // [in,out] Pointer to GS emit counter for this stream
-    Value*   pOutVertCounterPtr,            // [in,out] Pointer to GS output vertex counter for this stream
-    Value*   pOutPrimCounterPtr,            // [in,out] Pointer to GS output primitive counter for this stream
-    Value*   pOutstandingVertCounterPtr)    // [in,out] Pointer to GS outstanding vertex counter for this stream
+    Module*  pModule,               // [in] LLVM module
+    uint32_t streamId,              // ID of output vertex stream
+    Value*   pThreadIdInSubgroup,   // [in] Thread ID in subgroup
+    Value*   pEmitCounterPtr,       // [in,out] Pointer to GS emit counter for this stream
+    Value*   pOutPrimCounterPtr)    // [in,out] Pointer to GS output primitive counter for this stream
 {
     auto pGsCutHandler = pModule->getFunction(LlpcName::NggGsCut);
     if (pGsCutHandler == nullptr)
@@ -4065,9 +3947,7 @@ void NggPrimShader::ProcessGsCut(
                            {
                                pThreadIdInSubgroup,
                                pEmitCounterPtr,
-                               pOutVertCounterPtr,
-                               pOutPrimCounterPtr,
-                               pOutstandingVertCounterPtr
+                               pOutPrimCounterPtr
                            });
 }
 
@@ -4084,26 +3964,22 @@ Function* NggPrimShader::CreateGsEmitHandler(
     //
     //   emitCounter++;
     //   outVertCounter++;
-    //   outstandingVertCounter++;
     //   if (emitCounter == outVertsPerPrim)
     //   {
     //       Calculate primitive data and write it to LDS (valid primitive)
     //       outPrimCounter++;
     //       emitCounter--;
-    //       outstandingVertCounter = 0;
     //   }
     //
     const auto addrSpace = pModule->getDataLayout().getAllocaAddrSpace();
-    auto pFuncTy =
-        FunctionType::get(m_pBuilder->getVoidTy(),
-                          {
-                              m_pBuilder->getInt32Ty(),                                // %threadIdInSubgroup
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %emitCounterPtr
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outVertCounterPtr
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outPrimCounterPtr
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outstandingVertCounterPtr
-                          },
-                          false);
+    auto pFuncTy = FunctionType::get(m_pBuilder->getVoidTy(),
+                                     {
+                                         m_pBuilder->getInt32Ty(),                                // %threadIdInSubgroup
+                                         PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %emitCounterPtr
+                                         PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outVertCounterPtr
+                                         PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outPrimCounterPtr
+                                     },
+                                     false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggGsEmit, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
@@ -4121,9 +3997,6 @@ Function* NggPrimShader::CreateGsEmitHandler(
 
     Value* pOutPrimCounterPtr = argIt++;
     pOutPrimCounterPtr->setName("outPrimCounterPtr");
-
-    Value* pOutstandingVertCounterPtr = argIt++;
-    pOutstandingVertCounterPtr->setName("outstandingVertCounterPtr");
 
     auto pEntryBlock = CreateBlock(pFunc, ".entry");
     auto pEmitPrimBlock = CreateBlock(pFunc, ".emitPrim");
@@ -4157,7 +4030,6 @@ Function* NggPrimShader::CreateGsEmitHandler(
     Value* pEmitCounter = nullptr;
     Value* pOutVertCounter = nullptr;
     Value* pOutPrimCounter = nullptr;
-    Value* pOutstandingVertCounter = nullptr;
     Value* pPrimComplete = nullptr;
     {
         m_pBuilder->SetInsertPoint(pEntryBlock);
@@ -4165,16 +4037,12 @@ Function* NggPrimShader::CreateGsEmitHandler(
         pEmitCounter = m_pBuilder->CreateLoad(pEmitCounterPtr);
         pOutVertCounter = m_pBuilder->CreateLoad(pOutVertCounterPtr);
         pOutPrimCounter = m_pBuilder->CreateLoad(pOutPrimCounterPtr);
-        pOutstandingVertCounter = m_pBuilder->CreateLoad(pOutstandingVertCounterPtr);
 
         // emitCounter++
         pEmitCounter = m_pBuilder->CreateAdd(pEmitCounter, m_pBuilder->getInt32(1));
 
         // outVertCounter++
         pOutVertCounter = m_pBuilder->CreateAdd(pOutVertCounter, m_pBuilder->getInt32(1));
-
-        // outstandingVertCounter++
-        pOutstandingVertCounter = m_pBuilder->CreateAdd(pOutstandingVertCounter, m_pBuilder->getInt32(1));
 
         // primComplete = (emitCounter == outVertsPerPrim)
         pPrimComplete = m_pBuilder->CreateICmpEQ(pEmitCounter, pOutVertsPerPrim);
@@ -4188,8 +4056,10 @@ Function* NggPrimShader::CreateGsEmitHandler(
         // NOTE: Only calculate GS output primitive data and write it to LDS for rasterization stream.
         if (streamId == pResUsage->inOutUsage.gs.rasterStream)
         {
-            // vertexId = outVertCounter
-            auto pvertexId = pOutVertCounter;
+            // vertexId = threadIdInSubgroup * outputVertices + outVertCounter
+            auto pvertexId = m_pBuilder->CreateMul(pThreadIdInSubgroup,
+                m_pBuilder->getInt32(geometryMode.outputVertices));
+            pvertexId = m_pBuilder->CreateAdd(pvertexId, pOutVertCounter);
 
             // vertexId0 = vertexId - outVertsPerPrim
             auto pVertexId0 = m_pBuilder->CreateSub(pvertexId, pOutVertsPerPrim);
@@ -4278,14 +4148,9 @@ Function* NggPrimShader::CreateGsEmitHandler(
         // if (primComplete) outPrimCounter++
         pOutPrimCounter = m_pBuilder->CreateSelect(pPrimComplete, pOutPrimCounterInc, pOutPrimCounter);
 
-        // if (primComplete) outstandingVertCounter = 0
-        pOutstandingVertCounter =
-            m_pBuilder->CreateSelect(pPrimComplete, m_pBuilder->getInt32(0), pOutstandingVertCounter);
-
         m_pBuilder->CreateStore(pEmitCounter, pEmitCounterPtr);
         m_pBuilder->CreateStore(pOutVertCounter, pOutVertCounterPtr);
         m_pBuilder->CreateStore(pOutPrimCounter, pOutPrimCounterPtr);
-        m_pBuilder->CreateStore(pOutstandingVertCounter, pOutstandingVertCounterPtr);
 
         m_pBuilder->CreateRetVoid();
     }
@@ -4311,21 +4176,16 @@ Function* NggPrimShader::CreateGsCutHandler(
     //       Write primitive data to LDS (invalid primitive)
     //       outPrimCounter++;
     //   }
-    //   emitCounter = 0;
-    //   outVertCounter -= outstandingVertCounter;
-    //   outstandingVertCounter = 0;
+    //   emitCounter = 0
     //
     const auto addrSpace = pModule->getDataLayout().getAllocaAddrSpace();
-    auto pFuncTy =
-        FunctionType::get(m_pBuilder->getVoidTy(),
-                          {
-                              m_pBuilder->getInt32Ty(),                                // %threadIdInSubgroup
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %emitCounterPtr
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outVertCounterPtr
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outPrimCounterPtr
-                              PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outstandingVertCounterPtr
-                          },
-                          false);
+    auto pFuncTy = FunctionType::get(m_pBuilder->getVoidTy(),
+                                     {
+                                         m_pBuilder->getInt32Ty(),                                // %threadIdInSubgroup
+                                         PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %emitCounterPtr
+                                         PointerType::get(m_pBuilder->getInt32Ty(), addrSpace),   // %outPrimCounterPtr
+                                     },
+                                     false);
     auto pFunc = Function::Create(pFuncTy, GlobalValue::InternalLinkage, LlpcName::NggGsCut, pModule);
 
     pFunc->setCallingConv(CallingConv::C);
@@ -4338,14 +4198,8 @@ Function* NggPrimShader::CreateGsCutHandler(
     Value* pEmitCounterPtr = argIt++;
     pEmitCounterPtr->setName("emitCounterPtr");
 
-    Value* pOutVertCounterPtr = argIt++;
-    pOutVertCounterPtr->setName("outVertCounterPtr");
-
     Value* pOutPrimCounterPtr = argIt++;
     pOutPrimCounterPtr->setName("outPrimCounterPtr");
-
-    Value* pOutstandingVertCounterPtr = argIt++;
-    pOutstandingVertCounterPtr->setName("outstandingVertCounterPtr");
 
     auto pEntryBlock = CreateBlock(pFunc, ".entry");
     auto pEmitPrimBlock = CreateBlock(pFunc, ".emitPrim");
@@ -4440,132 +4294,12 @@ Function* NggPrimShader::CreateGsCutHandler(
         pOutPrimCounter = m_pBuilder->CreateSelect(pPrimIncomplete, pOutPrimCounterInc, pOutPrimCounter);
         m_pBuilder->CreateStore(pOutPrimCounter, pOutPrimCounterPtr);
 
-        // outVertCounter -= outstandingVertCounter
-        Value* pOutVertCounter = m_pBuilder->CreateLoad(pOutVertCounterPtr);
-        Value* pOutstandingVertCounter = m_pBuilder->CreateLoad(pOutstandingVertCounterPtr);
-
-        pOutVertCounter = m_pBuilder->CreateSub(pOutVertCounter, pOutstandingVertCounter);
-        m_pBuilder->CreateStore(pOutVertCounter, pOutVertCounterPtr);
-
-        // Reset outstanding vertex counter
-        m_pBuilder->CreateStore(m_pBuilder->getInt32(0), pOutstandingVertCounterPtr);
-
         m_pBuilder->CreateRetVoid();
     }
 
     m_pBuilder->restoreIP(savedInsertPoint);
 
     return pFunc;
-}
-
-// =====================================================================================================================
-// Revises GS output primitive data. The data in LDS region "OutPrimData" contains vertex indices representing the
-// connectivity of this primitive. The vertex indices were "thread-view" values before this revising. They are the output
-// vertices emitted by this GS thread. After revising, the index values are "subgroup-view" ones, corresponding to the
-// output vertices emitted by the whole GS sub-group. Thus, number of output vertices prior to this GS thread is
-// counted in.
-void NggPrimShader::ReviseOutputPrimitiveData(
-    Value* pOutPrimId,       // [in] GS output primitive ID
-    Value* pVertexIdAdjust)  // [in] Adjustment of vertex indices corresponding to the GS output primitive
-{
-    const auto& geometryMode = m_pPipelineState->GetShaderModes()->GetGeometryShaderMode();
-    const auto pResUsage = m_pContext->GetShaderResourceUsage(ShaderStageGeometry);
-
-    uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionOutPrimData);
-
-    // ldsOffset = regionStart + (threadIdInSubgroup * maxOutPrims + outPrimId) * 4
-    const uint32_t maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
-    auto pLdsOffset = m_pBuilder->CreateMul(m_nggFactor.pThreadIdInSubgroup, m_pBuilder->getInt32(maxOutPrims));
-    pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pOutPrimId);
-    pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, m_pBuilder->getInt32(2));
-    pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
-
-    auto pPrimData = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
-
-    // Get GS output vertices per output primitive
-    uint32_t outVertsPerPrim = 0;
-    switch (geometryMode.outputPrimitive)
-    {
-    case OutputPrimitives::Points:
-        outVertsPerPrim = 1;
-        break;
-    case OutputPrimitives::LineStrip:
-        outVertsPerPrim = 2;
-        break;
-    case OutputPrimitives::TriangleStrip:
-        outVertsPerPrim = 3;
-        break;
-    default:
-        LLPC_NEVER_CALLED();
-        break;
-    }
-
-    // Primitive data layout [31:0]
-    //   [31]    = null primitive flag
-    //   [28:20] = vertexId2 (in bytes)
-    //   [18:10] = vertexId1 (in bytes)
-    //   [8:0]   = vertexId0 (in bytes)
-    Value* pVertexId0 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                    m_pBuilder->getInt32Ty(),
-                                                    {
-                                                        pPrimData,
-                                                        m_pBuilder->getInt32(0),
-                                                        m_pBuilder->getInt32(9)
-                                                    });
-    pVertexId0 = m_pBuilder->CreateAdd(pVertexIdAdjust, pVertexId0);
-
-    Value* pVertexId1 = nullptr;
-    if (outVertsPerPrim > 1)
-    {
-        pVertexId1 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                 m_pBuilder->getInt32Ty(),
-                                                 {
-                                                     pPrimData,
-                                                     m_pBuilder->getInt32(10),
-                                                     m_pBuilder->getInt32(9)
-                                                 });
-        pVertexId1 = m_pBuilder->CreateAdd(pVertexIdAdjust, pVertexId1);
-    }
-
-    Value* pVertexId2 = nullptr;
-    if (outVertsPerPrim > 2)
-    {
-        pVertexId2 = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
-                                                 m_pBuilder->getInt32Ty(),
-                                                 {
-                                                     pPrimData,
-                                                     m_pBuilder->getInt32(20),
-                                                     m_pBuilder->getInt32(9)
-                                                 });
-        pVertexId2 = m_pBuilder->CreateAdd(pVertexIdAdjust, pVertexId2);
-    }
-
-    Value* pNewPrimData = nullptr;
-    if (outVertsPerPrim == 1)
-    {
-        pNewPrimData = pVertexId0;
-    }
-    else if (outVertsPerPrim == 2)
-    {
-        pNewPrimData = m_pBuilder->CreateShl(pVertexId1, 10);
-        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId0);
-    }
-    else if (outVertsPerPrim == 3)
-    {
-        pNewPrimData = m_pBuilder->CreateShl(pVertexId2, 10);
-        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId1);
-        pNewPrimData = m_pBuilder->CreateShl(pNewPrimData, 10);
-        pNewPrimData = m_pBuilder->CreateOr(pNewPrimData, pVertexId0);
-    }
-    else
-    {
-        LLPC_NEVER_CALLED();
-    }
-
-    auto pIsNullPrim = m_pBuilder->CreateICmpEQ(pPrimData, m_pBuilder->getInt32(NullPrim));
-    pNewPrimData = m_pBuilder->CreateSelect(pIsNullPrim, m_pBuilder->getInt32(NullPrim), pNewPrimData);
-
-    m_pLdsManager->WriteValueToLds(pNewPrimData, pLdsOffset);
 }
 
 // =====================================================================================================================
@@ -5327,7 +5061,7 @@ Function* NggPrimShader::CreateFrustumCuller(
         // -yDiscAdj
         auto pNegYDiscAdj = m_pBuilder->CreateFNeg(pYDiscAdj);
 
-        Value* pClipMask[6] = {};
+        Value* pClipMask[6] = { nullptr };
 
         //
         // Get clip mask for vertex0
