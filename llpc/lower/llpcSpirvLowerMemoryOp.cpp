@@ -209,7 +209,7 @@ void SpirvLowerMemoryOp::visitGetElementPtrInst(
 // Checks whether the specified "getelementptr" instruction contains dynamic index and is therefore able to be expanded.
 bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
     GetElementPtrInst* pGetElemPtr,       // [in] "GetElementPtr" instruction
-    uint32_t*          pOperandIndex,     // [out] Index of the operand that represents a dynamic index
+    uint32_t*          pOperandIndexOut,  // [out] Index of the operand that represents a dynamic index
     uint32_t*          pDynIndexBound     // [out] Upper bound of dynamic index
     ) const
 {
@@ -299,7 +299,7 @@ bool SpirvLowerMemoryOp::NeedExpandDynamicIndex(
         }
     }
 
-    *pOperandIndex = operandIndex;
+    *pOperandIndexOut = operandIndex;
     return needExpand && allowExpand;
 }
 
@@ -415,10 +415,10 @@ void SpirvLowerMemoryOp::ExpandStoreInst(
         Instruction* pCheckStoreInsertPos = &pCheckStoreBlock->getInstList().back();
         Instruction* pStoreInsertPos      = &pStoreBlock->getInstList().front();
 
-        auto pGetElemPtrCount = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), getElemPtrCount) :
-                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), getElemPtrCount);
+        auto pGetElemPtrCountVal = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_pContext), getElemPtrCount) :
+                                              ConstantInt::get(Type::getInt32Ty(*m_pContext), getElemPtrCount);
 
-        auto pDoStore = new ICmpInst(pCheckStoreInsertPos, ICmpInst::ICMP_ULT, pDynIndex, pGetElemPtrCount);
+        auto pDoStore = new ICmpInst(pCheckStoreInsertPos, ICmpInst::ICMP_ULT, pDynIndex, pGetElemPtrCountVal);
         BranchInst::Create(pStoreBlock, pEndStoreBlock, pDoStore, pCheckStoreInsertPos);
 
         for (uint32_t i = 1; i < getElemPtrCount; ++i)

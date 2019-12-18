@@ -175,9 +175,9 @@ Result File::Write(
 // =====================================================================================================================
 // Reads a stream of bytes from the file.
 Result File::Read(
-    void*   pBuffer,     // [out] Buffer to read the file into
-    size_t  bufferSize,  // Size of buffer in bytes
-    size_t* pBytesRead)  // [out] Number of bytes actually read (can be nullptr)
+    void*   pBuffer,        // [out] Buffer to read the file into
+    size_t  bufferSize,     // Size of buffer in bytes
+    size_t* pBytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
 {
     Result result = Result::Success;
 
@@ -202,9 +202,9 @@ Result File::Read(
             result = Result::ErrorUnknown;
         }
 
-        if (pBytesRead != nullptr)
+        if (pBytesReadOut != nullptr)
         {
-            *pBytesRead = bytesRead;
+            *pBytesReadOut = bytesRead;
         }
     }
 
@@ -214,9 +214,9 @@ Result File::Read(
 // =====================================================================================================================
 // Reads a single line (until the next newline) of bytes from the file.
 Result File::ReadLine(
-    void*   pBuffer,     // [out] Buffer to read the file into
-    size_t  bufferSize,  // Size of buffer in bytes
-    size_t* pBytesRead)  // [out] Number of bytes actually read (can be nullptr)
+    void*   pBuffer,        // [out] Buffer to read the file into
+    size_t  bufferSize,     // Size of buffer in bytes
+    size_t* pBytesReadOut)  // [out] Number of bytes actually read (can be nullptr)
 {
     Result result = Result::ErrorInvalidValue;
 
@@ -254,9 +254,9 @@ Result File::ReadLine(
             bytesRead++;
         }
 
-        if (pBytesRead != nullptr)
+        if (pBytesReadOut != nullptr)
         {
-            *pBytesRead = bytesRead;
+            *pBytesReadOut = bytesRead;
         }
     }
 
@@ -341,7 +341,7 @@ void File::Rewind()
 {
     if (m_pFileHandle != nullptr)
     {
-        rewind(m_pFileHandle);
+        ::rewind(m_pFileHandle);
     }
 }
 

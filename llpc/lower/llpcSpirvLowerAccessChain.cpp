@@ -83,11 +83,9 @@ bool SpirvLowerAccessChain::runOnModule(
 void SpirvLowerAccessChain::visitGetElementPtrInst(
     GetElementPtrInst& getElemPtrInst) // [in] "Getelementptr" instruction
 {
-    auto pGetElemPtrInst = &getElemPtrInst;
-
     // NOTE: Here, we try to coalesce chained "getelementptr" instructions (created from multi-level access chain).
     // Because the metadata is always decorated on top-level pointer value (actually a global variable).
-    const uint32_t addrSpace = pGetElemPtrInst->getType()->getPointerAddressSpace();
+    const uint32_t addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
     if ((addrSpace == SPIRAS_Private) ||
         (addrSpace == SPIRAS_Input) || (addrSpace == SPIRAS_Output))
     {

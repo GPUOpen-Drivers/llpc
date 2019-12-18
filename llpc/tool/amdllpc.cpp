@@ -772,9 +772,9 @@ static Result GetSpirvBinaryFromFile(
 // =====================================================================================================================
 // GLSL compiler, compiles GLSL source text file (input) to SPIR-V binary file (output).
 static Result CompileGlsl(
-    const std::string& inFile,      // [in] Input file, GLSL source text
+    const std::string& inFilename,  // [in] Input filename, GLSL source text
     ShaderStage*       pStage,      // [out] Shader stage
-    std::string&       outFile)     // [out] Output file, SPIR-V binary
+    std::string&       outFilename) // [out] Output filename, SPIR-V binary
 {
     if (InitSpvGen() == false)
     {
@@ -785,30 +785,30 @@ static Result CompileGlsl(
     Result result = Result::Success;
     bool isHlsl = false;
 
-    SpvGenStage lang = spvGetStageTypeFromName(inFile.c_str(), &isHlsl);
+    SpvGenStage lang = spvGetStageTypeFromName(inFilename.c_str(), &isHlsl);
     if (lang == SpvGenStageInvalid)
     {
-        LLPC_ERRS("File " << inFile << ": Bad file extension; try -help\n");
+        LLPC_ERRS("File " << inFilename << ": Bad file extension; try -help\n");
         return Result::ErrorInvalidShader;
     }
     *pStage = SourceLangToShaderStage(lang);
 
-    FILE* pInFile = fopen(inFile.c_str(), "r");
+    FILE* pInFile = fopen(inFilename.c_str(), "r");
     if (pInFile == nullptr)
     {
-        LLPC_ERRS("Fails to open input file: " << inFile << "\n");
+        LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
         result = Result::ErrorUnavailable;
     }
 
     FILE* pOutFile = nullptr;
     if (result == Result::Success)
     {
-        outFile = sys::path::filename(inFile).str() + LlpcExt::SpirvBin;
+        outFilename = sys::path::filename(inFilename).str() + LlpcExt::SpirvBin;
 
-        pOutFile = fopen(outFile.c_str(), "wb");
+        pOutFile = fopen(outFilename.c_str(), "wb");
         if (pOutFile == nullptr)
         {
-            LLPC_ERRS("Fails to open output file: " << outFile << "\n");
+            LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
             result = Result::ErrorUnavailable;
         }
     }
@@ -826,13 +826,13 @@ static Result CompileGlsl(
         pGlslText[readSize] = 0;
 
         LLPC_OUTS("===============================================================================\n");
-        LLPC_OUTS("// GLSL sources: " << inFile << "\n\n");
+        LLPC_OUTS("// GLSL sources: " << inFilename << "\n\n");
         LLPC_OUTS(pGlslText);
         LLPC_OUTS("\n\n");
 
         int32_t sourceStringCount = 1;
         const char*const* sourceList[1] = {};
-        const char* pFileName = inFile.c_str();
+        const char* pFileName = inFilename.c_str();
         const char* const* fileList[1]  = { &pFileName };
         sourceList[0] = &pGlslText;
 
@@ -863,7 +863,7 @@ static Result CompileGlsl(
             char* pSpvText = new char[textSize];
             assert(pSpvText != nullptr);
             memset(pSpvText, 0, textSize);
-            LLPC_OUTS("\nSPIR-V disassembly: " << outFile << "\n");
+            LLPC_OUTS("\nSPIR-V disassembly: " << outFilename << "\n");
             spvDisassembleSpirv(binSize, pSpvBin, textSize, pSpvText);
             LLPC_OUTS(pSpvText << "\n");
             delete[] pSpvText;
@@ -886,8 +886,8 @@ static Result CompileGlsl(
 // =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
 static Result AssembleSpirv(
-    const std::string& inFile,  // [in] Input file, SPIR-V assembly text
-    std::string&       outFile) // [out] Output file, SPIR-V binary
+    const std::string& inFilename,  // [in] Input filename, SPIR-V assembly text
+    std::string&       outFilename) // [out] Output filename, SPIR-V binary
 {
     if (InitSpvGen() == false)
     {
@@ -897,22 +897,22 @@ static Result AssembleSpirv(
 
     Result result = Result::Success;
 
-    FILE* pInFile = fopen(inFile.c_str(), "r");
+    FILE* pInFile = fopen(inFilename.c_str(), "r");
     if (pInFile == nullptr)
     {
-        LLPC_ERRS("Fails to open input file: " << inFile << "\n");
+        LLPC_ERRS("Fails to open input file: " << inFilename << "\n");
         result = Result::ErrorUnavailable;
     }
 
     FILE* pOutFile = nullptr;
     if (result == Result::Success)
     {
-        outFile = sys::path::stem(sys::path::filename(inFile)).str() + LlpcExt::SpirvBin;
+        outFilename = sys::path::stem(sys::path::filename(inFilename)).str() + LlpcExt::SpirvBin;
 
-        pOutFile = fopen(outFile.c_str(), "wb");
+        pOutFile = fopen(outFilename.c_str(), "wb");
         if (pOutFile == nullptr)
         {
-            LLPC_ERRS("Fails to open output file: " << outFile << "\n");
+            LLPC_ERRS("Fails to open output file: " << outFilename << "\n");
             result = Result::ErrorUnavailable;
         }
     }
@@ -946,7 +946,7 @@ static Result AssembleSpirv(
             fwrite(pSpvBin, 1, binSize, pOutFile);
 
             LLPC_OUTS("===============================================================================\n");
-            LLPC_OUTS("// SPIR-V disassembly: " << inFile << "\n");
+            LLPC_OUTS("// SPIR-V disassembly: " << inFilename << "\n");
             LLPC_OUTS(pSpvText);
             LLPC_OUTS("\n\n");
         }
@@ -1028,7 +1028,7 @@ static Result CheckAutoLayoutCompatibleFunc(
         GraphicsPipelineBuildInfo* pPipelineInfo = &pCompileInfo->gfxPipelineInfo;
 
         // Fill pipeline shader info
-        PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
+        PipelineShaderInfo* shaderInfos[ShaderStageGfxCount] =
         {
             &pPipelineInfo->vs,
             &pPipelineInfo->tcs,
@@ -1041,7 +1041,7 @@ static Result CheckAutoLayoutCompatibleFunc(
         for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
         {
 
-            PipelineShaderInfo*         pShaderInfo = shaderInfo[pCompileInfo->shaderModuleDatas[i].shaderStage];
+            PipelineShaderInfo*         pShaderInfo = shaderInfos[pCompileInfo->shaderModuleDatas[i].shaderStage];
             bool                        checkAutoLayoutCompatible = pCompileInfo->checkAutoLayoutCompatible;
 
             if (pCompileInfo->shaderModuleDatas[i].shaderStage != Vkgc::ShaderStageFragment)
@@ -1059,16 +1059,16 @@ static Result CheckAutoLayoutCompatibleFunc(
             pShaderInfo->entryStage = pCompileInfo->shaderModuleDatas[i].shaderStage;
             if (checkAutoLayoutCompatible)
             {
-                PipelineShaderInfo shaderInfo = *pShaderInfo;
-                GraphicsPipelineBuildInfo pipelineInfo = *pPipelineInfo;
+                PipelineShaderInfo shaderInfoCopy = *pShaderInfo;
+                GraphicsPipelineBuildInfo pipelineInfoCopy = *pPipelineInfo;
                 DoAutoLayoutDesc(pCompileInfo->shaderModuleDatas[i].shaderStage,
                                  pCompileInfo->shaderModuleDatas[i].spirvBin,
-                                 &pipelineInfo,
-                                 &shaderInfo,
+                                 &pipelineInfoCopy,
+                                 &shaderInfoCopy,
                                  userDataOffset,
                                  true);
-                if (CheckShaderInfoComptible(pShaderInfo, shaderInfo.userDataNodeCount, shaderInfo.pUserDataNodes) &&
-                    CheckPipelineStateCompatible(pCompiler, pPipelineInfo, &pipelineInfo, ParsedGfxIp))
+                if (CheckShaderInfoComptible(pShaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes) &&
+                    CheckPipelineStateCompatible(pCompiler, pPipelineInfo, &pipelineInfoCopy, ParsedGfxIp))
                 {
                     outs() << "Auto Layout fragment shader in " << pCompileInfo->pFileNames << " hitted\n";
                 }
@@ -1098,14 +1098,14 @@ static Result CheckAutoLayoutCompatibleFunc(
         if (pCompileInfo->checkAutoLayoutCompatible)
         {
             uint32_t userDataOffset = 0;
-            PipelineShaderInfo shaderInfo = *pShaderInfo;
+            PipelineShaderInfo shaderInfoCopy = *pShaderInfo;
             DoAutoLayoutDesc(ShaderStageCompute,
                              pCompileInfo->shaderModuleDatas[0].spirvBin,
                              nullptr,
-                             &shaderInfo,
+                             &shaderInfoCopy,
                              userDataOffset,
                              true);
-            if (CheckShaderInfoComptible(pShaderInfo, shaderInfo.userDataNodeCount, shaderInfo.pUserDataNodes))
+            if (CheckShaderInfoComptible(pShaderInfo, shaderInfoCopy.userDataNodeCount, shaderInfoCopy.pUserDataNodes))
             {
                 outs() << "Auto Layout compute shader in " << pCompileInfo->pFileNames << " hitted\n";
             }
@@ -1136,7 +1136,7 @@ static Result BuildPipeline(
         GraphicsPipelineBuildOut*  pPipelineOut  = &pCompileInfo->gfxPipelineOut;
 
         // Fill pipeline shader info
-        PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
+        PipelineShaderInfo* shaderInfos[ShaderStageGfxCount] =
         {
             &pPipelineInfo->vs,
             &pPipelineInfo->tcs,
@@ -1149,7 +1149,7 @@ static Result BuildPipeline(
         for (uint32_t i = 0; i < pCompileInfo->shaderModuleDatas.size(); ++i)
         {
 
-            PipelineShaderInfo*         pShaderInfo = shaderInfo[pCompileInfo->shaderModuleDatas[i].shaderStage];
+            PipelineShaderInfo*         pShaderInfo = shaderInfos[pCompileInfo->shaderModuleDatas[i].shaderStage];
             const ShaderModuleBuildOut* pShaderOut  = &(pCompileInfo->shaderModuleDatas[i].shaderOut);
 
             if (pShaderInfo->pEntryTarget == nullptr)
@@ -1193,9 +1193,9 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
 
-            PipelineBuildInfo pipelineInfo = {};
-            pipelineInfo.pGraphicsInfo = pPipelineInfo;
-            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
+            PipelineBuildInfo localPipelineInfo = {};
+            localPipelineInfo.pGraphicsInfo = pPipelineInfo;
+            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
@@ -1269,9 +1269,9 @@ static Result BuildPipeline(
             dumpOptions.filterPipelineDumpByType = llvm::cl::FilterPipelineDumpByType;
             dumpOptions.filterPipelineDumpByHash = llvm::cl::FilterPipelineDumpByHash;
             dumpOptions.dumpDuplicatePipelines   = llvm::cl::DumpDuplicatePipelines;
-            PipelineBuildInfo pipelineInfo = {};
-            pipelineInfo.pComputeInfo = pPipelineInfo;
-            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, pipelineInfo);
+            PipelineBuildInfo localPipelineInfo = {};
+            localPipelineInfo.pComputeInfo = pPipelineInfo;
+            pPipelineDumpHandle = Vkgc::IPipelineDumper::BeginPipelineDump(&dumpOptions, localPipelineInfo);
         }
 
         if (TimePassesIsEnabled || cl::EnableTimerProfile)
@@ -1306,16 +1306,16 @@ static Result BuildPipeline(
 // =====================================================================================================================
 // Output LLPC resulting binary (ELF binary, ISA assembly text, or LLVM bitcode) to the specified target file.
 static Result OutputElf(
-    CompileInfo*       pCompileInfo,  // [in] Compilation info of LLPC standalone tool
-    const std::string& outFile,       // [in] Name of the file to output ELF binary (specify "" to use base name of
-                                      //     first input file with appropriate extension; specify "-" to use stdout)
-    StringRef          firstInFile)   // [in] Name of first input file
+    CompileInfo*       pCompileInfo,    // [in] Compilation info of LLPC standalone tool
+    const std::string& suppliedOutFile, // [in] Name of the file to output ELF binary (specify "" to use base name of
+                                        //     first input file with appropriate extension; specify "-" to use stdout)
+    StringRef          firstInFile)     // [in] Name of first input file
 {
     Result result = Result::Success;
     const BinaryData* pPipelineBin = (pCompileInfo->stageMask & ShaderStageToMask(ShaderStageCompute)) ?
                                          &pCompileInfo->compPipelineOut.pipelineBin :
                                          &pCompileInfo->gfxPipelineOut.pipelineBin;
-    SmallString<64> outFileName(outFile);
+    SmallString<64> outFileName(suppliedOutFile);
     if (outFileName.empty())
     {
         // NOTE: The output file name was not specified, so we construct a default file name.  We detect the

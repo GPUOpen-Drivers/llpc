@@ -304,20 +304,23 @@ Value* FragColorExport::Run(
 
             for (uint32_t i = 0; i < compCount; i += 2)
             {
-                Value* pComps = EmitCall(funcName,
-                                         VectorType::get(Type::getInt16Ty(*m_pContext), 2),
-                                         { comps[i], comps[i + 1] },
-                                         {},
-                                         pInsertPos);
+                Value* pPackedComps = EmitCall(funcName,
+                                               VectorType::get(Type::getInt16Ty(*m_pContext), 2),
+                                               { comps[i], comps[i + 1] },
+                                               {},
+                                               pInsertPos);
 
-                pComps = new BitCastInst(pComps, VectorType::get(Type::getHalfTy(*m_pContext), 2), "", pInsertPos);
+                pPackedComps = new BitCastInst(pPackedComps,
+                                               VectorType::get(Type::getHalfTy(*m_pContext), 2),
+                                               "",
+                                               pInsertPos);
 
-                comps[i] = ExtractElementInst::Create(pComps,
+                comps[i] = ExtractElementInst::Create(pPackedComps,
                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                         "",
                                                         pInsertPos);
 
-                comps[i + 1] = ExtractElementInst::Create(pComps,
+                comps[i + 1] = ExtractElementInst::Create(pPackedComps,
                                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                             "",
                                                             pInsertPos);
@@ -356,20 +359,23 @@ Value* FragColorExport::Run(
 
             for (uint32_t i = 0; i < compCount; i += 2)
             {
-                Value* pComps = EmitCall(funcName,
-                                         VectorType::get(Type::getInt16Ty(*m_pContext), 2),
-                                         { comps[i], comps[i + 1] },
-                                         {},
-                                         pInsertPos);
+                Value* pPackedComps = EmitCall(funcName,
+                                               VectorType::get(Type::getInt16Ty(*m_pContext), 2),
+                                               { comps[i], comps[i + 1] },
+                                               {},
+                                               pInsertPos);
 
-                pComps = new BitCastInst(pComps, VectorType::get(Type::getHalfTy(*m_pContext), 2), "", pInsertPos);
+                pPackedComps = new BitCastInst(pPackedComps,
+                                               VectorType::get(Type::getHalfTy(*m_pContext), 2),
+                                               "",
+                                               pInsertPos);
 
-                comps[i] = ExtractElementInst::Create(pComps,
+                comps[i] = ExtractElementInst::Create(pPackedComps,
                                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
                                                         "",
                                                         pInsertPos);
 
-                comps[i + 1] = ExtractElementInst::Create(pComps,
+                comps[i + 1] = ExtractElementInst::Create(pPackedComps,
                                                             ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                                             "",
                                                             pInsertPos);
@@ -487,24 +493,24 @@ ExportFormat FragColorExport::ComputeExportFormat(
 
     const bool blendEnabled = pTarget->blendEnable;
 
-    const bool isUnorm = (pTarget->nfmt == BufNumFormatUnorm);
-    const bool isSnorm = (pTarget->nfmt == BufNumFormatSnorm);
-    bool isFloat = (pTarget->nfmt == BufNumFormatFloat);
-    const bool isUint = (pTarget->nfmt == BufNumFormatUint);
-    const bool isSint = (pTarget->nfmt == BufNumFormatSint);
-    const bool isSrgb = (pTarget->nfmt == BufNumFormatSrgb);
+    const bool isUnormFormat = (pTarget->nfmt == BufNumFormatUnorm);
+    const bool isSnormFormat = (pTarget->nfmt == BufNumFormatSnorm);
+    bool isFloatFormat = (pTarget->nfmt == BufNumFormatFloat);
+    const bool isUintFormat = (pTarget->nfmt == BufNumFormatUint);
+    const bool isSintFormat = (pTarget->nfmt == BufNumFormatSint);
+    const bool isSrgbFormat = (pTarget->nfmt == BufNumFormatSrgb);
 
     if ((pTarget->dfmt == BufDataFormat8_8_8) || (pTarget->dfmt == BufDataFormat8_8_8_Bgr))
     {
         // These three-byte formats are handled by pretending they are float.
-        isFloat = true;
+        isFloatFormat = true;
     }
 
     const uint32_t maxCompBitCount = GetMaxComponentBitCount(pTarget->dfmt);
 
-    const bool hasAlpha = HasAlpha(pTarget->dfmt);
+    const bool formatHasAlpha = HasAlpha(pTarget->dfmt);
     const bool alphaExport = ((outputMask == 0xF) &&
-                              (hasAlpha || pTarget->blendSrcAlphaToColor || enableAlphaToCoverage));
+                              (formatHasAlpha || pTarget->blendSrcAlphaToColor || enableAlphaToCoverage));
 
     const CompSetting compSetting = ComputeCompSetting(pTarget->dfmt);
 
@@ -523,20 +529,20 @@ ExportFormat FragColorExport::ComputeExportFormat(
     }
     else if ((compSetting == CompSetting::OneCompRed) &&
              (alphaExport == false)                   &&
-             (isSrgb == false)                        &&
+             (isSrgbFormat == false)                        &&
              ((gfx8RbPlusEnable == false) || (maxCompBitCount == 32)))
     {
         // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
         // "EXP_FORMAT_FP16_ABGR" and "EXP_FORMAT_UNORM16_ABGR" should be used for 2X exporting performance.
         expFmt = EXP_FORMAT_32_R;
     }
-    else if (((isUnorm || isSnorm) && (maxCompBitCount <= 10)) ||
-             (isFloat && (maxCompBitCount <= 16)) ||
-             (isSrgb && (maxCompBitCount == 8)))
+    else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount <= 10)) ||
+             (isFloatFormat && (maxCompBitCount <= 16)) ||
+             (isSrgbFormat && (maxCompBitCount == 8)))
     {
         expFmt = EXP_FORMAT_FP16_ABGR;
     }
-    else if (isSint &&
+    else if (isSintFormat &&
              ((maxCompBitCount == 16) ||
               ((pGpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
              (enableAlphaToCoverage == false))
@@ -547,11 +553,11 @@ ExportFormat FragColorExport::ComputeExportFormat(
         // performance 16-bit export format in this case.
         expFmt = EXP_FORMAT_SINT16_ABGR;
     }
-    else if (isSnorm && (maxCompBitCount == 16) && (blendEnabled == false))
+    else if (isSnormFormat && (maxCompBitCount == 16) && (blendEnabled == false))
     {
         expFmt = EXP_FORMAT_SNORM16_ABGR;
     }
-    else if (isUint &&
+    else if (isUintFormat &&
              ((maxCompBitCount == 16) ||
               ((pGpuWorkarounds->gfx6.cbNoLt16BitIntClamp == false) && (maxCompBitCount < 16))) &&
              (enableAlphaToCoverage == false))
@@ -562,29 +568,29 @@ ExportFormat FragColorExport::ComputeExportFormat(
         // performance 16-bit export format in this case.
         expFmt = EXP_FORMAT_UINT16_ABGR;
     }
-    else if (isUnorm && (maxCompBitCount == 16) && (blendEnabled == false))
+    else if (isUnormFormat && (maxCompBitCount == 16) && (blendEnabled == false))
     {
         expFmt = EXP_FORMAT_UNORM16_ABGR;
     }
-    else if (((isUint || isSint) ||
-              (isFloat && (maxCompBitCount > 16)) ||
-              ((isUnorm || isSnorm) && (maxCompBitCount == 16)))  &&
+    else if (((isUintFormat || isSintFormat) ||
+              (isFloatFormat && (maxCompBitCount > 16)) ||
+              ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
              ((compSetting == CompSetting::OneCompRed) ||
               (compSetting == CompSetting::OneCompAlpha) ||
               (compSetting == CompSetting::TwoCompAlphaRed)))
     {
         expFmt = EXP_FORMAT_32_AR;
     }
-    else if (((isUint || isSint) ||
-              (isFloat && (maxCompBitCount > 16)) ||
-              ((isUnorm || isSnorm) && (maxCompBitCount == 16)))  &&
+    else if (((isUintFormat || isSintFormat) ||
+              (isFloatFormat && (maxCompBitCount > 16)) ||
+              ((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)))  &&
              (compSetting == CompSetting::TwoCompGreenRed) && (alphaExport == false))
     {
         expFmt = EXP_FORMAT_32_GR;
     }
-    else if (((isUnorm || isSnorm) && (maxCompBitCount == 16)) ||
-             (isUint || isSint) ||
-             (isFloat && (maxCompBitCount >  16)))
+    else if (((isUnormFormat || isSnormFormat) && (maxCompBitCount == 16)) ||
+             (isUintFormat || isSintFormat) ||
+             (isFloatFormat && (maxCompBitCount >  16)))
     {
         expFmt = EXP_FORMAT_32_ABGR;
     }

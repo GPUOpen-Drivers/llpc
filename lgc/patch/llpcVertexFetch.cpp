@@ -296,8 +296,8 @@ VertexFetch::VertexFetch(
 
     // Float16 (0, 0, 0, 1.0)
     const uint16_t float16One = 0x3C00;
-    auto pFloat16One = ConstantInt::get(Type::getInt32Ty(*m_pContext), float16One);
-    m_fetchDefaults.pFloat16 = ConstantVector::get({ pZero, pZero, pZero, pFloat16One });
+    auto pFloat16OneVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), float16One);
+    m_fetchDefaults.pFloat16 = ConstantVector::get({ pZero, pZero, pZero, pFloat16OneVal });
 
     // Float (0.0, 0.0, 0.0, 1.0)
     union
@@ -305,8 +305,8 @@ VertexFetch::VertexFetch(
         float    f;
         uint32_t u32;
     } floatOne = { 1.0f };
-    auto pFloatOne = ConstantInt::get(Type::getInt32Ty(*m_pContext), floatOne.u32);
-    m_fetchDefaults.pFloat = ConstantVector::get({ pZero, pZero, pZero, pFloatOne });
+    auto pFloatOneVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), floatOne.u32);
+    m_fetchDefaults.pFloat = ConstantVector::get({ pZero, pZero, pZero, pFloatOneVal });
 
     // Double (0.0, 0.0, 0.0, 1.0)
     union
@@ -370,7 +370,7 @@ Value* VertexFetch::Run(
         }
     }
 
-    Value* vertexFetch[2] = {}; // Two vertex fetch operations might be required
+    Value* vertexFetches[2] = {}; // Two vertex fetch operations might be required
     Value* pVertexFetch = nullptr; // Coalesced vector by combining the results of two vertex fetch operations
 
     VertexFormatInfo formatInfo = GetVertexFormatInfo(pDescription);
@@ -388,7 +388,7 @@ Value* VertexFetch::Run(
                        formatInfo.dfmt,
                        formatInfo.nfmt,
                        pInsertPos,
-                       &vertexFetch[0]);
+                       &vertexFetches[0]);
 
     // Do post-processing in certain cases
     std::vector<Constant*> shuffleMask;
@@ -401,8 +401,8 @@ Value* VertexFetch::Run(
             // NOTE: If we are fetching a swizzled format, we have to add an extra "shufflevector" instruction to
             // get the components in the right order.
             assert(shuffleMask.empty() == false);
-            vertexFetch[0] = new ShuffleVectorInst(vertexFetch[0],
-                                                   vertexFetch[0],
+            vertexFetches[0] = new ShuffleVectorInst(vertexFetches[0],
+                                                   vertexFetches[0],
                                                    ConstantVector::get(shuffleMask),
                                                    "",
                                                    pInsertPos);
@@ -410,10 +410,10 @@ Value* VertexFetch::Run(
 
         if (patchA2S)
         {
-            assert(vertexFetch[0]->getType()->getVectorNumElements() == 4);
+            assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
 
             // Extract alpha channel: %a = extractelement %vf0, 3
-            Value* pAlpha = ExtractElementInst::Create(vertexFetch[0],
+            Value* pAlpha = ExtractElementInst::Create(vertexFetches[0],
                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                                                        "",
                                                        pInsertPos);
@@ -504,7 +504,7 @@ Value* VertexFetch::Run(
             }
 
             // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
-            vertexFetch[0] = InsertElementInst::Create(vertexFetch[0],
+            vertexFetches[0] = InsertElementInst::Create(vertexFetches[0],
                                                        pAlpha,
                                                        ConstantInt::get(Type::getInt32Ty(*m_pContext), 3),
                                                        "",
@@ -535,17 +535,17 @@ Value* VertexFetch::Run(
                            dfmt,
                            formatInfo.nfmt,
                            pInsertPos,
-                           &vertexFetch[1]);
+                           &vertexFetches[1]);
     }
 
     if (secondFetch)
     {
         // NOTE: If we performs vertex fetch operations twice, we have to coalesce result values of the two
         // fetch operations and generate a combined one.
-        assert((vertexFetch[0] != nullptr) && (vertexFetch[1] != nullptr));
-        assert(vertexFetch[0]->getType()->getVectorNumElements() == 4);
+        assert((vertexFetches[0] != nullptr) && (vertexFetches[1] != nullptr));
+        assert(vertexFetches[0]->getType()->getVectorNumElements() == 4);
 
-        uint32_t compCount = vertexFetch[1]->getType()->getVectorNumElements();
+        uint32_t compCount = vertexFetches[1]->getType()->getVectorNumElements();
         assert((compCount == 2) || (compCount == 4)); // Should be <2 x i32> or <4 x i32>
 
         if (compCount == 2)
@@ -561,8 +561,8 @@ Value* VertexFetch::Run(
                 UndefValue::get(Type::getInt32Ty(*m_pContext)),
                 UndefValue::get(Type::getInt32Ty(*m_pContext))
             };
-            vertexFetch[1] = new ShuffleVectorInst(vertexFetch[1],
-                                                   vertexFetch[1],
+            vertexFetches[1] = new ShuffleVectorInst(vertexFetches[1],
+                                                   vertexFetches[1],
                                                    ConstantVector::get(shuffleMask),
                                                    "",
                                                    pInsertPos);
@@ -574,15 +574,15 @@ Value* VertexFetch::Run(
         {
             shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_pContext), i));
         }
-        pVertexFetch = new ShuffleVectorInst(vertexFetch[0],
-                                             vertexFetch[1],
+        pVertexFetch = new ShuffleVectorInst(vertexFetches[0],
+                                             vertexFetches[1],
                                              ConstantVector::get(shuffleMask),
                                              "",
                                              pInsertPos);
     }
     else
     {
-        pVertexFetch = vertexFetch[0];
+        pVertexFetch = vertexFetches[0];
     }
 
     // Finalize vertex fetch

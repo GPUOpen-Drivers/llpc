@@ -146,9 +146,9 @@ Value* GfxRegHandlerBase::ReplaceBits(
 {
     // mask = ((1 << count) - 1) << offset
     // Result = (pDword & ~mask)|((pNewBits << offset) & mask)
-    uint32_t mask = ((1 << count) - 1) << offset;
-    Value* pMask = m_pBuilder->getInt32(mask);
-    Value* pNotMask = m_pBuilder->getInt32(~mask);
+    uint32_t maskBits = ((1 << count) - 1) << offset;
+    Value* pMask = m_pBuilder->getInt32(maskBits);
+    Value* pNotMask = m_pBuilder->getInt32(~maskBits);
     Value* pBeginBit = m_pBuilder->getInt32(offset);
     pNewBits = m_pBuilder->CreateAnd(m_pBuilder->CreateShl(pNewBits, pBeginBit), pMask);
     return m_pBuilder->CreateOr(m_pBuilder->CreateAnd(pDword, pNotMask), pNewBits);

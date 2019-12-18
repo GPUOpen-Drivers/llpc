@@ -1081,21 +1081,21 @@ void PatchBufferOp::PostVisitMemCpyInst(
     const uint32_t destAlignment = memCpyInst.getParamAlignment(0);
     const uint32_t srcAlignment = memCpyInst.getParamAlignment(1);
 
-    ConstantInt* const pConstantLength = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
+    ConstantInt* const pLengthConstant = dyn_cast<ConstantInt>(memCpyInst.getArgOperand(2));
 
-    const uint64_t constantLength = (pConstantLength != nullptr) ? pConstantLength->getZExtValue() : 0;
+    const uint64_t constantLength = (pLengthConstant != nullptr) ? pLengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((pConstantLength == nullptr) || (constantLength > MinMemOpLoopBytes))
+    if ((pLengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
     {
         // NOTE: We want to perform our memcpy operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        uint32_t stride = (pConstantLength == nullptr) ? 1 : 16;
+        uint32_t stride = (pLengthConstant == nullptr) ? 1 : 16;
 
         while (stride != 1)
         {
@@ -1183,7 +1183,7 @@ void PatchBufferOp::PostVisitMemCpyInst(
     else
     {
         // Get an vector type that is the length of the memcpy.
-        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pConstantLength->getZExtValue());
+        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLengthConstant->getZExtValue());
 
         PointerType* const pCastDestType = pMemoryType->getPointerTo(destAddrSpace);
         Value* const pCastDest = m_pBuilder->CreateBitCast(pDest, pCastDestType);
@@ -1233,21 +1233,21 @@ void PatchBufferOp::PostVisitMemSetInst(
 
     const uint32_t destAlignment = memSetInst.getParamAlignment(0);
 
-    ConstantInt* const pConstantLength = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
+    ConstantInt* const pLengthConstant = dyn_cast<ConstantInt>(memSetInst.getArgOperand(2));
 
-    const uint64_t constantLength = (pConstantLength != nullptr) ? pConstantLength->getZExtValue() : 0;
+    const uint64_t constantLength = (pLengthConstant != nullptr) ? pLengthConstant->getZExtValue() : 0;
 
     // NOTE: If we do not have a constant length, or the constant length is bigger than the minimum we require to
     // generate a loop, we make a loop to handle the memcpy instead. If we did not generate a loop here for any
     // constant-length memcpy with a large number of bytes would generate thousands of load/store instructions that
     // causes LLVM's optimizations and our AMDGPU backend to crawl (and generate worse code!).
-    if ((pConstantLength == nullptr) || (constantLength > MinMemOpLoopBytes))
+    if ((pLengthConstant == nullptr) || (constantLength > MinMemOpLoopBytes))
     {
         // NOTE: We want to perform our memset operation on the greatest stride of bytes possible (load/storing up to
         // DWORDx4 or 16 bytes per loop iteration). If we have a constant length, we check if the the alignment and
         // number of bytes to copy lets us load/store 16 bytes per loop iteration, and if not we check 8, then 4, then
         // 2. Worst case we have to load/store a single byte per loop.
-        uint32_t stride = (pConstantLength == nullptr) ? 1 : 16;
+        uint32_t stride = (pLengthConstant == nullptr) ? 1 : 16;
 
         while (stride != 1)
         {
@@ -1335,7 +1335,7 @@ void PatchBufferOp::PostVisitMemSetInst(
     else
     {
         // Get a vector type that is the length of the memset.
-        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pConstantLength->getZExtValue());
+        VectorType* const pMemoryType = VectorType::get(m_pBuilder->getInt8Ty(), pLengthConstant->getZExtValue());
 
         Value* pNewValue = nullptr;
 
@@ -1689,7 +1689,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
     while (remainingBytes > 0)
     {
         const uint32_t offset = bytesToHandle - remainingBytes;
-        Value* pOffset = (offset == 0) ?
+        Value* pOffsetVal = (offset == 0) ?
                                pBaseIndex :
                                m_pBuilder->CreateAdd(pBaseIndex, m_pBuilder->getInt32(offset));
 
@@ -1756,7 +1756,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
                                                     pIntAccessType,
                                                     {
                                                         pBufferDesc,
-                                                        pOffset,
+                                                        pOffsetVal,
                                                         m_pBuilder->getInt32(coherent.u32All)
                                                     });
             }
@@ -1769,7 +1769,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
                                                     pIntAccessType,
                                                     {
                                                         pBufferDesc,
-                                                        pOffset,
+                                                        pOffsetVal,
                                                         m_pBuilder->getInt32(0),
                                                         m_pBuilder->getInt32(coherent.u32All)
                                                     });
@@ -1793,7 +1793,7 @@ Value* PatchBufferOp::ReplaceLoadStore(
                                                 {
                                                     pPart,
                                                     pBufferDesc,
-                                                    pOffset,
+                                                    pOffsetVal,
                                                     m_pBuilder->getInt32(0),
                                                     m_pBuilder->getInt32(coherent.u32All)
                                                 });

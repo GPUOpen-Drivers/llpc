@@ -567,23 +567,23 @@ void ElfWriter<Elf>::AssembleSymbols()
     }
     pSymbolSection->secHead.sh_size = symSectionSize;
 
-    auto pSymbol = reinterpret_cast<typename Elf::Symbol*>(const_cast<uint8_t*>(pSymbolSection->pData));
+    auto pSymbolToWrite = reinterpret_cast<typename Elf::Symbol*>(const_cast<uint8_t*>(pSymbolSection->pData));
     for (auto& symbol : m_symbols)
     {
         if (symbol.secIdx != InvalidValue)
         {
-            pSymbol->st_name = symbol.nameOffset;
-            pSymbol->st_info.all = symbol.info.all;
-            pSymbol->st_other = 0;
-            pSymbol->st_shndx = symbol.secIdx;
-            pSymbol->st_value = symbol.value;
-            pSymbol->st_size = symbol.size;
-            ++pSymbol;
+            pSymbolToWrite->st_name = symbol.nameOffset;
+            pSymbolToWrite->st_info.all = symbol.info.all;
+            pSymbolToWrite->st_other = 0;
+            pSymbolToWrite->st_shndx = symbol.secIdx;
+            pSymbolToWrite->st_value = symbol.value;
+            pSymbolToWrite->st_size = symbol.size;
+            ++pSymbolToWrite;
         }
     }
 
     assert(pSymbolSection->secHead.sh_size ==
-                static_cast<uint32_t>(reinterpret_cast<uint8_t*>(pSymbol) - pSymbolSection->pData));
+                static_cast<uint32_t>(reinterpret_cast<uint8_t*>(pSymbolToWrite) - pSymbolSection->pData));
 }
 
 // =====================================================================================================================

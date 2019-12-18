@@ -500,9 +500,9 @@ Value* ShaderSystemValues::GetSpilledPushConstTablePtr()
         uint32_t pushConstOffset = pPushConstNode->offsetInDwords * sizeof(uint32_t);
 
         auto pSpillTablePtrLow = GetFunctionArgument(m_pEntryPoint, pIntfData->entryArgIdxs.spillTable, "spillTable");
-        auto pPushConstOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), pushConstOffset);
         auto pSpilledPushConstTablePtrLow = BinaryOperator::CreateAdd(pSpillTablePtrLow,
-                                                                      pPushConstOffset,
+                                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext),
+                                                                                       pushConstOffset),
                                                                       "",
                                                                       pInsertPos);
         auto pTy = PointerType::get(ArrayType::get(Type::getInt8Ty(*m_pContext), InterfaceData::MaxSpillTableSize),

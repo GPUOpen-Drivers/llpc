@@ -1824,7 +1824,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
                             derivatives);
 
     SmallVector<Value*, 8> args;
-    Instruction* pAtomicOp = nullptr;
+    Instruction* pAtomicInst = nullptr;
     uint32_t imageDescArgIndex = 0;
     if (pImageDesc->getType() == GetImageDescTy())
     {
@@ -1843,11 +1843,11 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
 
         // Get the intrinsic ID from the load intrinsic ID table, and create the intrinsic.
         Intrinsic::ID intrinsicId = ImageAtomicIntrinsicTable[atomicOp][dim];
-        pAtomicOp = CreateIntrinsic(intrinsicId,
-                                    { pInputValue->getType(), pCoord->getType()->getScalarType() },
-                                    args,
-                                    nullptr,
-                                    instName);
+        pAtomicInst = CreateIntrinsic(intrinsicId,
+                                      { pInputValue->getType(), pCoord->getType()->getScalarType() },
+                                      args,
+                                      nullptr,
+                                      instName);
     }
     else
     {
@@ -1863,15 +1863,15 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
         args.push_back(getInt32(0));
-        pAtomicOp = CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp],
-                                    pInputValue->getType(),
-                                    args,
-                                    nullptr,
-                                    instName);
+        pAtomicInst = CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp],
+                                      pInputValue->getType(),
+                                      args,
+                                      nullptr,
+                                      instName);
     }
     if (flags & ImageFlagNonUniformImage)
     {
-        pAtomicOp = CreateWaterfallLoop(pAtomicOp, imageDescArgIndex);
+        pAtomicInst = CreateWaterfallLoop(pAtomicInst, imageDescArgIndex);
     }
 
     switch (ordering)
@@ -1885,7 +1885,7 @@ Value* BuilderImplImage::CreateImageAtomicCommon(
         break;
     }
 
-    return pAtomicOp;
+    return pAtomicInst;
 }
 
 // =====================================================================================================================

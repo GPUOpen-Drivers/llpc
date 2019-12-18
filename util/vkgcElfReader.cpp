@@ -162,7 +162,7 @@ Result ElfReader<Elf>::ReadFromBuffer(
 template<class Elf>
 Result ElfReader<Elf>::GetSectionData(
     const char*  pName,       // [in] Name of the section to look for
-    const void** pData,       // [out] Pointer to section data
+    const void** pSectData,   // [out] Pointer to section data
     size_t*      pDataLength  // [out] Size of the section data
     ) const
 {
@@ -172,7 +172,7 @@ Result ElfReader<Elf>::GetSectionData(
 
     if (pEntry != m_map.end())
     {
-        *pData = m_sections[pEntry->second]->pData;
+        *pSectData = m_sections[pEntry->second]->pData;
         *pDataLength = static_cast<size_t>(m_sections[pEntry->second]->secHead.sh_size);
         result = Result::Success;
     }

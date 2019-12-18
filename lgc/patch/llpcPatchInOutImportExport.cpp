@@ -508,8 +508,7 @@ void PatchInOutImportExport::visitCallInst(
                     pLocOffset = callInst.getOperand(1);
                     if (isa<ConstantInt>(pLocOffset))
                     {
-                        auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                        value += locOffset;
+                        value += cast<ConstantInt>(pLocOffset)->getZExtValue();
                         pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                     }
                 }
@@ -674,8 +673,7 @@ void PatchInOutImportExport::visitCallInst(
             Value* pLocOffset = callInst.getOperand(1);
             if (isa<ConstantInt>(pLocOffset))
             {
-                auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                value += locOffset;
+                value += cast<ConstantInt>(pLocOffset)->getZExtValue();
                 pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
             }
 
@@ -832,8 +830,7 @@ void PatchInOutImportExport::visitCallInst(
                 pLocOffset = callInst.getOperand(1);
                 if (isa<ConstantInt>(pLocOffset))
                 {
-                    auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                    value += locOffset;
+                    value += cast<ConstantInt>(pLocOffset)->getZExtValue();
                     pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
@@ -1116,27 +1113,25 @@ void PatchInOutImportExport::visitReturnInst(
             std::vector<Value*> clipDistance;
             for (uint32_t i = 0; i < clipDistanceCount; ++i)
             {
-                auto pClipDistance = ExtractValueInst::Create(m_pClipDistance, { i }, "", pInsertPos);
-                clipDistance.push_back(pClipDistance);
+                clipDistance.push_back(ExtractValueInst::Create(m_pClipDistance, { i }, "", pInsertPos));
             }
 
             std::vector<Value*> cullDistance;
             for (uint32_t i = 0; i < cullDistanceCount; ++i)
             {
-                auto pCullDistance = ExtractValueInst::Create(m_pCullDistance, { i }, "", pInsertPos);
-                cullDistance.push_back(pCullDistance);
+                cullDistance.push_back(ExtractValueInst::Create(m_pCullDistance, { i }, "", pInsertPos));
             }
 
             // Merge gl_ClipDistance[] and gl_CullDistance[]
             std::vector<Value*> clipCullDistance;
-            for (auto pClipDistance : clipDistance)
+            for (auto pClipDistanceElement : clipDistance)
             {
-                clipCullDistance.push_back(pClipDistance);
+                clipCullDistance.push_back(pClipDistanceElement);
             }
 
-            for (auto pCullDistance : cullDistance)
+            for (auto pCullDistanceElement : cullDistance)
             {
-                clipCullDistance.push_back(pCullDistance);
+                clipCullDistance.push_back(pCullDistanceElement);
             }
 
             // Do array padding
@@ -1853,8 +1848,8 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
     auto& entryArgIdxs = m_pPipelineState->GetShaderInterfaceData(ShaderStageFragment)->entryArgIdxs.fs;
     auto  pPrimMask    = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.primMask);
-    Value* pI  = nullptr;
-    Value* pJ  = nullptr;
+    Value* pICoord  = nullptr;
+    Value* pJCoord  = nullptr;
 
     // Not "flat" and "custom" interpolation
     if ((interpMode != InOutInfo::InterpModeFlat) && (interpMode != InOutInfo::InterpModeCustom))
@@ -1900,8 +1895,8 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
                 }
             }
         }
-        pI = ExtractElementInst::Create(pIJ, ConstantInt::get(Type::getInt32Ty(*m_pContext), 0), "", pInsertPos);
-        pJ = ExtractElementInst::Create(pIJ, ConstantInt::get(Type::getInt32Ty(*m_pContext), 1), "", pInsertPos);
+        pICoord = ExtractElementInst::Create(pIJ, ConstantInt::get(Type::getInt32Ty(*m_pContext), 0), "", pInsertPos);
+        pJCoord = ExtractElementInst::Create(pIJ, ConstantInt::get(Type::getInt32Ty(*m_pContext), 1), "", pInsertPos);
     }
 
     Attribute::AttrKind attribs[] = {
@@ -1961,7 +1956,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             if (bitWidth == 16)
             {
                 Value* args1[] = {
-                    pI,                                                     // i
+                    pICoord,                                                // i
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), i),     // attr_chan
                     pLoc,                                                   // attr
                     ConstantInt::get(Type::getInt1Ty(*m_pContext), false),  // high
@@ -1975,7 +1970,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
                 Value* args2[] = {
                     pCompValue,                                             // p1
-                    pJ,                                                     // j
+                    pJCoord,                                                // j
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), i),     // attr_chan
                     pLoc,                                                   // attr
                     ConstantInt::get(Type::getInt1Ty(*m_pContext), false),  // high
@@ -1990,7 +1985,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
             else
             {
                 Value* args1[] = {
-                    pI,                                                   // i
+                    pICoord,                                              // i
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), i),   // attr_chan
                     pLoc,                                                 // attr
                     pPrimMask                                             // m0
@@ -2003,7 +1998,7 @@ Value* PatchInOutImportExport::PatchFsGenericInputImport(
 
                 Value* args2[] = {
                     pCompValue,                                         // p1
-                    pJ,                                                 // j
+                    pJCoord,                                            // j
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), i), // attr_chan
                     pLoc,                                               // attr
                     pPrimMask                                           // m0
@@ -2917,14 +2912,14 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             auto pIJ = GetFunctionArgument(m_pEntryPoint, entryArgIdxs.linearInterp.center);
 
             pIJ = new BitCastInst(pIJ, VectorType::get(Type::getFloatTy(*m_pContext), 2), "", pInsertPos);
-            auto pI = ExtractElementInst::Create(pIJ,
-                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
-                                                 "",
-                                                 pInsertPos);
-            auto pJ = ExtractElementInst::Create(pIJ,
-                                                 ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
-                                                 "",
-                                                 pInsertPos);
+            auto pICoord = ExtractElementInst::Create(pIJ,
+                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), 0),
+                                                      "",
+                                                      pInsertPos);
+            auto pJCoord = ExtractElementInst::Create(pIJ,
+                                                      ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
+                                                      "",
+                                                      pInsertPos);
 
             const uint32_t elemCount = pInputTy->getArrayNumElements();
             assert(elemCount <= MaxClipCullDistanceCount);
@@ -2932,7 +2927,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
             for (uint32_t i = 0; i < elemCount; ++i)
             {
                 Value* args1[] = {
-                    pI,                                                                             // i
+                    pICoord,                                                                        // i
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), (startChannel + i) % 4),        // attr_chan
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), loc + (startChannel + i) / 4),  // attr
                     pPrimMask                                                                       // m0
@@ -2945,7 +2940,7 @@ Value* PatchInOutImportExport::PatchFsBuiltInInputImport(
 
                 Value* args2[] = {
                     pCompValue,                                                                     // p1
-                    pJ,                                                                             // j
+                    pJCoord,                                                                        // j
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), (startChannel + i) % 4),        // attr_chan
                     ConstantInt::get(Type::getInt32Ty(*m_pContext), loc + (startChannel + i) / 4),  // attr
                     pPrimMask                                                                       // m0
@@ -4412,8 +4407,11 @@ void PatchInOutImportExport::CreateStreamOutBufferStoreFunction(
             outofRangeValue /= xfbStride;
         }
         outofRangeValue -= (m_pPipelineState->GetShaderWaveSize(m_shaderStage) - 1);
-        Value* pOutofRangeValue = ConstantInt::get(Type::getInt32Ty(*m_pContext), outofRangeValue);
-        pWriteIndex = SelectInst::Create(pThreadValid, pWriteIndex, pOutofRangeValue, "", pEntryBlock);
+        pWriteIndex = SelectInst::Create(pThreadValid,
+                                         pWriteIndex,
+                                         ConstantInt::get(Type::getInt32Ty(*m_pContext), outofRangeValue),
+                                         "",
+                                         pEntryBlock);
         BranchInst::Create(pStoreBlock, pEntryBlock);
     }
     else
@@ -4779,11 +4777,9 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
                                               "",
                                               pInsertPos);
 
-    auto pStreamInfo = GetFunctionArgument(m_pEntryPoint, streamInfo);
-
     // vertexCount = streamInfo[22:16]
     Value* ubfeArgs[] = {
-        pStreamInfo,
+        GetFunctionArgument(m_pEntryPoint, streamInfo),
         ConstantInt::get(Type::getInt32Ty(*m_pContext), 16),
         ConstantInt::get(Type::getInt32Ty(*m_pContext), 7)
     };
@@ -4794,11 +4790,11 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
                                    &*pInsertPos);
 
     // Setup write index for stream-out
-    auto pWriteIndex = GetFunctionArgument(m_pEntryPoint, writeIndex);
+    auto pWriteIndexVal = GetFunctionArgument(m_pEntryPoint, writeIndex);
 
     if (m_gfxIp.major >= 9)
     {
-        pWriteIndex = BinaryOperator::CreateAdd(pWriteIndex, m_pThreadId, "", pInsertPos);
+        pWriteIndexVal = BinaryOperator::CreateAdd(pWriteIndexVal, m_pThreadId, "", pInsertPos);
     }
 
     std::string funcName = lgcName::StreamOutBufferStore;
@@ -4807,7 +4803,7 @@ void PatchInOutImportExport::StoreValueToStreamOutBuffer(
     Value* args[] = {
         pStoreValue,
         pStreamOutBufDesc,
-        pWriteIndex,
+        pWriteIndexVal,
         m_pThreadId,
         pVertexCount,
         ConstantInt::get(Type::getInt32Ty(*m_pContext), xfbOffset),
@@ -5420,13 +5416,13 @@ Value* PatchInOutImportExport::ReadValueFromLds(
 
     if (m_pPipelineState->IsTessOffChip() && (isTcsOutput || isTesInput)) // Read from off-chip LDS buffer
     {
-        const auto& offChipLdsBase = (m_shaderStage == ShaderStageTessEval) ?
+        const auto& offChipLdsBaseArgIdx = (m_shaderStage == ShaderStageTessEval) ?
             m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes.offChipLdsBase :
             m_pPipelineState->GetShaderInterfaceData(m_shaderStage)->entryArgIdxs.tcs.offChipLdsBase;
 
         auto pOffChipLdsDesc = m_pipelineSysValues.Get(m_pEntryPoint)->GetOffChipLdsDesc();
 
-        auto pOffChipLdsBase = GetFunctionArgument(m_pEntryPoint, offChipLdsBase);
+        auto pOffChipLdsBase = GetFunctionArgument(m_pEntryPoint, offChipLdsBaseArgIdx);
 
         // Convert DWORD off-chip LDS offset to byte offset
         pLdsOffset = BinaryOperator::CreateMul(pLdsOffset,
@@ -5632,7 +5628,7 @@ void PatchInOutImportExport::WriteValueToLds(
 // Calculates start offset of tessellation factors in the TF buffer.
 Value* PatchInOutImportExport::CalcTessFactorOffset(
     bool         isOuter,     // Whether the calculation is for tessellation outer factors
-    Value*       pElemIdx,    // [in] Index used for array element indexing (could be null)
+    Value*       pElemIdxVal, // [in] Index used for array element indexing (could be null)
     Instruction* pInsertPos)  // [in] Where to insert store instructions
 {
     assert(m_shaderStage == ShaderStageTessControl);
@@ -5677,12 +5673,12 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
     }
 
     Value* pTessFactorOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), tessFactorStart);
-    if (pElemIdx != nullptr)
+    if (pElemIdxVal != nullptr)
     {
-        if (isa<ConstantInt>(pElemIdx))
+        if (isa<ConstantInt>(pElemIdxVal))
         {
             // Constant element indexing
-            uint32_t elemIdx = cast<ConstantInt>(pElemIdx)->getZExtValue();
+            uint32_t elemIdx = cast<ConstantInt>(pElemIdxVal)->getZExtValue();
             if (elemIdx < tessFactorCount)
             {
                 if ((primitiveMode == PrimitiveMode::Isolines) && isOuter)
@@ -5713,27 +5709,27 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
                 // elemIdx = (elemIdx <= 1) ? 1 - elemIdx : elemIdx
                 auto pCond = new ICmpInst(pInsertPos,
                                           ICmpInst::ICMP_ULE,
-                                          pElemIdx,
+                                          pElemIdxVal,
                                           ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
                                           "");
 
                 auto pSwapElemIdx = BinaryOperator::CreateSub(ConstantInt::get(Type::getInt32Ty(*m_pContext), 1),
-                                                              pElemIdx,
+                                                              pElemIdxVal,
                                                               "",
                                                               pInsertPos);
 
-                pElemIdx = SelectInst::Create(pCond, pSwapElemIdx, pElemIdx, "", pInsertPos);
+                pElemIdxVal = SelectInst::Create(pCond, pSwapElemIdx, pElemIdxVal, "", pInsertPos);
             }
 
             // tessFactorOffset = (elemIdx < tessFactorCount) ? (tessFactorStart + elemIdx) : invalidValue
             pTessFactorOffset = BinaryOperator::CreateAdd(pTessFactorOffset,
-                                                          pElemIdx,
+                                                          pElemIdxVal,
                                                           "",
                                                           pInsertPos);
 
             auto pCond = new ICmpInst(pInsertPos,
                                       ICmpInst::ICMP_ULT,
-                                      pElemIdx,
+                                      pElemIdxVal,
                                       ConstantInt::get(Type::getInt32Ty(*m_pContext), tessFactorCount),
                                       "");
 
@@ -5751,9 +5747,9 @@ Value* PatchInOutImportExport::CalcTessFactorOffset(
 // =====================================================================================================================
 // Stores tessellation factors (outer/inner) to corresponding tessellation factor (TF) buffer.
 void PatchInOutImportExport::StoreTessFactorToBuffer(
-    const std::vector<Value*>& tessFactors,         // [in] Tessellation factors to be stored
-    Value*                     pTessFactorOffset,   // [in] Start offset to store the specified tessellation factors
-    Instruction*               pInsertPos)          // [in] Where to insert store instructions
+    const std::vector<Value*>& tessFactors,           // [in] Tessellation factors to be stored
+    Value*                     pTessFactorOffsetVal,  // [in] Start offset to store the specified tessellation factors
+    Instruction*               pInsertPos)            // [in] Where to insert store instructions
 {
     assert(m_shaderStage == ShaderStageTessControl);
 
@@ -5771,9 +5767,9 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
 
     auto pTessFactorStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.tessFactorStride);
 
-    if (isa<ConstantInt>(pTessFactorOffset))
+    if (isa<ConstantInt>(pTessFactorOffsetVal))
     {
-        uint32_t tessFactorOffset = cast<ConstantInt>(pTessFactorOffset)->getZExtValue();
+        uint32_t tessFactorOffset = cast<ConstantInt>(pTessFactorOffsetVal)->getZExtValue();
         if (tessFactorOffset == InvalidValue)
         {
             // Out of range, drop it
@@ -5843,7 +5839,7 @@ void PatchInOutImportExport::StoreTessFactorToBuffer(
             pTfBufferBase,                                                  // tfBufferBase
             m_pipelineSysValues.Get(m_pEntryPoint)->GetRelativeId(),        // relPatchId
             pTessFactorStride,                                              // tfStride
-            pTessFactorOffset,                                              // tfOffset
+            pTessFactorOffsetVal,                                           // tfOffset
             tessFactors[0]                                                  // tfValue
         };
         EmitCall(lgcName::TfBufferStore, Type::getVoidTy(*m_pContext), args, {}, pInsertPos);
@@ -6038,10 +6034,10 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsInput(
 
     // dwordOffset = (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
     auto inVertexCount = m_pPipelineState->GetInputAssemblyState().patchControlPoints;
-    auto pInVertexCount = ConstantInt::get(Type::getInt32Ty(*m_pContext), inVertexCount);
+    auto pInVertexCountVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), inVertexCount);
     auto pRelativeId = m_pipelineSysValues.Get(m_pEntryPoint)->GetRelativeId();
 
-    Value* pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pInVertexCount, "", pInsertPos);
+    Value* pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pInVertexCountVal, "", pInsertPos);
     pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pVertexIdx, "", pInsertPos);
 
     auto pInVertexStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.inVertexStride);
@@ -6113,8 +6109,8 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
         auto pPatchConstSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.patchConstSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pPatchConstSize, "", pInsertPos);
 
-        auto pPatchConstStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchConstStart);
-        pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchConstStart, "", pInsertPos);
+        auto pPatchConstStartVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchConstStart);
+        pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchConstStartVal, "", pInsertPos);
 
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pAttibOffset, "", pInsertPos);
     }
@@ -6125,8 +6121,8 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTcsOutput(
         auto pOutPatchSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.outPatchSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelativeId, pOutPatchSize, "", pInsertPos);
 
-        auto pOutPatchStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), outPatchStart);
-        pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pOutPatchStart, "", pInsertPos);
+        auto pOutPatchStartVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), outPatchStart);
+        pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pOutPatchStartVal, "", pInsertPos);
 
         auto pOutVertexStride = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.outVertexStride);
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset,
@@ -6203,8 +6199,8 @@ Value* PatchInOutImportExport::CalcLdsOffsetForTesInput(
         auto pPatchConstSize = ConstantInt::get(Type::getInt32Ty(*m_pContext), calcFactor.patchConstSize);
         pLdsOffset = BinaryOperator::CreateMul(pRelPatchId, pPatchConstSize, "", pInsertPos);
 
-        auto pPatchConstStart = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchConstStart);
-        pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchConstStart, "", pInsertPos);
+        auto pPatchConstStartVal = ConstantInt::get(Type::getInt32Ty(*m_pContext), patchConstStart);
+        pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pPatchConstStartVal, "", pInsertPos);
 
         pLdsOffset = BinaryOperator::CreateAdd(pLdsOffset, pAttibOffset, "", pInsertPos);
     }
@@ -6916,7 +6912,6 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     if (workgroupLayout == WorkgroupLayout::SexagintiQuads)
     {
         const uint32_t workgroupSizeYMul8 = mode.workgroupSizeY * 8;
-        Constant* const pWorkgroupSizeYMul8 = ConstantInt::get(pInt32Ty, workgroupSizeYMul8);
 
         if (isPowerOf2_32(workgroupSizeYMul8))
         {
@@ -6949,7 +6944,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
         }
 
         Instruction* const pMulOffset = BinaryOperator::CreateMul(pOffset,
-                                                                  pWorkgroupSizeYMul8,
+                                                                  ConstantInt::get(pInt32Ty, workgroupSizeYMul8),
                                                                   "",
                                                                   pInsertPos);
 
@@ -7060,7 +7055,6 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     else
     {
         const uint32_t workgroupSizeXMul2 = mode.workgroupSizeX * 2;
-        Constant* const pWorkgroupSizeXMul2 = ConstantInt::get(pInt32Ty, workgroupSizeXMul2);
 
         if (isPowerOf2_32(workgroupSizeXMul2))
         {
@@ -7093,7 +7087,7 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
         }
 
         Instruction* const pMulDiv = BinaryOperator::CreateMul(pDiv,
-                                                               pWorkgroupSizeXMul2,
+                                                               ConstantInt::get(pInt32Ty, workgroupSizeXMul2),
                                                                "",
                                                                pInsertPos);
 
@@ -7115,9 +7109,8 @@ Value* PatchInOutImportExport::ReconfigWorkgroup(
     if (pOffset != nullptr)
     {
         const uint32_t workgroupSizeYMin8 = std::min(mode.workgroupSizeY, 8u);
-        Constant* const pWorkgroupSizeYMin8 = ConstantInt::get(pInt32Ty, workgroupSizeYMin8);
         Instruction* const pMul = BinaryOperator::CreateMul(pOffset,
-                                                            pWorkgroupSizeYMin8,
+                                                            ConstantInt::get(pInt32Ty, workgroupSizeYMin8),
                                                             "",
                                                             pInsertPos);
 

@@ -1287,18 +1287,16 @@ void PatchResourceCollect::visitCallInst(
                 if (isa<ConstantInt>(pLocOffset))
                 {
                     // Location offset is constant
-                    auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                    loc += locOffset;
+                    loc +=  cast<ConstantInt>(pLocOffset)->getZExtValue();
 
                     auto bitWidth = pInputTy->getScalarSizeInBits();
                     if (bitWidth == 64)
                     {
                         if (isa<ConstantInt>(pCompIdx))
                         {
-                            auto compIdx = cast<ConstantInt>(pCompIdx)->getZExtValue();
 
                             m_activeInputLocs.insert(loc);
-                            if (compIdx >= 2)
+                            if (cast<ConstantInt>(pCompIdx)->getZExtValue() >= 2)
                             {
                                 // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
                                 // occupied locations are two.
@@ -1354,8 +1352,7 @@ void PatchResourceCollect::visitCallInst(
             {
                 // Location offset is constant
                 auto loc = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-                auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-                loc += locOffset;
+                loc += cast<ConstantInt>(pLocOffset)->getZExtValue();
 
                 assert(callInst.getType()->getPrimitiveSizeInBits() <= (8 * SizeOfVec4));
                 m_activeInputLocs.insert(loc);
@@ -1395,18 +1392,15 @@ void PatchResourceCollect::visitCallInst(
         if (isa<ConstantInt>(pLocOffset))
         {
             // Location offset is constant
-            auto locOffset = cast<ConstantInt>(pLocOffset)->getZExtValue();
-            loc += locOffset;
+            loc += cast<ConstantInt>(pLocOffset)->getZExtValue();
 
             auto bitWidth = pOutputTy->getScalarSizeInBits();
             if (bitWidth == 64)
             {
                 if (isa<ConstantInt>(pCompIdx))
                 {
-                    auto compIdx = cast<ConstantInt>(pCompIdx)->getZExtValue();
-
                     m_importedOutputLocs.insert(loc);
-                    if (compIdx >= 2)
+                    if (cast<ConstantInt>(pCompIdx)->getZExtValue() >= 2)
                     {
                         // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
                         // occupied locations are two.

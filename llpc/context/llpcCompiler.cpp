@@ -400,11 +400,11 @@ Compiler::~Compiler()
 
             // This is just a W/A for Teamcity. Setting AMD_RESIDENT_CONTEXTS could reduce more than 40 minutes of
             // CTS running time.
-            char*  pMaxResidentContexts = getenv("AMD_RESIDENT_CONTEXTS");
+            char*  pMaxResidentContextsEnv = getenv("AMD_RESIDENT_CONTEXTS");
 
-            if (pMaxResidentContexts != nullptr)
+            if (pMaxResidentContextsEnv != nullptr)
             {
-                maxResidentContexts = strtoul(pMaxResidentContexts, nullptr, 0);
+                maxResidentContexts = strtoul(pMaxResidentContextsEnv, nullptr, 0);
             }
 
             if ((pContext->IsInUse() == false) && (m_pContextPool->size() > maxResidentContexts))
@@ -732,14 +732,14 @@ Result Compiler::BuildShaderModule(
     {
         // Memory layout of pAllocBuf: ShaderModuleDataEx | ShaderModuleEntryData | ShaderModuleEntry | binCode
         //                             | Resource nodes | FsOutInfo
-        ShaderModuleDataEx* pModuleDataEx = reinterpret_cast<ShaderModuleDataEx*>(pAllocBuf);
+        ShaderModuleDataEx* pModuleDataExCopy = reinterpret_cast<ShaderModuleDataEx*>(pAllocBuf);
 
-        ShaderModuleEntryData* pEntryData = &pModuleDataEx->extra.entryDatas[0];
+        ShaderModuleEntryData* pEntryData = &pModuleDataExCopy->extra.entryDatas[0];
         if (cacheEntryState != ShaderEntryState::Ready)
         {
             // Copy module data
-            memcpy(pModuleDataEx, &moduleDataEx, sizeof(moduleDataEx));
-            pModuleDataEx->common.binCode.pCode = nullptr;
+            memcpy(pModuleDataExCopy, &moduleDataEx, sizeof(moduleDataEx));
+            pModuleDataExCopy->common.binCode.pCode = nullptr;
 
             size_t entryOffset = 0, codeOffset = 0, resNodeOffset = 0, fsOutInfoOffset = 0;
 
@@ -748,23 +748,23 @@ Result Compiler::BuildShaderModule(
             codeOffset = entryOffset + moduleDataEx.extra.entryCount * sizeof(ShaderModuleEntry);
             resNodeOffset = codeOffset + moduleDataEx.common.binCode.codeSize;
             fsOutInfoOffset = resNodeOffset + totalNodeCount * sizeof(ResourceNodeData);
-            pModuleDataEx->codeOffset = codeOffset;
-            pModuleDataEx->entryOffset = entryOffset;
-            pModuleDataEx->resNodeOffset   = resNodeOffset;
-            pModuleDataEx->fsOutInfoOffset   = fsOutInfoOffset;
+            pModuleDataExCopy->codeOffset = codeOffset;
+            pModuleDataExCopy->entryOffset = entryOffset;
+            pModuleDataExCopy->resNodeOffset   = resNodeOffset;
+            pModuleDataExCopy->fsOutInfoOffset   = fsOutInfoOffset;
         }
         else
         {
-            memcpy(pModuleDataEx, pCacheData, allocSize);
+            memcpy(pModuleDataExCopy, pCacheData, allocSize);
         }
 
         ShaderModuleEntry* pEntry = reinterpret_cast<ShaderModuleEntry*>(VoidPtrInc(pAllocBuf,
-                                                                         pModuleDataEx->entryOffset));
+                                                                         pModuleDataExCopy->entryOffset));
         ResourceNodeData* pResNodeData = reinterpret_cast<ResourceNodeData*>(VoidPtrInc(pAllocBuf,
-                                                                             pModuleDataEx->resNodeOffset));
+                                                                             pModuleDataExCopy->resNodeOffset));
         FsOutInfo* pFsOutInfo = reinterpret_cast<FsOutInfo*>(VoidPtrInc(pAllocBuf,
-                                                                        pModuleDataEx->fsOutInfoOffset));
-        void* pCode = VoidPtrInc(pAllocBuf, pModuleDataEx->codeOffset);
+                                                                        pModuleDataExCopy->fsOutInfoOffset));
+        void* pCode = VoidPtrInc(pAllocBuf, pModuleDataExCopy->codeOffset);
 
         if (cacheEntryState != ShaderEntryState::Ready)
         {
@@ -795,7 +795,7 @@ Result Compiler::BuildShaderModule(
             }
 
             // Copy fragment shader output variables
-            pModuleDataEx->extra.fsOutInfoCount = fsOutInfos.size();
+            pModuleDataExCopy->extra.fsOutInfoCount = fsOutInfos.size();
             if (fsOutInfos.size() > 0)
             {
                 memcpy(pFsOutInfo, &fsOutInfos[0], fsOutInfos.size() * sizeof(FsOutInfo));
@@ -804,7 +804,7 @@ Result Compiler::BuildShaderModule(
             {
                 if (hEntry != nullptr)
                 {
-                    m_shaderCache->InsertShader(hEntry, pModuleDataEx, allocSize);
+                    m_shaderCache->InsertShader(hEntry, pModuleDataExCopy, allocSize);
                 }
             }
         }
@@ -818,9 +818,9 @@ Result Compiler::BuildShaderModule(
                 pResNodeData += pEntryData[i].resNodeDataCount;
             }
         }
-        pModuleDataEx->common.binCode.pCode = pCode;
-        pModuleDataEx->extra.pFsOutInfos = pFsOutInfo;
-        pShaderOut->pModuleData = &pModuleDataEx->common;
+        pModuleDataExCopy->common.binCode.pCode = pCode;
+        pModuleDataExCopy->extra.pFsOutInfos = pFsOutInfo;
+        pShaderOut->pModuleData = &pModuleDataExCopy->common;
     }
     else
     {
@@ -1049,10 +1049,10 @@ Result Compiler::BuildPipelineInternal(
     // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
     // whole pipeline.
     bool IsLlvmBc = false;
-    const PipelineShaderInfo* pShaderInfo = (shaderInfo[0] != nullptr) ? shaderInfo[0] : shaderInfo.back();
-    if (pShaderInfo != nullptr)
+    const PipelineShaderInfo* pShaderInfoEntry = (shaderInfo[0] != nullptr) ? shaderInfo[0] : shaderInfo.back();
+    if (pShaderInfoEntry != nullptr)
     {
-        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfo->pModuleData);
+        const ShaderModuleData* pModuleData = reinterpret_cast<const ShaderModuleData*>(pShaderInfoEntry->pModuleData);
         if ((pModuleData != nullptr) && (pModuleData->binType == BinaryType::LlvmBc))
         {
             IsLlvmBc = true;
@@ -1069,14 +1069,14 @@ Result Compiler::BuildPipelineInternal(
         uint32_t stageSkipMask = 0;
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
-            if ((pShaderInfo == nullptr) || (pShaderInfo->pModuleData == nullptr))
+            const PipelineShaderInfo* pShaderInfoEntry = shaderInfo[shaderIndex];
+            if ((pShaderInfoEntry == nullptr) || (pShaderInfoEntry->pModuleData == nullptr))
             {
                 continue;
             }
 
             const ShaderModuleDataEx* pModuleDataEx =
-                reinterpret_cast<const ShaderModuleDataEx*>(pShaderInfo->pModuleData);
+                reinterpret_cast<const ShaderModuleDataEx*>(pShaderInfoEntry->pModuleData);
 
             Module* pModule = nullptr;
             if (pModuleDataEx->common.binType == BinaryType::MultiLlvmBc)
@@ -1085,9 +1085,9 @@ Result Compiler::BuildPipelineInternal(
 
                 MetroHash::Hash entryNameHash = {};
 
-                assert(pShaderInfo->pEntryTarget != nullptr);
-                MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfo->pEntryTarget),
-                                  strlen(pShaderInfo->pEntryTarget),
+                assert(pShaderInfoEntry->pEntryTarget != nullptr);
+                MetroHash64::Hash(reinterpret_cast<const uint8_t*>(pShaderInfoEntry->pEntryTarget),
+                                  strlen(pShaderInfoEntry->pEntryTarget),
                                   entryNameHash.bytes);
 
                 BinaryData binCode = {};
@@ -1095,7 +1095,7 @@ Result Compiler::BuildPipelineInternal(
                 {
                     auto pEntryData = &pModuleDataEx->extra.entryDatas[i];
                     auto pShaderEntry = reinterpret_cast<ShaderModuleEntry*>(pEntryData->pShaderEntry);
-                    if ((pEntryData->stage == pShaderInfo->entryStage) &&
+                    if ((pEntryData->stage == pShaderInfoEntry->entryStage) &&
                         (memcmp(pShaderEntry->entryNameHash, &entryNameHash, sizeof(MetroHash::Hash)) == 0))
                     {
                         // LLVM bitcode
@@ -1120,7 +1120,7 @@ Result Compiler::BuildPipelineInternal(
             else
             {
                 pModule = new Module((Twine("llpc") +
-                                     GetShaderStageName(pShaderInfo->entryStage)).str() +
+                                     GetShaderStageName(pShaderInfoEntry->entryStage)).str() +
                                      std::to_string(GetModuleIdByIndex(shaderIndex)), *pContext);
             }
 
@@ -1130,15 +1130,15 @@ Result Compiler::BuildPipelineInternal(
 
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
-            ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
+            const PipelineShaderInfo* pShaderInfoEntry = shaderInfo[shaderIndex];
+            ShaderStage entryStage = (pShaderInfoEntry != nullptr) ? pShaderInfoEntry->entryStage : ShaderStageInvalid;
 
             if (entryStage == ShaderStageFragment)
             {
-                pFragmentShaderInfo = pShaderInfo;
+                pFragmentShaderInfo = pShaderInfoEntry;
             }
-            if ((pShaderInfo == nullptr) ||
-                (pShaderInfo->pModuleData == nullptr) ||
+            if ((pShaderInfoEntry == nullptr) ||
+                (pShaderInfoEntry->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(entryStage)))
             {
                 continue;
@@ -1154,7 +1154,7 @@ Result Compiler::BuildPipelineInternal(
             timerProfiler.AddTimerStartStopPass(&*lowerPassMgr, TimerTranslate, true);
 
             // SPIR-V translation, then dump the result.
-            lowerPassMgr->add(CreateSpirvLowerTranslator(entryStage, pShaderInfo));
+            lowerPassMgr->add(CreateSpirvLowerTranslator(entryStage, pShaderInfoEntry));
             if (EnableOuts())
             {
                 lowerPassMgr->add(createPrintModulePass(outs(), "\n"
@@ -1175,10 +1175,10 @@ Result Compiler::BuildPipelineInternal(
         for (uint32_t shaderIndex = 0; (shaderIndex < shaderInfo.size()) && (result == Result::Success); ++shaderIndex)
         {
             // Per-shader SPIR-V lowering passes.
-            const PipelineShaderInfo* pShaderInfo = shaderInfo[shaderIndex];
-            ShaderStage entryStage = (pShaderInfo != nullptr) ? pShaderInfo->entryStage : ShaderStageInvalid;
-            if ((pShaderInfo == nullptr) ||
-                (pShaderInfo->pModuleData == nullptr) ||
+            const PipelineShaderInfo* pShaderInfoEntry = shaderInfo[shaderIndex];
+            ShaderStage entryStage = (pShaderInfoEntry != nullptr) ? pShaderInfoEntry->entryStage : ShaderStageInvalid;
+            if ((pShaderInfoEntry == nullptr) ||
+                (pShaderInfoEntry->pModuleData == nullptr) ||
                 (stageSkipMask & ShaderStageToMask(entryStage)))
             {
                 continue;
@@ -1346,15 +1346,15 @@ void GraphicsShaderCacheChecker::UpdateRootUserDateOffset(
 // Update shader caches for graphics pipeline from compile result, and merge ELF outputs if necessary.
 void GraphicsShaderCacheChecker::UpdateAndMerge(
     Result            result,         // Result of compile
-    ElfPackage*       pPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
+    ElfPackage*       pOutputPipelineElf)   // ELF output of compile, updated to merge ELF from shader cache
 {
     // Update the shader cache if required, with the compiled pipeline or with a failure state.
     if (m_fragmentCacheEntryState == ShaderEntryState::Compiling ||
         m_nonFragmentCacheEntryState == ShaderEntryState::Compiling)
     {
         BinaryData pipelineElf = {};
-        pipelineElf.codeSize = pPipelineElf->size();
-        pipelineElf.pCode = pPipelineElf->data();
+        pipelineElf.codeSize = pOutputPipelineElf->size();
+        pipelineElf.pCode = pOutputPipelineElf->data();
 
         if (m_fragmentCacheEntryState == ShaderEntryState::Compiling)
         {
@@ -1376,8 +1376,8 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
          m_nonFragmentCacheEntryState == ShaderEntryState::Ready))
     {
         // Move the compiled ELF out of the way.
-        ElfPackage compiledPipelineElf = std::move(*pPipelineElf);
-        pPipelineElf->clear();
+        ElfPackage compiledPipelineElf = std::move(*pOutputPipelineElf);
+        pOutputPipelineElf->clear();
 
         // Determine where the fragment / non-fragment parts come from (cache or just-compiled).
         BinaryData fragmentElf = {};
@@ -1407,7 +1407,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         auto result = writer.ReadFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
         assert(result == Result::Success);
         (void(result)); // unused
-        writer.MergeElfBinary(m_pContext, &fragmentElf, pPipelineElf);
+        writer.MergeElfBinary(m_pContext, &fragmentElf, pOutputPipelineElf);
     }
 }
 

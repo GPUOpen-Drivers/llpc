@@ -259,34 +259,34 @@ void ConfigBuilderBase::SetApiName(
 void ConfigBuilderBase::SetPipelineType(
     Util::Abi::PipelineType value) // Value to set
 {
-    const char* pValue = "";
+    const char* pTypeStr = "";
     switch (value)
     {
     case Util::Abi::VsPs:
-        pValue = "VsPs";
+        pTypeStr = "VsPs";
         break;
     case Util::Abi::Gs:
-        pValue = "Gs";
+        pTypeStr = "Gs";
         break;
     case Util::Abi::Cs:
-        pValue = "Cs";
+        pTypeStr = "Cs";
         break;
     case Util::Abi::Ngg:
-        pValue = "Ngg";
+        pTypeStr = "Ngg";
         break;
     case Util::Abi::Tess:
-        pValue = "Tess";
+        pTypeStr = "Tess";
         break;
     case Util::Abi::GsTess:
-        pValue = "GsTess";
+        pTypeStr = "GsTess";
         break;
     case Util::Abi::NggTess:
-        pValue = "NggTess";
+        pTypeStr = "NggTess";
         break;
     default:
         break;
     }
-    m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(pValue);
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::Type] = m_document->getNode(pTypeStr);
 }
 
 // =====================================================================================================================

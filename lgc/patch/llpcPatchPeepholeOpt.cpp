@@ -342,17 +342,17 @@ void PatchPeepholeOpt::visitICmp(
         return;
     }
 
-    ConstantInt* const pConstant = dyn_cast<ConstantInt>(iCmp.getOperand(1));
+    ConstantInt* const pConstantVal = dyn_cast<ConstantInt>(iCmp.getOperand(1));
 
     // If we don't have a constant we are comparing against, or the constant is the maximum representable, bail.
-    if ((pConstant == nullptr) || pConstant->isMaxValue(false))
+    if ((pConstantVal == nullptr) || pConstantVal->isMaxValue(false))
     {
         return;
     }
 
-    const uint64_t constant = pConstant->getZExtValue();
+    const uint64_t constant = pConstantVal->getZExtValue();
 
-    ConstantInt* const pNewConstant = ConstantInt::get(pConstant->getType(), constant + 1, false);
+    ConstantInt* const pNewConstant = ConstantInt::get(pConstantVal->getType(), constant + 1, false);
 
     // Swap the predicate to less than. This helps the loop analysis passes detect more loops that can be trivially
     // unrolled.
@@ -415,15 +415,15 @@ void PatchPeepholeOpt::visitExtractElement(
 
     Value* const pVector = extractElement.getVectorOperand();
 
-    ConstantInt* const pIndex = dyn_cast<ConstantInt>(extractElement.getIndexOperand());
+    ConstantInt* const pIndexVal = dyn_cast<ConstantInt>(extractElement.getIndexOperand());
 
     // We only handle constant indices.
-    if (pIndex == nullptr)
+    if (pIndexVal == nullptr)
     {
         return;
     }
 
-    const uint64_t index = pIndex->getZExtValue();
+    const uint64_t index = pIndexVal->getZExtValue();
 
     // Check if the extract is coming from an insert element, and try and track the extract back to see if there is an
     // insert we can forward onto the result of the extract.
@@ -502,7 +502,7 @@ void PatchPeepholeOpt::visitExtractElement(
         if (Instruction* const pInst = dyn_cast<Instruction>(pVector))
         {
             ExtractElementInst* const pNewExtractElement =
-                ExtractElementInst::Create(pVector, pIndex, extractElement.getName());
+                ExtractElementInst::Create(pVector, pIndexVal, extractElement.getName());
 
             insertAfter(*pNewExtractElement, *pInst);
 
@@ -592,14 +592,14 @@ void PatchPeepholeOpt::visitPHINode(
         for (uint32_t elementIndex = 0; elementIndex < numElements; elementIndex++)
         {
             // We create a new name that is "old name".N, where N is the index of element into the original vector.
-            ConstantInt* const pElementIndex = ConstantInt::get(pInt32Type, elementIndex, false);
+            ConstantInt* const pElementIndexVal = ConstantInt::get(pInt32Type, elementIndex, false);
 
             PHINode* const pNewPhiNode = PHINode::Create(pElementType, numIncomings,
                                                          phiNode.getName() + "." +
                                                          Twine(elementIndex));
             insertAfter(*pNewPhiNode, phiNode);
 
-            pResult = InsertElementInst::Create(pResult, pNewPhiNode, pElementIndex, "", pInsertPos);
+            pResult = InsertElementInst::Create(pResult, pNewPhiNode, pElementIndexVal, "", pInsertPos);
 
             // Make sure the same incoming blocks have identical incoming values.
             // If we have already inserted an incoming arc for a basic block,
@@ -625,7 +625,7 @@ void PatchPeepholeOpt::visitPHINode(
                     else
                     {
                         ExtractElementInst* const pExtractElement =
-                            ExtractElementInst::Create(pIncoming, pElementIndex);
+                            ExtractElementInst::Create(pIncoming, pElementIndexVal);
 
                         insertAfter(*pExtractElement, *pInst);
                         pNewIncomingValue = pExtractElement;
@@ -636,7 +636,7 @@ void PatchPeepholeOpt::visitPHINode(
                 }
                 else if (Constant* const pConstant = dyn_cast<Constant>(pIncoming))
                 {
-                    Constant* const pExtractElement = ConstantExpr::getExtractElement(pConstant, pElementIndex);
+                    Constant* const pExtractElement = ConstantExpr::getExtractElement(pConstant, pElementIndexVal);
                     incomingPairMap.insert({pBasicBlock, pExtractElement});
                     pNewPhiNode->addIncoming(pExtractElement, pBasicBlock);
                 }
