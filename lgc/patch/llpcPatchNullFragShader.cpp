@@ -104,16 +104,15 @@ bool PatchNullFragShader::runOnModule(
 
     Patch::Init(&module);
 
-    auto pipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
+    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
 
-    if (cl::DisableNullFragShader || pipelineState->GetBuilderContext()->BuildingRelocatableElf())
+    if (cl::DisableNullFragShader || pPipelineState->GetBuilderContext()->BuildingRelocatableElf())
     {
         // NOTE: If the option -disable-null-frag-shader is set to TRUE, we skip this pass. This is done by
         // standalone compiler.
         return false;
     }
 
-    PipelineState* pPipelineState = getAnalysis<PipelineStateWrapper>().GetPipelineState(&module);
     const bool hasCs = pPipelineState->HasShaderStage(ShaderStageCompute);
     const bool hasVs = pPipelineState->HasShaderStage(ShaderStageVertex);
     const bool hasTes = pPipelineState->HasShaderStage(ShaderStageTessEval);

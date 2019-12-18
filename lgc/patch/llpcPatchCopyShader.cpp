@@ -635,8 +635,7 @@ void PatchCopyShader::ExportGenericOutput(
         assert(locIter != outLocMap.end());
         if (xfbOutsInfo.find(locIter->first) != xfbOutsInfo.end())
         {
-            uint32_t xfbOutInfo = xfbOutsInfo[locIter->first];
-            XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutInfo);
+            XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutsInfo[locIter->first]);
 
             if (pXfbOutInfo->is16bit)
             {
@@ -712,8 +711,7 @@ void PatchCopyShader::ExportBuiltInOutput(
         auto locIter = xfbOutsInfo.find(outLocInfo.u32All);
         if (locIter != xfbOutsInfo.end())
         {
-            uint32_t xfbOutInfo = xfbOutsInfo[locIter->first];
-            XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutInfo);
+            XfbOutInfo* pXfbOutInfo = reinterpret_cast<XfbOutInfo*>(&xfbOutsInfo[locIter->first]);
 
             std::string instName(lgcName::OutputExportXfb);
             Value* args[] =

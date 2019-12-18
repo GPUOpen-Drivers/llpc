@@ -1435,9 +1435,9 @@ Value* BuilderImplSubgroup::CreateThreadMaskedSelect(
     Value* const pValue1,     // [in] The first value to select.
     Value* const pValue2)     // [in] The second value to select.
 {
-    Value* const pAndMask = getIntN(GetShaderSubgroupSize(), andMask);
+    Value* const pAndMaskVal = getIntN(GetShaderSubgroupSize(), andMask);
     Value* const pZero = getIntN(GetShaderSubgroupSize(), 0);
-    return CreateSelect(CreateICmpNE(CreateAnd(pThreadMask, pAndMask), pZero), pValue1, pValue2);
+    return CreateSelect(CreateICmpNE(CreateAnd(pThreadMask, pAndMaskVal), pZero), pValue1, pValue2);
 }
 
 // =====================================================================================================================

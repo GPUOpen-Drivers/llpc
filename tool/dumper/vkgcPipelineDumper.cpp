@@ -172,8 +172,8 @@ void VKAPI_CALL IPipelineDumper::DumpPipelineExtraInfo(
     void*                     pDumpFile,   // [in] The handle of pipeline dump file
     const char*               pStr)        // [in] Extra string info to dump
 {
-    std::string str(pStr);
-    PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pDumpFile), &str);
+    std::string tmpStr(pStr);
+    PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile*>(pDumpFile), &tmpStr);
 }
 
 // =====================================================================================================================
@@ -196,34 +196,34 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(
 // =====================================================================================================================
 // Get graphics pipeline name.
 void VKAPI_CALL IPipelineDumper::GetPipelineName(
-    const  GraphicsPipelineBuildInfo* pPipelineInfo, // [In]  Info to build this graphics pipeline
-    char*                             pPipeName,     // [Out] The full name of this graphics pipeline
-    const size_t                      nameBufSize)   // Size of the buffer to store pipeline name
+    const  GraphicsPipelineBuildInfo* pGraphicsPipelineInfo,  // [In]  Info to build this graphics pipeline
+    char*                             pPipeNameOut,           // [Out] The full name of this graphics pipeline
+    const size_t                      nameBufSize)            // Size of the buffer to store pipeline name
 {
-    auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pPipelineInfo, false);
+    auto hash = PipelineDumper::GenerateHashForGraphicsPipeline(pGraphicsPipelineInfo, false);
     PipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.pGraphicsInfo = pPipelineInfo;
+    pipelineInfo.pGraphicsInfo = pGraphicsPipelineInfo;
     std::string pipeName = PipelineDumper::GetPipelineInfoFileName(
         pipelineInfo,
         &hash);
-    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+    snprintf(pPipeNameOut, nameBufSize, "%s", pipeName.c_str());
 }
 
 // =====================================================================================================================
 // Get compute pipeline name.
 void VKAPI_CALL IPipelineDumper::GetPipelineName(
-    const ComputePipelineBuildInfo* pPipelineInfo, // [In]  Info to build this compute pipeline
-    char*                           pPipeName,     // [Out] The full name of this compute pipeline
-    const size_t                    nameBufSize)   // Size of the buffer to store pipeline name
+    const ComputePipelineBuildInfo* pComputePipelineInfo, // [In]  Info to build this compute pipeline
+    char*                           pPipeNameOut,         // [Out] The full name of this compute pipeline
+    const size_t                    nameBufSize)          // Size of the buffer to store pipeline name
 {
-    auto hash = PipelineDumper::GenerateHashForComputePipeline(pPipelineInfo, false);
+    auto hash = PipelineDumper::GenerateHashForComputePipeline(pComputePipelineInfo, false);
     PipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.pComputeInfo = pPipelineInfo;
+    pipelineInfo.pComputeInfo = pComputePipelineInfo;
 
     std::string pipeName = PipelineDumper::GetPipelineInfoFileName(
         pipelineInfo,
         &hash);
-    snprintf(pPipeName, nameBufSize, "%s", pipeName.c_str());
+    snprintf(pPipeNameOut, nameBufSize, "%s", pipeName.c_str());
 }
 
 // =====================================================================================================================
@@ -843,7 +843,7 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
 {
     DumpVersionInfo(*pDumpFile);
     // Dump pipeline
-    const PipelineShaderInfo* shaderInfo[ShaderStageGfxCount] =
+    const PipelineShaderInfo* shaderInfos[ShaderStageGfxCount] =
     {
         &pPipelineInfo->vs,
         &pPipelineInfo->tcs,
@@ -854,7 +854,7 @@ void PipelineDumper::DumpGraphicsPipelineInfo(
 
     for (uint32_t stage = 0; stage < ShaderStageGfxCount; ++stage)
     {
-        const PipelineShaderInfo* pShaderInfo = shaderInfo[stage];
+        const PipelineShaderInfo* pShaderInfo = shaderInfos[stage];
         if (pShaderInfo->pModuleData == nullptr)
         {
             continue;
@@ -1297,7 +1297,7 @@ void OutputBinary(
     uint32_t       endPos,    // End position
     OStream&       out)       // [out] Output stream
 {
-    const uint32_t* pStartPos = reinterpret_cast<const uint32_t*>(pData + startPos);
+    const uint32_t* pStartData = reinterpret_cast<const uint32_t*>(pData + startPos);
     int32_t dwordCount = (endPos - startPos) / sizeof(uint32_t);
     char formatBuf[256];
     for (int32_t i = 0; i < dwordCount; ++i)
@@ -1308,7 +1308,7 @@ void OutputBinary(
             length = snprintf(formatBuf, sizeof(formatBuf), "    %7u:", startPos + i * 4u);
             out << formatBuf;
         }
-        length = snprintf(formatBuf, sizeof(formatBuf), "%08X", pStartPos[i]);
+        length = snprintf(formatBuf, sizeof(formatBuf), "%08X", pStartData[i]);
         (void(length)); // unused
         out << formatBuf;
 

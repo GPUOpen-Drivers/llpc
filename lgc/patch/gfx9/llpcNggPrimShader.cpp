@@ -1218,12 +1218,12 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
                 Value* pSignMask = m_pBuilder->getInt32(0);
                 for (uint32_t i = 0; i < cullDistance.size(); ++i)
                 {
-                    auto pCullDistance = m_pBuilder->CreateBitCast(cullDistance[i], m_pBuilder->getInt32Ty());
+                    auto pCullDistanceVal = m_pBuilder->CreateBitCast(cullDistance[i], m_pBuilder->getInt32Ty());
 
                     Value* pSignBit = m_pBuilder->CreateIntrinsic(Intrinsic::amdgcn_ubfe,
                                                                   m_pBuilder->getInt32Ty(),
                                                                   {
-                                                                      pCullDistance,
+                                                                      pCullDistanceVal,
                                                                       m_pBuilder->getInt32(31),
                                                                       m_pBuilder->getInt32(1)
                                                                   });
@@ -1327,13 +1327,13 @@ void NggPrimShader::ConstructPrimShaderWithoutGs(
             Value* vertexId[3] = { pVertexId0, pVertexId1, pVertexId2 };
 
             uint32_t regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionDrawFlag);
-            auto pRegionStart = m_pBuilder->getInt32(regionStart);
+            auto pRegionStartVal = m_pBuilder->getInt32(regionStart);
 
             auto pOne = m_pBuilder->getInt8(1);
 
             for (uint32_t i = 0; i < 3; ++i)
             {
-                auto pLdsOffset = m_pBuilder->CreateAdd(pRegionStart, vertexId[i]);
+                auto pLdsOffset = m_pBuilder->CreateAdd(pRegionStartVal, vertexId[i]);
                 m_pLdsManager->WriteValueToLds(pOne, pLdsOffset);
             }
 
@@ -2152,11 +2152,11 @@ void NggPrimShader::ConstructPrimShaderWithGs(
         pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
         pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
-        auto pNullPrim = m_pBuilder->getInt32(NullPrim);
+        auto pNullPrimVal = m_pBuilder->getInt32(NullPrim);
         Value* pNullPrims = UndefValue::get(VectorType::get(m_pBuilder->getInt32Ty(), maxOutPrims));
         for (uint32_t i = 0; i < maxOutPrims; ++i)
         {
-            pNullPrims = m_pBuilder->CreateInsertElement(pNullPrims, pNullPrim, i);
+            pNullPrims = m_pBuilder->CreateInsertElement(pNullPrims, pNullPrimVal, i);
         }
 
         m_pLdsManager->WriteValueToLds(pNullPrims, pLdsOffset);
@@ -2667,12 +2667,12 @@ Value* NggPrimShader::DoCulling(
 
     const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionPosData);
     assert(regionStart % SizeOfVec4 == 0); // Use 128-bit LDS operation
-    auto pRegionStart = m_pBuilder->getInt32(regionStart);
+    auto pRegionStartVal = m_pBuilder->getInt32(regionStart);
 
     for (uint32_t i = 0; i < 3; ++i)
     {
         Value* pLdsOffset = m_pBuilder->CreateMul(vertexId[i], m_pBuilder->getInt32(SizeOfVec4));
-        pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStart);
+        pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStartVal);
 
         // Use 128-bit LDS load
         vertex[i] = m_pLdsManager->ReadValueFromLds(
@@ -2715,12 +2715,12 @@ Value* NggPrimShader::DoCulling(
         Value* signMask[3] = {};
 
         const auto regionStart = m_pLdsManager->GetLdsRegionStart(LdsRegionCullDistance);
-        auto pRegionStart = m_pBuilder->getInt32(regionStart);
+        auto pRegionStartVal = m_pBuilder->getInt32(regionStart);
 
         for (uint32_t i = 0; i < 3; ++i)
         {
             Value* pLdsOffset = m_pBuilder->CreateShl(vertexId[i], 2);
-            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStart);
+            pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, pRegionStartVal);
 
             signMask[i] = m_pLdsManager->ReadValueFromLds(m_pBuilder->getInt32Ty(), pLdsOffset);
         }
@@ -2871,8 +2871,8 @@ void NggPrimShader::DoPrimitiveExport(
         if (vertexCompact)
         {
             assert(pCullFlag != nullptr); // Must not be null
-            const auto pNullPrim = m_pBuilder->getInt32(NullPrim);
-            pPrimData = m_pBuilder->CreateSelect(pCullFlag, pNullPrim, pPrimData);
+            const auto pNullPrimVal = m_pBuilder->getInt32(NullPrim);
+            pPrimData = m_pBuilder->CreateSelect(pCullFlag, pNullPrimVal, pPrimData);
         }
     }
 
@@ -3365,24 +3365,24 @@ Function* NggPrimShader::MutateEsToVariant(
                 {
                     uint8_t channelMask = cast<ConstantInt>(pCall->getArgOperand(1))->getZExtValue();
 
-                    Value* expValue[4] = {};
-                    expValue[0] = pCall->getArgOperand(2);
-                    expValue[1] = pCall->getArgOperand(3);
-                    expValue[2] = pCall->getArgOperand(4);
-                    expValue[3] = pCall->getArgOperand(5);
+                    Value* expValues[4] = {};
+                    expValues[0] = pCall->getArgOperand(2);
+                    expValues[1] = pCall->getArgOperand(3);
+                    expValues[2] = pCall->getArgOperand(4);
+                    expValues[3] = pCall->getArgOperand(5);
 
                     if (func.getName().endswith(".i32"))
                     {
-                        expValue[0] = m_pBuilder->CreateBitCast(expValue[0], m_pBuilder->getFloatTy());
-                        expValue[1] = m_pBuilder->CreateBitCast(expValue[1], m_pBuilder->getFloatTy());
-                        expValue[2] = m_pBuilder->CreateBitCast(expValue[2], m_pBuilder->getFloatTy());
-                        expValue[3] = m_pBuilder->CreateBitCast(expValue[3], m_pBuilder->getFloatTy());
+                        expValues[0] = m_pBuilder->CreateBitCast(expValues[0], m_pBuilder->getFloatTy());
+                        expValues[1] = m_pBuilder->CreateBitCast(expValues[1], m_pBuilder->getFloatTy());
+                        expValues[2] = m_pBuilder->CreateBitCast(expValues[2], m_pBuilder->getFloatTy());
+                        expValues[3] = m_pBuilder->CreateBitCast(expValues[3], m_pBuilder->getFloatTy());
                     }
 
                     Value* pExpValue = UndefValue::get(VectorType::get(Type::getFloatTy(*m_pContext), 4));
                     for (uint32_t i = 0; i < 4; ++i)
                     {
-                        pExpValue = m_pBuilder->CreateInsertElement(pExpValue, expValue[i], i);
+                        pExpValue = m_pBuilder->CreateInsertElement(pExpValue, expValues[i], i);
                     }
 
                     if (expPos)
@@ -3409,10 +3409,10 @@ Function* NggPrimShader::MutateEsToVariant(
 
     // Construct exported data
     uint32_t i = 0;
-    for (auto& expData : expDataSet)
+    for (auto& expDataElement : expDataSet)
     {
-        pExpData = m_pBuilder->CreateInsertValue(pExpData, expData.pExpValue, i++);
-        expData.pExpValue = nullptr;
+        pExpData = m_pBuilder->CreateInsertValue(pExpData, expDataElement.pExpValue, i++);
+        expDataElement.pExpValue = nullptr;
     }
 
     // Insert new "return" instruction
@@ -4203,7 +4203,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
         llvm_unreachable("Should never be called!");
         break;
     }
-    auto pOutVertsPerPrim = m_pBuilder->getInt32(outVertsPerPrim);
+    auto pOutVertsPerPrimVal = m_pBuilder->getInt32(outVertsPerPrim);
 
     // Construct ".entry" block
     Value* pEmitCounter = nullptr;
@@ -4236,7 +4236,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
         pOutstandingVertCounter = m_pBuilder->CreateAdd(pOutstandingVertCounter, m_pBuilder->getInt32(1));
 
         // primComplete = (emitCounter == outVertsPerPrim)
-        pPrimComplete = m_pBuilder->CreateICmpEQ(pEmitCounter, pOutVertsPerPrim);
+        pPrimComplete = m_pBuilder->CreateICmpEQ(pEmitCounter, pOutVertsPerPrimVal);
         m_pBuilder->CreateCondBr(pPrimComplete, pEmitPrimBlock, pEndEmitPrimBlock);
     }
 
@@ -4251,7 +4251,7 @@ Function* NggPrimShader::CreateGsEmitHandler(
             auto pvertexId = pOutVertCounter;
 
             // vertexId0 = vertexId - outVertsPerPrim
-            auto pVertexId0 = m_pBuilder->CreateSub(pvertexId, pOutVertsPerPrim);
+            auto pVertexId0 = m_pBuilder->CreateSub(pvertexId, pOutVertsPerPrimVal);
 
             // vertexId1 = vertexId - (outVertsPerPrim - 1) = vertexId0 + 1
             Value* pVertexId1 = nullptr;
@@ -4442,10 +4442,10 @@ Function* NggPrimShader::CreateGsCutHandler(
         llvm_unreachable("Should never be called!");
         break;
     }
-    auto pOutVertsPerPrim = m_pBuilder->getInt32(outVertsPerPrim);
+    auto pOutVertsPerPrimVal = m_pBuilder->getInt32(outVertsPerPrim);
 
     const uint32_t maxOutPrims = pResUsage->inOutUsage.gs.calcFactor.primAmpFactor;
-    auto pMaxOutPrims = m_pBuilder->getInt32(maxOutPrims);
+    auto pMaxOutPrimsVal = m_pBuilder->getInt32(maxOutPrims);
 
     // Construct ".entry" block
     Value* pEmitCounter = nullptr;
@@ -4461,10 +4461,10 @@ Function* NggPrimShader::CreateGsCutHandler(
         auto hasEmit = m_pBuilder->CreateICmpUGT(pEmitCounter, m_pBuilder->getInt32(0));
 
         // primIncomplete = (emitCounter != outVertsPerPrim)
-        pPrimIncomplete = m_pBuilder->CreateICmpNE(pEmitCounter, pOutVertsPerPrim);
+        pPrimIncomplete = m_pBuilder->CreateICmpNE(pEmitCounter, pOutVertsPerPrimVal);
 
         // validPrimCounter = (outPrimCounter < maxOutPrims)
-        auto pValidPrimCounter = m_pBuilder->CreateICmpULT(pOutPrimCounter, pMaxOutPrims);
+        auto pValidPrimCounter = m_pBuilder->CreateICmpULT(pOutPrimCounter, pMaxOutPrimsVal);
 
         pPrimIncomplete = m_pBuilder->CreateAnd(hasEmit, pPrimIncomplete);
         pPrimIncomplete = m_pBuilder->CreateAnd(pPrimIncomplete, pValidPrimCounter);
@@ -4487,8 +4487,7 @@ Function* NggPrimShader::CreateGsCutHandler(
             pLdsOffset = m_pBuilder->CreateShl(pLdsOffset, 2);
             pLdsOffset = m_pBuilder->CreateAdd(pLdsOffset, m_pBuilder->getInt32(regionStart));
 
-            auto pNullPrim = m_pBuilder->getInt32(NullPrim);
-            m_pLdsManager->WriteValueToLds(pNullPrim, pLdsOffset);
+            m_pLdsManager->WriteValueToLds(m_pBuilder->getInt32(NullPrim), pLdsOffset);
         }
 
         m_pBuilder->CreateBr(pEndEmitPrimBlock);

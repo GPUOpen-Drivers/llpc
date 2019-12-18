@@ -339,15 +339,15 @@ Value* PatchIntrinsicSimplify::SimplifyTrigonometric(
         return nullptr;
     }
 
-    Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
+    Intrinsic::ID intrinsicId = Intrinsic::not_intrinsic;
 
     switch (intrinsicCall.getIntrinsicID())
     {
     case Intrinsic::cos:
-        intrinsic = Intrinsic::amdgcn_cos;
+        intrinsicId = Intrinsic::amdgcn_cos;
         break;
     case Intrinsic::sin:
-        intrinsic = Intrinsic::amdgcn_sin;
+        intrinsicId = Intrinsic::amdgcn_sin;
         break;
     default:
         return nullptr;
@@ -356,7 +356,7 @@ Value* PatchIntrinsicSimplify::SimplifyTrigonometric(
     Type* pIntrinsicType = intrinsicCall.getType();
 
     Function* const pIntrinsic = Intrinsic::getDeclaration(m_pModule,
-                                                           intrinsic,
+                                                           intrinsicId,
                                                            {pIntrinsicType, pIntrinsicType});
 
     assert(pIntrinsic != nullptr);

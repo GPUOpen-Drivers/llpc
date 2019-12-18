@@ -741,7 +741,7 @@ Value* PatchDescriptorLoad::BuildBufferCompactDesc(
     return pBufDesc;
 }
 
-} // Llpc
+} // lgc
 
 // =====================================================================================================================
 // Initializes the pass of LLVM patching opertions for descriptor load.

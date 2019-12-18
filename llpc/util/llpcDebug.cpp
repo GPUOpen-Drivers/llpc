@@ -153,14 +153,14 @@ void RedirectLogOutput(
             {
                 std::error_code errCode;
 
-                static raw_fd_ostream dbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
+                static raw_fd_ostream newDbgFile(cl::LogFileDbgs.c_str(), errCode, sys::fs::F_Text);
                 assert(!errCode);
                 if (pDbgFile == nullptr)
                 {
-                    dbgFile.SetUnbuffered();
+                    newDbgFile.SetUnbuffered();
                     memcpy((void*)dbgFileBak, (void*)&errs(), sizeof(raw_fd_ostream));
-                    memcpy((void*)&errs(), (void*)&dbgFile, sizeof(raw_fd_ostream));
-                    pDbgFile = &dbgFile;
+                    memcpy((void*)&errs(), (void*)&newDbgFile, sizeof(raw_fd_ostream));
+                    pDbgFile = &newDbgFile;
                 }
             }
         }
@@ -178,14 +178,14 @@ void RedirectLogOutput(
             {
                 std::error_code errCode;
 
-                static raw_fd_ostream outFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
+                static raw_fd_ostream newOutFile(cl::LogFileOuts.c_str(), errCode, sys::fs::F_Text);
                 assert(!errCode);
                 if (pOutFile == nullptr)
                 {
-                    outFile.SetUnbuffered();
+                    newOutFile.SetUnbuffered();
                     memcpy((void*)outFileBak, (void*)&outs(), sizeof(raw_fd_ostream));
-                    memcpy((void*)&outs(), (void*)&outFile, sizeof(raw_fd_ostream));
-                    pOutFile = &outFile;
+                    memcpy((void*)&outs(), (void*)&newOutFile, sizeof(raw_fd_ostream));
+                    pOutFile = &newOutFile;
                 }
             }
         }

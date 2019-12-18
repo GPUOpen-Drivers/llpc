@@ -391,7 +391,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
         MDNode* pMetaNode = pInOut->getMetadata(gSPIRVMD::InOut);
         assert(pMetaNode != nullptr);
-        auto pInOutMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        auto pInOutMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
 
         Value* pVertexIdx = nullptr;
 
@@ -400,11 +400,11 @@ void SpirvLowerGlobal::visitLoadInst(
         {
             bool isVertexIdx = false;
 
-            assert(pInOutMeta->getNumOperands() == 4);
+            assert(pInOutMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
 
-            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
-            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
 
             if (inOutMeta.IsBuiltIn)
             {
@@ -426,7 +426,7 @@ void SpirvLowerGlobal::visitLoadInst(
                 pVertexIdx = indexOperands[1];
                 ++operandIdx;
 
-                pInOutMeta = cast<Constant>(pInOutMeta->getOperand(1));
+                pInOutMetaVal = cast<Constant>(pInOutMetaVal->getOperand(1));
             }
         }
 
@@ -435,7 +435,7 @@ void SpirvLowerGlobal::visitLoadInst(
                                           indexOperands,
                                           operandIdx,
                                           0,
-                                          pInOutMeta,
+                                          pInOutMetaVal,
                                           nullptr,
                                           pVertexIdx,
                                           InterpLocUnknown,
@@ -454,7 +454,7 @@ void SpirvLowerGlobal::visitLoadInst(
 
         MDNode* pMetaNode = pInOut->getMetadata(gSPIRVMD::InOut);
         assert(pMetaNode != nullptr);
-        auto pInOutMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        auto pInOutMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
 
         Value* pLoadValue = UndefValue::get(pInOutTy);
         bool hasVertexIdx = false;
@@ -462,10 +462,10 @@ void SpirvLowerGlobal::visitLoadInst(
         if (pInOutTy->isArrayTy())
         {
             // Arrayed input/output
-            assert(pInOutMeta->getNumOperands() == 4);
+            assert(pInOutMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
-            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
-            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
 
             // If the input/output is arrayed, the outermost dimension might for vertex indexing
             if (inOutMeta.IsBuiltIn)
@@ -488,7 +488,7 @@ void SpirvLowerGlobal::visitLoadInst(
             assert(pInOutTy->isArrayTy());
 
             auto pElemTy = pInOutTy->getArrayElementType();
-            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
+            auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
 
             const uint32_t elemCount = pInOutTy->getArrayNumElements();
             for (uint32_t i = 0; i < elemCount; ++i)
@@ -511,7 +511,7 @@ void SpirvLowerGlobal::visitLoadInst(
         {
             pLoadValue = AddCallInstForInOutImport(pInOutTy,
                                                    addrSpace,
-                                                   pInOutMeta,
+                                                   pInOutMetaVal,
                                                    nullptr,
                                                    0,
                                                    nullptr,
@@ -586,7 +586,7 @@ void SpirvLowerGlobal::visitStoreInst(
 
         MDNode* pMetaNode = pOutput->getMetadata(gSPIRVMD::InOut);
         assert(pMetaNode != nullptr);
-        auto pOutputMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        auto pOutputMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
 
         Value* pVertexIdx = nullptr;
 
@@ -595,10 +595,10 @@ void SpirvLowerGlobal::visitStoreInst(
         {
             bool isVertexIdx = false;
 
-            assert(pOutputMeta->getNumOperands() == 4);
+            assert(pOutputMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
-            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -620,7 +620,7 @@ void SpirvLowerGlobal::visitStoreInst(
                 pVertexIdx = indexOperands[1];
                 ++operandIdx;
 
-                pOutputMeta = cast<Constant>(pOutputMeta->getOperand(1));
+                pOutputMetaVal = cast<Constant>(pOutputMetaVal->getOperand(1));
             }
         }
 
@@ -629,7 +629,7 @@ void SpirvLowerGlobal::visitStoreInst(
                           indexOperands,
                           operandIdx,
                           0,
-                          pOutputMeta,
+                          pOutputMetaVal,
                           nullptr,
                           pVertexIdx,
                           &storeInst);
@@ -645,17 +645,17 @@ void SpirvLowerGlobal::visitStoreInst(
 
         MDNode* pMetaNode = pOutput->getMetadata(gSPIRVMD::InOut);
         assert(pMetaNode != nullptr);
-        auto pOutputMeta = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
+        auto pOutputMetaVal = mdconst::dyn_extract<Constant>(pMetaNode->getOperand(0));
 
         bool hasVertexIdx = false;
 
         // If the input/output is arrayed, the outermost dimension might for vertex indexing
         if (pOutputy->isArrayTy())
         {
-            assert(pOutputMeta->getNumOperands() == 4);
+            assert(pOutputMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
-            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
-            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
 
             if (outputMeta.IsBuiltIn)
             {
@@ -675,7 +675,7 @@ void SpirvLowerGlobal::visitStoreInst(
         if (hasVertexIdx)
         {
             assert(pOutputy->isArrayTy());
-            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
+            auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
 
             const uint32_t elemCount = pOutputy->getArrayNumElements();
             for (uint32_t i = 0; i < elemCount; ++i)
@@ -697,7 +697,7 @@ void SpirvLowerGlobal::visitStoreInst(
         else
         {
             AddCallInstForOutputExport(pStoreValue,
-                                       pOutputMeta,
+                                       pOutputMetaVal,
                                        nullptr,
                                        0,
                                        InvalidValue,
@@ -1143,7 +1143,7 @@ void SpirvLowerGlobal::LowerInOutInPlace()
 Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     Type*        pInOutTy,          // [in] Type of value imported from input/output
     uint32_t     addrSpace,         // Address space
-    Constant*    pInOutMeta,        // [in] Metadata of this input/output
+    Constant*    pInOutMetaVal,        // [in] Metadata of this input/output
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
     uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
@@ -1172,10 +1172,10 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         // Array type
         assert(pElemIdx == nullptr);
 
-        assert(pInOutMeta->getNumOperands() == 4);
-        uint32_t stride = cast<ConstantInt>(pInOutMeta->getOperand(0))->getZExtValue();
-        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
-        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
+        assert(pInOutMetaVal->getNumOperands() == 4);
+        uint32_t stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
+        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
 
         if (inOutMeta.IsBuiltIn)
         {
@@ -1198,14 +1198,14 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                             (m_shaderStage == ShaderStageTessControl) ||
                             (m_shaderStage == ShaderStageTessEval));
 
-                auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
+                auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
                 auto pElemTy   = pInOutTy->getArrayElementType();
 
                 const uint64_t elemCount = pInOutTy->getArrayNumElements();
-                for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+                for (uint32_t idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
-                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), elemIdx);
+                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), idx);
                     auto pElem = AddCallInstForInOutImport(pElemTy,
                                                            addrSpace,
                                                            pElemMeta,
@@ -1216,7 +1216,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            interpLoc,
                                                            pAuxInterpValue,
                                                            pInsertPos);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { elemIdx }, "", pInsertPos);
+                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { idx }, "", pInsertPos);
                 }
             }
             else
@@ -1245,7 +1245,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         }
         else
         {
-            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
+            auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
             auto pElemTy   = pInOutTy->getArrayElementType();
 
             const uint64_t elemCount = pInOutTy->getArrayNumElements();
@@ -1254,9 +1254,9 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
             {
                 // NOTE: We are handling vertex indexing of generic inputs of geometry shader. For tessellation shader,
                 // vertex indexing is handled by "load"/"store" instruction lowering.
-                for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+                for (uint32_t idx = 0; idx < elemCount; ++idx)
                 {
-                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), elemIdx);
+                    pVertexIdx = ConstantInt::get(Type::getInt32Ty(*m_pContext), idx);
                     auto pElem = AddCallInstForInOutImport(pElemTy,
                                                            addrSpace,
                                                            pElemMeta,
@@ -1267,7 +1267,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            InterpLocUnknown,
                                                            nullptr,
                                                            pInsertPos);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { elemIdx }, "", pInsertPos);
+                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { idx }, "", pInsertPos);
                 }
             }
             else
@@ -1278,15 +1278,15 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                     pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
                 }
 
-                for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+                for (uint32_t idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
 
-                    // elemLocOffset = locOffset + stride * elemIdx
+                    // elemLocOffset = locOffset + stride * idx
                     Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                                        stride),
                                                                       ConstantInt::get(Type::getInt32Ty(*m_pContext),
-                                                                                       elemIdx),
+                                                                                       idx),
                                                                       "",
                                                                       pInsertPos);
                     pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
@@ -1301,7 +1301,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
                                                            InterpLocUnknown,
                                                            nullptr,
                                                            pInsertPos);
-                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { elemIdx }, "", pInsertPos);
+                    pInOutValue = InsertValueInst::Create(pInOutValue, pElem, { idx }, "", pInsertPos);
                 }
             }
         }
@@ -1316,7 +1316,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         {
             // Handle structure member recursively
             auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
-            auto pMemberMeta = cast<Constant>(pInOutMeta->getOperand(memberIdx));
+            auto pMemberMeta = cast<Constant>(pInOutMetaVal->getOperand(memberIdx));
 
             auto pMember = AddCallInstForInOutImport(pMemberTy,
                                                      addrSpace,
@@ -1333,9 +1333,9 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
     }
     else
     {
-        Constant* pInOutMetaConst = cast<Constant>(pInOutMeta);
-        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
-        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
+        Constant* pInOutMetaValConst = cast<Constant>(pInOutMetaVal);
+        inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaValConst->getOperand(0))->getZExtValue();
+        inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaValConst->getOperand(1))->getZExtValue();
 
         assert(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
@@ -1378,15 +1378,15 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
         }
         else
         {
-            uint32_t elemIdx = inOutMeta.Component;
+            uint32_t idx = inOutMeta.Component;
             assert(inOutMeta.Component <= 3);
             if (pInOutTy->getScalarSizeInBits() == 64)
             {
                 assert(inOutMeta.Component % 2 == 0); // Must be even for 64-bit type
-                elemIdx = inOutMeta.Component / 2;
+                idx = inOutMeta.Component / 2;
             }
-            pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
-                                               m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
+            pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(idx) :
+                                               m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(idx));
 
             lgc::InOutInfo inOutInfo;
             if (pLocOffset == nullptr)
@@ -1440,7 +1440,7 @@ Value* SpirvLowerGlobal::AddCallInstForInOutImport(
 // Inserts LLVM call instruction to export output.
 void SpirvLowerGlobal::AddCallInstForOutputExport(
     Value*       pOutputValue,      // [in] Value exported to output
-    Constant*    pOutputMeta,       // [in] Metadata of this output
+    Constant*    pOutputMetaVal,       // [in] Metadata of this output
     Value*       pLocOffset,        // [in] Relative location offset, passed from aggregate type
     uint32_t     maxLocOffset,      // Max+1 location offset if variable index has been encountered.
                                     //   For an array built-in with a variable index, this is the array size.
@@ -1466,11 +1466,11 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         // Array type
         assert(pElemIdx == nullptr);
 
-        assert(pOutputMeta->getNumOperands() == 4);
-        uint32_t stride = cast<ConstantInt>(pOutputMeta->getOperand(0))->getZExtValue();
+        assert(pOutputMetaVal->getNumOperands() == 4);
+        uint32_t stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
 
-        outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
-        outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
+        outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
+        outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
 
         if ((m_shaderStage == ShaderStageGeometry) && (emitStreamId != outputMeta.StreamId))
         {
@@ -1504,14 +1504,14 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 const uint64_t elemCount = pOutputTy->getArrayNumElements();
                 const uint64_t byteSize = pElemTy->getScalarSizeInBits() / 8;
 
-                for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+                for (uint32_t idx = 0; idx < elemCount; ++idx)
                 {
                     // Handle array elements recursively
-		  auto pElem = ExtractValueInst::Create(pOutputValue, { elemIdx }, "", pInsertPos);
+		  auto pElem = ExtractValueInst::Create(pOutputValue, { idx }, "", pInsertPos);
 
                     auto pXfbOffset = m_pBuilder->getInt32(outputMeta.XfbOffset +
                                                            outputMeta.XfbExtraOffset +
-                                                           byteSize * elemIdx);
+                                                           byteSize * idx);
                     m_pBuilder->CreateWriteXfbOutput(pElem,
                                                      /*isBuiltIn=*/true,
                                                      builtInId,
@@ -1546,13 +1546,13 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 pLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), 0);
             }
 
-            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
+            auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
 
             const uint64_t elemCount = pOutputTy->getArrayNumElements();
-            for (uint32_t elemIdx = 0; elemIdx < elemCount; ++elemIdx)
+            for (uint32_t idx = 0; idx < elemCount; ++idx)
             {
                 // Handle array elements recursively
-	      Value* pElem = ExtractValueInst::Create(pOutputValue, { elemIdx }, "", pInsertPos);
+	      Value* pElem = ExtractValueInst::Create(pOutputValue, { idx }, "", pInsertPos);
 
                 Value* pElemLocOffset = nullptr;
                 ConstantInt* pLocOffsetConst = dyn_cast<ConstantInt>(pLocOffset);
@@ -1560,13 +1560,13 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                 if (pLocOffsetConst != nullptr)
                 {
                     uint32_t locOffset = pLocOffsetConst->getZExtValue();
-                    pElemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), locOffset + stride * elemIdx);
+                    pElemLocOffset = ConstantInt::get(Type::getInt32Ty(*m_pContext), locOffset + stride * idx);
                 }
                 else
                 {
-                    // elemLocOffset = locOffset + stride * elemIdx
+                    // elemLocOffset = locOffset + stride * idx
                     pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext), stride),
-                                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), elemIdx),
+                                                               ConstantInt::get(Type::getInt32Ty(*m_pContext), idx),
                                                                "",
                                                                pInsertPos);
                     pElemLocOffset = BinaryOperator::CreateAdd(pLocOffset, pElemLocOffset, "", pInsertPos);
@@ -1580,8 +1580,8 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
                                            pElemMeta,
                                            pElemLocOffset,
                                            maxLocOffset,
-                                           xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * elemIdx),
-                                           xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * elemIdx : 0),
+                                           xfbOffsetAdjust + (blockArray ? 0 : outputMeta.XfbArrayStride * idx),
+                                           xfbBufferAdjust + (blockArray ? outputMeta.XfbArrayStride * idx : 0),
                                            nullptr,
                                            pVertexIdx,
                                            emitStreamId,
@@ -1598,7 +1598,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         for (uint32_t memberIdx = 0; memberIdx < memberCount; ++memberIdx)
         {
             // Handle structure member recursively
-            auto pMemberMeta = cast<Constant>(pOutputMeta->getOperand(memberIdx));
+            auto pMemberMeta = cast<Constant>(pOutputMetaVal->getOperand(memberIdx));
             Value* pMember = ExtractValueInst::Create(pOutputValue, { memberIdx }, "", pInsertPos);
             AddCallInstForOutputExport(pMember,
                                        pMemberMeta,
@@ -1616,7 +1616,7 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
     {
         // Normal scalar or vector type
         m_pBuilder->SetInsertPoint(pInsertPos);
-        Constant* pInOutMetaConst = cast<Constant>(pOutputMeta);
+        Constant* pInOutMetaConst = cast<Constant>(pOutputMetaVal);
         outputMeta.U64All[0] = cast<ConstantInt>(pInOutMetaConst->getOperand(0))->getZExtValue();
         outputMeta.U64All[1] = cast<ConstantInt>(pInOutMetaConst->getOperand(1))->getZExtValue();
 
@@ -1677,15 +1677,15 @@ void SpirvLowerGlobal::AddCallInstForOutputExport(
         assert(((outputMeta.Index == 1) && (outputMeta.Value == 0)) || (outputMeta.Index == 0));
         assert(pOutputTy->isSingleValueType());
 
-        uint32_t elemIdx = outputMeta.Component;
+        uint32_t idx = outputMeta.Component;
         assert(outputMeta.Component <= 3);
         if (pOutputTy->getScalarSizeInBits() == 64)
         {
             assert(outputMeta.Component % 2 == 0); // Must be even for 64-bit type
-            elemIdx = outputMeta.Component / 2;
+            idx = outputMeta.Component / 2;
         }
-        pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(elemIdx) :
-                                           m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(elemIdx));
+        pElemIdx = (pElemIdx == nullptr) ? m_pBuilder->getInt32(idx) :
+                                           m_pBuilder->CreateAdd(pElemIdx, m_pBuilder->getInt32(idx));
         pLocOffset = (pLocOffset == nullptr) ? m_pBuilder->getInt32(0) : pLocOffset;
 
         if (outputMeta.IsXfb)
@@ -1736,7 +1736,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
     const std::vector<Value*>& indexOperands,   // [in] Index operands
     uint32_t                   operandIdx,      // Index of the index operand in processing
     uint32_t                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
-    Constant*                  pInOutMeta,      // [in] Metadata of this input/output member
+    Constant*                  pInOutMetaVal,      // [in] Metadata of this input/output member
     Value*                     pLocOffset,      // [in] Relative location offset of this input/output member
     Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
     uint32_t                   interpLoc,       // Interpolation location, valid for fragment shader
@@ -1756,13 +1756,13 @@ Value* SpirvLowerGlobal::LoadInOutMember(
         if (pInOutTy->isArrayTy())
         {
             // Array type
-            assert(pInOutMeta->getNumOperands() == 4);
+            assert(pInOutMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata inOutMeta = {};
 
-            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMeta->getOperand(2))->getZExtValue();
-            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMeta->getOperand(3))->getZExtValue();
+            inOutMeta.U64All[0] = cast<ConstantInt>(pInOutMetaVal->getOperand(2))->getZExtValue();
+            inOutMeta.U64All[1] = cast<ConstantInt>(pInOutMetaVal->getOperand(3))->getZExtValue();
 
-            auto pElemMeta = cast<Constant>(pInOutMeta->getOperand(1));
+            auto pElemMeta = cast<Constant>(pInOutMetaVal->getOperand(1));
             auto pElemTy   = pInOutTy->getArrayElementType();
 
             if (inOutMeta.IsBuiltIn)
@@ -1789,7 +1789,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
-                uint32_t stride = cast<ConstantInt>(pInOutMeta->getOperand(0))->getZExtValue();
+                uint32_t stride = cast<ConstantInt>(pInOutMetaVal->getOperand(0))->getZExtValue();
                 auto pElemIdx = indexOperands[operandIdx + 1];
                 Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                                    stride),
@@ -1825,7 +1825,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
             uint32_t memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
             auto pMemberTy = pInOutTy->getStructElementType(memberIdx);
-            auto pMemberMeta = cast<Constant>(pInOutMeta->getOperand(memberIdx));
+            auto pMemberMeta = cast<Constant>(pInOutMetaVal->getOperand(memberIdx));
 
             return LoadInOutMember(pMemberTy,
                                    addrSpace,
@@ -1849,7 +1849,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
 
             return AddCallInstForInOutImport(pCompTy,
                                              addrSpace,
-                                             pInOutMeta,
+                                             pInOutMetaVal,
                                              pLocOffset,
                                              maxLocOffset,
                                              pCompIdx,
@@ -1865,7 +1865,7 @@ Value* SpirvLowerGlobal::LoadInOutMember(
         assert(operandIdx == indexOperands.size() - 1);
         return AddCallInstForInOutImport(pInOutTy,
                                          addrSpace,
-                                         pInOutMeta,
+                                         pInOutMetaVal,
                                          pLocOffset,
                                          maxLocOffset,
                                          nullptr,
@@ -1887,7 +1887,7 @@ void SpirvLowerGlobal::StoreOutputMember(
     const std::vector<Value*>& indexOperands,   // [in] Index operands
     uint32_t                   operandIdx,      // Index of the index operand in processing
     uint32_t                   maxLocOffset,    // Max+1 location offset if variable index has been encountered
-    Constant*                  pOutputMeta,     // [in] Metadata of this output member
+    Constant*                  pOutputMetaVal,     // [in] Metadata of this output member
     Value*                     pLocOffset,      // [in] Relative location offset of this output member
     Value*                     pVertexIdx,      // [in] Input array outermost index used for vertex indexing
     Instruction*               pInsertPos)      // [in] Where to insert store instructions
@@ -1898,13 +1898,13 @@ void SpirvLowerGlobal::StoreOutputMember(
     {
         if (pOutputTy->isArrayTy())
         {
-            assert(pOutputMeta->getNumOperands() == 4);
+            assert(pOutputMetaVal->getNumOperands() == 4);
             ShaderInOutMetadata outputMeta = {};
 
-            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMeta->getOperand(2))->getZExtValue();
-            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMeta->getOperand(3))->getZExtValue();
+            outputMeta.U64All[0] = cast<ConstantInt>(pOutputMetaVal->getOperand(2))->getZExtValue();
+            outputMeta.U64All[1] = cast<ConstantInt>(pOutputMetaVal->getOperand(3))->getZExtValue();
 
-            auto pElemMeta = cast<Constant>(pOutputMeta->getOperand(1));
+            auto pElemMeta = cast<Constant>(pOutputMetaVal->getOperand(1));
             auto pElemTy   = pOutputTy->getArrayElementType();
 
             if (outputMeta.IsBuiltIn)
@@ -1933,7 +1933,7 @@ void SpirvLowerGlobal::StoreOutputMember(
                 }
 
                 // elemLocOffset = locOffset + stride * elemIdx
-                uint32_t stride = cast<ConstantInt>(pOutputMeta->getOperand(0))->getZExtValue();
+                uint32_t stride = cast<ConstantInt>(pOutputMetaVal->getOperand(0))->getZExtValue();
                 auto pElemIdx = indexOperands[operandIdx + 1];
                 Value* pElemLocOffset = BinaryOperator::CreateMul(ConstantInt::get(Type::getInt32Ty(*m_pContext),
                                                                                    stride),
@@ -1967,7 +1967,7 @@ void SpirvLowerGlobal::StoreOutputMember(
             uint32_t memberIdx = cast<ConstantInt>(indexOperands[operandIdx + 1])->getZExtValue();
 
             auto pMemberTy = pOutputTy->getStructElementType(memberIdx);
-            auto pMemberMeta = cast<Constant>(pOutputMeta->getOperand(memberIdx));
+            auto pMemberMeta = cast<Constant>(pOutputMetaVal->getOperand(memberIdx));
 
             return StoreOutputMember(pMemberTy,
                                      pStoreValue,
@@ -1986,7 +1986,7 @@ void SpirvLowerGlobal::StoreOutputMember(
             auto pCompIdx = indexOperands[operandIdx + 1];
 
             return AddCallInstForOutputExport(pStoreValue,
-                                              pOutputMeta,
+                                              pOutputMetaVal,
                                               pLocOffset,
                                               maxLocOffset,
                                               InvalidValue,
@@ -2003,7 +2003,7 @@ void SpirvLowerGlobal::StoreOutputMember(
         assert(operandIdx == indexOperands.size() - 1);
 
         return AddCallInstForOutputExport(pStoreValue,
-                                          pOutputMeta,
+                                          pOutputMetaVal,
                                           pLocOffset,
                                           maxLocOffset,
                                           InvalidValue,

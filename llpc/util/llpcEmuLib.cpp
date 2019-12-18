@@ -89,11 +89,11 @@ Function* EmuLib::GetFunction(
         auto pChild = cantFail(archive.archive->findSym(funcName), "Failed in archive symbol search");
         assert(pChild.hasValue());
         // Found the symbol. Get the bitcode for its module.
-        StringRef child = cantFail(pChild->getBuffer(), "Failed in archive module extraction");
+        StringRef childBitcode = cantFail(pChild->getBuffer(), "Failed in archive module extraction");
 
         // Parse the bitcode archive member into a Module.
         auto libModule = cantFail(parseBitcodeFile(
-            MemoryBufferRef(child, ""), *pContext), "Failed to parse archive bitcode");
+            MemoryBufferRef(childBitcode, ""), *pContext), "Failed to parse archive bitcode");
 
         // Find and mark the non-native library functions. A library function is non-native if:
         //   it references llvm.amdgcn.*

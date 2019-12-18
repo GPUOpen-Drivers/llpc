@@ -1703,15 +1703,15 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix()
 
                             for (uint32_t column = 0, e = pStoreType->getArrayNumElements(); column < e; column++)
                             {
-                                Value* pColumn = UndefValue::get(pColumnType);
+                                Value* pColumnVal = UndefValue::get(pColumnType);
 
                                 for (uint32_t row = 0; row < rowCount; row++)
                                 {
                                     Value* const pElement = getBuilder()->CreateExtractValue(pStoreValue, { column, row });
-                                    pColumn = getBuilder()->CreateInsertElement(pColumn, pElement, row);
+                                    pColumnVal = getBuilder()->CreateInsertElement(pColumnVal, pElement, row);
                                 }
 
-                                pMatrix = getBuilder()->CreateInsertValue(pMatrix, pColumn, column);
+                                pMatrix = getBuilder()->CreateInsertValue(pMatrix, pColumnVal, column);
                             }
 
                             pStoreValue = pMatrix;
@@ -3066,12 +3066,12 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(
     StructType* const pStructType = cast<StructType>(pStruct->getType()->getPointerElementType());
     const StructLayout* const pStructLayout = M->getDataLayout().getStructLayout(pStructType);
     const uint32_t offset = static_cast<uint32_t>(pStructLayout->getElementOffset(remappedMemberIndex));
-    Value* const pOffset = getBuilder()->getInt32(offset);
+    Value* const pOffsetVal = getBuilder()->getInt32(offset);
 
     Type* const pMemberType = pStructType->getStructElementType(remappedMemberIndex)->getArrayElementType();
     const uint32_t stride = static_cast<uint32_t>(M->getDataLayout().getTypeSizeInBits(pMemberType) / 8);
 
-    return getBuilder()->CreateUDiv(getBuilder()->CreateSub(pBufferLength, pOffset), getBuilder()->getInt32(stride));
+    return getBuilder()->CreateUDiv(getBuilder()->CreateSub(pBufferLength, pOffsetVal), getBuilder()->getInt32(stride));
 }
 
 // =====================================================================================================================
@@ -3290,9 +3290,9 @@ template<> Value* SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(
             // Always need at least a single index in back.
             indices[index++] = getBuilder()->getInt32(0);
 
-            for (Value* const pIndex : indexArray.slice(split.first))
+            for (Value* const pIndexVal : indexArray.slice(split.first))
             {
-                indices[index++] = pIndex;
+                indices[index++] = pIndexVal;
             }
 
             indices.resize(index);
