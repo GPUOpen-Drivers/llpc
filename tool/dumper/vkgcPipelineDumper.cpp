@@ -1720,9 +1720,9 @@ OStream& operator<<(
 // =====================================================================================================================
 // Assistant macros for pipeline dump
 #define CASE_CLASSENUM_TO_STRING(TYPE, ENUM) \
-    case TYPE::ENUM: pString = #ENUM; break;
+    case TYPE::ENUM: string = #ENUM; break;
 #define CASE_ENUM_TO_STRING(ENUM) \
-    case ENUM: pString = #ENUM; break;
+    case ENUM: string = #ENUM; break;
 
 // =====================================================================================================================
 // Translates enum "VkVertexInputRate" to string and output to ostream.
@@ -1730,7 +1730,7 @@ std::ostream& operator<<(
     std::ostream&       out,        // [out] Output stream
     VkVertexInputRate  inputRate)   // Vertex input rate
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (inputRate)
     {
     CASE_ENUM_TO_STRING(VK_VERTEX_INPUT_RATE_VERTEX)
@@ -1740,7 +1740,7 @@ std::ostream& operator<<(
         llvm_unreachable("Should never be called!");
         break;
     }
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1758,7 +1758,7 @@ std::ostream& operator<<(
     std::ostream&           out,            // [out] Output stream
     NggSubgroupSizingType   subgroupSizing) // NGG sub-group sizing type
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (subgroupSizing)
     {
     CASE_CLASSENUM_TO_STRING(NggSubgroupSizingType, Auto)
@@ -1773,7 +1773,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1782,7 +1782,7 @@ std::ostream& operator<<(
     std::ostream&   out,         // [out] Output stream
     NggCompactMode  compactMode) // NGG compaction mode
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (compactMode)
     {
     CASE_ENUM_TO_STRING(NggCompactSubgroup)
@@ -1793,7 +1793,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1802,7 +1802,7 @@ std::ostream& operator<<(
     std::ostream&   out,            // [out] Output stream
     WaveBreakSize   waveBreakSize)  // Wave break size
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (waveBreakSize)
     {
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, None)
@@ -1816,7 +1816,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1825,7 +1825,7 @@ std::ostream& operator<<(
     std::ostream&              out,                         // [out] Output stream
     ShadowDescriptorTableUsage shadowDescriptorTableUsage)  // Shadow descriptor table setting
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (shadowDescriptorTableUsage)
     {
     CASE_CLASSENUM_TO_STRING(ShadowDescriptorTableUsage, Auto)
@@ -1837,7 +1837,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1846,7 +1846,7 @@ std::ostream& operator<<(
     std::ostream&       out,       // [out] Output stream
     VkPrimitiveTopology topology)  // Primitive topology
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (topology)
     {
     CASE_ENUM_TO_STRING(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
@@ -1867,7 +1867,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1876,7 +1876,7 @@ std::ostream& operator<<(
     std::ostream&       out,            // [out] Output stream
     VkPolygonMode       polygonMode)    // Rendering mode
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (polygonMode)
     {
     CASE_ENUM_TO_STRING(VK_POLYGON_MODE_FILL)
@@ -1890,7 +1890,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1899,7 +1899,7 @@ std::ostream& operator<<(
     std::ostream&       out,         // [out] Output stream
     VkCullModeFlagBits  cullMode)    // Culling mode
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (cullMode)
     {
     CASE_ENUM_TO_STRING(VK_CULL_MODE_NONE)
@@ -1913,7 +1913,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1922,7 +1922,7 @@ std::ostream& operator<<(
     std::ostream&       out,         // [out] Output stream
     VkFrontFace         frontFace)   // Front facing orientation
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (frontFace)
     {
     CASE_ENUM_TO_STRING(VK_FRONT_FACE_COUNTER_CLOCKWISE)
@@ -1934,7 +1934,7 @@ std::ostream& operator<<(
         break;
     }
 
-    return out << pString;
+    return out << string;
 }
 
 // =====================================================================================================================
@@ -1943,7 +1943,7 @@ std::ostream& operator<<(
     std::ostream&       out,     // [out] Output stream
     VkFormat            format)  // Resource format
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (format)
     {
     CASE_ENUM_TO_STRING(VK_FORMAT_UNDEFINED)
@@ -2144,7 +2144,7 @@ std::ostream& operator<<(
         llvm_unreachable("Should never be called!");
         break;
     }
-    return out << pString;
+    return out << string;
 }
 
 } // Vkgc

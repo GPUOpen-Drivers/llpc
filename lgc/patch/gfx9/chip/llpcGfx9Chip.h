@@ -396,10 +396,10 @@ struct PsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (VS-FS).
 struct PipelineVsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    VsRegConfig m_vsRegs;   // VS -> hardware VS
-    PsRegConfig m_psRegs;   // FS -> hardware PS
+    VsRegConfig vsRegs;   // VS -> hardware VS
+    PsRegConfig psRegs;   // FS -> hardware PS
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(VGT_GS_ONCHIP_CNTL);
     DEF_REG(IA_MULTI_VGT_PARAM);
@@ -412,11 +412,11 @@ struct PipelineVsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (VS-TS-FS).
 struct PipelineVsTsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    LsHsRegConfig m_lsHsRegs; // VS-TCS -> hardware LS-HS
-    VsRegConfig   m_vsRegs;   // TES    -> hardware VS
-    PsRegConfig   m_psRegs;   // FS     -> hardware PS
+    LsHsRegConfig lsHsRegs; // VS-TCS -> hardware LS-HS
+    VsRegConfig   vsRegs;   // TES    -> hardware VS
+    PsRegConfig   psRegs;   // FS     -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
@@ -430,11 +430,11 @@ struct PipelineVsTsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (VS-GS-FS).
 struct PipelineVsGsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    EsGsRegConfig m_esGsRegs;   // VS-GS -> hardware ES-GS
-    VsRegConfig   m_vsRegs;     // Copy shader -> hardware VS
-    PsRegConfig   m_psRegs;     // FS -> hardware PS
+    EsGsRegConfig esGsRegs;   // VS-GS -> hardware ES-GS
+    VsRegConfig   vsRegs;     // Copy shader -> hardware VS
+    PsRegConfig   psRegs;     // FS -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
@@ -447,12 +447,12 @@ struct PipelineVsGsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (VS-TS-GS-FS).
 struct PipelineVsTsGsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    LsHsRegConfig m_lsHsRegs;   // VS-TCS -> hardware LS-HS
-    EsGsRegConfig m_esGsRegs;   // TES-GS -> hardware ES-GS
-    VsRegConfig   m_vsRegs;     // Copy shader -> hardware VS
-    PsRegConfig   m_psRegs;     // FS -> hardware PS
+    LsHsRegConfig lsHsRegs;   // VS-TCS -> hardware LS-HS
+    EsGsRegConfig esGsRegs;   // TES-GS -> hardware ES-GS
+    VsRegConfig   vsRegs;     // Copy shader -> hardware VS
+    PsRegConfig   psRegs;     // FS -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM);
@@ -465,10 +465,10 @@ struct PipelineVsTsGsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (NGG, VS-FS).
 struct PipelineNggVsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    PrimShaderRegConfig m_primShaderRegs; // VS -> hardware primitive shader (NGG, ES-GS)
-    PsRegConfig         m_psRegs;         // FS -> hardware PS
+    PrimShaderRegConfig primShaderRegs; // VS -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         psRegs;         // FS -> hardware PS
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
 
@@ -479,11 +479,11 @@ struct PipelineNggVsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (NGG, VS-TS-FS).
 struct PipelineNggVsTsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    LsHsRegConfig       m_lsHsRegs;       // VS-TCS -> hardware LS-HS
-    PrimShaderRegConfig m_primShaderRegs; // TES    -> hardware primitive shader (NGG, ES-GS)
-    PsRegConfig         m_psRegs;         // FS     -> hardware PS
+    LsHsRegConfig       lsHsRegs;       // VS-TCS -> hardware LS-HS
+    PrimShaderRegConfig primShaderRegs; // TES    -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         psRegs;         // FS     -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
@@ -495,10 +495,10 @@ struct PipelineNggVsTsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (NGG, VS-GS-FS).
 struct PipelineNggVsGsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    PrimShaderRegConfig m_primShaderRegs; // VS-GS -> hardware primitive shader (NGG, ES-GS)
-    PsRegConfig         m_psRegs;         // FS    -> hardware PS
+    PrimShaderRegConfig primShaderRegs; // VS-GS -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         psRegs;         // FS    -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
@@ -510,11 +510,11 @@ struct PipelineNggVsGsFsRegConfig
 // Represents configuration of registers relevant to graphics pipeline (NGG, VS-TS-GS-FS).
 struct PipelineNggVsTsGsFsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
-    LsHsRegConfig       m_lsHsRegs;       // VS-TCS -> hardware LS-HS
-    PrimShaderRegConfig m_primShaderRegs; // TES-GS -> hardware primitive shader (NGG, ES-GS)
-    PsRegConfig         m_psRegs;         // FS     -> hardware PS
+    LsHsRegConfig       lsHsRegs;       // VS-TCS -> hardware LS-HS
+    PrimShaderRegConfig primShaderRegs; // TES-GS -> hardware primitive shader (NGG, ES-GS)
+    PsRegConfig         psRegs;         // FS     -> hardware PS
 
     DEF_REG(VGT_SHADER_STAGES_EN);
     DEF_REG(IA_MULTI_VGT_PARAM_PIPED);
@@ -526,7 +526,7 @@ struct PipelineNggVsTsGsFsRegConfig
 // Represents configuration of registers relevant to compute shader.
 struct CsRegConfig
 {
-    static constexpr bool containsPalAbiMetadataOnly = true;
+    static constexpr bool ContainsPalAbiMetadataOnly = true;
 
     DEF_REG(COMPUTE_PGM_RSRC1);
     DEF_REG(COMPUTE_PGM_RSRC2);

@@ -93,7 +93,7 @@ protected:
     template<typename T>
     void AppendConfig(const T& config)
     {
-        static_assert(T::containsPalAbiMetadataOnly,
+        static_assert(T::ContainsPalAbiMetadataOnly,
                       "may only be used with structs that are fully metadata notes");
         static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
                       "T claims to be isPalAbiMetadataOnly, but sizeof contradicts that");
