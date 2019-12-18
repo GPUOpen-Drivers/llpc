@@ -1285,14 +1285,14 @@ const char* PipelineState::GetShaderStageAbbreviation(
 // =====================================================================================================================
 // Helper macro
 #define CASE_CLASSENUM_TO_STRING(TYPE, ENUM) \
-    case TYPE::ENUM: pString = #ENUM; break;
+    case TYPE::ENUM: string = #ENUM; break;
 
 // =====================================================================================================================
 // Translate enum "ResourceNodeType" to string
 const char* PipelineState::GetResourceNodeTypeName(
     ResourceNodeType type)  // Resource map node type
 {
-    const char* pString = nullptr;
+    const char* string = nullptr;
     switch (type)
     {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, Unknown)
@@ -1314,7 +1314,7 @@ const char* PipelineState::GetResourceNodeTypeName(
         llvm_unreachable("Should never be called!");
         break;
     }
-    return pString;
+    return string;
 }
 
 // =====================================================================================================================

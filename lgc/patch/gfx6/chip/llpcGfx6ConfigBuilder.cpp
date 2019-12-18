@@ -397,92 +397,92 @@ void ConfigBuilder::BuildVsRegConfig(
     const auto& builtInUsage = pResUsage->builtInUsage;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, floatMode);
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, FLOAT_MODE, floatMode);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto& xfbStrides = pResUsage->inOutUsage.xfbStrides;
     bool enableXfb = pResUsage->inOutUsage.enableXfb;
 
     if (shaderStage == ShaderStageCopyShader)
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, lgc::CopyShaderUserSgprCount);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, lgc::CopyShaderUserSgprCount);
         SetNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxSgprsAvailable);
         SetNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pPipelineState->GetTargetInfo().GetGpuProperty().maxVgprsAvailable);
 
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN,
             (pResUsage->inOutUsage.gs.outLocCount[0] > 0) && enableXfb);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN,
             pResUsage->inOutUsage.gs.outLocCount[1] > 0);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG,
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG,
             STREAMOUT_2_EN, pResUsage->inOutUsage.gs.outLocCount[2] > 0);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN,
             pResUsage->inOutUsage.gs.outLocCount[3] > 0);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM,
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM,
             pResUsage->inOutUsage.gs.rasterStream);
     }
     else
     {
         const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, shaderOptions.debugMode);
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, shaderOptions.trapPresent);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, shaderOptions.debugMode);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, TRAP_PRESENT, shaderOptions.trapPresent);
 
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, pIntfData->userDataCount);
 
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, enableXfb);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
-        SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_0_EN, enableXfb);
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, false);
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, false);
+        SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, false);
 
         SetNumAvailSgprs(Util::Abi::HardwareStage::Vs, pResUsage->numSgprsAvailable);
         SetNumAvailVgprs(Util::Abi::HardwareStage::Vs, pResUsage->numVgprsAvailable);
     }
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_EN, enableXfb);
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE0_EN, (xfbStrides[0] > 0));
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE1_EN, (xfbStrides[1] > 0));
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_EN, enableXfb);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE0_EN, (xfbStrides[0] > 0));
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE1_EN, (xfbStrides[1] > 0));
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE2_EN, (xfbStrides[2] > 0));
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, SO_BASE3_EN, (xfbStrides[3] > 0));
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(int));
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(int));
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(int));
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(int));
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_0, STRIDE, xfbStrides[0] / sizeof(int));
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_1, STRIDE, xfbStrides[1] / sizeof(int));
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_2, STRIDE, xfbStrides[2] / sizeof(int));
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_STRMOUT_VTX_STRIDE_3, STRIDE, xfbStrides[3] / sizeof(int));
 
     uint32_t streamBufferConfig = 0;
     for (auto i = 0; i < MaxGsStreams; ++i)
     {
         streamBufferConfig |= (pResUsage->inOutUsage.streamXfbBuffers[i] << (i * 4));
     }
-    SET_REG(&pConfig->m_vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
+    SET_REG(&pConfig->vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
     uint8_t usrClipPlaneMask = m_pPipelineState->GetRasterizerState().usrClipPlaneMask;
     bool depthClipDisable = (m_pPipelineState->GetViewportState().depthClipEnable == false);
     bool rasterizerDiscardEnable = m_pPipelineState->GetRasterizerState().rasterizerDiscardEnable;
     bool disableVertexReuse = m_pPipelineState->GetInputAssemblyState().disableVertexReuse;
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_0, (usrClipPlaneMask >> 0) & 0x1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_1, (usrClipPlaneMask >> 1) & 0x1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_2, (usrClipPlaneMask >> 2) & 0x1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_3, (usrClipPlaneMask >> 3) & 0x1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_4, (usrClipPlaneMask >> 4) & 0x1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_5, (usrClipPlaneMask >> 5) & 0x1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, DX_LINEAR_ATTR_CLIP_ENA,true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, DX_CLIP_SPACE_DEF, true); // DepthRange::ZeroToOne
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, ZCLIP_NEAR_DISABLE,depthClipDisable);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, ZCLIP_FAR_DISABLE, depthClipDisable);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, DX_RASTERIZATION_KILL,rasterizerDiscardEnable);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_0, (usrClipPlaneMask >> 0) & 0x1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_1, (usrClipPlaneMask >> 1) & 0x1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_2, (usrClipPlaneMask >> 2) & 0x1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_3, (usrClipPlaneMask >> 3) & 0x1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_4, (usrClipPlaneMask >> 4) & 0x1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, UCP_ENA_5, (usrClipPlaneMask >> 5) & 0x1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_LINEAR_ATTR_CLIP_ENA,true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_CLIP_SPACE_DEF, true); // DepthRange::ZeroToOne
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, ZCLIP_NEAR_DISABLE,depthClipDisable);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, ZCLIP_FAR_DISABLE, depthClipDisable);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, DX_RASTERIZATION_KILL,rasterizerDiscardEnable);
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VPORT_X_SCALE_ENA, true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VPORT_X_OFFSET_ENA, true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VPORT_Y_SCALE_ENA, true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VPORT_Y_OFFSET_ENA, true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VPORT_Z_SCALE_ENA, true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VPORT_Z_OFFSET_ENA, true);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VTE_CNTL, VTX_W0_FMT, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_X_SCALE_ENA, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_X_OFFSET_ENA, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_Y_SCALE_ENA, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_Y_OFFSET_ENA, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_Z_SCALE_ENA, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VPORT_Z_OFFSET_ENA, true);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VTE_CNTL, VTX_W0_FMT, true);
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_SU_VTX_CNTL, PIX_CENTER, 1);
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_SU_VTX_CNTL, ROUND_MODE, 2); // Round to even
-    SET_REG_FIELD(&pConfig->m_vsRegs, PA_SU_VTX_CNTL, QUANT_MODE, 5); // Use 8-bit fractions
+    SET_REG_FIELD(&pConfig->vsRegs, PA_SU_VTX_CNTL, PIX_CENTER, 1);
+    SET_REG_FIELD(&pConfig->vsRegs, PA_SU_VTX_CNTL, ROUND_MODE, 2); // Round to even
+    SET_REG_FIELD(&pConfig->vsRegs, PA_SU_VTX_CNTL, QUANT_MODE, 5); // Use 8-bit fractions
 
     // Stage-specific processing
     bool usePointSize = false;
@@ -503,11 +503,11 @@ void ConfigBuilder::BuildVsRegConfig(
 
         if (builtInUsage.vs.instanceIndex)
         {
-            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 3); // 3: Enable instance ID
+            SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 3); // 3: Enable instance ID
         }
         else if (builtInUsage.vs.primitiveId)
         {
-            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 2);
+            SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 2);
         }
     }
     else if (shaderStage == ShaderStageTessEval)
@@ -522,16 +522,16 @@ void ConfigBuilder::BuildVsRegConfig(
         if (builtInUsage.tes.primitiveId)
         {
             // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
-            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 3); // 3: Enable primitive ID
+            SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 3); // 3: Enable primitive ID
         }
         else
         {
-            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 2);
+            SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC1_VS, VGPR_COMP_CNT, 2);
         }
 
         if (m_pPipelineState->IsTessOffChip())
         {
-            SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
+            SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_PGM_RSRC2_VS, OC_LDS_EN, true);
         }
     }
     else
@@ -559,8 +559,8 @@ void ConfigBuilder::BuildVsRegConfig(
         }
     }
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_VS_OUT_CONFIG, VS_EXPORT_COUNT, pResUsage->inOutUsage.expCount - 1);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_VS_OUT_CONFIG, VS_EXPORT_COUNT, pResUsage->inOutUsage.expCount - 1);
     SetUsesViewportArrayIndex(useViewportIndex);
 
     // According to the IA_VGT_Spec, it is only legal to enable vertex reuse when we're using viewport array
@@ -571,44 +571,44 @@ void ConfigBuilder::BuildVsRegConfig(
         // TODO: In the future, we can only disable vertex reuse only if viewport array index is emitted divergently
         // for each vertex.
         disableVertexReuse = true;
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, true);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, true);
     }
     else
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, false);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_CLIP_CNTL, VTE_VPORT_PROVOKE_DISABLE, false);
     }
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse);
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, VGT_VERTEX_REUSE_BLOCK_CNTL, VTX_REUSE_DEPTH, 14);
+    SET_REG_FIELD(&pConfig->vsRegs, VGT_VERTEX_REUSE_BLOCK_CNTL, VTX_REUSE_DEPTH, 14);
 
     useLayer = useLayer || m_pPipelineState->GetInputAssemblyState().enableMultiView;
 
     if (usePointSize || useLayer || useViewportIndex)
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
     }
 
     if ((clipDistanceCount > 0) || (cullDistanceCount > 0))
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
+        SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST0_VEC_ENA, true);
         if (clipDistanceCount + cullDistanceCount > 4)
         {
-            SET_REG_FIELD(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST1_VEC_ENA, true);
+            SET_REG_FIELD(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_CCDIST1_VEC_ENA, true);
         }
 
         uint32_t clipDistanceMask = (1 << clipDistanceCount) - 1;
         uint32_t cullDistanceMask = (1 << cullDistanceCount) - 1;
 
         // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
-        uint32_t paClVsOutCntl = GET_REG(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL);
+        uint32_t paClVsOutCntl = GET_REG(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL);
         paClVsOutCntl |= clipDistanceMask;
         paClVsOutCntl |= (cullDistanceMask << 8);
-        SET_REG(&pConfig->m_vsRegs, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
+        SET_REG(&pConfig->vsRegs, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
     }
 
     uint32_t posCount = 1; // gl_Position is always exported
@@ -626,18 +626,18 @@ void ConfigBuilder::BuildVsRegConfig(
         }
     }
 
-    SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
+    SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS0_EXPORT_FORMAT, SPI_SHADER_4COMP);
     if (posCount > 1)
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_POS_FORMAT, POS1_EXPORT_FORMAT, SPI_SHADER_4COMP);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS1_EXPORT_FORMAT, SPI_SHADER_4COMP);
     }
     if (posCount > 2)
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_POS_FORMAT, POS2_EXPORT_FORMAT, SPI_SHADER_4COMP);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS2_EXPORT_FORMAT, SPI_SHADER_4COMP);
     }
     if (posCount > 3)
     {
-        SET_REG_FIELD(&pConfig->m_vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
+        SET_REG_FIELD(&pConfig->vsRegs, SPI_SHADER_POS_FORMAT, POS3_EXPORT_FORMAT, SPI_SHADER_4COMP);
     }
 
     // Set shader user data maping
@@ -659,34 +659,34 @@ void ConfigBuilder::BuildHsRegConfig(
     const auto& tessMode = m_pPipelineState->GetShaderModes()->GetTessellationMode();
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
-    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
-    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true);  // Follow PAL setting
+    SET_REG_FIELD(&pConfig->hsRegs, SPI_SHADER_PGM_RSRC1_HS, FLOAT_MODE, floatMode);
+    SET_REG_FIELD(&pConfig->hsRegs, SPI_SHADER_PGM_RSRC1_HS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
-    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, shaderOptions.debugMode);
-    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, shaderOptions.trapPresent);
-    SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, pIntfData->userDataCount);
+    SET_REG_FIELD(&pConfig->hsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, shaderOptions.debugMode);
+    SET_REG_FIELD(&pConfig->hsRegs, SPI_SHADER_PGM_RSRC2_HS, TRAP_PRESENT, shaderOptions.trapPresent);
+    SET_REG_FIELD(&pConfig->hsRegs, SPI_SHADER_PGM_RSRC2_HS, USER_SGPR, pIntfData->userDataCount);
 
     if (m_pPipelineState->IsTessOffChip())
     {
-        SET_REG_FIELD(&pConfig->m_hsRegs, SPI_SHADER_PGM_RSRC2_HS, OC_LDS_EN, true);
+        SET_REG_FIELD(&pConfig->hsRegs, SPI_SHADER_PGM_RSRC2_HS, OC_LDS_EN, true);
     }
 
     // Minimum and maximum tessellation factors supported by the hardware.
     constexpr float MinTessFactor = 1.0f;
     constexpr float MaxTessFactor = 64.0f;
-    SET_REG(&pConfig->m_hsRegs, VGT_HOS_MIN_TESS_LEVEL, FloatToBits(MinTessFactor));
-    SET_REG(&pConfig->m_hsRegs, VGT_HOS_MAX_TESS_LEVEL, FloatToBits(MaxTessFactor));
+    SET_REG(&pConfig->hsRegs, VGT_HOS_MIN_TESS_LEVEL, FloatToBits(MinTessFactor));
+    SET_REG(&pConfig->hsRegs, VGT_HOS_MAX_TESS_LEVEL, FloatToBits(MaxTessFactor));
 
     // Set VGT_LS_HS_CONFIG
-    SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, NUM_PATCHES, calcFactor.patchCountPerThreadGroup);
-    SET_REG_FIELD(&pConfig->m_hsRegs,
+    SET_REG_FIELD(&pConfig->hsRegs, VGT_LS_HS_CONFIG, NUM_PATCHES, calcFactor.patchCountPerThreadGroup);
+    SET_REG_FIELD(&pConfig->hsRegs,
                   VGT_LS_HS_CONFIG,
                   HS_NUM_INPUT_CP,
                   m_pPipelineState->GetInputAssemblyState().patchControlPoints);
 
     auto hsNumOutputCp = tessMode.outputVertices;
-    SET_REG_FIELD(&pConfig->m_hsRegs, VGT_LS_HS_CONFIG, HS_NUM_OUTPUT_CP, hsNumOutputCp);
+    SET_REG_FIELD(&pConfig->hsRegs, VGT_LS_HS_CONFIG, HS_NUM_OUTPUT_CP, hsNumOutputCp);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Hs, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Hs, pResUsage->numVgprsAvailable);
@@ -711,18 +711,18 @@ void ConfigBuilder::BuildEsRegConfig(
     const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, FLOAT_MODE, floatMode);
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, DX10_CLAMP, true); // Follow PAL setting
+    SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC1_ES, FLOAT_MODE, floatMode);
+    SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC1_ES, DX10_CLAMP, true); // Follow PAL setting
 
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, DEBUG_MODE, shaderOptions.debugMode);
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, TRAP_PRESENT, shaderOptions.trapPresent);
+    SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC1_ES, DEBUG_MODE, shaderOptions.debugMode);
+    SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC2_ES, TRAP_PRESENT, shaderOptions.trapPresent);
     if (m_pPipelineState->IsGsOnChip())
     {
         assert(calcFactor.gsOnChipLdsSize <= m_pPipelineState->GetTargetInfo().GetGpuProperty().gsOnChipMaxLdsSize);
         assert((calcFactor.gsOnChipLdsSize %
                      (1 << m_pPipelineState->GetTargetInfo().GetGpuProperty().ldsSizeDwordGranularityShift)) == 0);
-        SET_REG_FIELD(&pConfig->m_esRegs,
+        SET_REG_FIELD(&pConfig->esRegs,
                       SPI_SHADER_PGM_RSRC2_ES,
                       LDS_SIZE__CI__VI,
                       (calcFactor.gsOnChipLdsSize >>
@@ -754,15 +754,15 @@ void ConfigBuilder::BuildEsRegConfig(
 
         if (m_pPipelineState->IsTessOffChip())
         {
-            SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, OC_LDS_EN, true);
+            SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC2_ES, OC_LDS_EN, true);
         }
     }
 
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC1_ES, VGPR_COMP_CNT, vgprCompCnt);
+    SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC1_ES, VGPR_COMP_CNT, vgprCompCnt);
 
-    SET_REG_FIELD(&pConfig->m_esRegs, SPI_SHADER_PGM_RSRC2_ES, USER_SGPR, pIntfData->userDataCount);
+    SET_REG_FIELD(&pConfig->esRegs, SPI_SHADER_PGM_RSRC2_ES, USER_SGPR, pIntfData->userDataCount);
 
-    SET_REG_FIELD(&pConfig->m_esRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, calcFactor.esGsRingItemSize);
+    SET_REG_FIELD(&pConfig->esRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, calcFactor.esGsRingItemSize);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Es, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Es, pResUsage->numVgprsAvailable);
@@ -786,19 +786,19 @@ void ConfigBuilder::BuildLsRegConfig(
     const auto& builtInUsage = pResUsage->builtInUsage.vs;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, FLOAT_MODE, floatMode);
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, DX10_CLAMP, true);  // Follow PAL setting
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, DEBUG_MODE, shaderOptions.debugMode);
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, TRAP_PRESENT, shaderOptions.trapPresent);
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC1_LS, FLOAT_MODE, floatMode);
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC1_LS, DX10_CLAMP, true);  // Follow PAL setting
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC1_LS, DEBUG_MODE, shaderOptions.debugMode);
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC2_LS, TRAP_PRESENT, shaderOptions.trapPresent);
 
     uint32_t vgtCompCnt = 1;
     if (builtInUsage.instanceIndex)
     {
         vgtCompCnt += 2; // Enable instance ID
     }
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC1_LS, VGPR_COMP_CNT, vgtCompCnt);
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC1_LS, VGPR_COMP_CNT, vgtCompCnt);
 
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, USER_SGPR, pIntfData->userDataCount);
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC2_LS, USER_SGPR, pIntfData->userDataCount);
 
     const auto& calcFactor = m_pPipelineState->GetShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
@@ -846,7 +846,7 @@ void ConfigBuilder::BuildLsRegConfig(
     const uint32_t ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
     ldsSize = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity) >> ldsSizeDwordGranularityShift;
 
-    SET_REG_FIELD(&pConfig->m_lsRegs, SPI_SHADER_PGM_RSRC2_LS, LDS_SIZE, ldsSize);
+    SET_REG_FIELD(&pConfig->lsRegs, SPI_SHADER_PGM_RSRC2_LS, LDS_SIZE, ldsSize);
     SetLdsSizeByteSize(Util::Abi::HardwareStage::Ls, ldsSizeInDwords * 4);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Ls, pResUsage->numSgprsAvailable);
@@ -873,13 +873,13 @@ void ConfigBuilder::BuildGsRegConfig(
     const auto& inOutUsage   = pResUsage->inOutUsage;
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
-    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
-    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true);  // Follow PAL setting
+    SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
+    SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true);  // Follow PAL setting
 
     const auto& shaderOptions = m_pPipelineState->GetShaderOptions(shaderStage);
-    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, shaderOptions.debugMode);
-    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, shaderOptions.trapPresent);
-    SET_REG_FIELD(&pConfig->m_gsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, pIntfData->userDataCount);
+    SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, shaderOptions.debugMode);
+    SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC2_GS, TRAP_PRESENT, shaderOptions.trapPresent);
+    SET_REG_FIELD(&pConfig->gsRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR, pIntfData->userDataCount);
 
     const bool primAdjacency = (geometryMode.inputPrimitive == InputPrimitives::LinesAdjacency) ||
                                (geometryMode.inputPrimitive == InputPrimitives::TrianglesAdjacency);
@@ -895,27 +895,27 @@ void ConfigBuilder::BuildGsRegConfig(
     }
 
     uint32_t maxVertOut = std::max(1u, static_cast<uint32_t>(geometryMode.outputVertices));
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
 
     // TODO: Currently only support offchip GS
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, MODE, GS_SCENARIO_G);
     if (m_pPipelineState->IsGsOnChip())
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, ONCHIP__CI__VI, VGT_GS_MODE_ONCHIP_ON);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, false);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, ONCHIP__CI__VI, VGT_GS_MODE_ONCHIP_ON);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, false);
 
         uint32_t gsPrimsPerSubgrp = std::min(maxGsPerEs, inOutUsage.gs.calcFactor.gsPrimsPerSubgroup);
 
-        SET_REG_FIELD(&pConfig->m_gsRegs,
+        SET_REG_FIELD(&pConfig->gsRegs,
                       VGT_GS_ONCHIP_CNTL__CI__VI,
                       ES_VERTS_PER_SUBGRP,
                       inOutUsage.gs.calcFactor.esVertsPerSubgroup);
 
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_ONCHIP_CNTL__CI__VI, GS_PRIMS_PER_SUBGRP, gsPrimsPerSubgrp);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_ONCHIP_CNTL__CI__VI, GS_PRIMS_PER_SUBGRP, gsPrimsPerSubgrp);
 
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_ES_PER_GS, ES_PER_GS, inOutUsage.gs.calcFactor.esVertsPerSubgroup);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_PER_ES, GS_PER_ES, gsPrimsPerSubgrp);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_ES_PER_GS, ES_PER_GS, inOutUsage.gs.calcFactor.esVertsPerSubgroup);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_PER_ES, GS_PER_ES, gsPrimsPerSubgrp);
 
         if (cl::InRegEsGsLdsSize)
         {
@@ -925,58 +925,58 @@ void ConfigBuilder::BuildGsRegConfig(
     }
     else
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, ONCHIP__CI__VI, VGT_GS_MODE_ONCHIP_OFF);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, true);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
-        SET_REG(&pConfig->m_gsRegs, VGT_GS_ONCHIP_CNTL__CI__VI, 0);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, ONCHIP__CI__VI, VGT_GS_MODE_ONCHIP_OFF);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, true);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, true);
+        SET_REG(&pConfig->gsRegs, VGT_GS_ONCHIP_CNTL__CI__VI, 0);
 
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_ES_PER_GS, ES_PER_GS, EsThreadsPerGsThread);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_PER_ES, GS_PER_ES, std::min(maxGsPerEs, GsPrimsPerEsThread));
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_ES_PER_GS, ES_PER_GS, EsThreadsPerGsThread);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_PER_ES, GS_PER_ES, std::min(maxGsPerEs, GsPrimsPerEsThread));
     }
     if (geometryMode.outputVertices <= 128)
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_128);
     }
     else if (geometryMode.outputVertices <= 256)
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_256);
     }
     else if (geometryMode.outputVertices <= 512)
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_512);
     }
     else
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_MODE, CUT_MODE, GS_CUT_1024);
     }
 
     uint32_t gsVertItemSize0 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[0];
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize0);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_VERT_ITEMSIZE, ITEMSIZE, gsVertItemSize0);
 
     uint32_t gsVertItemSize1 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[1];
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE_1, ITEMSIZE, gsVertItemSize1);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_VERT_ITEMSIZE_1, ITEMSIZE, gsVertItemSize1);
 
     uint32_t gsVertItemSize2 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[2];
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE_2, ITEMSIZE, gsVertItemSize2);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_VERT_ITEMSIZE_2, ITEMSIZE, gsVertItemSize2);
 
     uint32_t gsVertItemSize3 = sizeof(uint32_t) * inOutUsage.gs.outLocCount[3];
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_VERT_ITEMSIZE_3, ITEMSIZE, gsVertItemSize3);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_VERT_ITEMSIZE_3, ITEMSIZE, gsVertItemSize3);
 
     uint32_t gsVsRingOffset = gsVertItemSize0 * maxVertOut;
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_1, OFFSET, gsVsRingOffset);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GSVS_RING_OFFSET_1, OFFSET, gsVsRingOffset);
 
     gsVsRingOffset += gsVertItemSize1 * maxVertOut;
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_2, OFFSET, gsVsRingOffset);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GSVS_RING_OFFSET_2, OFFSET, gsVsRingOffset);
 
     gsVsRingOffset += gsVertItemSize2 * maxVertOut;
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, gsVsRingOffset);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GSVS_RING_OFFSET_3, OFFSET, gsVsRingOffset);
 
     if ((geometryMode.invocations > 1) || builtInUsage.invocationId)
     {
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
     }
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_PER_VS, GS_PER_VS, GsThreadsPerVsThread);
 
     VGT_GS_OUTPRIM_TYPE gsOutputPrimitiveType = TRISTRIP;
     if (inOutUsage.outputMapLocCount == 0)
@@ -992,23 +992,23 @@ void ConfigBuilder::BuildGsRegConfig(
         gsOutputPrimitiveType = LINESTRIP;
     }
 
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
 
     // Set multi-stream output primitive type
     if ((gsVertItemSize1 > 0) || (gsVertItemSize2 > 0) || (gsVertItemSize3 > 0))
     {
         const static auto GS_OUT_PRIM_INVALID = 3u;
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_1,
             (gsVertItemSize1 > 0) ? gsOutputPrimitiveType : GS_OUT_PRIM_INVALID);
 
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_2,
             (gsVertItemSize2 > 0) ? gsOutputPrimitiveType : GS_OUT_PRIM_INVALID);
 
-        SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
+        SET_REG_FIELD(&pConfig->gsRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE_3,
             (gsVertItemSize3 > 0) ? gsOutputPrimitiveType : GS_OUT_PRIM_INVALID);
     }
 
-    SET_REG_FIELD(&pConfig->m_gsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, inOutUsage.gs.calcFactor.gsVsRingItemSize);
+    SET_REG_FIELD(&pConfig->gsRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, inOutUsage.gs.calcFactor.gsVsRingItemSize);
 
     SetNumAvailSgprs(Util::Abi::HardwareStage::Gs, pResUsage->numSgprsAvailable);
     SetNumAvailVgprs(Util::Abi::HardwareStage::Gs, pResUsage->numVgprsAvailable);
@@ -1032,39 +1032,39 @@ void ConfigBuilder::BuildPsRegConfig(
     const auto& fragmentMode = m_pPipelineState->GetShaderModes()->GetFragmentShaderMode();
 
     uint32_t floatMode = SetupFloatingPointMode(shaderStage);
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, shaderOptions.debugMode);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC1_PS, DX10_CLAMP, true);  // Follow PAL setting
+    SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC1_PS, DEBUG_MODE, shaderOptions.debugMode);
 
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, shaderOptions.trapPresent);
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC2_PS, TRAP_PRESENT, shaderOptions.trapPresent);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, pIntfData->userDataCount);
 
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, FRONT_FACE_ALL_BITS, true);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_BARYC_CNTL, FRONT_FACE_ALL_BITS, true);
     if (fragmentMode.pixelCenterInteger)
     {
         // TRUE - Force floating point position to upper left corner of pixel (X.0, Y.0)
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, POS_FLOAT_ULC, true);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_BARYC_CNTL, POS_FLOAT_ULC, true);
     }
     else if (builtInUsage.runAtSampleRate)
     {
         // 2 - Calculate per-pixel floating point position at iterated sample number
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, POS_FLOAT_LOCATION, 2);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_BARYC_CNTL, POS_FLOAT_LOCATION, 2);
     }
     else
     {
         // 0 - Calculate per-pixel floating point position at pixel center
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_BARYC_CNTL, POS_FLOAT_LOCATION, 0);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_BARYC_CNTL, POS_FLOAT_LOCATION, 0);
     }
 
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, WALK_ALIGN8_PRIM_FITS_ST, true);
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, WALK_FENCE_ENABLE, true);
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, TILE_WALK_ORDER_ENABLE, true);
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, PS_ITER_SAMPLE, builtInUsage.runAtSampleRate);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, WALK_ALIGN8_PRIM_FITS_ST, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, WALK_FENCE_ENABLE, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, TILE_WALK_ORDER_ENABLE, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, PS_ITER_SAMPLE, builtInUsage.runAtSampleRate);
 
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, SUPERTILE_WALK_ORDER_ENABLE, true);
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, MULTI_SHADER_ENGINE_PRIM_DISCARD_ENABLE, true);
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_CNTDWN_ENABLE, true);
-    SET_REG_FIELD(&pConfig->m_psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_REZ_ENABLE, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, SUPERTILE_WALK_ORDER_ENABLE, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, MULTI_SHADER_ENGINE_PRIM_DISCARD_ENABLE, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_CNTDWN_ENABLE, true);
+    SET_REG_FIELD(&pConfig->psRegs, PA_SC_MODE_CNTL_1, FORCE_EOV_REZ_ENABLE, true);
 
     ZOrder zOrder = LATE_Z;
     bool execOnHeirFail = false;
@@ -1086,16 +1086,16 @@ void ConfigBuilder::BuildPsRegConfig(
         zOrder = EARLY_Z_THEN_LATE_Z;
     }
 
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, Z_ORDER, zOrder);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, KILL_ENABLE, builtInUsage.discard);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, Z_EXPORT_ENABLE, builtInUsage.fragDepth);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, builtInUsage.sampleMask);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_ORDER, zOrder);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, KILL_ENABLE, builtInUsage.discard);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, Z_EXPORT_ENABLE, builtInUsage.fragDepth);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, STENCIL_TEST_VAL_EXPORT_ENABLE, builtInUsage.fragStencilRef);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, MASK_EXPORT_ENABLE, builtInUsage.sampleMask);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, ALPHA_TO_MASK_DISABLE, builtInUsage.sampleMask);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, DEPTH_BEFORE_SHADER, fragmentMode.earlyFragmentTests);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_NOOP,
                   (fragmentMode.earlyFragmentTests && pResUsage->resourceWrite));
-    SET_REG_FIELD(&pConfig->m_psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
+    SET_REG_FIELD(&pConfig->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
 
     uint32_t depthExpFmt = EXP_FORMAT_ZERO;
     if (builtInUsage.sampleMask)
@@ -1110,7 +1110,7 @@ void ConfigBuilder::BuildPsRegConfig(
     {
         depthExpFmt = EXP_FORMAT_32_R;
     }
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
 
     uint32_t spiShaderColFormat = 0;
     uint32_t cbShaderMask = pResUsage->inOutUsage.fs.cbShaderMask;
@@ -1131,10 +1131,10 @@ void ConfigBuilder::BuildPsRegConfig(
         spiShaderColFormat = SPI_SHADER_32_R;
     }
 
-    SET_REG(&pConfig->m_psRegs, SPI_SHADER_COL_FORMAT, spiShaderColFormat);
+    SET_REG(&pConfig->psRegs, SPI_SHADER_COL_FORMAT, spiShaderColFormat);
 
-    SET_REG(&pConfig->m_psRegs, CB_SHADER_MASK, cbShaderMask);
-    SET_REG_FIELD(&pConfig->m_psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, pResUsage->inOutUsage.fs.interpInfo.size());
+    SET_REG(&pConfig->psRegs, CB_SHADER_MASK, cbShaderMask);
+    SET_REG_FIELD(&pConfig->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, pResUsage->inOutUsage.fs.interpInfo.size());
 
     uint32_t pointCoordLoc = InvalidValue;
     if (pResUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord) !=
@@ -1193,11 +1193,11 @@ void ConfigBuilder::BuildPsRegConfig(
 
     if (pointCoordLoc != InvalidValue)
     {
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_ENA, true);
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_X, SPI_PNT_SPRITE_SEL_S);
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Y, SPI_PNT_SPRITE_SEL_T);
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Z, SPI_PNT_SPRITE_SEL_0);
-        SET_REG_FIELD(&pConfig->m_psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, SPI_PNT_SPRITE_SEL_1);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_ENA, true);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_X, SPI_PNT_SPRITE_SEL_S);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Y, SPI_PNT_SPRITE_SEL_T);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_Z, SPI_PNT_SPRITE_SEL_0);
+        SET_REG_FIELD(&pConfig->psRegs, SPI_INTERP_CONTROL_0, PNT_SPRITE_OVRD_W, SPI_PNT_SPRITE_SEL_1);
     }
 
     SetPsUsesUavs(pResUsage->resourceWrite || pResUsage->resourceRead);

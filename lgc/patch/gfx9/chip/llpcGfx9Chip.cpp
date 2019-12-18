@@ -208,8 +208,8 @@ PsRegConfig::PsRegConfig(
 PipelineVsFsRegConfig::PipelineVsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_vsRegs(gfxIp),
-    m_psRegs(gfxIp)
+    vsRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG(VGT_GS_ONCHIP_CNTL);
@@ -222,9 +222,9 @@ PipelineVsFsRegConfig::PipelineVsFsRegConfig(
 PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_lsHsRegs(gfxIp),
-    m_vsRegs(gfxIp),
-    m_psRegs(gfxIp)
+    lsHsRegs(gfxIp),
+    vsRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
@@ -237,9 +237,9 @@ PipelineVsTsFsRegConfig::PipelineVsTsFsRegConfig(
 PipelineVsGsFsRegConfig::PipelineVsGsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_esGsRegs(gfxIp),
-    m_vsRegs(gfxIp),
-    m_psRegs(gfxIp)
+    esGsRegs(gfxIp),
+    vsRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
@@ -250,10 +250,10 @@ PipelineVsGsFsRegConfig::PipelineVsGsFsRegConfig(
 // Initializer
 PipelineVsTsGsFsRegConfig::PipelineVsTsGsFsRegConfig(GfxIpVersion gfxIp)
     :
-    m_lsHsRegs(gfxIp),
-    m_esGsRegs(gfxIp),
-    m_vsRegs(gfxIp),
-    m_psRegs(gfxIp)
+    lsHsRegs(gfxIp),
+    esGsRegs(gfxIp),
+    vsRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX9(gfxIp.major, IA_MULTI_VGT_PARAM);
@@ -265,8 +265,8 @@ PipelineVsTsGsFsRegConfig::PipelineVsTsGsFsRegConfig(GfxIpVersion gfxIp)
 PipelineNggVsFsRegConfig::PipelineNggVsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_primShaderRegs(gfxIp),
-    m_psRegs(gfxIp)
+    primShaderRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
@@ -277,9 +277,9 @@ PipelineNggVsFsRegConfig::PipelineNggVsFsRegConfig(
 PipelineNggVsTsFsRegConfig::PipelineNggVsTsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_lsHsRegs(gfxIp),
-    m_primShaderRegs(gfxIp),
-    m_psRegs(gfxIp)
+    lsHsRegs(gfxIp),
+    primShaderRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
@@ -290,8 +290,8 @@ PipelineNggVsTsFsRegConfig::PipelineNggVsTsFsRegConfig(
 PipelineNggVsGsFsRegConfig::PipelineNggVsGsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_primShaderRegs(gfxIp),
-    m_psRegs(gfxIp)
+    primShaderRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);
@@ -302,9 +302,9 @@ PipelineNggVsGsFsRegConfig::PipelineNggVsGsFsRegConfig(
 PipelineNggVsTsGsFsRegConfig::PipelineNggVsTsGsFsRegConfig(
     GfxIpVersion gfxIp) // Graphics IP version info
     :
-    m_lsHsRegs(gfxIp),
-    m_primShaderRegs(gfxIp),
-    m_psRegs(gfxIp)
+    lsHsRegs(gfxIp),
+    primShaderRegs(gfxIp),
+    psRegs(gfxIp)
 {
     INIT_REG(VGT_SHADER_STAGES_EN);
     INIT_REG_GFX10_PLUS(gfxIp.major, IA_MULTI_VGT_PARAM_PIPED);

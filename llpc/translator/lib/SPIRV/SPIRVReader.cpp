@@ -1109,22 +1109,47 @@ Type *SPIRVToLLVM::transType(
                    StructType::get(*Context, {transType(SIT->getImageType()),
                                               getBuilder()->GetSamplerDescTy()}));
   }
-#define HANDLE_OPCODE(op) case (op): {                                         \
-    Type *NewTy = transTypeWithOpcode<op>(T, MatrixStride, ColumnMajor,        \
-      ParentIsPointer, ExplicitlyLaidOut);                                     \
-    return ParentIsPointer ? NewTy : mapType(T, NewTy);                        \
+
+  case OpTypeArray: {
+    Type *NewTy = transTypeWithOpcode<OpTypeArray>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
   }
-
-  HANDLE_OPCODE(OpTypeArray);
-  HANDLE_OPCODE(OpTypeBool);
-  HANDLE_OPCODE(OpTypeForwardPointer);
-  HANDLE_OPCODE(OpTypeMatrix);
-  HANDLE_OPCODE(OpTypePointer);
-  HANDLE_OPCODE(OpTypeRuntimeArray);
-  HANDLE_OPCODE(OpTypeStruct);
-  HANDLE_OPCODE(OpTypeVector);
-
-#undef HANDLE_OPCODE
+  case OpTypeBool: {
+    Type *NewTy = transTypeWithOpcode<OpTypeBool>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
+  case OpTypeForwardPointer: {
+    Type *NewTy = transTypeWithOpcode<OpTypeForwardPointer>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
+  case OpTypeMatrix: {
+    Type *NewTy = transTypeWithOpcode<OpTypeMatrix>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
+  case OpTypePointer: {
+    Type *NewTy = transTypeWithOpcode<OpTypePointer>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
+  case OpTypeRuntimeArray: {
+    Type *NewTy = transTypeWithOpcode<OpTypeRuntimeArray>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
+  case OpTypeStruct: {
+    Type *NewTy = transTypeWithOpcode<OpTypeStruct>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
+  case OpTypeVector: {
+    Type *NewTy = transTypeWithOpcode<OpTypeVector>(
+        T, MatrixStride, ColumnMajor, ParentIsPointer, ExplicitlyLaidOut);
+    return ParentIsPointer ? NewTy : mapType(T, NewTy);
+  }
 
   default: {
     llvm_unreachable("Not implemented");
@@ -4760,16 +4785,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   case OpLabel:
     return mapValue(BV, BasicBlock::Create(*Context, BV->getName(), F));
 
-#define HANDLE_OPCODE(op) case (op):  \
-  if (BB) {                           \
-    getBuilder()->SetInsertPoint(BB); \
-    updateBuilderDebugLoc(BV, F);     \
-  }                                   \
-  return mapValue(BV, transValueWithOpcode<op>(BV))
-
-  HANDLE_OPCODE(OpVariable);
-
-#undef HANDLE_OPCODE
+  case (OpVariable):
+    if (BB) {
+      getBuilder()->SetInsertPoint(BB);
+      updateBuilderDebugLoc(BV, F);
+    }
+    return mapValue(BV, transValueWithOpcode<OpVariable>(BV));
 
   default:
     // do nothing
@@ -5556,109 +5577,202 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *BV, Function *F,
   }
 #endif
 
-#define HANDLE_OPCODE(op) case (op): \
-  return mapValue(BV, transValueWithOpcode<op>(BV))
-
-  HANDLE_OPCODE(OpAtomicLoad);
-  HANDLE_OPCODE(OpAtomicStore);
-  HANDLE_OPCODE(OpAtomicExchange);
-  HANDLE_OPCODE(OpAtomicCompareExchange);
-  HANDLE_OPCODE(OpAtomicIIncrement);
-  HANDLE_OPCODE(OpAtomicIDecrement);
-  HANDLE_OPCODE(OpAtomicIAdd);
-  HANDLE_OPCODE(OpAtomicISub);
-  HANDLE_OPCODE(OpAtomicSMin);
-  HANDLE_OPCODE(OpAtomicUMin);
-  HANDLE_OPCODE(OpAtomicSMax);
-  HANDLE_OPCODE(OpAtomicUMax);
-  HANDLE_OPCODE(OpAtomicAnd);
-  HANDLE_OPCODE(OpAtomicOr);
-  HANDLE_OPCODE(OpAtomicXor);
-  HANDLE_OPCODE(OpCopyMemory);
-  HANDLE_OPCODE(OpLoad);
-  HANDLE_OPCODE(OpStore);
-  HANDLE_OPCODE(OpEndPrimitive);
-  HANDLE_OPCODE(OpEndStreamPrimitive);
-  HANDLE_OPCODE(OpAccessChain);
-  HANDLE_OPCODE(OpArrayLength);
-  HANDLE_OPCODE(OpInBoundsAccessChain);
-  HANDLE_OPCODE(OpPtrAccessChain);
-  HANDLE_OPCODE(OpInBoundsPtrAccessChain);
-  HANDLE_OPCODE(OpImage);
-  HANDLE_OPCODE(OpSampledImage);
-  HANDLE_OPCODE(OpKill);
-  HANDLE_OPCODE(OpReadClockKHR);
-  HANDLE_OPCODE(OpGroupAll);
-  HANDLE_OPCODE(OpGroupAny);
-  HANDLE_OPCODE(OpGroupBroadcast);
-  HANDLE_OPCODE(OpGroupIAdd);
-  HANDLE_OPCODE(OpGroupFAdd);
-  HANDLE_OPCODE(OpGroupFMin);
-  HANDLE_OPCODE(OpGroupUMin);
-  HANDLE_OPCODE(OpGroupSMin);
-  HANDLE_OPCODE(OpGroupFMax);
-  HANDLE_OPCODE(OpGroupUMax);
-  HANDLE_OPCODE(OpGroupSMax);
-  HANDLE_OPCODE(OpGroupNonUniformElect);
-  HANDLE_OPCODE(OpGroupNonUniformAll);
-  HANDLE_OPCODE(OpGroupNonUniformAny);
-  HANDLE_OPCODE(OpGroupNonUniformAllEqual);
-  HANDLE_OPCODE(OpGroupNonUniformBroadcast);
-  HANDLE_OPCODE(OpGroupNonUniformBroadcastFirst);
-  HANDLE_OPCODE(OpGroupNonUniformBallot);
-  HANDLE_OPCODE(OpGroupNonUniformInverseBallot);
-  HANDLE_OPCODE(OpGroupNonUniformBallotBitExtract);
-  HANDLE_OPCODE(OpGroupNonUniformBallotBitCount);
-  HANDLE_OPCODE(OpGroupNonUniformBallotFindLSB);
-  HANDLE_OPCODE(OpGroupNonUniformBallotFindMSB);
-  HANDLE_OPCODE(OpGroupNonUniformShuffle);
-  HANDLE_OPCODE(OpGroupNonUniformShuffleXor);
-  HANDLE_OPCODE(OpGroupNonUniformShuffleUp);
-  HANDLE_OPCODE(OpGroupNonUniformShuffleDown);
-  HANDLE_OPCODE(OpGroupNonUniformIAdd);
-  HANDLE_OPCODE(OpGroupNonUniformFAdd);
-  HANDLE_OPCODE(OpGroupNonUniformIMul);
-  HANDLE_OPCODE(OpGroupNonUniformFMul);
-  HANDLE_OPCODE(OpGroupNonUniformSMin);
-  HANDLE_OPCODE(OpGroupNonUniformUMin);
-  HANDLE_OPCODE(OpGroupNonUniformFMin);
-  HANDLE_OPCODE(OpGroupNonUniformSMax);
-  HANDLE_OPCODE(OpGroupNonUniformUMax);
-  HANDLE_OPCODE(OpGroupNonUniformFMax);
-  HANDLE_OPCODE(OpGroupNonUniformBitwiseAnd);
-  HANDLE_OPCODE(OpGroupNonUniformBitwiseOr);
-  HANDLE_OPCODE(OpGroupNonUniformBitwiseXor);
-  HANDLE_OPCODE(OpGroupNonUniformLogicalAnd);
-  HANDLE_OPCODE(OpGroupNonUniformLogicalOr);
-  HANDLE_OPCODE(OpGroupNonUniformLogicalXor);
-  HANDLE_OPCODE(OpGroupNonUniformQuadBroadcast);
-  HANDLE_OPCODE(OpGroupNonUniformQuadSwap);
-  HANDLE_OPCODE(OpSubgroupBallotKHR);
-  HANDLE_OPCODE(OpSubgroupFirstInvocationKHR);
-  HANDLE_OPCODE(OpSubgroupAllKHR);
-  HANDLE_OPCODE(OpSubgroupAnyKHR);
-  HANDLE_OPCODE(OpSubgroupAllEqualKHR);
-  HANDLE_OPCODE(OpSubgroupReadInvocationKHR);
-  HANDLE_OPCODE(OpGroupIAddNonUniformAMD);
-  HANDLE_OPCODE(OpGroupFAddNonUniformAMD);
-  HANDLE_OPCODE(OpGroupFMinNonUniformAMD);
-  HANDLE_OPCODE(OpGroupUMinNonUniformAMD);
-  HANDLE_OPCODE(OpGroupSMinNonUniformAMD);
-  HANDLE_OPCODE(OpGroupFMaxNonUniformAMD);
-  HANDLE_OPCODE(OpGroupUMaxNonUniformAMD);
-  HANDLE_OPCODE(OpGroupSMaxNonUniformAMD);
-  HANDLE_OPCODE(OpTranspose);
-  HANDLE_OPCODE(OpExtInst);
-  HANDLE_OPCODE(OpMatrixTimesScalar);
-  HANDLE_OPCODE(OpVectorTimesMatrix);
-  HANDLE_OPCODE(OpMatrixTimesVector);
-  HANDLE_OPCODE(OpMatrixTimesMatrix);
-  HANDLE_OPCODE(OpOuterProduct);
-  HANDLE_OPCODE(OpDot);
-  HANDLE_OPCODE(OpDemoteToHelperInvocationEXT);
-  HANDLE_OPCODE(OpIsHelperInvocationEXT);
-
-#undef HANDLE_OPCODE
+  case OpAtomicLoad:
+    return mapValue(BV, transValueWithOpcode<OpAtomicLoad>(BV));
+  case OpAtomicStore:
+    return mapValue(BV, transValueWithOpcode<OpAtomicStore>(BV));
+  case OpAtomicExchange:
+    return mapValue(BV, transValueWithOpcode<OpAtomicExchange>(BV));
+  case OpAtomicCompareExchange:
+    return mapValue(BV, transValueWithOpcode<OpAtomicCompareExchange>(BV));
+  case OpAtomicIIncrement:
+    return mapValue(BV, transValueWithOpcode<OpAtomicIIncrement>(BV));
+  case OpAtomicIDecrement:
+    return mapValue(BV, transValueWithOpcode<OpAtomicIDecrement>(BV));
+  case OpAtomicIAdd:
+    return mapValue(BV, transValueWithOpcode<OpAtomicIAdd>(BV));
+  case OpAtomicISub:
+    return mapValue(BV, transValueWithOpcode<OpAtomicISub>(BV));
+  case OpAtomicSMin:
+    return mapValue(BV, transValueWithOpcode<OpAtomicSMin>(BV));
+  case OpAtomicUMin:
+    return mapValue(BV, transValueWithOpcode<OpAtomicUMin>(BV));
+  case OpAtomicSMax:
+    return mapValue(BV, transValueWithOpcode<OpAtomicSMax>(BV));
+  case OpAtomicUMax:
+    return mapValue(BV, transValueWithOpcode<OpAtomicUMax>(BV));
+  case OpAtomicAnd:
+    return mapValue(BV, transValueWithOpcode<OpAtomicAnd>(BV));
+  case OpAtomicOr:
+    return mapValue(BV, transValueWithOpcode<OpAtomicOr>(BV));
+  case OpAtomicXor:
+    return mapValue(BV, transValueWithOpcode<OpAtomicXor>(BV));
+  case OpCopyMemory:
+    return mapValue(BV, transValueWithOpcode<OpCopyMemory>(BV));
+  case OpLoad:
+    return mapValue(BV, transValueWithOpcode<OpLoad>(BV));
+  case OpStore:
+    return mapValue(BV, transValueWithOpcode<OpStore>(BV));
+  case OpEndPrimitive:
+    return mapValue(BV, transValueWithOpcode<OpEndPrimitive>(BV));
+  case OpEndStreamPrimitive:
+    return mapValue(BV, transValueWithOpcode<OpEndStreamPrimitive>(BV));
+  case OpAccessChain:
+    return mapValue(BV, transValueWithOpcode<OpAccessChain>(BV));
+  case OpArrayLength:
+    return mapValue(BV, transValueWithOpcode<OpArrayLength>(BV));
+  case OpInBoundsAccessChain:
+    return mapValue(BV, transValueWithOpcode<OpInBoundsAccessChain>(BV));
+  case OpPtrAccessChain:
+    return mapValue(BV, transValueWithOpcode<OpPtrAccessChain>(BV));
+  case OpInBoundsPtrAccessChain:
+    return mapValue(BV, transValueWithOpcode<OpInBoundsPtrAccessChain>(BV));
+  case OpImage:
+    return mapValue(BV, transValueWithOpcode<OpImage>(BV));
+  case OpSampledImage:
+    return mapValue(BV, transValueWithOpcode<OpSampledImage>(BV));
+  case OpKill:
+    return mapValue(BV, transValueWithOpcode<OpKill>(BV));
+  case OpReadClockKHR:
+    return mapValue(BV, transValueWithOpcode<OpReadClockKHR>(BV));
+  case OpGroupAll:
+    return mapValue(BV, transValueWithOpcode<OpGroupAll>(BV));
+  case OpGroupAny:
+    return mapValue(BV, transValueWithOpcode<OpGroupAny>(BV));
+  case OpGroupBroadcast:
+    return mapValue(BV, transValueWithOpcode<OpGroupBroadcast>(BV));
+  case OpGroupIAdd:
+    return mapValue(BV, transValueWithOpcode<OpGroupIAdd>(BV));
+  case OpGroupFAdd:
+    return mapValue(BV, transValueWithOpcode<OpGroupFAdd>(BV));
+  case OpGroupFMin:
+    return mapValue(BV, transValueWithOpcode<OpGroupFMin>(BV));
+  case OpGroupUMin:
+    return mapValue(BV, transValueWithOpcode<OpGroupUMin>(BV));
+  case OpGroupSMin:
+    return mapValue(BV, transValueWithOpcode<OpGroupSMin>(BV));
+  case OpGroupFMax:
+    return mapValue(BV, transValueWithOpcode<OpGroupFMax>(BV));
+  case OpGroupUMax:
+    return mapValue(BV, transValueWithOpcode<OpGroupUMax>(BV));
+  case OpGroupSMax:
+    return mapValue(BV, transValueWithOpcode<OpGroupSMax>(BV));
+  case OpGroupNonUniformElect:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformElect>(BV));
+  case OpGroupNonUniformAll:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformAll>(BV));
+  case OpGroupNonUniformAny:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformAny>(BV));
+  case OpGroupNonUniformAllEqual:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformAllEqual>(BV));
+  case OpGroupNonUniformBroadcast:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBroadcast>(BV));
+  case OpGroupNonUniformBroadcastFirst:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(BV));
+  case OpGroupNonUniformBallot:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBallot>(BV));
+  case OpGroupNonUniformInverseBallot:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformInverseBallot>(BV));
+  case OpGroupNonUniformBallotBitExtract:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBallotBitExtract>(BV));
+  case OpGroupNonUniformBallotBitCount:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBallotBitCount>(BV));
+  case OpGroupNonUniformBallotFindLSB:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBallotFindLSB>(BV));
+  case OpGroupNonUniformBallotFindMSB:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBallotFindMSB>(BV));
+  case OpGroupNonUniformShuffle:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformShuffle>(BV));
+  case OpGroupNonUniformShuffleXor:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformShuffleXor>(BV));
+  case OpGroupNonUniformShuffleUp:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformShuffleUp>(BV));
+  case OpGroupNonUniformShuffleDown:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformShuffleDown>(BV));
+  case OpGroupNonUniformIAdd:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformIAdd>(BV));
+  case OpGroupNonUniformFAdd:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformFAdd>(BV));
+  case OpGroupNonUniformIMul:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformIMul>(BV));
+  case OpGroupNonUniformFMul:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformFMul>(BV));
+  case OpGroupNonUniformSMin:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformSMin>(BV));
+  case OpGroupNonUniformUMin:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformUMin>(BV));
+  case OpGroupNonUniformFMin:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformFMin>(BV));
+  case OpGroupNonUniformSMax:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformSMax>(BV));
+  case OpGroupNonUniformUMax:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformUMax>(BV));
+  case OpGroupNonUniformFMax:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformFMax>(BV));
+  case OpGroupNonUniformBitwiseAnd:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBitwiseAnd>(BV));
+  case OpGroupNonUniformBitwiseOr:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBitwiseOr>(BV));
+  case OpGroupNonUniformBitwiseXor:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformBitwiseXor>(BV));
+  case OpGroupNonUniformLogicalAnd:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformLogicalAnd>(BV));
+  case OpGroupNonUniformLogicalOr:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformLogicalOr>(BV));
+  case OpGroupNonUniformLogicalXor:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformLogicalXor>(BV));
+  case OpGroupNonUniformQuadBroadcast:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformQuadBroadcast>(BV));
+  case OpGroupNonUniformQuadSwap:
+    return mapValue(BV, transValueWithOpcode<OpGroupNonUniformQuadSwap>(BV));
+  case OpSubgroupBallotKHR:
+    return mapValue(BV, transValueWithOpcode<OpSubgroupBallotKHR>(BV));
+  case OpSubgroupFirstInvocationKHR:
+    return mapValue(BV, transValueWithOpcode<OpSubgroupFirstInvocationKHR>(BV));
+  case OpSubgroupAllKHR:
+    return mapValue(BV, transValueWithOpcode<OpSubgroupAllKHR>(BV));
+  case OpSubgroupAnyKHR:
+    return mapValue(BV, transValueWithOpcode<OpSubgroupAnyKHR>(BV));
+  case OpSubgroupAllEqualKHR:
+    return mapValue(BV, transValueWithOpcode<OpSubgroupAllEqualKHR>(BV));
+  case OpSubgroupReadInvocationKHR:
+    return mapValue(BV, transValueWithOpcode<OpSubgroupReadInvocationKHR>(BV));
+  case OpGroupIAddNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupIAddNonUniformAMD>(BV));
+  case OpGroupFAddNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupFAddNonUniformAMD>(BV));
+  case OpGroupFMinNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupFMinNonUniformAMD>(BV));
+  case OpGroupUMinNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupUMinNonUniformAMD>(BV));
+  case OpGroupSMinNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupSMinNonUniformAMD>(BV));
+  case OpGroupFMaxNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupFMaxNonUniformAMD>(BV));
+  case OpGroupUMaxNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupUMaxNonUniformAMD>(BV));
+  case OpGroupSMaxNonUniformAMD:
+    return mapValue(BV, transValueWithOpcode<OpGroupSMaxNonUniformAMD>(BV));
+  case OpTranspose:
+    return mapValue(BV, transValueWithOpcode<OpTranspose>(BV));
+  case OpExtInst:
+    return mapValue(BV, transValueWithOpcode<OpExtInst>(BV));
+  case OpMatrixTimesScalar:
+    return mapValue(BV, transValueWithOpcode<OpMatrixTimesScalar>(BV));
+  case OpVectorTimesMatrix:
+    return mapValue(BV, transValueWithOpcode<OpVectorTimesMatrix>(BV));
+  case OpMatrixTimesVector:
+    return mapValue(BV, transValueWithOpcode<OpMatrixTimesVector>(BV));
+  case OpMatrixTimesMatrix:
+    return mapValue(BV, transValueWithOpcode<OpMatrixTimesMatrix>(BV));
+  case OpOuterProduct:
+    return mapValue(BV, transValueWithOpcode<OpOuterProduct>(BV));
+  case OpDot:
+    return mapValue(BV, transValueWithOpcode<OpDot>(BV));
+  case OpDemoteToHelperInvocationEXT:
+    return mapValue(BV, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(BV));
+  case OpIsHelperInvocationEXT:
+    return mapValue(BV, transValueWithOpcode<OpIsHelperInvocationEXT>(BV));
 
   default: {
     auto OC = BV->getOpCode();
