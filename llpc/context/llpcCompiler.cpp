@@ -367,11 +367,11 @@ Compiler::Compiler(
     auxCreateInfo.gfxIp           = m_gfxIp;
     auxCreateInfo.hash            = m_optionHash;
     auxCreateInfo.pExecutableName = cl::ExecutableName.c_str();
-    auxCreateInfo.pCacheFilePath  = cl::ShaderCacheFileDir.c_str();
+    auxCreateInfo.cacheFilePath   = cl::ShaderCacheFileDir.c_str();
     if (cl::ShaderCacheFileDir.empty())
     {
 #ifdef WIN_OS
-        auxCreateInfo.pCacheFilePath  = getenv("LOCALAPPDATA");
+        auxCreateInfo.cacheFilePath  = getenv("LOCALAPPDATA");
 #else
         llvm_unreachable("Should never be called!");
 #endif
@@ -1339,7 +1339,7 @@ void GraphicsShaderCacheChecker::UpdateRootUserDateOffset(
     auto result = writer.ReadFromBuffer(pPipelineElf->data(), pPipelineElf->size());
     assert(result == Result::Success);
     (void(result)); // unused
-    writer.UpdateElfBinary(m_pContext, pPipelineElf);
+    writer.updateElfBinary(m_pContext, pPipelineElf);
 }
 
 // =====================================================================================================================
@@ -1407,7 +1407,7 @@ void GraphicsShaderCacheChecker::UpdateAndMerge(
         auto result = writer.ReadFromBuffer(nonFragmentElf.pCode, nonFragmentElf.codeSize);
         assert(result == Result::Success);
         (void(result)); // unused
-        writer.MergeElfBinary(m_pContext, &fragmentElf, pOutputPipelineElf);
+        writer.mergeElfBinary(m_pContext, &fragmentElf, pOutputPipelineElf);
     }
 }
 
@@ -2149,7 +2149,7 @@ void Compiler::LinkRelocatableShaderElf(
             }
         }
 
-        result = writer.LinkGraphicsRelocatableElf({&vsReader, &fsReader}, pContext);
+        result = writer.linkGraphicsRelocatableElf({&vsReader, &fsReader}, pContext);
     }
     else
     {
@@ -2160,14 +2160,14 @@ void Compiler::LinkRelocatableShaderElf(
         {
             return;
         }
-        result = writer.LinkComputeRelocatableElf(csReader, pContext);
+        result = writer.linkComputeRelocatableElf(csReader, pContext);
     }
 
     if (result != Result::Success)
     {
         return;
     }
-    writer.WriteToBuffer(pPipelineElf);
+    writer.writeToBuffer(pPipelineElf);
 }
 
 // =====================================================================================================================

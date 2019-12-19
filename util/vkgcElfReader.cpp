@@ -183,7 +183,7 @@ Result ElfReader<Elf>::GetSectionData(
 // =====================================================================================================================
 // Gets the count of symbols in the symbol table section.
 template<class Elf>
-uint32_t ElfReader<Elf>::GetSymbolCount() const
+uint32_t ElfReader<Elf>::getSymbolCount() const
 {
     uint32_t symCount = 0;
     if (m_symSecIdx >= 0)
@@ -197,7 +197,7 @@ uint32_t ElfReader<Elf>::GetSymbolCount() const
 // =====================================================================================================================
 // Gets info of the symbol in the symbol table section according to the specified index.
 template<class Elf>
-void ElfReader<Elf>::GetSymbol(
+void ElfReader<Elf>::getSymbol(
     uint32_t   idx,       // Symbol index
     ElfSymbol* pSymbol)   // [out] Info of the symbol
 {
@@ -216,7 +216,7 @@ void ElfReader<Elf>::GetSymbol(
 // =====================================================================================================================
 // Gets the count of relocations in the relocation section.
 template<class Elf>
-uint32_t ElfReader<Elf>::GetRelocationCount()
+uint32_t ElfReader<Elf>::getRelocationCount()
 {
     uint32_t relocCount = 0;
     if (m_relocSecIdx >= 0)
@@ -230,7 +230,7 @@ uint32_t ElfReader<Elf>::GetRelocationCount()
 // =====================================================================================================================
 // Gets info of the relocation in the relocation section according to the specified index.
 template<class Elf>
-void ElfReader<Elf>::GetRelocation(
+void ElfReader<Elf>::getRelocation(
     uint32_t  idx,      // Relocation index
     ElfReloc* pReloc)   // [out] Info of the relocation
 {
@@ -244,7 +244,7 @@ void ElfReader<Elf>::GetRelocation(
 // =====================================================================================================================
 // Gets the count of Elf section.
 template<class Elf>
-uint32_t ElfReader<Elf>::GetSectionCount()
+uint32_t ElfReader<Elf>::getSectionCount()
 {
     return static_cast<uint32_t>(m_sections.size());
 }
@@ -252,7 +252,7 @@ uint32_t ElfReader<Elf>::GetSectionCount()
 // =====================================================================================================================
 // Gets section data by section index.
 template<class Elf>
-Result ElfReader<Elf>::GetSectionDataBySectionIndex(
+Result ElfReader<Elf>::getSectionDataBySectionIndex(
     uint32_t           secIdx,          // Section index
     SectionBuffer**    ppSectionData    // [out] Section data
     ) const
@@ -269,7 +269,7 @@ Result ElfReader<Elf>::GetSectionDataBySectionIndex(
 // =====================================================================================================================
 // Gets section data by sorting index (ordered map).
 template<class Elf>
-Result ElfReader<Elf>::GetSectionDataBySortingIndex(
+Result ElfReader<Elf>::getSectionDataBySortingIndex(
     uint32_t           sortIdx,         // Sorting index
     uint32_t*          pSecIdx,         // [out] Section index
     SectionBuffer**    ppSectionData    // [out] Section data
@@ -304,7 +304,7 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
         const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->pData);
 
         auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSection->pData);
-        uint32_t symCount = GetSymbolCount();
+        uint32_t symCount = getSymbolCount();
         ElfSymbol symbol = {};
 
         for (uint32_t idx = 0; idx < symCount; ++idx)
@@ -333,14 +333,14 @@ void ElfReader<Elf>::GetSymbolsBySectionIndex(
 // =====================================================================================================================
 // Checks whether the input name is a valid symbol.
 template<class Elf>
-bool ElfReader<Elf>::IsValidSymbol(
+bool ElfReader<Elf>::isValidSymbol(
     const char* pSymbolName)  // [in] Symbol name
 {
     auto& pSection = m_sections[m_symSecIdx];
     const char* pStrTab = reinterpret_cast<const char*>(m_sections[m_strtabSecIdx]->pData);
 
     auto symbols = reinterpret_cast<const typename Elf::Symbol*>(pSection->pData);
-    uint32_t symCount = GetSymbolCount();
+    uint32_t symCount = getSymbolCount();
     bool findSymbol = false;
     for (uint32_t idx = 0; idx < symCount; ++idx)
     {
@@ -357,7 +357,7 @@ bool ElfReader<Elf>::IsValidSymbol(
 // =====================================================================================================================
 // Gets note according to note type
 template<class Elf>
-ElfNote ElfReader<Elf>::GetNote(
+ElfNote ElfReader<Elf>::getNote(
     Util::Abi::PipelineAbiNoteType noteType // Note type
     ) const
 {
@@ -388,7 +388,7 @@ ElfNote ElfReader<Elf>::GetNote(
 // =====================================================================================================================
 // Initialize MsgPack document and related visitor iterators
 template<class Elf>
-void ElfReader<Elf>::InitMsgPackDocument(
+void ElfReader<Elf>::initMsgPackDocument(
     const void* pBuffer,       // [in] Message buffer
     uint32_t    sizeInBytes)   // Buffer size in bytes
 {
@@ -409,7 +409,7 @@ void ElfReader<Elf>::InitMsgPackDocument(
 // =====================================================================================================================
 // Advances the MsgPack context to the next item token and return true if success.
 template<class Elf>
-bool ElfReader<Elf>::GetNextMsgNode()
+bool ElfReader<Elf>::getNextMsgNode()
 {
     if (m_iteratorStack.empty())
     {
@@ -547,7 +547,7 @@ bool ElfReader<Elf>::GetNextMsgNode()
 // =====================================================================================================================
 // Gets MsgPack node.
 template<class Elf>
-const llvm::msgpack::DocNode* ElfReader<Elf>::GetMsgNode() const
+const llvm::msgpack::DocNode* ElfReader<Elf>::getMsgNode() const
 {
     assert(m_iteratorStack.size() > 0);
     auto pCurIter = &(m_iteratorStack.back());
@@ -572,7 +572,7 @@ const llvm::msgpack::DocNode* ElfReader<Elf>::GetMsgNode() const
 // =====================================================================================================================
 // Gets the map level of current message item.
 template<class Elf>
-uint32_t ElfReader<Elf>::GetMsgMapLevel() const
+uint32_t ElfReader<Elf>::getMsgMapLevel() const
 {
     return m_msgPackMapLevel;
 }
@@ -580,7 +580,7 @@ uint32_t ElfReader<Elf>::GetMsgMapLevel() const
 // =====================================================================================================================
 // Gets the status of message packer iterator.
 template<class Elf>
-MsgPackIteratorStatus ElfReader<Elf>::GetMsgIteratorStatus() const
+MsgPackIteratorStatus ElfReader<Elf>::getMsgIteratorStatus() const
 {
     return m_iteratorStack.back().status;
 }
