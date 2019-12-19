@@ -38,7 +38,7 @@ namespace lgc
 
 //======================================================================================================================
 // Get pointer to stream for LLPC_OUTS, or nullptr if disabled.
-raw_ostream* GetLgcOuts()
+raw_ostream* getLgcOuts()
 {
     return BuilderContext::GetLgcOuts();
 }

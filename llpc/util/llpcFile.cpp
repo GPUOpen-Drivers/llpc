@@ -41,16 +41,16 @@ namespace Llpc
 // =====================================================================================================================
 // Opens a file stream for read, write or append access.
 Result File::Open(
-    const char*  pFilename,    // [in] Name of file to open
+    const char*  filename,     // [in] Name of file to open
     uint32_t     accessFlags)  // ORed mask of FileAccessMode values describing how the file will be used
 {
     Result result = Result::Success;
 
-    if (m_pFileHandle != nullptr)
+    if (m_fileHandle != nullptr)
     {
         result = Result::ErrorUnavailable;
     }
-    else if (pFilename == nullptr)
+    else if (filename == nullptr)
     {
         result = Result::ErrorInvalidPointer;
     }
@@ -119,8 +119,8 @@ Result File::Open(
         if (result == Result::Success)
         {
             // Just use the traditional fopen.
-            m_pFileHandle = fopen(pFilename, &fileMode[0]);
-            if (m_pFileHandle == nullptr)
+            m_fileHandle = fopen(filename, &fileMode[0]);
+            if (m_fileHandle == nullptr)
             {
                 result = Result::ErrorUnknown;
             }
@@ -134,10 +134,10 @@ Result File::Open(
 // Closes the file handle if still open.
 void File::Close()
 {
-    if (m_pFileHandle != nullptr)
+    if (m_fileHandle != nullptr)
     {
-        fclose(m_pFileHandle);
-        m_pFileHandle = nullptr;
+        fclose(m_fileHandle);
+        m_fileHandle = nullptr;
     }
 }
 
@@ -149,7 +149,7 @@ Result File::Write(
 {
     Result result = Result::Success;
 
-    if (m_pFileHandle == nullptr)
+    if (m_fileHandle == nullptr)
     {
         result = Result::ErrorUnavailable;
     }
@@ -163,7 +163,7 @@ Result File::Write(
     }
     else
     {
-        if (fwrite(pBuffer, 1, bufferSize, m_pFileHandle) != bufferSize)
+        if (fwrite(pBuffer, 1, bufferSize, m_fileHandle) != bufferSize)
         {
             result = Result::ErrorUnknown;
         }
@@ -181,7 +181,7 @@ Result File::Read(
 {
     Result result = Result::Success;
 
-    if (m_pFileHandle == nullptr)
+    if (m_fileHandle == nullptr)
     {
         result = Result::ErrorUnavailable;
     }
@@ -195,7 +195,7 @@ Result File::Read(
     }
     else
     {
-        const size_t bytesRead = fread(pBuffer, 1, bufferSize, m_pFileHandle);
+        const size_t bytesRead = fread(pBuffer, 1, bufferSize, m_fileHandle);
 
         if (bytesRead != bufferSize)
         {
@@ -220,7 +220,7 @@ Result File::ReadLine(
 {
     Result result = Result::ErrorInvalidValue;
 
-    if (m_pFileHandle == nullptr)
+    if (m_fileHandle == nullptr)
     {
         result = Result::ErrorUnavailable;
     }
@@ -239,7 +239,7 @@ Result File::ReadLine(
 
         while (bytesRead < bufferSize)
         {
-            int32_t c = getc(m_pFileHandle);
+            int32_t c = getc(m_fileHandle);
             if (c == '\n')
             {
                 result = Result::Success;
@@ -266,19 +266,19 @@ Result File::ReadLine(
 // =====================================================================================================================
 // Prints a formatted string to the file.
 Result File::Printf(
-    const char* pFormatStr,  // [in] Printf-style format string
+    const char* formatStr,   // [in] Printf-style format string
     ...                      // Printf-style argument list
     ) const
 {
     Result result = Result::ErrorUnavailable;
 
-    if (m_pFileHandle != nullptr)
+    if (m_fileHandle != nullptr)
     {
         va_list argList;
-        va_start(argList, pFormatStr);
+        va_start(argList, formatStr);
 
         // Just use the traditional vfprintf.
-        if (vfprintf(m_pFileHandle, pFormatStr, argList) >= 0)
+        if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
         {
             result = Result::Success;
         }
@@ -296,15 +296,15 @@ Result File::Printf(
 // =====================================================================================================================
 // Prints a formatted string to the file.
 Result File::VPrintf(
-    const char* pFormatStr,  // [in] Printf-style format string
+    const char* formatStr,   // [in] Printf-style format string
     va_list     argList)     // Pre-started variable argument list
 {
     Result result = Result::ErrorUnavailable;
 
-    if (m_pFileHandle != nullptr)
+    if (m_fileHandle != nullptr)
     {
         // Just use the traditional vfprintf.
-        if (vfprintf(m_pFileHandle, pFormatStr, argList) >= 0)
+        if (vfprintf(m_fileHandle, formatStr, argList) >= 0)
         {
             result = Result::Success;
         }
@@ -323,13 +323,13 @@ Result File::Flush() const
 {
     Result result = Result::Success;
 
-    if (m_pFileHandle == nullptr)
+    if (m_fileHandle == nullptr)
     {
         result = Result::ErrorUnavailable;
     }
     else
     {
-        fflush(m_pFileHandle);
+        fflush(m_fileHandle);
     }
 
     return result;
@@ -339,9 +339,9 @@ Result File::Flush() const
 // Sets the file position to the beginning of the file.
 void File::Rewind()
 {
-    if (m_pFileHandle != nullptr)
+    if (m_fileHandle != nullptr)
     {
-        ::rewind(m_pFileHandle);
+        ::rewind(m_fileHandle);
     }
 }
 
@@ -352,9 +352,9 @@ void File::Seek(
     bool   fromOrigin)      // If true, the seek will be relative to the file origin;
                             // if false, it will be from the current position
 {
-    if (m_pFileHandle != nullptr)
+    if (m_fileHandle != nullptr)
     {
-        int32_t ret = fseek(m_pFileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
+        int32_t ret = fseek(m_fileHandle, offset, fromOrigin ? SEEK_SET : SEEK_CUR);
 
         assert(ret == 0);
         (void(ret)); // unused
@@ -364,11 +364,11 @@ void File::Seek(
 // =====================================================================================================================
 // Returns true if a file with the given name exists.
 size_t File::GetFileSize(
-    const char* pFilename)     // [in] Name of the file to check
+    const char* filename)     // [in] Name of the file to check
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
     struct stat fileStatus = {};
-    const int32_t result = stat(pFilename, &fileStatus);
+    const int32_t result = stat(filename, &fileStatus);
     // If the function call to retrieve file status information fails (returns 0), then the file does not exist (or is
     // inaccessible in some other manner).
     return (result == 0) ? fileStatus.st_size : 0;
@@ -377,11 +377,11 @@ size_t File::GetFileSize(
 // =====================================================================================================================
 // Returns true if a file with the given name exists.
 bool File::Exists(
-    const char* pFilename)      // [in] Name of the file to check
+    const char* filename)      // [in] Name of the file to check
 {
     // ...however, on other compilers, they are named 'stat' (no underbar).
     struct stat fileStatus = {};
-    const int32_t result = stat(pFilename, &fileStatus);
+    const int32_t result = stat(filename, &fileStatus);
     // If the function call to retrieve file status information fails (returns -1), then the file does not exist (or is
     // inaccessible in some other manner).
     return (result != -1);

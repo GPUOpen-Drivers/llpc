@@ -52,7 +52,7 @@ enum FileAccessMode : uint32_t
 class File
 {
 public:
-    File() : m_pFileHandle(nullptr) { }
+    File() : m_fileHandle(nullptr) { }
 
     // Closes the file if it is still open.
     ~File() { Close(); }
@@ -72,12 +72,12 @@ public:
     void Seek(int32_t offset, bool fromOrigin);
 
     // Returns true if the file is presently open.
-    bool IsOpen() const { return (m_pFileHandle != nullptr); }
+    bool IsOpen() const { return (m_fileHandle != nullptr); }
     // Gets handle of the file
-    const std::FILE* GetHandle() const { return m_pFileHandle; }
+    const std::FILE* GetHandle() const { return m_fileHandle; }
 
 private:
-    std::FILE* m_pFileHandle;      // File handle
+    std::FILE* m_fileHandle;      // File handle
 };
 
 } // Llpc

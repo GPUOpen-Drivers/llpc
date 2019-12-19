@@ -445,37 +445,37 @@ public:
     ~ElfReader();
 
     // Gets architecture-specific flags
-    uint32_t GetFlags() const { return m_header.e_flags; }
+    uint32_t getFlags() const { return m_header.e_flags; }
 
     // Gets graphics IP version info (used by ELF dump only)
-    GfxIpVersion GetGfxIpVersion() const { return m_gfxIp; }
+    GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
     Result ReadFromBuffer(const void* pBuffer, size_t* pBufSize);
 
     Result GetSectionData(const char* pName, const void** ppData, size_t* pDataLength) const;
 
-    uint32_t GetSectionCount();
-    Result GetSectionDataBySectionIndex(uint32_t secIdx, SectionBuffer** ppSectionData) const;
-    Result GetSectionDataBySortingIndex(uint32_t sortIdx, uint32_t* pSecIdx, SectionBuffer** ppSectionData) const;
-    Result GetTextSectionData(SectionBuffer** ppSectionData) const
+    uint32_t getSectionCount();
+    Result getSectionDataBySectionIndex(uint32_t secIdx, SectionBuffer** ppSectionData) const;
+    Result getSectionDataBySortingIndex(uint32_t sortIdx, uint32_t* pSecIdx, SectionBuffer** ppSectionData) const;
+    Result getTextSectionData(SectionBuffer** ppSectionData) const
     {
-        return GetSectionDataBySectionIndex(m_textSecIdx, ppSectionData);
+        return getSectionDataBySectionIndex(m_textSecIdx, ppSectionData);
     }
 
     // Determine if a section with the specified name is present in this ELF.
-    bool IsSectionPresent(const char* pName) const { return (m_map.find(pName) != m_map.end()); }
+    bool isSectionPresent(const char* pName) const { return (m_map.find(pName) != m_map.end()); }
 
-    uint32_t GetSymbolCount() const;
-    void GetSymbol(uint32_t idx, ElfSymbol* pSymbol);
+    uint32_t getSymbolCount() const;
+    void getSymbol(uint32_t idx, ElfSymbol* pSymbol);
 
-    bool IsValidSymbol(const char* pSymbolName);
+    bool isValidSymbol(const char* pSymbolName);
 
-    ElfNote GetNote(Util::Abi::PipelineAbiNoteType noteType) const;
+    ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType) const;
 
     void GetSymbolsBySectionIndex(uint32_t secIndx, std::vector<ElfSymbol>& secSymbols) const;
 
-    uint32_t GetRelocationCount();
-    void GetRelocation(uint32_t idx, ElfReloc* pReloc);
+    uint32_t getRelocationCount();
+    void getRelocation(uint32_t idx, ElfReloc* pReloc);
 
     // Gets the section index for the specified section name.
     int32_t GetSectionIndex(const char* pName) const
@@ -484,47 +484,47 @@ public:
         return (pEntry != m_map.end()) ? pEntry->second : InvalidValue;
     }
 
-    void InitMsgPackDocument(const void* pBuffer, uint32_t sizeInBytes);
+    void initMsgPackDocument(const void* pBuffer, uint32_t sizeInBytes);
 
-    bool GetNextMsgNode();
+    bool getNextMsgNode();
 
-    const llvm::msgpack::DocNode* GetMsgNode() const;
+    const llvm::msgpack::DocNode* getMsgNode() const;
 
-    MsgPackIteratorStatus GetMsgIteratorStatus() const;
+    MsgPackIteratorStatus getMsgIteratorStatus() const;
 
-    uint32_t GetMsgMapLevel() const;
+    uint32_t getMsgMapLevel() const;
 
-    const typename Elf::FormatHeader& GetHeader() const
+    const typename Elf::FormatHeader& getHeader() const
     {
         return m_header;
     }
 
-    const std::map<std::string, uint32_t>& GetMap() const
+    const std::map<std::string, uint32_t>& getMap() const
     {
         return m_map;
     }
 
-    const std::vector<SectionBuffer*>& GetSections() const
+    const std::vector<SectionBuffer*>& getSections() const
     {
         return m_sections;
     }
 
-    int32_t GetSymSecIdx() const
+    int32_t getSymSecIdx() const
     {
         return m_symSecIdx;
     }
 
-    int32_t GetRelocSecIdx() const
+    int32_t getRelocSecIdx() const
     {
         return m_relocSecIdx;
     }
 
-    int32_t GetStrtabSecIdx() const
+    int32_t getStrtabSecIdx() const
     {
         return m_strtabSecIdx;
     }
 
-    int32_t GetTextSecIdx() const
+    int32_t getTextSecIdx() const
     {
         return m_textSecIdx;
     }

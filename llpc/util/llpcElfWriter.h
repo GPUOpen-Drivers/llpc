@@ -65,7 +65,7 @@ public:
 
     ~ElfWriter();
 
-    static void MergeSection(const SectionBuffer* pSection1,
+    static void mergeSection(const SectionBuffer* pSection1,
                              size_t               section1Size,
                              const char*          pPrefixString1,
                              const SectionBuffer* pSection2,
@@ -73,21 +73,21 @@ public:
                              const char*          pPrefixString2,
                              SectionBuffer*       pNewSection);
 
-    static void MergeMetaNote(Context*       pContext,
+    static void mergeMetaNote(Context*       pContext,
                               const ElfNote* pNote1,
                               const ElfNote* pNote2,
                               ElfNote*       pNewNote);
 
-    static void UpdateMetaNote(Context*       pContext,
+    static void updateMetaNote(Context*       pContext,
                                const ElfNote* pNote,
                                ElfNote*       pNewNote);
 
     Result ReadFromBuffer(const void* pBuffer, size_t bufSize);
-    Result CopyFromReader(const ElfReader<Elf>& reader);
+    Result copyFromReader(const ElfReader<Elf>& reader);
 
-    void UpdateElfBinary(Context* pContext, ElfPackage* pPipelineElf);
+    void updateElfBinary(Context* pContext, ElfPackage* pPipelineElf);
 
-    void MergeElfBinary(Context*          pContext,
+    void mergeElfBinary(Context*          pContext,
                         const BinaryData* pFragmentElf,
                         ElfPackage*       pPipelineElf);
 
@@ -98,38 +98,38 @@ public:
         return (pEntry != m_map.end()) ? pEntry->second : InvalidValue;
     }
 
-    void SetSection(uint32_t secIndex, SectionBuffer* pSection);
+    void setSection(uint32_t secIndex, SectionBuffer* pSection);
 
-    ElfSymbol* GetSymbol(const char* pSymbolName);
+    ElfSymbol* getSymbol(const char* pSymbolName);
 
-    ElfNote GetNote(Util::Abi::PipelineAbiNoteType noteType);
+    ElfNote getNote(Util::Abi::PipelineAbiNoteType noteType);
 
-    void SetNote(ElfNote* pNote);
+    void setNote(ElfNote* pNote);
 
-    Result GetSectionDataBySectionIndex(uint32_t secIdx, const SectionBuffer** ppSectionData) const;
+    Result getSectionDataBySectionIndex(uint32_t secIdx, const SectionBuffer** ppSectionData) const;
 
     void GetSymbolsBySectionIndex(uint32_t secIdx, std::vector<ElfSymbol*>& secSymbols);
 
-    void WriteToBuffer(ElfPackage* pElf);
+    void writeToBuffer(ElfPackage* pElf);
 
-    Result LinkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *pContext);
+    Result linkGraphicsRelocatableElf(const llvm::ArrayRef<ElfReader<Elf>*>& relocatableElfs, Context *pContext);
 
-    Result LinkComputeRelocatableElf(const ElfReader<Elf>& relocatableElf, Context* pContext);
+    Result linkComputeRelocatableElf(const ElfReader<Elf>& relocatableElf, Context* pContext);
 private:
     ElfWriter(const ElfWriter&) = delete;
     ElfWriter& operator=(const ElfWriter&) = delete;
 
-    static void MergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, uint32_t key);
+    static void mergeMapItem(llvm::msgpack::MapDocNode& destMap, llvm::msgpack::MapDocNode& srcMap, uint32_t key);
 
-    size_t GetRequiredBufferSizeBytes();
+    size_t getRequiredBufferSizeBytes();
 
-    void CalcSectionHeaderOffset();
+    void calcSectionHeaderOffset();
 
-    void AssembleNotes();
+    void assembleNotes();
 
-    void AssembleSymbols();
+    void assembleSymbols();
 
-    void Reinitialize();
+    void reinitialize();
 
     // -----------------------------------------------------------------------------------------------------------------
 

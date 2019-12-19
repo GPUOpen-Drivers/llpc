@@ -89,7 +89,7 @@ struct ShaderCacheAuxCreateInfo
     ShaderCacheMode        shaderCacheMode;    // Mode of shader cache
     GfxIpVersion           gfxIp;              // Graphics IP version info
     MetroHash::Hash        hash;               // Hash code of compilation options
-    const char*            pCacheFilePath;     // root directory of cache file
+    const char*            cacheFilePath;      // root directory of cache file
     const char*            pExecutableName;    // Name of executable file
 };
 

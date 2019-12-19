@@ -109,7 +109,7 @@ void Patch::AddPasses(
         passMgr.add(pReplayerPass);
     }
 
-    if (raw_ostream* pOuts = GetLgcOuts())
+    if (raw_ostream* pOuts = getLgcOuts())
     {
         passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"
@@ -229,7 +229,7 @@ void Patch::AddPasses(
     }
 
     // Dump the result
-    if (raw_ostream* pOuts = GetLgcOuts())
+    if (raw_ostream* pOuts = getLgcOuts())
     {
         passMgr.add(createPrintModulePass(*pOuts,
                     "===============================================================================\n"

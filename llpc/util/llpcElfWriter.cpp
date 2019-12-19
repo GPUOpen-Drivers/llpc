@@ -109,7 +109,7 @@ ElfWriter<Elf>::~ElfWriter()
 // =====================================================================================================================
 // Merge base section and input section into merged section
 template<class Elf>
-void ElfWriter<Elf>::MergeSection(
+void ElfWriter<Elf>::mergeSection(
     const SectionBuffer*    pSection1,          // [in] The first section buffer to merge
     size_t                  section1Size,       // Byte size of the first section
     const char*             pPrefixString1,     // [in] Prefix string of the first section's contents
@@ -210,7 +210,7 @@ public:
 // =====================================================================================================================
 // Merges the map item pair from source map to destination map for llvm::msgpack::MapDocNode.
 template<class Elf>
-void ElfWriter<Elf>::MergeMapItem(
+void ElfWriter<Elf>::mergeMapItem(
     llvm::msgpack::MapDocNode& destMap,    // [in,out] Destination map
     llvm::msgpack::MapDocNode& srcMap,     // [in] Source map
     uint32_t                    key)       // Key to check in source map
@@ -237,7 +237,7 @@ void ElfWriter<Elf>::MergeMapItem(
 // =====================================================================================================================
 // Merges fragment shader related info for meta notes.
 template<class Elf>
-void ElfWriter<Elf>::MergeMetaNote(
+void ElfWriter<Elf>::mergeMetaNote(
     Context*       pContext,       // [in] The first note section to merge
     const ElfNote* pNote1,         // [in] The second note section to merge (contain fragment shader info)
     const ElfNote* pNote2,         // [in] Note section contains fragment shader info
@@ -334,14 +334,14 @@ void ElfWriter<Elf>::MergeMetaNote(
 
     for (uint32_t regNumber : ArrayRef<uint32_t>(PsRegNumbers))
     {
-        MergeMapItem(destRegisters, srcRegisters, regNumber);
+        mergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
     const uint32_t mmSPI_PS_INPUT_CNTL_0 = 0xa191;
     const uint32_t mmSPI_PS_INPUT_CNTL_31 = 0xa1b0;
     for (uint32_t regNumber = mmSPI_PS_INPUT_CNTL_0; regNumber != mmSPI_PS_INPUT_CNTL_31 + 1; ++regNumber)
     {
-        MergeMapItem(destRegisters, srcRegisters, regNumber);
+        mergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
     const uint32_t mmSPI_SHADER_USER_DATA_PS_0 = 0x2c0c;
@@ -349,7 +349,7 @@ void ElfWriter<Elf>::MergeMetaNote(
     for (uint32_t regNumber = mmSPI_SHADER_USER_DATA_PS_0;
          regNumber != mmSPI_SHADER_USER_DATA_PS_0 + psUserDataCount; ++regNumber)
     {
-        MergeMapItem(destRegisters, srcRegisters, regNumber);
+        mergeMapItem(destRegisters, srcRegisters, regNumber);
     }
 
     std::string destBlob;
@@ -364,7 +364,7 @@ void ElfWriter<Elf>::MergeMetaNote(
 // =====================================================================================================================
 // Gets symbol according to symbol name, and creates a new one if it doesn't exist.
 template<class Elf>
-ElfSymbol* ElfWriter<Elf>::GetSymbol(
+ElfSymbol* ElfWriter<Elf>::getSymbol(
     const char* pSymbolName)   // [in] Symbol name
 {
     for (auto& symbol : m_symbols)
@@ -393,7 +393,7 @@ ElfSymbol* ElfWriter<Elf>::GetSymbol(
 // =====================================================================================================================
 // Gets note according to noteType.
 template<class Elf>
-ElfNote ElfWriter<Elf>::GetNote(
+ElfNote ElfWriter<Elf>::getNote(
     Util::Abi::PipelineAbiNoteType noteType)  // Note type
 {
     for (auto& note : m_notes)
@@ -411,7 +411,7 @@ ElfNote ElfWriter<Elf>::GetNote(
 // =====================================================================================================================
 // Replaces exist note with input note according to input note type.
 template<class Elf>
-void ElfWriter<Elf>::SetNote(
+void ElfWriter<Elf>::setNote(
     ElfNote* pNote)   // [in] Input note
 {
     for (auto& note : m_notes)
@@ -431,7 +431,7 @@ void ElfWriter<Elf>::SetNote(
 // =====================================================================================================================
 // Replace exist section with input section according to section index
 template<class Elf>
-void ElfWriter<Elf>::SetSection(
+void ElfWriter<Elf>::setSection(
     uint32_t          secIndex,   //  Section index
     SectionBuffer*    pSection)   // [in] Input section
 {
@@ -446,10 +446,10 @@ void ElfWriter<Elf>::SetSection(
 // =====================================================================================================================
 // Determines the size needed for a memory buffer to store this ELF.
 template<class Elf>
-size_t ElfWriter<Elf>::GetRequiredBufferSizeBytes()
+size_t ElfWriter<Elf>::getRequiredBufferSizeBytes()
 {
     // Update offsets and size values
-    CalcSectionHeaderOffset();
+    calcSectionHeaderOffset();
 
     size_t totalBytes = sizeof(typename Elf::FormatHeader);
 
@@ -468,7 +468,7 @@ size_t ElfWriter<Elf>::GetRequiredBufferSizeBytes()
 // =====================================================================================================================
 // Assembles ELF notes and add them to .note section
 template<class Elf>
-void ElfWriter<Elf>::AssembleNotes()
+void ElfWriter<Elf>::assembleNotes()
 {
     if (m_noteSecIdx == InvalidValue)
     {
@@ -507,7 +507,7 @@ void ElfWriter<Elf>::AssembleNotes()
 // =====================================================================================================================
 // Assembles ELF symbols and symbol info to .symtab section
 template<class Elf>
-void ElfWriter<Elf>::AssembleSymbols()
+void ElfWriter<Elf>::assembleSymbols()
 {
     if (m_symSecIdx == InvalidValue)
     {
@@ -590,7 +590,7 @@ void ElfWriter<Elf>::AssembleSymbols()
 // Determines the offset of the section header table by totaling the sizes of each binary chunk written to the ELF file,
 // accounting for alignment.
 template<class Elf>
-void ElfWriter<Elf>::CalcSectionHeaderOffset()
+void ElfWriter<Elf>::calcSectionHeaderOffset()
 {
     uint32_t sharedHdrOffset = 0;
 
@@ -616,16 +616,16 @@ void ElfWriter<Elf>::CalcSectionHeaderOffset()
 // Writes the data out to the given buffer in ELF format. Assumes the buffer has been pre-allocated with adequate
 // space, which can be determined with a call to "GetRequireBufferSizeBytes()".
 template<class Elf>
-void ElfWriter<Elf>::WriteToBuffer(
+void ElfWriter<Elf>::writeToBuffer(
     ElfPackage* pElf)   // [in] Output buffer to write ELF data
 {
     assert(pElf != nullptr);
 
     // Update offsets and size values
-    AssembleNotes();
-    AssembleSymbols();
+    assembleNotes();
+    assembleSymbols();
 
-    const size_t reqSize = GetRequiredBufferSizeBytes();
+    const size_t reqSize = getRequiredBufferSizeBytes();
     pElf->resize(reqSize);
     auto pData = pElf->data();
     memset(pData, 0, reqSize);
@@ -661,15 +661,15 @@ void ElfWriter<Elf>::WriteToBuffer(
 // =====================================================================================================================
 // Copies ELF content from a ElfReader.
 template<class Elf>
-Result ElfWriter<Elf>::CopyFromReader(
+Result ElfWriter<Elf>::copyFromReader(
     const ElfReader<Elf>& reader)   // The ElfReader to copy from.
 {
     Result result = Result::Success;
-    m_header = reader.GetHeader();
-    m_sections.resize(reader.GetSections().size());
-    for (size_t i = 0; i < reader.GetSections().size(); ++i)
+    m_header = reader.getHeader();
+    m_sections.resize(reader.getSections().size());
+    for (size_t i = 0; i < reader.getSections().size(); ++i)
     {
-        auto pSection = reader.GetSections()[i];
+        auto pSection = reader.getSections()[i];
         m_sections[i].secHead = pSection->secHead;
         m_sections[i].pName = pSection->pName;
         auto pData = new uint8_t[pSection->secHead.sh_size + 1];
@@ -678,7 +678,7 @@ Result ElfWriter<Elf>::CopyFromReader(
         m_sections[i].pData = pData;
     }
 
-    m_map = reader.GetMap();
+    m_map = reader.getMap();
     assert(m_header.e_phnum == 0);
 
     m_noteSecIdx = m_map[NoteName];
@@ -750,13 +750,13 @@ Result ElfWriter<Elf>::ReadFromBuffer(
     {
         return result;
     }
-    return CopyFromReader(reader);
+    return copyFromReader(reader);
 }
 
 // =====================================================================================================================
 // Gets section data by section index.
 template<class Elf>
-Result ElfWriter<Elf>::GetSectionDataBySectionIndex(
+Result ElfWriter<Elf>::getSectionDataBySectionIndex(
     uint32_t                 secIdx,          // Section index
     const SectionBuffer**    ppSectionData    // [out] Section data
     ) const
@@ -773,7 +773,7 @@ Result ElfWriter<Elf>::GetSectionDataBySectionIndex(
 // =====================================================================================================================
 // Update descriptor offset to USER_DATA in metaNote.
 template<class Elf>
-void ElfWriter<Elf>::UpdateMetaNote(
+void ElfWriter<Elf>::updateMetaNote(
     Context*       pContext,       // [in] context related to ElfNote
     const ElfNote* pNote,          // [in] Note section to update
     ElfNote*       pNewNote)       // [out] new note section
@@ -858,26 +858,26 @@ void ElfWriter<Elf>::GetSymbolsBySectionIndex(
 // =====================================================================================================================
 // Update descriptor root offset in ELF binary
 template<class Elf>
-void ElfWriter<Elf>::UpdateElfBinary(
+void ElfWriter<Elf>::updateElfBinary(
     Context*          pContext,        // [in] Pipeline context
     ElfPackage*       pPipelineElf)    // [out] Final ELF binary
 {
     // Merge PAL metadata
     ElfNote metaNote = {};
-    metaNote = GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    metaNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
 
     assert(metaNote.pData != nullptr);
     ElfNote newMetaNote = {};
-    UpdateMetaNote(pContext, &metaNote, &newMetaNote);
-    SetNote(&newMetaNote);
+    updateMetaNote(pContext, &metaNote, &newMetaNote);
+    setNote(&newMetaNote);
 
-    WriteToBuffer(pPipelineElf);
+    writeToBuffer(pPipelineElf);
 }
 
 // =====================================================================================================================
 // Merge ELF binary of fragment shader and ELF binary of non-fragment shaders into single ELF binary
 template<class Elf>
-void ElfWriter<Elf>::MergeElfBinary(
+void ElfWriter<Elf>::mergeElfBinary(
     Context*          pContext,        // [in] Pipeline context
     const BinaryData* pFragmentElf,    // [in] ELF binary of fragment shader
     ElfPackage*       pPipelineElf)    // [out] Final ELF binary
@@ -908,10 +908,10 @@ void ElfWriter<Elf>::MergeElfBinary(
 
     auto fragmentTextSecIndex = reader.GetSectionIndex(TextName);
     auto nonFragmentSecIndex = GetSectionIndex(TextName);
-    reader.GetSectionDataBySectionIndex(fragmentTextSecIndex, &pFragmentTextSection);
+    reader.getSectionDataBySectionIndex(fragmentTextSecIndex, &pFragmentTextSection);
     reader.GetSymbolsBySectionIndex(fragmentTextSecIndex, fragmentSymbols);
 
-    GetSectionDataBySectionIndex(nonFragmentSecIndex, &pNonFragmentTextSection);
+    getSectionDataBySectionIndex(nonFragmentSecIndex, &pNonFragmentTextSection);
     GetSymbolsBySectionIndex(nonFragmentSecIndex, nonFragmentSymbols);
     ElfSymbol* pFragmentIsaSymbol = nullptr;
     ElfSymbol* pNonFragmentIsaSymbol = nullptr;
@@ -953,14 +953,14 @@ void ElfWriter<Elf>::MergeElfBinary(
             // Modify ISA code
             pFragmentIsaSymbol = &fragmentSymbol;
             ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
-            MergeSection(pNonFragmentTextSection,
+            mergeSection(pNonFragmentTextSection,
                                 isaOffset,
                                 nullptr,
                                 pFragmentTextSection,
                                 pFragmentIsaSymbol->value,
                                 nullptr,
                                 &newSection);
-            SetSection(nonFragmentSecIndex, &newSection);
+            setSection(nonFragmentSecIndex, &newSection);
         }
 
         if (pFragmentIsaSymbol == nullptr)
@@ -970,7 +970,7 @@ void ElfWriter<Elf>::MergeElfBinary(
 
         // Update fragment shader related symbols
         ElfSymbol* pSymbol = nullptr;
-        pSymbol = GetSymbol(fragmentSymbol.pSymName);
+        pSymbol = getSymbol(fragmentSymbol.pSymName);
         pSymbol->secIdx = nonFragmentSecIndex;
         pSymbol->pSecName = nullptr;
         pSymbol->value = isaOffset + fragmentSymbol.value - pFragmentIsaSymbol->value;
@@ -978,10 +978,10 @@ void ElfWriter<Elf>::MergeElfBinary(
     }
 
     // LLPC doesn't use per pipeline internal table, and LLVM backend doesn't add symbols for disassembly info.
-    assert((reader.IsValidSymbol(FragmentIntrlTblSymbolName) == false) &&
-                (reader.IsValidSymbol(FragmentDisassemblySymbolName) == false) &&
-                (reader.IsValidSymbol(FragmentIntrlDataSymbolName) == false) &&
-                (reader.IsValidSymbol(FragmentAmdIlSymbolName) == false));
+    assert((reader.isValidSymbol(FragmentIntrlTblSymbolName) == false) &&
+                (reader.isValidSymbol(FragmentDisassemblySymbolName) == false) &&
+                (reader.isValidSymbol(FragmentIntrlDataSymbolName) == false) &&
+                (reader.isValidSymbol(FragmentAmdIlSymbolName) == false));
     (void(FragmentIntrlTblSymbolName)); // unused
     (void(FragmentDisassemblySymbolName)); // unused
     (void(FragmentIntrlDataSymbolName)); // unused
@@ -992,8 +992,8 @@ void ElfWriter<Elf>::MergeElfBinary(
     auto nonFragmentDisassemblySecIndex = GetSectionIndex(Util::Abi::AmdGpuDisassemblyName);
     ElfSectionBuffer<Elf64::SectionHeader>* pFragmentDisassemblySection = nullptr;
     const ElfSectionBuffer<Elf64::SectionHeader>* pNonFragmentDisassemblySection = nullptr;
-    reader.GetSectionDataBySectionIndex(fragmentDisassemblySecIndex, &pFragmentDisassemblySection);
-    GetSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &pNonFragmentDisassemblySection);
+    reader.getSectionDataBySectionIndex(fragmentDisassemblySecIndex, &pFragmentDisassemblySection);
+    getSectionDataBySectionIndex(nonFragmentDisassemblySecIndex, &pNonFragmentDisassemblySection);
     if (pNonFragmentDisassemblySection != nullptr)
     {
         assert(pFragmentDisassemblySection != nullptr);
@@ -1020,14 +1020,14 @@ void ElfWriter<Elf>::MergeElfBinary(
                               pDisassemblyEnd - reinterpret_cast<const char*>(pNonFragmentDisassemblySection->pData);
 
         ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
-        MergeSection(pNonFragmentDisassemblySection,
+        mergeSection(pNonFragmentDisassemblySection,
                      disassemblySize,
                      firstIsaSymbolName.c_str(),
                      pFragmentDisassemblySection,
                      fragmentDisassemblyOffset,
                      FragmentIsaSymbolName,
                      &newSection);
-        SetSection(nonFragmentDisassemblySecIndex, &newSection);
+        setSection(nonFragmentDisassemblySecIndex, &newSection);
     }
 
     // Merge LLVM IR disassemble
@@ -1037,8 +1037,8 @@ void ElfWriter<Elf>::MergeElfBinary(
 
     auto fragmentLlvmIrSecIndex = reader.GetSectionIndex(LlvmIrSectionName.c_str());
     auto nonFragmentLlvmIrSecIndex = GetSectionIndex(LlvmIrSectionName.c_str());
-    reader.GetSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &pFragmentLlvmIrSection);
-    GetSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &pNonFragmentLlvmIrSection);
+    reader.getSectionDataBySectionIndex(fragmentLlvmIrSecIndex, &pFragmentLlvmIrSection);
+    getSectionDataBySectionIndex(nonFragmentLlvmIrSecIndex, &pNonFragmentLlvmIrSection);
 
     if (pNonFragmentLlvmIrSection != nullptr)
     {
@@ -1067,34 +1067,34 @@ void ElfWriter<Elf>::MergeElfBinary(
                           pLlvmIrEnd - reinterpret_cast<const char*>(pNonFragmentLlvmIrSection->pData);
 
         ElfSectionBuffer<Elf64::SectionHeader> newSection = {};
-        MergeSection(pNonFragmentLlvmIrSection,
+        mergeSection(pNonFragmentLlvmIrSection,
                      llvmIrSize,
                      firstIsaSymbolName.c_str(),
                      pFragmentLlvmIrSection,
                      fragmentLlvmIrOffset,
                      FragmentIsaSymbolName,
                      &newSection);
-        SetSection(nonFragmentLlvmIrSecIndex, &newSection);
+        setSection(nonFragmentLlvmIrSecIndex, &newSection);
     }
 
     // Merge PAL metadata
     ElfNote nonFragmentMetaNote = {};
-    nonFragmentMetaNote = GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    nonFragmentMetaNote = getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
 
     assert(nonFragmentMetaNote.pData != nullptr);
     ElfNote fragmentMetaNote = {};
     ElfNote newMetaNote = {};
-    fragmentMetaNote = reader.GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-    MergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
-    SetNote(&newMetaNote);
+    fragmentMetaNote = reader.getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    mergeMetaNote(pContext, &nonFragmentMetaNote, &fragmentMetaNote, &newMetaNote);
+    setNote(&newMetaNote);
 
-    WriteToBuffer(pPipelineElf);
+    writeToBuffer(pPipelineElf);
 }
 
 // =====================================================================================================================
 // Reset the contents to an empty ELF file.
 template<class Elf>
-void ElfWriter<Elf>::Reinitialize()
+void ElfWriter<Elf>::reinitialize()
 {
     m_map.clear();
     m_notes.clear();
@@ -1122,24 +1122,24 @@ void ElfWriter<Elf>::Reinitialize()
 // =====================================================================================================================
 // Link the relocatable ELF readers into a pipeline ELF.
 template<class Elf>
-Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
+Result ElfWriter<Elf>::linkGraphicsRelocatableElf(
     const ArrayRef<ElfReader<Elf>*>& relocatableElfs, // An array of relocatable ELF objects
     Context* pContext)                                // [in] Acquired context
 {
-    Reinitialize();
+    reinitialize();
     assert(relocatableElfs.size() == 2 && "Can only handle VsPs Shaders for now.");
 
     // Get the main data for the header, the parts that change will be updated when writing to buffer.
-    m_header = relocatableElfs[0]->GetHeader();
+    m_header = relocatableElfs[0]->getHeader();
 
     // Copy the contents of the string table
     ElfSectionBuffer<typename Elf::SectionHeader>* pStringTable1 = nullptr;
-    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->GetStrtabSecIdx(), &pStringTable1);
+    relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getStrtabSecIdx(), &pStringTable1);
 
     ElfSectionBuffer<typename Elf::SectionHeader>* pStringTable2 = nullptr;
-    relocatableElfs[1]->GetSectionDataBySectionIndex(relocatableElfs[1]->GetStrtabSecIdx(), &pStringTable2);
+    relocatableElfs[1]->getSectionDataBySectionIndex(relocatableElfs[1]->getStrtabSecIdx(), &pStringTable2);
 
-    MergeSection(pStringTable1,
+    mergeSection(pStringTable1,
                  pStringTable1->secHead.sh_size,
                  nullptr,
                  pStringTable2,
@@ -1149,11 +1149,11 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
 
     // Merge text sections
     ElfSectionBuffer<typename Elf::SectionHeader>* pTextSection1 = nullptr;
-    relocatableElfs[0]->GetTextSectionData(&pTextSection1);
+    relocatableElfs[0]->getTextSectionData(&pTextSection1);
     ElfSectionBuffer<typename Elf::SectionHeader> *pTextSection2 = nullptr;
-    relocatableElfs[1]->GetTextSectionData(&pTextSection2);
+    relocatableElfs[1]->getTextSectionData(&pTextSection2);
 
-    MergeSection(pTextSection1,
+    mergeSection(pTextSection1,
                  alignTo(pTextSection1->secHead.sh_size, 0x100),
                  nullptr,
                  pTextSection2,
@@ -1163,7 +1163,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
 
     // Build the symbol table.  First set the symbol table section header.
     ElfSectionBuffer<typename Elf::SectionHeader>* pSymbolTableSection = nullptr;
-    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->GetSymSecIdx(), &pSymbolTableSection);
+    relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->getSymSecIdx(), &pSymbolTableSection);
     m_sections[m_symSecIdx].secHead = pSymbolTableSection->secHead;
 
     // Now get the symbols that belong in the symbol table.
@@ -1177,7 +1177,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
         {
             // When relocations start being used, we will have to filter out symbols related to relocations.
             // We should be able to filter the BB* symbols as well.
-            ElfSymbol *pNewSym = GetSymbol(sym.pSymName);
+            ElfSymbol *pNewSym = getSymbol(sym.pSymName);
             pNewSym->secIdx = m_textSecIdx;
             pNewSym->pSecName = nullptr;
             pNewSym->value = sym.value + offset;
@@ -1187,7 +1187,7 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
 
         // Update the offset for the next elf file.
         ElfSectionBuffer<typename Elf::SectionHeader>* pTextSection = nullptr;
-        pElf->GetSectionDataBySectionIndex(relocElfTextSectionId, &pTextSection);
+        pElf->getSectionDataBySectionIndex(relocElfTextSectionId, &pTextSection);
         offset += alignTo(pTextSection->secHead.sh_size, 0x100);
     }
 
@@ -1196,15 +1196,15 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
 
     // Set the .note section header
     ElfSectionBuffer<typename Elf::SectionHeader>* pNoteSection = nullptr;
-    relocatableElfs[0]->GetSectionDataBySectionIndex(relocatableElfs[0]->GetSectionIndex(NoteName), &pNoteSection);
+    relocatableElfs[0]->getSectionDataBySectionIndex(relocatableElfs[0]->GetSectionIndex(NoteName), &pNoteSection);
     m_sections[m_noteSecIdx].secHead = pNoteSection->secHead;
 
     // Merge and update the .note data
     // The merged note info will be updated using data in the pipeline create info, but nothing needs to be done yet.
-    ElfNote noteInfo1 = relocatableElfs[0]->GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
-    ElfNote noteInfo2 = relocatableElfs[1]->GetNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    ElfNote noteInfo1 = relocatableElfs[0]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
+    ElfNote noteInfo2 = relocatableElfs[1]->getNote(Util::Abi::PipelineAbiNoteType::PalMetadata);
     m_notes.push_back({});
-    MergeMetaNote(pContext, &noteInfo1, &noteInfo2, &m_notes.back());
+    mergeMetaNote(pContext, &noteInfo1, &noteInfo2, &m_notes.back());
 
     // Merge other sections.  For now, none of the other sections are important, so we will not do anything.
 
@@ -1214,12 +1214,12 @@ Result ElfWriter<Elf>::LinkGraphicsRelocatableElf(
 // =====================================================================================================================
 // Link the compute shader relocatable ELF reader into a pipeline ELF.
 template<class Elf>
-Result ElfWriter<Elf>::LinkComputeRelocatableElf(
+Result ElfWriter<Elf>::linkComputeRelocatableElf(
     const ElfReader<Elf>& relocatableElf,   // [in] Relocatable compute shader elf
     Context* pContext)                      // [in] Acquired context
 {
     // Currently nothing to do, just copy the elf.
-    CopyFromReader(relocatableElf);
+    copyFromReader(relocatableElf);
 
     // Apply relocations
     // There are no relocations to apply yet.

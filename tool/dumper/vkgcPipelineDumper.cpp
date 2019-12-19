@@ -1346,14 +1346,14 @@ OStream& operator<<(
     OStream&          out,      // [out] Output stream
     ElfReader<Elf>&   reader)   // [in] ELF object
 {
-    uint32_t sectionCount = reader.GetSectionCount();
+    uint32_t sectionCount = reader.getSectionCount();
     char formatBuf[256];
 
     for (uint32_t sortIdx = 0; sortIdx < sectionCount; ++sortIdx)
     {
         typename ElfReader<Elf>::SectionBuffer* pSection = nullptr;
         uint32_t secIdx = 0;
-        Result result = reader.GetSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
+        Result result = reader.getSectionDataBySortingIndex(sortIdx, &secIdx, &pSection);
         assert(result == Result::Success);
         (void(result)); // unused
         if ((strcmp(pSection->pName, ShStrTabName) == 0) ||
@@ -1406,12 +1406,12 @@ OStream& operator<<(
                         << pNode->name << "  size = " << pNode->descSize << ")\n";
 
                     auto pBuffer = pSection->pData + offset + noteHeaderSize + noteNameSize;
-                    reader.InitMsgPackDocument(pBuffer, pNode->descSize);
+                    reader.initMsgPackDocument(pBuffer, pNode->descSize);
 
                     do
                     {
-                        auto pNode = reader.GetMsgNode();
-                        auto msgIterStatus = reader.GetMsgIteratorStatus();
+                        auto pNode = reader.getMsgNode();
+                        auto msgIterStatus = reader.getMsgIteratorStatus();
                         switch (pNode->getKind())
                         {
                         case msgpack::Type::Int:
@@ -1470,7 +1470,7 @@ OStream& operator<<(
                                 if (msgIterStatus == MsgPackIteratorMapPair)
                                 {
                                     out << "\n";
-                                        for (uint32_t i = 0; i < reader.GetMsgMapLevel(); ++i)
+                                        for (uint32_t i = 0; i < reader.getMsgMapLevel(); ++i)
                                         {
                                             out << "    ";
                                         }
@@ -1506,7 +1506,7 @@ OStream& operator<<(
                             }
                         }
 
-                    } while (reader.GetNextMsgNode());
+                    } while (reader.getNextMsgNode());
                     out << "\n";
                     break;
                 }
@@ -1538,13 +1538,13 @@ OStream& operator<<(
         {
             // Output .reloc section
             out << pSection->pName << " (size = " << pSection->secHead.sh_size << " bytes)\n";
-            const uint32_t relocCount = reader.GetRelocationCount();
+            const uint32_t relocCount = reader.getRelocationCount();
             for (uint32_t i = 0; i < relocCount; ++i)
             {
                 ElfReloc reloc = {};
-                reader.GetRelocation(i, &reloc);
+                reader.getRelocation(i, &reloc);
                 ElfSymbol elfSym = {};
-                reader.GetSymbol(reloc.symIdx, &elfSym);
+                reader.getSymbol(reloc.symIdx, &elfSym);
                 auto length = snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
                 (void(length)); // unused
                 out << "#" << i << "    " << formatBuf

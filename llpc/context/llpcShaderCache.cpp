@@ -323,7 +323,7 @@ Result ShaderCache::Init(
             // Build the cache file name and make required directories if necessary
             // cacheFileValid gets initially set based on whether the file exists.
             result = BuildFileName(pAuxCreateInfo->pExecutableName,
-                                   pAuxCreateInfo->pCacheFilePath,
+                                   pAuxCreateInfo->cacheFilePath,
                                    pAuxCreateInfo->gfxIp,
                                    &cacheFileExists);
 
