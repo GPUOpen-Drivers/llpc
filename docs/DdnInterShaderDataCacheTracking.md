@@ -17,7 +17,6 @@ obtained from other shaders must be taken into account. There are essentially tw
 There are various trade-offs between these two approaches. In LLPC, we choose the second one and implement it as
 described in this note.
 
-
 Historical Background
 ---------------------
 
@@ -33,7 +32,6 @@ This approach has two downsides:
   2. Knowledge about what kind of full pipeline optimizations are applied, including some of their details, is
      centralized in `PatchCheckShaderCache`. This limits the design's extensibility.
 
-
 Implementation overview
 -----------------------
 
@@ -42,7 +40,6 @@ This metadata node is initialized with the relevant input shader hash.
 Every pass that performs inter-shader transforms updates the metadata by hashing the old hash together with any data
 that is relevant from other shaders, i.e. it computes `h_new = h(h_old | inter-shader data)`.
 The metadata node is finally inspected in the `PatchCheckShaderCache` pass.
-
 
 Extensible specialized metadata
 -------------------------------
